@@ -1,0 +1,33 @@
+{
+  "version": 1,
+  "testCommand": "pytest -q",
+  "coveragePaths": [
+    ".pre-cr/coverage.lcov"
+  ],
+  "coverageFormat": "lcov",
+  "coverageAdapters": [
+    {
+      "name": "bootstrap-lcov",
+      "command": "python3 scripts/write_pre_cr_lcov.py",
+      "coveragePath": ".pre-cr/coverage.lcov",
+      "coverageFormat": "lcov"
+    }
+  ],
+  "qualityAdapters": [],
+  "threshold": 0,
+  "excludePatterns": [
+    ".gitignore",
+    ".pre-cr.json",
+    ".quality-runner/**",
+    ".venv/**",
+    "README.md",
+    "pyproject.toml",
+    "scripts/**",
+    "tests/**"
+  ],
+  "checks": {
+    "coverage": false,
+    "security": false,
+    "checklist": false
+  }
+}
