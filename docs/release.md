@@ -23,17 +23,20 @@ workflow when a `v*.*.*` tag is pushed.
 ### Trusted Publisher Settings
 
 The release workflow uses GitHub OIDC and does not require a PyPI API token.
-Configure the PyPI project publisher with:
+Because `quality-runner` does not exist on PyPI yet, create a pending publisher
+from the PyPI account publishing page. Configure the pending GitHub publisher
+with:
 
+- PyPI project name: `quality-runner`
 - Owner: `jakyeamos`
 - Repository name: `quality-runner`
 - Workflow filename: `release.yml`
-- Environment name: leave blank unless the workflow later adds a protected
-  publish environment
+- Environment name: `pypi`
 
 The `v0.1.0` release run reached the publish step on 2026-06-28 and failed with
 `invalid-publisher`, which means PyPI did not have a matching trusted publisher
-for those claims yet.
+for those claims yet. After adding the pending publisher, rerun the release
+workflow or repush the version tag.
 
 ## Homebrew
 
