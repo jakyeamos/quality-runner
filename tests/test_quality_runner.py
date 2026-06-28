@@ -36,19 +36,38 @@ def test_module_entrypoint_exits_successfully() -> None:
     assert "Quality Runner" in result.stdout
 
 
-def test_scaffold_entrypoint_functions_import_and_return_success() -> None:
-    code = (
-        "import sys; "
-        f"sys.path.insert(0, {str(ROOT)!r}); "
-        "from quality_runner.cli import main as cli_main; "
-        "from quality_runner.mcp import main as mcp_main; "
-        "print(cli_main(['--version']), mcp_main())"
-    )
+def test_module_entrypoint_version_exits_successfully() -> None:
     result = subprocess.run(
-        [sys.executable, "-c", code],
+        [sys.executable, "-m", "quality_runner", "--version"],
+        cwd=ROOT,
         check=True,
         capture_output=True,
         text=True,
     )
 
-    assert result.stdout.splitlines()[-1] == "0 0"
+    assert result.stdout.strip() == "0.1.0"
+
+
+def test_module_entrypoint_fails_closed_for_pending_commands() -> None:
+    result = subprocess.run(
+        [sys.executable, "-m", "quality_runner", "audit", "/tmp", "--json"],
+        cwd=ROOT,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 2
+    assert "not implemented" in result.stderr
+
+
+def test_scaffold_entrypoint_functions_import_and_return_success() -> None:
+    sys.path.insert(0, str(ROOT))
+
+    from quality_runner.cli import main as cli_main
+    from quality_runner.mcp import main as mcp_main
+
+    assert cli_main(["--version"]) == 0
+    assert cli_main(["audit"]) == 2
+    assert mcp_main(["--version"]) == 0
+    assert mcp_main() == 2

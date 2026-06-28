@@ -11,6 +11,13 @@ def main(argv: list[str] | None = None) -> int:
         print(__version__)
         return 0
 
+    if args:
+        print(
+            "quality-runner scaffold: command not implemented: " + " ".join(args),
+            file=sys.stderr,
+        )
+        return 2
+
     print(f"Quality Runner {__version__}")
     print("Scaffold CLI is ready; command implementations are pending.")
     return 0
