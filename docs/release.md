@@ -20,6 +20,21 @@ workflow when a `v*.*.*` tag is pushed.
    - `quality-runner --version`
    - `quality-runner doctor --json`
 
+### Trusted Publisher Settings
+
+The release workflow uses GitHub OIDC and does not require a PyPI API token.
+Configure the PyPI project publisher with:
+
+- Owner: `jakyeamos`
+- Repository name: `quality-runner`
+- Workflow filename: `release.yml`
+- Environment name: leave blank unless the workflow later adds a protected
+  publish environment
+
+The `v0.1.0` release run reached the publish step on 2026-06-28 and failed with
+`invalid-publisher`, which means PyPI did not have a matching trusted publisher
+for those claims yet.
+
 ## Homebrew
 
 Use `packaging/homebrew/quality-runner.rb` as the initial formula template after
