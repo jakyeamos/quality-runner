@@ -16,6 +16,7 @@
     "CHANGELOG.md",
     "CONTRIBUTING.md",
     "docs/**",
+    "fixtures/**",
     "LICENSE",
     "README.md",
     "SECURITY.md",

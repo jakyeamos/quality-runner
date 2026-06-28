@@ -1,0 +1,14 @@
+{
+  "packageManager": "pnpm@10.0.0",
+  "scripts": {
+    "format": "prettier --check .",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "build": "vite build",
+    "dead-code": "knip",
+    "smoke": "playwright test smoke",
+    "pre-pr": "pre-cr",
+    "pre-cr": "pre-cr"
+  }
+}
