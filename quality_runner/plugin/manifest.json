@@ -1,0 +1,27 @@
+{
+  "schema": "quality-runner-plugin-manifest-v0.1",
+  "name": "quality-runner",
+  "version": "0.1.0",
+  "description": "Standalone audit-and-plan quality orchestration for repositories.",
+  "commands": {
+    "inspect": {
+      "command": "quality-runner",
+      "args": ["inspect"]
+    },
+    "run": {
+      "command": "quality-runner",
+      "args": ["run"]
+    }
+  },
+  "mcp": {
+    "command": "quality-runner-mcp",
+    "tools": [
+      "quality_runner_doctor",
+      "quality_runner_inspect_repo",
+      "quality_runner_run",
+      "quality_runner_status",
+      "quality_runner_export_handoff"
+    ]
+  },
+  "skill": "SKILL.md"
+}

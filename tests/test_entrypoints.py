@@ -64,7 +64,7 @@ def test_module_entrypoint_rejects_unknown_commands() -> None:
     assert "invalid choice: 'audit'" in result.stderr
 
 
-def test_scaffold_entrypoint_functions_import_and_return_success() -> None:
+def test_scaffold_entrypoint_functions_import_and_return_success(monkeypatch) -> None:
     sys.path.insert(0, str(ROOT))
 
     from quality_runner.cli import main as cli_main
@@ -73,7 +73,8 @@ def test_scaffold_entrypoint_functions_import_and_return_success() -> None:
     assert cli_main(["--version"]) == 0
     assert cli_main(["audit"]) == 2
     assert mcp_main(["--version"]) == 0
-    assert mcp_main() == 2
+    monkeypatch.setattr("sys.stdin", iter([]))
+    assert mcp_main([]) == 0
 
 
 def test_packaged_console_script_invokes_cli(tmp_path: Path) -> None:
@@ -109,6 +110,9 @@ def test_packaged_console_script_invokes_cli(tmp_path: Path) -> None:
         wheel_names = wheel.namelist()
         entry_points = wheel.read("quality_runner-0.1.0.dist-info/entry_points.txt").decode()
     assert "quality-runner = quality_runner.cli:main" in entry_points
+    assert "quality-runner-mcp = quality_runner.mcp:main" in entry_points
+    assert "quality_runner/plugin/manifest.json" in wheel_names
+    assert "quality_runner/plugin/SKILL.md" in wheel_names
     assert not any(name.startswith("test_support/") for name in wheel_names)
 
     venv_dir = tmp_path / "venv"
