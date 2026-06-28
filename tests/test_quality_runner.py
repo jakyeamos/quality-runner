@@ -223,6 +223,7 @@ def _write_js_fixture(repo: Path) -> None:
         "Always use pnpm. Full lint, typecheck, tests, and dead-code scans are required.\n",
         encoding="utf-8",
     )
+    (repo / "pnpm-lock.yaml").write_text("lockfileVersion: '9.0'\n", encoding="utf-8")
     (repo / ".pre-cr.json").write_text("{}", encoding="utf-8")
     (repo / ".tracker").mkdir()
     (repo / ".tracker" / "PROJECT_TRUTH.md").write_text(
@@ -246,6 +247,20 @@ def test_inspect_repo_detects_js_quality_surfaces(tmp_path: Path) -> None:
     assert scan["truth_file"] == ".tracker/PROJECT_TRUTH.md"
 
 
+def test_inspect_repo_does_not_infer_package_manager_from_policy_text(tmp_path: Path) -> None:
+    from quality_runner.discovery import inspect_repo
+
+    (tmp_path / "package.json").write_text(
+        json.dumps({"scripts": {"test": "vitest run"}}),
+        encoding="utf-8",
+    )
+    (tmp_path / "AGENTS.md").write_text("Always use pnpm.\n", encoding="utf-8")
+
+    scan = inspect_repo(tmp_path, run_id="policy-only-001")
+
+    assert scan["package_manager"] == "npm"
+
+
 def test_inspect_repo_warns_on_invalid_package_json(tmp_path: Path) -> None:
     from quality_runner.discovery import inspect_repo
 
@@ -261,6 +276,26 @@ def test_inspect_repo_warns_on_invalid_package_json(tmp_path: Path) -> None:
             "path": "package.json",
         }
     ]
+
+
+def test_package_json_warnings_propagate_to_standards_and_capabilities(tmp_path: Path) -> None:
+    from quality_runner.capabilities import detect_capabilities
+    from quality_runner.discovery import inspect_repo
+    from quality_runner.standards import compile_standards
+
+    (tmp_path / "package.json").write_text("{not-json", encoding="utf-8")
+
+    scan = inspect_repo(tmp_path, run_id="invalid-package-002")
+    packet = compile_standards(repo_root=tmp_path, scan=scan, profile="jakyeamos")
+    capability_map = detect_capabilities(scan=scan, standards_packet=packet)
+
+    expected_warning = {
+        "code": "invalid_package_json",
+        "message": "package.json could not be parsed as JSON",
+        "path": "package.json",
+    }
+    assert expected_warning in packet["warnings"]
+    assert expected_warning in capability_map["warnings"]
 
 
 def test_inspect_repo_expands_home_before_validating(
@@ -338,6 +373,24 @@ def test_compile_standards_rejects_unsupported_profiles(tmp_path: Path) -> None:
         raise AssertionError("compile_standards accepted an unsupported profile")
 
 
+def test_compile_standards_handles_malformed_package_manager() -> None:
+    from quality_runner.standards import compile_standards
+
+    packet = compile_standards(
+        repo_root=Path("/tmp"),
+        scan={"package_manager": []},
+        profile="jakyeamos",
+    )
+
+    assert {
+        "code": "invalid_package_manager",
+        "message": "scan package_manager must be a string or null",
+        "path": "package_manager",
+    } in packet["warnings"]
+    requirement_ids = {requirement["id"] for requirement in packet["requirements"]}
+    assert "package_manager_mismatch" in requirement_ids
+
+
 def test_detect_capabilities_records_missing_expected_surfaces(tmp_path: Path) -> None:
     from quality_runner.capabilities import detect_capabilities
     from quality_runner.discovery import inspect_repo
@@ -374,6 +427,27 @@ def test_detect_capabilities_records_pre_cr_script_with_stable_id(tmp_path: Path
     assert "pre_cr" in available_ids
     assert "pre_cr" not in missing_ids
     assert "pre_pr" in missing_ids
+
+
+def test_detect_capabilities_records_pre_cr_config_with_stable_id(tmp_path: Path) -> None:
+    from quality_runner.capabilities import detect_capabilities
+    from quality_runner.discovery import inspect_repo
+    from quality_runner.standards import compile_standards
+
+    (tmp_path / "package.json").write_text(
+        json.dumps({"scripts": {"test": "vitest run"}}),
+        encoding="utf-8",
+    )
+    (tmp_path / ".pre-cr.json").write_text("{}", encoding="utf-8")
+    scan = inspect_repo(tmp_path, run_id="pre-cr-config-001")
+    packet = compile_standards(repo_root=tmp_path, scan=scan, profile="jakyeamos")
+
+    capability_map = detect_capabilities(scan=scan, standards_packet=packet)
+
+    available_ids = {item["id"] for item in capability_map["available"]}
+    missing_ids = {item["id"] for item in capability_map["missing"]}
+    assert "pre_cr" in available_ids
+    assert "pre_cr" not in missing_ids
 
 
 def test_detect_capabilities_treats_malformed_scripts_as_missing() -> None:

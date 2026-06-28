@@ -11,12 +11,16 @@ def compile_standards(repo_root: Path, scan: dict[str, Any], profile: str) -> di
     if profile not in SUPPORTED_PROFILES:
         raise ValueError(f"unsupported standards profile: {profile}")
 
+    warnings = _warnings(scan)
+    package_manager = _package_manager(scan, warnings)
+
     return {
         "schema": STANDARDS_PACKET_SCHEMA,
         "profile": profile,
         "repo_root": str(repo_root.expanduser().resolve()),
         "sources": _sources(scan, profile),
-        "requirements": _requirements(scan),
+        "requirements": _requirements(package_manager),
+        "warnings": warnings,
     }
 
 
@@ -36,7 +40,7 @@ def _sources(scan: dict[str, Any], profile: str) -> list[dict[str, str]]:
     return sources
 
 
-def _requirements(scan: dict[str, Any]) -> list[dict[str, Any]]:
+def _requirements(package_manager: str | None) -> list[dict[str, Any]]:
     requirements: list[dict[str, Any]] = [
         {
             "id": "use_pnpm",
@@ -60,7 +64,7 @@ def _requirements(scan: dict[str, Any]) -> list[dict[str, Any]]:
         },
     ]
 
-    if scan.get("package_manager") not in {"pnpm", None}:
+    if package_manager not in {"pnpm", None}:
         requirements.append(
             {
                 "id": "package_manager_mismatch",
@@ -70,3 +74,37 @@ def _requirements(scan: dict[str, Any]) -> list[dict[str, Any]]:
         )
 
     return requirements
+
+
+def _warnings(scan: dict[str, Any]) -> list[dict[str, str]]:
+    warnings = scan.get("warnings")
+    if not isinstance(warnings, list):
+        return []
+
+    normalized: list[dict[str, str]] = []
+    for warning in warnings:
+        if not isinstance(warning, dict):
+            continue
+        code = warning.get("code")
+        message = warning.get("message")
+        path = warning.get("path")
+        if isinstance(code, str) and isinstance(message, str) and isinstance(path, str):
+            normalized.append({"code": code, "message": message, "path": path})
+    return normalized
+
+
+def _package_manager(scan: dict[str, Any], warnings: list[dict[str, str]]) -> str | None:
+    package_manager = scan.get("package_manager")
+    if package_manager is None:
+        return None
+    if isinstance(package_manager, str):
+        return package_manager
+
+    warnings.append(
+        {
+            "code": "invalid_package_manager",
+            "message": "scan package_manager must be a string or null",
+            "path": "package_manager",
+        }
+    )
+    return "unknown"

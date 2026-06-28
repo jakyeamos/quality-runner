@@ -18,7 +18,7 @@ def inspect_repo(repo_root: Path, run_id: str) -> dict[str, Any]:
         "run_id": run_id,
         "repo_root": str(root),
         "is_git_repo": (root / ".git").exists(),
-        "package_manager": _detect_package_manager(root, package_json, agent_instruction_files),
+        "package_manager": _detect_package_manager(root, package_json),
         "languages": _detect_languages(root, package_json),
         "scripts": scripts,
         "agent_instruction_files": agent_instruction_files,
@@ -86,7 +86,6 @@ def _agent_instruction_files(root: Path) -> list[str]:
 def _detect_package_manager(
     root: Path,
     package_json: dict[str, Any],
-    agent_instruction_files: list[str],
 ) -> str | None:
     package_manager = package_json.get("packageManager")
     if isinstance(package_manager, str) and package_manager:
@@ -102,15 +101,6 @@ def _detect_package_manager(
     for lockfile, manager in lockfile_managers:
         if (root / lockfile).exists():
             return manager
-
-    for instruction_file in agent_instruction_files:
-        text = _read_text(root / instruction_file).lower()
-        if "pnpm" in text:
-            return "pnpm"
-        if "yarn" in text:
-            return "yarn"
-        if "npm" in text:
-            return "npm"
 
     if package_json:
         return "npm"
