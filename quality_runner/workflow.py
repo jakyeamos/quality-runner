@@ -6,15 +6,18 @@ from typing import Any
 from uuid import uuid4
 
 from quality_runner.artifacts import prepare_artifact_dir, write_json, write_text
-from quality_runner.audit import build_audit_report, render_audit_markdown
+from quality_runner.audit import build_audit_report
 from quality_runner.capabilities import detect_capabilities
 from quality_runner.discovery import inspect_repo
-from quality_runner.findings import validate_audit_report, validate_remediation_plan
+from quality_runner.findings import (
+    validate_agent_handoff,
+    validate_audit_report,
+    validate_remediation_plan,
+)
 from quality_runner.planning import (
     build_agent_handoff,
     build_remediation_plan,
     render_handoff_markdown,
-    render_plan_markdown,
 )
 from quality_runner.standards import compile_standards
 
@@ -34,10 +37,10 @@ def inspect_payload(
 
     artifact_paths = {
         "repo_scan_json": str(write_json(run_dir / "repo-scan.json", scan)),
-        "standards_packet_json": str(
-            write_json(run_dir / "standards-packet.json", standards_packet)
+        "standards_json": str(write_json(run_dir / "standards.json", standards_packet)),
+        "capability_matrix_json": str(
+            write_json(run_dir / "capability-matrix.json", capability_map)
         ),
-        "capability_map_json": str(write_json(run_dir / "capability-map.json", capability_map)),
     }
 
     return {
@@ -73,12 +76,10 @@ def run_payload(
 
     artifact_paths = {
         "repo_scan_json": str(run_dir / "repo-scan.json"),
-        "standards_packet_json": str(run_dir / "standards-packet.json"),
-        "capability_map_json": str(run_dir / "capability-map.json"),
-        "audit_report_json": str(run_dir / "audit-report.json"),
-        "audit_report_md": str(run_dir / "audit-report.md"),
+        "standards_json": str(run_dir / "standards.json"),
+        "capability_matrix_json": str(run_dir / "capability-matrix.json"),
+        "quality_audit_json": str(run_dir / "quality-audit.json"),
         "remediation_plan_json": str(run_dir / "remediation-plan.json"),
-        "remediation_plan_md": str(run_dir / "remediation-plan.md"),
         "agent_handoff_json": str(run_dir / "agent-handoff.json"),
         "agent_handoff_md": str(run_dir / "agent-handoff.md"),
     }
@@ -87,25 +88,18 @@ def run_payload(
         remediation_plan=remediation_plan,
         artifact_paths=artifact_paths,
     )
+    _require_valid("agent handoff", validate_agent_handoff(handoff))
 
     artifact_paths["repo_scan_json"] = str(write_json(run_dir / "repo-scan.json", scan))
-    artifact_paths["standards_packet_json"] = str(
-        write_json(run_dir / "standards-packet.json", standards_packet)
+    artifact_paths["standards_json"] = str(write_json(run_dir / "standards.json", standards_packet))
+    artifact_paths["capability_matrix_json"] = str(
+        write_json(run_dir / "capability-matrix.json", capability_map)
     )
-    artifact_paths["capability_map_json"] = str(
-        write_json(run_dir / "capability-map.json", capability_map)
-    )
-    artifact_paths["audit_report_json"] = str(
-        write_json(run_dir / "audit-report.json", audit_report)
-    )
-    artifact_paths["audit_report_md"] = str(
-        write_text(run_dir / "audit-report.md", render_audit_markdown(audit_report))
+    artifact_paths["quality_audit_json"] = str(
+        write_json(run_dir / "quality-audit.json", audit_report)
     )
     artifact_paths["remediation_plan_json"] = str(
         write_json(run_dir / "remediation-plan.json", remediation_plan)
-    )
-    artifact_paths["remediation_plan_md"] = str(
-        write_text(run_dir / "remediation-plan.md", render_plan_markdown(remediation_plan))
     )
     artifact_paths["agent_handoff_json"] = str(write_json(run_dir / "agent-handoff.json", handoff))
     artifact_paths["agent_handoff_md"] = str(

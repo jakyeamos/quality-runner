@@ -2,7 +2,9 @@ from __future__ import annotations
 
 from typing import Any
 
-from quality_runner.findings import REMEDIATION_PLAN_SCHEMA
+from quality_runner.findings import AGENT_HANDOFF_SCHEMA, REMEDIATION_PLAN_SCHEMA
+
+PRIORITY_ORDER = {"high": 0, "medium": 1, "low": 2}
 
 
 def build_remediation_plan(
@@ -10,7 +12,7 @@ def build_remediation_plan(
     audit_report: dict[str, Any],
     capability_map: dict[str, Any],
 ) -> dict[str, Any]:
-    findings = _findings(audit_report)
+    findings = sorted(_findings(audit_report), key=_finding_sort_key)
     slices = [_slice_for_finding(finding) for finding in findings]
 
     return {
@@ -44,10 +46,13 @@ def render_plan_markdown(plan: dict[str, Any]) -> str:
                     f"### {slice_item.get('id')}",
                     "",
                     f"- Title: {slice_item.get('title')}",
+                    f"- Priority: {slice_item.get('priority')}",
                     "- Findings:",
-                    *_markdown_items(slice_item.get("findings")),
+                    *_finding_markdown_items(slice_item.get("findings")),
+                    "- Actions:",
+                    *_markdown_items(slice_item.get("actions")),
                     "- Verification:",
-                    *_markdown_items(slice_item.get("verification")),
+                    *_markdown_items(slice_item.get("verification_gates")),
                     "",
                 ]
             )
@@ -65,7 +70,7 @@ def build_agent_handoff(
 ) -> dict[str, Any]:
     status = "clean" if not _slices(remediation_plan) else "planned"
     return {
-        "schema": "quality-runner-agent-handoff-v0.1",
+        "schema": AGENT_HANDOFF_SCHEMA,
         "run_id": _string_or_none(audit_report.get("run_id")),
         "status": status,
         "implementation_allowed": False,
@@ -122,11 +127,24 @@ def render_handoff_markdown(handoff: dict[str, Any]) -> str:
 
 def _slice_for_finding(finding: dict[str, Any]) -> dict[str, Any]:
     finding_id = finding["id"]
+    recommended_fix = finding["recommended_fix"]
     return {
         "id": f"remediate-{finding_id}",
         "title": f"Remediate {finding_id}",
-        "findings": [finding_id],
-        "verification": list(finding["verification"]),
+        "priority": _priority_for_finding(finding),
+        "findings": [
+            {
+                "id": finding_id,
+                "severity": finding["severity"],
+                "category": finding["category"],
+                "summary": finding["summary"],
+            }
+        ],
+        "actions": [
+            f"Apply recommended fix: {recommended_fix}",
+            f"Rerun quality-runner and confirm {finding_id} no longer appears.",
+        ],
+        "verification_gates": list(finding["verification"]),
     }
 
 
@@ -140,14 +158,35 @@ def _findings(audit_report: dict[str, Any]) -> list[dict[str, Any]]:
         if not isinstance(finding, dict):
             continue
         finding_id = finding.get("id")
+        severity = finding.get("severity")
+        category = finding.get("category")
+        summary = finding.get("summary")
+        recommended_fix = finding.get("recommended_fix")
         verification = finding.get("verification")
         if (
             isinstance(finding_id, str)
             and finding_id
+            and isinstance(severity, str)
+            and severity
+            and isinstance(category, str)
+            and category
+            and isinstance(summary, str)
+            and summary
+            and isinstance(recommended_fix, str)
+            and recommended_fix
             and isinstance(verification, list)
             and all(isinstance(item, str) and item for item in verification)
         ):
-            normalized.append({"id": finding_id, "verification": verification})
+            normalized.append(
+                {
+                    "id": finding_id,
+                    "severity": severity,
+                    "category": category,
+                    "summary": summary,
+                    "recommended_fix": recommended_fix,
+                    "verification": verification,
+                }
+            )
     return normalized
 
 
@@ -188,6 +227,37 @@ def _markdown_items(value: object) -> list[str]:
     if not items:
         return ["- unavailable"]
     return [f"- {item}" for item in items]
+
+
+def _finding_markdown_items(value: object) -> list[str]:
+    if not isinstance(value, list):
+        return ["- unavailable"]
+
+    items: list[str] = []
+    for finding in value:
+        if not isinstance(finding, dict):
+            continue
+        finding_id = finding.get("id")
+        summary = finding.get("summary")
+        if isinstance(finding_id, str) and finding_id and isinstance(summary, str) and summary:
+            items.append(f"- {finding_id}: {summary}")
+    if not items:
+        return ["- unavailable"]
+    return items
+
+
+def _finding_sort_key(finding: dict[str, Any]) -> tuple[int, str]:
+    priority = _priority_for_finding(finding)
+    return PRIORITY_ORDER.get(priority, 99), finding["id"]
+
+
+def _priority_for_finding(finding: dict[str, Any]) -> str:
+    severity = finding["severity"]
+    if severity == "error":
+        return "high"
+    if severity == "warning":
+        return "medium"
+    return "low"
 
 
 def _string_or_none(value: object) -> str | None:

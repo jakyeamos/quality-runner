@@ -694,7 +694,7 @@ def test_validate_audit_report_rejects_empty_string_verification_items() -> None
     assert result["errors"] == ["finding finding-001 has no verification"]
 
 
-def test_validate_remediation_plan_rejects_slices_without_verification() -> None:
+def test_validate_remediation_plan_rejects_slices_without_verification_gates() -> None:
     from quality_runner.findings import validate_remediation_plan
 
     plan = {
@@ -703,8 +703,17 @@ def test_validate_remediation_plan_rejects_slices_without_verification() -> None
             {
                 "id": "slice-001",
                 "title": "No verification",
-                "findings": ["finding-001"],
-                "verification": [],
+                "priority": "high",
+                "findings": [
+                    {
+                        "id": "finding-001",
+                        "severity": "error",
+                        "category": "capability",
+                        "summary": "Missing tests",
+                    }
+                ],
+                "actions": ["Add tests"],
+                "verification_gates": [],
             }
         ],
     }
@@ -712,7 +721,7 @@ def test_validate_remediation_plan_rejects_slices_without_verification() -> None
     result = validate_remediation_plan(plan)
 
     assert result["passed"] is False
-    assert result["errors"] == ["slice slice-001 has no verification"]
+    assert result["errors"] == ["slice slice-001 has no verification gates"]
 
 
 def test_validate_remediation_plan_rejects_missing_schema() -> None:
@@ -732,7 +741,7 @@ def test_validate_remediation_plan_rejects_missing_required_slice_fields() -> No
     result = validate_remediation_plan(
         {
             "schema": "quality-runner-remediation-plan-v0.1",
-            "slices": [{"verification": ["run tests"]}],
+            "slices": [{"verification_gates": ["run tests"]}],
         }
     )
 
@@ -740,7 +749,9 @@ def test_validate_remediation_plan_rejects_missing_required_slice_fields() -> No
     assert result["errors"] == [
         "slice at index 0 field id must be a non-empty string",
         "slice at index 0 field title must be a non-empty string",
+        "slice at index 0 field priority must be a non-empty string",
         "slice unknown has no findings",
+        "slice unknown has no actions",
     ]
 
 
@@ -780,7 +791,7 @@ def test_validate_remediation_plan_rejects_non_dict_slices() -> None:
     ]
 
 
-def test_validate_remediation_plan_rejects_non_string_finding_items() -> None:
+def test_validate_remediation_plan_rejects_malformed_finding_items() -> None:
     from quality_runner.findings import validate_remediation_plan
 
     result = validate_remediation_plan(
@@ -790,8 +801,10 @@ def test_validate_remediation_plan_rejects_non_string_finding_items() -> None:
                 {
                     "id": "slice-001",
                     "title": "Bad findings",
+                    "priority": "high",
                     "findings": [None],
-                    "verification": ["run tests"],
+                    "actions": ["Add tests"],
+                    "verification_gates": ["run tests"],
                 }
             ],
         }
@@ -801,7 +814,7 @@ def test_validate_remediation_plan_rejects_non_string_finding_items() -> None:
     assert result["errors"] == ["slice slice-001 has no findings"]
 
 
-def test_validate_remediation_plan_rejects_non_string_verification_items() -> None:
+def test_validate_remediation_plan_rejects_non_string_verification_gate_items() -> None:
     from quality_runner.findings import validate_remediation_plan
 
     result = validate_remediation_plan(
@@ -811,15 +824,24 @@ def test_validate_remediation_plan_rejects_non_string_verification_items() -> No
                 {
                     "id": "slice-001",
                     "title": "Bad verification",
-                    "findings": ["finding-001"],
-                    "verification": [123],
+                    "priority": "high",
+                    "findings": [
+                        {
+                            "id": "finding-001",
+                            "severity": "error",
+                            "category": "capability",
+                            "summary": "Missing tests",
+                        }
+                    ],
+                    "actions": ["Add tests"],
+                    "verification_gates": [123],
                 }
             ],
         }
     )
 
     assert result["passed"] is False
-    assert result["errors"] == ["slice slice-001 has no verification"]
+    assert result["errors"] == ["slice slice-001 has no verification gates"]
 
 
 def test_run_payload_writes_audit_plan_and_handoff(tmp_path: Path) -> None:
@@ -833,19 +855,40 @@ def test_run_payload_writes_audit_plan_and_handoff(tmp_path: Path) -> None:
     assert payload["status"] == "planned"
     assert payload["implementation_allowed"] is False
     artifact_paths = payload["artifact_paths"]
+    assert set(artifact_paths) == {
+        "repo_scan_json",
+        "standards_json",
+        "capability_matrix_json",
+        "quality_audit_json",
+        "remediation_plan_json",
+        "agent_handoff_json",
+        "agent_handoff_md",
+    }
+    assert Path(artifact_paths["standards_json"]).name == "standards.json"
+    assert Path(artifact_paths["capability_matrix_json"]).name == "capability-matrix.json"
+    assert Path(artifact_paths["quality_audit_json"]).name == "quality-audit.json"
     assert Path(artifact_paths["repo_scan_json"]).exists()
-    assert Path(artifact_paths["standards_packet_json"]).exists()
-    assert Path(artifact_paths["capability_map_json"]).exists()
-    assert Path(artifact_paths["audit_report_json"]).exists()
+    assert Path(artifact_paths["standards_json"]).exists()
+    assert Path(artifact_paths["capability_matrix_json"]).exists()
+    assert Path(artifact_paths["quality_audit_json"]).exists()
     assert Path(artifact_paths["remediation_plan_json"]).exists()
     assert Path(artifact_paths["agent_handoff_md"]).exists()
+    run_dir = Path(artifact_paths["repo_scan_json"]).parent
+    legacy_names = {
+        "standards-packet.json",
+        "capability-map.json",
+        "audit-report.json",
+        "audit-report.md",
+        "remediation-plan.md",
+    }
+    assert not any((run_dir / name).exists() for name in legacy_names)
 
 
 def test_run_payload_records_missing_capability_findings(tmp_path: Path) -> None:
     from quality_runner.workflow import run_payload
 
     payload = run_payload(repo_root=tmp_path, run_id="empty-run", profile="jakyeamos")
-    audit_report = json.loads(Path(payload["artifact_paths"]["audit_report_json"]).read_text())
+    audit_report = json.loads(Path(payload["artifact_paths"]["quality_audit_json"]).read_text())
 
     finding_ids = {finding["id"] for finding in audit_report["findings"]}
     assert "missing-lint" in finding_ids
@@ -857,7 +900,7 @@ def test_run_payload_records_missing_formatter_as_error(tmp_path: Path) -> None:
     from quality_runner.workflow import run_payload
 
     payload = run_payload(repo_root=tmp_path, run_id="missing-formatter-run", profile="jakyeamos")
-    audit_report = json.loads(Path(payload["artifact_paths"]["audit_report_json"]).read_text())
+    audit_report = json.loads(Path(payload["artifact_paths"]["quality_audit_json"]).read_text())
 
     formatter_finding = next(
         finding for finding in audit_report["findings"] if finding["id"] == "missing-formatter"
@@ -872,7 +915,11 @@ def test_inspect_payload_does_not_write_audit_plan(tmp_path: Path) -> None:
 
     assert payload["schema"] == "quality-runner-inspect-result-v0.1"
     assert Path(payload["artifact_paths"]["repo_scan_json"]).exists()
-    assert "audit_report_json" not in payload["artifact_paths"]
+    assert Path(payload["artifact_paths"]["standards_json"]).name == "standards.json"
+    assert (
+        Path(payload["artifact_paths"]["capability_matrix_json"]).name == "capability-matrix.json"
+    )
+    assert "quality_audit_json" not in payload["artifact_paths"]
 
 
 def test_run_payload_rejects_unsafe_run_ids(tmp_path: Path) -> None:
@@ -964,6 +1011,43 @@ def test_run_payload_writes_handoff_warnings(tmp_path: Path) -> None:
     } in handoff["warnings"]
 
 
+def test_run_payload_rejects_invalid_handoff_before_writing_artifacts(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    import quality_runner.workflow as workflow
+
+    _write_js_fixture(tmp_path)
+
+    def invalid_handoff(**_: object) -> dict[str, object]:
+        return {
+            "schema": "quality-runner-agent-handoff-v0.1",
+            "status": "planned",
+            "implementation_allowed": False,
+        }
+
+    monkeypatch.setattr(workflow, "build_agent_handoff", invalid_handoff)
+
+    try:
+        workflow.run_payload(repo_root=tmp_path, run_id="invalid-handoff-run", profile="jakyeamos")
+    except ValueError as error:
+        assert str(error) == (
+            "invalid agent handoff: agent handoff artifact_paths must be an object; "
+            "agent handoff warnings must be a list of warning objects; "
+            "agent handoff finding_ids must be a string list; "
+            "agent handoff slice_ids must be a string list"
+        )
+    else:
+        raise AssertionError("run_payload accepted an invalid agent handoff")
+
+    run_dir = tmp_path / ".quality-runner" / "runs" / "invalid-handoff-run"
+    assert not (run_dir / "repo-scan.json").exists()
+    assert not (run_dir / "standards.json").exists()
+    assert not (run_dir / "capability-matrix.json").exists()
+    assert not (run_dir / "agent-handoff.json").exists()
+    assert not (run_dir / "quality-audit.json").exists()
+
+
 def test_run_payload_reports_clean_when_no_remediation_slices(tmp_path: Path) -> None:
     from quality_runner.workflow import run_payload
 
@@ -978,6 +1062,50 @@ def test_run_payload_reports_clean_when_no_remediation_slices(tmp_path: Path) ->
     assert payload["status"] == "clean"
     assert remediation_plan["slices"] == []
     assert handoff["status"] == "clean"
+
+
+def test_generated_remediation_plan_orders_findings_and_exposes_actions(tmp_path: Path) -> None:
+    from quality_runner.audit import build_audit_report
+    from quality_runner.capabilities import detect_capabilities
+    from quality_runner.discovery import inspect_repo
+    from quality_runner.planning import build_remediation_plan
+    from quality_runner.standards import compile_standards
+
+    scan = inspect_repo(tmp_path, run_id="ordered-plan-001")
+    packet = compile_standards(repo_root=tmp_path, scan=scan, profile="jakyeamos")
+    capability_map = detect_capabilities(scan=scan, standards_packet=packet)
+    report = build_audit_report(scan=scan, standards_packet=packet, capability_map=capability_map)
+
+    plan = build_remediation_plan(audit_report=report, capability_map=capability_map)
+
+    priorities = [slice_item["priority"] for slice_item in plan["slices"]]
+    ids = [slice_item["findings"][0]["id"] for slice_item in plan["slices"]]
+    assert priorities[:6] == ["high", "high", "high", "high", "high", "high"]
+    assert ids[:6] == [
+        "missing-dead-code",
+        "missing-formatter",
+        "missing-lint",
+        "missing-tests",
+        "missing-truth-file",
+        "missing-typecheck",
+    ]
+    first_slice = plan["slices"][0]
+    assert first_slice["actions"] == [
+        "Apply recommended fix: Add a dead-code scan command such as pnpm audit:dead-code.",
+        "Rerun quality-runner and confirm missing-dead-code no longer appears.",
+    ]
+    assert first_slice["verification_gates"] == [
+        "Add the dead_code capability and rerun quality-runner.",
+        "Confirm audit finding missing-dead-code is absent from the regenerated report.",
+    ]
+    assert first_slice["findings"] == [
+        {
+            "id": "missing-dead-code",
+            "severity": "error",
+            "category": "capability",
+            "summary": "Required quality capability is missing: dead_code.",
+        }
+    ]
 
 
 def test_generated_audit_report_validates(tmp_path: Path) -> None:
