@@ -11,6 +11,12 @@ remediation.
 
 ## Install
 
+After the first PyPI release:
+
+```bash
+uv tool install quality-runner
+```
+
 Install from the repository while the package is pre-release:
 
 ```bash
@@ -48,6 +54,7 @@ Quality Runner writes artifacts under the target repo:
   repo-scan.json
   standards.json
   capability-matrix.json
+  run-manifest.json
   quality-audit.json
   remediation-plan.json
   agent-handoff.json
@@ -66,8 +73,11 @@ The normal workflow is:
 
 ```bash
 quality-runner doctor
+quality-runner init /path/to/repo --json
+quality-runner status /path/to/repo --json
 quality-runner inspect /path/to/repo --profile jakyeamos --json
 quality-runner run /path/to/repo --profile jakyeamos --json
+quality-runner export-handoff /path/to/repo
 quality-runner-mcp
 ```
 
@@ -123,3 +133,5 @@ pre-cr run --workspace .
 
 See [Troubleshooting](docs/troubleshooting.md) for common install and runtime
 issues.
+
+See [Release Checklist](docs/release.md) for PyPI and Homebrew packaging notes.

@@ -18,6 +18,7 @@
     "docs/**",
     "fixtures/**",
     "LICENSE",
+    "packaging/**",
     "README.md",
     "SECURITY.md",
     "pyproject.toml",
