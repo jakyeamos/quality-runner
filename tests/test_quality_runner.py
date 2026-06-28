@@ -203,6 +203,138 @@ def test_write_text_creates_parent_returns_path_and_writes_exact_content(tmp_pat
     assert path.read_text(encoding="utf-8") == "line 1\nline 2"
 
 
+def _write_js_fixture(repo: Path) -> None:
+    (repo / "package.json").write_text(
+        json.dumps(
+            {
+                "scripts": {
+                    "lint": "eslint .",
+                    "typecheck": "tsc --noEmit",
+                    "test": "vitest run",
+                    "build": "vite build",
+                    "dead-code": "knip",
+                    "pre-cr": "pre-cr",
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    (repo / "AGENTS.md").write_text(
+        "Always use pnpm. Full lint, typecheck, tests, and dead-code scans are required.\n",
+        encoding="utf-8",
+    )
+    (repo / ".pre-cr.json").write_text("{}", encoding="utf-8")
+    (repo / ".tracker").mkdir()
+    (repo / ".tracker" / "PROJECT_TRUTH.md").write_text(
+        "---\nprojectName: Fixture\n---\n",
+        encoding="utf-8",
+    )
+
+
+def test_inspect_repo_detects_js_quality_surfaces(tmp_path: Path) -> None:
+    from quality_runner.discovery import inspect_repo
+
+    _write_js_fixture(tmp_path)
+
+    scan = inspect_repo(tmp_path, run_id="scan-001")
+
+    assert scan["schema"] == "quality-runner-repo-scan-v0.1"
+    assert scan["package_manager"] == "pnpm"
+    assert scan["languages"] == ["javascript"]
+    assert scan["scripts"]["lint"] == "eslint ."
+    assert scan["pre_cr_config"] == ".pre-cr.json"
+    assert scan["truth_file"] == ".tracker/PROJECT_TRUTH.md"
+
+
+def test_inspect_repo_rejects_missing_repo_root(tmp_path: Path) -> None:
+    from quality_runner.discovery import inspect_repo
+
+    missing_root = tmp_path / "missing"
+
+    try:
+        inspect_repo(missing_root, run_id="missing-001")
+    except FileNotFoundError as error:
+        assert str(error) == f"repo root does not exist: {missing_root}"
+    else:
+        raise AssertionError("inspect_repo accepted a missing repo root")
+
+
+def test_inspect_repo_rejects_file_repo_root(tmp_path: Path) -> None:
+    from quality_runner.discovery import inspect_repo
+
+    file_root = tmp_path / "not-a-directory"
+    file_root.write_text("content", encoding="utf-8")
+
+    try:
+        inspect_repo(file_root, run_id="file-001")
+    except NotADirectoryError as error:
+        assert str(error) == f"repo root is not a directory: {file_root}"
+    else:
+        raise AssertionError("inspect_repo accepted a file repo root")
+
+
+def test_compile_standards_preserves_profile_and_local_provenance(tmp_path: Path) -> None:
+    from quality_runner.discovery import inspect_repo
+    from quality_runner.standards import compile_standards
+
+    _write_js_fixture(tmp_path)
+    scan = inspect_repo(tmp_path, run_id="scan-001")
+
+    packet = compile_standards(repo_root=tmp_path, scan=scan, profile="jakyeamos")
+
+    assert packet["schema"] == "quality-runner-standards-packet-v0.1"
+    assert packet["profile"] == "jakyeamos"
+    sources = {source["path"] for source in packet["sources"]}
+    assert "AGENTS.md" in sources
+    requirement_ids = {requirement["id"] for requirement in packet["requirements"]}
+    assert "use_pnpm" in requirement_ids
+    assert "truth_file_current" in requirement_ids
+
+
+def test_compile_standards_rejects_unsupported_profiles(tmp_path: Path) -> None:
+    from quality_runner.discovery import inspect_repo
+    from quality_runner.standards import compile_standards
+
+    scan = inspect_repo(tmp_path, run_id="scan-001")
+
+    try:
+        compile_standards(repo_root=tmp_path, scan=scan, profile="someone-else")
+    except ValueError as error:
+        assert str(error) == "unsupported standards profile: someone-else"
+    else:
+        raise AssertionError("compile_standards accepted an unsupported profile")
+
+
+def test_detect_capabilities_records_missing_expected_surfaces(tmp_path: Path) -> None:
+    from quality_runner.capabilities import detect_capabilities
+    from quality_runner.discovery import inspect_repo
+    from quality_runner.standards import compile_standards
+
+    scan = inspect_repo(tmp_path, run_id="empty-001")
+    packet = compile_standards(repo_root=tmp_path, scan=scan, profile="jakyeamos")
+
+    capability_map = detect_capabilities(scan=scan, standards_packet=packet)
+
+    assert capability_map["schema"] == "quality-runner-capability-map-v0.1"
+    missing_ids = {item["id"] for item in capability_map["missing"]}
+    assert "lint" in missing_ids
+    assert "tests" in missing_ids
+    assert "truth_file" in missing_ids
+
+
+def test_detect_capabilities_treats_malformed_scripts_as_missing() -> None:
+    from quality_runner.capabilities import detect_capabilities
+
+    capability_map = detect_capabilities(
+        scan={"schema": "quality-runner-repo-scan-v0.1", "scripts": "not-a-dict"},
+        standards_packet={"profile": "jakyeamos"},
+    )
+
+    missing_ids = {item["id"] for item in capability_map["missing"]}
+    assert "lint" in missing_ids
+    assert "tests" in missing_ids
+
+
 def test_validate_audit_report_rejects_findings_without_evidence() -> None:
     from quality_runner.findings import validate_audit_report
 
