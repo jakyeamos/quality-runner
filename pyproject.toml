@@ -15,6 +15,12 @@ quality-runner-mcp = "quality_runner.mcp:main"
 [tool.setuptools.package-data]
 quality_runner = ["plugin/*.json", "plugin/*.md"]
 
+[tool.setuptools.packages.find]
+include = ["quality_runner*"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+
 [tool.ruff]
 line-length = 100
 target-version = "py312"
