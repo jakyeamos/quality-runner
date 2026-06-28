@@ -8,11 +8,16 @@
   "qualityAdapters": [],
   "threshold": 80,
   "excludePatterns": [
+    ".github/**",
     ".gitignore",
     ".pre-cr.json",
     ".quality-runner/**",
     ".venv/**",
+    "CHANGELOG.md",
+    "CONTRIBUTING.md",
+    "LICENSE",
     "README.md",
+    "SECURITY.md",
     "pyproject.toml",
     "scripts/**",
     "tests/**"

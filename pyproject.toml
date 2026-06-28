@@ -3,6 +3,26 @@ name = "quality-runner"
 version = "0.1.0"
 description = "Standalone audit-and-plan quality orchestrator with CLI and MCP surfaces."
 requires-python = ">=3.12"
+readme = "README.md"
+license = "MIT"
+authors = [{ name = "Jakye Amos" }]
+keywords = ["quality", "audit", "mcp", "cli", "repository-analysis"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Environment :: Console",
+  "Intended Audience :: Developers",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
+  "Topic :: Software Development :: Quality Assurance",
+]
+
+[project.urls]
+Homepage = "https://github.com/jakyeamos/quality-runner"
+Repository = "https://github.com/jakyeamos/quality-runner"
+Issues = "https://github.com/jakyeamos/quality-runner/issues"
+Changelog = "https://github.com/jakyeamos/quality-runner/blob/main/CHANGELOG.md"
 
 [build-system]
 requires = ["setuptools>=68"]
