@@ -284,6 +284,7 @@ def test_packaged_schema_files_are_parseable() -> None:
         "quality-audit.schema.json",
         "remediation-plan.schema.json",
         "agent-handoff.schema.json",
+        "run-manifest.schema.json",
         "run-result.schema.json",
     }
 

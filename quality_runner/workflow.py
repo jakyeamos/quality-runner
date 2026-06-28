@@ -15,6 +15,7 @@ from quality_runner.findings import (
     validate_audit_report,
     validate_remediation_plan,
 )
+from quality_runner.manifest import build_run_manifest
 from quality_runner.planning import (
     build_agent_handoff,
     build_remediation_plan,
@@ -42,7 +43,17 @@ def inspect_payload(
         "capability_matrix_json": str(
             write_json(run_dir / "capability-matrix.json", capability_map)
         ),
+        "run_manifest_json": str(run_dir / "run-manifest.json"),
     }
+    inspect_manifest = build_run_manifest(
+        repo_root=repo_root,
+        run_id=resolved_run_id,
+        mode="inspect",
+        artifact_paths=artifact_paths,
+    )
+    artifact_paths["run_manifest_json"] = str(
+        write_json(run_dir / "run-manifest.json", inspect_manifest)
+    )
 
     return {
         "schema": "quality-runner-inspect-result-v0.1",
@@ -79,6 +90,7 @@ def run_payload(
         "repo_scan_json": str(run_dir / "repo-scan.json"),
         "standards_json": str(run_dir / "standards.json"),
         "capability_matrix_json": str(run_dir / "capability-matrix.json"),
+        "run_manifest_json": str(run_dir / "run-manifest.json"),
         "quality_audit_json": str(run_dir / "quality-audit.json"),
         "remediation_plan_json": str(run_dir / "remediation-plan.json"),
         "agent_handoff_json": str(run_dir / "agent-handoff.json"),
@@ -95,6 +107,15 @@ def run_payload(
     artifact_paths["standards_json"] = str(write_json(run_dir / "standards.json", standards_packet))
     artifact_paths["capability_matrix_json"] = str(
         write_json(run_dir / "capability-matrix.json", capability_map)
+    )
+    run_manifest = build_run_manifest(
+        repo_root=repo_root,
+        run_id=resolved_run_id,
+        mode="run",
+        artifact_paths=artifact_paths,
+    )
+    artifact_paths["run_manifest_json"] = str(
+        write_json(run_dir / "run-manifest.json", run_manifest)
     )
     artifact_paths["quality_audit_json"] = str(
         write_json(run_dir / "quality-audit.json", audit_report)

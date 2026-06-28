@@ -1,9 +1,40 @@
 from __future__ import annotations
 
 import json
+import subprocess
 from pathlib import Path
 
 from test_support.quality_runner_fixtures import write_complete_js_fixture, write_js_fixture
+
+
+def _git_commit(repo_root: Path) -> str:
+    subprocess.run(["git", "init"], cwd=repo_root, check=True, capture_output=True, text=True)
+    (repo_root / "tracked.txt").write_text("tracked\n", encoding="utf-8")
+    subprocess.run(["git", "add", "tracked.txt"], cwd=repo_root, check=True)
+    subprocess.run(
+        [
+            "git",
+            "-c",
+            "user.email=quality-runner@example.com",
+            "-c",
+            "user.name=Quality Runner",
+            "commit",
+            "-m",
+            "Initial commit",
+        ],
+        cwd=repo_root,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    result = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=repo_root,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    return result.stdout.strip()
 
 
 def test_run_payload_writes_audit_plan_and_handoff(tmp_path: Path) -> None:
@@ -21,6 +52,7 @@ def test_run_payload_writes_audit_plan_and_handoff(tmp_path: Path) -> None:
         "repo_scan_json",
         "standards_json",
         "capability_matrix_json",
+        "run_manifest_json",
         "quality_audit_json",
         "remediation_plan_json",
         "agent_handoff_json",
@@ -32,6 +64,7 @@ def test_run_payload_writes_audit_plan_and_handoff(tmp_path: Path) -> None:
     assert Path(artifact_paths["repo_scan_json"]).exists()
     assert Path(artifact_paths["standards_json"]).exists()
     assert Path(artifact_paths["capability_matrix_json"]).exists()
+    assert Path(artifact_paths["run_manifest_json"]).exists()
     assert Path(artifact_paths["quality_audit_json"]).exists()
     assert Path(artifact_paths["remediation_plan_json"]).exists()
     assert Path(artifact_paths["agent_handoff_md"]).exists()
@@ -44,6 +77,24 @@ def test_run_payload_writes_audit_plan_and_handoff(tmp_path: Path) -> None:
         "remediation-plan.md",
     }
     assert not any((run_dir / name).exists() for name in legacy_names)
+
+
+def test_run_payload_writes_manifest_with_git_head(tmp_path: Path) -> None:
+    from quality_runner.workflow import run_payload
+
+    head_sha = _git_commit(tmp_path)
+
+    payload = run_payload(repo_root=tmp_path, run_id="manifest-run", profile="jakyeamos")
+    manifest = json.loads(Path(payload["artifact_paths"]["run_manifest_json"]).read_text())
+
+    assert manifest["schema"] == "quality-runner-run-manifest-v0.1"
+    assert manifest["mode"] == "run"
+    assert manifest["run_id"] == "manifest-run"
+    assert manifest["quality_runner_version"] == "0.1.0"
+    assert manifest["git"]["head_sha"] == head_sha
+    assert manifest["git"]["is_repo"] is True
+    assert manifest["git"]["dirty"] is True
+    assert manifest["artifact_paths"]["quality_audit_json"].endswith("quality-audit.json")
 
 
 def test_run_payload_records_missing_capability_findings(tmp_path: Path) -> None:
@@ -119,7 +170,49 @@ def test_inspect_payload_does_not_write_audit_plan(tmp_path: Path) -> None:
     assert (
         Path(payload["artifact_paths"]["capability_matrix_json"]).name == "capability-matrix.json"
     )
+    assert Path(payload["artifact_paths"]["run_manifest_json"]).name == "run-manifest.json"
     assert "quality_audit_json" not in payload["artifact_paths"]
+
+
+def test_inspect_payload_writes_manifest_without_git_repo(tmp_path: Path) -> None:
+    from quality_runner.workflow import inspect_payload
+
+    payload = inspect_payload(repo_root=tmp_path, run_id="inspect-manifest", profile="jakyeamos")
+    manifest = json.loads(Path(payload["artifact_paths"]["run_manifest_json"]).read_text())
+
+    assert manifest["schema"] == "quality-runner-run-manifest-v0.1"
+    assert manifest["mode"] == "inspect"
+    assert manifest["git"] == {
+        "is_repo": False,
+        "head_sha": None,
+        "branch": None,
+        "dirty": None,
+    }
+
+
+def test_run_manifest_handles_git_command_failures(tmp_path: Path, monkeypatch) -> None:
+    import quality_runner.manifest as manifest
+
+    (tmp_path / ".git").mkdir()
+
+    def failed_git(*_: object, **__: object) -> object:
+        raise OSError("git unavailable")
+
+    monkeypatch.setattr(manifest.subprocess, "run", failed_git)
+
+    payload = manifest.build_run_manifest(
+        repo_root=tmp_path,
+        run_id="git-failure",
+        mode="run",
+        artifact_paths={},
+    )
+
+    assert payload["git"] == {
+        "is_repo": False,
+        "head_sha": None,
+        "branch": None,
+        "dirty": None,
+    }
 
 
 def test_run_payload_rejects_unsafe_run_ids(tmp_path: Path) -> None:

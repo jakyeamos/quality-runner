@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://quality-runner.dev/schemas/run-manifest.schema.json",
+  "title": "Quality Runner Run Manifest",
+  "type": "object",
+  "required": ["schema", "run_id", "mode", "repo_root", "created_at", "quality_runner_version", "implementation_allowed", "git", "artifact_paths"],
+  "properties": {
+    "schema": { "const": "quality-runner-run-manifest-v0.1" },
+    "run_id": { "type": "string", "minLength": 1 },
+    "mode": { "enum": ["inspect", "run"] },
+    "repo_root": { "type": "string", "minLength": 1 },
+    "created_at": { "type": "string", "format": "date-time" },
+    "quality_runner_version": { "type": "string", "minLength": 1 },
+    "implementation_allowed": { "const": false },
+    "git": {
+      "type": "object",
+      "required": ["is_repo", "head_sha", "branch", "dirty"],
+      "properties": {
+        "is_repo": { "type": "boolean" },
+        "head_sha": { "type": ["string", "null"] },
+        "branch": { "type": ["string", "null"] },
+        "dirty": { "type": ["boolean", "null"] }
+      },
+      "additionalProperties": false
+    },
+    "artifact_paths": {
+      "type": "object",
+      "additionalProperties": { "type": "string" }
+    }
+  }
+}
