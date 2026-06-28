@@ -770,3 +770,114 @@ def test_validate_remediation_plan_rejects_non_string_verification_items() -> No
 
     assert result["passed"] is False
     assert result["errors"] == ["slice slice-001 has no verification"]
+
+
+def test_run_payload_writes_audit_plan_and_handoff(tmp_path: Path) -> None:
+    from quality_runner.workflow import run_payload
+
+    _write_js_fixture(tmp_path)
+
+    payload = run_payload(repo_root=tmp_path, run_id="run-001", profile="jakyeamos")
+
+    assert payload["schema"] == "quality-runner-run-result-v0.1"
+    assert payload["status"] == "planned"
+    assert payload["implementation_allowed"] is False
+    artifact_paths = payload["artifact_paths"]
+    assert Path(artifact_paths["repo_scan_json"]).exists()
+    assert Path(artifact_paths["standards_packet_json"]).exists()
+    assert Path(artifact_paths["capability_map_json"]).exists()
+    assert Path(artifact_paths["audit_report_json"]).exists()
+    assert Path(artifact_paths["remediation_plan_json"]).exists()
+    assert Path(artifact_paths["agent_handoff_md"]).exists()
+
+
+def test_run_payload_records_missing_capability_findings(tmp_path: Path) -> None:
+    from quality_runner.workflow import run_payload
+
+    payload = run_payload(repo_root=tmp_path, run_id="empty-run", profile="jakyeamos")
+    audit_report = json.loads(Path(payload["artifact_paths"]["audit_report_json"]).read_text())
+
+    finding_ids = {finding["id"] for finding in audit_report["findings"]}
+    assert "missing-lint" in finding_ids
+    assert "missing-tests" in finding_ids
+    assert "missing-truth-file" in finding_ids
+
+
+def test_inspect_payload_does_not_write_audit_plan(tmp_path: Path) -> None:
+    from quality_runner.workflow import inspect_payload
+
+    payload = inspect_payload(repo_root=tmp_path, run_id="inspect-001", profile="jakyeamos")
+
+    assert payload["schema"] == "quality-runner-inspect-result-v0.1"
+    assert Path(payload["artifact_paths"]["repo_scan_json"]).exists()
+    assert "audit_report_json" not in payload["artifact_paths"]
+
+
+def test_run_payload_rejects_unsafe_run_ids(tmp_path: Path) -> None:
+    from quality_runner.workflow import run_payload
+
+    try:
+        run_payload(repo_root=tmp_path, run_id="../escape", profile="jakyeamos")
+    except ValueError as error:
+        assert str(error) == "run_id must be a non-empty single path segment"
+    else:
+        raise AssertionError("run_payload accepted a parent traversal run ID")
+
+
+def test_inspect_payload_rejects_unsafe_run_ids(tmp_path: Path) -> None:
+    from quality_runner.workflow import inspect_payload
+
+    try:
+        inspect_payload(repo_root=tmp_path, run_id="nested/run", profile="jakyeamos")
+    except ValueError as error:
+        assert str(error) == "run_id must be a non-empty single path segment"
+    else:
+        raise AssertionError("inspect_payload accepted a separator run ID")
+
+
+def test_generated_audit_report_validates(tmp_path: Path) -> None:
+    from quality_runner.audit import build_audit_report
+    from quality_runner.capabilities import detect_capabilities
+    from quality_runner.discovery import inspect_repo
+    from quality_runner.findings import validate_audit_report
+    from quality_runner.standards import compile_standards
+
+    scan = inspect_repo(tmp_path, run_id="audit-valid-001")
+    packet = compile_standards(repo_root=tmp_path, scan=scan, profile="jakyeamos")
+    capability_map = detect_capabilities(scan=scan, standards_packet=packet)
+
+    report = build_audit_report(scan=scan, standards_packet=packet, capability_map=capability_map)
+
+    assert validate_audit_report(report) == {"passed": True, "errors": []}
+
+
+def test_generated_remediation_plan_validates(tmp_path: Path) -> None:
+    from quality_runner.audit import build_audit_report
+    from quality_runner.capabilities import detect_capabilities
+    from quality_runner.discovery import inspect_repo
+    from quality_runner.findings import validate_remediation_plan
+    from quality_runner.planning import build_remediation_plan
+    from quality_runner.standards import compile_standards
+
+    scan = inspect_repo(tmp_path, run_id="plan-valid-001")
+    packet = compile_standards(repo_root=tmp_path, scan=scan, profile="jakyeamos")
+    capability_map = detect_capabilities(scan=scan, standards_packet=packet)
+    report = build_audit_report(scan=scan, standards_packet=packet, capability_map=capability_map)
+
+    plan = build_remediation_plan(audit_report=report, capability_map=capability_map)
+
+    assert validate_remediation_plan(plan) == {"passed": True, "errors": []}
+
+
+def test_run_payload_only_writes_quality_runner_artifacts(tmp_path: Path) -> None:
+    from quality_runner.workflow import run_payload
+
+    _write_js_fixture(tmp_path)
+    before = {path.relative_to(tmp_path) for path in tmp_path.rglob("*")}
+
+    run_payload(repo_root=tmp_path, run_id="write-boundary-001", profile="jakyeamos")
+
+    after = {path.relative_to(tmp_path) for path in tmp_path.rglob("*")}
+    created = after - before
+    assert created
+    assert all(path.parts[0] == ".quality-runner" for path in created)
