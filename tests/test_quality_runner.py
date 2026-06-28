@@ -258,7 +258,34 @@ def test_inspect_repo_does_not_infer_package_manager_from_policy_text(tmp_path: 
 
     scan = inspect_repo(tmp_path, run_id="policy-only-001")
 
-    assert scan["package_manager"] == "npm"
+    assert scan["package_manager"] is None
+
+
+def test_compile_standards_does_not_warn_for_unknown_package_manager(tmp_path: Path) -> None:
+    from quality_runner.discovery import inspect_repo
+    from quality_runner.standards import compile_standards
+
+    (tmp_path / "package.json").write_text(
+        json.dumps({"scripts": {"test": "vitest run"}}),
+        encoding="utf-8",
+    )
+
+    scan = inspect_repo(tmp_path, run_id="unknown-package-manager-001")
+    packet = compile_standards(repo_root=tmp_path, scan=scan, profile="jakyeamos")
+
+    assert scan["package_manager"] is None
+    requirement_ids = {requirement["id"] for requirement in packet["requirements"]}
+    assert "package_manager_mismatch" not in requirement_ids
+
+
+def test_inspect_repo_does_not_mark_tests_required_from_latest(tmp_path: Path) -> None:
+    from quality_runner.discovery import inspect_repo
+
+    (tmp_path / "AGENTS.md").write_text("Use the latest stable toolchain.\n", encoding="utf-8")
+
+    scan = inspect_repo(tmp_path, run_id="latest-001")
+
+    assert scan["quality_contract"]["required_terms"]["tests"] is False
 
 
 def test_inspect_repo_warns_on_invalid_package_json(tmp_path: Path) -> None:

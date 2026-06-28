@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 from typing import Any
 
@@ -102,8 +103,6 @@ def _detect_package_manager(
         if (root / lockfile).exists():
             return manager
 
-    if package_json:
-        return "npm"
     return None
 
 
@@ -136,10 +135,23 @@ def _detect_quality_contract(
         _read_text(root / path).lower() for path in agent_instruction_files
     )
     required_terms = {
-        "lint": "lint" in instruction_text or "lint" in scripts,
-        "typecheck": "typecheck" in instruction_text or "typecheck" in scripts,
-        "tests": "test" in instruction_text or "test" in scripts,
-        "dead_code": "dead-code" in instruction_text or "dead-code" in scripts,
+        "lint": _has_instruction_term(instruction_text, ("lint", "linting")) or "lint" in scripts,
+        "typecheck": _has_instruction_term(
+            instruction_text,
+            ("typecheck", "type-check", "type checking", "typechecking"),
+        )
+        or "typecheck" in scripts,
+        "tests": _has_instruction_term(
+            instruction_text,
+            ("test", "tests", "testing", "test suite"),
+        )
+        or "test" in scripts
+        or "tests" in scripts,
+        "dead_code": _has_instruction_term(
+            instruction_text,
+            ("dead-code", "dead code", "dead-code scans", "dead code scans"),
+        )
+        or "dead-code" in scripts,
     }
     return {
         "declared": any(required_terms.values()),
@@ -156,6 +168,10 @@ def _ci_files(root: Path) -> list[str]:
         "azure-pipelines.yml",
     ]
     return [candidate for candidate in candidates if (root / candidate).exists()]
+
+
+def _has_instruction_term(text: str, terms: tuple[str, ...]) -> bool:
+    return any(re.search(rf"\b{re.escape(term)}\b", text) is not None for term in terms)
 
 
 def _read_text(path: Path) -> str:
