@@ -263,7 +263,10 @@ def test_validate_audit_report_rejects_missing_findings() -> None:
     result = validate_audit_report({})
 
     assert result["passed"] is False
-    assert result["errors"] == ["audit report findings must be a list"]
+    assert result["errors"] == [
+        "audit report schema must be quality-runner-audit-report-v0.1",
+        "audit report findings must be a list",
+    ]
 
 
 def test_validate_audit_report_rejects_non_list_findings() -> None:
@@ -272,16 +275,70 @@ def test_validate_audit_report_rejects_non_list_findings() -> None:
     result = validate_audit_report({"findings": "not-a-list"})
 
     assert result["passed"] is False
-    assert result["errors"] == ["audit report findings must be a list"]
+    assert result["errors"] == [
+        "audit report schema must be quality-runner-audit-report-v0.1",
+        "audit report findings must be a list",
+    ]
 
 
 def test_validate_audit_report_rejects_non_dict_findings() -> None:
     from quality_runner.findings import validate_audit_report
 
-    result = validate_audit_report({"findings": ["not-a-dict"]})
+    result = validate_audit_report({"schema": "wrong", "findings": ["not-a-dict"]})
 
     assert result["passed"] is False
-    assert result["errors"] == ["finding at index 0 is not an object"]
+    assert result["errors"] == [
+        "audit report schema must be quality-runner-audit-report-v0.1",
+        "finding at index 0 is not an object",
+    ]
+
+
+def test_validate_audit_report_rejects_non_string_evidence_items() -> None:
+    from quality_runner.findings import validate_audit_report
+
+    result = validate_audit_report(
+        {
+            "schema": "quality-runner-audit-report-v0.1",
+            "findings": [
+                {
+                    "id": "finding-001",
+                    "severity": "warning",
+                    "category": "docs",
+                    "summary": "Bad evidence",
+                    "evidence": [123],
+                    "recommended_fix": "Use string evidence",
+                    "verification": ["review report"],
+                }
+            ],
+        }
+    )
+
+    assert result["passed"] is False
+    assert result["errors"] == ["finding finding-001 has no evidence"]
+
+
+def test_validate_audit_report_rejects_empty_string_verification_items() -> None:
+    from quality_runner.findings import validate_audit_report
+
+    result = validate_audit_report(
+        {
+            "schema": "quality-runner-audit-report-v0.1",
+            "findings": [
+                {
+                    "id": "finding-001",
+                    "severity": "warning",
+                    "category": "docs",
+                    "summary": "Bad verification",
+                    "evidence": ["line 1"],
+                    "recommended_fix": "Use string verification",
+                    "verification": [""],
+                }
+            ],
+        }
+    )
+
+    assert result["passed"] is False
+    assert result["errors"] == ["finding finding-001 has no verification"]
 
 
 def test_validate_remediation_plan_rejects_slices_without_verification() -> None:
@@ -340,7 +397,10 @@ def test_validate_remediation_plan_rejects_missing_slices() -> None:
     result = validate_remediation_plan({})
 
     assert result["passed"] is False
-    assert result["errors"] == ["remediation plan slices must be a list"]
+    assert result["errors"] == [
+        "remediation plan schema must be quality-runner-remediation-plan-v0.1",
+        "remediation plan slices must be a list",
+    ]
 
 
 def test_validate_remediation_plan_rejects_non_list_slices() -> None:
@@ -349,13 +409,61 @@ def test_validate_remediation_plan_rejects_non_list_slices() -> None:
     result = validate_remediation_plan({"slices": "not-a-list"})
 
     assert result["passed"] is False
-    assert result["errors"] == ["remediation plan slices must be a list"]
+    assert result["errors"] == [
+        "remediation plan schema must be quality-runner-remediation-plan-v0.1",
+        "remediation plan slices must be a list",
+    ]
 
 
 def test_validate_remediation_plan_rejects_non_dict_slices() -> None:
     from quality_runner.findings import validate_remediation_plan
 
-    result = validate_remediation_plan({"slices": ["not-a-dict"]})
+    result = validate_remediation_plan({"schema": "wrong", "slices": ["not-a-dict"]})
 
     assert result["passed"] is False
-    assert result["errors"] == ["slice at index 0 is not an object"]
+    assert result["errors"] == [
+        "remediation plan schema must be quality-runner-remediation-plan-v0.1",
+        "slice at index 0 is not an object",
+    ]
+
+
+def test_validate_remediation_plan_rejects_non_string_finding_items() -> None:
+    from quality_runner.findings import validate_remediation_plan
+
+    result = validate_remediation_plan(
+        {
+            "schema": "quality-runner-remediation-plan-v0.1",
+            "slices": [
+                {
+                    "id": "slice-001",
+                    "title": "Bad findings",
+                    "findings": [None],
+                    "verification": ["run tests"],
+                }
+            ],
+        }
+    )
+
+    assert result["passed"] is False
+    assert result["errors"] == ["slice slice-001 has no findings"]
+
+
+def test_validate_remediation_plan_rejects_non_string_verification_items() -> None:
+    from quality_runner.findings import validate_remediation_plan
+
+    result = validate_remediation_plan(
+        {
+            "schema": "quality-runner-remediation-plan-v0.1",
+            "slices": [
+                {
+                    "id": "slice-001",
+                    "title": "Bad verification",
+                    "findings": ["finding-001"],
+                    "verification": [123],
+                }
+            ],
+        }
+    )
+
+    assert result["passed"] is False
+    assert result["errors"] == ["slice slice-001 has no verification"]
