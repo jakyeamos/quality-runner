@@ -48,7 +48,7 @@ def test_module_entrypoint_version_exits_successfully() -> None:
     assert result.stdout.strip() == "0.1.0"
 
 
-def test_module_entrypoint_fails_closed_for_pending_commands() -> None:
+def test_module_entrypoint_rejects_unknown_commands() -> None:
     result = subprocess.run(
         [sys.executable, "-m", "quality_runner", "audit", "/tmp", "--json"],
         cwd=ROOT,
@@ -58,7 +58,7 @@ def test_module_entrypoint_fails_closed_for_pending_commands() -> None:
     )
 
     assert result.returncode == 2
-    assert "not implemented" in result.stderr
+    assert "invalid choice: 'audit'" in result.stderr
 
 
 def test_scaffold_entrypoint_functions_import_and_return_success() -> None:
