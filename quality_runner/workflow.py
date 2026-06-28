@@ -3,8 +3,9 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
+from uuid import uuid4
 
-from quality_runner.artifacts import artifact_dir, write_json, write_text
+from quality_runner.artifacts import prepare_artifact_dir, write_json, write_text
 from quality_runner.audit import build_audit_report, render_audit_markdown
 from quality_runner.capabilities import detect_capabilities
 from quality_runner.discovery import inspect_repo
@@ -18,16 +19,17 @@ from quality_runner.planning import (
 from quality_runner.standards import compile_standards
 
 
-def generated_run_id(now: datetime | None = None) -> str:
+def generated_run_id(now: datetime | None = None, suffix: str | None = None) -> str:
     timestamp = datetime.now(UTC) if now is None else now.astimezone(UTC)
-    return timestamp.strftime("%Y%m%dT%H%M%SZ")
+    run_suffix = uuid4().hex[:8] if suffix is None else suffix
+    return f"{timestamp.strftime('%Y%m%dT%H%M%SZ')}-{run_suffix}"
 
 
 def inspect_payload(
     repo_root: Path, run_id: str | None = None, profile: str = "jakyeamos"
 ) -> dict[str, Any]:
     resolved_run_id = generated_run_id() if run_id is None else run_id
-    run_dir = artifact_dir(repo_root, resolved_run_id)
+    run_dir = prepare_artifact_dir(repo_root, resolved_run_id)
     scan, standards_packet, capability_map = _inspect(repo_root, resolved_run_id, profile)
 
     artifact_paths = {
@@ -52,7 +54,7 @@ def run_payload(
     repo_root: Path, run_id: str | None = None, profile: str = "jakyeamos"
 ) -> dict[str, Any]:
     resolved_run_id = generated_run_id() if run_id is None else run_id
-    run_dir = artifact_dir(repo_root, resolved_run_id)
+    run_dir = prepare_artifact_dir(repo_root, resolved_run_id)
     scan, standards_packet, capability_map = _inspect(repo_root, resolved_run_id, profile)
 
     audit_report = build_audit_report(
@@ -67,6 +69,7 @@ def run_payload(
         capability_map=capability_map,
     )
     _require_valid("remediation plan", validate_remediation_plan(remediation_plan))
+    status = "clean" if not remediation_plan["slices"] else "planned"
 
     artifact_paths = {
         "repo_scan_json": str(run_dir / "repo-scan.json"),
@@ -111,7 +114,7 @@ def run_payload(
 
     return {
         "schema": "quality-runner-run-result-v0.1",
-        "status": "planned",
+        "status": status,
         "implementation_allowed": False,
         "run_id": resolved_run_id,
         "artifact_paths": artifact_paths,

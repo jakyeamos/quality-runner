@@ -145,7 +145,7 @@ def _warnings(payload: dict[str, Any]) -> list[dict[str, str]]:
 
 
 def _severity_for_capability(capability_id: str) -> str:
-    if capability_id in {"lint", "typecheck", "tests", "dead_code", "truth_file"}:
+    if capability_id in {"formatter", "lint", "typecheck", "tests", "dead_code", "truth_file"}:
         return "error"
     return "warning"
 

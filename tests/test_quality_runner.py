@@ -232,6 +232,37 @@ def _write_js_fixture(repo: Path) -> None:
     )
 
 
+def _write_complete_js_fixture(repo: Path) -> None:
+    (repo / "package.json").write_text(
+        json.dumps(
+            {
+                "scripts": {
+                    "format": "prettier --check .",
+                    "lint": "eslint .",
+                    "typecheck": "tsc --noEmit",
+                    "test": "vitest run",
+                    "build": "vite build",
+                    "dead-code": "knip",
+                    "smoke": "playwright test smoke",
+                    "pre-pr": "pre-cr",
+                    "pre-cr": "pre-cr",
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    (repo / "AGENTS.md").write_text(
+        "Always use pnpm. Full lint, typecheck, tests, and dead-code scans are required.\n",
+        encoding="utf-8",
+    )
+    (repo / "pnpm-lock.yaml").write_text("lockfileVersion: '9.0'\n", encoding="utf-8")
+    (repo / ".tracker").mkdir()
+    (repo / ".tracker" / "PROJECT_TRUTH.md").write_text(
+        "---\nprojectName: Complete Fixture\n---\n",
+        encoding="utf-8",
+    )
+
+
 def test_inspect_repo_detects_js_quality_surfaces(tmp_path: Path) -> None:
     from quality_runner.discovery import inspect_repo
 
@@ -803,6 +834,18 @@ def test_run_payload_records_missing_capability_findings(tmp_path: Path) -> None
     assert "missing-truth-file" in finding_ids
 
 
+def test_run_payload_records_missing_formatter_as_error(tmp_path: Path) -> None:
+    from quality_runner.workflow import run_payload
+
+    payload = run_payload(repo_root=tmp_path, run_id="missing-formatter-run", profile="jakyeamos")
+    audit_report = json.loads(Path(payload["artifact_paths"]["audit_report_json"]).read_text())
+
+    formatter_finding = next(
+        finding for finding in audit_report["findings"] if finding["id"] == "missing-formatter"
+    )
+    assert formatter_finding["severity"] == "error"
+
+
 def test_inspect_payload_does_not_write_audit_plan(tmp_path: Path) -> None:
     from quality_runner.workflow import inspect_payload
 
@@ -833,6 +876,67 @@ def test_inspect_payload_rejects_unsafe_run_ids(tmp_path: Path) -> None:
         assert str(error) == "run_id must be a non-empty single path segment"
     else:
         raise AssertionError("inspect_payload accepted a separator run ID")
+
+
+def test_run_payload_rejects_symlinked_run_dir_without_external_writes(tmp_path: Path) -> None:
+    from quality_runner.workflow import run_payload
+
+    _write_js_fixture(tmp_path)
+    external = tmp_path.parent / f"{tmp_path.name}-external-artifacts"
+    external.mkdir()
+    runs_dir = tmp_path / ".quality-runner" / "runs"
+    runs_dir.mkdir(parents=True)
+    (runs_dir / "symlink-run").symlink_to(external, target_is_directory=True)
+
+    try:
+        run_payload(repo_root=tmp_path, run_id="symlink-run", profile="jakyeamos")
+    except ValueError as error:
+        assert str(error) == "artifact path component must not be a symlink"
+    else:
+        raise AssertionError("run_payload accepted a symlinked run directory")
+
+    assert list(external.iterdir()) == []
+
+
+def test_generated_run_id_uses_explicit_suffix_for_collision_resistance() -> None:
+    from datetime import UTC, datetime
+
+    from quality_runner.workflow import generated_run_id
+
+    now = datetime(2026, 1, 2, 3, 4, 5, tzinfo=UTC)
+
+    assert generated_run_id(now=now, suffix="abcdef12") == "20260102T030405Z-abcdef12"
+
+
+def test_run_payload_writes_handoff_warnings(tmp_path: Path) -> None:
+    from quality_runner.workflow import run_payload
+
+    (tmp_path / "package.json").write_text("{not-json", encoding="utf-8")
+
+    payload = run_payload(repo_root=tmp_path, run_id="warning-run", profile="jakyeamos")
+    handoff = json.loads(Path(payload["artifact_paths"]["agent_handoff_json"]).read_text())
+
+    assert {
+        "code": "invalid_package_json",
+        "message": "package.json could not be parsed as JSON",
+        "path": "package.json",
+    } in handoff["warnings"]
+
+
+def test_run_payload_reports_clean_when_no_remediation_slices(tmp_path: Path) -> None:
+    from quality_runner.workflow import run_payload
+
+    _write_complete_js_fixture(tmp_path)
+
+    payload = run_payload(repo_root=tmp_path, run_id="clean-run", profile="jakyeamos")
+    remediation_plan = json.loads(
+        Path(payload["artifact_paths"]["remediation_plan_json"]).read_text()
+    )
+    handoff = json.loads(Path(payload["artifact_paths"]["agent_handoff_json"]).read_text())
+
+    assert payload["status"] == "clean"
+    assert remediation_plan["slices"] == []
+    assert handoff["status"] == "clean"
 
 
 def test_generated_audit_report_validates(tmp_path: Path) -> None:

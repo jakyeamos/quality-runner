@@ -10,6 +10,22 @@ def artifact_dir(repo_root: Path, run_id: str) -> Path:
     return repo_root.expanduser().resolve() / ".quality-runner" / "runs" / run_id
 
 
+def prepare_artifact_dir(repo_root: Path, run_id: str) -> Path:
+    run_dir = artifact_dir(repo_root, run_id)
+    root = repo_root.expanduser().resolve()
+    current = root
+    for segment in (".quality-runner", "runs", run_id):
+        current = current / segment
+        if current.is_symlink():
+            raise ValueError("artifact path component must not be a symlink")
+        if current.exists():
+            if not current.is_dir():
+                raise ValueError("artifact path component must be a directory")
+        else:
+            current.mkdir()
+    return run_dir
+
+
 def write_json(path: Path, payload: dict[str, Any]) -> Path:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")

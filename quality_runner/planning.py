@@ -63,12 +63,14 @@ def build_agent_handoff(
     remediation_plan: dict[str, Any],
     artifact_paths: dict[str, str],
 ) -> dict[str, Any]:
+    status = "clean" if not _slices(remediation_plan) else "planned"
     return {
         "schema": "quality-runner-agent-handoff-v0.1",
         "run_id": _string_or_none(audit_report.get("run_id")),
-        "status": "planned",
+        "status": status,
         "implementation_allowed": False,
         "artifact_paths": artifact_paths,
+        "warnings": _warnings(remediation_plan),
         "finding_ids": [finding["id"] for finding in _findings(audit_report)],
         "slice_ids": [slice_item["id"] for slice_item in _slices(remediation_plan)],
     }
@@ -92,6 +94,21 @@ def render_handoff_markdown(handoff: dict[str, Any]) -> str:
             value = artifact_paths[name]
             if isinstance(value, str):
                 lines.append(f"- {name}: {value}")
+    lines.extend(["", "## Warnings", ""])
+
+    warnings = handoff.get("warnings")
+    if isinstance(warnings, list) and warnings:
+        for warning in warnings:
+            if not isinstance(warning, dict):
+                continue
+            code = warning.get("code")
+            message = warning.get("message")
+            path = warning.get("path")
+            if isinstance(code, str) and isinstance(message, str) and isinstance(path, str):
+                lines.append(f"- {code} ({path}): {message}")
+    else:
+        lines.append("No warnings.")
+
     lines.extend(["", "## Remediation Slices", ""])
 
     slice_ids = handoff.get("slice_ids")
