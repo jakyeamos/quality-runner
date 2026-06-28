@@ -1,8 +1,66 @@
 # Quality Runner
 
-Quality Runner is a standalone audit-and-plan quality orchestrator.
+Quality Runner is a local-first audit-and-plan quality orchestrator for code
+repositories.
 
-Version 1 inspects a target repository, compiles applicable standards, detects available quality capabilities, writes audit artifacts, and produces an ordered remediation plan. It does not edit target source files or create commits.
+It inspects a target repo, compiles standards, detects available quality gates,
+normalizes evidence-backed findings, writes `.quality-runner/` artifacts, and
+produces an ordered remediation plan. Version 1 does not edit source files,
+install dependencies, create commits, call remote services, or execute
+remediation.
+
+## Install
+
+Install from the repository while the package is pre-release:
+
+```bash
+uv tool install git+ssh://git@github.com/jakyeamos/quality-runner.git
+```
+
+For local development:
+
+```bash
+git clone git@github.com:jakyeamos/quality-runner.git
+cd quality-runner
+uv tool install --editable . --force
+```
+
+Verify the installed commands:
+
+```bash
+quality-runner --version
+quality-runner-mcp --version
+quality-runner doctor --json
+```
+
+## Quickstart
+
+Run a full audit-and-plan pass against a repository:
+
+```bash
+quality-runner run /path/to/repo --profile jakyeamos --run-id baseline-001 --json
+```
+
+Quality Runner writes artifacts under the target repo:
+
+```text
+/path/to/repo/.quality-runner/runs/baseline-001/
+  repo-scan.json
+  standards.json
+  capability-matrix.json
+  quality-audit.json
+  remediation-plan.json
+  agent-handoff.json
+  agent-handoff.md
+```
+
+The normal workflow is:
+
+1. Read `agent-handoff.md`.
+2. Review `quality-audit.json` for evidence-backed findings.
+3. Review `remediation-plan.json` for ordered actions and verification gates.
+4. Give an approved remediation slice to a coding agent.
+5. Rerun Quality Runner to confirm findings clear.
 
 ## Commands
 
@@ -13,9 +71,31 @@ quality-runner run /path/to/repo --profile jakyeamos --json
 quality-runner-mcp
 ```
 
-The MCP server exposes `quality_runner_doctor`, `quality_runner_inspect_repo`,
-`quality_runner_run`, `quality_runner_status`, and
-`quality_runner_export_handoff`.
+See [CLI Reference](docs/cli.md) for command details.
+
+## MCP
+
+The MCP server exposes:
+
+- `quality_runner_doctor`
+- `quality_runner_inspect_repo`
+- `quality_runner_run`
+- `quality_runner_status`
+- `quality_runner_export_handoff`
+
+See [MCP Integration](docs/mcp.md) for JSON-RPC examples and tool payloads.
+
+## Artifacts
+
+Quality Runner writes versioned JSON and Markdown artifacts. See
+[Artifact Contract](docs/artifacts.md) for the current v1 artifact set and
+field-level guarantees.
+
+## Standards Profiles
+
+The initial profile is `jakyeamos`. See
+[Standards Profiles](docs/standards-profiles.md) for the current behavior and
+the planned profile-extension boundary.
 
 ## v1 Safety Boundary
 
@@ -25,3 +105,21 @@ create commits, call remote services, or execute remediation.
 
 Every generated remediation slice includes verification guidance, but a separate
 coding agent must receive user approval before implementation.
+
+## Development
+
+Run the full local ladder:
+
+```bash
+python3.14 -m pytest -q
+ruff check .
+ruff format --check .
+basedpyright
+vulture . --min-confidence 70
+uv run --with pytest pytest -q
+python3.14 scripts/run_pytest_with_lcov.py
+pre-cr run --workspace .
+```
+
+See [Troubleshooting](docs/troubleshooting.md) for common install and runtime
+issues.

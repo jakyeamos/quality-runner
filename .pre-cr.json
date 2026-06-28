@@ -15,6 +15,7 @@
     ".venv/**",
     "CHANGELOG.md",
     "CONTRIBUTING.md",
+    "docs/**",
     "LICENSE",
     "README.md",
     "SECURITY.md",
