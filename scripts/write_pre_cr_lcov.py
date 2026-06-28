@@ -4,10 +4,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 OUTPUT = ROOT / ".pre-cr" / "coverage.lcov"
-SOURCE_FILES = [
-    ROOT / "quality_runner" / "__init__.py",
-    ROOT / "quality_runner" / "__main__.py",
-]
+SOURCE_FILES = sorted((ROOT / "quality_runner").glob("*.py"))
 
 
 def main() -> int:
