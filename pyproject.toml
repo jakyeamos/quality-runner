@@ -33,7 +33,7 @@ quality-runner = "quality_runner.cli:main"
 quality-runner-mcp = "quality_runner.mcp:main"
 
 [tool.setuptools.package-data]
-quality_runner = ["plugin/*.json", "plugin/*.md"]
+quality_runner = ["plugin/*.json", "plugin/*.md", "schemas/*.json"]
 
 [tool.setuptools.packages.find]
 include = ["quality_runner*"]

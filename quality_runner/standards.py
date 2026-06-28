@@ -3,29 +3,39 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+from quality_runner.config import load_repo_config
+
 STANDARDS_PACKET_SCHEMA = "quality-runner-standards-packet-v0.1"
 SUPPORTED_PROFILES = {"jakyeamos"}
 
 
-def compile_standards(repo_root: Path, scan: dict[str, Any], profile: str) -> dict[str, Any]:
+# fmt: off
+def compile_standards(repo_root: Path, scan: dict[str, Any], profile: str, config: dict[str, Any] | None = None) -> dict[str, Any]:
+# fmt: on
     if profile not in SUPPORTED_PROFILES:
         raise ValueError(f"unsupported standards profile: {profile}")
 
-    warnings = _warnings(scan)
+    resolved_config = load_repo_config(repo_root) if config is None else config
+    warnings = [*_warnings(scan), *_warnings(resolved_config)]
     package_manager = _package_manager(scan, warnings)
 
     return {
         "schema": STANDARDS_PACKET_SCHEMA,
         "profile": profile,
         "repo_root": str(repo_root.expanduser().resolve()),
-        "sources": _sources(scan, profile),
+        "sources": _sources(scan, profile, resolved_config),
+        "config": resolved_config,
         "requirements": _requirements(package_manager),
         "warnings": warnings,
     }
 
 
-def _sources(scan: dict[str, Any], profile: str) -> list[dict[str, str]]:
+def _sources(scan: dict[str, Any], profile: str, config: dict[str, Any]) -> list[dict[str, str]]:
     sources = [{"type": "profile", "path": f"profile:{profile}"}]
+
+    config_path = config.get("path")
+    if isinstance(config_path, str) and config_path:
+        sources.append({"type": "config", "path": config_path})
 
     instruction_files = scan.get("agent_instruction_files")
     if isinstance(instruction_files, list):

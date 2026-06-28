@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://quality-runner.dev/schemas/capability-matrix.schema.json",
+  "title": "Quality Runner Capability Matrix",
+  "type": "object",
+  "required": ["schema", "profile", "available", "missing", "warnings"],
+  "properties": {
+    "schema": { "const": "quality-runner-capability-map-v0.1" },
+    "profile": { "type": ["string", "null"] },
+    "available": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/capability" }
+    },
+    "missing": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/missingCapability" }
+    },
+    "accepted_exceptions": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/acceptedException" },
+      "default": []
+    },
+    "warnings": { "$ref": "#/$defs/warnings" }
+  },
+  "$defs": {
+    "capability": {
+      "type": "object",
+      "required": ["id", "type", "source"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "type": { "type": "string", "minLength": 1 },
+        "source": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": false
+    },
+    "missingCapability": {
+      "type": "object",
+      "required": ["id", "type", "reason"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "type": { "type": "string", "minLength": 1 },
+        "reason": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": false
+    },
+    "acceptedException": {
+      "type": "object",
+      "required": ["capability", "reason", "expires"],
+      "properties": {
+        "capability": { "type": "string", "minLength": 1 },
+        "reason": { "type": "string", "minLength": 1 },
+        "expires": { "type": "string", "format": "date" }
+      },
+      "additionalProperties": false
+    },
+    "warnings": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/warning" }
+    },
+    "warning": {
+      "type": "object",
+      "required": ["code", "message", "path"],
+      "properties": {
+        "code": { "type": "string", "minLength": 1 },
+        "message": { "type": "string", "minLength": 1 },
+        "path": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": false
+    }
+  }
+}

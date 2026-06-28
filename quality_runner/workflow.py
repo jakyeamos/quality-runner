@@ -8,6 +8,7 @@ from uuid import uuid4
 from quality_runner.artifacts import prepare_artifact_dir, write_json, write_text
 from quality_runner.audit import build_audit_report
 from quality_runner.capabilities import detect_capabilities
+from quality_runner.config import load_repo_config
 from quality_runner.discovery import inspect_repo
 from quality_runner.findings import (
     validate_agent_handoff,
@@ -29,7 +30,7 @@ def generated_run_id(now: datetime | None = None, suffix: str | None = None) -> 
 
 
 def inspect_payload(
-    repo_root: Path, run_id: str | None = None, profile: str = "jakyeamos"
+    repo_root: Path, run_id: str | None = None, profile: str | None = None
 ) -> dict[str, Any]:
     resolved_run_id = generated_run_id() if run_id is None else run_id
     run_dir = prepare_artifact_dir(repo_root, resolved_run_id)
@@ -54,7 +55,7 @@ def inspect_payload(
 
 
 def run_payload(
-    repo_root: Path, run_id: str | None = None, profile: str = "jakyeamos"
+    repo_root: Path, run_id: str | None = None, profile: str | None = None
 ) -> dict[str, Any]:
     resolved_run_id = generated_run_id() if run_id is None else run_id
     run_dir = prepare_artifact_dir(repo_root, resolved_run_id)
@@ -117,12 +118,14 @@ def run_payload(
 
 
 def _inspect(
-    repo_root: Path,
-    run_id: str,
-    profile: str,
+    repo_root: Path, run_id: str, profile: str | None
 ) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
     scan = inspect_repo(repo_root, run_id=run_id)
-    standards_packet = compile_standards(repo_root=repo_root, scan=scan, profile=profile)
+    config = load_repo_config(repo_root)
+    resolved_profile = profile or _string_or_default(config.get("default_profile"), "jakyeamos")
+    standards_packet = compile_standards(
+        repo_root=repo_root, scan=scan, profile=resolved_profile, config=config
+    )
     capability_map = detect_capabilities(scan=scan, standards_packet=standards_packet)
     return scan, standards_packet, capability_map
 
@@ -136,3 +139,7 @@ def _require_valid(name: str, result: dict[str, Any]) -> None:
     else:
         message = "unknown validation error"
     raise ValueError(f"invalid {name}: {message}")
+
+
+def _string_or_default(value: object, default: str) -> str:
+    return value if isinstance(value, str) and value else default

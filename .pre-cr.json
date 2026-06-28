@@ -20,6 +20,7 @@
     "README.md",
     "SECURITY.md",
     "pyproject.toml",
+    "quality_runner/schemas/**",
     "scripts/**",
     "tests/**"
   ],

@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://quality-runner.dev/schemas/agent-handoff.schema.json",
+  "title": "Quality Runner Agent Handoff",
+  "type": "object",
+  "required": ["schema", "status", "implementation_allowed", "artifact_paths", "warnings", "finding_ids", "slice_ids", "verification_gates"],
+  "properties": {
+    "schema": { "const": "quality-runner-agent-handoff-v0.1" },
+    "run_id": { "type": ["string", "null"] },
+    "status": { "enum": ["clean", "planned"] },
+    "implementation_allowed": { "const": false },
+    "artifact_paths": {
+      "type": "object",
+      "additionalProperties": { "type": "string" }
+    },
+    "warnings": { "$ref": "#/$defs/warnings" },
+    "finding_ids": { "type": "array", "items": { "type": "string" } },
+    "slice_ids": { "type": "array", "items": { "type": "string" } },
+    "next_slice": { "type": ["object", "null"] },
+    "verification_gates": { "type": "array", "items": { "type": "string" } }
+  },
+  "$defs": {
+    "warnings": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/warning" }
+    },
+    "warning": {
+      "type": "object",
+      "required": ["code", "message", "path"],
+      "properties": {
+        "code": { "type": "string", "minLength": 1 },
+        "message": { "type": "string", "minLength": 1 },
+        "path": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": false
+    }
+  }
+}
