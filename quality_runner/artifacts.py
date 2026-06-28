@@ -27,13 +27,13 @@ def prepare_artifact_dir(repo_root: Path, run_id: str) -> Path:
 
 
 def write_json(path: Path, payload: dict[str, Any]) -> Path:
-    path.parent.mkdir(parents=True, exist_ok=True)
+    _prepare_artifact_file(path)
     path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     return path
 
 
 def write_text(path: Path, content: str) -> Path:
-    path.parent.mkdir(parents=True, exist_ok=True)
+    _prepare_artifact_file(path)
     path.write_text(content, encoding="utf-8")
     return path
 
@@ -51,3 +51,11 @@ def _validate_run_id(run_id: str) -> None:
         or any(part in {".", ".."} for part in path.parts)
     ):
         raise ValueError("run_id must be a non-empty single path segment")
+
+
+def _prepare_artifact_file(path: Path) -> None:
+    if path.parent.is_symlink():
+        raise ValueError("artifact file must not be a symlink")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if path.parent.is_symlink() or path.is_symlink():
+        raise ValueError("artifact file must not be a symlink")

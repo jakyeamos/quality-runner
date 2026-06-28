@@ -192,6 +192,25 @@ def test_write_json_creates_parent_and_stable_json(tmp_path: Path) -> None:
     assert path.read_text(encoding="utf-8") == '{\n  "a": 1,\n  "b": 2\n}\n'
 
 
+def test_write_json_rejects_symlink_leaf_without_external_write(tmp_path: Path) -> None:
+    from quality_runner.artifacts import write_json
+
+    external = tmp_path / "external.json"
+    external.write_text("sentinel\n", encoding="utf-8")
+    target = tmp_path / "nested" / "payload.json"
+    target.parent.mkdir()
+    target.symlink_to(external)
+
+    try:
+        write_json(target, {"changed": True})
+    except ValueError as error:
+        assert str(error) == "artifact file must not be a symlink"
+    else:
+        raise AssertionError("write_json accepted a symlink leaf")
+
+    assert external.read_text(encoding="utf-8") == "sentinel\n"
+
+
 def test_write_text_creates_parent_returns_path_and_writes_exact_content(tmp_path: Path) -> None:
     from quality_runner.artifacts import write_text
 
@@ -896,6 +915,28 @@ def test_run_payload_rejects_symlinked_run_dir_without_external_writes(tmp_path:
         raise AssertionError("run_payload accepted a symlinked run directory")
 
     assert list(external.iterdir()) == []
+
+
+def test_run_payload_rejects_symlinked_artifact_leaf_without_external_write(
+    tmp_path: Path,
+) -> None:
+    from quality_runner.workflow import run_payload
+
+    _write_js_fixture(tmp_path)
+    run_dir = tmp_path / ".quality-runner" / "runs" / "leaf-symlink-run"
+    run_dir.mkdir(parents=True)
+    external = tmp_path.parent / f"{tmp_path.name}-external-handoff.json"
+    external.write_text("sentinel\n", encoding="utf-8")
+    (run_dir / "agent-handoff.json").symlink_to(external)
+
+    try:
+        run_payload(repo_root=tmp_path, run_id="leaf-symlink-run", profile="jakyeamos")
+    except ValueError as error:
+        assert str(error) == "artifact file must not be a symlink"
+    else:
+        raise AssertionError("run_payload accepted a symlinked artifact leaf")
+
+    assert external.read_text(encoding="utf-8") == "sentinel\n"
 
 
 def test_generated_run_id_uses_explicit_suffix_for_collision_resistance() -> None:
