@@ -88,13 +88,13 @@ def call_tool(name: str, arguments: dict[str, Any] | None = None) -> dict[str, A
 
     if name == "quality_runner_inspect_repo":
         repo_root = _validated_repo_root(args)
-        run_id = _string_arg(args, "run_id") or generated_run_id(suffix="quality-runner-mcp")
+        run_id = _string_arg(args, "run_id") or generated_run_id()
         profile = _string_arg(args, "standards") or "jakyeamos"
         return _tool_result(inspect_payload(repo_root=repo_root, run_id=run_id, profile=profile))
 
     if name == "quality_runner_run":
         repo_root = _validated_repo_root(args)
-        run_id = _string_arg(args, "run_id") or generated_run_id(suffix="quality-runner-mcp")
+        run_id = _string_arg(args, "run_id") or generated_run_id()
         profile = _string_arg(args, "standards") or "jakyeamos"
         return _tool_result(run_payload(repo_root=repo_root, run_id=run_id, profile=profile))
 
@@ -201,8 +201,8 @@ def _doctor_payload() -> dict[str, Any]:
 def _status_payload(repo_root: Path) -> dict[str, Any]:
     runs_dir = repo_root / ".quality-runner" / "runs"
     runs = (
-        sorted(path.name for path in runs_dir.iterdir() if path.is_dir())
-        if runs_dir.exists()
+        sorted(path.name for path in runs_dir.iterdir() if path.is_dir() and not path.is_symlink())
+        if runs_dir.exists() and not runs_dir.is_symlink()
         else []
     )
     return {
@@ -214,7 +214,11 @@ def _status_payload(repo_root: Path) -> dict[str, Any]:
 
 
 def _export_handoff_payload(repo_root: Path, run_id: str) -> dict[str, Any]:
-    handoff_path = artifact_dir(repo_root, run_id) / "agent-handoff.md"
+    run_dir = artifact_dir(repo_root, run_id)
+    _reject_symlinked_artifact_components(run_dir, repo_root)
+    handoff_path = run_dir / "agent-handoff.md"
+    if handoff_path.is_symlink():
+        raise ValueError("artifact file must not be a symlink")
     if not handoff_path.exists():
         raise FileNotFoundError(f"agent handoff does not exist: {handoff_path}")
     if not handoff_path.is_file():
@@ -267,6 +271,13 @@ def _validated_repo_root(arguments: dict[str, Any]) -> Path:
     if not repo_root.is_dir():
         raise NotADirectoryError(f"repo root is not a directory: {repo_root}")
     return repo_root
+
+
+def _reject_symlinked_artifact_components(run_dir: Path, repo_root: Path) -> None:
+    root = repo_root.expanduser().resolve()
+    for component in (root / ".quality-runner", root / ".quality-runner" / "runs", run_dir):
+        if component.is_symlink():
+            raise ValueError("artifact path component must not be a symlink")
 
 
 if __name__ == "__main__":

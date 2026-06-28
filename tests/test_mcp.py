@@ -44,6 +44,23 @@ def test_mcp_run_returns_structured_content(tmp_path: Path) -> None:
     assert Path(structured["artifact_paths"]["agent_handoff_md"]).exists()
 
 
+def test_mcp_default_run_ids_do_not_collide_for_quick_calls(tmp_path: Path) -> None:
+    write_js_fixture(tmp_path)
+
+    results = [
+        call_tool("quality_runner_inspect_repo", {"repo_root": str(tmp_path)}),
+        call_tool("quality_runner_inspect_repo", {"repo_root": str(tmp_path)}),
+        call_tool("quality_runner_run", {"repo_root": str(tmp_path)}),
+        call_tool("quality_runner_run", {"repo_root": str(tmp_path)}),
+    ]
+
+    run_ids = [result["structuredContent"]["run_id"] for result in results]
+    assert len(set(run_ids)) == len(run_ids)
+    assert sorted(
+        path.name for path in (tmp_path / ".quality-runner" / "runs").iterdir()
+    ) == sorted(run_ids)
+
+
 def test_mcp_jsonrpc_tools_call(tmp_path: Path) -> None:
     write_js_fixture(tmp_path)
 
@@ -133,6 +150,20 @@ def test_mcp_status_lists_existing_runs(tmp_path: Path) -> None:
     }
 
 
+def test_mcp_status_excludes_symlinked_run_directories(tmp_path: Path) -> None:
+    write_js_fixture(tmp_path)
+    call_tool("quality_runner_run", {"repo_root": str(tmp_path), "run_id": "real-run"})
+    external_run = tmp_path.parent / f"{tmp_path.name}-external-run"
+    external_run.mkdir()
+    runs_dir = tmp_path / ".quality-runner" / "runs"
+    (runs_dir / "linked-run").symlink_to(external_run, target_is_directory=True)
+
+    result = call_tool("quality_runner_status", {"repo_root": str(tmp_path)})
+
+    assert result["isError"] is False
+    assert result["structuredContent"]["runs"] == ["real-run"]
+
+
 def test_mcp_export_handoff_returns_existing_handoff(tmp_path: Path) -> None:
     write_js_fixture(tmp_path)
     call_tool("quality_runner_run", {"repo_root": str(tmp_path), "run_id": "handoff-run"})
@@ -166,6 +197,72 @@ def test_mcp_export_handoff_rejects_unsafe_run_id(tmp_path: Path) -> None:
     assert response is not None
     assert response["error"]["code"] == -32602
     assert response["error"]["message"] == "run_id must be a non-empty single path segment"
+
+
+def test_mcp_export_handoff_rejects_symlinked_handoff_leaf_without_leaking_contents(
+    tmp_path: Path,
+) -> None:
+    external_handoff = tmp_path.parent / f"{tmp_path.name}-external-handoff.md"
+    external_handoff.write_text("external secret handoff\n", encoding="utf-8")
+    run_dir = tmp_path / ".quality-runner" / "runs" / "linked-leaf"
+    run_dir.mkdir(parents=True)
+    (run_dir / "agent-handoff.md").symlink_to(external_handoff)
+
+    response = handle_jsonrpc_message(
+        {
+            "jsonrpc": "2.0",
+            "id": 21,
+            "method": "tools/call",
+            "params": {
+                "name": "quality_runner_export_handoff",
+                "arguments": {"repo_root": str(tmp_path), "run_id": "linked-leaf"},
+            },
+        }
+    )
+
+    assert response is not None
+    assert response["error"]["code"] == -32602
+    assert response["error"]["message"] == "artifact file must not be a symlink"
+    assert "external secret handoff" not in json.dumps(response)
+
+
+def test_mcp_export_handoff_rejects_symlinked_artifact_directories(tmp_path: Path) -> None:
+    cases = [
+        (".quality-runner",),
+        (".quality-runner", "runs"),
+        (".quality-runner", "runs", "linked-run"),
+    ]
+
+    for index, symlink_parts in enumerate(cases):
+        repo = tmp_path / f"repo-{index}"
+        repo.mkdir()
+        external = tmp_path / f"external-{index}"
+        external.mkdir()
+        if symlink_parts == (".quality-runner",):
+            (repo / ".quality-runner").symlink_to(external, target_is_directory=True)
+        elif symlink_parts == (".quality-runner", "runs"):
+            (repo / ".quality-runner").mkdir()
+            (repo / ".quality-runner" / "runs").symlink_to(external, target_is_directory=True)
+        else:
+            runs_dir = repo / ".quality-runner" / "runs"
+            runs_dir.mkdir(parents=True)
+            (runs_dir / "linked-run").symlink_to(external, target_is_directory=True)
+
+        response = handle_jsonrpc_message(
+            {
+                "jsonrpc": "2.0",
+                "id": 22 + index,
+                "method": "tools/call",
+                "params": {
+                    "name": "quality_runner_export_handoff",
+                    "arguments": {"repo_root": str(repo), "run_id": "linked-run"},
+                },
+            }
+        )
+
+        assert response is not None
+        assert response["error"]["code"] == -32602
+        assert response["error"]["message"] == "artifact path component must not be a symlink"
 
 
 def test_mcp_main_preserves_version_behavior(capsys) -> None:
