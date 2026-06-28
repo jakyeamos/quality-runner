@@ -69,7 +69,7 @@ def detect_capabilities(
         "profile": profile if isinstance(profile, str) else None,
         "available": available,
         "missing": missing,
-        "warnings": _warnings(scan),
+        "warnings": _combined_warnings(scan, standards_packet),
     }
 
 
@@ -139,3 +139,17 @@ def _warnings(scan: dict[str, Any]) -> list[dict[str, str]]:
         if isinstance(code, str) and isinstance(message, str) and isinstance(path, str):
             normalized.append({"code": code, "message": message, "path": path})
     return normalized
+
+
+def _combined_warnings(
+    scan: dict[str, Any],
+    standards_packet: dict[str, Any],
+) -> list[dict[str, str]]:
+    combined: list[dict[str, str]] = []
+    seen: set[tuple[str, str, str]] = set()
+    for warning in [*_warnings(scan), *_warnings(standards_packet)]:
+        key = (warning["code"], warning["message"], warning["path"])
+        if key not in seen:
+            combined.append(warning)
+            seen.add(key)
+    return combined

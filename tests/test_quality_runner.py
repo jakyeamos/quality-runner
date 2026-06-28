@@ -418,6 +418,22 @@ def test_compile_standards_handles_malformed_package_manager() -> None:
     assert "package_manager_mismatch" in requirement_ids
 
 
+def test_detect_capabilities_includes_standards_warnings() -> None:
+    from quality_runner.capabilities import detect_capabilities
+    from quality_runner.standards import compile_standards
+
+    scan = {"package_manager": []}
+    packet = compile_standards(repo_root=Path("/tmp"), scan=scan, profile="jakyeamos")
+
+    capability_map = detect_capabilities(scan=scan, standards_packet=packet)
+
+    assert {
+        "code": "invalid_package_manager",
+        "message": "scan package_manager must be a string or null",
+        "path": "package_manager",
+    } in capability_map["warnings"]
+
+
 def test_detect_capabilities_records_missing_expected_surfaces(tmp_path: Path) -> None:
     from quality_runner.capabilities import detect_capabilities
     from quality_runner.discovery import inspect_repo
