@@ -83,6 +83,72 @@ def test_artifact_dir_uses_quality_runner_namespace(tmp_path: Path) -> None:
     assert path == tmp_path / ".quality-runner" / "runs" / "run-001"
 
 
+def test_artifact_dir_rejects_absolute_run_ids(tmp_path: Path) -> None:
+    from quality_runner.artifacts import artifact_dir
+
+    try:
+        artifact_dir(tmp_path, "/tmp/run-001")
+    except ValueError as error:
+        assert str(error) == "run_id must be a non-empty single path segment"
+    else:
+        raise AssertionError("artifact_dir accepted an absolute run ID")
+
+
+def test_artifact_dir_rejects_parent_traversal_run_ids(tmp_path: Path) -> None:
+    from quality_runner.artifacts import artifact_dir
+
+    try:
+        artifact_dir(tmp_path, "../escape")
+    except ValueError as error:
+        assert str(error) == "run_id must be a non-empty single path segment"
+    else:
+        raise AssertionError("artifact_dir accepted a parent traversal run ID")
+
+
+def test_artifact_dir_rejects_empty_run_ids(tmp_path: Path) -> None:
+    from quality_runner.artifacts import artifact_dir
+
+    try:
+        artifact_dir(tmp_path, "")
+    except ValueError as error:
+        assert str(error) == "run_id must be a non-empty single path segment"
+    else:
+        raise AssertionError("artifact_dir accepted an empty run ID")
+
+
+def test_artifact_dir_rejects_separator_run_ids(tmp_path: Path) -> None:
+    from quality_runner.artifacts import artifact_dir
+
+    try:
+        artifact_dir(tmp_path, "nested/run")
+    except ValueError as error:
+        assert str(error) == "run_id must be a non-empty single path segment"
+    else:
+        raise AssertionError("artifact_dir accepted a separator run ID")
+
+
+def test_artifact_dir_rejects_dot_run_ids(tmp_path: Path) -> None:
+    from quality_runner.artifacts import artifact_dir
+
+    try:
+        artifact_dir(tmp_path, ".")
+    except ValueError as error:
+        assert str(error) == "run_id must be a non-empty single path segment"
+    else:
+        raise AssertionError("artifact_dir accepted a dot run ID")
+
+
+def test_artifact_dir_rejects_parent_run_ids(tmp_path: Path) -> None:
+    from quality_runner.artifacts import artifact_dir
+
+    try:
+        artifact_dir(tmp_path, "..")
+    except ValueError as error:
+        assert str(error) == "run_id must be a non-empty single path segment"
+    else:
+        raise AssertionError("artifact_dir accepted a parent run ID")
+
+
 def test_write_json_creates_parent_and_stable_json(tmp_path: Path) -> None:
     from quality_runner.artifacts import write_json
 
@@ -117,6 +183,33 @@ def test_validate_audit_report_rejects_findings_without_evidence() -> None:
     assert result["errors"] == ["finding missing-evidence has no evidence"]
 
 
+def test_validate_audit_report_rejects_missing_findings() -> None:
+    from quality_runner.findings import validate_audit_report
+
+    result = validate_audit_report({})
+
+    assert result["passed"] is False
+    assert result["errors"] == ["audit report findings must be a list"]
+
+
+def test_validate_audit_report_rejects_non_list_findings() -> None:
+    from quality_runner.findings import validate_audit_report
+
+    result = validate_audit_report({"findings": "not-a-list"})
+
+    assert result["passed"] is False
+    assert result["errors"] == ["audit report findings must be a list"]
+
+
+def test_validate_audit_report_rejects_non_dict_findings() -> None:
+    from quality_runner.findings import validate_audit_report
+
+    result = validate_audit_report({"findings": ["not-a-dict"]})
+
+    assert result["passed"] is False
+    assert result["errors"] == ["finding at index 0 is not an object"]
+
+
 def test_validate_remediation_plan_rejects_slices_without_verification() -> None:
     from quality_runner.findings import validate_remediation_plan
 
@@ -136,3 +229,30 @@ def test_validate_remediation_plan_rejects_slices_without_verification() -> None
 
     assert result["passed"] is False
     assert result["errors"] == ["slice slice-001 has no verification"]
+
+
+def test_validate_remediation_plan_rejects_missing_slices() -> None:
+    from quality_runner.findings import validate_remediation_plan
+
+    result = validate_remediation_plan({})
+
+    assert result["passed"] is False
+    assert result["errors"] == ["remediation plan slices must be a list"]
+
+
+def test_validate_remediation_plan_rejects_non_list_slices() -> None:
+    from quality_runner.findings import validate_remediation_plan
+
+    result = validate_remediation_plan({"slices": "not-a-list"})
+
+    assert result["passed"] is False
+    assert result["errors"] == ["remediation plan slices must be a list"]
+
+
+def test_validate_remediation_plan_rejects_non_dict_slices() -> None:
+    from quality_runner.findings import validate_remediation_plan
+
+    result = validate_remediation_plan({"slices": ["not-a-dict"]})
+
+    assert result["passed"] is False
+    assert result["errors"] == ["slice at index 0 is not an object"]
