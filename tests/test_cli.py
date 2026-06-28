@@ -82,6 +82,237 @@ def test_cli_doctor_json_reports_ready() -> None:
     assert payload["environment"]["python_executable"]
 
 
+def test_cli_init_writes_starter_config(tmp_path: Path) -> None:
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "quality_runner",
+            "init",
+            str(tmp_path),
+            "--required-capability",
+            "lint",
+            "--required-capability",
+            "tests",
+            "--json",
+        ],
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+    payload = json.loads(result.stdout)
+    config_path = tmp_path / ".quality-runner.toml"
+
+    assert payload == {
+        "schema": "quality-runner-init-result-v0.1",
+        "status": "created",
+        "config_path": str(config_path),
+        "implementation_allowed": False,
+    }
+    assert config_path.read_text(encoding="utf-8") == (
+        "[quality_runner]\n"
+        'default_profile = "jakyeamos"\n'
+        'required_capabilities = ["lint", "tests"]\n'
+    )
+
+
+def test_cli_init_refuses_existing_config_without_force(tmp_path: Path) -> None:
+    (tmp_path / ".quality-runner.toml").write_text("[quality_runner]\n", encoding="utf-8")
+
+    result = subprocess.run(
+        [sys.executable, "-m", "quality_runner", "init", str(tmp_path), "--json"],
+        cwd=ROOT,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 1
+    assert "already exists" in result.stderr
+    assert result.stdout == ""
+
+
+def test_cli_status_json_reports_config_and_latest_run(tmp_path: Path) -> None:
+    write_js_fixture(tmp_path)
+    (tmp_path / ".quality-runner.toml").write_text(
+        '[quality_runner]\ndefault_profile = "jakyeamos"\n',
+        encoding="utf-8",
+    )
+    subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "quality_runner",
+            "run",
+            str(tmp_path),
+            "--run-id",
+            "cli-status-run",
+            "--json",
+        ],
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+    result = subprocess.run(
+        [sys.executable, "-m", "quality_runner", "status", str(tmp_path), "--json"],
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+    payload = json.loads(result.stdout)
+    assert payload["schema"] == "quality-runner-status-result-v0.1"
+    assert payload["status"] == "ready"
+    assert payload["config"]["path"] == ".quality-runner.toml"
+    assert payload["latest_run"]["run_id"] == "cli-status-run"
+    assert payload["latest_run"]["has_handoff"] is True
+
+
+def test_cli_export_handoff_prints_latest_handoff(tmp_path: Path) -> None:
+    write_js_fixture(tmp_path)
+    subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "quality_runner",
+            "run",
+            str(tmp_path),
+            "--run-id",
+            "cli-export-run",
+            "--json",
+        ],
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+    result = subprocess.run(
+        [sys.executable, "-m", "quality_runner", "export-handoff", str(tmp_path)],
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.stdout.startswith("# Quality Runner Agent Handoff\n")
+    assert "remediate-missing-formatter" in result.stdout
+
+
+def test_cli_export_handoff_writes_selected_run_to_output(tmp_path: Path) -> None:
+    write_js_fixture(tmp_path)
+    subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "quality_runner",
+            "run",
+            str(tmp_path),
+            "--run-id",
+            "cli-export-output",
+            "--json",
+        ],
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+    output_path = tmp_path / "handoff.md"
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "quality_runner",
+            "export-handoff",
+            str(tmp_path),
+            "--run-id",
+            "cli-export-output",
+            "--output",
+            str(output_path),
+            "--json",
+        ],
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+    payload = json.loads(result.stdout)
+    assert payload["schema"] == "quality-runner-export-handoff-result-v0.1"
+    assert payload["status"] == "exported"
+    assert payload["run_id"] == "cli-export-output"
+    assert payload["output_path"] == str(output_path)
+    assert output_path.read_text(encoding="utf-8").startswith("# Quality Runner Agent Handoff\n")
+
+
+def test_cli_main_new_commands_in_process(tmp_path: Path, capsys) -> None:
+    from quality_runner.cli import main
+
+    assert (
+        main(
+            [
+                "init",
+                str(tmp_path),
+                "--required-capability",
+                "lint",
+                "--json",
+            ]
+        )
+        == 0
+    )
+    init_payload = json.loads(capsys.readouterr().out)
+    assert init_payload["status"] == "created"
+
+    assert main(["status", str(tmp_path)]) == 0
+    assert "latest run: none" in capsys.readouterr().out
+
+    write_js_fixture(tmp_path)
+    assert main(["run", str(tmp_path), "--run-id", "direct-cli-run", "--json"]) == 0
+    capsys.readouterr()
+
+    assert main(["status", str(tmp_path), "--json"]) == 0
+    status_payload = json.loads(capsys.readouterr().out)
+    assert status_payload["latest_run"]["run_id"] == "direct-cli-run"
+
+    assert main(["export-handoff", str(tmp_path), "--run-id", "direct-cli-run"]) == 0
+    assert capsys.readouterr().out.startswith("# Quality Runner Agent Handoff\n")
+
+    output_path = tmp_path / "direct-handoff.md"
+    assert (
+        main(
+            [
+                "export-handoff",
+                str(tmp_path),
+                "--run-id",
+                "direct-cli-run",
+                "--output",
+                str(output_path),
+            ]
+        )
+        == 0
+    )
+    assert f"handoff: {output_path.resolve()}" in capsys.readouterr().out
+    assert output_path.exists()
+
+
+def test_cli_main_reports_init_conflict_in_process(tmp_path: Path, capsys) -> None:
+    from quality_runner.cli import main
+
+    (tmp_path / ".quality-runner.toml").write_text("[quality_runner]\n", encoding="utf-8")
+
+    assert main(["init", str(tmp_path), "--json"]) == 1
+    captured = capsys.readouterr()
+
+    assert "already exists" in captured.err
+    assert captured.out == ""
+
+
 def test_cli_invalid_repo_path_fails_without_traceback(tmp_path: Path) -> None:
     missing_repo = tmp_path / "missing"
 

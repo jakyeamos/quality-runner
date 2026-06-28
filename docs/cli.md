@@ -35,6 +35,27 @@ Writes:
 - `standards.json`
 - `capability-matrix.json`
 
+## `quality-runner init`
+
+Writes a starter `.quality-runner.toml`.
+
+```bash
+quality-runner init /path/to/repo \
+  --required-capability lint \
+  --required-capability tests \
+  --json
+```
+
+Use `--force` to replace an existing config.
+
+## `quality-runner status`
+
+Reports the normalized repo config and latest run metadata.
+
+```bash
+quality-runner status /path/to/repo --json
+```
+
 ## `quality-runner run`
 
 Runs the full audit-and-plan workflow.
@@ -52,6 +73,15 @@ Writes:
 - `remediation-plan.json`
 - `agent-handoff.json`
 - `agent-handoff.md`
+
+## `quality-runner export-handoff`
+
+Prints the latest `agent-handoff.md`, or a selected run handoff.
+
+```bash
+quality-runner export-handoff /path/to/repo
+quality-runner export-handoff /path/to/repo --run-id baseline-001 --output handoff.md --json
+```
 
 ## Exit Behavior
 
