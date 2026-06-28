@@ -192,6 +192,17 @@ def test_write_json_creates_parent_and_stable_json(tmp_path: Path) -> None:
     assert path.read_text(encoding="utf-8") == '{\n  "a": 1,\n  "b": 2\n}\n'
 
 
+def test_write_text_creates_parent_returns_path_and_writes_exact_content(tmp_path: Path) -> None:
+    from quality_runner.artifacts import write_text
+
+    target = tmp_path / "nested" / "report.txt"
+    path = write_text(target, "line 1\nline 2")
+
+    assert path == target
+    assert path.exists()
+    assert path.read_text(encoding="utf-8") == "line 1\nline 2"
+
+
 def test_validate_audit_report_rejects_findings_without_evidence() -> None:
     from quality_runner.findings import validate_audit_report
 
@@ -214,6 +225,36 @@ def test_validate_audit_report_rejects_findings_without_evidence() -> None:
 
     assert result["passed"] is False
     assert result["errors"] == ["finding missing-evidence has no evidence"]
+
+
+def test_validate_audit_report_rejects_missing_schema() -> None:
+    from quality_runner.findings import validate_audit_report
+
+    result = validate_audit_report({"findings": []})
+
+    assert result["passed"] is False
+    assert result["errors"] == ["audit report schema must be quality-runner-audit-report-v0.1"]
+
+
+def test_validate_audit_report_rejects_missing_required_finding_fields() -> None:
+    from quality_runner.findings import validate_audit_report
+
+    result = validate_audit_report(
+        {
+            "schema": "quality-runner-audit-report-v0.1",
+            "findings": [{"evidence": ["line 1"]}],
+        }
+    )
+
+    assert result["passed"] is False
+    assert result["errors"] == [
+        "finding at index 0 field id must be a non-empty string",
+        "finding at index 0 field severity must be a non-empty string",
+        "finding at index 0 field category must be a non-empty string",
+        "finding at index 0 field summary must be a non-empty string",
+        "finding at index 0 field recommended_fix must be a non-empty string",
+        "finding unknown has no verification",
+    ]
 
 
 def test_validate_audit_report_rejects_missing_findings() -> None:
@@ -262,6 +303,35 @@ def test_validate_remediation_plan_rejects_slices_without_verification() -> None
 
     assert result["passed"] is False
     assert result["errors"] == ["slice slice-001 has no verification"]
+
+
+def test_validate_remediation_plan_rejects_missing_schema() -> None:
+    from quality_runner.findings import validate_remediation_plan
+
+    result = validate_remediation_plan({"slices": []})
+
+    assert result["passed"] is False
+    assert result["errors"] == [
+        "remediation plan schema must be quality-runner-remediation-plan-v0.1"
+    ]
+
+
+def test_validate_remediation_plan_rejects_missing_required_slice_fields() -> None:
+    from quality_runner.findings import validate_remediation_plan
+
+    result = validate_remediation_plan(
+        {
+            "schema": "quality-runner-remediation-plan-v0.1",
+            "slices": [{"verification": ["run tests"]}],
+        }
+    )
+
+    assert result["passed"] is False
+    assert result["errors"] == [
+        "slice at index 0 field id must be a non-empty string",
+        "slice at index 0 field title must be a non-empty string",
+        "slice unknown has no findings",
+    ]
 
 
 def test_validate_remediation_plan_rejects_missing_slices() -> None:
