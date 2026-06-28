@@ -127,6 +127,39 @@ def test_artifact_dir_rejects_separator_run_ids(tmp_path: Path) -> None:
         raise AssertionError("artifact_dir accepted a separator run ID")
 
 
+def test_artifact_dir_rejects_backslash_separator_run_ids(tmp_path: Path) -> None:
+    from quality_runner.artifacts import artifact_dir
+
+    try:
+        artifact_dir(tmp_path, "nested\\run")
+    except ValueError as error:
+        assert str(error) == "run_id must be a non-empty single path segment"
+    else:
+        raise AssertionError("artifact_dir accepted a backslash separator run ID")
+
+
+def test_artifact_dir_rejects_windows_absolute_run_ids(tmp_path: Path) -> None:
+    from quality_runner.artifacts import artifact_dir
+
+    try:
+        artifact_dir(tmp_path, "C:\\temp\\run")
+    except ValueError as error:
+        assert str(error) == "run_id must be a non-empty single path segment"
+    else:
+        raise AssertionError("artifact_dir accepted a Windows absolute run ID")
+
+
+def test_artifact_dir_rejects_windows_drive_relative_run_ids(tmp_path: Path) -> None:
+    from quality_runner.artifacts import artifact_dir
+
+    try:
+        artifact_dir(tmp_path, "C:run")
+    except ValueError as error:
+        assert str(error) == "run_id must be a non-empty single path segment"
+    else:
+        raise AssertionError("artifact_dir accepted a Windows drive-relative run ID")
+
+
 def test_artifact_dir_rejects_dot_run_ids(tmp_path: Path) -> None:
     from quality_runner.artifacts import artifact_dir
 

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import os
 from pathlib import Path
 from typing import Any
 
@@ -25,13 +24,12 @@ def write_text(path: Path, content: str) -> Path:
 
 def _validate_run_id(run_id: str) -> None:
     path = Path(run_id)
-    separators = {"/", os.sep}
-    if os.altsep is not None:
-        separators.add(os.altsep)
+    separators = {"/", "\\"}
 
     if (
         not run_id
         or run_id in {".", ".."}
+        or ":" in run_id
         or path.is_absolute()
         or any(separator in run_id for separator in separators)
         or any(part in {".", ".."} for part in path.parts)
