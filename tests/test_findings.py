@@ -287,3 +287,75 @@ def test_validate_remediation_plan_rejects_non_string_verification_gate_items() 
 
     assert result["passed"] is False
     assert result["errors"] == ["slice slice-001 has no verification gates"]
+
+
+def test_validate_remediation_plan_rejects_unknown_priority() -> None:
+    from quality_runner.findings import validate_remediation_plan
+
+    plan = {
+        "schema": "quality-runner-remediation-plan-v0.1",
+        "slices": [_valid_remediation_slice(priority="urgent")],
+    }
+
+    result = validate_remediation_plan(plan)
+
+    assert result["passed"] is False
+    assert result["errors"] == ["slice slice-001 priority is not in the allowed vocabulary"]
+
+
+def test_validate_agent_handoff_rejects_unknown_status() -> None:
+    from quality_runner.findings import validate_agent_handoff
+
+    handoff = _valid_agent_handoff(status="started")
+
+    result = validate_agent_handoff(handoff)
+
+    assert result["passed"] is False
+    assert result["errors"] == [
+        "agent handoff status is not in the allowed vocabulary",
+        "agent handoff next_slice must be a remediation slice object",
+    ]
+
+
+def test_validate_agent_handoff_rejects_next_slice_unknown_priority() -> None:
+    from quality_runner.findings import validate_agent_handoff
+
+    handoff = _valid_agent_handoff()
+    handoff["next_slice"] = _valid_remediation_slice(priority="urgent")
+
+    result = validate_agent_handoff(handoff)
+
+    assert result["passed"] is False
+    assert result["errors"] == ["agent handoff next_slice must be a remediation slice object"]
+
+
+def _valid_remediation_slice(priority: str = "high") -> dict[str, object]:
+    return {
+        "id": "slice-001",
+        "title": "Fix missing tests",
+        "priority": priority,
+        "findings": [
+            {
+                "id": "finding-001",
+                "severity": "blocker",
+                "category": "capability",
+                "summary": "Missing tests",
+            }
+        ],
+        "actions": ["Add tests"],
+        "verification_gates": ["Run tests"],
+    }
+
+
+def _valid_agent_handoff(status: str = "planned") -> dict[str, object]:
+    return {
+        "schema": "quality-runner-agent-handoff-v0.1",
+        "status": status,
+        "implementation_allowed": False,
+        "artifact_paths": {"agent_handoff_json": "/tmp/agent-handoff.json"},
+        "warnings": [],
+        "finding_ids": ["finding-001"],
+        "slice_ids": ["slice-001"],
+        "next_slice": _valid_remediation_slice(),
+        "verification_gates": ["Run tests"],
+    }

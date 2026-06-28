@@ -7,6 +7,8 @@ AUDIT_REPORT_SCHEMA = "quality-runner-audit-report-v0.1"
 REMEDIATION_PLAN_SCHEMA = "quality-runner-remediation-plan-v0.1"
 AGENT_HANDOFF_SCHEMA = "quality-runner-agent-handoff-v0.1"
 ALLOWED_SEVERITIES = {"blocker", "warning", "observation"}
+ALLOWED_PRIORITIES = {"high", "medium", "low"}
+ALLOWED_HANDOFF_STATUSES = {"clean", "planned"}
 
 
 def validate_audit_report(report: dict[str, Any]) -> ValidationResult:
@@ -57,6 +59,9 @@ def validate_remediation_plan(plan: dict[str, Any]) -> ValidationResult:
             if not _non_empty_string(slice_item.get(field)):
                 errors.append(f"slice at index {index} field {field} must be a non-empty string")
         slice_id = str(slice_item.get("id", "unknown"))
+        priority = slice_item.get("priority")
+        if isinstance(priority, str) and priority and priority not in ALLOWED_PRIORITIES:
+            errors.append(f"slice {slice_id} priority is not in the allowed vocabulary")
         if not _non_empty_finding_list(slice_item.get("findings")):
             errors.append(f"slice {slice_id} has no findings")
         if not _non_empty_string_list(slice_item.get("actions")):
@@ -71,8 +76,11 @@ def validate_agent_handoff(handoff: dict[str, Any]) -> ValidationResult:
     if handoff.get("schema") != AGENT_HANDOFF_SCHEMA:
         errors.append(f"agent handoff schema must be {AGENT_HANDOFF_SCHEMA}")
 
-    if not _non_empty_string(handoff.get("status")):
+    status = handoff.get("status")
+    if not _non_empty_string(status):
         errors.append("agent handoff status must be a non-empty string")
+    elif status not in ALLOWED_HANDOFF_STATUSES:
+        errors.append("agent handoff status is not in the allowed vocabulary")
 
     if handoff.get("implementation_allowed") is not False:
         errors.append("agent handoff implementation_allowed must be false")
@@ -94,12 +102,13 @@ def validate_agent_handoff(handoff: dict[str, Any]) -> ValidationResult:
     if not _string_list(handoff.get("slice_ids")):
         errors.append("agent handoff slice_ids must be a string list")
 
-    status = handoff.get("status")
     next_slice = handoff.get("next_slice")
     if status == "clean":
         if next_slice is not None:
             errors.append("agent handoff next_slice must be null for clean status")
-    elif not _slice_item(next_slice):
+    elif (status == "planned" and not _slice_item(next_slice)) or (
+        status not in {"clean", "planned"} and next_slice is not None
+    ):
         errors.append("agent handoff next_slice must be a remediation slice object")
 
     if not _string_list(handoff.get("verification_gates")):
@@ -143,6 +152,7 @@ def _slice_item(value: object) -> bool:
         return False
     return (
         all(_non_empty_string(value.get(field)) for field in ("id", "title", "priority"))
+        and value.get("priority") in ALLOWED_PRIORITIES
         and _non_empty_finding_list(value.get("findings"))
         and _non_empty_string_list(value.get("actions"))
         and _non_empty_string_list(value.get("verification_gates"))

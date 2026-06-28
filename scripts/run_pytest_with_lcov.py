@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import sys
 import trace
 from pathlib import Path
 
@@ -8,6 +9,9 @@ import pytest
 ROOT = Path(__file__).resolve().parents[1]
 OUTPUT = ROOT / ".pre-cr" / "coverage.lcov"
 PACKAGE_ROOT = ROOT / "quality_runner"
+
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 
 
 def main() -> int:
