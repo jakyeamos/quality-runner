@@ -6,6 +6,7 @@ ValidationResult = dict[str, Any]
 AUDIT_REPORT_SCHEMA = "quality-runner-audit-report-v0.1"
 REMEDIATION_PLAN_SCHEMA = "quality-runner-remediation-plan-v0.1"
 AGENT_HANDOFF_SCHEMA = "quality-runner-agent-handoff-v0.1"
+ALLOWED_SEVERITIES = {"blocker", "warning", "observation"}
 
 
 def validate_audit_report(report: dict[str, Any]) -> ValidationResult:
@@ -26,6 +27,9 @@ def validate_audit_report(report: dict[str, Any]) -> ValidationResult:
             if not _non_empty_string(finding.get(field)):
                 errors.append(f"finding at index {index} field {field} must be a non-empty string")
         finding_id = str(finding.get("id", "unknown"))
+        severity = finding.get("severity")
+        if isinstance(severity, str) and severity and severity not in ALLOWED_SEVERITIES:
+            errors.append(f"finding {finding_id} severity is not in the allowed vocabulary")
         evidence = finding.get("evidence")
         if not _non_empty_string_list(evidence):
             errors.append(f"finding {finding_id} has no evidence")
@@ -90,6 +94,17 @@ def validate_agent_handoff(handoff: dict[str, Any]) -> ValidationResult:
     if not _string_list(handoff.get("slice_ids")):
         errors.append("agent handoff slice_ids must be a string list")
 
+    status = handoff.get("status")
+    next_slice = handoff.get("next_slice")
+    if status == "clean":
+        if next_slice is not None:
+            errors.append("agent handoff next_slice must be null for clean status")
+    elif not _slice_item(next_slice):
+        errors.append("agent handoff next_slice must be a remediation slice object")
+
+    if not _string_list(handoff.get("verification_gates")):
+        errors.append("agent handoff verification_gates must be a string list")
+
     return {"passed": not errors, "errors": errors}
 
 
@@ -114,8 +129,23 @@ def _non_empty_finding_list(value: object) -> bool:
 def _finding_item(value: object) -> bool:
     if not isinstance(value, dict):
         return False
-    return all(
-        _non_empty_string(value.get(field)) for field in ("id", "severity", "category", "summary")
+    return (
+        all(
+            _non_empty_string(value.get(field))
+            for field in ("id", "severity", "category", "summary")
+        )
+        and value.get("severity") in ALLOWED_SEVERITIES
+    )
+
+
+def _slice_item(value: object) -> bool:
+    if not isinstance(value, dict):
+        return False
+    return (
+        all(_non_empty_string(value.get(field)) for field in ("id", "title", "priority"))
+        and _non_empty_finding_list(value.get("findings"))
+        and _non_empty_string_list(value.get("actions"))
+        and _non_empty_string_list(value.get("verification_gates"))
     )
 
 

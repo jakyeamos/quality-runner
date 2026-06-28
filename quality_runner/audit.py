@@ -13,6 +13,7 @@ def build_audit_report(
 ) -> dict[str, Any]:
     findings = [
         *_missing_capability_findings(capability_map),
+        *_standards_requirement_findings(standards_packet, scan),
         *_warning_findings(capability_map),
     ]
 
@@ -127,6 +128,44 @@ def _warning_findings(capability_map: dict[str, Any]) -> list[dict[str, Any]]:
     return findings
 
 
+def _standards_requirement_findings(
+    standards_packet: dict[str, Any],
+    scan: dict[str, Any],
+) -> list[dict[str, Any]]:
+    requirements = standards_packet.get("requirements")
+    if not isinstance(requirements, list):
+        return []
+
+    findings: list[dict[str, Any]] = []
+    for requirement in requirements:
+        if not isinstance(requirement, dict):
+            continue
+        requirement_id = requirement.get("id")
+        if requirement_id == "package_manager_mismatch":
+            detected = _string_or_default(scan.get("package_manager"), "unknown")
+            findings.append(
+                {
+                    "id": "standard-package-manager-mismatch",
+                    "severity": "warning",
+                    "category": "standard",
+                    "summary": "Detected package manager does not match the pnpm standard.",
+                    "evidence": [
+                        "Expected package manager: pnpm.",
+                        f"Detected package manager: {detected}.",
+                        "Package manager source: package.json packageManager or lockfile discovery.",
+                    ],
+                    "recommended_fix": (
+                        "Align JavaScript dependency management to the pnpm standard."
+                    ),
+                    "verification": [
+                        "Update package metadata and lockfiles to use pnpm.",
+                        "Rerun quality-runner and confirm standard-package-manager-mismatch is absent.",
+                    ],
+                }
+            )
+    return findings
+
+
 def _warnings(payload: dict[str, Any]) -> list[dict[str, str]]:
     warnings = payload.get("warnings")
     if not isinstance(warnings, list):
@@ -146,7 +185,7 @@ def _warnings(payload: dict[str, Any]) -> list[dict[str, str]]:
 
 def _severity_for_capability(capability_id: str) -> str:
     if capability_id in {"formatter", "lint", "typecheck", "tests", "dead_code", "truth_file"}:
-        return "error"
+        return "blocker"
     return "warning"
 
 
@@ -177,3 +216,7 @@ def _markdown_items(value: object) -> list[str]:
 
 def _string_or_none(value: object) -> str | None:
     return value if isinstance(value, str) else None
+
+
+def _string_or_default(value: object, default: str) -> str:
+    return value if isinstance(value, str) and value else default

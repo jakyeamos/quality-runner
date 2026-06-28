@@ -69,6 +69,7 @@ def build_agent_handoff(
     artifact_paths: dict[str, str],
 ) -> dict[str, Any]:
     status = "clean" if not _slices(remediation_plan) else "planned"
+    next_slice = _next_slice(remediation_plan)
     return {
         "schema": AGENT_HANDOFF_SCHEMA,
         "run_id": _string_or_none(audit_report.get("run_id")),
@@ -78,6 +79,8 @@ def build_agent_handoff(
         "warnings": _warnings(remediation_plan),
         "finding_ids": [finding["id"] for finding in _findings(audit_report)],
         "slice_ids": [slice_item["id"] for slice_item in _slices(remediation_plan)],
+        "next_slice": next_slice,
+        "verification_gates": _slice_verification_gates(next_slice),
     }
 
 
@@ -113,6 +116,27 @@ def render_handoff_markdown(handoff: dict[str, Any]) -> str:
                 lines.append(f"- {code} ({path}): {message}")
     else:
         lines.append("No warnings.")
+
+    lines.extend(["", "## Next Slice", ""])
+
+    next_slice = handoff.get("next_slice")
+    if isinstance(next_slice, dict):
+        lines.extend(
+            [
+                f"- ID: {next_slice.get('id')}",
+                f"- Title: {next_slice.get('title')}",
+                f"- Priority: {next_slice.get('priority')}",
+                "- Findings:",
+                *_finding_markdown_items(next_slice.get("findings")),
+                "- Actions:",
+                *_markdown_items(next_slice.get("actions")),
+            ]
+        )
+    else:
+        lines.append("No remediation slice is queued.")
+
+    lines.extend(["", "## Verification Gates", ""])
+    lines.extend(_markdown_items(handoff.get("verification_gates")))
 
     lines.extend(["", "## Remediation Slices", ""])
 
@@ -203,6 +227,32 @@ def _slices(plan: dict[str, Any]) -> list[dict[str, str]]:
     ]
 
 
+def _next_slice(plan: dict[str, Any]) -> dict[str, Any] | None:
+    slices = plan.get("slices")
+    if not isinstance(slices, list) or not slices:
+        return None
+    first = slices[0]
+    if not isinstance(first, dict):
+        return None
+    return {
+        "id": first["id"],
+        "title": first["title"],
+        "priority": first["priority"],
+        "findings": list(first["findings"]),
+        "actions": list(first["actions"]),
+        "verification_gates": list(first["verification_gates"]),
+    }
+
+
+def _slice_verification_gates(slice_item: dict[str, Any] | None) -> list[str]:
+    if slice_item is None:
+        return []
+    verification_gates = slice_item.get("verification_gates")
+    if not isinstance(verification_gates, list):
+        return []
+    return [gate for gate in verification_gates if isinstance(gate, str)]
+
+
 def _warnings(payload: dict[str, Any]) -> list[dict[str, str]]:
     warnings = payload.get("warnings")
     if not isinstance(warnings, list):
@@ -253,7 +303,7 @@ def _finding_sort_key(finding: dict[str, Any]) -> tuple[int, str]:
 
 def _priority_for_finding(finding: dict[str, Any]) -> str:
     severity = finding["severity"]
-    if severity == "error":
+    if severity == "blocker":
         return "high"
     if severity == "warning":
         return "medium"

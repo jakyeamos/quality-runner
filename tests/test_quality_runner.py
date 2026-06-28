@@ -707,7 +707,7 @@ def test_validate_remediation_plan_rejects_slices_without_verification_gates() -
                 "findings": [
                     {
                         "id": "finding-001",
-                        "severity": "error",
+                        "severity": "blocker",
                         "category": "capability",
                         "summary": "Missing tests",
                     }
@@ -828,7 +828,7 @@ def test_validate_remediation_plan_rejects_non_string_verification_gate_items() 
                     "findings": [
                         {
                             "id": "finding-001",
-                            "severity": "error",
+                            "severity": "blocker",
                             "category": "capability",
                             "summary": "Missing tests",
                         }
@@ -896,7 +896,45 @@ def test_run_payload_records_missing_capability_findings(tmp_path: Path) -> None
     assert "missing-truth-file" in finding_ids
 
 
-def test_run_payload_records_missing_formatter_as_error(tmp_path: Path) -> None:
+def test_run_payload_records_package_manager_mismatch_in_audit_and_plan(
+    tmp_path: Path,
+) -> None:
+    from quality_runner.workflow import run_payload
+
+    _write_complete_js_fixture(tmp_path)
+    package_json_path = tmp_path / "package.json"
+    package_json = json.loads(package_json_path.read_text(encoding="utf-8"))
+    package_json["packageManager"] = "npm@10.0.0"
+    package_json_path.write_text(json.dumps(package_json), encoding="utf-8")
+
+    payload = run_payload(repo_root=tmp_path, run_id="mismatch-run", profile="jakyeamos")
+    audit_report = json.loads(Path(payload["artifact_paths"]["quality_audit_json"]).read_text())
+    remediation_plan = json.loads(
+        Path(payload["artifact_paths"]["remediation_plan_json"]).read_text()
+    )
+
+    mismatch_finding = next(
+        finding
+        for finding in audit_report["findings"]
+        if finding["id"] == "standard-package-manager-mismatch"
+    )
+    assert mismatch_finding["severity"] == "warning"
+    assert mismatch_finding["evidence"] == [
+        "Expected package manager: pnpm.",
+        "Detected package manager: npm.",
+        "Package manager source: package.json packageManager or lockfile discovery.",
+    ]
+    assert (
+        mismatch_finding["recommended_fix"]
+        == "Align JavaScript dependency management to the pnpm standard."
+    )
+    assert any(
+        slice_item["findings"][0]["id"] == "standard-package-manager-mismatch"
+        for slice_item in remediation_plan["slices"]
+    )
+
+
+def test_run_payload_records_missing_formatter_as_blocker(tmp_path: Path) -> None:
     from quality_runner.workflow import run_payload
 
     payload = run_payload(repo_root=tmp_path, run_id="missing-formatter-run", profile="jakyeamos")
@@ -905,7 +943,7 @@ def test_run_payload_records_missing_formatter_as_error(tmp_path: Path) -> None:
     formatter_finding = next(
         finding for finding in audit_report["findings"] if finding["id"] == "missing-formatter"
     )
-    assert formatter_finding["severity"] == "error"
+    assert formatter_finding["severity"] == "blocker"
 
 
 def test_inspect_payload_does_not_write_audit_plan(tmp_path: Path) -> None:
@@ -1011,6 +1049,43 @@ def test_run_payload_writes_handoff_warnings(tmp_path: Path) -> None:
     } in handoff["warnings"]
 
 
+def test_run_payload_handoff_contains_next_slice_and_verification_gates(tmp_path: Path) -> None:
+    from quality_runner.findings import validate_agent_handoff
+    from quality_runner.workflow import run_payload
+
+    _write_js_fixture(tmp_path)
+
+    payload = run_payload(repo_root=tmp_path, run_id="handoff-context-run", profile="jakyeamos")
+    handoff = json.loads(Path(payload["artifact_paths"]["agent_handoff_json"]).read_text())
+
+    assert validate_agent_handoff(handoff) == {"passed": True, "errors": []}
+    assert handoff["next_slice"] == {
+        "id": "remediate-missing-formatter",
+        "title": "Remediate missing-formatter",
+        "priority": "high",
+        "findings": [
+            {
+                "id": "missing-formatter",
+                "severity": "blocker",
+                "category": "capability",
+                "summary": "Required quality capability is missing: formatter.",
+            }
+        ],
+        "actions": [
+            "Apply recommended fix: Add a formatter command such as pnpm format.",
+            "Rerun quality-runner and confirm missing-formatter no longer appears.",
+        ],
+        "verification_gates": [
+            "Add the formatter capability and rerun quality-runner.",
+            "Confirm audit finding missing-formatter is absent from the regenerated report.",
+        ],
+    }
+    assert handoff["verification_gates"] == [
+        "Add the formatter capability and rerun quality-runner.",
+        "Confirm audit finding missing-formatter is absent from the regenerated report.",
+    ]
+
+
 def test_run_payload_rejects_invalid_handoff_before_writing_artifacts(
     tmp_path: Path,
     monkeypatch,
@@ -1035,7 +1110,9 @@ def test_run_payload_rejects_invalid_handoff_before_writing_artifacts(
             "invalid agent handoff: agent handoff artifact_paths must be an object; "
             "agent handoff warnings must be a list of warning objects; "
             "agent handoff finding_ids must be a string list; "
-            "agent handoff slice_ids must be a string list"
+            "agent handoff slice_ids must be a string list; "
+            "agent handoff next_slice must be a remediation slice object; "
+            "agent handoff verification_gates must be a string list"
         )
     else:
         raise AssertionError("run_payload accepted an invalid agent handoff")
@@ -1101,7 +1178,7 @@ def test_generated_remediation_plan_orders_findings_and_exposes_actions(tmp_path
     assert first_slice["findings"] == [
         {
             "id": "missing-dead-code",
-            "severity": "error",
+            "severity": "blocker",
             "category": "capability",
             "summary": "Required quality capability is missing: dead_code.",
         }
