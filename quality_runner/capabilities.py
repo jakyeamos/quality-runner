@@ -12,7 +12,8 @@ SCRIPT_CAPABILITIES = {
     "build": ("build",),
     "dead_code": ("dead-code", "dead_code", "knip", "vulture", "unused"),
     "runtime_smoke": ("smoke", "runtime-smoke", "smoke-test"),
-    "pre_pr": ("pre-pr", "prepr", "pre-cr"),
+    "pre_pr": ("pre-pr", "prepr"),
+    "pre_cr": ("pre-cr", "precr", "pre-cr:run"),
 }
 
 
@@ -97,6 +98,11 @@ def _record_file_capability(
     reason: str,
 ) -> None:
     if isinstance(path, str) and path:
-        available.append({"id": capability_id, "type": "file", "source": path})
-    else:
+        if not _has_capability(available, capability_id):
+            available.append({"id": capability_id, "type": "file", "source": path})
+    elif not _has_capability(available, capability_id):
         missing.append({"id": capability_id, "type": "file", "reason": reason})
+
+
+def _has_capability(capabilities: list[dict[str, str]], capability_id: str) -> bool:
+    return any(capability.get("id") == capability_id for capability in capabilities)

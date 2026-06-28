@@ -8,9 +8,8 @@ REPO_SCAN_SCHEMA = "quality-runner-repo-scan-v0.1"
 
 
 def inspect_repo(repo_root: Path, run_id: str) -> dict[str, Any]:
-    _validate_repo_root(repo_root)
-    root = repo_root.expanduser().resolve()
-    package_json = _read_package_json(root)
+    root = _validated_repo_root(repo_root)
+    package_json, warnings = _read_package_json(root)
     scripts = _package_scripts(package_json)
     agent_instruction_files = _agent_instruction_files(root)
 
@@ -30,27 +29,42 @@ def inspect_repo(repo_root: Path, run_id: str) -> dict[str, Any]:
         "truth_file": _first_existing(root, [".tracker/PROJECT_TRUTH.md"]),
         "quality_contract": _detect_quality_contract(root, scripts, agent_instruction_files),
         "ci_files": _ci_files(root),
+        "warnings": warnings,
     }
 
 
-def _validate_repo_root(repo_root: Path) -> None:
-    if not repo_root.exists():
-        raise FileNotFoundError(f"repo root does not exist: {repo_root}")
-    if not repo_root.is_dir():
-        raise NotADirectoryError(f"repo root is not a directory: {repo_root}")
+def _validated_repo_root(repo_root: Path) -> Path:
+    root = repo_root.expanduser().resolve()
+    if not root.exists():
+        raise FileNotFoundError(f"repo root does not exist: {root}")
+    if not root.is_dir():
+        raise NotADirectoryError(f"repo root is not a directory: {root}")
+    return root
 
 
-def _read_package_json(root: Path) -> dict[str, Any]:
+def _read_package_json(root: Path) -> tuple[dict[str, Any], list[dict[str, str]]]:
     package_json_path = root / "package.json"
     if not package_json_path.exists():
-        return {}
+        return {}, []
     try:
         payload = json.loads(package_json_path.read_text(encoding="utf-8"))
     except json.JSONDecodeError:
-        return {}
+        return {}, [
+            {
+                "code": "invalid_package_json",
+                "message": "package.json could not be parsed as JSON",
+                "path": "package.json",
+            }
+        ]
     if not isinstance(payload, dict):
-        return {}
-    return payload
+        return {}, [
+            {
+                "code": "invalid_package_json_shape",
+                "message": "package.json must contain a JSON object",
+                "path": "package.json",
+            }
+        ]
+    return payload, []
 
 
 def _package_scripts(package_json: dict[str, Any]) -> dict[str, str]:

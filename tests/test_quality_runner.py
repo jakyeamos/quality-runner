@@ -246,6 +246,39 @@ def test_inspect_repo_detects_js_quality_surfaces(tmp_path: Path) -> None:
     assert scan["truth_file"] == ".tracker/PROJECT_TRUTH.md"
 
 
+def test_inspect_repo_warns_on_invalid_package_json(tmp_path: Path) -> None:
+    from quality_runner.discovery import inspect_repo
+
+    (tmp_path / "package.json").write_text("{not-json", encoding="utf-8")
+
+    scan = inspect_repo(tmp_path, run_id="invalid-package-001")
+
+    assert scan["scripts"] == {}
+    assert scan["warnings"] == [
+        {
+            "code": "invalid_package_json",
+            "message": "package.json could not be parsed as JSON",
+            "path": "package.json",
+        }
+    ]
+
+
+def test_inspect_repo_expands_home_before_validating(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    from quality_runner.discovery import inspect_repo
+
+    home = tmp_path / "home"
+    repo = home / "repo"
+    repo.mkdir(parents=True)
+    monkeypatch.setenv("HOME", str(home))
+
+    scan = inspect_repo(Path("~/repo"), run_id="home-001")
+
+    assert scan["repo_root"] == str(repo.resolve())
+
+
 def test_inspect_repo_rejects_missing_repo_root(tmp_path: Path) -> None:
     from quality_runner.discovery import inspect_repo
 
@@ -320,6 +353,27 @@ def test_detect_capabilities_records_missing_expected_surfaces(tmp_path: Path) -
     assert "lint" in missing_ids
     assert "tests" in missing_ids
     assert "truth_file" in missing_ids
+
+
+def test_detect_capabilities_records_pre_cr_script_with_stable_id(tmp_path: Path) -> None:
+    from quality_runner.capabilities import detect_capabilities
+    from quality_runner.discovery import inspect_repo
+    from quality_runner.standards import compile_standards
+
+    (tmp_path / "package.json").write_text(
+        json.dumps({"scripts": {"pre-cr": "pre-cr"}}),
+        encoding="utf-8",
+    )
+    scan = inspect_repo(tmp_path, run_id="pre-cr-script-001")
+    packet = compile_standards(repo_root=tmp_path, scan=scan, profile="jakyeamos")
+
+    capability_map = detect_capabilities(scan=scan, standards_packet=packet)
+
+    available_ids = {item["id"] for item in capability_map["available"]}
+    missing_ids = {item["id"] for item in capability_map["missing"]}
+    assert "pre_cr" in available_ids
+    assert "pre_cr" not in missing_ids
+    assert "pre_pr" in missing_ids
 
 
 def test_detect_capabilities_treats_malformed_scripts_as_missing() -> None:
