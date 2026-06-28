@@ -79,28 +79,38 @@ def test_scaffold_entrypoint_functions_import_and_return_success(monkeypatch) ->
 
 def test_packaged_console_script_invokes_cli(tmp_path: Path) -> None:
     dist_dir = tmp_path / "dist"
+    build_command = [
+        "uv",
+        "run",
+        "--offline",
+        "--with",
+        "setuptools",
+        "--with",
+        "wheel",
+        "uv",
+        "build",
+        "--wheel",
+        "--no-build-isolation",
+        "--out-dir",
+        str(dist_dir),
+    ]
     try:
-        subprocess.run(
-            [
-                "uv",
-                "run",
-                "--offline",
-                "--with",
-                "setuptools",
-                "--with",
-                "wheel",
-                "uv",
-                "build",
-                "--wheel",
-                "--no-build-isolation",
-                "--out-dir",
-                str(dist_dir),
-            ],
+        result = subprocess.run(
+            build_command,
             cwd=ROOT,
-            check=True,
+            check=False,
             capture_output=True,
             text=True,
         )
+        if result.returncode != 0:
+            online_command = [part for part in build_command if part != "--offline"]
+            subprocess.run(
+                online_command,
+                cwd=ROOT,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
     finally:
         shutil.rmtree(ROOT / "build", ignore_errors=True)
         shutil.rmtree(ROOT / "quality_runner.egg-info", ignore_errors=True)
