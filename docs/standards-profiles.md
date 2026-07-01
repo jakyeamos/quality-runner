@@ -24,6 +24,7 @@ Repos can add `.quality-runner.toml` to make local policy explicit:
 [quality_runner]
 default_profile = "jakyeamos"
 required_capabilities = ["lint", "tests", "dead_code"]
+allowed_package_managers = ["pnpm"]
 
 [quality_runner.severity_overrides]
 missing-dead-code = "warning"

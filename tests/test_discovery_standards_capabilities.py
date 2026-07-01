@@ -85,6 +85,33 @@ def test_compile_standards_does_not_warn_for_unknown_package_manager(tmp_path: P
     assert "package_manager_mismatch" not in requirement_ids
 
 
+def test_compile_standards_respects_configured_package_manager_policy(tmp_path: Path) -> None:
+    from quality_runner.discovery import inspect_repo
+    from quality_runner.standards import compile_standards
+
+    (tmp_path / "package.json").write_text(
+        json.dumps({"packageManager": "bun@1.3.12", "scripts": {"test": "bun test"}}),
+        encoding="utf-8",
+    )
+    (tmp_path / ".quality-runner.toml").write_text(
+        "\n".join(
+            [
+                "[quality_runner]",
+                'allowed_package_managers = ["bun"]',
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    scan = inspect_repo(tmp_path, run_id="bun-policy-001")
+    packet = compile_standards(repo_root=tmp_path, scan=scan, profile="jakyeamos")
+
+    assert scan["package_manager"] == "bun"
+    requirement_ids = {requirement["id"] for requirement in packet["requirements"]}
+    assert "package_manager_mismatch" not in requirement_ids
+
+
 def test_inspect_repo_does_not_mark_tests_required_from_latest(tmp_path: Path) -> None:
     from quality_runner.discovery import inspect_repo
 
@@ -281,6 +308,101 @@ def test_inspect_repo_detects_ci_only_python_commands(tmp_path: Path) -> None:
     assert commands["build"]["command"] == "uv build"
     assert commands["runtime_smoke"]["command"] == "quality-runner doctor --json"
     assert commands["pre_pr"]["command"] == "github-actions pull_request quality"
+
+
+def test_inspect_repo_detects_nested_workspaces_and_quality_aliases(tmp_path: Path) -> None:
+    from quality_runner.discovery import inspect_repo
+
+    backend = tmp_path / "backend"
+    backend.mkdir()
+    (backend / "pyproject.toml").write_text(
+        "\n".join(
+            [
+                "[project]",
+                'name = "backend"',
+                'version = "0.1.0"',
+                "",
+                "[build-system]",
+                'requires = ["hatchling"]',
+                'build-backend = "hatchling.build"',
+                "",
+                "[tool.pytest.ini_options]",
+                'pythonpath = ["."]',
+                "",
+                "[tool.ruff]",
+                "line-length = 100",
+                "",
+                "[tool.mypy]",
+                "strict = true",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    frontend = tmp_path / "frontend"
+    frontend.mkdir()
+    (frontend / "package.json").write_text(
+        json.dumps(
+            {
+                "packageManager": "pnpm@10.0.0",
+                "scripts": {
+                    "check": "ultracite check",
+                    "build:ts": "tsc -b tsconfig.project.json",
+                    "test": "vitest run",
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    scan = inspect_repo(tmp_path, run_id="nested-workspaces-001")
+
+    assert scan["languages"] == ["javascript", "python"]
+    assert scan["workspaces"] == [
+        {"path": "backend", "kind": "python", "manifest": "backend/pyproject.toml"},
+        {"path": "frontend", "kind": "javascript", "manifest": "frontend/package.json"},
+    ]
+    commands = {(command["id"], command["source"]): command for command in scan["quality_commands"]}
+    assert commands[("lint", "backend/pyproject.toml:tool.ruff")] == {
+        "id": "lint",
+        "command": "cd backend && ruff check .",
+        "source_type": "pyproject",
+        "source": "backend/pyproject.toml:tool.ruff",
+        "language": "python",
+    }
+    assert (
+        commands[("typecheck", "backend/pyproject.toml:tool.mypy")]["command"]
+        == "cd backend && mypy ."
+    )
+    assert (
+        commands[("lint", "frontend/package.json:scripts.check")]["command"]
+        == "cd frontend && ultracite check"
+    )
+    assert (
+        commands[("typecheck", "frontend/package.json:scripts.build:ts")]["command"]
+        == "cd frontend && tsc -b tsconfig.project.json"
+    )
+
+
+def test_inspect_repo_caps_workspace_inventory_with_warning(tmp_path: Path) -> None:
+    from quality_runner.discovery import inspect_repo
+
+    for index in range(205):
+        workspace = tmp_path / f"packages/package-{index:03d}"
+        workspace.mkdir(parents=True)
+        (workspace / "package.json").write_text(
+            json.dumps({"scripts": {"test": "vitest run"}}),
+            encoding="utf-8",
+        )
+
+    scan = inspect_repo(tmp_path, run_id="workspace-cap-001")
+
+    assert len(scan["workspaces"]) == 200
+    assert {
+        "code": "workspace_scan_limit_reached",
+        "message": "workspace discovery reached the 200 workspace limit",
+        "path": "workspaces",
+    } in scan["warnings"]
 
 
 def test_inspect_repo_detects_mature_repo_surfaces_and_promotes_quality_commands(

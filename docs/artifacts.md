@@ -15,8 +15,8 @@ Artifacts are written under:
 
 - `repo-scan.json`: repository facts such as package scripts, lockfiles, agent
   instruction files, language-aware quality commands, mature repo surfaces,
-  ecosystems, generated-code markers, local CI checks, Pre-CR config, and
-  project truth file presence.
+  nested workspaces, ecosystems, generated-code markers, local CI checks,
+  Pre-CR config, and project truth file presence.
 - `standards.json`: compiled standards packet for the selected profile.
 - `capability-matrix.json`: available and missing quality capabilities.
   Available command-backed capabilities include the command, source, detected

@@ -10,6 +10,7 @@ from quality_runner.schema_constants import REPO_SCAN_SCHEMA
 from quality_runner.surfaces import detect_surfaces, quality_commands_from_surfaces
 
 MAX_DISCOVERY_TEXT_BYTES = 1_000_000
+MAX_WORKSPACES = 200
 
 
 def inspect_repo(
@@ -22,6 +23,8 @@ def inspect_repo(
     package_json, warnings = _read_package_json(root)
     pyproject, pyproject_warnings = _read_pyproject(root)
     warnings.extend(pyproject_warnings)
+    workspaces, workspace_warnings = _workspace_manifests(root)
+    warnings.extend(workspace_warnings)
     scripts = _package_scripts(package_json)
     agent_instruction_files = _agent_instruction_files(root)
     ci_files, ci_warnings = _ci_files(root)
@@ -36,8 +39,9 @@ def inspect_repo(
         "repo_root": str(root),
         "is_git_repo": (root / ".git").exists(),
         "package_manager": _detect_package_manager(root, package_json),
-        "languages": _detect_languages(root, package_json),
+        "languages": _detect_languages(root, package_json, workspaces),
         "ecosystems": ecosystems,
+        "workspaces": workspaces,
         "repo_surfaces": repo_surfaces,
         "scripts": scripts,
         "quality_commands": _quality_commands(
@@ -49,6 +53,7 @@ def inspect_repo(
                 [".pre-cr.json", ".pre-cr.yaml", ".pre-cr.yml", "pre-cr.config.json"],
             ),
             ci_files=ci_files,
+            workspaces=workspaces,
         ),
         "generated_code": generated_code,
         "agent_instruction_files": agent_instruction_files,
@@ -73,8 +78,10 @@ def _validated_repo_root(repo_root: Path) -> Path:
     return root
 
 
-def _read_package_json(root: Path) -> tuple[dict[str, Any], list[dict[str, str]]]:
-    package_json_path = root / "package.json"
+def _read_package_json(
+    root: Path, path: str = "package.json"
+) -> tuple[dict[str, Any], list[dict[str, str]]]:
+    package_json_path = root / path
     if not package_json_path.exists():
         return {}, []
     try:
@@ -83,23 +90,25 @@ def _read_package_json(root: Path) -> tuple[dict[str, Any], list[dict[str, str]]
         return {}, [
             {
                 "code": "invalid_package_json",
-                "message": "package.json could not be parsed as JSON",
-                "path": "package.json",
+                "message": f"{path} could not be parsed as JSON",
+                "path": path,
             }
         ]
     if not isinstance(payload, dict):
         return {}, [
             {
                 "code": "invalid_package_json_shape",
-                "message": "package.json must contain a JSON object",
-                "path": "package.json",
+                "message": f"{path} must contain a JSON object",
+                "path": path,
             }
         ]
     return payload, []
 
 
-def _read_pyproject(root: Path) -> tuple[dict[str, Any], list[dict[str, str]]]:
-    pyproject_path = root / "pyproject.toml"
+def _read_pyproject(
+    root: Path, path: str = "pyproject.toml"
+) -> tuple[dict[str, Any], list[dict[str, str]]]:
+    pyproject_path = root / path
     if not pyproject_path.exists():
         return {}, []
     try:
@@ -108,16 +117,16 @@ def _read_pyproject(root: Path) -> tuple[dict[str, Any], list[dict[str, str]]]:
         return {}, [
             {
                 "code": "invalid_pyproject_toml",
-                "message": "pyproject.toml could not be parsed as TOML",
-                "path": "pyproject.toml",
+                "message": f"{path} could not be parsed as TOML",
+                "path": path,
             }
         ]
     if not isinstance(payload, dict):
         return {}, [
             {
                 "code": "invalid_pyproject_toml_shape",
-                "message": "pyproject.toml must contain a TOML table",
-                "path": "pyproject.toml",
+                "message": f"{path} must contain a TOML table",
+                "path": path,
             }
         ]
     return payload, []
@@ -132,6 +141,53 @@ def _package_scripts(package_json: dict[str, Any]) -> dict[str, str]:
         for name, command in scripts.items()
         if isinstance(name, str) and isinstance(command, str) and command
     }
+
+
+def _workspace_manifests(root: Path) -> tuple[list[dict[str, str]], list[dict[str, str]]]:
+    manifests: list[dict[str, str]] = []
+    warnings: list[dict[str, str]] = []
+    seen_paths: set[str] = set()
+
+    for manifest_name, kind in (
+        ("pyproject.toml", "python"),
+        ("package.json", "javascript"),
+        ("Cargo.toml", "rust"),
+        ("go.mod", "go"),
+    ):
+        for manifest in sorted(root.rglob(manifest_name)):
+            if manifest.parent == root or not _scan_path_allowed(root, manifest):
+                continue
+            relative_manifest = manifest.relative_to(root).as_posix()
+            if relative_manifest in seen_paths:
+                continue
+            seen_paths.add(relative_manifest)
+            workspace_path = manifest.parent.relative_to(root).as_posix()
+            manifests.append(
+                {
+                    "path": workspace_path,
+                    "kind": kind,
+                    "manifest": relative_manifest,
+                }
+            )
+
+            if manifest_name == "pyproject.toml":
+                _, manifest_warnings = _read_pyproject(root, relative_manifest)
+                warnings.extend(manifest_warnings)
+            elif manifest_name == "package.json":
+                _, manifest_warnings = _read_package_json(root, relative_manifest)
+                warnings.extend(manifest_warnings)
+
+    manifests.sort(key=lambda workspace: (workspace["path"], workspace["manifest"]))
+    if len(manifests) > MAX_WORKSPACES:
+        manifests = manifests[:MAX_WORKSPACES]
+        warnings.append(
+            {
+                "code": "workspace_scan_limit_reached",
+                "message": f"workspace discovery reached the {MAX_WORKSPACES} workspace limit",
+                "path": "workspaces",
+            }
+        )
+    return manifests, warnings
 
 
 def _agent_instruction_files(root: Path) -> list[str]:
@@ -161,17 +217,30 @@ def _detect_package_manager(
     return None
 
 
-def _detect_languages(root: Path, package_json: dict[str, Any]) -> list[str]:
-    languages: list[str] = []
+def _detect_languages(
+    root: Path,
+    package_json: dict[str, Any],
+    workspaces: list[dict[str, str]],
+) -> list[str]:
+    languages: set[str] = set()
     if package_json:
-        languages.append("javascript")
+        languages.add("javascript")
     if (root / "pyproject.toml").exists() or (root / "requirements.txt").exists():
-        languages.append("python")
+        languages.add("python")
     if (root / "Package.swift").exists():
-        languages.append("swift")
+        languages.add("swift")
     if (root / "go.mod").exists():
-        languages.append("go")
-    return languages
+        languages.add("go")
+    for workspace in workspaces:
+        kind = workspace.get("kind")
+        if kind == "javascript":
+            languages.add("javascript")
+        elif kind == "python":
+            languages.add("python")
+        elif kind in {"swift", "go", "rust"}:
+            languages.add(kind)
+    ordered = ["javascript", "python", "swift", "go", "rust"]
+    return [language for language in ordered if language in languages]
 
 
 def _quality_commands(
@@ -181,10 +250,12 @@ def _quality_commands(
     pyproject: dict[str, Any],
     pre_cr_config: str | None,
     ci_files: list[str],
+    workspaces: list[dict[str, str]],
 ) -> list[dict[str, str]]:
     commands: list[dict[str, str]] = [
-        *(_javascript_quality_commands(scripts)),
-        *(_python_pyproject_quality_commands(pyproject)),
+        *(_javascript_quality_commands(scripts, manifest_path="package.json")),
+        *(_python_pyproject_quality_commands(pyproject, manifest_path="pyproject.toml")),
+        *(_workspace_quality_commands(root, workspaces)),
         *(_pre_cr_quality_commands(root, pre_cr_config)),
         *(quality_commands_from_surfaces(root)),
     ]
@@ -193,11 +264,15 @@ def _quality_commands(
     return commands
 
 
-def _javascript_quality_commands(scripts: dict[str, str]) -> list[dict[str, str]]:
+def _javascript_quality_commands(
+    scripts: dict[str, str],
+    *,
+    manifest_path: str,
+) -> list[dict[str, str]]:
     script_capabilities = {
         "formatter": ("format", "fmt", "prettier"),
-        "lint": ("lint",),
-        "typecheck": ("typecheck", "type-check", "check-types"),
+        "lint": ("lint", "check"),
+        "typecheck": ("typecheck", "type-check", "check-types", "build:ts"),
         "tests": ("test", "tests"),
         "build": ("build",),
         "dead_code": ("dead-code", "dead_code", "knip", "vulture", "unused"),
@@ -206,16 +281,17 @@ def _javascript_quality_commands(scripts: dict[str, str]) -> list[dict[str, str]
         "pre_cr": ("pre-cr", "precr", "pre-cr:run"),
     }
     commands: list[dict[str, str]] = []
+    workspace_path = _workspace_path_from_manifest(manifest_path)
     for capability_id, script_names in script_capabilities.items():
         for script_name in script_names:
             command = scripts.get(script_name)
-            if command:
+            if command and _script_matches_capability(capability_id, script_name, command):
                 commands.append(
                     _quality_command(
                         capability_id=capability_id,
-                        command=command,
+                        command=_workspace_command(workspace_path, command),
                         source_type="package_script",
-                        source=f"package.json:scripts.{script_name}",
+                        source=f"{manifest_path}:scripts.{script_name}",
                         language="javascript",
                     )
                 )
@@ -223,25 +299,39 @@ def _javascript_quality_commands(scripts: dict[str, str]) -> list[dict[str, str]
     return commands
 
 
-def _python_pyproject_quality_commands(pyproject: dict[str, Any]) -> list[dict[str, str]]:
+def _script_matches_capability(capability_id: str, script_name: str, command: str) -> bool:
+    command_lower = command.lower()
+    if capability_id == "lint" and script_name == "check":
+        return "lint" in command_lower or "ultracite" in command_lower
+    if capability_id == "typecheck":
+        return "tsc" in command_lower or "type" in command_lower
+    return True
+
+
+def _python_pyproject_quality_commands(
+    pyproject: dict[str, Any],
+    *,
+    manifest_path: str,
+) -> list[dict[str, str]]:
     tool = pyproject.get("tool")
     commands: list[dict[str, str]] = []
+    workspace_path = _workspace_path_from_manifest(manifest_path)
     if isinstance(tool, dict):
         if isinstance(tool.get("ruff"), dict):
             commands.extend(
                 [
                     _quality_command(
                         capability_id="formatter",
-                        command="ruff format --check .",
+                        command=_workspace_command(workspace_path, "ruff format --check ."),
                         source_type="pyproject",
-                        source="pyproject.toml:tool.ruff",
+                        source=f"{manifest_path}:tool.ruff",
                         language="python",
                     ),
                     _quality_command(
                         capability_id="lint",
-                        command="ruff check .",
+                        command=_workspace_command(workspace_path, "ruff check ."),
                         source_type="pyproject",
-                        source="pyproject.toml:tool.ruff",
+                        source=f"{manifest_path}:tool.ruff",
                         language="python",
                     ),
                 ]
@@ -250,9 +340,29 @@ def _python_pyproject_quality_commands(pyproject: dict[str, Any]) -> list[dict[s
             commands.append(
                 _quality_command(
                     capability_id="typecheck",
-                    command="basedpyright",
+                    command=_workspace_command(workspace_path, "basedpyright"),
                     source_type="pyproject",
-                    source="pyproject.toml:tool.basedpyright",
+                    source=f"{manifest_path}:tool.basedpyright",
+                    language="python",
+                )
+            )
+        elif isinstance(tool.get("mypy"), dict):
+            commands.append(
+                _quality_command(
+                    capability_id="typecheck",
+                    command=_workspace_command(workspace_path, "mypy ."),
+                    source_type="pyproject",
+                    source=f"{manifest_path}:tool.mypy",
+                    language="python",
+                )
+            )
+        elif isinstance(tool.get("ty"), dict):
+            commands.append(
+                _quality_command(
+                    capability_id="typecheck",
+                    command=_workspace_command(workspace_path, "ty check"),
+                    source_type="pyproject",
+                    source=f"{manifest_path}:tool.ty",
                     language="python",
                 )
             )
@@ -261,9 +371,9 @@ def _python_pyproject_quality_commands(pyproject: dict[str, Any]) -> list[dict[s
             commands.append(
                 _quality_command(
                     capability_id="tests",
-                    command="pytest -q",
+                    command=_workspace_command(workspace_path, "pytest -q"),
                     source_type="pyproject",
-                    source="pyproject.toml:tool.pytest.ini_options",
+                    source=f"{manifest_path}:tool.pytest.ini_options",
                     language="python",
                 )
             )
@@ -271,12 +381,36 @@ def _python_pyproject_quality_commands(pyproject: dict[str, Any]) -> list[dict[s
         commands.append(
             _quality_command(
                 capability_id="build",
-                command="uv build",
+                command=_workspace_command(workspace_path, "uv build"),
                 source_type="pyproject",
-                source="pyproject.toml:build-system",
+                source=f"{manifest_path}:build-system",
                 language="python",
             )
         )
+    return commands
+
+
+def _workspace_quality_commands(
+    root: Path,
+    workspaces: list[dict[str, str]],
+) -> list[dict[str, str]]:
+    commands: list[dict[str, str]] = []
+    for workspace in workspaces:
+        manifest = workspace.get("manifest")
+        kind = workspace.get("kind")
+        if not isinstance(manifest, str) or not isinstance(kind, str):
+            continue
+        if kind == "python":
+            pyproject, _ = _read_pyproject(root, manifest)
+            commands.extend(_python_pyproject_quality_commands(pyproject, manifest_path=manifest))
+        elif kind == "javascript":
+            package_json, _ = _read_package_json(root, manifest)
+            commands.extend(
+                _javascript_quality_commands(
+                    _package_scripts(package_json),
+                    manifest_path=manifest,
+                )
+            )
     return commands
 
 
@@ -344,9 +478,12 @@ def _ci_quality_commands(
         ("build", "uv build", "uv build", "python"),
         ("runtime_smoke", "quality-runner doctor --json", "quality-runner doctor --json", "python"),
         ("lint", "pnpm lint", "pnpm lint", "javascript"),
+        ("lint", "ultracite check", "pnpm check", "javascript"),
         ("typecheck", "pnpm typecheck", "pnpm typecheck", "javascript"),
+        ("typecheck", "tsc -b", "pnpm build:ts", "javascript"),
         ("tests", "pnpm test", "pnpm test", "javascript"),
         ("build", "pnpm build", "pnpm build", "javascript"),
+        ("pre_cr", "prek run", "uv run prek run", "python"),
     ]
     for capability_id, needle, command, language in ci_patterns:
         if capability_id in existing_ids or needle not in text:
@@ -395,6 +532,17 @@ def _first_existing(root: Path, candidates: list[str]) -> str | None:
         if (root / candidate).exists():
             return candidate
     return None
+
+
+def _workspace_path_from_manifest(manifest_path: str) -> str:
+    parent = Path(manifest_path).parent.as_posix()
+    return "" if parent == "." else parent
+
+
+def _workspace_command(workspace_path: str, command: str) -> str:
+    if not workspace_path:
+        return command
+    return f"cd {workspace_path} && {command}"
 
 
 def _detect_quality_contract(
@@ -472,3 +620,20 @@ def _read_text(path: Path) -> str:
         return path.read_text(encoding="utf-8")
     except OSError:
         return ""
+
+
+def _scan_path_allowed(root: Path, path: Path) -> bool:
+    try:
+        relative = path.relative_to(root)
+    except ValueError:
+        return False
+    blocked = {
+        ".git",
+        ".quality-runner",
+        ".venv",
+        "node_modules",
+        "dist",
+        "build",
+        "__pycache__",
+    }
+    return not path.is_symlink() and not any(part in blocked for part in relative.parts)

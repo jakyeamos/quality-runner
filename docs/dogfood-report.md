@@ -67,3 +67,36 @@ The next improvement should be evidence-driven, not another broad detector pass:
 This is the hiring-manager proof point: the tool now has real-world evidence,
 known limitations, and a concrete next roadmap derived from observed behavior
 rather than speculative feature ideas.
+
+## Evidence-Driven Fix Rerun
+
+Date: 2026-07-01
+
+After the first external run, Quality Runner added:
+
+- recursive workspace discovery for nested `package.json`, `pyproject.toml`,
+  `Cargo.toml`, and `go.mod`
+- quality alias classification for commands such as `check`, `build:ts`,
+  `mypy`, `ty`, and `prek`
+- a bounded workspace inventory with a 200-workspace cap and warning
+- configurable `allowed_package_managers` in `.quality-runner.toml`
+
+| Repo | Before | After | Change |
+| --- | --- | --- | --- |
+| `quality-runner` | `clean`, 0 workspaces | `clean`, 5 fixture workspaces | Still clean; fixture workspaces are now visible evidence. |
+| `fastapi/full-stack-fastapi-template` | 6 findings | 2 findings | Nested `backend/pyproject.toml`, `frontend/package.json`, and `prek` evidence removed false missing formatter/typecheck/build/Pre-CR findings. Remaining findings: missing dead-code and package-manager policy mismatch. |
+| `nextjs/saas-starter` | 8 findings | 8 findings | No change; this remains useful evidence that the app has build/db scripts but no explicit lint/typecheck/test/smoke/CI gates in the cloned root. |
+| `vercel/turborepo` | 4 findings, 0 workspaces | 4 findings, 200 capped workspaces | Recursive scan detects JS/Rust workspaces and removes the false missing typecheck finding. A workspace-limit warning is now emitted instead of writing an unreadable 1,095-workspace artifact. |
+| `emilybache/GildedRose-Refactoring-Kata` | 8 findings, no languages | 7 findings, 8 workspaces | Nested JS/Go/Rust workspaces and JS test scripts are now detected, removing the false missing tests finding. |
+
+Rerun artifacts:
+
+- `quality-runner`: `.quality-runner/runs/dogfood-quality-runner-fixed-2026-07-01/`
+- `python-backend-fastapi-template`: `.quality-runner/runs/dogfood-python-backend-fixed-2026-07-01/`
+- `js-ts-nextjs-saas-starter`: `.quality-runner/runs/dogfood-js-ts-app-fixed-2026-07-01/`
+- `mixed-monorepo-turborepo`: `.quality-runner/runs/dogfood-mixed-monorepo-fixed-2026-07-01/`
+- `intentionally-messy-gildedrose`: `.quality-runner/runs/dogfood-messy-gildedrose-fixed-2026-07-01/`
+
+The senior-review conclusion improved: Quality Runner now converts real
+dogfood evidence into targeted product changes and can demonstrate measurable
+noise reduction without weakening the audit boundary.

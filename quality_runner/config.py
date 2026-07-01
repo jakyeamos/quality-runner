@@ -37,6 +37,11 @@ def load_repo_config(repo_root: Path) -> dict[str, Any]:
     required = _string_list(
         section.get("required_capabilities"), "quality_runner.required_capabilities", warnings
     )
+    allowed_package_managers = _string_list(
+        section.get("allowed_package_managers"),
+        "quality_runner.allowed_package_managers",
+        warnings,
+    )
     gates = _gates(section.get("gates"), warnings)
     exceptions = _accepted_exceptions(section.get("accepted_exceptions"), warnings)
     severity_overrides = _string_mapping(
@@ -47,6 +52,7 @@ def load_repo_config(repo_root: Path) -> dict[str, Any]:
         default_profile=default_profile,
         required_capabilities=required,
         required_capabilities_configured="required_capabilities" in section,
+        allowed_package_managers=allowed_package_managers,
         accepted_exceptions=exceptions,
         gates=gates,
         severity_overrides=severity_overrides,
@@ -56,10 +62,10 @@ def load_repo_config(repo_root: Path) -> dict[str, Any]:
 
 # fmt: off
 def _config(
-    *, path: str | None, default_profile: str | None, required_capabilities: list[str], required_capabilities_configured: bool, accepted_exceptions: list[dict[str, str]], gates: list[dict[str, Any]], severity_overrides: dict[str, str], warnings: list[dict[str, str]],
+    *, path: str | None, default_profile: str | None, required_capabilities: list[str], required_capabilities_configured: bool, allowed_package_managers: list[str], accepted_exceptions: list[dict[str, str]], gates: list[dict[str, Any]], severity_overrides: dict[str, str], warnings: list[dict[str, str]],
 ) -> dict[str, Any]:
     return dict(
-        schema=CONFIG_SCHEMA, path=path, default_profile=default_profile, required_capabilities=required_capabilities, required_capabilities_configured=required_capabilities_configured, accepted_exceptions=accepted_exceptions, gates=gates, severity_overrides=severity_overrides, warnings=warnings,
+        schema=CONFIG_SCHEMA, path=path, default_profile=default_profile, required_capabilities=required_capabilities, required_capabilities_configured=required_capabilities_configured, allowed_package_managers=allowed_package_managers, accepted_exceptions=accepted_exceptions, gates=gates, severity_overrides=severity_overrides, warnings=warnings,
     )
 # fmt: on
 
@@ -70,6 +76,7 @@ def _empty_config(*, path: str | None, warnings: list[dict[str, str]]) -> dict[s
         default_profile=None,
         required_capabilities=[],
         required_capabilities_configured=False,
+        allowed_package_managers=[],
         accepted_exceptions=[],
         gates=[],
         severity_overrides={},

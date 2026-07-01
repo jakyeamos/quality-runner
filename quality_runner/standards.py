@@ -19,13 +19,15 @@ def compile_standards(repo_root: Path, scan: dict[str, Any], profile: str, confi
     warnings = [*_warnings(scan), *_warnings(resolved_config)]
     package_manager = _package_manager(scan, warnings)
 
+    allowed_package_managers = _allowed_package_managers(resolved_config)
+
     return {
         "schema": STANDARDS_PACKET_SCHEMA,
         "profile": profile,
         "repo_root": str(repo_root.expanduser().resolve()),
         "sources": _sources(scan, profile, resolved_config),
         "config": resolved_config,
-        "requirements": _requirements(package_manager),
+        "requirements": _requirements(package_manager, allowed_package_managers),
         "warnings": warnings,
     }
 
@@ -50,7 +52,10 @@ def _sources(scan: dict[str, Any], profile: str, config: dict[str, Any]) -> list
     return sources
 
 
-def _requirements(package_manager: str | None) -> list[dict[str, Any]]:
+def _requirements(
+    package_manager: str | None,
+    allowed_package_managers: set[str],
+) -> list[dict[str, Any]]:
     requirements: list[dict[str, Any]] = [
         {
             "id": "use_pnpm",
@@ -74,7 +79,7 @@ def _requirements(package_manager: str | None) -> list[dict[str, Any]]:
         },
     ]
 
-    if package_manager not in {"pnpm", None}:
+    if package_manager not in {*allowed_package_managers, None}:
         requirements.append(
             {
                 "id": "package_manager_mismatch",
@@ -84,6 +89,13 @@ def _requirements(package_manager: str | None) -> list[dict[str, Any]]:
         )
 
     return requirements
+
+
+def _allowed_package_managers(config: dict[str, Any]) -> set[str]:
+    configured = config.get("allowed_package_managers")
+    if isinstance(configured, list) and configured:
+        return {item for item in configured if isinstance(item, str) and item}
+    return {"pnpm"}
 
 
 def _warnings(scan: dict[str, Any]) -> list[dict[str, str]]:

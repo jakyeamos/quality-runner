@@ -11,6 +11,11 @@
     "is_git_repo": { "type": "boolean" },
     "package_manager": { "type": ["string", "null"] },
     "languages": { "type": "array", "items": { "type": "string" } },
+    "workspaces": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/workspace" },
+      "default": []
+    },
     "ecosystems": { "type": "array", "items": { "type": "string" } },
     "repo_surfaces": {
       "type": "array",
@@ -39,6 +44,16 @@
     "warnings": { "$ref": "#/$defs/warnings" }
   },
   "$defs": {
+    "workspace": {
+      "type": "object",
+      "required": ["path", "kind", "manifest"],
+      "properties": {
+        "path": { "type": "string", "minLength": 1 },
+        "kind": { "type": "string", "minLength": 1 },
+        "manifest": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": false
+    },
     "repoSurface": {
       "type": "object",
       "required": ["id", "kind", "ecosystem", "path", "evidence"],
