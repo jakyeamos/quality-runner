@@ -1,6 +1,8 @@
 __pycache__/
 .pytest_cache/
 .aios/
+.quality-runner/
+.tmcp/
 .pre-cr/
 *.egg-info/
 uv.lock
