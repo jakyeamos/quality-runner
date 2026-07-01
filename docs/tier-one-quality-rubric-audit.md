@@ -34,6 +34,11 @@ Tier result: conditional pass for Tier 1. The implementation and package checks
 are strong, but audit fidelity and Pre-CR integration need remediation before
 the project should be treated as a trusted general-purpose quality runner.
 
+Post-remediation note: the release-ready showpiece pass added language-aware
+quality command evidence, corrected truth-file semantics, documented Pre-CR as
+changed-line readiness, and raised executable-line LCOV to 92.4%. A self-audit
+run on 2026-07-01 returned `clean`.
+
 ## Audit Findings
 
 ### P1: Self-audit misclassifies this Python repo's gates as missing

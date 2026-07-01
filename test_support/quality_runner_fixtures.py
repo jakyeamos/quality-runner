@@ -62,3 +62,78 @@ def write_complete_js_fixture(repo: Path) -> None:
         "---\nprojectName: Complete Fixture\n---\n",
         encoding="utf-8",
     )
+
+
+def write_python_quality_fixture(repo: Path) -> None:
+    (repo / "quality_app").mkdir()
+    (repo / "quality_app" / "__init__.py").write_text("", encoding="utf-8")
+    (repo / "tests").mkdir()
+    (repo / "tests" / "test_quality_app.py").write_text(
+        "def test_placeholder() -> None:\n    assert True\n",
+        encoding="utf-8",
+    )
+    (repo / "pyproject.toml").write_text(
+        "\n".join(
+            [
+                "[project]",
+                'name = "python-quality-fixture"',
+                'version = "0.1.0"',
+                'requires-python = ">=3.12"',
+                "",
+                "[build-system]",
+                'requires = ["setuptools>=68"]',
+                'build-backend = "setuptools.build_meta"',
+                "",
+                "[tool.pytest.ini_options]",
+                'pythonpath = ["."]',
+                "",
+                "[tool.ruff]",
+                "line-length = 100",
+                "",
+                "[tool.basedpyright]",
+                'include = ["quality_app", "tests"]',
+                'typeCheckingMode = "standard"',
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    (repo / ".pre-cr.json").write_text(
+        json.dumps(
+            {
+                "version": 1,
+                "testCommand": "python3.14 scripts/run_pytest_with_lcov.py",
+                "coveragePaths": [".pre-cr/coverage.lcov"],
+                "coverageFormat": "lcov",
+                "threshold": 80,
+            }
+        ),
+        encoding="utf-8",
+    )
+    workflows = repo / ".github" / "workflows"
+    workflows.mkdir(parents=True)
+    (workflows / "ci.yml").write_text(
+        "\n".join(
+            [
+                "name: CI",
+                "on:",
+                "  pull_request:",
+                "  push:",
+                "    branches: [main]",
+                "jobs:",
+                "  quality:",
+                "    runs-on: ubuntu-latest",
+                "    steps:",
+                "      - uses: actions/checkout@v4",
+                "      - run: uv run --with pytest pytest -q",
+                "      - run: uv run --with ruff ruff check .",
+                "      - run: uv run --with ruff ruff format --check .",
+                "      - run: uv run --with basedpyright basedpyright",
+                "      - run: uv run --with vulture vulture . --min-confidence 70",
+                "      - run: uv build",
+                "      - run: quality-runner doctor --json",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )

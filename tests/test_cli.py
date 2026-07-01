@@ -301,6 +301,51 @@ def test_cli_main_new_commands_in_process(tmp_path: Path, capsys) -> None:
     assert output_path.exists()
 
 
+def test_cli_main_reports_human_summaries_in_process(tmp_path: Path, capsys) -> None:
+    from quality_runner.cli import main
+
+    assert main([]) == 0
+    assert "Quality Runner 0.1.0" in capsys.readouterr().out
+
+    assert main(["doctor"]) == 0
+    assert capsys.readouterr().out.strip() == "Quality Runner 0.1.0: ready"
+
+    write_js_fixture(tmp_path)
+    assert main(["inspect", str(tmp_path), "--run-id", "human-inspect"]) == 0
+    inspect_output = capsys.readouterr().out
+    assert "status: inspected" in inspect_output
+    assert "repo scan:" in inspect_output
+
+    assert main(["run", str(tmp_path), "--run-id", "human-run"]) == 0
+    run_output = capsys.readouterr().out
+    assert "status: planned" in run_output
+    assert "handoff:" in run_output
+    assert "audit:" in run_output
+
+
+def test_cli_main_reports_export_errors_in_process(tmp_path: Path, capsys) -> None:
+    from quality_runner.cli import main
+
+    assert main(["export-handoff", str(tmp_path)]) == 1
+    captured = capsys.readouterr()
+
+    assert "no Quality Runner runs found" in captured.err
+    assert captured.out == ""
+
+
+def test_cli_main_rejects_file_repo_path_in_process(tmp_path: Path, capsys) -> None:
+    from quality_runner.cli import main
+
+    repo_file = tmp_path / "not-a-repo"
+    repo_file.write_text("content", encoding="utf-8")
+
+    assert main(["status", str(repo_file)]) == 1
+    captured = capsys.readouterr()
+
+    assert "repo root is not a directory" in captured.err
+    assert captured.out == ""
+
+
 def test_cli_main_reports_init_conflict_in_process(tmp_path: Path, capsys) -> None:
     from quality_runner.cli import main
 

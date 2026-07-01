@@ -24,7 +24,8 @@ def detect_capabilities(
     standards_packet: dict[str, Any],
 ) -> dict[str, Any]:
     scripts = _scripts(scan)
-    required_capabilities = _required_capabilities(standards_packet)
+    quality_commands = _quality_commands(scan)
+    required_capabilities = _required_capabilities(scan, standards_packet)
     accepted_exceptions: list[dict[str, str]] = []
     available: list[dict[str, str]] = []
     missing: list[dict[str, str]] = []
@@ -32,16 +33,28 @@ def detect_capabilities(
     for capability_id, script_names in SCRIPT_CAPABILITIES.items():
         if capability_id not in required_capabilities:
             continue
+        command = _first_quality_command(quality_commands, capability_id)
         script_name = _first_matching_script(scripts, script_names)
-        if script_name is None:
+        if command is not None:
+            available.append(
+                {
+                    "id": capability_id,
+                    "type": "command",
+                    "source": command["source"],
+                    "command": command["command"],
+                    "language": command["language"],
+                }
+            )
+        elif script_name is None:
             _record_missing(
                 missing=missing,
                 accepted_exceptions=accepted_exceptions,
                 standards_packet=standards_packet,
                 capability=dict(
                     id=capability_id,
-                    type="script",
-                    reason=f"no package script found for {capability_id}",
+                    type="command",
+                    reason=f"no quality command found for {capability_id}",
+                    language=_primary_language(scan),
                 ),
             )
         else:
@@ -55,9 +68,9 @@ def detect_capabilities(
 
     # fmt: off
     if "pre_cr" in required_capabilities:
-        _record_file_capability(available=available, missing=missing, accepted_exceptions=accepted_exceptions, standards_packet=standards_packet, scripts=scripts, capability_id="pre_cr", script_names=PRE_CR_SCRIPT_NAMES, path=scan.get("pre_cr_config"), reason="no Pre-CR script or configuration found")
+        _record_file_capability(available=available, missing=missing, accepted_exceptions=accepted_exceptions, standards_packet=standards_packet, scripts=scripts, quality_commands=quality_commands, capability_id="pre_cr", script_names=PRE_CR_SCRIPT_NAMES, path=scan.get("pre_cr_config"), reason="no Pre-CR script or configuration found", language=_primary_language(scan))
     if "truth_file" in required_capabilities:
-        _record_file_capability(available=available, missing=missing, accepted_exceptions=accepted_exceptions, standards_packet=standards_packet, scripts=scripts, capability_id="truth_file", script_names=(), path=scan.get("truth_file"), reason="no project truth file found")
+        _record_file_capability(available=available, missing=missing, accepted_exceptions=accepted_exceptions, standards_packet=standards_packet, scripts=scripts, quality_commands=quality_commands, capability_id="truth_file", script_names=(), path=scan.get("truth_file"), reason="no project truth file found", language=_primary_language(scan))
     # fmt: on
 
     profile = standards_packet.get("profile")
@@ -82,6 +95,49 @@ def _scripts(scan: dict[str, Any]) -> dict[str, str]:
     }
 
 
+def _quality_commands(scan: dict[str, Any]) -> list[dict[str, str]]:
+    commands = scan.get("quality_commands")
+    if not isinstance(commands, list):
+        return []
+    normalized: list[dict[str, str]] = []
+    for command in commands:
+        if not isinstance(command, dict):
+            continue
+        capability_id = command.get("id")
+        command_text = command.get("command")
+        source = command.get("source")
+        language = command.get("language")
+        if (
+            isinstance(capability_id, str)
+            and capability_id
+            and isinstance(command_text, str)
+            and command_text
+            and isinstance(source, str)
+            and source
+            and isinstance(language, str)
+            and language
+        ):
+            normalized.append(
+                {
+                    "id": capability_id,
+                    "command": command_text,
+                    "source": source,
+                    "language": language,
+                }
+            )
+    return normalized
+
+
+def _first_quality_command(
+    commands: list[dict[str, str]],
+    capability_id: str,
+) -> dict[str, str] | None:
+    for command in commands:
+        if command["id"] == capability_id:
+            return command
+    return None
+
+
 def _first_matching_script(
     scripts: dict[str, str],
     script_names: tuple[str, ...],
@@ -93,8 +149,21 @@ def _first_matching_script(
 
 
 # fmt: off
-def _record_file_capability(*, available: list[dict[str, str]], missing: list[dict[str, str]], accepted_exceptions: list[dict[str, str]], standards_packet: dict[str, Any], scripts: dict[str, str], capability_id: str, script_names: tuple[str, ...], path: object, reason: str) -> None:
+def _record_file_capability(*, available: list[dict[str, str]], missing: list[dict[str, str]], accepted_exceptions: list[dict[str, str]], standards_packet: dict[str, Any], scripts: dict[str, str], quality_commands: list[dict[str, str]], capability_id: str, script_names: tuple[str, ...], path: object, reason: str, language: str) -> None:
 # fmt: on
+    command = _first_quality_command(quality_commands, capability_id)
+    if command is not None:
+        available.append(
+            {
+                "id": capability_id,
+                "type": "command",
+                "source": command["source"],
+                "command": command["command"],
+                "language": command["language"],
+            }
+        )
+        return
+
     script_name = _first_matching_script(scripts, script_names)
     if script_name is not None:
         available.append(
@@ -112,7 +181,7 @@ def _record_file_capability(*, available: list[dict[str, str]], missing: list[di
             missing=missing,
             accepted_exceptions=accepted_exceptions,
             standards_packet=standards_packet,
-            capability=dict(id=capability_id, type="file", reason=reason),
+            capability=dict(id=capability_id, type="file", reason=reason, language=language),
         )
 
 
@@ -130,20 +199,48 @@ def _record_missing(*, missing: list[dict[str, str]], accepted_exceptions: list[
         accepted_exceptions.append(exception)
 
 
-def _required_capabilities(standards_packet: dict[str, Any]) -> set[str]:
+def _required_capabilities(scan: dict[str, Any], standards_packet: dict[str, Any]) -> set[str]:
     config = standards_packet.get("config")
     if isinstance(config, dict):
-        if config.get("required_capabilities_configured") is not True:
-            return {*SCRIPT_CAPABILITIES, *FILE_CAPABILITIES}
         required_capabilities = config.get("required_capabilities")
-        if isinstance(required_capabilities, list):
+        if config.get("required_capabilities_configured") is True and isinstance(
+            required_capabilities, list
+        ):
             return {
                 capability
                 for capability in required_capabilities
                 if isinstance(capability, str)
                 and (capability in SCRIPT_CAPABILITIES or capability in FILE_CAPABILITIES)
             }
-    return {*SCRIPT_CAPABILITIES, *FILE_CAPABILITIES}
+
+    required = {*SCRIPT_CAPABILITIES, "pre_cr"}
+    if _truth_file_required(scan):
+        required.add("truth_file")
+    return required
+
+
+def _truth_file_required(scan: dict[str, Any]) -> bool:
+    if isinstance(scan.get("truth_file"), str) and scan["truth_file"]:
+        return True
+    instruction_files = scan.get("agent_instruction_files")
+    if not isinstance(instruction_files, list):
+        return False
+    quality_contract = scan.get("quality_contract")
+    if not isinstance(quality_contract, dict):
+        return False
+    required_terms = quality_contract.get("required_terms")
+    if not isinstance(required_terms, dict):
+        return False
+    return required_terms.get("truth_file") is True
+
+
+def _primary_language(scan: dict[str, Any]) -> str:
+    languages = scan.get("languages")
+    if isinstance(languages, list):
+        for language in languages:
+            if isinstance(language, str) and language:
+                return language
+    return "unknown"
 
 
 def _active_exception(standards_packet: dict[str, Any], capability_id: str) -> dict[str, str] | None:

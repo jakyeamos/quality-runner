@@ -14,9 +14,12 @@ Artifacts are written under:
 `quality-runner inspect` writes:
 
 - `repo-scan.json`: repository facts such as package scripts, lockfiles, agent
-  instruction files, Pre-CR config, and project truth file presence.
+  instruction files, language-aware quality commands, Pre-CR config, and project
+  truth file presence.
 - `standards.json`: compiled standards packet for the selected profile.
 - `capability-matrix.json`: available and missing quality capabilities.
+  Available command-backed capabilities include the command, source, and
+  detected language used as evidence.
 - `run-manifest.json`: run metadata, Quality Runner version, artifact paths, and
   git HEAD/branch/dirty state when the target is a git repo.
 

@@ -159,7 +159,12 @@ def test_detect_capabilities_applies_required_capabilities_and_active_exceptions
 
     assert {item["id"] for item in capability_map["available"]} == {"lint"}
     assert capability_map["missing"] == [
-        {"id": "tests", "type": "script", "reason": "no package script found for tests"}
+        {
+            "id": "tests",
+            "type": "command",
+            "reason": "no quality command found for tests",
+            "language": "javascript",
+        }
     ]
     assert capability_map["accepted_exceptions"] == [
         {
@@ -210,13 +215,20 @@ def test_detect_capabilities_handles_file_sources_and_inactive_exceptions(tmp_pa
     assert capability_map["available"] == [
         {
             "id": "pre_cr",
-            "type": "script",
+            "type": "command",
             "source": "package.json:scripts.pre-cr",
+            "command": "pre-cr run",
+            "language": "javascript",
         },
         {"id": "truth_file", "type": "file", "source": ".tracker/PROJECT_TRUTH.md"},
     ]
     assert capability_map["missing"] == [
-        {"id": "tests", "type": "script", "reason": "no package script found for tests"}
+        {
+            "id": "tests",
+            "type": "command",
+            "reason": "no quality command found for tests",
+            "language": "javascript",
+        }
     ]
     assert capability_map["accepted_exceptions"] == []
 

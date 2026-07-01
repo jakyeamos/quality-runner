@@ -15,9 +15,26 @@
       "type": "object",
       "additionalProperties": { "type": "string" }
     },
+    "quality_commands": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/qualityCommand" },
+      "default": []
+    },
     "warnings": { "$ref": "#/$defs/warnings" }
   },
   "$defs": {
+    "qualityCommand": {
+      "type": "object",
+      "required": ["id", "command", "source_type", "source", "language"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "command": { "type": "string", "minLength": 1 },
+        "source_type": { "type": "string", "minLength": 1 },
+        "source": { "type": "string", "minLength": 1 },
+        "language": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": false
+    },
     "warnings": {
       "type": "array",
       "items": { "$ref": "#/$defs/warning" }

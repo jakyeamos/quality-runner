@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from test_support.quality_runner_fixtures import write_js_fixture
+from test_support.quality_runner_fixtures import write_js_fixture, write_python_quality_fixture
 
 
 def test_inspect_repo_detects_js_quality_surfaces(tmp_path: Path) -> None:
@@ -19,6 +19,39 @@ def test_inspect_repo_detects_js_quality_surfaces(tmp_path: Path) -> None:
     assert scan["scripts"]["lint"] == "eslint ."
     assert scan["pre_cr_config"] == ".pre-cr.json"
     assert scan["truth_file"] == ".tracker/PROJECT_TRUTH.md"
+
+
+def test_inspect_repo_detects_python_quality_commands(tmp_path: Path) -> None:
+    from quality_runner.discovery import inspect_repo
+
+    write_python_quality_fixture(tmp_path)
+
+    scan = inspect_repo(tmp_path, run_id="python-scan-001")
+
+    assert scan["package_manager"] is None
+    assert scan["languages"] == ["python"]
+    commands = {command["id"]: command for command in scan["quality_commands"]}
+    assert commands["formatter"] == {
+        "id": "formatter",
+        "command": "ruff format --check .",
+        "source_type": "pyproject",
+        "source": "pyproject.toml:tool.ruff",
+        "language": "python",
+    }
+    assert commands["lint"]["command"] == "ruff check ."
+    assert commands["typecheck"]["source"] == "pyproject.toml:tool.basedpyright"
+    assert commands["tests"]["source"] == "pyproject.toml:tool.pytest.ini_options"
+    assert commands["dead_code"]["command"] == "uv run --with vulture vulture . --min-confidence 70"
+    assert commands["build"]["command"] == "uv build"
+    assert commands["runtime_smoke"]["command"] == "quality-runner doctor --json"
+    assert commands["pre_pr"]["source"] == ".github/workflows"
+    assert commands["pre_cr"] == {
+        "id": "pre_cr",
+        "command": "python3.14 scripts/run_pytest_with_lcov.py",
+        "source_type": "pre_cr_config",
+        "source": ".pre-cr.json:testCommand",
+        "language": "python",
+    }
 
 
 def test_inspect_repo_does_not_infer_package_manager_from_policy_text(tmp_path: Path) -> None:
@@ -77,6 +110,177 @@ def test_inspect_repo_warns_on_invalid_package_json(tmp_path: Path) -> None:
             "path": "package.json",
         }
     ]
+
+
+def test_inspect_repo_warns_on_invalid_package_json_shape(tmp_path: Path) -> None:
+    from quality_runner.discovery import inspect_repo
+
+    (tmp_path / "package.json").write_text("[]", encoding="utf-8")
+
+    scan = inspect_repo(tmp_path, run_id="invalid-package-shape-001")
+
+    assert scan["scripts"] == {}
+    assert scan["warnings"] == [
+        {
+            "code": "invalid_package_json_shape",
+            "message": "package.json must contain a JSON object",
+            "path": "package.json",
+        }
+    ]
+
+
+def test_inspect_repo_detects_lockfile_languages_and_truth_policy(tmp_path: Path) -> None:
+    from quality_runner.discovery import inspect_repo
+
+    (tmp_path / "package.json").write_text(
+        json.dumps(
+            {
+                "packageManager": "yarn@4.0.0",
+                "scripts": {
+                    "fmt": "prettier --check .",
+                    "check-types": "tsc --noEmit",
+                    "tests": "vitest run",
+                    "smoke-test": "playwright test smoke",
+                    "prepr": "pre-cr",
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    (tmp_path / "Package.swift").write_text("// swift\n", encoding="utf-8")
+    (tmp_path / "go.mod").write_text("module example.com/fixture\n", encoding="utf-8")
+    (tmp_path / "AGENTS.md").write_text(
+        "Maintain .tracker/PROJECT_TRUTH.md after every change.\n",
+        encoding="utf-8",
+    )
+
+    scan = inspect_repo(tmp_path, run_id="mixed-language-001")
+
+    assert scan["package_manager"] == "yarn"
+    assert scan["languages"] == ["javascript", "swift", "go"]
+    assert scan["quality_contract"]["required_terms"]["truth_file"] is True
+    commands = {command["id"]: command for command in scan["quality_commands"]}
+    assert commands["formatter"]["source"] == "package.json:scripts.fmt"
+    assert commands["typecheck"]["source"] == "package.json:scripts.check-types"
+    assert commands["tests"]["source"] == "package.json:scripts.tests"
+    assert commands["runtime_smoke"]["source"] == "package.json:scripts.smoke-test"
+    assert commands["pre_pr"]["source"] == "package.json:scripts.prepr"
+
+
+def test_inspect_repo_warns_on_invalid_pyproject_toml(tmp_path: Path) -> None:
+    from quality_runner.discovery import inspect_repo
+
+    (tmp_path / "pyproject.toml").write_text("[project\n", encoding="utf-8")
+
+    scan = inspect_repo(tmp_path, run_id="invalid-pyproject-001")
+
+    assert scan["quality_commands"] == []
+    assert {
+        "code": "invalid_pyproject_toml",
+        "message": "pyproject.toml could not be parsed as TOML",
+        "path": "pyproject.toml",
+    } in scan["warnings"]
+
+
+def test_inspect_repo_detects_yaml_pre_cr_config_without_test_command(tmp_path: Path) -> None:
+    from quality_runner.discovery import inspect_repo
+
+    (tmp_path / ".pre-cr.yml").write_text("version: 1\n", encoding="utf-8")
+
+    scan = inspect_repo(tmp_path, run_id="yaml-pre-cr-001")
+
+    assert {
+        "id": "pre_cr",
+        "command": "pre-cr run --workspace .",
+        "source_type": "pre_cr_config",
+        "source": ".pre-cr.yml",
+        "language": "unknown",
+    } in scan["quality_commands"]
+
+
+def test_inspect_repo_detects_json_pre_cr_config_without_test_command(tmp_path: Path) -> None:
+    from quality_runner.discovery import inspect_repo
+
+    (tmp_path / ".pre-cr.json").write_text("{}", encoding="utf-8")
+
+    scan = inspect_repo(tmp_path, run_id="json-pre-cr-default-001")
+
+    assert {
+        "id": "pre_cr",
+        "command": "pre-cr run --workspace .",
+        "source_type": "pre_cr_config",
+        "source": ".pre-cr.json",
+        "language": "unknown",
+    } in scan["quality_commands"]
+
+
+def test_inspect_repo_detects_invalid_json_pre_cr_config_as_default_command(
+    tmp_path: Path,
+) -> None:
+    from quality_runner.discovery import inspect_repo
+
+    (tmp_path / ".pre-cr.json").write_text("{not-json", encoding="utf-8")
+
+    scan = inspect_repo(tmp_path, run_id="json-pre-cr-invalid-001")
+
+    assert {
+        "id": "pre_cr",
+        "command": "pre-cr run --workspace .",
+        "source_type": "pre_cr_config",
+        "source": ".pre-cr.json",
+        "language": "unknown",
+    } in scan["quality_commands"]
+
+
+def test_inspect_repo_detects_ci_only_python_commands(tmp_path: Path) -> None:
+    from quality_runner.discovery import inspect_repo
+
+    (tmp_path / "pyproject.toml").write_text(
+        "\n".join(
+            [
+                "[project]",
+                'name = "ci-only-python"',
+                'version = "0.1.0"',
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    workflow_root = tmp_path / ".github" / "workflows"
+    workflow_root.mkdir(parents=True)
+    (workflow_root / "ci.yaml").write_text(
+        "\n".join(
+            [
+                "name: CI",
+                "on:",
+                "  pull_request:",
+                "jobs:",
+                "  quality:",
+                "    steps:",
+                "      - run: uv run --with pytest pytest -q",
+                "      - run: uv run --with ruff ruff check .",
+                "      - run: uv run --with ruff ruff format --check .",
+                "      - run: uv run --with basedpyright basedpyright",
+                "      - run: uv run --with vulture vulture . --min-confidence 70",
+                "      - run: uv build",
+                "      - run: quality-runner doctor --json",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    scan = inspect_repo(tmp_path, run_id="ci-only-python-001")
+
+    commands = {command["id"]: command for command in scan["quality_commands"]}
+    assert commands["lint"]["source_type"] == "github_workflow"
+    assert commands["formatter"]["source"] == ".github/workflows"
+    assert commands["typecheck"]["command"] == "uv run --with basedpyright basedpyright"
+    assert commands["tests"]["command"] == "uv run --with pytest pytest -q"
+    assert commands["dead_code"]["command"] == "uv run --with vulture vulture . --min-confidence 70"
+    assert commands["build"]["command"] == "uv build"
+    assert commands["runtime_smoke"]["command"] == "quality-runner doctor --json"
+    assert commands["pre_pr"]["command"] == "github-actions pull_request quality"
 
 
 def test_package_json_warnings_propagate_to_standards_and_capabilities(tmp_path: Path) -> None:
@@ -222,7 +426,41 @@ def test_detect_capabilities_records_missing_expected_surfaces(tmp_path: Path) -
     missing_ids = {item["id"] for item in capability_map["missing"]}
     assert "lint" in missing_ids
     assert "tests" in missing_ids
-    assert "truth_file" in missing_ids
+    assert "truth_file" not in missing_ids
+
+
+def test_detect_capabilities_accepts_python_quality_commands(tmp_path: Path) -> None:
+    from quality_runner.capabilities import detect_capabilities
+    from quality_runner.discovery import inspect_repo
+    from quality_runner.standards import compile_standards
+
+    write_python_quality_fixture(tmp_path)
+    scan = inspect_repo(tmp_path, run_id="python-capabilities-001")
+    packet = compile_standards(repo_root=tmp_path, scan=scan, profile="jakyeamos")
+
+    capability_map = detect_capabilities(scan=scan, standards_packet=packet)
+
+    available = {item["id"]: item for item in capability_map["available"]}
+    missing_ids = {item["id"] for item in capability_map["missing"]}
+    assert {
+        "formatter",
+        "lint",
+        "typecheck",
+        "tests",
+        "build",
+        "dead_code",
+        "runtime_smoke",
+        "pre_pr",
+        "pre_cr",
+    }.issubset(available)
+    assert "truth_file" not in missing_ids
+    assert available["lint"] == {
+        "id": "lint",
+        "type": "command",
+        "source": "pyproject.toml:tool.ruff",
+        "command": "ruff check .",
+        "language": "python",
+    }
 
 
 def test_detect_capabilities_records_pre_cr_script_with_stable_id(tmp_path: Path) -> None:
@@ -278,3 +516,38 @@ def test_detect_capabilities_treats_malformed_scripts_as_missing() -> None:
     missing_ids = {item["id"] for item in capability_map["missing"]}
     assert "lint" in missing_ids
     assert "tests" in missing_ids
+
+
+def test_detect_capabilities_ignores_malformed_quality_commands_and_requires_truth_policy(
+    tmp_path: Path,
+) -> None:
+    from quality_runner.capabilities import detect_capabilities
+    from quality_runner.discovery import inspect_repo
+    from quality_runner.standards import compile_standards
+
+    (tmp_path / "AGENTS.md").write_text(
+        "Maintain project truth before completion.\n",
+        encoding="utf-8",
+    )
+    scan = inspect_repo(tmp_path, run_id="malformed-quality-command-001")
+    scan["quality_commands"] = [
+        "invalid",
+        {"id": "lint", "command": "ruff check .", "source": "pyproject.toml:tool.ruff"},
+    ]
+    packet = compile_standards(repo_root=tmp_path, scan=scan, profile="jakyeamos")
+
+    capability_map = detect_capabilities(scan=scan, standards_packet=packet)
+
+    missing = {item["id"]: item for item in capability_map["missing"]}
+    assert missing["lint"] == {
+        "id": "lint",
+        "type": "command",
+        "reason": "no quality command found for lint",
+        "language": "unknown",
+    }
+    assert missing["truth_file"] == {
+        "id": "truth_file",
+        "type": "file",
+        "reason": "no project truth file found",
+        "language": "unknown",
+    }

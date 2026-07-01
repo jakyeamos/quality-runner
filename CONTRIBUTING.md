@@ -17,8 +17,12 @@ basedpyright
 vulture . --min-confidence 70
 uv run --with pytest pytest -q
 python3.14 scripts/run_pytest_with_lcov.py
-pre-cr run --workspace .
+pre-cr run --workspace . --json
 ```
+
+Pre-CR is changed-line readiness. It is expected to block with `no-changes` on an
+unchanged workspace; use it after editing or staging files, and use the LCOV
+script above for full-suite coverage generation.
 
 ## Tests
 

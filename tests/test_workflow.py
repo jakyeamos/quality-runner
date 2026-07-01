@@ -4,7 +4,11 @@ import json
 import subprocess
 from pathlib import Path
 
-from test_support.quality_runner_fixtures import write_complete_js_fixture, write_js_fixture
+from test_support.quality_runner_fixtures import (
+    write_complete_js_fixture,
+    write_js_fixture,
+    write_python_quality_fixture,
+)
 
 
 def _git_commit(repo_root: Path) -> str:
@@ -106,7 +110,61 @@ def test_run_payload_records_missing_capability_findings(tmp_path: Path) -> None
     finding_ids = {finding["id"] for finding in audit_report["findings"]}
     assert "missing-lint" in finding_ids
     assert "missing-tests" in finding_ids
-    assert "missing-truth-file" in finding_ids
+    assert "missing-truth-file" not in finding_ids
+
+
+def test_run_payload_does_not_false_positive_python_quality_gates(tmp_path: Path) -> None:
+    from quality_runner.workflow import run_payload
+
+    write_python_quality_fixture(tmp_path)
+
+    payload = run_payload(repo_root=tmp_path, run_id="python-quality-run", profile="jakyeamos")
+    audit_report = json.loads(Path(payload["artifact_paths"]["quality_audit_json"]).read_text())
+    capability_map = json.loads(
+        Path(payload["artifact_paths"]["capability_matrix_json"]).read_text()
+    )
+
+    assert payload["status"] == "clean"
+    finding_ids = {finding["id"] for finding in audit_report["findings"]}
+    assert "missing-formatter" not in finding_ids
+    assert "missing-lint" not in finding_ids
+    assert "missing-typecheck" not in finding_ids
+    assert "missing-tests" not in finding_ids
+    assert "missing-build" not in finding_ids
+    assert "missing-dead-code" not in finding_ids
+    assert "missing-runtime-smoke" not in finding_ids
+    assert "missing-pre-pr" not in finding_ids
+    assert "missing-truth-file" not in finding_ids
+    available = {item["id"]: item for item in capability_map["available"]}
+    assert available["dead_code"]["source"] == ".github/workflows"
+    assert available["runtime_smoke"]["command"] == "quality-runner doctor --json"
+
+
+def test_run_payload_python_missing_gate_uses_python_recommendation(tmp_path: Path) -> None:
+    from quality_runner.workflow import run_payload
+
+    (tmp_path / "pyproject.toml").write_text(
+        "\n".join(
+            [
+                "[project]",
+                'name = "partial-python"',
+                'version = "0.1.0"',
+                "",
+                "[tool.pytest.ini_options]",
+                'pythonpath = ["."]',
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    payload = run_payload(repo_root=tmp_path, run_id="python-missing-run", profile="jakyeamos")
+    audit_report = json.loads(Path(payload["artifact_paths"]["quality_audit_json"]).read_text())
+    lint_finding = next(
+        finding for finding in audit_report["findings"] if finding["id"] == "missing-lint"
+    )
+
+    assert lint_finding["recommended_fix"] == "Add a Python lint gate such as ruff check ."
 
 
 def test_run_payload_records_package_manager_mismatch_in_audit_and_plan(
@@ -412,13 +470,12 @@ def test_generated_remediation_plan_orders_findings_and_exposes_actions(tmp_path
 
     priorities = [slice_item["priority"] for slice_item in plan["slices"]]
     ids = [slice_item["findings"][0]["id"] for slice_item in plan["slices"]]
-    assert priorities[:6] == ["high", "high", "high", "high", "high", "high"]
-    assert ids[:6] == [
+    assert priorities[:5] == ["high", "high", "high", "high", "high"]
+    assert ids[:5] == [
         "missing-dead-code",
         "missing-formatter",
         "missing-lint",
         "missing-tests",
-        "missing-truth-file",
         "missing-typecheck",
     ]
     first_slice = plan["slices"][0]
@@ -454,6 +511,117 @@ def test_generated_audit_report_validates(tmp_path: Path) -> None:
     report = build_audit_report(scan=scan, standards_packet=packet, capability_map=capability_map)
 
     assert validate_audit_report(report) == {"passed": True, "errors": []}
+
+
+def test_audit_and_plan_markdown_render_findings_and_clean_states() -> None:
+    from quality_runner.audit import render_audit_markdown
+    from quality_runner.planning import render_handoff_markdown, render_plan_markdown
+
+    audit_markdown = render_audit_markdown(
+        {
+            "schema": "quality-runner-audit-report-v0.1",
+            "status": "findings",
+            "implementation_allowed": False,
+            "findings": [
+                {
+                    "id": "missing-lint",
+                    "severity": "blocker",
+                    "category": "capability",
+                    "summary": "Required quality capability is missing: lint.",
+                    "recommended_fix": "Add a lint gate.",
+                    "evidence": ["Capability map lists lint as missing."],
+                    "verification": ["Rerun quality-runner."],
+                },
+                "invalid",
+            ],
+        }
+    )
+    clean_audit_markdown = render_audit_markdown(
+        {
+            "schema": "quality-runner-audit-report-v0.1",
+            "status": "clean",
+            "implementation_allowed": False,
+            "findings": [],
+        }
+    )
+    plan_markdown = render_plan_markdown(
+        {
+            "schema": "quality-runner-remediation-plan-v0.1",
+            "implementation_allowed": False,
+            "slices": [
+                {
+                    "id": "remediate-missing-lint",
+                    "title": "Remediate missing-lint",
+                    "priority": "high",
+                    "findings": [
+                        {
+                            "id": "missing-lint",
+                            "summary": "Required quality capability is missing: lint.",
+                        }
+                    ],
+                    "actions": ["Add a lint gate."],
+                    "verification_gates": ["Rerun quality-runner."],
+                },
+                "invalid",
+            ],
+        }
+    )
+    clean_plan_markdown = render_plan_markdown(
+        {
+            "schema": "quality-runner-remediation-plan-v0.1",
+            "implementation_allowed": False,
+            "slices": [],
+        }
+    )
+    handoff_markdown = render_handoff_markdown(
+        {
+            "schema": "quality-runner-agent-handoff-v0.1",
+            "status": "planned",
+            "implementation_allowed": False,
+            "artifact_paths": {"quality_audit_json": "/tmp/audit.json"},
+            "warnings": [
+                {
+                    "code": "invalid_package_json",
+                    "message": "package.json could not be parsed as JSON",
+                    "path": "package.json",
+                },
+                "invalid",
+            ],
+            "next_slice": {
+                "id": "remediate-missing-lint",
+                "title": "Remediate missing-lint",
+                "priority": "high",
+                "findings": [
+                    {
+                        "id": "missing-lint",
+                        "summary": "Required quality capability is missing: lint.",
+                    }
+                ],
+                "actions": ["Add a lint gate."],
+            },
+            "verification_gates": ["Rerun quality-runner."],
+            "slice_ids": ["remediate-missing-lint"],
+        }
+    )
+    clean_handoff_markdown = render_handoff_markdown(
+        {
+            "schema": "quality-runner-agent-handoff-v0.1",
+            "status": "clean",
+            "implementation_allowed": False,
+            "artifact_paths": {},
+            "warnings": [],
+            "next_slice": None,
+            "verification_gates": [],
+            "slice_ids": [],
+        }
+    )
+
+    assert "### missing-lint" in audit_markdown
+    assert "No findings." in clean_audit_markdown
+    assert "### remediate-missing-lint" in plan_markdown
+    assert "No remediation slices are required." in clean_plan_markdown
+    assert "invalid_package_json (package.json)" in handoff_markdown
+    assert "No remediation slice is queued." in clean_handoff_markdown
 
 
 def test_generated_remediation_plan_validates(tmp_path: Path) -> None:

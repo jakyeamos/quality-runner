@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import runpy
 import shutil
 import subprocess
 import sys
@@ -37,6 +38,19 @@ def test_module_entrypoint_exits_successfully() -> None:
     )
 
     assert "Quality Runner" in result.stdout
+
+
+def test_module_entrypoint_runs_in_process(capsys, monkeypatch) -> None:
+    monkeypatch.setattr(sys, "argv", ["quality-runner"])
+
+    try:
+        runpy.run_module("quality_runner.__main__", run_name="__main__")
+    except SystemExit as error:
+        assert error.code == 0
+    else:
+        raise AssertionError("__main__ did not raise SystemExit")
+
+    assert "Quality Runner" in capsys.readouterr().out
 
 
 def test_module_entrypoint_version_exits_successfully() -> None:

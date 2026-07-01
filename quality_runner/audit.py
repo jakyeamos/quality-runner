@@ -79,12 +79,14 @@ def _missing_capability_findings(capability_map: dict[str, Any]) -> list[dict[st
         capability_id = capability.get("id")
         reason = capability.get("reason")
         capability_type = capability.get("type")
+        language = capability.get("language")
         if not isinstance(capability_id, str) or not capability_id:
             continue
         reason_text = reason if isinstance(reason, str) and reason else "capability is absent"
         type_text = (
             capability_type if isinstance(capability_type, str) and capability_type else "unknown"
         )
+        language_text = language if isinstance(language, str) and language else "unknown"
         finding_id = f"missing-{capability_id.replace('_', '-')}"
         findings.append(
             {
@@ -96,7 +98,7 @@ def _missing_capability_findings(capability_map: dict[str, Any]) -> list[dict[st
                     f"Capability map lists {capability_id} as missing.",
                     f"Missing {type_text} capability evidence: {reason_text}.",
                 ],
-                "recommended_fix": _recommended_fix(capability_id),
+                "recommended_fix": _recommended_fix(capability_id, language_text),
                 "verification": [
                     f"Add the {capability_id} capability and rerun quality-runner.",
                     f"Confirm audit finding {finding_id} is absent from the regenerated report.",
@@ -189,8 +191,19 @@ def _severity_for_capability(capability_id: str) -> str:
     return "warning"
 
 
-def _recommended_fix(capability_id: str) -> str:
-    fixes = {
+def _recommended_fix(capability_id: str, language: str) -> str:
+    python_fixes = {
+        "formatter": "Add a Python format gate such as ruff format --check .",
+        "lint": "Add a Python lint gate such as ruff check .",
+        "typecheck": "Add a Python typecheck gate such as basedpyright.",
+        "tests": "Add a Python test gate such as pytest -q.",
+        "build": "Add a Python build gate such as uv build.",
+        "dead_code": "Add a Python dead-code gate such as vulture . --min-confidence 70.",
+        "runtime_smoke": "Add a Python smoke gate that exercises installed console scripts.",
+        "pre_pr": "Add a pull_request CI quality gate or document the equivalent pre-PR check.",
+        "pre_cr": "Add a Pre-CR changed-line readiness configuration.",
+    }
+    javascript_fixes = {
         "formatter": "Add a formatter command such as pnpm format.",
         "lint": "Add a lint command such as pnpm lint.",
         "typecheck": "Add a typecheck command such as pnpm typecheck.",
@@ -202,6 +215,7 @@ def _recommended_fix(capability_id: str) -> str:
         "pre_cr": "Add a Pre-CR script or configuration.",
         "truth_file": "Create and maintain .tracker/PROJECT_TRUTH.md.",
     }
+    fixes = python_fixes if language == "python" else javascript_fixes
     return fixes.get(capability_id, f"Provide the missing {capability_id} capability.")
 
 

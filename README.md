@@ -9,6 +9,23 @@ produces an ordered remediation plan. Version 1 does not edit source files,
 install dependencies, create commits, call remote services, or execute
 remediation.
 
+## Why this exists
+
+Agentic coding workflows need a reliable way to separate evidence from opinion.
+Quality Runner turns repository facts, local standards, and available quality
+gates into versioned artifacts that another agent or human maintainer can review
+before approving implementation work.
+
+## Architecture
+
+The pipeline is intentionally small: repository discovery compiles facts and
+quality-command evidence, standards compilation applies a profile, capability
+detection identifies available and missing gates, audit generation normalizes
+findings, and remediation planning writes an agent handoff.
+
+See [Backend Platform Case Study](docs/case-study.md) for the design narrative,
+self-audit improvements, and release-readiness proof.
+
 ## Install
 
 After the first PyPI release:
@@ -128,7 +145,7 @@ basedpyright
 vulture . --min-confidence 70
 uv run --with pytest pytest -q
 python3.14 scripts/run_pytest_with_lcov.py
-pre-cr run --workspace .
+pre-cr run --workspace . --json  # changed-line readiness; expects changed files
 ```
 
 See [Troubleshooting](docs/troubleshooting.md) for common install and runtime
