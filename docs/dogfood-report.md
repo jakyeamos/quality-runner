@@ -21,3 +21,49 @@ capabilities: Make targets, Docker runtime files, Terraform configuration, DB
 migrations, service contracts, generated code, and monorepo task runners are
 recognized as repo surfaces, while the intentionally absent dead-code gate stays
 as the planned remediation item.
+
+## External Dogfood Run
+
+Date: 2026-07-01
+
+Quality Runner was run against this repo plus four shallow-cloned public repos
+under `/Users/jakyeamos/projects/quality-runner-dogfood-repos`.
+
+| Repo | Category | Commit | Run status | Useful signal | Noise or gap |
+| --- | --- | --- | --- | --- | --- |
+| `quality-runner` | Self-audit | `217c2c4` | `clean` | Detected the Python quality ladder, CI-backed gates, Pre-CR config, and no missing required capabilities. | Surface discovery also sees mature fixture files under `fixtures/corpus`; future scan policy should support fixture/test exclusions. |
+| `fastapi/full-stack-fastapi-template` | Python backend/full-stack | `3685fb6` | `planned` | Detected a mixed Python/JS repo, Docker Compose, frontend lint/test scripts, backend test workflow, and pull-request CI evidence. | Root-only Python discovery missed `backend/pyproject.toml` tool evidence; personal pnpm policy flags `bun` even though this repo intentionally uses it. |
+| `nextjs/saas-starter` | JS/TS app | `6e33e58` | `planned` | Correctly found `pnpm` and the build script. The missing lint/typecheck/test/smoke findings are useful because the root `package.json` has only dev/build/start/db scripts. | No major scanner noise observed; a senior reviewer would still inspect app-specific CI if added later. |
+| `vercel/turborepo` | Mixed monorepo/task-runner repo | `b426736` | `planned` | Detected `pnpm`, `turbo.json`, `pnpm-workspace.yaml`, protobuf contracts, format/lint/test/build scripts, and pull-request CI evidence. | Missed repo-specific quality semantics such as `check`, `build:ts`, Rust/Cargo gates, and release workflows; this needs workspace-aware command classification. |
+| `emilybache/GildedRose-Refactoring-Kata` | Intentionally messy/legacy sample | `3e0085b` | `planned` | Produced a high-signal incomplete-quality posture: no root package manager, quality ladder, smoke, dead-code, or Pre-CR evidence. | Root-only scanning misses many nested language examples; this is acceptable as a first finding but not enough for mature polyglot audits. |
+
+Run artifacts:
+
+- `quality-runner`: `.quality-runner/runs/dogfood-quality-runner-2026-07-01/`
+- `python-backend-fastapi-template`: `.quality-runner/runs/dogfood-python-backend-2026-07-01/`
+- `js-ts-nextjs-saas-starter`: `.quality-runner/runs/dogfood-js-ts-app-2026-07-01/`
+- `mixed-monorepo-turborepo`: `.quality-runner/runs/dogfood-mixed-monorepo-2026-07-01/`
+- `intentionally-messy-gildedrose`: `.quality-runner/runs/dogfood-messy-gildedrose-2026-07-01/`
+
+### Senior Review Takeaway
+
+The external run validates the core product shape: Quality Runner is useful as
+an evidence normalizer and missing-gate planner, especially for repos with clear
+root-level package scripts, CI workflows, Docker/Compose files, and monorepo
+markers.
+
+The next improvement should be evidence-driven, not another broad detector pass:
+
+1. Add recursive workspace discovery for nested `pyproject.toml`,
+   `package.json`, Cargo, Go, and language-specific project roots.
+2. Make package-manager policy configurable per repo so intentional Bun/Yarn/npm
+   projects are not flagged by a personal pnpm default.
+3. Expand command classification to understand repo-specific quality aliases
+   such as `check`, `build:ts`, `pre-commit`, `prek`, `ultracite`, Cargo tests,
+   and backend scripts invoked from CI.
+4. Add scan exclusions for fixtures, generated corpora, vendored examples, and
+   docs so self-audits do not over-report intentionally embedded sample repos.
+
+This is the hiring-manager proof point: the tool now has real-world evidence,
+known limitations, and a concrete next roadmap derived from observed behavior
+rather than speculative feature ideas.
