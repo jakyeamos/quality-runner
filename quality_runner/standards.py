@@ -4,8 +4,8 @@ from pathlib import Path
 from typing import Any
 
 from quality_runner.config import load_repo_config
+from quality_runner.schema_constants import STANDARDS_PACKET_SCHEMA
 
-STANDARDS_PACKET_SCHEMA = "quality-runner-standards-packet-v0.1"
 SUPPORTED_PROFILES = {"jakyeamos"}
 
 

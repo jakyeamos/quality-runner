@@ -6,8 +6,7 @@ from pathlib import Path
 from typing import Any
 
 from quality_runner import __version__
-
-RUN_MANIFEST_SCHEMA = "quality-runner-run-manifest-v0.1"
+from quality_runner.schema_constants import RUN_MANIFEST_SCHEMA
 
 
 # fmt: off

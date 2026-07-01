@@ -37,23 +37,29 @@ def load_repo_config(repo_root: Path) -> dict[str, Any]:
     required = _string_list(
         section.get("required_capabilities"), "quality_runner.required_capabilities", warnings
     )
+    gates = _gates(section.get("gates"), warnings)
     exceptions = _accepted_exceptions(section.get("accepted_exceptions"), warnings)
+    severity_overrides = _string_mapping(
+        section.get("severity_overrides"), "quality_runner.severity_overrides", warnings
+    )
     return _config(
         path=CONFIG_FILE_NAME,
         default_profile=default_profile,
         required_capabilities=required,
         required_capabilities_configured="required_capabilities" in section,
         accepted_exceptions=exceptions,
+        gates=gates,
+        severity_overrides=severity_overrides,
         warnings=warnings,
     )
 
 
 # fmt: off
 def _config(
-    *, path: str | None, default_profile: str | None, required_capabilities: list[str], required_capabilities_configured: bool, accepted_exceptions: list[dict[str, str]], warnings: list[dict[str, str]],
+    *, path: str | None, default_profile: str | None, required_capabilities: list[str], required_capabilities_configured: bool, accepted_exceptions: list[dict[str, str]], gates: list[dict[str, Any]], severity_overrides: dict[str, str], warnings: list[dict[str, str]],
 ) -> dict[str, Any]:
     return dict(
-        schema=CONFIG_SCHEMA, path=path, default_profile=default_profile, required_capabilities=required_capabilities, required_capabilities_configured=required_capabilities_configured, accepted_exceptions=accepted_exceptions, warnings=warnings,
+        schema=CONFIG_SCHEMA, path=path, default_profile=default_profile, required_capabilities=required_capabilities, required_capabilities_configured=required_capabilities_configured, accepted_exceptions=accepted_exceptions, gates=gates, severity_overrides=severity_overrides, warnings=warnings,
     )
 # fmt: on
 
@@ -65,6 +71,8 @@ def _empty_config(*, path: str | None, warnings: list[dict[str, str]]) -> dict[s
         required_capabilities=[],
         required_capabilities_configured=False,
         accepted_exceptions=[],
+        gates=[],
+        severity_overrides={},
         warnings=warnings,
     )
 
@@ -94,6 +102,91 @@ def _string_list(value: object, field: str, warnings: list[dict[str, str]]) -> l
     return []
 
 
+def _string_mapping(
+    value: object,
+    field: str,
+    warnings: list[dict[str, str]],
+) -> dict[str, str]:
+    if value is None:
+        return {}
+    if isinstance(value, dict) and all(
+        isinstance(key, str) and key and isinstance(item, str) and item
+        for key, item in value.items()
+    ):
+        return dict(value)
+    warnings.append(
+        _warning(
+            "invalid_quality_runner_config_field",
+            f"{field} must be a table of non-empty string values",
+        )
+    )
+    return {}
+
+
+def _gates(value: object, warnings: list[dict[str, str]]) -> list[dict[str, Any]]:
+    if value is None:
+        return []
+    if not isinstance(value, list):
+        warnings.append(
+            _warning(
+                "invalid_quality_runner_config_field",
+                "quality_runner.gates must be a list of tables",
+            )
+        )
+        return []
+
+    gates: list[dict[str, Any]] = []
+    for index, item in enumerate(value):
+        if not isinstance(item, dict):
+            _gate_warning(index, warnings)
+            continue
+        capability_id = item.get("id")
+        command = item.get("command")
+        ecosystem = item.get("ecosystem")
+        source = item.get("source")
+        owner = item.get("owner")
+        required = item.get("required")
+        severity = item.get("severity")
+        if (
+            isinstance(capability_id, str)
+            and capability_id
+            and isinstance(command, str)
+            and command
+            and isinstance(ecosystem, str)
+            and ecosystem
+            and isinstance(source, str)
+            and source
+            and isinstance(owner, str)
+            and owner
+            and isinstance(required, bool)
+            and isinstance(severity, str)
+            and severity
+        ):
+            gates.append(
+                {
+                    "id": capability_id,
+                    "command": command,
+                    "ecosystem": ecosystem,
+                    "source": source,
+                    "owner": owner,
+                    "required": required,
+                    "severity": severity,
+                }
+            )
+        else:
+            _gate_warning(index, warnings)
+    return gates
+
+
+def _gate_warning(index: int, warnings: list[dict[str, str]]) -> None:
+    warnings.append(
+        _warning(
+            "invalid_quality_runner_config_field",
+            f"quality_runner.gates[{index}] must include id, command, ecosystem, source, owner, required, and severity",
+        )
+    )
+
+
 def _accepted_exceptions(value: object, warnings: list[dict[str, str]]) -> list[dict[str, str]]:
     if value is None:
         return []
@@ -113,16 +206,21 @@ def _accepted_exceptions(value: object, warnings: list[dict[str, str]]) -> list[
             continue
         capability = item.get("capability")
         reason = item.get("reason")
+        owner = item.get("owner")
         expires = item.get("expires")
         if (
             isinstance(capability, str)
             and capability
             and isinstance(reason, str)
             and reason
+            and isinstance(owner, str)
+            and owner
             and isinstance(expires, str)
             and expires
         ):
-            accepted.append(dict(capability=capability, reason=reason, expires=expires))
+            accepted.append(
+                dict(capability=capability, reason=reason, owner=owner, expires=expires)
+            )
         else:
             _accepted_exception_warning(index, warnings)
     return accepted
@@ -132,7 +230,7 @@ def _accepted_exception_warning(index: int, warnings: list[dict[str, str]]) -> N
     warnings.append(
         _warning(
             "invalid_quality_runner_config_field",
-            f"quality_runner.accepted_exceptions[{index}] must include capability, reason, and expires strings",
+            f"quality_runner.accepted_exceptions[{index}] must include capability, reason, owner, and expires strings",
         )
     )
 

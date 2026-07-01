@@ -2,11 +2,14 @@ from __future__ import annotations
 
 from typing import Any
 
+from quality_runner.schema_constants import (
+    AGENT_HANDOFF_SCHEMA,
+    AUDIT_REPORT_SCHEMA,
+    REMEDIATION_PLAN_SCHEMA,
+)
+
 ValidationResult = dict[str, Any]
-AUDIT_REPORT_SCHEMA = "quality-runner-audit-report-v0.1"
-REMEDIATION_PLAN_SCHEMA = "quality-runner-remediation-plan-v0.1"
-AGENT_HANDOFF_SCHEMA = "quality-runner-agent-handoff-v0.1"
-ALLOWED_SEVERITIES = {"blocker", "warning", "observation"}
+ALLOWED_SEVERITIES = {"critical", "blocker", "warning", "observation"}
 ALLOWED_PRIORITIES = {"high", "medium", "low"}
 ALLOWED_HANDOFF_STATUSES = {"clean", "planned"}
 

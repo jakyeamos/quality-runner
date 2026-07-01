@@ -31,7 +31,11 @@
         "type": { "type": "string", "minLength": 1 },
         "source": { "type": "string", "minLength": 1 },
         "command": { "type": "string", "minLength": 1 },
-        "language": { "type": "string", "minLength": 1 }
+        "language": { "type": "string", "minLength": 1 },
+        "required_by": { "type": "string", "minLength": 1 },
+        "owner": { "type": "string", "minLength": 1 },
+        "severity": { "type": "string", "minLength": 1 },
+        "ci_status": { "$ref": "#/$defs/ciStatus" }
       },
       "additionalProperties": false
     },
@@ -42,7 +46,10 @@
         "id": { "type": "string", "minLength": 1 },
         "type": { "type": "string", "minLength": 1 },
         "reason": { "type": "string", "minLength": 1 },
-        "language": { "type": "string", "minLength": 1 }
+        "language": { "type": "string", "minLength": 1 },
+        "required_by": { "type": "string", "minLength": 1 },
+        "owner": { "type": "string", "minLength": 1 },
+        "severity": { "type": "string", "minLength": 1 }
       },
       "additionalProperties": false
     },
@@ -52,7 +59,19 @@
       "properties": {
         "capability": { "type": "string", "minLength": 1 },
         "reason": { "type": "string", "minLength": 1 },
+        "owner": { "type": "string", "minLength": 1 },
         "expires": { "type": "string", "format": "date" }
+      },
+      "additionalProperties": false
+    },
+    "ciStatus": {
+      "type": "object",
+      "required": ["name", "status", "conclusion", "url"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "status": { "type": ["string", "null"] },
+        "conclusion": { "type": ["string", "null"] },
+        "url": { "type": ["string", "null"] }
       },
       "additionalProperties": false
     },

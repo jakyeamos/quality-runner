@@ -6,17 +6,29 @@ import tomllib
 from pathlib import Path
 from typing import Any
 
-REPO_SCAN_SCHEMA = "quality-runner-repo-scan-v0.1"
+from quality_runner.schema_constants import REPO_SCAN_SCHEMA
+from quality_runner.surfaces import detect_surfaces, quality_commands_from_surfaces
+
+MAX_DISCOVERY_TEXT_BYTES = 1_000_000
 
 
-def inspect_repo(repo_root: Path, run_id: str) -> dict[str, Any]:
+def inspect_repo(
+    repo_root: Path,
+    run_id: str,
+    ci_checks: list[dict[str, str | None]] | None = None,
+    extra_warnings: list[dict[str, str]] | None = None,
+) -> dict[str, Any]:
     root = _validated_repo_root(repo_root)
     package_json, warnings = _read_package_json(root)
     pyproject, pyproject_warnings = _read_pyproject(root)
     warnings.extend(pyproject_warnings)
     scripts = _package_scripts(package_json)
     agent_instruction_files = _agent_instruction_files(root)
-    ci_files = _ci_files(root)
+    ci_files, ci_warnings = _ci_files(root)
+    warnings.extend(ci_warnings)
+    if extra_warnings:
+        warnings.extend(extra_warnings)
+    repo_surfaces, ecosystems, generated_code = detect_surfaces(root)
 
     return {
         "schema": REPO_SCAN_SCHEMA,
@@ -25,6 +37,8 @@ def inspect_repo(repo_root: Path, run_id: str) -> dict[str, Any]:
         "is_git_repo": (root / ".git").exists(),
         "package_manager": _detect_package_manager(root, package_json),
         "languages": _detect_languages(root, package_json),
+        "ecosystems": ecosystems,
+        "repo_surfaces": repo_surfaces,
         "scripts": scripts,
         "quality_commands": _quality_commands(
             root=root,
@@ -36,6 +50,7 @@ def inspect_repo(repo_root: Path, run_id: str) -> dict[str, Any]:
             ),
             ci_files=ci_files,
         ),
+        "generated_code": generated_code,
         "agent_instruction_files": agent_instruction_files,
         "pre_cr_config": _first_existing(
             root,
@@ -44,6 +59,7 @@ def inspect_repo(repo_root: Path, run_id: str) -> dict[str, Any]:
         "truth_file": _first_existing(root, [".tracker/PROJECT_TRUTH.md"]),
         "quality_contract": _detect_quality_contract(root, scripts, agent_instruction_files),
         "ci_files": ci_files,
+        "ci_checks": ci_checks or [],
         "warnings": warnings,
     }
 
@@ -170,6 +186,7 @@ def _quality_commands(
         *(_javascript_quality_commands(scripts)),
         *(_python_pyproject_quality_commands(pyproject)),
         *(_pre_cr_quality_commands(root, pre_cr_config)),
+        *(quality_commands_from_surfaces(root)),
     ]
     existing_ids = {command["id"] for command in commands}
     commands.extend(_ci_quality_commands(root=root, ci_files=ci_files, existing_ids=existing_ids))
@@ -326,6 +343,10 @@ def _ci_quality_commands(
         ("dead_code", "vulture", "uv run --with vulture vulture . --min-confidence 70", "python"),
         ("build", "uv build", "uv build", "python"),
         ("runtime_smoke", "quality-runner doctor --json", "quality-runner doctor --json", "python"),
+        ("lint", "pnpm lint", "pnpm lint", "javascript"),
+        ("typecheck", "pnpm typecheck", "pnpm typecheck", "javascript"),
+        ("tests", "pnpm test", "pnpm test", "javascript"),
+        ("build", "pnpm build", "pnpm build", "javascript"),
     ]
     for capability_id, needle, command, language in ci_patterns:
         if capability_id in existing_ids or needle not in text:
@@ -413,7 +434,7 @@ def _detect_quality_contract(
     }
 
 
-def _ci_files(root: Path) -> list[str]:
+def _ci_files(root: Path) -> tuple[list[str], list[dict[str, str]]]:
     candidates = [
         ".github/workflows",
         ".gitlab-ci.yml",
@@ -421,7 +442,23 @@ def _ci_files(root: Path) -> list[str]:
         ".circleci/config.yml",
         "azure-pipelines.yml",
     ]
-    return [candidate for candidate in candidates if (root / candidate).exists()]
+    files: list[str] = []
+    warnings: list[dict[str, str]] = []
+    for candidate in candidates:
+        path = root / candidate
+        if not path.exists():
+            continue
+        if path.is_symlink():
+            warnings.append(
+                {
+                    "code": "skipped_symlinked_ci_path",
+                    "message": f"{candidate} is a symlink and was skipped",
+                    "path": candidate,
+                }
+            )
+            continue
+        files.append(candidate)
+    return files, warnings
 
 
 def _has_instruction_term(text: str, terms: tuple[str, ...]) -> bool:
@@ -430,6 +467,8 @@ def _has_instruction_term(text: str, terms: tuple[str, ...]) -> bool:
 
 def _read_text(path: Path) -> str:
     try:
+        if path.is_symlink() or path.stat().st_size > MAX_DISCOVERY_TEXT_BYTES:
+            return ""
         return path.read_text(encoding="utf-8")
     except OSError:
         return ""

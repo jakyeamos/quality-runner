@@ -1,0 +1,16 @@
+name: CI
+on:
+  pull_request:
+jobs:
+  quality:
+    name: Quality
+    runs-on: ubuntu-latest
+    steps:
+      - name: Lint
+        run: make lint
+      - name: Tests
+        run: make test
+      - name: Build
+        run: make build
+      - name: Smoke
+        run: make smoke

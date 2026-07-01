@@ -12,7 +12,7 @@ def build_audit_report(
     capability_map: dict[str, Any],
 ) -> dict[str, Any]:
     findings = [
-        *_missing_capability_findings(capability_map),
+        *_missing_capability_findings(capability_map, standards_packet),
         *_standards_requirement_findings(standards_packet, scan),
         *_warning_findings(capability_map),
     ]
@@ -67,7 +67,10 @@ def render_audit_markdown(report: dict[str, Any]) -> str:
     return "\n".join(lines).rstrip() + "\n"
 
 
-def _missing_capability_findings(capability_map: dict[str, Any]) -> list[dict[str, Any]]:
+def _missing_capability_findings(
+    capability_map: dict[str, Any],
+    standards_packet: dict[str, Any],
+) -> list[dict[str, Any]]:
     missing = capability_map.get("missing")
     if not isinstance(missing, list):
         return []
@@ -80,6 +83,7 @@ def _missing_capability_findings(capability_map: dict[str, Any]) -> list[dict[st
         reason = capability.get("reason")
         capability_type = capability.get("type")
         language = capability.get("language")
+        required_owner = capability.get("owner")
         if not isinstance(capability_id, str) or not capability_id:
             continue
         reason_text = reason if isinstance(reason, str) and reason else "capability is absent"
@@ -88,10 +92,16 @@ def _missing_capability_findings(capability_map: dict[str, Any]) -> list[dict[st
         )
         language_text = language if isinstance(language, str) and language else "unknown"
         finding_id = f"missing-{capability_id.replace('_', '-')}"
+        owner = required_owner if isinstance(required_owner, str) and required_owner else None
         findings.append(
             {
                 "id": finding_id,
-                "severity": _severity_for_capability(capability_id),
+                "severity": _effective_severity(
+                    capability_id=capability_id,
+                    finding_id=finding_id,
+                    standards_packet=standards_packet,
+                ),
+                "owner": owner,
                 "category": "capability",
                 "summary": f"Required quality capability is missing: {capability_id}.",
                 "evidence": [
@@ -189,6 +199,23 @@ def _severity_for_capability(capability_id: str) -> str:
     if capability_id in {"formatter", "lint", "typecheck", "tests", "dead_code", "truth_file"}:
         return "blocker"
     return "warning"
+
+
+def _effective_severity(
+    *,
+    capability_id: str,
+    finding_id: str,
+    standards_packet: dict[str, Any],
+) -> str:
+    config = standards_packet.get("config")
+    if isinstance(config, dict):
+        overrides = config.get("severity_overrides")
+        if isinstance(overrides, dict):
+            for key in (finding_id, capability_id):
+                value = overrides.get(key)
+                if isinstance(value, str) and value:
+                    return value
+    return _severity_for_capability(capability_id)
 
 
 def _recommended_fix(capability_id: str, language: str) -> str:

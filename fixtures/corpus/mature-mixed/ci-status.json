@@ -1,0 +1,16 @@
+{
+  "checks": [
+    {
+      "name": "Quality / Lint",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://example.invalid/checks/lint"
+    },
+    {
+      "name": "Quality / Tests",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://example.invalid/checks/tests"
+    }
+  ]
+}

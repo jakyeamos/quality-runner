@@ -27,7 +27,8 @@ Runs the inspect-only workflow.
 {
   "repo_root": "/path/to/repo",
   "standards": "jakyeamos",
-  "run_id": "inspect-001"
+  "run_id": "inspect-001",
+  "ci_status_json": "/path/to/repo/ci-status.json"
 }
 ```
 
@@ -39,7 +40,8 @@ Runs the full audit-and-plan workflow.
 {
   "repo_root": "/path/to/repo",
   "standards": "jakyeamos",
-  "run_id": "baseline-001"
+  "run_id": "baseline-001",
+  "ci_status_json": "/path/to/repo/ci-status.json"
 }
 ```
 

@@ -44,6 +44,26 @@ def test_mcp_run_returns_structured_content(tmp_path: Path) -> None:
     assert Path(structured["artifact_paths"]["agent_handoff_md"]).exists()
 
 
+def test_mcp_run_accepts_ci_status_json(tmp_path: Path) -> None:
+    ci_status = tmp_path / "ci-status.json"
+    ci_status.write_text(json.dumps({"checks": [{"name": "Lint", "status": "completed"}]}))
+
+    result = call_tool(
+        "quality_runner_run",
+        {
+            "repo_root": str(tmp_path),
+            "run_id": "mcp-ci-run",
+            "standards": "jakyeamos",
+            "ci_status_json": str(ci_status),
+        },
+    )
+
+    repo_scan = json.loads(
+        Path(result["structuredContent"]["artifact_paths"]["repo_scan_json"]).read_text()
+    )
+    assert repo_scan["ci_checks"][0]["name"] == "Lint"
+
+
 def test_mcp_default_run_ids_do_not_collide_for_quick_calls(tmp_path: Path) -> None:
     write_js_fixture(tmp_path)
 

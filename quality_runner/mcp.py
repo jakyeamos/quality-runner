@@ -34,6 +34,7 @@ def list_tools() -> list[dict[str, Any]]:
             "repo_root": {"type": "string"},
             "run_id": {"type": "string"},
             "standards": {"type": "string"},
+            "ci_status_json": {"type": "string"},
         },
         "required": ["repo_root"],
         "additionalProperties": False,
@@ -90,13 +91,29 @@ def call_tool(name: str, arguments: dict[str, Any] | None = None) -> dict[str, A
         repo_root = _validated_repo_root(args)
         run_id = _string_arg(args, "run_id") or generated_run_id()
         profile = _string_arg(args, "standards") or "jakyeamos"
-        return _tool_result(inspect_payload(repo_root=repo_root, run_id=run_id, profile=profile))
+        ci_status_json = _path_arg(args, "ci_status_json")
+        return _tool_result(
+            inspect_payload(
+                repo_root=repo_root,
+                run_id=run_id,
+                profile=profile,
+                ci_status_json=ci_status_json,
+            )
+        )
 
     if name == "quality_runner_run":
         repo_root = _validated_repo_root(args)
         run_id = _string_arg(args, "run_id") or generated_run_id()
         profile = _string_arg(args, "standards") or "jakyeamos"
-        return _tool_result(run_payload(repo_root=repo_root, run_id=run_id, profile=profile))
+        ci_status_json = _path_arg(args, "ci_status_json")
+        return _tool_result(
+            run_payload(
+                repo_root=repo_root,
+                run_id=run_id,
+                profile=profile,
+                ci_status_json=ci_status_json,
+            )
+        )
 
     if name == "quality_runner_status":
         repo_root = _validated_repo_root(args)
@@ -261,6 +278,11 @@ def _required_string_arg(arguments: dict[str, Any], key: str) -> str:
     if value is None:
         raise JsonRpcError(JSONRPC_INVALID_PARAMS, f"{key} is required")
     return value
+
+
+def _path_arg(arguments: dict[str, Any], key: str) -> Path | None:
+    value = _string_arg(arguments, key)
+    return Path(value).expanduser().resolve() if value is not None else None
 
 
 def _validated_repo_root(arguments: dict[str, Any]) -> Path:

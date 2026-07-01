@@ -23,7 +23,8 @@
       "required": ["id", "severity", "category", "summary", "evidence", "recommended_fix", "verification"],
       "properties": {
         "id": { "type": "string", "minLength": 1 },
-        "severity": { "enum": ["blocker", "warning", "observation"] },
+        "severity": { "enum": ["critical", "blocker", "warning", "observation"] },
+        "owner": { "type": ["string", "null"] },
         "category": { "type": "string", "minLength": 1 },
         "summary": { "type": "string", "minLength": 1 },
         "evidence": { "type": "array", "items": { "type": "string" } },

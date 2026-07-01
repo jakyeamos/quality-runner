@@ -8,6 +8,7 @@ from uuid import uuid4
 from quality_runner.artifacts import prepare_artifact_dir, write_json, write_text
 from quality_runner.audit import build_audit_report
 from quality_runner.capabilities import detect_capabilities
+from quality_runner.ci_status import load_ci_status
 from quality_runner.config import load_repo_config
 from quality_runner.discovery import inspect_repo
 from quality_runner.findings import (
@@ -31,11 +32,16 @@ def generated_run_id(now: datetime | None = None, suffix: str | None = None) -> 
 
 
 def inspect_payload(
-    repo_root: Path, run_id: str | None = None, profile: str | None = None
+    repo_root: Path,
+    run_id: str | None = None,
+    profile: str | None = None,
+    ci_status_json: Path | None = None,
 ) -> dict[str, Any]:
     resolved_run_id = generated_run_id() if run_id is None else run_id
     run_dir = prepare_artifact_dir(repo_root, resolved_run_id)
-    scan, standards_packet, capability_map = _inspect(repo_root, resolved_run_id, profile)
+    scan, standards_packet, capability_map = _inspect(
+        repo_root, resolved_run_id, profile, ci_status_json
+    )
 
     artifact_paths = {
         "repo_scan_json": str(write_json(run_dir / "repo-scan.json", scan)),
@@ -66,11 +72,16 @@ def inspect_payload(
 
 
 def run_payload(
-    repo_root: Path, run_id: str | None = None, profile: str | None = None
+    repo_root: Path,
+    run_id: str | None = None,
+    profile: str | None = None,
+    ci_status_json: Path | None = None,
 ) -> dict[str, Any]:
     resolved_run_id = generated_run_id() if run_id is None else run_id
     run_dir = prepare_artifact_dir(repo_root, resolved_run_id)
-    scan, standards_packet, capability_map = _inspect(repo_root, resolved_run_id, profile)
+    scan, standards_packet, capability_map = _inspect(
+        repo_root, resolved_run_id, profile, ci_status_json
+    )
 
     audit_report = build_audit_report(
         scan=scan,
@@ -139,9 +150,15 @@ def run_payload(
 
 
 def _inspect(
-    repo_root: Path, run_id: str, profile: str | None
+    repo_root: Path, run_id: str, profile: str | None, ci_status_json: Path | None
 ) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
-    scan = inspect_repo(repo_root, run_id=run_id)
+    ci_checks, ci_warnings = load_ci_status(repo_root, ci_status_json)
+    scan = inspect_repo(
+        repo_root,
+        run_id=run_id,
+        ci_checks=ci_checks,
+        extra_warnings=ci_warnings,
+    )
     config = load_repo_config(repo_root)
     resolved_profile = profile or _string_or_default(config.get("default_profile"), "jakyeamos")
     standards_packet = compile_standards(

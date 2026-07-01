@@ -11,6 +11,12 @@
     "is_git_repo": { "type": "boolean" },
     "package_manager": { "type": ["string", "null"] },
     "languages": { "type": "array", "items": { "type": "string" } },
+    "ecosystems": { "type": "array", "items": { "type": "string" } },
+    "repo_surfaces": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/repoSurface" },
+      "default": []
+    },
     "scripts": {
       "type": "object",
       "additionalProperties": { "type": "string" }
@@ -20,9 +26,31 @@
       "items": { "$ref": "#/$defs/qualityCommand" },
       "default": []
     },
+    "ci_checks": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/ciCheck" },
+      "default": []
+    },
+    "generated_code": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/generatedCode" },
+      "default": []
+    },
     "warnings": { "$ref": "#/$defs/warnings" }
   },
   "$defs": {
+    "repoSurface": {
+      "type": "object",
+      "required": ["id", "kind", "ecosystem", "path", "evidence"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "kind": { "type": "string", "minLength": 1 },
+        "ecosystem": { "type": "string", "minLength": 1 },
+        "path": { "type": "string", "minLength": 1 },
+        "evidence": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": false
+    },
     "qualityCommand": {
       "type": "object",
       "required": ["id", "command", "source_type", "source", "language"],
@@ -32,6 +60,27 @@
         "source_type": { "type": "string", "minLength": 1 },
         "source": { "type": "string", "minLength": 1 },
         "language": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": false
+    },
+    "ciCheck": {
+      "type": "object",
+      "required": ["name", "status", "conclusion", "url", "source"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "status": { "type": ["string", "null"] },
+        "conclusion": { "type": ["string", "null"] },
+        "url": { "type": ["string", "null"] },
+        "source": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": false
+    },
+    "generatedCode": {
+      "type": "object",
+      "required": ["path", "evidence"],
+      "properties": {
+        "path": { "type": "string", "minLength": 1 },
+        "evidence": { "type": "string", "minLength": 1 }
       },
       "additionalProperties": false
     },

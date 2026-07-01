@@ -96,6 +96,11 @@ def _add_workflow_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("repo_path", help="Target repository path")
     parser.add_argument("--run-id", default=None, help="Stable run id")
     parser.add_argument("--profile", default=None, help="Standards profile")
+    parser.add_argument(
+        "--ci-status-json",
+        default=None,
+        help="Local CI status JSON export to attach to capability evidence",
+    )
     parser.add_argument("--json", action="store_true", help="Emit JSON output")
 
 
@@ -122,12 +127,14 @@ def _payload_for_args(args: argparse.Namespace) -> dict[str, Any]:
             repo_root=_validated_repo_path(args.repo_path),
             run_id=args.run_id,
             profile=args.profile,
+            ci_status_json=Path(args.ci_status_json) if args.ci_status_json else None,
         )
     if args.command == "inspect":
         return inspect_payload(
             repo_root=_validated_repo_path(args.repo_path),
             run_id=args.run_id,
             profile=args.profile,
+            ci_status_json=Path(args.ci_status_json) if args.ci_status_json else None,
         )
     raise ValueError(f"unsupported command: {args.command}")
 

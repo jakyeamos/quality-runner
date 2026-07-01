@@ -66,6 +66,42 @@ def test_cli_inspect_json_writes_inspection_artifacts(tmp_path: Path) -> None:
     assert "quality_audit_json" not in payload["artifact_paths"]
 
 
+def test_cli_inspect_accepts_ci_status_json(tmp_path: Path) -> None:
+    ci_status = tmp_path / "ci-status.json"
+    ci_status.write_text(json.dumps({"checks": [{"name": "Lint", "status": "completed"}]}))
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "quality_runner",
+            "inspect",
+            str(tmp_path),
+            "--run-id",
+            "cli-ci-inspect",
+            "--ci-status-json",
+            str(ci_status),
+            "--json",
+        ],
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+    payload = json.loads(result.stdout)
+    repo_scan = json.loads(Path(payload["artifact_paths"]["repo_scan_json"]).read_text())
+    assert repo_scan["ci_checks"] == [
+        {
+            "name": "Lint",
+            "status": "completed",
+            "conclusion": None,
+            "url": None,
+            "source": "ci-status.json",
+        }
+    ]
+
+
 def test_cli_doctor_json_reports_ready() -> None:
     result = subprocess.run(
         [sys.executable, "-m", "quality_runner", "doctor", "--json"],

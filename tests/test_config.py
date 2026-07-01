@@ -19,6 +19,7 @@ def test_load_repo_config_reads_default_profile_required_capabilities_and_except
                 "[[quality_runner.accepted_exceptions]]",
                 'capability = "truth_file"',
                 'reason = "Fixture repo has no project truth file."',
+                'owner = "platform"',
                 'expires = "2999-01-01"',
                 "",
             ]
@@ -38,11 +39,72 @@ def test_load_repo_config_reads_default_profile_required_capabilities_and_except
             {
                 "capability": "truth_file",
                 "reason": "Fixture repo has no project truth file.",
+                "owner": "platform",
                 "expires": "2999-01-01",
             }
         ],
+        "gates": [],
+        "severity_overrides": {},
         "warnings": [],
     }
+
+
+def test_load_repo_config_reads_gates_and_severity_overrides(tmp_path) -> None:
+    from quality_runner.config import load_repo_config
+
+    (tmp_path / ".quality-runner.toml").write_text(
+        "\n".join(
+            [
+                "[quality_runner]",
+                'required_capabilities = ["lint", "tests"]',
+                "",
+                "[quality_runner.severity_overrides]",
+                'missing-tests = "critical"',
+                'lint = "warning"',
+                "",
+                "[[quality_runner.gates]]",
+                'id = "lint"',
+                'command = "python -c \\"raise SystemExit(99)\\""',
+                'ecosystem = "python"',
+                'source = "local policy"',
+                'owner = "platform"',
+                "required = true",
+                'severity = "blocker"',
+                "",
+                "[[quality_runner.accepted_exceptions]]",
+                'capability = "tests"',
+                'reason = "Temporarily delegated to integration suite."',
+                'owner = "qa"',
+                'expires = "2999-01-01"',
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    config = load_repo_config(tmp_path)
+
+    assert config["gates"] == [
+        {
+            "id": "lint",
+            "command": 'python -c "raise SystemExit(99)"',
+            "ecosystem": "python",
+            "source": "local policy",
+            "owner": "platform",
+            "required": True,
+            "severity": "blocker",
+        }
+    ]
+    assert config["severity_overrides"] == {"missing-tests": "critical", "lint": "warning"}
+    assert config["accepted_exceptions"] == [
+        {
+            "capability": "tests",
+            "reason": "Temporarily delegated to integration suite.",
+            "owner": "qa",
+            "expires": "2999-01-01",
+        }
+    ]
+    assert not (tmp_path / "should-not-exist").exists()
 
 
 def test_load_repo_config_reports_missing_invalid_and_malformed_values(tmp_path) -> None:
@@ -55,6 +117,8 @@ def test_load_repo_config_reports_missing_invalid_and_malformed_values(tmp_path)
         "required_capabilities": [],
         "required_capabilities_configured": False,
         "accepted_exceptions": [],
+        "gates": [],
+        "severity_overrides": {},
         "warnings": [],
     }
 
@@ -69,6 +133,8 @@ def test_load_repo_config_reports_missing_invalid_and_malformed_values(tmp_path)
     assert invalid["required_capabilities"] == []
     assert invalid["required_capabilities_configured"] is False
     assert invalid["accepted_exceptions"] == []
+    assert invalid["gates"] == []
+    assert invalid["severity_overrides"] == {}
     assert invalid["warnings"][0]["code"] == "invalid_quality_runner_config"
 
     (tmp_path / ".quality-runner.toml").write_text(
@@ -109,8 +175,8 @@ def test_load_repo_config_reports_missing_invalid_and_malformed_values(tmp_path)
 
     assert malformed_exceptions["accepted_exceptions"] == []
     assert [warning["message"] for warning in malformed_exceptions["warnings"]] == [
-        "quality_runner.accepted_exceptions[0] must include capability, reason, and expires strings",
-        "quality_runner.accepted_exceptions[1] must include capability, reason, and expires strings",
+        "quality_runner.accepted_exceptions[0] must include capability, reason, owner, and expires strings",
+        "quality_runner.accepted_exceptions[1] must include capability, reason, owner, and expires strings",
     ]
 
     (tmp_path / ".quality-runner.toml").write_text(
@@ -146,6 +212,7 @@ def test_detect_capabilities_applies_required_capabilities_and_active_exceptions
                 "[[quality_runner.accepted_exceptions]]",
                 'capability = "truth_file"',
                 'reason = "Truth file will be added after bootstrap."',
+                'owner = "platform"',
                 'expires = "2999-01-01"',
                 "",
             ]
@@ -164,15 +231,79 @@ def test_detect_capabilities_applies_required_capabilities_and_active_exceptions
             "type": "command",
             "reason": "no quality command found for tests",
             "language": "javascript",
+            "required_by": "config",
         }
     ]
     assert capability_map["accepted_exceptions"] == [
         {
             "capability": "truth_file",
             "reason": "Truth file will be added after bootstrap.",
+            "owner": "platform",
             "expires": "2999-01-01",
         }
     ]
+
+
+def test_configured_gates_satisfy_capabilities_and_policy_metadata_reaches_audit(
+    tmp_path,
+) -> None:
+    from quality_runner.audit import build_audit_report
+    from quality_runner.capabilities import detect_capabilities
+    from quality_runner.discovery import inspect_repo
+    from quality_runner.standards import compile_standards
+
+    (tmp_path / ".quality-runner.toml").write_text(
+        "\n".join(
+            [
+                "[quality_runner]",
+                'required_capabilities = ["lint", "tests"]',
+                "",
+                "[quality_runner.severity_overrides]",
+                'missing-tests = "critical"',
+                "",
+                "[[quality_runner.gates]]",
+                'id = "lint"',
+                'command = "python -c \\"raise SystemExit(99)\\""',
+                'ecosystem = "python"',
+                'source = "local policy"',
+                'owner = "platform"',
+                "required = true",
+                'severity = "blocker"',
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    scan = inspect_repo(tmp_path, run_id="policy-gate-001")
+    packet = compile_standards(repo_root=tmp_path, scan=scan, profile="jakyeamos")
+    capability_map = detect_capabilities(scan=scan, standards_packet=packet)
+    report = build_audit_report(scan=scan, standards_packet=packet, capability_map=capability_map)
+
+    assert capability_map["available"] == [
+        {
+            "id": "lint",
+            "type": "command",
+            "source": ".quality-runner.toml:quality_runner.gates[0]",
+            "command": 'python -c "raise SystemExit(99)"',
+            "language": "python",
+            "required_by": "config",
+            "owner": "platform",
+            "severity": "blocker",
+        }
+    ]
+    assert capability_map["missing"] == [
+        {
+            "id": "tests",
+            "type": "command",
+            "reason": "no quality command found for tests",
+            "language": "unknown",
+            "required_by": "config",
+        }
+    ]
+    assert report["findings"][0]["id"] == "missing-tests"
+    assert report["findings"][0]["severity"] == "critical"
+    assert report["findings"][0]["owner"] is None
 
 
 def test_detect_capabilities_handles_file_sources_and_inactive_exceptions(tmp_path) -> None:
@@ -196,11 +327,13 @@ def test_detect_capabilities_handles_file_sources_and_inactive_exceptions(tmp_pa
                 "[[quality_runner.accepted_exceptions]]",
                 'capability = "tests"',
                 'reason = "Expired exception should not suppress missing tests."',
+                'owner = "qa"',
                 'expires = "2000-01-01"',
                 "",
                 "[[quality_runner.accepted_exceptions]]",
                 'capability = "tests"',
                 'reason = "Invalid expiry should not suppress missing tests."',
+                'owner = "qa"',
                 'expires = "not-a-date"',
                 "",
             ]
@@ -219,8 +352,14 @@ def test_detect_capabilities_handles_file_sources_and_inactive_exceptions(tmp_pa
             "source": "package.json:scripts.pre-cr",
             "command": "pre-cr run",
             "language": "javascript",
+            "required_by": "config",
         },
-        {"id": "truth_file", "type": "file", "source": ".tracker/PROJECT_TRUTH.md"},
+        {
+            "id": "truth_file",
+            "type": "file",
+            "source": ".tracker/PROJECT_TRUTH.md",
+            "required_by": "config",
+        },
     ]
     assert capability_map["missing"] == [
         {
@@ -228,6 +367,7 @@ def test_detect_capabilities_handles_file_sources_and_inactive_exceptions(tmp_pa
             "type": "command",
             "reason": "no quality command found for tests",
             "language": "javascript",
+            "required_by": "config",
         }
     ]
     assert capability_map["accepted_exceptions"] == []
@@ -311,3 +451,22 @@ def test_packaged_schema_files_are_parseable() -> None:
         for payload in loaded.values()
     )
     assert all(payload["type"] == "object" for payload in loaded.values())
+
+
+def test_artifact_schema_additions_remain_optional_for_v01_compatibility() -> None:
+    schema_root = resources.files("quality_runner").joinpath("schemas")
+    repo_scan = json.loads(schema_root.joinpath("repo-scan.schema.json").read_text())
+    capability_matrix = json.loads(
+        schema_root.joinpath("capability-matrix.schema.json").read_text()
+    )
+
+    assert repo_scan["properties"]["schema"]["const"] == "quality-runner-repo-scan-v0.1"
+    assert "repo_surfaces" not in repo_scan["required"]
+    assert "ecosystems" not in repo_scan["required"]
+    assert "ci_checks" not in repo_scan["required"]
+    assert "generated_code" not in repo_scan["required"]
+    assert capability_matrix["properties"]["schema"]["const"] == (
+        "quality-runner-capability-map-v0.1"
+    )
+    capability_properties = capability_matrix["$defs"]["capability"]["properties"]
+    assert {"required_by", "owner", "severity", "ci_status"}.issubset(capability_properties)

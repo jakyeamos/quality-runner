@@ -1,0 +1,23 @@
+[quality_runner]
+required_capabilities = ["lint", "tests", "build", "runtime_smoke", "dead_code", "pre_pr"]
+
+[quality_runner.severity_overrides]
+missing-dead-code = "warning"
+
+[[quality_runner.gates]]
+id = "lint"
+command = "make lint"
+ecosystem = "make"
+source = "local policy"
+owner = "platform"
+required = true
+severity = "blocker"
+
+[[quality_runner.gates]]
+id = "tests"
+command = "make test"
+ecosystem = "make"
+source = "local policy"
+owner = "platform"
+required = true
+severity = "blocker"

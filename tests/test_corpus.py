@@ -10,6 +10,7 @@ def test_fixture_corpus_dogfood_contract(tmp_path: Path) -> None:
     corpus_root = Path(__file__).resolve().parents[1] / "fixtures" / "corpus"
     expected = {
         "complete-js": "clean",
+        "mature-mixed": "planned",
         "partial-js": "planned",
         "python-empty": "planned",
     }

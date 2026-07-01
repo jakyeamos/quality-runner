@@ -83,6 +83,105 @@ def test_run_payload_writes_audit_plan_and_handoff(tmp_path: Path) -> None:
     assert not any((run_dir / name).exists() for name in legacy_names)
 
 
+def test_workflow_ingests_local_ci_status_and_attaches_check_evidence(tmp_path: Path) -> None:
+    from quality_runner.workflow import run_payload
+
+    (tmp_path / "package.json").write_text(
+        json.dumps({"scripts": {"lint": "eslint .", "test": "vitest run"}}),
+        encoding="utf-8",
+    )
+    (tmp_path / "pnpm-lock.yaml").write_text("lockfileVersion: '9.0'\n", encoding="utf-8")
+    workflow_root = tmp_path / ".github" / "workflows"
+    workflow_root.mkdir(parents=True)
+    (workflow_root / "ci.yml").write_text(
+        "\n".join(
+            [
+                "name: CI",
+                "on:",
+                "  pull_request:",
+                "jobs:",
+                "  quality:",
+                "    name: Quality",
+                "    steps:",
+                "      - name: Lint",
+                "        run: pnpm lint",
+                "      - name: Tests",
+                "        run: pnpm test",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    ci_status = tmp_path / "ci-status.json"
+    ci_status.write_text(
+        json.dumps(
+            {
+                "checks": [
+                    {
+                        "name": "Quality / Lint",
+                        "status": "completed",
+                        "conclusion": "success",
+                        "url": "https://example.invalid/check/lint",
+                    },
+                    {
+                        "name": "Quality / Tests",
+                        "status": "completed",
+                        "conclusion": "failure",
+                        "url": "https://example.invalid/check/tests",
+                    },
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    payload = run_payload(repo_root=tmp_path, run_id="ci-status-run", ci_status_json=ci_status)
+
+    repo_scan = json.loads(Path(payload["artifact_paths"]["repo_scan_json"]).read_text())
+    capability_map = json.loads(
+        Path(payload["artifact_paths"]["capability_matrix_json"]).read_text()
+    )
+    assert repo_scan["ci_checks"] == [
+        {
+            "name": "Quality / Lint",
+            "status": "completed",
+            "conclusion": "success",
+            "url": "https://example.invalid/check/lint",
+            "source": "ci-status.json",
+        },
+        {
+            "name": "Quality / Tests",
+            "status": "completed",
+            "conclusion": "failure",
+            "url": "https://example.invalid/check/tests",
+            "source": "ci-status.json",
+        },
+    ]
+    available = {item["id"]: item for item in capability_map["available"]}
+    assert available["lint"]["ci_status"] == {
+        "name": "Quality / Lint",
+        "status": "completed",
+        "conclusion": "success",
+        "url": "https://example.invalid/check/lint",
+    }
+    assert available["tests"]["ci_status"]["conclusion"] == "failure"
+
+
+def test_workflow_warns_on_malformed_local_ci_status(tmp_path: Path) -> None:
+    from quality_runner.workflow import inspect_payload
+
+    ci_status = tmp_path / "ci-status.json"
+    ci_status.write_text("{not-json", encoding="utf-8")
+
+    payload = inspect_payload(repo_root=tmp_path, run_id="bad-ci-status", ci_status_json=ci_status)
+
+    assert {
+        "code": "invalid_ci_status_json",
+        "message": "ci-status.json could not be parsed as JSON",
+        "path": "ci-status.json",
+    } in payload["warnings"]
+
+
 def test_run_payload_writes_manifest_with_git_head(tmp_path: Path) -> None:
     from quality_runner.workflow import run_payload
 
