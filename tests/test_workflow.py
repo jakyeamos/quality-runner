@@ -54,11 +54,14 @@ def test_run_payload_writes_audit_plan_and_handoff(tmp_path: Path) -> None:
     artifact_paths = payload["artifact_paths"]
     assert set(artifact_paths) == {
         "repo_scan_json",
+        "code_quality_scan_json",
         "standards_json",
         "capability_matrix_json",
         "run_manifest_json",
         "quality_audit_json",
         "remediation_plan_json",
+        "resolution_ledger_json",
+        "resolution_ledger_md",
         "agent_handoff_json",
         "agent_handoff_md",
     }
@@ -70,6 +73,9 @@ def test_run_payload_writes_audit_plan_and_handoff(tmp_path: Path) -> None:
     assert Path(artifact_paths["capability_matrix_json"]).exists()
     assert Path(artifact_paths["run_manifest_json"]).exists()
     assert Path(artifact_paths["quality_audit_json"]).exists()
+    assert Path(artifact_paths["code_quality_scan_json"]).exists()
+    assert Path(artifact_paths["resolution_ledger_json"]).exists()
+    assert Path(artifact_paths["resolution_ledger_md"]).exists()
     assert Path(artifact_paths["remediation_plan_json"]).exists()
     assert Path(artifact_paths["agent_handoff_md"]).exists()
     run_dir = Path(artifact_paths["repo_scan_json"]).parent
@@ -81,6 +87,113 @@ def test_run_payload_writes_audit_plan_and_handoff(tmp_path: Path) -> None:
         "remediation-plan.md",
     }
     assert not any((run_dir / name).exists() for name in legacy_names)
+
+
+def test_run_payload_adds_structural_findings_and_groups_remediation_slices(
+    tmp_path: Path,
+) -> None:
+    from quality_runner.workflow import run_payload
+
+    write_complete_js_fixture(tmp_path)
+    source = tmp_path / "src" / "app" / "page.tsx"
+    source.parent.mkdir(parents=True)
+    source.write_text(
+        "\n".join(
+            [
+                "import { trpc } from '@/lib/trpc';",
+                "export default function Page() {",
+                "  const user = trpc.user.me.useQuery();",
+                "  const first: any = user.data;",
+                "  const second: any = user.error;",
+                '  return <main><div className="card"><div className="card">Nested</div></div></main>;',
+                "}",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    payload = run_payload(repo_root=tmp_path, run_id="structural-run", profile="jakyeamos")
+
+    code_scan = json.loads(Path(payload["artifact_paths"]["code_quality_scan_json"]).read_text())
+    audit_report = json.loads(Path(payload["artifact_paths"]["quality_audit_json"]).read_text())
+    remediation_plan = json.loads(
+        Path(payload["artifact_paths"]["remediation_plan_json"]).read_text()
+    )
+    handoff = json.loads(Path(payload["artifact_paths"]["agent_handoff_json"]).read_text())
+
+    structural_rules = {finding["rule_id"] for finding in code_scan["findings"]}
+    assert {"explicit-any", "nested-card-markup"} <= structural_rules
+    audit_ids = {finding["id"] for finding in audit_report["findings"]}
+    assert any(finding_id.startswith("structural-") for finding_id in audit_ids)
+    explicit_any_slices = [
+        slice_item
+        for slice_item in remediation_plan["slices"]
+        if slice_item["id"] == "remediate-structural-harden-explicit-any"
+    ]
+    assert len(explicit_any_slices) == 1
+    assert len(explicit_any_slices[0]["findings"]) == 1
+    assert "2 findings" in explicit_any_slices[0]["actions"][0]
+    assert handoff["next_slice"]["id"] == remediation_plan["slices"][0]["id"]
+
+
+def test_resolution_ledger_marks_missing_prior_findings_fixed_and_preserves_acceptance(
+    tmp_path: Path,
+) -> None:
+    from quality_runner.workflow import run_payload
+
+    write_complete_js_fixture(tmp_path)
+    source = tmp_path / "src" / "index.ts"
+    source.parent.mkdir(parents=True)
+    source.write_text("const first: any = {};\n", encoding="utf-8")
+
+    first_payload = run_payload(repo_root=tmp_path, run_id="ledger-first", profile="jakyeamos")
+    first_scan = json.loads(
+        Path(first_payload["artifact_paths"]["code_quality_scan_json"]).read_text()
+    )
+    explicit_any = next(
+        finding for finding in first_scan["findings"] if finding["rule_id"] == "explicit-any"
+    )
+
+    (tmp_path / ".quality-runner.toml").write_text(
+        "\n".join(
+            [
+                "[quality_runner]",
+                "",
+                "[[quality_runner.accepted_dispositions]]",
+                f'fingerprint = "{explicit_any["fingerprint"]}"',
+                'status = "accepted-intentional"',
+                'reason = "Fixture intentionally keeps one type escape hatch."',
+                'owner = "qa"',
+                'expires = "2999-01-01"',
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    accepted_payload = run_payload(
+        repo_root=tmp_path, run_id="ledger-accepted", profile="jakyeamos"
+    )
+    accepted_ledger = json.loads(
+        Path(accepted_payload["artifact_paths"]["resolution_ledger_json"]).read_text()
+    )
+    accepted_row = next(
+        row
+        for row in accepted_ledger["entries"]
+        if row["fingerprint"] == explicit_any["fingerprint"]
+    )
+    assert accepted_row["status"] == "accepted-intentional"
+    assert accepted_row["reason"] == "Fixture intentionally keeps one type escape hatch."
+
+    source.write_text("const first: unknown = {};\n", encoding="utf-8")
+    fixed_payload = run_payload(repo_root=tmp_path, run_id="ledger-fixed", profile="jakyeamos")
+    fixed_ledger = json.loads(
+        Path(fixed_payload["artifact_paths"]["resolution_ledger_json"]).read_text()
+    )
+    fixed_row = next(
+        row for row in fixed_ledger["entries"] if row["fingerprint"] == explicit_any["fingerprint"]
+    )
+    assert fixed_row["status"] == "fixed"
 
 
 def test_workflow_ingests_local_ci_status_and_attaches_check_evidence(tmp_path: Path) -> None:

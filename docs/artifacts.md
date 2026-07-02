@@ -17,6 +17,9 @@ Artifacts are written under:
   instruction files, language-aware quality commands, mature repo surfaces,
   nested workspaces, ecosystems, generated-code markers, local CI checks,
   Pre-CR config, and project truth file presence.
+- `code-quality-scan.json`: deterministic structural/code-quality findings,
+  line accountability, duplicate clusters, skipped generated/vendor paths, and
+  non-blocking remediation buckets.
 - `standards.json`: compiled standards packet for the selected profile.
 - `capability-matrix.json`: available and missing quality capabilities.
   Available command-backed capabilities include the command, source, detected
@@ -33,6 +36,10 @@ Artifacts are written under:
   category, evidence, recommended fix, and verification.
 - `remediation-plan.json`: ordered remediation slices with priority, actions,
   findings, and verification gates.
+- `resolution-ledger.json`: current finding lifecycle state by stable
+  fingerprint, preserving accepted dispositions and marking disappeared
+  findings fixed on later runs.
+- `resolution-ledger.md`: human-readable resolution ledger summary.
 - `agent-handoff.json`: machine-readable next-slice handoff.
 - `agent-handoff.md`: human-readable handoff for a coding agent.
 

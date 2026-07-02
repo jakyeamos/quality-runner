@@ -29,6 +29,11 @@ allowed_package_managers = ["pnpm"]
 [quality_runner.severity_overrides]
 missing-dead-code = "warning"
 
+[quality_runner.structural_scan]
+disabled_rule_groups = ["ui_structural"]
+large_file_lines = 900
+fat_router_lines = 400
+
 [[quality_runner.gates]]
 id = "lint"
 command = "make lint"
@@ -43,9 +48,20 @@ capability = "dead_code"
 reason = "Legacy repo is being migrated in phases."
 owner = "platform"
 expires = "2026-12-31"
+
+[[quality_runner.accepted_dispositions]]
+fingerprint = "abc123"
+status = "accepted-intentional"
+reason = "The large test file is one cohesive math invariant suite."
+owner = "qa"
+expires = "2026-12-31"
 ```
 
 Configured gates are recorded as command evidence only. Quality Runner does not
 execute them.
+
+Structural scan findings are default-on and non-blocking. Repos can disable
+rule groups, tune large-file/router thresholds, or preserve accepted dispositions
+by stable finding fingerprint.
 
 Unknown profiles fail closed.

@@ -44,8 +44,10 @@ def test_load_repo_config_reads_default_profile_required_capabilities_and_except
                 "expires": "2999-01-01",
             }
         ],
+        "accepted_dispositions": [],
         "gates": [],
         "severity_overrides": {},
+        "structural_scan": {},
         "warnings": [],
     }
 
@@ -110,6 +112,51 @@ def test_load_repo_config_reads_gates_and_severity_overrides(tmp_path) -> None:
     assert not (tmp_path / "should-not-exist").exists()
 
 
+def test_load_repo_config_reads_structural_scan_policy_and_accepted_dispositions(
+    tmp_path,
+) -> None:
+    from quality_runner.config import load_repo_config
+
+    (tmp_path / ".quality-runner.toml").write_text(
+        "\n".join(
+            [
+                "[quality_runner]",
+                "",
+                "[quality_runner.structural_scan]",
+                'disabled_rule_groups = ["ui_structural", "speed"]',
+                "large_file_lines = 900",
+                "fat_router_lines = 300",
+                "",
+                "[[quality_runner.accepted_dispositions]]",
+                'fingerprint = "abc123"',
+                'status = "accepted-false-positive"',
+                'reason = "Generated wrapper is scanned as source."',
+                'owner = "platform"',
+                'expires = "2999-01-01"',
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    config = load_repo_config(tmp_path)
+
+    assert config["structural_scan"] == {
+        "disabled_rule_groups": ["ui_structural", "speed"],
+        "large_file_lines": 900,
+        "fat_router_lines": 300,
+    }
+    assert config["accepted_dispositions"] == [
+        {
+            "fingerprint": "abc123",
+            "status": "accepted-false-positive",
+            "reason": "Generated wrapper is scanned as source.",
+            "owner": "platform",
+            "expires": "2999-01-01",
+        }
+    ]
+
+
 def test_load_repo_config_reports_missing_invalid_and_malformed_values(tmp_path) -> None:
     from quality_runner.config import load_repo_config
 
@@ -121,8 +168,10 @@ def test_load_repo_config_reports_missing_invalid_and_malformed_values(tmp_path)
         "required_capabilities_configured": False,
         "allowed_package_managers": [],
         "accepted_exceptions": [],
+        "accepted_dispositions": [],
         "gates": [],
         "severity_overrides": {},
+        "structural_scan": {},
         "warnings": [],
     }
 
@@ -138,8 +187,10 @@ def test_load_repo_config_reports_missing_invalid_and_malformed_values(tmp_path)
     assert invalid["required_capabilities_configured"] is False
     assert invalid["allowed_package_managers"] == []
     assert invalid["accepted_exceptions"] == []
+    assert invalid["accepted_dispositions"] == []
     assert invalid["gates"] == []
     assert invalid["severity_overrides"] == {}
+    assert invalid["structural_scan"] == {}
     assert invalid["warnings"][0]["code"] == "invalid_quality_runner_config"
 
     (tmp_path / ".quality-runner.toml").write_text(
@@ -185,6 +236,23 @@ def test_load_repo_config_reports_missing_invalid_and_malformed_values(tmp_path)
     assert [warning["message"] for warning in malformed_exceptions["warnings"]] == [
         "quality_runner.accepted_exceptions[0] must include capability, reason, owner, and expires strings",
         "quality_runner.accepted_exceptions[1] must include capability, reason, owner, and expires strings",
+    ]
+
+    (tmp_path / ".quality-runner.toml").write_text(
+        "\n".join(
+            [
+                "[quality_runner]",
+                'accepted_dispositions = [{ fingerprint = "abc123", status = "unresolved", reason = "not accepted", owner = "qa" }]',
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    malformed_dispositions = load_repo_config(tmp_path)
+
+    assert malformed_dispositions["accepted_dispositions"] == []
+    assert [warning["message"] for warning in malformed_dispositions["warnings"]] == [
+        "quality_runner.accepted_dispositions[0] must include fingerprint, status, reason, owner, and optional expires strings",
     ]
 
     (tmp_path / ".quality-runner.toml").write_text(

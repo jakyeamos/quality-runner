@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://quality-runner.dev/schemas/resolution-ledger.schema.json",
+  "title": "Quality Runner Resolution Ledger",
+  "type": "object",
+  "required": ["schema", "run_id", "summary", "entries"],
+  "properties": {
+    "schema": { "const": "quality-runner-resolution-ledger-v0.1" },
+    "run_id": { "type": "string", "minLength": 1 },
+    "summary": { "type": "object" },
+    "entries": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/entry" }
+    }
+  },
+  "$defs": {
+    "entry": {
+      "type": "object",
+      "required": [
+        "fingerprint",
+        "status",
+        "category",
+        "severity",
+        "rule_id",
+        "file",
+        "line",
+        "score",
+        "confidence",
+        "verification",
+        "reason",
+        "owner",
+        "expires"
+      ],
+      "properties": {
+        "fingerprint": { "type": "string", "minLength": 1 },
+        "status": {
+          "enum": [
+            "unresolved",
+            "fixed",
+            "accepted-intentional",
+            "accepted-false-positive",
+            "blocked-with-prerequisite"
+          ]
+        },
+        "category": { "type": "string", "minLength": 1 },
+        "severity": { "type": "string", "minLength": 1 },
+        "rule_id": { "type": "string", "minLength": 1 },
+        "file": { "type": "string", "minLength": 1 },
+        "line": { "type": "integer", "minimum": 1 },
+        "score": { "type": "integer" },
+        "confidence": { "type": "string", "minLength": 1 },
+        "verification": { "type": "string", "minLength": 1 },
+        "reason": { "type": "string" },
+        "owner": { "type": ["string", "null"] },
+        "expires": { "type": ["string", "null"] }
+      },
+      "additionalProperties": true
+    }
+  }
+}

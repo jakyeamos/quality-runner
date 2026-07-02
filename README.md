@@ -69,11 +69,14 @@ Quality Runner writes artifacts under the target repo:
 ```text
 /path/to/repo/.quality-runner/runs/baseline-001/
   repo-scan.json
+  code-quality-scan.json
   standards.json
   capability-matrix.json
   run-manifest.json
   quality-audit.json
   remediation-plan.json
+  resolution-ledger.json
+  resolution-ledger.md
   agent-handoff.json
   agent-handoff.md
 ```
@@ -82,9 +85,10 @@ The normal workflow is:
 
 1. Read `agent-handoff.md`.
 2. Review `quality-audit.json` for evidence-backed findings.
-3. Review `remediation-plan.json` for ordered actions and verification gates.
-4. Give an approved remediation slice to a coding agent.
-5. Rerun Quality Runner to confirm findings clear.
+3. Review `code-quality-scan.json` for structural warnings and line evidence.
+4. Review `remediation-plan.json` for ordered actions and verification gates.
+5. Give an approved remediation slice to a coding agent.
+6. Rerun Quality Runner to confirm findings clear and update the resolution ledger.
 
 ## Commands
 

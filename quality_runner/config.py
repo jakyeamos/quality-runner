@@ -6,6 +6,11 @@ from typing import Any
 
 CONFIG_FILE_NAME = ".quality-runner.toml"
 CONFIG_SCHEMA = "quality-runner-config-v0.1"
+ACCEPTED_DISPOSITION_STATUSES = {
+    "accepted-intentional",
+    "accepted-false-positive",
+    "blocked-with-prerequisite",
+}
 
 
 def load_repo_config(repo_root: Path) -> dict[str, Any]:
@@ -44,9 +49,11 @@ def load_repo_config(repo_root: Path) -> dict[str, Any]:
     )
     gates = _gates(section.get("gates"), warnings)
     exceptions = _accepted_exceptions(section.get("accepted_exceptions"), warnings)
+    accepted_dispositions = _accepted_dispositions(section.get("accepted_dispositions"), warnings)
     severity_overrides = _string_mapping(
         section.get("severity_overrides"), "quality_runner.severity_overrides", warnings
     )
+    structural_scan = _structural_scan(section.get("structural_scan"), warnings)
     return _config(
         path=CONFIG_FILE_NAME,
         default_profile=default_profile,
@@ -54,18 +61,20 @@ def load_repo_config(repo_root: Path) -> dict[str, Any]:
         required_capabilities_configured="required_capabilities" in section,
         allowed_package_managers=allowed_package_managers,
         accepted_exceptions=exceptions,
+        accepted_dispositions=accepted_dispositions,
         gates=gates,
         severity_overrides=severity_overrides,
+        structural_scan=structural_scan,
         warnings=warnings,
     )
 
 
 # fmt: off
 def _config(
-    *, path: str | None, default_profile: str | None, required_capabilities: list[str], required_capabilities_configured: bool, allowed_package_managers: list[str], accepted_exceptions: list[dict[str, str]], gates: list[dict[str, Any]], severity_overrides: dict[str, str], warnings: list[dict[str, str]],
+    *, path: str | None, default_profile: str | None, required_capabilities: list[str], required_capabilities_configured: bool, allowed_package_managers: list[str], accepted_exceptions: list[dict[str, str]], accepted_dispositions: list[dict[str, str]], gates: list[dict[str, Any]], severity_overrides: dict[str, str], structural_scan: dict[str, Any], warnings: list[dict[str, str]],
 ) -> dict[str, Any]:
     return dict(
-        schema=CONFIG_SCHEMA, path=path, default_profile=default_profile, required_capabilities=required_capabilities, required_capabilities_configured=required_capabilities_configured, allowed_package_managers=allowed_package_managers, accepted_exceptions=accepted_exceptions, gates=gates, severity_overrides=severity_overrides, warnings=warnings,
+        schema=CONFIG_SCHEMA, path=path, default_profile=default_profile, required_capabilities=required_capabilities, required_capabilities_configured=required_capabilities_configured, allowed_package_managers=allowed_package_managers, accepted_exceptions=accepted_exceptions, accepted_dispositions=accepted_dispositions, gates=gates, severity_overrides=severity_overrides, structural_scan=structural_scan, warnings=warnings,
     )
 # fmt: on
 
@@ -78,8 +87,10 @@ def _empty_config(*, path: str | None, warnings: list[dict[str, str]]) -> dict[s
         required_capabilities_configured=False,
         allowed_package_managers=[],
         accepted_exceptions=[],
+        accepted_dispositions=[],
         gates=[],
         severity_overrides={},
+        structural_scan={},
         warnings=warnings,
     )
 
@@ -231,6 +242,111 @@ def _accepted_exceptions(value: object, warnings: list[dict[str, str]]) -> list[
         else:
             _accepted_exception_warning(index, warnings)
     return accepted
+
+
+def _accepted_dispositions(
+    value: object,
+    warnings: list[dict[str, str]],
+) -> list[dict[str, str]]:
+    if value is None:
+        return []
+    if not isinstance(value, list):
+        warnings.append(
+            _warning(
+                "invalid_quality_runner_config_field",
+                "quality_runner.accepted_dispositions must be a list of tables",
+            )
+        )
+        return []
+
+    accepted: list[dict[str, str]] = []
+    for index, item in enumerate(value):
+        if not isinstance(item, dict):
+            _accepted_disposition_warning(index, warnings)
+            continue
+        fingerprint = item.get("fingerprint")
+        status = item.get("status")
+        reason = item.get("reason")
+        owner = item.get("owner")
+        expires = item.get("expires")
+        if (
+            isinstance(fingerprint, str)
+            and fingerprint
+            and isinstance(status, str)
+            and status in ACCEPTED_DISPOSITION_STATUSES
+            and isinstance(reason, str)
+            and reason
+            and isinstance(owner, str)
+            and owner
+            and (expires is None or isinstance(expires, str))
+        ):
+            accepted.append(
+                {
+                    "fingerprint": fingerprint,
+                    "status": status,
+                    "reason": reason,
+                    "owner": owner,
+                    **({"expires": expires} if isinstance(expires, str) and expires else {}),
+                }
+            )
+        else:
+            _accepted_disposition_warning(index, warnings)
+    return accepted
+
+
+def _accepted_disposition_warning(index: int, warnings: list[dict[str, str]]) -> None:
+    warnings.append(
+        _warning(
+            "invalid_quality_runner_config_field",
+            f"quality_runner.accepted_dispositions[{index}] must include fingerprint, status, reason, owner, and optional expires strings",
+        )
+    )
+
+
+def _structural_scan(value: object, warnings: list[dict[str, str]]) -> dict[str, Any]:
+    if value is None:
+        return {}
+    if not isinstance(value, dict):
+        warnings.append(
+            _warning(
+                "invalid_quality_runner_config_field",
+                "quality_runner.structural_scan must be a table",
+            )
+        )
+        return {}
+
+    disabled = _string_list(
+        value.get("disabled_rule_groups"),
+        "quality_runner.structural_scan.disabled_rule_groups",
+        warnings,
+    )
+    large_file_lines = _positive_int(
+        value.get("large_file_lines"),
+        "quality_runner.structural_scan.large_file_lines",
+        warnings,
+    )
+    fat_router_lines = _positive_int(
+        value.get("fat_router_lines"),
+        "quality_runner.structural_scan.fat_router_lines",
+        warnings,
+    )
+    result: dict[str, Any] = {"disabled_rule_groups": disabled}
+    if large_file_lines is not None:
+        result["large_file_lines"] = large_file_lines
+    if fat_router_lines is not None:
+        result["fat_router_lines"] = fat_router_lines
+    return result
+
+
+def _positive_int(value: object, field: str, warnings: list[dict[str, str]]) -> int | None:
+    if value is None:
+        return None
+    if isinstance(value, int) and value > 0:
+        return value
+    warnings.append(
+        _warning("invalid_quality_runner_config_field", f"{field} must be a positive integer")
+    )
+    return None
 
 
 def _accepted_exception_warning(index: int, warnings: list[dict[str, str]]) -> None:
