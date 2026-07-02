@@ -6,6 +6,7 @@ import tomllib
 from pathlib import Path
 from typing import Any
 
+from quality_runner.scan_exclusions import is_scan_path_allowed, resolve_scan_exclusions
 from quality_runner.schema_constants import REPO_SCAN_SCHEMA
 from quality_runner.surfaces import detect_surfaces, quality_commands_from_surfaces
 
@@ -18,12 +19,14 @@ def inspect_repo(
     run_id: str,
     ci_checks: list[dict[str, str | None]] | None = None,
     extra_warnings: list[dict[str, str]] | None = None,
+    config: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     root = _validated_repo_root(repo_root)
+    scan_exclusions = resolve_scan_exclusions(config)
     package_json, warnings = _read_package_json(root)
     pyproject, pyproject_warnings = _read_pyproject(root)
     warnings.extend(pyproject_warnings)
-    workspaces, workspace_warnings = _workspace_manifests(root)
+    workspaces, workspace_warnings = _workspace_manifests(root, scan_exclusions)
     warnings.extend(workspace_warnings)
     scripts = _package_scripts(package_json)
     agent_instruction_files = _agent_instruction_files(root)
@@ -31,7 +34,9 @@ def inspect_repo(
     warnings.extend(ci_warnings)
     if extra_warnings:
         warnings.extend(extra_warnings)
-    repo_surfaces, ecosystems, generated_code = detect_surfaces(root)
+    repo_surfaces, ecosystems, generated_code = detect_surfaces(
+        root, scan_exclusions=scan_exclusions
+    )
 
     return {
         "schema": REPO_SCAN_SCHEMA,
@@ -42,6 +47,7 @@ def inspect_repo(
         "languages": _detect_languages(root, package_json, workspaces),
         "ecosystems": ecosystems,
         "workspaces": workspaces,
+        "scan_exclusions": scan_exclusions,
         "repo_surfaces": repo_surfaces,
         "scripts": scripts,
         "quality_commands": _quality_commands(
@@ -54,6 +60,7 @@ def inspect_repo(
             ),
             ci_files=ci_files,
             workspaces=workspaces,
+            scan_exclusions=scan_exclusions,
         ),
         "generated_code": generated_code,
         "agent_instruction_files": agent_instruction_files,
@@ -143,7 +150,10 @@ def _package_scripts(package_json: dict[str, Any]) -> dict[str, str]:
     }
 
 
-def _workspace_manifests(root: Path) -> tuple[list[dict[str, str]], list[dict[str, str]]]:
+def _workspace_manifests(
+    root: Path,
+    scan_exclusions: list[str],
+) -> tuple[list[dict[str, str]], list[dict[str, str]]]:
     manifests: list[dict[str, str]] = []
     warnings: list[dict[str, str]] = []
     seen_paths: set[str] = set()
@@ -155,7 +165,7 @@ def _workspace_manifests(root: Path) -> tuple[list[dict[str, str]], list[dict[st
         ("go.mod", "go"),
     ):
         for manifest in sorted(root.rglob(manifest_name)):
-            if manifest.parent == root or not _scan_path_allowed(root, manifest):
+            if manifest.parent == root or not is_scan_path_allowed(root, manifest, scan_exclusions):
                 continue
             relative_manifest = manifest.relative_to(root).as_posix()
             if relative_manifest in seen_paths:
@@ -251,13 +261,14 @@ def _quality_commands(
     pre_cr_config: str | None,
     ci_files: list[str],
     workspaces: list[dict[str, str]],
+    scan_exclusions: list[str],
 ) -> list[dict[str, str]]:
     commands: list[dict[str, str]] = [
         *(_javascript_quality_commands(scripts, manifest_path="package.json")),
         *(_python_pyproject_quality_commands(pyproject, manifest_path="pyproject.toml")),
         *(_workspace_quality_commands(root, workspaces)),
         *(_pre_cr_quality_commands(root, pre_cr_config)),
-        *(quality_commands_from_surfaces(root)),
+        *(quality_commands_from_surfaces(root, scan_exclusions=scan_exclusions)),
     ]
     existing_ids = {command["id"] for command in commands}
     commands.extend(_ci_quality_commands(root=root, ci_files=ci_files, existing_ids=existing_ids))
@@ -620,20 +631,3 @@ def _read_text(path: Path) -> str:
         return path.read_text(encoding="utf-8")
     except OSError:
         return ""
-
-
-def _scan_path_allowed(root: Path, path: Path) -> bool:
-    try:
-        relative = path.relative_to(root)
-    except ValueError:
-        return False
-    blocked = {
-        ".git",
-        ".quality-runner",
-        ".venv",
-        "node_modules",
-        "dist",
-        "build",
-        "__pycache__",
-    }
-    return not path.is_symlink() and not any(part in blocked for part in relative.parts)

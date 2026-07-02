@@ -124,6 +124,17 @@ The initial profile is `jakyeamos`. See
 [Standards Profiles](docs/standards-profiles.md) for the current behavior and
 the planned profile-extension boundary.
 
+## Scan Exclusions
+
+Discovery skips fixture corpora, docs, vendored trees, generated corpora, and
+tool output directories by default so embedded samples are not reported as
+product workspaces. Add repo-specific exclusions in `.quality-runner.toml`:
+
+```toml
+[quality_runner]
+scan_exclusions = ["samples", "generated-reports/**"]
+```
+
 ## v1 Safety Boundary
 
 Quality Runner v1 may create or update files under `.quality-runner/runs/<run-id>/`

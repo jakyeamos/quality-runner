@@ -153,13 +153,14 @@ def _inspect(
     repo_root: Path, run_id: str, profile: str | None, ci_status_json: Path | None
 ) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
     ci_checks, ci_warnings = load_ci_status(repo_root, ci_status_json)
+    config = load_repo_config(repo_root)
     scan = inspect_repo(
         repo_root,
         run_id=run_id,
         ci_checks=ci_checks,
         extra_warnings=ci_warnings,
+        config=config,
     )
-    config = load_repo_config(repo_root)
     resolved_profile = profile or _string_or_default(config.get("default_profile"), "jakyeamos")
     standards_packet = compile_standards(
         repo_root=repo_root, scan=scan, profile=resolved_profile, config=config

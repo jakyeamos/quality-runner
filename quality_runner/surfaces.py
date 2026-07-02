@@ -3,6 +3,8 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
+from quality_runner.scan_exclusions import is_scan_path_allowed, resolve_scan_exclusions
+
 QUALITY_TARGETS = {
     "format": "formatter",
     "fmt": "formatter",
@@ -15,29 +17,41 @@ QUALITY_TARGETS = {
 }
 
 
-def detect_surfaces(root: Path) -> tuple[list[dict[str, str]], list[str], list[dict[str, str]]]:
+def detect_surfaces(
+    root: Path,
+    scan_exclusions: list[str] | None = None,
+) -> tuple[list[dict[str, str]], list[str], list[dict[str, str]]]:
+    resolved_exclusions = resolve_scan_exclusions(
+        {"scan_exclusions": scan_exclusions} if scan_exclusions is not None else None
+    )
     surfaces: list[dict[str, str]] = []
     commands: list[dict[str, str]] = []
     generated_code: list[dict[str, str]] = []
 
     _detect_make(root, surfaces, commands)
     _detect_docker(root, surfaces, commands)
-    _detect_terraform(root, surfaces, commands)
+    _detect_terraform(root, surfaces, commands, resolved_exclusions)
     _detect_db_migrations(root, surfaces)
-    _detect_contracts(root, surfaces)
-    _detect_generated(root, surfaces, generated_code)
+    _detect_contracts(root, surfaces, resolved_exclusions)
+    _detect_generated(root, surfaces, generated_code, resolved_exclusions)
     _detect_monorepo(root, surfaces)
 
     ecosystems = sorted({surface["ecosystem"] for surface in surfaces})
     return surfaces, ecosystems, generated_code
 
 
-def quality_commands_from_surfaces(root: Path) -> list[dict[str, str]]:
+def quality_commands_from_surfaces(
+    root: Path,
+    scan_exclusions: list[str] | None = None,
+) -> list[dict[str, str]]:
+    resolved_exclusions = resolve_scan_exclusions(
+        {"scan_exclusions": scan_exclusions} if scan_exclusions is not None else None
+    )
     surfaces: list[dict[str, str]] = []
     commands: list[dict[str, str]] = []
     _detect_make(root, surfaces, commands)
     _detect_docker(root, surfaces, commands)
-    _detect_terraform(root, surfaces, commands)
+    _detect_terraform(root, surfaces, commands, resolved_exclusions)
     return commands
 
 
@@ -137,12 +151,13 @@ def _detect_terraform(
     root: Path,
     surfaces: list[dict[str, str]],
     commands: list[dict[str, str]],
+    scan_exclusions: list[str],
 ) -> None:
     terraform_dirs = sorted(
         {
             path.parent
             for path in root.rglob("*.tf")
-            if path.is_file() and not path.is_symlink() and _is_repo_local(root, path)
+            if path.is_file() and is_scan_path_allowed(root, path, scan_exclusions)
         }
     )
     if not terraform_dirs:
@@ -194,7 +209,11 @@ def _detect_db_migrations(root: Path, surfaces: list[dict[str, str]]) -> None:
             return
 
 
-def _detect_contracts(root: Path, surfaces: list[dict[str, str]]) -> None:
+def _detect_contracts(
+    root: Path,
+    surfaces: list[dict[str, str]],
+    scan_exclusions: list[str],
+) -> None:
     for name in ("openapi.yaml", "openapi.yml", "openapi.json"):
         path = root / name
         if path.is_file() and not path.is_symlink():
@@ -210,7 +229,9 @@ def _detect_contracts(root: Path, surfaces: list[dict[str, str]]) -> None:
             break
 
     proto_files = sorted(
-        path for path in root.rglob("*.proto") if path.is_file() and not path.is_symlink()
+        path
+        for path in root.rglob("*.proto")
+        if path.is_file() and is_scan_path_allowed(root, path, scan_exclusions)
     )
     if proto_files:
         surfaces.append(
@@ -228,14 +249,14 @@ def _detect_generated(
     root: Path,
     surfaces: list[dict[str, str]],
     generated_code: list[dict[str, str]],
+    scan_exclusions: list[str],
 ) -> None:
     generated_dirs = sorted(
         path
         for path in root.rglob("*")
         if path.is_dir()
-        and not path.is_symlink()
         and path.name in {"generated", "__generated__", "gen"}
-        and _is_repo_local(root, path)
+        and is_scan_path_allowed(root, path, scan_exclusions)
     )
     if not generated_dirs:
         return
@@ -298,11 +319,3 @@ def _read_text(path: Path) -> str:
 
 def _relative(root: Path, path: Path) -> str:
     return path.relative_to(root).as_posix()
-
-
-def _is_repo_local(root: Path, path: Path) -> bool:
-    try:
-        path.relative_to(root)
-    except ValueError:
-        return False
-    return not any(part in {".git", ".quality-runner"} for part in path.parts)

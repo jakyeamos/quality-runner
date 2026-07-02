@@ -23,8 +23,9 @@ structured artifacts:
 The backend pipeline is intentionally boring and inspectable:
 
 1. `discovery` reads repository facts, language signals, package scripts,
-   Python project metadata, CI workflow command evidence, Pre-CR config, and
-   truth-file presence.
+   Python project metadata, recursive workspace manifests, mature-codebase
+   surfaces, CI workflow command evidence, Pre-CR config, and truth-file
+   presence while applying scan exclusions.
 2. `standards` compiles the selected profile and local config into a standards
    packet.
 3. `capabilities` maps discovered evidence to required quality gates.
@@ -54,6 +55,10 @@ capability detection only trusted JavaScript package scripts.
 The release-ready version adds language-aware command evidence:
 
 - Python gates from `pyproject.toml`
+- nested workspace gates from child `package.json`, `pyproject.toml`,
+  `Cargo.toml`, and `go.mod` manifests
+- default scan exclusions for fixture corpora, docs, vendored examples, and
+  generated corpora
 - CI command evidence from GitHub workflow text
 - Pre-CR `testCommand` evidence from `.pre-cr.json`
 - JavaScript package-script evidence preserved for JS repositories

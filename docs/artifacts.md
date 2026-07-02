@@ -15,8 +15,8 @@ Artifacts are written under:
 
 - `repo-scan.json`: repository facts such as package scripts, lockfiles, agent
   instruction files, language-aware quality commands, mature repo surfaces,
-  nested workspaces, ecosystems, generated-code markers, local CI checks,
-  Pre-CR config, and project truth file presence.
+  nested workspaces, active scan exclusions, ecosystems, generated-code markers,
+  local CI checks, Pre-CR config, and project truth file presence.
 - `standards.json`: compiled standards packet for the selected profile.
 - `capability-matrix.json`: available and missing quality capabilities.
   Available command-backed capabilities include the command, source, detected
@@ -78,3 +78,19 @@ optional field required.
 The file must live inside the target repo and is read as evidence only. Quality
 Runner does not call GitHub, fetch live check runs, or execute commands from CI
 configuration.
+
+## Scan Exclusions
+
+Discovery skips common non-product trees by default: `docs`, `fixtures`,
+`corpus`, `generated-corpus`, `generated-corpora`, `vendor`, `vendors`,
+`vendored`, and `third_party`, alongside tool output directories such as
+`.git`, `.quality-runner`, `node_modules`, `dist`, and `build`.
+
+Repos can add more patterns in `.quality-runner.toml`:
+
+```toml
+[quality_runner]
+scan_exclusions = ["samples", "generated-reports/**"]
+```
+
+The active list is written to `repo-scan.json` as `scan_exclusions`.

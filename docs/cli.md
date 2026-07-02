@@ -49,6 +49,16 @@ quality-runner init /path/to/repo \
 
 Use `--force` to replace an existing config.
 
+The same config file can add repo-specific scan exclusions:
+
+```toml
+[quality_runner]
+scan_exclusions = ["samples", "generated-reports/**"]
+```
+
+These augment the default exclusions for fixtures, corpora, docs, vendored
+trees, and tool output directories.
+
 ## `quality-runner status`
 
 Reports the normalized repo config and latest run metadata.

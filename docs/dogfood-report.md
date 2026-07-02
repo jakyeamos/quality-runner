@@ -100,3 +100,26 @@ Rerun artifacts:
 The senior-review conclusion improved: Quality Runner now converts real
 dogfood evidence into targeted product changes and can demonstrate measurable
 noise reduction without weakening the audit boundary.
+
+## Scan Exclusion Fix Rerun
+
+Date: 2026-07-02
+
+The next dogfood pass targeted the remaining Quality Runner self-audit noise:
+embedded fixture workspaces under `fixtures/corpus` were useful for tests but
+not product workspaces.
+
+Quality Runner now applies default scan exclusions for `docs`, `fixtures`,
+`corpus`, `generated-corpus`, `generated-corpora`, `vendor`, `vendors`,
+`vendored`, and `third_party`, with repo-specific additions available through
+`.quality-runner.toml` as `scan_exclusions`.
+
+Evidence:
+
+- `quality-runner inspect . --run-id dogfood-scan-exclusions-2026-07-02 --json`
+- `repo-scan.json` reports `workspaces: []` for Quality Runner itself.
+- `repo-scan.json` records the active `scan_exclusions` list for auditability.
+
+Result: Quality Runner no longer reports its fixture corpus as nested
+workspaces by default, while standalone fixture-corpus tests still run against
+those repos explicitly.

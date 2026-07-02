@@ -25,6 +25,7 @@ Repos can add `.quality-runner.toml` to make local policy explicit:
 default_profile = "jakyeamos"
 required_capabilities = ["lint", "tests", "dead_code"]
 allowed_package_managers = ["pnpm"]
+scan_exclusions = ["samples", "generated-reports/**"]
 
 [quality_runner.severity_overrides]
 missing-dead-code = "warning"
@@ -47,5 +48,10 @@ expires = "2026-12-31"
 
 Configured gates are recorded as command evidence only. Quality Runner does not
 execute them.
+
+`scan_exclusions` augments the default discovery exclusions. Defaults skip
+fixture corpora, generated corpora, docs, vendored directories, and third-party
+trees so embedded examples do not appear as first-class workspaces in self-audit
+artifacts.
 
 Unknown profiles fail closed.

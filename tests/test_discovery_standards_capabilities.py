@@ -384,6 +384,114 @@ def test_inspect_repo_detects_nested_workspaces_and_quality_aliases(tmp_path: Pa
     )
 
 
+def test_inspect_repo_excludes_default_fixture_corpus_vendor_and_docs_paths(
+    tmp_path: Path,
+) -> None:
+    from quality_runner.discovery import inspect_repo
+
+    app = tmp_path / "app"
+    app.mkdir()
+    (app / "package.json").write_text(
+        json.dumps({"scripts": {"test": "vitest run"}}),
+        encoding="utf-8",
+    )
+    (tmp_path / "fixtures" / "corpus" / "sample").mkdir(parents=True)
+    (tmp_path / "fixtures" / "corpus" / "sample" / "package.json").write_text(
+        json.dumps({"scripts": {"test": "vitest run"}}),
+        encoding="utf-8",
+    )
+    (tmp_path / "docs" / "snippet").mkdir(parents=True)
+    (tmp_path / "docs" / "snippet" / "pyproject.toml").write_text(
+        '[project]\nname = "snippet"\nversion = "0.1.0"\n',
+        encoding="utf-8",
+    )
+    (tmp_path / "vendor" / "examples" / "go").mkdir(parents=True)
+    (tmp_path / "vendor" / "examples" / "go" / "go.mod").write_text(
+        "module example.com/vendored\n",
+        encoding="utf-8",
+    )
+    terraform_dir = tmp_path / "infra" / "terraform"
+    terraform_dir.mkdir(parents=True)
+    (terraform_dir / "main.tf").write_text("terraform {}\n", encoding="utf-8")
+    docs_terraform = tmp_path / "docs" / "terraform"
+    docs_terraform.mkdir(parents=True)
+    (docs_terraform / "main.tf").write_text("terraform {}\n", encoding="utf-8")
+    proto_dir = tmp_path / "proto"
+    proto_dir.mkdir()
+    (proto_dir / "service.proto").write_text('syntax = "proto3";\n', encoding="utf-8")
+    (tmp_path / "fixtures" / "corpus" / "service.proto").write_text(
+        'syntax = "proto3";\n',
+        encoding="utf-8",
+    )
+    generated_dir = tmp_path / "src" / "generated"
+    generated_dir.mkdir(parents=True)
+    (generated_dir / "client.py").write_text("# generated client\n", encoding="utf-8")
+    fixture_generated_dir = tmp_path / "fixtures" / "corpus" / "src" / "generated"
+    fixture_generated_dir.mkdir(parents=True)
+    (fixture_generated_dir / "client.py").write_text(
+        "# generated fixture client\n",
+        encoding="utf-8",
+    )
+
+    scan = inspect_repo(tmp_path, run_id="scan-exclusions-001")
+
+    assert scan["workspaces"] == [
+        {"path": "app", "kind": "javascript", "manifest": "app/package.json"}
+    ]
+    surface_paths = {surface["path"] for surface in scan["repo_surfaces"]}
+    assert "infra/terraform" in surface_paths
+    assert "proto/service.proto" in surface_paths
+    assert "src/generated" in surface_paths
+    assert all(not path.startswith(("docs/", "fixtures/", "vendor/")) for path in surface_paths)
+    assert scan["generated_code"] == [{"path": "src/generated", "evidence": "generated directory"}]
+
+
+def test_workflow_applies_configured_scan_exclusions(tmp_path: Path) -> None:
+    from quality_runner.workflow import inspect_payload
+
+    app = tmp_path / "app"
+    app.mkdir()
+    (app / "package.json").write_text(
+        json.dumps({"scripts": {"test": "vitest run"}}),
+        encoding="utf-8",
+    )
+    sample = tmp_path / "samples" / "demo"
+    sample.mkdir(parents=True)
+    (sample / "package.json").write_text(
+        json.dumps({"scripts": {"test": "vitest run"}}),
+        encoding="utf-8",
+    )
+    (tmp_path / ".quality-runner.toml").write_text(
+        "\n".join(
+            [
+                "[quality_runner]",
+                'scan_exclusions = ["samples"]',
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    payload = inspect_payload(tmp_path, run_id="configured-scan-exclusions")
+    scan = json.loads(Path(payload["artifact_paths"]["repo_scan_json"]).read_text())
+
+    assert scan["scan_exclusions"] == [
+        "docs",
+        "fixtures",
+        "corpus",
+        "generated-corpus",
+        "generated-corpora",
+        "vendor",
+        "vendors",
+        "vendored",
+        "third_party",
+        "samples",
+    ]
+    assert scan["workspaces"] == [
+        {"path": "app", "kind": "javascript", "manifest": "app/package.json"}
+    ]
+
+
 def test_inspect_repo_caps_workspace_inventory_with_warning(tmp_path: Path) -> None:
     from quality_runner.discovery import inspect_repo
 

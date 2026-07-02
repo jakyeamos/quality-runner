@@ -36,6 +36,7 @@ def test_load_repo_config_reads_default_profile_required_capabilities_and_except
         "required_capabilities": ["lint", "tests"],
         "required_capabilities_configured": True,
         "allowed_package_managers": [],
+        "scan_exclusions": [],
         "accepted_exceptions": [
             {
                 "capability": "truth_file",
@@ -98,6 +99,7 @@ def test_load_repo_config_reads_gates_and_severity_overrides(tmp_path) -> None:
         }
     ]
     assert config["allowed_package_managers"] == ["bun", "pnpm"]
+    assert config["scan_exclusions"] == []
     assert config["severity_overrides"] == {"missing-tests": "critical", "lint": "warning"}
     assert config["accepted_exceptions"] == [
         {
@@ -120,6 +122,7 @@ def test_load_repo_config_reports_missing_invalid_and_malformed_values(tmp_path)
         "required_capabilities": [],
         "required_capabilities_configured": False,
         "allowed_package_managers": [],
+        "scan_exclusions": [],
         "accepted_exceptions": [],
         "gates": [],
         "severity_overrides": {},
@@ -137,6 +140,7 @@ def test_load_repo_config_reports_missing_invalid_and_malformed_values(tmp_path)
     assert invalid["required_capabilities"] == []
     assert invalid["required_capabilities_configured"] is False
     assert invalid["allowed_package_managers"] == []
+    assert invalid["scan_exclusions"] == []
     assert invalid["accepted_exceptions"] == []
     assert invalid["gates"] == []
     assert invalid["severity_overrides"] == {}
@@ -149,6 +153,7 @@ def test_load_repo_config_reports_missing_invalid_and_malformed_values(tmp_path)
                 "default_profile = 42",
                 'required_capabilities = ["lint", 42]',
                 'allowed_package_managers = ["pnpm", 42]',
+                'scan_exclusions = ["samples", 42]',
                 'accepted_exceptions = "not-a-list"',
                 "",
             ]
@@ -160,9 +165,11 @@ def test_load_repo_config_reports_missing_invalid_and_malformed_values(tmp_path)
     assert malformed["default_profile"] is None
     assert malformed["required_capabilities"] == []
     assert malformed["allowed_package_managers"] == []
+    assert malformed["scan_exclusions"] == []
     assert malformed["required_capabilities_configured"] is True
     assert malformed["accepted_exceptions"] == []
     assert [warning["code"] for warning in malformed["warnings"]] == [
+        "invalid_quality_runner_config_field",
         "invalid_quality_runner_config_field",
         "invalid_quality_runner_config_field",
         "invalid_quality_runner_config_field",
@@ -200,6 +207,26 @@ def test_load_repo_config_reports_missing_invalid_and_malformed_values(tmp_path)
 
     assert missing_section["path"] == ".quality-runner.toml"
     assert missing_section["warnings"] == []
+
+
+def test_load_repo_config_reads_scan_exclusions(tmp_path) -> None:
+    from quality_runner.config import load_repo_config
+
+    (tmp_path / ".quality-runner.toml").write_text(
+        "\n".join(
+            [
+                "[quality_runner]",
+                'scan_exclusions = ["samples", "generated-reports/**"]',
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    config = load_repo_config(tmp_path)
+
+    assert config["scan_exclusions"] == ["samples", "generated-reports/**"]
+    assert config["warnings"] == []
 
 
 def test_detect_capabilities_applies_required_capabilities_and_active_exceptions(tmp_path) -> None:
@@ -470,6 +497,7 @@ def test_artifact_schema_additions_remain_optional_for_v01_compatibility() -> No
 
     assert repo_scan["properties"]["schema"]["const"] == "quality-runner-repo-scan-v0.1"
     assert "workspaces" not in repo_scan["required"]
+    assert "scan_exclusions" not in repo_scan["required"]
     assert "repo_surfaces" not in repo_scan["required"]
     assert "ecosystems" not in repo_scan["required"]
     assert "ci_checks" not in repo_scan["required"]
