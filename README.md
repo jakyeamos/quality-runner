@@ -124,9 +124,32 @@ field-level guarantees.
 
 ## Standards Profiles
 
-The built-in profile is `default`. See
-[Standards Profiles](docs/standards-profiles.md) for the current behavior and
-the planned profile-extension boundary.
+The built-in profile is `default`. Repos can also save custom profiles in
+`.quality-runner.toml`:
+
+```bash
+quality-runner init /path/to/repo --json
+```
+
+```toml
+[quality_runner]
+default_profile = "team"
+
+[quality_runner.profiles.team]
+extends = "default"
+required_capabilities = ["lint", "typecheck", "tests", "dead_code"]
+allowed_package_managers = ["pnpm", "bun"]
+```
+
+After saving the config, the custom profile is selected automatically by
+`default_profile`, or explicitly with:
+
+```bash
+quality-runner run /path/to/repo --profile team --json
+```
+
+See [Standards Profiles](docs/standards-profiles.md) for the full profile and
+repo-policy reference.
 
 ## v1 Safety Boundary
 
