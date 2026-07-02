@@ -102,6 +102,12 @@ quality-runner export-handoff /path/to/repo
 quality-runner-mcp
 ```
 
+`inspect` and `run` scan the currently checked-out branch by default. If that
+branch is neither `main` nor the local branch with the highest commit count,
+`repo-scan.json` includes a warning. Use
+`--checkout-most-advanced-branch` to switch to that local most-advanced branch
+before scanning; the worktree must be clean.
+
 See [CLI Reference](docs/cli.md) for command details.
 
 ## MCP
