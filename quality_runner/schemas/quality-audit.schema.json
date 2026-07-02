@@ -29,7 +29,8 @@
         "summary": { "type": "string", "minLength": 1 },
         "evidence": { "type": "array", "items": { "type": "string" } },
         "recommended_fix": { "type": "string", "minLength": 1 },
-        "verification": { "type": "array", "items": { "type": "string" } }
+        "verification": { "type": "array", "items": { "type": "string" } },
+        "score": { "type": "integer", "minimum": 0 }
       },
       "additionalProperties": false
     },

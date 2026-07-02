@@ -29,10 +29,68 @@ IGNORED_DIRS = {
     "node_modules",
     "out",
     "playwright-report",
+    "public",
     "target",
     "test-results",
     "vendor",
 }
+IGNORED_DIR_PREFIXES = (".next",)
+IGNORED_PATH_PREFIXES = (
+    ".aios/shadow-worktrees",
+    ".worktrees",
+    ".tmp",
+)
+IGNORED_PATH_PARTS = {
+    "site-packages",
+}
+IGNORED_TOP_LEVEL_DIRS = {
+    ".pnpm-store",
+    "data",
+    "logs",
+    "staging",
+}
+IGNORED_TOP_LEVEL_SUFFIXES = ("-benchmark",)
+
+
+def _ignored_directory_reason(
+    relative_path: str,
+    *,
+    include_ignored_paths: set[str],
+) -> str | None:
+    normalized = relative_path.strip("/")
+    if not normalized or _is_included_or_included_parent(normalized, include_ignored_paths):
+        return None
+
+    name = Path(normalized).name
+    parts = set(Path(normalized).parts)
+    top_level = "/" not in normalized
+    if top_level and (
+        name in IGNORED_TOP_LEVEL_DIRS
+        or any(name.endswith(suffix) for suffix in IGNORED_TOP_LEVEL_SUFFIXES)
+    ):
+        return "ignored directory"
+    if name in IGNORED_DIRS:
+        return "ignored directory"
+    if any(name.startswith(prefix) for prefix in IGNORED_DIR_PREFIXES):
+        return "ignored directory"
+    if any(
+        normalized == prefix or normalized.startswith(f"{prefix}/")
+        for prefix in IGNORED_PATH_PREFIXES
+    ):
+        return "ignored directory"
+    if parts & IGNORED_PATH_PARTS:
+        return "ignored directory"
+    return None
+
+
+def _is_included_or_included_parent(relative_path: str, include_ignored_paths: set[str]) -> bool:
+    normalized = relative_path.strip("/")
+    return any(
+        normalized == included
+        or normalized.startswith(f"{included}/")
+        or included.startswith(f"{normalized}/")
+        for included in include_ignored_paths
+    )
 
 
 def _under_generated_path(relative_path: str, generated_paths: set[str]) -> bool:
@@ -73,12 +131,19 @@ def _check_coverage(relative_path: str) -> list[str]:
 def _verification_for_path(relative_path: str) -> str:
     if relative_path.startswith("quality_runner/") or relative_path.startswith("tests/"):
         return "python3.14 -m pytest -q"
-    if relative_path.startswith("packages/api/"):
-        return "pnpm --filter @soundscape/api typecheck && pnpm --filter @soundscape/api test"
-    if relative_path.startswith("packages/web/") or relative_path.startswith("src/"):
-        return "pnpm --filter @soundscape/web typecheck && pnpm --filter @soundscape/web test"
-    if relative_path.startswith("apps/mobile/"):
-        return "pnpm --filter @soundscape/mobile typecheck && pnpm --filter @soundscape/mobile test"
+    if Path(relative_path).suffix in {
+        ".cjs",
+        ".css",
+        ".html",
+        ".js",
+        ".jsx",
+        ".mjs",
+        ".ts",
+        ".tsx",
+    }:
+        return (
+            "Run the relevant JavaScript formatter, typecheck, and tests for the touched package."
+        )
     return "Run the relevant formatter, typecheck, and tests for the touched package."
 
 

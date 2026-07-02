@@ -159,6 +159,7 @@ def test_load_repo_config_reads_structural_scan_policy_and_accepted_dispositions
                 "",
                 "[quality_runner.structural_scan]",
                 'disabled_rule_groups = ["ui_structural", "speed"]',
+                'include_ignored_paths = [".aios/shadow-worktrees/approved"]',
                 "large_file_lines = 900",
                 "fat_router_lines = 300",
                 "",
@@ -178,6 +179,7 @@ def test_load_repo_config_reads_structural_scan_policy_and_accepted_dispositions
 
     assert config["structural_scan"] == {
         "disabled_rule_groups": ["ui_structural", "speed"],
+        "include_ignored_paths": [".aios/shadow-worktrees/approved"],
         "large_file_lines": 900,
         "fat_router_lines": 300,
     }

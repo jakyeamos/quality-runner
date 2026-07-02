@@ -1,11 +1,11 @@
 # Release Checklist
 
 Quality Runner publishes Python distributions from the `Release` GitHub Actions
-workflow when a `v*.*.*` tag is pushed. The next release tag is `v0.2.0`.
+workflow when a `v*.*.*` tag is pushed. The next release tag is `v0.2.1`.
 
-Do not reuse `v0.1.0`. That tag already reached the PyPI publish step on
-2026-06-28 and failed because the PyPI Trusted Publisher was not configured for
-the GitHub OIDC claims.
+Do not reuse `v0.1.0` or `v0.2.0`. `v0.1.0` already reached the PyPI publish
+step on 2026-06-28 and failed because the PyPI Trusted Publisher was not
+configured for the GitHub OIDC claims. `v0.2.0` was published on 2026-07-02.
 
 ## PyPI
 
@@ -24,11 +24,11 @@ the GitHub OIDC claims.
    - `quality-runner run . --run-id pre-release-self-audit --json`
 3. Confirm the PyPI Trusted Publisher settings before tagging.
 4. Merge the verified release branch to `main`.
-5. Push `v0.2.0`.
+5. Push `v0.2.1`.
 6. Confirm the GitHub Actions release workflow publishes the package.
 7. Verify the published artifact:
-   - `curl -sS https://pypi.org/pypi/quality-runner/0.2.0/json`
-   - `uv tool install quality-runner==0.2.0 --force`
+   - `curl -sS https://pypi.org/pypi/quality-runner/0.2.1/json`
+   - `uv tool install quality-runner==0.2.1 --force`
    - `quality-runner --version`
    - `quality-runner doctor --json`
    - `quality-runner run /path/to/small/repo --run-id release-smoke --json`
@@ -45,12 +45,12 @@ Before tagging, confirm PyPI has a pending or active trusted publisher with:
 - Environment name: `pypi`
 
 If that publisher is missing, create it from the PyPI account publishing page
-before pushing `v0.2.0`. The release must not be tagged until these claims match
+before pushing `v0.2.1`. The release must not be tagged until these claims match
 the GitHub workflow.
 
 ## Homebrew
 
 Use `packaging/homebrew/quality-runner.rb` as the formula template after the
-PyPI source distribution for `0.2.0` is live. Replace the placeholder `sha256`
-with the checksum from the published source artifact, run the formula
+PyPI source distribution for `0.2.1` is live. Recompute the `sha256` from the
+published source artifact, update the formula URL/version, run the formula
 install/audit checks, and commit the formula update after PyPI verification.

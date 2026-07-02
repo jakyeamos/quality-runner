@@ -41,6 +41,42 @@ def _git_commit(repo_root: Path) -> str:
     return result.stdout.strip()
 
 
+def _git(repo_root: Path, *args: str) -> str:
+    result = subprocess.run(
+        ["git", *args],
+        cwd=repo_root,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    return result.stdout.strip()
+
+
+def _git_commit_all(repo_root: Path, message: str) -> str:
+    subprocess.run(["git", "add", "."], cwd=repo_root, check=True)
+    subprocess.run(
+        [
+            "git",
+            "-c",
+            "user.email=quality-runner@example.com",
+            "-c",
+            "user.name=Quality Runner",
+            "commit",
+            "-m",
+            message,
+        ],
+        cwd=repo_root,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    return _git(repo_root, "rev-parse", "HEAD")
+
+
+def _write_branch_marker(repo_root: Path, marker: str) -> None:
+    (repo_root / f"{marker}.txt").write_text(f"{marker}\n", encoding="utf-8")
+
+
 def test_run_payload_writes_audit_plan_and_handoff(tmp_path: Path) -> None:
     from quality_runner.workflow import run_payload
 
@@ -125,6 +161,13 @@ def test_run_payload_adds_structural_findings_and_groups_remediation_slices(
     assert {"explicit-any", "nested-card-markup"} <= structural_rules
     audit_ids = {finding["id"] for finding in audit_report["findings"]}
     assert any(finding_id.startswith("structural-") for finding_id in audit_ids)
+    explicit_any_audit = next(
+        finding
+        for finding in audit_report["findings"]
+        if finding["id"] == "structural-harden-explicit-any"
+    )
+    assert explicit_any_audit["score"] == 18
+    assert "API hardening and type safety" in explicit_any_audit["summary"]
     explicit_any_slices = [
         slice_item
         for slice_item in remediation_plan["slices"]
@@ -133,7 +176,13 @@ def test_run_payload_adds_structural_findings_and_groups_remediation_slices(
     assert len(explicit_any_slices) == 1
     assert len(explicit_any_slices[0]["findings"]) == 1
     assert "2 findings" in explicit_any_slices[0]["actions"][0]
+    assert handoff["next_slice"]["id"] == "remediate-structural-harden-explicit-any"
     assert handoff["next_slice"]["id"] == remediation_plan["slices"][0]["id"]
+    runner_checks = {item["id"]: item for item in handoff["runner_provided_checks"]}
+    assert runner_checks["harden"]["finding_count"] >= 1
+    assert runner_checks["ui_structural"]["description"] == (
+        "UI structure and frontend maintainability heuristics"
+    )
 
 
 def test_resolution_ledger_marks_missing_prior_findings_fixed_and_preserves_acceptance(
@@ -304,11 +353,115 @@ def test_run_payload_writes_manifest_with_git_head(tmp_path: Path) -> None:
     assert manifest["schema"] == "quality-runner-run-manifest-v0.1"
     assert manifest["mode"] == "run"
     assert manifest["run_id"] == "manifest-run"
-    assert manifest["quality_runner_version"] == "0.2.0"
+    assert manifest["quality_runner_version"] == "0.2.1"
     assert manifest["git"]["head_sha"] == head_sha
     assert manifest["git"]["is_repo"] is True
     assert manifest["git"]["dirty"] is True
     assert manifest["artifact_paths"]["quality_audit_json"].endswith("quality-audit.json")
+
+
+def test_run_payload_warns_when_checked_out_branch_is_not_main_or_most_advanced(
+    tmp_path: Path,
+) -> None:
+    from quality_runner.workflow import run_payload
+
+    write_js_fixture(tmp_path)
+    _git(tmp_path, "init", "-b", "main")
+    _git_commit_all(tmp_path, "Initial commit")
+    _git(tmp_path, "switch", "-c", "old-feature")
+    _write_branch_marker(tmp_path, "old-feature")
+    _git_commit_all(tmp_path, "Old feature")
+    _git(tmp_path, "switch", "main")
+    _git(tmp_path, "switch", "-c", "advanced-feature")
+    _write_branch_marker(tmp_path, "advanced-one")
+    _git_commit_all(tmp_path, "Advanced one")
+    _write_branch_marker(tmp_path, "advanced-two")
+    _git_commit_all(tmp_path, "Advanced two")
+    _git(tmp_path, "switch", "old-feature")
+
+    payload = run_payload(repo_root=tmp_path, run_id="branch-warning-run", profile="default")
+    repo_scan = json.loads(Path(payload["artifact_paths"]["repo_scan_json"]).read_text())
+
+    assert _git(tmp_path, "branch", "--show-current") == "old-feature"
+    assert {
+        "code": "checked_out_branch_not_main_or_most_advanced",
+        "message": (
+            "Current branch 'old-feature' is neither main nor the local most-advanced branch "
+            "'advanced-feature'. Re-run with --checkout-most-advanced-branch to scan "
+            "'advanced-feature'."
+        ),
+        "path": ".",
+    } in repo_scan["warnings"]
+    assert repo_scan["warnings"] == payload["warnings"]
+
+
+def test_run_payload_can_checkout_most_advanced_branch_before_scanning(
+    tmp_path: Path,
+) -> None:
+    from quality_runner.workflow import run_payload
+
+    write_js_fixture(tmp_path)
+    _git(tmp_path, "init", "-b", "main")
+    _git_commit_all(tmp_path, "Initial commit")
+    _git(tmp_path, "switch", "-c", "old-feature")
+    _write_branch_marker(tmp_path, "old-feature")
+    _git_commit_all(tmp_path, "Old feature")
+    _git(tmp_path, "switch", "main")
+    _git(tmp_path, "switch", "-c", "advanced-feature")
+    _write_branch_marker(tmp_path, "advanced-one")
+    _git_commit_all(tmp_path, "Advanced one")
+    _write_branch_marker(tmp_path, "advanced-two")
+    _git_commit_all(tmp_path, "Advanced two")
+    _git(tmp_path, "switch", "old-feature")
+
+    payload = run_payload(
+        repo_root=tmp_path,
+        run_id="branch-checkout-run",
+        profile="default",
+        checkout_most_advanced_branch=True,
+    )
+    manifest = json.loads(Path(payload["artifact_paths"]["run_manifest_json"]).read_text())
+    repo_scan = json.loads(Path(payload["artifact_paths"]["repo_scan_json"]).read_text())
+
+    assert _git(tmp_path, "branch", "--show-current") == "advanced-feature"
+    assert manifest["git"]["branch"] == "advanced-feature"
+    assert "advanced-two.txt" in {path.name for path in tmp_path.iterdir()}
+    assert "checked_out_branch_not_main_or_most_advanced" not in {
+        warning["code"] for warning in repo_scan["warnings"]
+    }
+
+
+def test_run_payload_refuses_to_checkout_most_advanced_branch_with_dirty_worktree(
+    tmp_path: Path,
+) -> None:
+    from quality_runner.workflow import run_payload
+
+    write_js_fixture(tmp_path)
+    _git(tmp_path, "init", "-b", "main")
+    _git_commit_all(tmp_path, "Initial commit")
+    _git(tmp_path, "switch", "-c", "old-feature")
+    _write_branch_marker(tmp_path, "old-feature")
+    _git_commit_all(tmp_path, "Old feature")
+    _git(tmp_path, "switch", "main")
+    _git(tmp_path, "switch", "-c", "advanced-feature")
+    _write_branch_marker(tmp_path, "advanced-one")
+    _git_commit_all(tmp_path, "Advanced one")
+    _write_branch_marker(tmp_path, "advanced-two")
+    _git_commit_all(tmp_path, "Advanced two")
+    _git(tmp_path, "switch", "old-feature")
+    (tmp_path / "dirty.txt").write_text("dirty\n", encoding="utf-8")
+
+    try:
+        run_payload(
+            repo_root=tmp_path,
+            run_id="dirty-branch-checkout-run",
+            profile="default",
+            checkout_most_advanced_branch=True,
+        )
+    except ValueError as error:
+        assert "requires a clean git worktree" in str(error)
+    else:
+        raise AssertionError("expected dirty branch checkout to fail")
 
 
 def test_run_payload_records_missing_capability_findings(tmp_path: Path) -> None:
@@ -607,6 +760,44 @@ def test_run_payload_handoff_contains_next_slice_and_verification_gates(tmp_path
         "Add the formatter capability and rerun quality-runner.",
         "Confirm audit finding missing-formatter is absent from the regenerated report.",
     ]
+    missing_gates = {gate["id"]: gate for gate in handoff["missing_repo_owned_gates"]}
+    assert missing_gates["formatter"] == {
+        "id": "formatter",
+        "severity": "blocker",
+        "reason": "no quality command found for formatter",
+        "suggested_command": "pnpm format",
+        "required_by": "profile",
+    }
+    assert missing_gates["runtime_smoke"]["suggested_command"] == "pnpm smoke"
+    assert handoff["runner_provided_checks"] == []
+
+
+def test_handoff_markdown_names_repo_owned_gates_and_runner_checks(tmp_path: Path) -> None:
+    from quality_runner.workflow import run_payload
+
+    write_complete_js_fixture(tmp_path)
+    source = tmp_path / "src" / "app" / "page.tsx"
+    source.parent.mkdir(parents=True)
+    source.write_text(
+        "\n".join(
+            [
+                "export default function Page() {",
+                "  const state: any = {};",
+                '  return <main><div className="card"><div className="card">Nested</div></div></main>;',
+                "}",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    payload = run_payload(repo_root=tmp_path, run_id="handoff-markdown-run", profile="default")
+    handoff_markdown = Path(payload["artifact_paths"]["agent_handoff_md"]).read_text()
+
+    assert "## Missing Repo-Owned Gates" in handoff_markdown
+    assert "No missing repo-owned gates." in handoff_markdown
+    assert "## Runner-Provided Checks" in handoff_markdown
+    assert "- harden:" in handoff_markdown
+    assert "- ui_structural:" in handoff_markdown
 
 
 def test_run_payload_rejects_invalid_handoff_before_writing_artifacts(

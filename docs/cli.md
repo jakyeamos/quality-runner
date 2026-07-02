@@ -28,10 +28,16 @@ audit or remediation artifacts.
 ```bash
 quality-runner inspect /path/to/repo --run-id inspect-001 --json
 quality-runner inspect /path/to/repo --ci-status-json ci-status.json --json
+quality-runner inspect /path/to/repo --checkout-most-advanced-branch --json
 ```
 
 The standards profile defaults to `default`; use `--profile` only to select a
 saved custom profile or override repo config.
+
+By default, scans use the branch that is already checked out. If that branch is
+neither `main` nor the local branch with the highest commit count, the repo scan
+includes a warning. Use `--checkout-most-advanced-branch` to switch to that
+local most-advanced branch before scanning; this requires a clean worktree.
 
 Writes:
 
@@ -78,10 +84,16 @@ Runs the full audit-and-plan workflow.
 ```bash
 quality-runner run /path/to/repo --run-id baseline-001 --json
 quality-runner run /path/to/repo --ci-status-json ci-status.json --json
+quality-runner run /path/to/repo --checkout-most-advanced-branch --json
 ```
 
 The standards profile defaults to `default`; use `--profile` only to select a
 saved custom profile or override repo config.
+
+By default, scans use the branch that is already checked out. If that branch is
+neither `main` nor the local branch with the highest commit count, the repo scan
+includes a warning. Use `--checkout-most-advanced-branch` to switch to that
+local most-advanced branch before scanning; this requires a clean worktree.
 
 Writes:
 

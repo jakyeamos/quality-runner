@@ -10,6 +10,38 @@ from test_support.quality_runner_fixtures import write_js_fixture
 ROOT = Path(__file__).resolve().parents[1]
 
 
+def _git(repo_root: Path, *args: str) -> str:
+    result = subprocess.run(
+        ["git", *args],
+        cwd=repo_root,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    return result.stdout.strip()
+
+
+def _git_commit_all(repo_root: Path, message: str) -> str:
+    subprocess.run(["git", "add", "."], cwd=repo_root, check=True)
+    subprocess.run(
+        [
+            "git",
+            "-c",
+            "user.email=quality-runner@example.com",
+            "-c",
+            "user.name=Quality Runner",
+            "commit",
+            "-m",
+            message,
+        ],
+        cwd=repo_root,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    return _git(repo_root, "rev-parse", "HEAD")
+
+
 def test_cli_run_json_writes_artifacts(tmp_path: Path) -> None:
     write_js_fixture(tmp_path)
 
@@ -38,6 +70,75 @@ def test_cli_run_json_writes_artifacts(tmp_path: Path) -> None:
     assert Path(payload["artifact_paths"]["agent_handoff_md"]).exists()
     standards = json.loads(Path(payload["artifact_paths"]["standards_json"]).read_text())
     assert standards["profile"] == "default"
+
+
+def test_cli_run_interactive_excludes_expensive_paths_by_default(tmp_path: Path) -> None:
+    write_js_fixture(tmp_path)
+    for index in range(120):
+        path = tmp_path / "data" / f"row-{index}.json"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("{}\n", encoding="utf-8")
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "quality_runner",
+            "run",
+            str(tmp_path),
+            "--run-id",
+            "cli-interactive-default",
+            "--json",
+            "--interactive",
+        ],
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+        input="\n",
+        text=True,
+    )
+
+    payload = json.loads(result.stdout)
+    code_quality = json.loads(Path(payload["artifact_paths"]["code_quality_scan_json"]).read_text())
+    scanned_paths = {item["path"] for item in code_quality["accountability"]}
+
+    assert "Exclude these paths from this run? [Y/n]" in result.stderr
+    assert "include_ignored_paths" in result.stderr
+    assert "data" not in scanned_paths
+
+
+def test_cli_run_interactive_can_include_expensive_paths_once(tmp_path: Path) -> None:
+    write_js_fixture(tmp_path)
+    for index in range(120):
+        path = tmp_path / "data" / f"row-{index}.ts"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("const included: any = {};\n", encoding="utf-8")
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "quality_runner",
+            "run",
+            str(tmp_path),
+            "--run-id",
+            "cli-interactive-include",
+            "--json",
+            "--interactive",
+        ],
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+        input="n\n",
+        text=True,
+    )
+
+    payload = json.loads(result.stdout)
+    code_quality = json.loads(Path(payload["artifact_paths"]["code_quality_scan_json"]).read_text())
+    scanned_paths = {item["path"] for item in code_quality["accountability"]}
+
+    assert "Scanning these paths for this run only." in result.stderr
+    assert "data/row-0.ts" in scanned_paths
 
 
 def test_cli_inspect_json_writes_inspection_artifacts(tmp_path: Path) -> None:
@@ -104,6 +205,45 @@ def test_cli_inspect_accepts_ci_status_json(tmp_path: Path) -> None:
     ]
 
 
+def test_cli_inspect_can_checkout_most_advanced_branch(tmp_path: Path) -> None:
+    write_js_fixture(tmp_path)
+    _git(tmp_path, "init", "-b", "main")
+    _git_commit_all(tmp_path, "Initial commit")
+    _git(tmp_path, "switch", "-c", "old-feature")
+    (tmp_path / "old-feature.txt").write_text("old\n", encoding="utf-8")
+    _git_commit_all(tmp_path, "Old feature")
+    _git(tmp_path, "switch", "main")
+    _git(tmp_path, "switch", "-c", "advanced-feature")
+    (tmp_path / "advanced-one.txt").write_text("one\n", encoding="utf-8")
+    _git_commit_all(tmp_path, "Advanced one")
+    (tmp_path / "advanced-two.txt").write_text("two\n", encoding="utf-8")
+    _git_commit_all(tmp_path, "Advanced two")
+    _git(tmp_path, "switch", "old-feature")
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "quality_runner",
+            "inspect",
+            str(tmp_path),
+            "--run-id",
+            "cli-branch-checkout",
+            "--checkout-most-advanced-branch",
+            "--json",
+        ],
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+    payload = json.loads(result.stdout)
+    manifest = json.loads(Path(payload["artifact_paths"]["run_manifest_json"]).read_text())
+    assert _git(tmp_path, "branch", "--show-current") == "advanced-feature"
+    assert manifest["git"]["branch"] == "advanced-feature"
+
+
 def test_cli_doctor_json_reports_ready() -> None:
     result = subprocess.run(
         [sys.executable, "-m", "quality_runner", "doctor", "--json"],
@@ -116,7 +256,7 @@ def test_cli_doctor_json_reports_ready() -> None:
     payload = json.loads(result.stdout)
     assert payload["schema"] == "quality-runner-doctor-result-v0.1"
     assert payload["status"] == "ready"
-    assert payload["version"] == "0.2.0"
+    assert payload["version"] == "0.2.1"
     assert payload["environment"]["python_executable"]
 
 
@@ -341,10 +481,10 @@ def test_cli_main_reports_human_summaries_in_process(tmp_path: Path, capsys) -> 
     from quality_runner.cli import main
 
     assert main([]) == 0
-    assert "Quality Runner 0.2.0" in capsys.readouterr().out
+    assert "Quality Runner 0.2.1" in capsys.readouterr().out
 
     assert main(["doctor"]) == 0
-    assert capsys.readouterr().out.strip() == "Quality Runner 0.2.0: ready"
+    assert capsys.readouterr().out.strip() == "Quality Runner 0.2.1: ready"
 
     write_js_fixture(tmp_path)
     assert main(["inspect", str(tmp_path), "--run-id", "human-inspect"]) == 0
@@ -427,4 +567,4 @@ def test_cli_version_preserves_bare_version_output() -> None:
         text=True,
     )
 
-    assert result.stdout.strip() == "0.2.0"
+    assert result.stdout.strip() == "0.2.1"

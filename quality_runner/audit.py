@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from quality_runner.code_quality_findings import CATEGORY_ORDER
 from quality_runner.findings import AUDIT_REPORT_SCHEMA
 
 
@@ -197,18 +198,22 @@ def _code_quality_findings(code_quality_scan: dict[str, Any] | None) -> list[dic
             groups.setdefault((category, rule_id), []).append(finding)
 
     audit_findings: list[dict[str, Any]] = []
-    for (category, rule_id), group in sorted(groups.items()):
+    for (category, rule_id), group in sorted(groups.items(), key=_structural_group_sort_key):
         representative = group[0]
         expected = _string_or_default(representative.get("expected_improvement"), "Review finding.")
         count = len(group)
+        score = _structural_score(group)
         audit_findings.append(
             {
                 "id": f"structural-{category}-{rule_id}",
                 "severity": _structural_severity(group),
                 "category": f"structural:{category}",
-                "summary": f"{count} {rule_id} structural finding{'s' if count != 1 else ''}.",
+                "summary": (
+                    f"{count} {rule_id} structural finding{'s' if count != 1 else ''} "
+                    f"in {_string_or_default(representative.get('remediation_bucket'), 'structural quality')}."
+                ),
                 "evidence": _structural_evidence(group),
-                "recommended_fix": f"{count} findings: {expected}",
+                "recommended_fix": f"{count} findings, aggregate score {score}: {expected}",
                 "verification": sorted(
                     {
                         item
@@ -218,9 +223,29 @@ def _code_quality_findings(code_quality_scan: dict[str, Any] | None) -> list[dic
                 )
                 or ["Rerun quality-runner and confirm the structural finding clears."],
                 "owner": None,
+                "score": score,
             }
         )
     return audit_findings
+
+
+def _structural_group_sort_key(
+    item: tuple[tuple[str, str], list[dict[str, Any]]],
+) -> tuple[int, int, str]:
+    (category, rule_id), group = item
+    category_rank = (
+        CATEGORY_ORDER.index(category) if category in CATEGORY_ORDER else len(CATEGORY_ORDER)
+    )
+    return -_structural_score(group), category_rank, rule_id
+
+
+def _structural_score(group: list[dict[str, Any]]) -> int:
+    score = 0
+    for item in group:
+        value = item.get("score")
+        if isinstance(value, int):
+            score += value
+    return score
 
 
 def _structural_severity(group: list[dict[str, Any]]) -> str:

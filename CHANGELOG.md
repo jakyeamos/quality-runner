@@ -2,6 +2,22 @@
 
 All notable changes to Quality Runner are documented here.
 
+## 0.2.1 - 2026-07-02
+
+- Clarified handoff output by separating missing repo-owned quality gates from
+  runner-provided structural checks.
+- Added suggested commands for missing repo-owned gates in `agent-handoff.json`
+  and `agent-handoff.md`.
+- Added ignored-path scan previews, interactive one-run inclusion prompts, and
+  `.quality-runner.toml` `structural_scan.include_ignored_paths` support.
+- Expanded structural scanning with API boundary, UI structural, bundle-budget,
+  and Ponytail-debt rules.
+- Added aggregate structural scores to audit findings so remediation slices are
+  ordered by impact within each priority tier.
+- Added branch-selection warnings for repo scans and
+  `--checkout-most-advanced-branch` for explicitly scanning the local branch
+  with the highest commit count.
+
 ## 0.2.0 - 2026-07-02
 
 - Added the default-on structural/code-quality scan and `code-quality-scan.json`

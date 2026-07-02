@@ -376,6 +376,11 @@ def _structural_scan(value: object, warnings: list[dict[str, str]]) -> dict[str,
         "quality_runner.structural_scan.disabled_rule_groups",
         warnings,
     )
+    include_ignored_paths = _string_list(
+        value.get("include_ignored_paths"),
+        "quality_runner.structural_scan.include_ignored_paths",
+        warnings,
+    )
     large_file_lines = _positive_int(
         value.get("large_file_lines"),
         "quality_runner.structural_scan.large_file_lines",
@@ -387,6 +392,8 @@ def _structural_scan(value: object, warnings: list[dict[str, str]]) -> dict[str,
         warnings,
     )
     result: dict[str, Any] = {"disabled_rule_groups": disabled}
+    if include_ignored_paths:
+        result["include_ignored_paths"] = include_ignored_paths
     if large_file_lines is not None:
         result["large_file_lines"] = large_file_lines
     if fat_router_lines is not None:

@@ -16,10 +16,42 @@
     "warnings": { "$ref": "#/$defs/warnings" },
     "finding_ids": { "type": "array", "items": { "type": "string" } },
     "slice_ids": { "type": "array", "items": { "type": "string" } },
+    "missing_repo_owned_gates": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/missingRepoOwnedGate" },
+      "default": []
+    },
+    "runner_provided_checks": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/runnerProvidedCheck" },
+      "default": []
+    },
     "next_slice": { "type": ["object", "null"] },
     "verification_gates": { "type": "array", "items": { "type": "string" } }
   },
   "$defs": {
+    "missingRepoOwnedGate": {
+      "type": "object",
+      "required": ["id", "severity", "reason", "suggested_command"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "severity": { "type": "string", "minLength": 1 },
+        "reason": { "type": "string", "minLength": 1 },
+        "suggested_command": { "type": "string", "minLength": 1 },
+        "required_by": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": false
+    },
+    "runnerProvidedCheck": {
+      "type": "object",
+      "required": ["id", "finding_count", "description"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "finding_count": { "type": "integer", "minimum": 0 },
+        "description": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": false
+    },
     "warnings": {
       "type": "array",
       "items": { "$ref": "#/$defs/warning" }

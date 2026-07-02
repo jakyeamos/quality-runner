@@ -21,6 +21,7 @@ from quality_runner.findings import (
     validate_audit_report,
     validate_remediation_plan,
 )
+from quality_runner.git_branches import prepare_scan_branch
 from quality_runner.manifest import build_run_manifest
 from quality_runner.planning import (
     build_agent_handoff,
@@ -41,12 +42,18 @@ def inspect_payload(
     run_id: str | None = None,
     profile: str | None = None,
     ci_status_json: Path | None = None,
+    include_ignored_paths: list[str] | None = None,
+    checkout_most_advanced_branch: bool = False,
 ) -> dict[str, Any]:
     resolved_run_id = generated_run_id() if run_id is None else run_id
+    branch_warnings = prepare_scan_branch(
+        repo_root, checkout_most_advanced_branch=checkout_most_advanced_branch
+    )
     run_dir = prepare_artifact_dir(repo_root, resolved_run_id)
     scan, standards_packet, capability_map, config = _inspect(
-        repo_root, resolved_run_id, profile, ci_status_json
+        repo_root, resolved_run_id, profile, ci_status_json, branch_warnings
     )
+    config = _config_with_include_overrides(config, include_ignored_paths)
     code_quality_scan = create_code_quality_scan(repo_root, scan=scan, config=config)
 
     artifact_paths = {
@@ -76,7 +83,7 @@ def inspect_payload(
         "implementation_allowed": False,
         "run_id": resolved_run_id,
         "artifact_paths": artifact_paths,
-        "warnings": capability_map["warnings"],
+        "warnings": _combined_warnings(scan, capability_map),
     }
 
 
@@ -85,12 +92,18 @@ def run_payload(
     run_id: str | None = None,
     profile: str | None = None,
     ci_status_json: Path | None = None,
+    include_ignored_paths: list[str] | None = None,
+    checkout_most_advanced_branch: bool = False,
 ) -> dict[str, Any]:
     resolved_run_id = generated_run_id() if run_id is None else run_id
+    branch_warnings = prepare_scan_branch(
+        repo_root, checkout_most_advanced_branch=checkout_most_advanced_branch
+    )
     run_dir = prepare_artifact_dir(repo_root, resolved_run_id)
     scan, standards_packet, capability_map, config = _inspect(
-        repo_root, resolved_run_id, profile, ci_status_json
+        repo_root, resolved_run_id, profile, ci_status_json, branch_warnings
     )
+    config = _config_with_include_overrides(config, include_ignored_paths)
     code_quality_scan = create_code_quality_scan(repo_root, scan=scan, config=config)
     resolution_ledger = build_resolution_ledger(
         repo_root=repo_root,
@@ -131,6 +144,7 @@ def run_payload(
         audit_report=audit_report,
         remediation_plan=remediation_plan,
         artifact_paths=artifact_paths,
+        capability_map=capability_map,
     )
     _require_valid("agent handoff", validate_agent_handoff(handoff))
 
@@ -177,12 +191,16 @@ def run_payload(
         "implementation_allowed": False,
         "run_id": resolved_run_id,
         "artifact_paths": artifact_paths,
-        "warnings": capability_map["warnings"],
+        "warnings": _combined_warnings(scan, capability_map),
     }
 
 
 def _inspect(
-    repo_root: Path, run_id: str, profile: str | None, ci_status_json: Path | None
+    repo_root: Path,
+    run_id: str,
+    profile: str | None,
+    ci_status_json: Path | None,
+    branch_warnings: list[dict[str, str]],
 ) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any], dict[str, Any]]:
     ci_checks, ci_warnings = load_ci_status(repo_root, ci_status_json)
     config = load_repo_config(repo_root)
@@ -190,7 +208,7 @@ def _inspect(
         repo_root,
         run_id=run_id,
         ci_checks=ci_checks,
-        extra_warnings=ci_warnings,
+        extra_warnings=[*branch_warnings, *ci_warnings],
         config=config,
     )
     resolved_profile = profile or _string_or_default(config.get("default_profile"), DEFAULT_PROFILE)
@@ -214,3 +232,45 @@ def _require_valid(name: str, result: dict[str, Any]) -> None:
 
 def _string_or_default(value: object, default: str) -> str:
     return value if isinstance(value, str) and value else default
+
+
+def _config_with_include_overrides(
+    config: dict[str, Any],
+    include_ignored_paths: list[str] | None,
+) -> dict[str, Any]:
+    if not include_ignored_paths:
+        return config
+    merged = dict(config)
+    structural_scan = dict(merged.get("structural_scan") or {})
+    existing = structural_scan.get("include_ignored_paths")
+    paths = (
+        [item for item in existing if isinstance(item, str)] if isinstance(existing, list) else []
+    )
+    for path in include_ignored_paths:
+        if path not in paths:
+            paths.append(path)
+    structural_scan["include_ignored_paths"] = paths
+    merged["structural_scan"] = structural_scan
+    return merged
+
+
+def _combined_warnings(
+    scan: dict[str, Any], capability_map: dict[str, Any]
+) -> list[dict[str, Any]]:
+    warnings: list[dict[str, Any]] = []
+    seen: set[tuple[str, str, str]] = set()
+    for source in (scan.get("warnings"), capability_map.get("warnings")):
+        if not isinstance(source, list):
+            continue
+        for item in source:
+            if not isinstance(item, dict):
+                continue
+            code = str(item.get("code") or "")
+            message = str(item.get("message") or "")
+            path = str(item.get("path") or "")
+            key = (code, message, path)
+            if key in seen:
+                continue
+            seen.add(key)
+            warnings.append(item)
+    return warnings
