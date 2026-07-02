@@ -33,6 +33,7 @@ def test_load_repo_config_reads_default_profile_required_capabilities_and_except
         "schema": "quality-runner-config-v0.1",
         "path": ".quality-runner.toml",
         "default_profile": "default",
+        "profiles": {},
         "required_capabilities": ["lint", "tests"],
         "required_capabilities_configured": True,
         "allowed_package_managers": [],
@@ -112,6 +113,38 @@ def test_load_repo_config_reads_gates_and_severity_overrides(tmp_path) -> None:
     assert not (tmp_path / "should-not-exist").exists()
 
 
+def test_load_repo_config_reads_custom_profiles(tmp_path) -> None:
+    from quality_runner.config import load_repo_config
+
+    (tmp_path / ".quality-runner.toml").write_text(
+        "\n".join(
+            [
+                "[quality_runner]",
+                'default_profile = "team"',
+                "",
+                "[quality_runner.profiles.team]",
+                'extends = "default"',
+                'required_capabilities = ["lint", "tests"]',
+                'allowed_package_managers = ["pnpm", "bun"]',
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    config = load_repo_config(tmp_path)
+
+    assert config["default_profile"] == "team"
+    assert config["profiles"] == {
+        "team": {
+            "extends": "default",
+            "required_capabilities": ["lint", "tests"],
+            "required_capabilities_configured": True,
+            "allowed_package_managers": ["pnpm", "bun"],
+        }
+    }
+
+
 def test_load_repo_config_reads_structural_scan_policy_and_accepted_dispositions(
     tmp_path,
 ) -> None:
@@ -164,6 +197,7 @@ def test_load_repo_config_reports_missing_invalid_and_malformed_values(tmp_path)
         "schema": "quality-runner-config-v0.1",
         "path": None,
         "default_profile": None,
+        "profiles": {},
         "required_capabilities": [],
         "required_capabilities_configured": False,
         "allowed_package_managers": [],
@@ -484,6 +518,61 @@ def test_workflow_uses_config_default_profile_when_profile_is_omitted(tmp_path) 
     assert payload["schema"] == "quality-runner-inspect-result-v0.1"
     assert standards["profile"] == "default"
     assert {"type": "config", "path": ".quality-runner.toml"} in standards["sources"]
+
+
+def test_custom_profile_can_be_selected_from_repo_config(tmp_path) -> None:
+    from quality_runner.capabilities import detect_capabilities
+    from quality_runner.discovery import inspect_repo
+    from quality_runner.standards import compile_standards
+
+    (tmp_path / "package.json").write_text(
+        json.dumps(
+            {
+                "packageManager": "bun@1.2.0",
+                "scripts": {"lint": "eslint ."},
+            }
+        ),
+        encoding="utf-8",
+    )
+    (tmp_path / ".quality-runner.toml").write_text(
+        "\n".join(
+            [
+                "[quality_runner]",
+                'default_profile = "team"',
+                "",
+                "[quality_runner.profiles.team]",
+                'extends = "default"',
+                'required_capabilities = ["lint", "tests"]',
+                'allowed_package_managers = ["bun"]',
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    scan = inspect_repo(tmp_path, run_id="custom-profile")
+    packet = compile_standards(repo_root=tmp_path, scan=scan, profile="team")
+    capability_map = detect_capabilities(scan=scan, standards_packet=packet)
+
+    assert packet["profile"] == "team"
+    assert packet["profile_config"] == {
+        "extends": "default",
+        "required_capabilities": ["lint", "tests"],
+        "required_capabilities_configured": True,
+        "allowed_package_managers": ["bun"],
+    }
+    assert "package_manager_mismatch" not in {
+        requirement["id"] for requirement in packet["requirements"]
+    }
+    assert capability_map["missing"] == [
+        {
+            "id": "tests",
+            "type": "command",
+            "reason": "no quality command found for tests",
+            "language": "javascript",
+            "required_by": "profile",
+        }
+    ]
 
 
 def test_workflow_allows_explicit_profile_to_override_config_default(tmp_path) -> None:

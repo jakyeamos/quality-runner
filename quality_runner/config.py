@@ -6,6 +6,7 @@ from typing import Any
 
 CONFIG_FILE_NAME = ".quality-runner.toml"
 CONFIG_SCHEMA = "quality-runner-config-v0.1"
+PROFILE_EXTENDS_DEFAULT = "default"
 ACCEPTED_DISPOSITION_STATUSES = {
     "accepted-intentional",
     "accepted-false-positive",
@@ -39,6 +40,7 @@ def load_repo_config(repo_root: Path) -> dict[str, Any]:
     default_profile = _string_value(
         section.get("default_profile"), "quality_runner.default_profile", warnings
     )
+    profiles = _profiles(section.get("profiles"), warnings)
     required = _string_list(
         section.get("required_capabilities"), "quality_runner.required_capabilities", warnings
     )
@@ -57,6 +59,7 @@ def load_repo_config(repo_root: Path) -> dict[str, Any]:
     return _config(
         path=CONFIG_FILE_NAME,
         default_profile=default_profile,
+        profiles=profiles,
         required_capabilities=required,
         required_capabilities_configured="required_capabilities" in section,
         allowed_package_managers=allowed_package_managers,
@@ -71,10 +74,10 @@ def load_repo_config(repo_root: Path) -> dict[str, Any]:
 
 # fmt: off
 def _config(
-    *, path: str | None, default_profile: str | None, required_capabilities: list[str], required_capabilities_configured: bool, allowed_package_managers: list[str], accepted_exceptions: list[dict[str, str]], accepted_dispositions: list[dict[str, str]], gates: list[dict[str, Any]], severity_overrides: dict[str, str], structural_scan: dict[str, Any], warnings: list[dict[str, str]],
+    *, path: str | None, default_profile: str | None, profiles: dict[str, dict[str, Any]], required_capabilities: list[str], required_capabilities_configured: bool, allowed_package_managers: list[str], accepted_exceptions: list[dict[str, str]], accepted_dispositions: list[dict[str, str]], gates: list[dict[str, Any]], severity_overrides: dict[str, str], structural_scan: dict[str, Any], warnings: list[dict[str, str]],
 ) -> dict[str, Any]:
     return dict(
-        schema=CONFIG_SCHEMA, path=path, default_profile=default_profile, required_capabilities=required_capabilities, required_capabilities_configured=required_capabilities_configured, allowed_package_managers=allowed_package_managers, accepted_exceptions=accepted_exceptions, accepted_dispositions=accepted_dispositions, gates=gates, severity_overrides=severity_overrides, structural_scan=structural_scan, warnings=warnings,
+        schema=CONFIG_SCHEMA, path=path, default_profile=default_profile, profiles=profiles, required_capabilities=required_capabilities, required_capabilities_configured=required_capabilities_configured, allowed_package_managers=allowed_package_managers, accepted_exceptions=accepted_exceptions, accepted_dispositions=accepted_dispositions, gates=gates, severity_overrides=severity_overrides, structural_scan=structural_scan, warnings=warnings,
     )
 # fmt: on
 
@@ -83,6 +86,7 @@ def _empty_config(*, path: str | None, warnings: list[dict[str, str]]) -> dict[s
     return _config(
         path=path,
         default_profile=None,
+        profiles={},
         required_capabilities=[],
         required_capabilities_configured=False,
         allowed_package_managers=[],
@@ -139,6 +143,53 @@ def _string_mapping(
         )
     )
     return {}
+
+
+def _profiles(value: object, warnings: list[dict[str, str]]) -> dict[str, dict[str, Any]]:
+    if value is None:
+        return {}
+    if not isinstance(value, dict):
+        warnings.append(
+            _warning(
+                "invalid_quality_runner_config_field",
+                "quality_runner.profiles must be a table of profile tables",
+            )
+        )
+        return {}
+
+    profiles: dict[str, dict[str, Any]] = {}
+    for name, item in value.items():
+        if not isinstance(name, str) or not name or not isinstance(item, dict):
+            _profile_warning(str(name), warnings)
+            continue
+        extends = item.get("extends")
+        if extends != PROFILE_EXTENDS_DEFAULT:
+            _profile_warning(name, warnings)
+            continue
+        profiles[name] = {
+            "extends": extends,
+            "required_capabilities": _string_list(
+                item.get("required_capabilities"),
+                f"quality_runner.profiles.{name}.required_capabilities",
+                warnings,
+            ),
+            "required_capabilities_configured": "required_capabilities" in item,
+            "allowed_package_managers": _string_list(
+                item.get("allowed_package_managers"),
+                f"quality_runner.profiles.{name}.allowed_package_managers",
+                warnings,
+            ),
+        }
+    return profiles
+
+
+def _profile_warning(name: str, warnings: list[dict[str, str]]) -> None:
+    warnings.append(
+        _warning(
+            "invalid_quality_runner_config_field",
+            f"quality_runner.profiles.{name} must be a table with extends = \"default\"",
+        )
+    )
 
 
 def _gates(value: object, warnings: list[dict[str, str]]) -> list[dict[str, Any]]:

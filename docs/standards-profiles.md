@@ -57,6 +57,22 @@ owner = "qa"
 expires = "2026-12-31"
 ```
 
+Repos can also save named custom profiles and select them as the default:
+
+```toml
+[quality_runner]
+default_profile = "team"
+
+[quality_runner.profiles.team]
+extends = "default"
+required_capabilities = ["lint", "typecheck", "tests", "dead_code"]
+allowed_package_managers = ["pnpm", "bun"]
+```
+
+Custom profiles are repository-local. They must currently extend `default`.
+Profile-level `required_capabilities` and `allowed_package_managers` provide
+saved defaults; top-level repo policy can still override them.
+
 Configured gates are recorded as command evidence only. Quality Runner does not
 execute them.
 
@@ -64,7 +80,9 @@ Structural scan findings are default-on and non-blocking. Repos can disable
 rule groups, tune large-file/router thresholds, or preserve accepted dispositions
 by stable finding fingerprint.
 
-Unknown profiles fail closed.
+Unknown profiles fail closed unless they are defined under
+`quality_runner.profiles`.
 
 CLI examples omit `--profile` because `default` is selected automatically unless
-a repo config sets a different default.
+a repo config sets a different default. `--profile <name>` can select either the
+built-in `default` profile or a custom profile saved in `.quality-runner.toml`.

@@ -30,8 +30,8 @@ quality-runner inspect /path/to/repo --run-id inspect-001 --json
 quality-runner inspect /path/to/repo --ci-status-json ci-status.json --json
 ```
 
-The standards profile defaults to `default`; use `--profile` only to override
-repo config.
+The standards profile defaults to `default`; use `--profile` only to select a
+saved custom profile or override repo config.
 
 Writes:
 
@@ -70,8 +70,8 @@ quality-runner run /path/to/repo --run-id baseline-001 --json
 quality-runner run /path/to/repo --ci-status-json ci-status.json --json
 ```
 
-The standards profile defaults to `default`; use `--profile` only to override
-repo config.
+The standards profile defaults to `default`; use `--profile` only to select a
+saved custom profile or override repo config.
 
 Writes:
 

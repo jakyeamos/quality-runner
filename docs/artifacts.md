@@ -20,7 +20,8 @@ Artifacts are written under:
 - `code-quality-scan.json`: deterministic structural/code-quality findings,
   line accountability, duplicate clusters, skipped generated/vendor paths, and
   non-blocking remediation buckets.
-- `standards.json`: compiled standards packet for the selected profile.
+- `standards.json`: compiled standards packet for the selected profile,
+  including saved custom profile settings when a repo-defined profile is used.
 - `capability-matrix.json`: available and missing quality capabilities.
   Available command-backed capabilities include the command, source, detected
   language, optional owner/severity policy, required-by provenance, and local CI

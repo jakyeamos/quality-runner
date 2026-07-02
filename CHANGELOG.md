@@ -19,6 +19,8 @@ All notable changes to Quality Runner are documented here.
   scan no longer reports large-source-file findings for the scanner internals.
 - Renamed the built-in standards profile to `default` and simplified CLI/MCP
   examples so profile overrides are optional.
+- Added repository-local custom standards profiles under
+  `.quality-runner.toml`.
 
 ## 0.1.0 - 2026-06-28
 
