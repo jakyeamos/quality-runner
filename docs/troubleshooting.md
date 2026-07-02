@@ -40,8 +40,13 @@ pre-cr run --workspace .
 Documentation, workflow files, tests, and packaging metadata are excluded from
 changed-line coverage surfaces.
 
-## A run writes findings for missing capabilities
+## A run writes findings for missing repo-owned gates
 
-That is expected. Quality Runner reports missing quality surfaces such as lint,
-typecheck, tests, dead-code checks, Pre-CR, and truth-file maintenance. The tool
-does not install or create those surfaces automatically.
+That is expected. Quality Runner reports repo-owned quality gates it cannot
+detect, such as lint, typecheck, tests, build, dead-code checks, Pre-CR, and
+truth-file maintenance. These are separate from runner-provided structural
+checks, which Quality Runner performs itself during the scan.
+
+The tool does not install dependencies or create repo scripts automatically.
+Review `agent-handoff.md` for suggested commands to add, or document an accepted
+exception in `.quality-runner.toml` when a gate is intentionally absent.

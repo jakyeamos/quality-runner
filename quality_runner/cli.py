@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from quality_runner import __version__
+from quality_runner.code_quality import preview_ignored_paths
 from quality_runner.config import CONFIG_FILE_NAME, load_repo_config
 from quality_runner.standards import DEFAULT_PROFILE
 from quality_runner.workflow import inspect_payload, run_payload
@@ -16,6 +17,9 @@ DOCTOR_RESULT_SCHEMA = "quality-runner-doctor-result-v0.1"
 EXPORT_HANDOFF_RESULT_SCHEMA = "quality-runner-export-handoff-result-v0.1"
 INIT_RESULT_SCHEMA = "quality-runner-init-result-v0.1"
 STATUS_RESULT_SCHEMA = "quality-runner-status-result-v0.1"
+EXPENSIVE_IGNORED_PATH_TEXT_FILE_THRESHOLD = 100
+EXPENSIVE_IGNORED_PATH_SECONDS_THRESHOLD = 5.0
+MAX_INTERACTIVE_IGNORED_PATHS = 10
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -102,6 +106,11 @@ def _add_workflow_arguments(parser: argparse.ArgumentParser) -> None:
         default=None,
         help="Local CI status JSON export to attach to capability evidence",
     )
+    parser.add_argument(
+        "--interactive",
+        action="store_true",
+        help="Prompt before excluding expensive default-ignored scan paths",
+    )
     parser.add_argument("--json", action="store_true", help="Emit JSON output")
 
 
@@ -124,18 +133,22 @@ def _payload_for_args(args: argparse.Namespace) -> dict[str, Any]:
             output_path=Path(args.output).expanduser().resolve() if args.output else None,
         )
     if args.command == "run":
+        repo_root = _validated_repo_path(args.repo_path)
         return run_payload(
-            repo_root=_validated_repo_path(args.repo_path),
+            repo_root=repo_root,
             run_id=args.run_id,
             profile=args.profile,
             ci_status_json=Path(args.ci_status_json) if args.ci_status_json else None,
+            include_ignored_paths=_interactive_include_ignored_paths(args, repo_root),
         )
     if args.command == "inspect":
+        repo_root = _validated_repo_path(args.repo_path)
         return inspect_payload(
-            repo_root=_validated_repo_path(args.repo_path),
+            repo_root=repo_root,
             run_id=args.run_id,
             profile=args.profile,
             ci_status_json=Path(args.ci_status_json) if args.ci_status_json else None,
+            include_ignored_paths=_interactive_include_ignored_paths(args, repo_root),
         )
     raise ValueError(f"unsupported command: {args.command}")
 
@@ -233,6 +246,69 @@ def _validated_repo_path(repo_path: str) -> Path:
     if not root.is_dir():
         raise NotADirectoryError(f"repo root is not a directory: {root}")
     return root
+
+
+def _interactive_include_ignored_paths(args: argparse.Namespace, repo_root: Path) -> list[str]:
+    if not _should_prompt_for_ignored_paths(args):
+        return []
+
+    preview = preview_ignored_paths(repo_root, config=load_repo_config(repo_root))
+    expensive = [
+        item
+        for item in preview
+        if _int_value(item.get("estimated_text_files"))
+        >= EXPENSIVE_IGNORED_PATH_TEXT_FILE_THRESHOLD
+        or _float_value(item.get("estimated_scan_seconds"))
+        >= EXPENSIVE_IGNORED_PATH_SECONDS_THRESHOLD
+        or item.get("estimate_truncated") is True
+    ]
+    if not expensive:
+        return []
+
+    _print_ignored_path_prompt(expensive)
+    answer = sys.stdin.readline().strip().lower()
+    if answer in {"n", "no"}:
+        paths = [item["path"] for item in expensive if isinstance(item.get("path"), str)]
+        print("Scanning these paths for this run only.", file=sys.stderr)
+        return paths
+    print("Keeping these paths excluded for this run.", file=sys.stderr)
+    return []
+
+
+def _should_prompt_for_ignored_paths(args: argparse.Namespace) -> bool:
+    if getattr(args, "interactive", False):
+        return True
+    return not getattr(args, "json", False) and sys.stdin.isatty() and sys.stderr.isatty()
+
+
+def _print_ignored_path_prompt(paths: list[dict[str, Any]]) -> None:
+    print(
+        "Quality Runner found default-excluded paths that would expand the scan surface:",
+        file=sys.stderr,
+    )
+    for item in paths[:MAX_INTERACTIVE_IGNORED_PATHS]:
+        path = item.get("path")
+        files = _int_value(item.get("estimated_text_files"))
+        seconds = _float_value(item.get("estimated_scan_seconds"))
+        truncated = "+" if item.get("estimate_truncated") is True else ""
+        print(f"- {path}: ~{files}{truncated} text files, ~{seconds:.1f}s", file=sys.stderr)
+    remaining = len(paths) - MAX_INTERACTIVE_IGNORED_PATHS
+    if remaining > 0:
+        print(f"- ...and {remaining} more paths", file=sys.stderr)
+    print(
+        "Default is to exclude them. To always scan one, add its path to "
+        "quality_runner.structural_scan.include_ignored_paths.",
+        file=sys.stderr,
+    )
+    print("Exclude these paths from this run? [Y/n] ", end="", file=sys.stderr, flush=True)
+
+
+def _int_value(value: object) -> int:
+    return value if isinstance(value, int) else 0
+
+
+def _float_value(value: object) -> float:
+    return float(value) if isinstance(value, int | float) else 0.0
 
 
 def _latest_run(repo_root: Path) -> dict[str, Any] | None:

@@ -125,6 +125,13 @@ def test_run_payload_adds_structural_findings_and_groups_remediation_slices(
     assert {"explicit-any", "nested-card-markup"} <= structural_rules
     audit_ids = {finding["id"] for finding in audit_report["findings"]}
     assert any(finding_id.startswith("structural-") for finding_id in audit_ids)
+    explicit_any_audit = next(
+        finding
+        for finding in audit_report["findings"]
+        if finding["id"] == "structural-harden-explicit-any"
+    )
+    assert explicit_any_audit["score"] == 18
+    assert "API hardening and type safety" in explicit_any_audit["summary"]
     explicit_any_slices = [
         slice_item
         for slice_item in remediation_plan["slices"]
@@ -133,7 +140,13 @@ def test_run_payload_adds_structural_findings_and_groups_remediation_slices(
     assert len(explicit_any_slices) == 1
     assert len(explicit_any_slices[0]["findings"]) == 1
     assert "2 findings" in explicit_any_slices[0]["actions"][0]
+    assert handoff["next_slice"]["id"] == "remediate-structural-harden-explicit-any"
     assert handoff["next_slice"]["id"] == remediation_plan["slices"][0]["id"]
+    runner_checks = {item["id"]: item for item in handoff["runner_provided_checks"]}
+    assert runner_checks["harden"]["finding_count"] >= 1
+    assert runner_checks["ui_structural"]["description"] == (
+        "UI structure and frontend maintainability heuristics"
+    )
 
 
 def test_resolution_ledger_marks_missing_prior_findings_fixed_and_preserves_acceptance(
@@ -171,9 +184,7 @@ def test_resolution_ledger_marks_missing_prior_findings_fixed_and_preserves_acce
         encoding="utf-8",
     )
 
-    accepted_payload = run_payload(
-        repo_root=tmp_path, run_id="ledger-accepted", profile="default"
-    )
+    accepted_payload = run_payload(repo_root=tmp_path, run_id="ledger-accepted", profile="default")
     accepted_ledger = json.loads(
         Path(accepted_payload["artifact_paths"]["resolution_ledger_json"]).read_text()
     )
@@ -306,7 +317,7 @@ def test_run_payload_writes_manifest_with_git_head(tmp_path: Path) -> None:
     assert manifest["schema"] == "quality-runner-run-manifest-v0.1"
     assert manifest["mode"] == "run"
     assert manifest["run_id"] == "manifest-run"
-    assert manifest["quality_runner_version"] == "0.2.0"
+    assert manifest["quality_runner_version"] == "0.2.1"
     assert manifest["git"]["head_sha"] == head_sha
     assert manifest["git"]["is_repo"] is True
     assert manifest["git"]["dirty"] is True
@@ -609,6 +620,44 @@ def test_run_payload_handoff_contains_next_slice_and_verification_gates(tmp_path
         "Add the formatter capability and rerun quality-runner.",
         "Confirm audit finding missing-formatter is absent from the regenerated report.",
     ]
+    missing_gates = {gate["id"]: gate for gate in handoff["missing_repo_owned_gates"]}
+    assert missing_gates["formatter"] == {
+        "id": "formatter",
+        "severity": "blocker",
+        "reason": "no quality command found for formatter",
+        "suggested_command": "pnpm format",
+        "required_by": "profile",
+    }
+    assert missing_gates["runtime_smoke"]["suggested_command"] == "pnpm smoke"
+    assert handoff["runner_provided_checks"] == []
+
+
+def test_handoff_markdown_names_repo_owned_gates_and_runner_checks(tmp_path: Path) -> None:
+    from quality_runner.workflow import run_payload
+
+    write_complete_js_fixture(tmp_path)
+    source = tmp_path / "src" / "app" / "page.tsx"
+    source.parent.mkdir(parents=True)
+    source.write_text(
+        "\n".join(
+            [
+                "export default function Page() {",
+                "  const state: any = {};",
+                '  return <main><div className="card"><div className="card">Nested</div></div></main>;',
+                "}",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    payload = run_payload(repo_root=tmp_path, run_id="handoff-markdown-run", profile="default")
+    handoff_markdown = Path(payload["artifact_paths"]["agent_handoff_md"]).read_text()
+
+    assert "## Missing Repo-Owned Gates" in handoff_markdown
+    assert "No missing repo-owned gates." in handoff_markdown
+    assert "## Runner-Provided Checks" in handoff_markdown
+    assert "- harden:" in handoff_markdown
+    assert "- ui_structural:" in handoff_markdown
 
 
 def test_run_payload_rejects_invalid_handoff_before_writing_artifacts(

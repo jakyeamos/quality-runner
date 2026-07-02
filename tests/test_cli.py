@@ -40,6 +40,75 @@ def test_cli_run_json_writes_artifacts(tmp_path: Path) -> None:
     assert standards["profile"] == "default"
 
 
+def test_cli_run_interactive_excludes_expensive_paths_by_default(tmp_path: Path) -> None:
+    write_js_fixture(tmp_path)
+    for index in range(120):
+        path = tmp_path / "data" / f"row-{index}.json"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("{}\n", encoding="utf-8")
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "quality_runner",
+            "run",
+            str(tmp_path),
+            "--run-id",
+            "cli-interactive-default",
+            "--json",
+            "--interactive",
+        ],
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+        input="\n",
+        text=True,
+    )
+
+    payload = json.loads(result.stdout)
+    code_quality = json.loads(Path(payload["artifact_paths"]["code_quality_scan_json"]).read_text())
+    scanned_paths = {item["path"] for item in code_quality["accountability"]}
+
+    assert "Exclude these paths from this run? [Y/n]" in result.stderr
+    assert "include_ignored_paths" in result.stderr
+    assert "data" not in scanned_paths
+
+
+def test_cli_run_interactive_can_include_expensive_paths_once(tmp_path: Path) -> None:
+    write_js_fixture(tmp_path)
+    for index in range(120):
+        path = tmp_path / "data" / f"row-{index}.ts"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("const included: any = {};\n", encoding="utf-8")
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "quality_runner",
+            "run",
+            str(tmp_path),
+            "--run-id",
+            "cli-interactive-include",
+            "--json",
+            "--interactive",
+        ],
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+        input="n\n",
+        text=True,
+    )
+
+    payload = json.loads(result.stdout)
+    code_quality = json.loads(Path(payload["artifact_paths"]["code_quality_scan_json"]).read_text())
+    scanned_paths = {item["path"] for item in code_quality["accountability"]}
+
+    assert "Scanning these paths for this run only." in result.stderr
+    assert "data/row-0.ts" in scanned_paths
+
+
 def test_cli_inspect_json_writes_inspection_artifacts(tmp_path: Path) -> None:
     write_js_fixture(tmp_path)
 
@@ -116,7 +185,7 @@ def test_cli_doctor_json_reports_ready() -> None:
     payload = json.loads(result.stdout)
     assert payload["schema"] == "quality-runner-doctor-result-v0.1"
     assert payload["status"] == "ready"
-    assert payload["version"] == "0.2.0"
+    assert payload["version"] == "0.2.1"
     assert payload["environment"]["python_executable"]
 
 
@@ -150,9 +219,7 @@ def test_cli_init_writes_starter_config(tmp_path: Path) -> None:
         "implementation_allowed": False,
     }
     assert config_path.read_text(encoding="utf-8") == (
-        "[quality_runner]\n"
-        'default_profile = "default"\n'
-        'required_capabilities = ["lint", "tests"]\n'
+        '[quality_runner]\ndefault_profile = "default"\nrequired_capabilities = ["lint", "tests"]\n'
     )
 
 
@@ -343,10 +410,10 @@ def test_cli_main_reports_human_summaries_in_process(tmp_path: Path, capsys) -> 
     from quality_runner.cli import main
 
     assert main([]) == 0
-    assert "Quality Runner 0.2.0" in capsys.readouterr().out
+    assert "Quality Runner 0.2.1" in capsys.readouterr().out
 
     assert main(["doctor"]) == 0
-    assert capsys.readouterr().out.strip() == "Quality Runner 0.2.0: ready"
+    assert capsys.readouterr().out.strip() == "Quality Runner 0.2.1: ready"
 
     write_js_fixture(tmp_path)
     assert main(["inspect", str(tmp_path), "--run-id", "human-inspect"]) == 0
@@ -429,4 +496,4 @@ def test_cli_version_preserves_bare_version_output() -> None:
         text=True,
     )
 
-    assert result.stdout.strip() == "0.2.0"
+    assert result.stdout.strip() == "0.2.1"

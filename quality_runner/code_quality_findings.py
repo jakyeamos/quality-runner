@@ -6,6 +6,7 @@ from typing import Any
 CATEGORY_ORDER = [
     "harden",
     "simplify",
+    "ponytail",
     "clarify",
     "deduplicate",
     "speed",

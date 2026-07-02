@@ -6,12 +6,10 @@ from typing import Any
 from quality_runner.code_quality_findings import _finding
 from quality_runner.code_quality_paths import (
     _has_todo_comment,
-    _is_api_file,
     _is_javascript_source_file,
     _is_page_file,
     _is_runtime_file,
     _is_test_file,
-    _is_ui_file,
     _verification_for_path,
 )
 
@@ -45,6 +43,24 @@ def _harden_findings(relative_path: str, line: str, line_number: int) -> list[di
             "Route required env access through validation or fail closed.",
             "Deploy misconfiguration can become runtime crashes.",
         ),
+        (
+            "wildcard-cors-origin",
+            r"(?:Access-Control-Allow-Origin|origin)\s*[:=]\s*['\"]\*['\"]|cors\(\s*{[^}]*origin\s*:\s*['\"]\*['\"]",
+            "Restrict CORS origins to known production hosts.",
+            "Wildcard CORS can expose authenticated or internal APIs cross-origin.",
+        ),
+        (
+            "unsafe-html-injection",
+            r"\bdangerouslySetInnerHTML\b|\.innerHTML\s*=",
+            "Render escaped text or sanitize trusted HTML at the boundary.",
+            "HTML sinks can become XSS when external data reaches them.",
+        ),
+        (
+            "eval-user-code",
+            r"\beval\s*\(|\bnew\s+Function\s*\(",
+            "Replace dynamic code execution with explicit parsing or dispatch.",
+            "Dynamic evaluation turns data into executable code.",
+        ),
     ]
     findings = [
         _finding(
@@ -61,8 +77,62 @@ def _harden_findings(relative_path: str, line: str, line_number: int) -> list[di
             remediation_bucket="API hardening and type safety",
         )
         for rule_id, pattern, expected, risk in rules
-        if re.search(pattern, line)
+        if re.search(pattern, line, re.IGNORECASE)
     ]
+    if _has_sql_string_interpolation(line):
+        findings.append(
+            _finding(
+                category="harden",
+                severity="warning",
+                confidence="high",
+                file=relative_path,
+                line=line_number,
+                rule_id="sql-string-interpolation",
+                evidence=line,
+                expected_improvement="Use parameterized queries or the ORM parameter API.",
+                risk="Interpolated SQL strings can turn external input into injection risk.",
+                verification=_verification_for_path(relative_path),
+                remediation_bucket="API hardening and type safety",
+            )
+        )
+    if re.search(
+        r"\b(?:exec|execFile|execSync|spawn|spawnSync)\s*\(",
+        line,
+    ) and re.search(r"\b(?:req|request|params|body|query|input|argv)\b|\$\{", line):
+        findings.append(
+            _finding(
+                category="harden",
+                severity="warning",
+                confidence="high",
+                file=relative_path,
+                line=line_number,
+                rule_id="user-controlled-shell-command",
+                evidence=line,
+                expected_improvement="Map user input to allowlisted command arguments.",
+                risk="External input in shell execution can become command injection.",
+                verification=_verification_for_path(relative_path),
+                remediation_bucket="API hardening and unsafe sink cleanup",
+            )
+        )
+    if re.search(
+        r"\b(?:readFile|writeFile|unlink|rm|open|createReadStream|createWriteStream)\s*\(",
+        line,
+    ) and re.search(r"\b(?:req|request|params|body|query|input|argv)\b", line):
+        findings.append(
+            _finding(
+                category="harden",
+                severity="warning",
+                confidence="high",
+                file=relative_path,
+                line=line_number,
+                rule_id="user-controlled-file-path",
+                evidence=line,
+                expected_improvement="Resolve paths through an allowlisted root and reject traversal.",
+                risk="External input in file paths can read, overwrite, or delete unintended files.",
+                verification=_verification_for_path(relative_path),
+                remediation_bucket="API hardening and unsafe sink cleanup",
+            )
+        )
     if _is_runtime_file(relative_path) and re.search(
         r"\bconsole\.(?:log|debug|warn|error)\s*\(", line
     ):
@@ -81,64 +151,78 @@ def _harden_findings(relative_path: str, line: str, line_number: int) -> list[di
                 remediation_bucket="API hardening and logging",
             )
         )
-    if _is_api_file(relative_path):
-        if re.search(r"\bnew\s+TRPCError\s*\(", line):
-            findings.append(
-                _finding(
-                    category="harden",
-                    severity="warning",
-                    confidence="high",
-                    file=relative_path,
-                    line=line_number,
-                    rule_id="bare-trpc-error",
-                    evidence=line,
-                    expected_improvement="Use the project typed error taxonomy when available.",
-                    risk="Bare tRPC errors weaken downstream error handling.",
-                    verification=_verification_for_path(relative_path),
-                    remediation_bucket="API hardening, errors, instrumentation, logging",
-                )
+    if re.search(r"\bnew\s+TRPCError\s*\(", line):
+        findings.append(
+            _finding(
+                category="harden",
+                severity="warning",
+                confidence="high",
+                file=relative_path,
+                line=line_number,
+                rule_id="bare-trpc-error",
+                evidence=line,
+                expected_improvement="Use the project typed error taxonomy when available.",
+                risk="Bare tRPC errors weaken downstream error handling.",
+                verification=_verification_for_path(relative_path),
+                remediation_bucket="API hardening, errors, instrumentation, logging",
             )
-        if re.search(
-            r"\b(?:publicProcedure|protectedProcedure|adminProcedure)\b", line
-        ) and not re.search(r"\binstrumented(?:Public|Protected|Admin)Procedure\b", line):
-            findings.append(
-                _finding(
-                    category="harden",
-                    severity="warning",
-                    confidence="medium",
-                    file=relative_path,
-                    line=line_number,
-                    rule_id="uninstrumented-trpc-procedure",
-                    evidence=line,
-                    expected_improvement="Use an instrumented procedure or document an explicit opt-out.",
-                    risk="Uninstrumented procedures bypass latency and error visibility.",
-                    verification=_verification_for_path(relative_path),
-                    remediation_bucket="API hardening, errors, instrumentation, logging",
-                )
+        )
+    if re.search(
+        r"\b(?:publicProcedure|protectedProcedure|adminProcedure)\b", line
+    ) and not re.search(r"\binstrumented(?:Public|Protected|Admin)Procedure\b", line):
+        findings.append(
+            _finding(
+                category="harden",
+                severity="warning",
+                confidence="medium",
+                file=relative_path,
+                line=line_number,
+                rule_id="uninstrumented-trpc-procedure",
+                evidence=line,
+                expected_improvement="Use an instrumented procedure or document an explicit opt-out.",
+                risk="Uninstrumented procedures bypass latency and error visibility.",
+                verification=_verification_for_path(relative_path),
+                remediation_bucket="API hardening, errors, instrumentation, logging",
             )
-        if re.search(
-            r"\b(?:bio|name|displayName|username|comment|body|reason|title|label|description|note|notes)\s*:\s*z\.string\(\)",
-            line,
-        ) or re.search(
-            r"\b(?:bio|name|displayName|username|comment|body|reason|title|label|description|note|notes)\s*=\s*z\.string\(\)",
-            line,
-        ):
-            findings.append(
-                _finding(
-                    category="harden",
-                    severity="warning",
-                    confidence="medium",
-                    file=relative_path,
-                    line=line_number,
-                    rule_id="raw-free-text-z-string",
-                    evidence=line,
-                    expected_improvement="Use an appropriate shared text sanitizer or bounded schema.",
-                    risk="Raw free-text schemas bypass input hygiene.",
-                    verification=_verification_for_path(relative_path),
-                    remediation_bucket="API hardening and input hygiene",
-                )
+        )
+    if re.search(
+        r"\b(?:bio|name|displayName|username|comment|body|reason|title|label|description|note|notes)\s*:\s*z\.string\(\)",
+        line,
+    ) or re.search(
+        r"\b(?:bio|name|displayName|username|comment|body|reason|title|label|description|note|notes)\s*=\s*z\.string\(\)",
+        line,
+    ):
+        findings.append(
+            _finding(
+                category="harden",
+                severity="warning",
+                confidence="medium",
+                file=relative_path,
+                line=line_number,
+                rule_id="raw-free-text-z-string",
+                evidence=line,
+                expected_improvement="Use an appropriate shared text sanitizer or bounded schema.",
+                risk="Raw free-text schemas bypass input hygiene.",
+                verification=_verification_for_path(relative_path),
+                remediation_bucket="API hardening and input hygiene",
             )
+        )
     return findings
+
+
+def _has_sql_string_interpolation(line: str) -> bool:
+    if "`" not in line or "${" not in line:
+        return False
+    sql_shapes = (
+        r"`[^`]*\bSELECT\b[\s\S]*\bFROM\b[^`]*\$\{",
+        r"`[^`]*\bINSERT\s+INTO\b[^`]*\$\{",
+        r"`[^`]*\bUPDATE\b[^`]*\bSET\b[^`]*\$\{",
+        r"`[^`]*\bDELETE\s+FROM\b[^`]*\$\{",
+        r"`[^`]*\bWITH\s+\w+\s+AS\s*\([^`]*\$\{",
+        r"`[^`]*\bALTER\s+TABLE\b[^`]*\$\{",
+        r"`[^`]*\bDROP\s+(?:TABLE|DATABASE|INDEX)\b[^`]*\$\{",
+    )
+    return any(re.search(pattern, line, re.IGNORECASE) for pattern in sql_shapes)
 
 
 def _clarify_findings(relative_path: str, line: str, line_number: int) -> list[dict[str, Any]]:
@@ -219,75 +303,3 @@ def _test_quality_findings(relative_path: str, line: str, line_number: int) -> l
             )
         )
     return findings
-
-
-def _ui_structural_findings(
-    relative_path: str, line: str, line_number: int
-) -> list[dict[str, Any]]:
-    if not _is_ui_file(relative_path):
-        return []
-    specs = [
-        (
-            "gradient-text",
-            "background-clip" in line and "text" in line and "gradient(" in line,
-            "Use a solid text color; reserve gradients for meaningful surfaces.",
-            "Gradient text is a common low-signal visual trope.",
-        ),
-        (
-            "decorative-grid-background",
-            "linear-gradient" in line
-            and "1px" in line
-            and ("90deg" in line or line.count("linear-gradient") > 1),
-            "Remove decorative grid backgrounds unless the surface is a real canvas/map/measurement tool.",
-            "Decorative grids read as generic AI decoration.",
-        ),
-        (
-            "side-stripe-border",
-            bool(re.search(r"border-(?:left|right)\s*:\s*(?:[2-9]|\d{2,})px", line)),
-            "Use full borders, background tints, icons, or no accent instead.",
-            "Side-stripe accents are a repetitive card/callout trope.",
-        ),
-        (
-            "excessive-border-radius",
-            bool(re.search(r"border-radius\s*:\s*(?:3[2-9]|[4-9]\d|\d{3,})px", line)),
-            "Keep cards and panels within the project's radius scale.",
-            "Over-rounded containers make interfaces feel generic.",
-        ),
-        (
-            "arbitrary-z-index",
-            bool(re.search(r"z-index\s*:\s*(?:999|9999|\d{4,})", line)),
-            "Use a semantic z-index scale.",
-            "Arbitrary stacking values make overlays fragile.",
-        ),
-        (
-            "nested-card-markup",
-            line.count('className="card') + line.count("className='card") >= 2,
-            "Avoid nesting cards inside cards; flatten the layout or use sections.",
-            "Nested cards create heavy, unclear visual hierarchy.",
-        ),
-        (
-            "risky-hidden-reveal",
-            bool(
-                re.search(r"\b(?:opacity\s*:\s*0|visibility\s*:\s*hidden|display\s*:\s*none)", line)
-            ),
-            "Ensure reveal animations enhance visible content rather than gating it.",
-            "Hidden default content can ship blank in paused/headless renderers.",
-        ),
-    ]
-    return [
-        _finding(
-            category="ui_structural",
-            severity="observation",
-            confidence="medium",
-            file=relative_path,
-            line=line_number,
-            rule_id=rule_id,
-            evidence=line,
-            expected_improvement=expected,
-            risk=risk,
-            verification=_verification_for_path(relative_path),
-            remediation_bucket="UI structural quality",
-        )
-        for rule_id, matched, expected, risk in specs
-        if matched
-    ]

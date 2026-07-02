@@ -67,6 +67,7 @@ def build_agent_handoff(
     audit_report: dict[str, Any],
     remediation_plan: dict[str, Any],
     artifact_paths: dict[str, str],
+    capability_map: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     status = "clean" if not _slices(remediation_plan) else "planned"
     next_slice = _next_slice(remediation_plan)
@@ -79,6 +80,8 @@ def build_agent_handoff(
         "warnings": _warnings(remediation_plan),
         "finding_ids": [finding["id"] for finding in _findings(audit_report)],
         "slice_ids": [slice_item["id"] for slice_item in _slices(remediation_plan)],
+        "missing_repo_owned_gates": _missing_repo_owned_gates(capability_map),
+        "runner_provided_checks": _runner_provided_checks(audit_report),
         "next_slice": next_slice,
         "verification_gates": _slice_verification_gates(next_slice),
     }
@@ -116,6 +119,43 @@ def render_handoff_markdown(handoff: dict[str, Any]) -> str:
                 lines.append(f"- {code} ({path}): {message}")
     else:
         lines.append("No warnings.")
+
+    lines.extend(["", "## Missing Repo-Owned Gates", ""])
+
+    missing_gates = handoff.get("missing_repo_owned_gates")
+    if isinstance(missing_gates, list) and missing_gates:
+        for gate in missing_gates:
+            if not isinstance(gate, dict):
+                continue
+            gate_id = gate.get("id")
+            severity = gate.get("severity")
+            suggestion = gate.get("suggested_command")
+            reason = gate.get("reason")
+            if isinstance(gate_id, str) and isinstance(suggestion, str):
+                lines.append(f"- {gate_id} ({severity}): add `{suggestion}`.")
+                if isinstance(reason, str) and reason:
+                    lines.append(f"  - Why: {reason}")
+    else:
+        lines.append("No missing repo-owned gates.")
+
+    lines.extend(["", "## Runner-Provided Checks", ""])
+
+    runner_checks = handoff.get("runner_provided_checks")
+    if isinstance(runner_checks, list) and runner_checks:
+        for check in runner_checks:
+            if not isinstance(check, dict):
+                continue
+            check_id = check.get("id")
+            finding_count = check.get("finding_count")
+            description = check.get("description")
+            if isinstance(check_id, str) and isinstance(finding_count, int):
+                line = f"- {check_id}: {finding_count} finding"
+                line += "" if finding_count == 1 else "s"
+                if isinstance(description, str) and description:
+                    line += f" ({description})"
+                lines.append(line + ".")
+    else:
+        lines.append("No runner-provided structural checks produced findings.")
 
     lines.extend(["", "## Next Slice", ""])
 
@@ -172,6 +212,108 @@ def _slice_for_finding(finding: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _missing_repo_owned_gates(capability_map: dict[str, Any] | None) -> list[dict[str, str]]:
+    if not isinstance(capability_map, dict):
+        return []
+    missing = capability_map.get("missing")
+    if not isinstance(missing, list):
+        return []
+
+    gates: list[dict[str, str]] = []
+    for capability in missing:
+        if not isinstance(capability, dict):
+            continue
+        capability_id = capability.get("id")
+        reason = capability.get("reason")
+        language = capability.get("language")
+        required_by = capability.get("required_by")
+        if not isinstance(capability_id, str) or not capability_id:
+            continue
+        gates.append(
+            {
+                "id": capability_id,
+                "severity": _gate_severity(capability_id),
+                "reason": reason if isinstance(reason, str) and reason else "gate was not found",
+                "suggested_command": _suggested_gate_command(capability_id, language),
+                **_optional_string("required_by", required_by),
+            }
+        )
+    return gates
+
+
+def _runner_provided_checks(audit_report: dict[str, Any]) -> list[dict[str, Any]]:
+    counts: dict[str, int] = {}
+    for finding in _findings(audit_report):
+        category = finding["category"]
+        if not category.startswith("structural:"):
+            continue
+        check_id = category.removeprefix("structural:")
+        counts[check_id] = counts.get(check_id, 0) + 1
+    return [
+        {
+            "id": check_id,
+            "finding_count": counts[check_id],
+            "description": _runner_check_description(check_id),
+        }
+        for check_id in sorted(counts)
+    ]
+
+
+def _gate_severity(capability_id: str) -> str:
+    if capability_id in {"formatter", "lint", "typecheck", "tests", "dead_code", "truth_file"}:
+        return "blocker"
+    return "warning"
+
+
+def _suggested_gate_command(capability_id: str, language: object) -> str:
+    python_commands = {
+        "formatter": "ruff format --check .",
+        "lint": "ruff check .",
+        "typecheck": "basedpyright",
+        "tests": "pytest -q",
+        "build": "uv build",
+        "dead_code": "vulture . --min-confidence 70",
+        "runtime_smoke": "python -m <package_or_console_script>",
+        "pre_pr": "quality-runner run . --json",
+        "pre_cr": "pre-cr run --workspace . --json",
+        "truth_file": "maintain .tracker/PROJECT_TRUTH.md",
+    }
+    javascript_commands = {
+        "formatter": "pnpm format",
+        "lint": "pnpm lint",
+        "typecheck": "pnpm typecheck",
+        "tests": "pnpm test",
+        "build": "pnpm build",
+        "dead_code": "pnpm audit:dead-code",
+        "runtime_smoke": "pnpm smoke",
+        "pre_pr": "pnpm pre-pr",
+        "pre_cr": "pnpm pre-cr",
+        "truth_file": "maintain .tracker/PROJECT_TRUTH.md",
+    }
+    commands = python_commands if language == "python" else javascript_commands
+    return commands.get(capability_id, f"add a {capability_id} gate")
+
+
+def _runner_check_description(check_id: str) -> str:
+    descriptions = {
+        "clarify": "readability and naming clarity heuristics",
+        "deduplicate": "duplicate and near-duplicate detection",
+        "harden": "API, error handling, and boundary hardening heuristics",
+        "improve-tests": "test quality and coverage structure heuristics",
+        "ponytail": "standard-library and native-platform replacement heuristics",
+        "simplify": "complexity and nesting heuristics",
+        "speed": "performance and unnecessary work heuristics",
+        "ui_structural": "UI structure and frontend maintainability heuristics",
+    }
+    return descriptions.get(check_id, "Quality Runner structural heuristic")
+
+
+def _optional_string(key: str, value: object) -> dict[str, str]:
+    if isinstance(value, str) and value:
+        return {key: value}
+    return {}
+
+
 def _findings(audit_report: dict[str, Any]) -> list[dict[str, Any]]:
     findings = audit_report.get("findings")
     if not isinstance(findings, list):
@@ -187,6 +329,7 @@ def _findings(audit_report: dict[str, Any]) -> list[dict[str, Any]]:
         summary = finding.get("summary")
         recommended_fix = finding.get("recommended_fix")
         verification = finding.get("verification")
+        score = finding.get("score")
         if (
             isinstance(finding_id, str)
             and finding_id
@@ -209,6 +352,7 @@ def _findings(audit_report: dict[str, Any]) -> list[dict[str, Any]]:
                     "summary": summary,
                     "recommended_fix": recommended_fix,
                     "verification": verification,
+                    "score": score if isinstance(score, int) else _default_score(severity),
                 }
             )
     return normalized
@@ -296,9 +440,11 @@ def _finding_markdown_items(value: object) -> list[str]:
     return items
 
 
-def _finding_sort_key(finding: dict[str, Any]) -> tuple[int, str]:
+def _finding_sort_key(finding: dict[str, Any]) -> tuple[int, int, str]:
     priority = _priority_for_finding(finding)
-    return PRIORITY_ORDER.get(priority, 99), finding["id"]
+    score = finding.get("score")
+    ranking_score = score if isinstance(score, int) else 0
+    return PRIORITY_ORDER.get(priority, 99), -ranking_score, finding["id"]
 
 
 def _priority_for_finding(finding: dict[str, Any]) -> str:
@@ -308,6 +454,10 @@ def _priority_for_finding(finding: dict[str, Any]) -> str:
     if severity == "warning":
         return "medium"
     return "low"
+
+
+def _default_score(severity: str) -> int:
+    return {"critical": 1000, "blocker": 900}.get(severity, 0)
 
 
 def _string_or_none(value: object) -> str | None:

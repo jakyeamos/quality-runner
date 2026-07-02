@@ -22,7 +22,7 @@ Artifacts are written under:
   non-blocking remediation buckets.
 - `standards.json`: compiled standards packet for the selected profile,
   including saved custom profile settings when a repo-defined profile is used.
-- `capability-matrix.json`: available and missing quality capabilities.
+- `capability-matrix.json`: available and missing repo-owned quality gates.
   Available command-backed capabilities include the command, source, detected
   language, optional owner/severity policy, required-by provenance, and local CI
   status evidence.
@@ -34,15 +34,22 @@ Artifacts are written under:
 `quality-runner run` writes all inspect artifacts plus:
 
 - `quality-audit.json`: evidence-backed findings with severity, optional owner,
-  category, evidence, recommended fix, and verification.
+  category, evidence, recommended fix, verification, and optional aggregate
+  score for grouped structural findings.
 - `remediation-plan.json`: ordered remediation slices with priority, actions,
   findings, and verification gates.
 - `resolution-ledger.json`: current finding lifecycle state by stable
   fingerprint, preserving accepted dispositions and marking disappeared
   findings fixed on later runs.
 - `resolution-ledger.md`: human-readable resolution ledger summary.
-- `agent-handoff.json`: machine-readable next-slice handoff.
-- `agent-handoff.md`: human-readable handoff for a coding agent.
+- `agent-handoff.json`: machine-readable next-slice handoff, including missing
+  repo-owned gates with suggested commands and runner-provided structural checks
+  that produced findings.
+- `agent-handoff.md`: human-readable handoff for a coding agent. The Markdown
+  intentionally separates missing repo-owned gates such as `pnpm test` or
+  `pnpm typecheck` from Quality Runner's built-in structural checks so readers
+  do not mistake a runner heuristic for a repo-native test, build, or typecheck
+  gate.
 
 ## Safety Guarantees
 

@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import re
 from typing import Any
 
+from quality_runner.code_quality_api_rules import _api_contract_findings, _api_line_findings
 from quality_runner.code_quality_findings import _finding
 from quality_runner.code_quality_paths import (
     _has_motion_without_reduced_motion,
@@ -18,6 +20,9 @@ from quality_runner.code_quality_rule_groups import (
     _clarify_findings,
     _harden_findings,
     _test_quality_findings,
+)
+from quality_runner.code_quality_ui_rules import (
+    _ui_file_level_findings,
     _ui_structural_findings,
 )
 
@@ -75,6 +80,7 @@ def _scan_file(
 
         if "harden" not in disabled_groups:
             findings.extend(_harden_findings(relative_path, line, index))
+            findings.extend(_api_line_findings(relative_path, line, index))
 
         if "clarify" not in disabled_groups:
             findings.extend(_clarify_findings(relative_path, line, index))
@@ -85,21 +91,9 @@ def _scan_file(
             and loop_depth > 0
             and "await" in stripped
         ):
-            findings.append(
-                _finding(
-                    category="speed",
-                    severity="warning",
-                    confidence="medium",
-                    file=relative_path,
-                    line=index,
-                    rule_id="await-in-loop",
-                    evidence=line,
-                    expected_improvement="Batch independent work or document required sequencing.",
-                    risk="Sequential async work can become a latency bottleneck.",
-                    verification=_verification_for_path(relative_path),
-                    remediation_bucket="performance and batching improvements",
-                )
-            )
+            finding = _await_in_loop_finding(relative_path, line, index, lines)
+            if finding is not None:
+                findings.append(finding)
 
         if "improve-tests" not in disabled_groups:
             findings.extend(_test_quality_findings(relative_path, line, index))
@@ -171,4 +165,65 @@ def _scan_file(
             )
         )
 
+    if "ui_structural" not in disabled_groups:
+        findings.extend(_ui_file_level_findings(relative_path, text, lines))
+
+    if "harden" not in disabled_groups or "speed" not in disabled_groups:
+        findings.extend(
+            finding
+            for finding in _api_contract_findings(relative_path, text, lines)
+            if str(finding["category"]) not in disabled_groups
+        )
+
     return findings
+
+
+def _await_in_loop_finding(
+    relative_path: str, line: str, line_number: int, lines: list[str]
+) -> dict[str, Any] | None:
+    context = "\n".join(lines[max(0, line_number - 8) : min(len(lines), line_number + 3)])
+    lowered_context = context.lower()
+    lowered_line = line.lower()
+
+    if _is_test_file(relative_path) and "expect(" in line:
+        return None
+    if re.search(r"\breader\.read\s*\(", line):
+        return None
+
+    severity = "warning"
+    confidence = "medium"
+    expected = "Batch independent work or document required sequencing."
+    risk = "Sequential async work can become a latency bottleneck."
+
+    if _is_test_file(relative_path):
+        severity = "observation"
+        confidence = "low"
+        expected = "Confirm the loop must stay serial or move independent test setup into a batch."
+        risk = "Sequential test utilities can slow suites, but may be deliberate for stability."
+    elif "interceptors" in lowered_context or re.search(r"\bawait\s+fn\s*\(", line):
+        severity = "observation"
+        confidence = "low"
+        expected = "Keep interceptor chains serial when each step depends on the previous result."
+        risk = "Interceptor awaits are often intentional, but can hide slow extension points."
+    elif (
+        "while (true)" in lowered_context
+        and re.search(r"\b(?:poll|retry|sleep|delay|wait|timeout)\b", lowered_context)
+    ) or re.search(r"\b(?:poll|retry|sleep|delay|wait)\b", lowered_line):
+        severity = "observation"
+        confidence = "low"
+        expected = "Confirm polling cadence and timeout bounds are explicit."
+        risk = "Polling awaits can be expected, but missing bounds turn them into latency traps."
+
+    return _finding(
+        category="speed",
+        severity=severity,
+        confidence=confidence,
+        file=relative_path,
+        line=line_number,
+        rule_id="await-in-loop",
+        evidence=line,
+        expected_improvement=expected,
+        risk=risk,
+        verification=_verification_for_path(relative_path),
+        remediation_bucket="performance and batching improvements",
+    )
