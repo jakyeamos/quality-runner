@@ -43,6 +43,27 @@ Codex project resolution:
 3. If neither is available, mark `needs-codex-project` and do not start that
    repo thread.
 
+## Wave 1 Retrospective
+
+Wave 1 should not advance until every worker returns `complete` or `blocked`.
+Early worker reports used `ready-for-review` after clearing missing repo-owned
+gates but before clearing runner-provided findings. The controller tightened the
+terminal vocabulary so partial progress remains `running` and gets returned to
+the worker.
+
+Product improvements found:
+
+- Quality Runner recommended `pnpm audit:dead-code` but did not recognize
+  `audit:dead-code` as a `dead_code` package script. The detector now accepts
+  the recommended script name.
+- Several repos needed repo-specific scan exclusions for generated,
+  operational, or third-party paths. Current Quality Runner source applies
+  `scan_exclusions` to the structural scanner; workers using an older installed
+  CLI may need to rebuild or reinstall the current checkout before rerunning.
+- Workers need a stricter final report: if QR status is not `clean`, they must
+  classify the remaining findings as a blocker with evidence, not as a
+  successful completion.
+
 ## Rollout Ledger
 
 | Wave | Repo | Repo path | Total | Blockers | Baseline artifacts | Codex project status | Thread status | Thread id | Final QR status | Commit | Push | Notes |

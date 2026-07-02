@@ -824,6 +824,26 @@ def test_detect_capabilities_records_pre_cr_script_with_stable_id(tmp_path: Path
     assert "pre_pr" in missing_ids
 
 
+def test_detect_capabilities_accepts_recommended_dead_code_script_name(tmp_path: Path) -> None:
+    from quality_runner.capabilities import detect_capabilities
+    from quality_runner.discovery import inspect_repo
+    from quality_runner.standards import compile_standards
+
+    (tmp_path / "package.json").write_text(
+        json.dumps({"scripts": {"audit:dead-code": "knip --production"}}),
+        encoding="utf-8",
+    )
+    scan = inspect_repo(tmp_path, run_id="dead-code-script-001")
+    packet = compile_standards(repo_root=tmp_path, scan=scan, profile="default")
+
+    capability_map = detect_capabilities(scan=scan, standards_packet=packet)
+
+    available = {item["id"]: item for item in capability_map["available"]}
+    missing_ids = {item["id"] for item in capability_map["missing"]}
+    assert available["dead_code"]["source"] == "package.json:scripts.audit:dead-code"
+    assert "dead_code" not in missing_ids
+
+
 def test_detect_capabilities_records_pre_cr_config_with_stable_id(tmp_path: Path) -> None:
     from quality_runner.capabilities import detect_capabilities
     from quality_runner.discovery import inspect_repo

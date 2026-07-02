@@ -11,7 +11,7 @@ SCRIPT_CAPABILITIES = {
     "typecheck": ("typecheck", "type-check", "check-types"),
     "tests": ("test", "tests"),
     "build": ("build",),
-    "dead_code": ("dead-code", "dead_code", "knip", "vulture", "unused"),
+    "dead_code": ("dead-code", "dead_code", "audit:dead-code", "knip", "vulture", "unused"),
     "runtime_smoke": ("smoke", "runtime-smoke", "smoke-test"),
     "pre_pr": ("pre-pr", "prepr"),
 }

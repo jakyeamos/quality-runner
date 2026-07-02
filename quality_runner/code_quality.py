@@ -302,6 +302,7 @@ def _is_scan_excluded(
         and matches_scan_exclusion(normalized, scan_exclusions)
     )
 
+
 def _estimate_text_files(path: Path) -> tuple[int, bool]:
     if not path.is_dir():
         return 0, False

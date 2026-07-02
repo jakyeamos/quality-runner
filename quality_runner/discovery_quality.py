@@ -47,7 +47,7 @@ def _javascript_quality_commands(
         "typecheck": ("typecheck", "type-check", "check-types", "build:ts"),
         "tests": ("test", "tests"),
         "build": ("build",),
-        "dead_code": ("dead-code", "dead_code", "knip", "vulture", "unused"),
+        "dead_code": ("dead-code", "dead_code", "audit:dead-code", "knip", "vulture", "unused"),
         "runtime_smoke": ("smoke", "runtime-smoke", "smoke-test"),
         "pre_pr": ("pre-pr", "prepr"),
         "pre_cr": ("pre-cr", "precr", "pre-cr:run"),
