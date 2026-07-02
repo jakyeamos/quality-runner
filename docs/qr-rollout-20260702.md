@@ -7,6 +7,7 @@ Source report: `/private/tmp/quality-runner-readable-report-20260702.md`
 - Wave size: 5
 - Scope: 44 repos from the report
 - Excluded: `soundscape-app`
+- Restarted wave 1 runner: `/Users/jakyeamos/projects/quality-runner/.venv/bin/quality-runner`
 
 ## Controller Protocol
 
@@ -60,9 +61,32 @@ Product improvements found:
   operational, or third-party paths. Current Quality Runner source applies
   `scan_exclusions` to the structural scanner; workers using an older installed
   CLI may need to rebuild or reinstall the current checkout before rerunning.
+- Hidden operational/governance folders (`.aios`, `.planning`, `.superpowers`,
+  `.tracker`) are now excluded from structural scanning by default. Workers
+  should only re-include them with
+  `quality_runner.structural_scan.include_ignored_paths` when those folders are
+  the intended source under review.
 - Workers need a stricter final report: if QR status is not `clean`, they must
   classify the remaining findings as a blocker with evidence, not as a
   successful completion.
+
+## Wave 1 Restart Protocol
+
+Wave 1 is being restarted after Quality Runner product fixes on branch
+`codex/structural-scan-exclusions`.
+
+Worker requirements for the restart:
+
+- Use `/Users/jakyeamos/projects/quality-runner/.venv/bin/quality-runner` for
+  every final QR run, not a globally installed `quality-runner` binary.
+- Run `quality-runner --version` first and require version `0.2.1`.
+- Preserve existing repo branch commits and unrelated dirty work.
+- Continue from the existing QR branch when present.
+- Do not disable whole structural rule groups merely to make QR green unless
+  the repo is genuinely a non-code/content container and the reason is
+  documented in the repo config and final report.
+- Terminal status remains only `complete` when final QR is clean, or `blocked`
+  with a hard blocker and evidence.
 
 ## Rollout Ledger
 

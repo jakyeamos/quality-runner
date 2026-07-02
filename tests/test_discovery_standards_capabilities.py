@@ -476,6 +476,10 @@ def test_workflow_applies_configured_scan_exclusions(tmp_path: Path) -> None:
     scan = json.loads(Path(payload["artifact_paths"]["repo_scan_json"]).read_text())
 
     assert scan["scan_exclusions"] == [
+        ".aios",
+        ".planning",
+        ".superpowers",
+        ".tracker",
         "docs",
         "fixtures",
         "corpus",

@@ -15,6 +15,10 @@ ALWAYS_EXCLUDED_PATH_PARTS = {
 }
 
 DEFAULT_SCAN_EXCLUSIONS = [
+    ".aios",
+    ".planning",
+    ".superpowers",
+    ".tracker",
     "docs",
     "fixtures",
     "corpus",

@@ -484,6 +484,35 @@ def test_code_quality_scan_applies_configured_scan_exclusions(tmp_path: Path) ->
     assert finding_files == {"src/index.ts"}
 
 
+def test_code_quality_scan_excludes_hidden_operational_dirs_by_default(
+    tmp_path: Path,
+) -> None:
+    from quality_runner.code_quality import create_code_quality_scan
+
+    for directory in (".aios", ".planning", ".superpowers", ".tracker"):
+        _write(tmp_path / directory / "notes.ts", "const hidden: any = {};\n")
+    _write(tmp_path / "src" / "index.ts", "const value: any = {};\n")
+
+    result = create_code_quality_scan(
+        tmp_path,
+        scan={"run_id": "scan-001"},
+        config={},
+    )
+
+    scanned_paths = {item["path"] for item in result["accountability"]}
+    skipped = {item["path"]: item["reason"] for item in result["skipped_files"]}
+    finding_files = {finding["file"] for finding in result["findings"]}
+
+    assert scanned_paths == {"src/index.ts"}
+    assert skipped == {
+        ".aios": "scan exclusion",
+        ".planning": "scan exclusion",
+        ".superpowers": "scan exclusion",
+        ".tracker": "scan exclusion",
+    }
+    assert finding_files == {"src/index.ts"}
+
+
 def test_code_quality_scan_include_ignored_paths_overrides_scan_exclusions(
     tmp_path: Path,
 ) -> None:
@@ -583,7 +612,7 @@ def test_code_quality_scan_ignores_shadow_vendor_cache_and_build_variants(
     finding_files = {finding["file"] for finding in result["findings"]}
 
     assert scanned_paths == {"src/data/model.ts", "src/index.ts"}
-    assert skipped[".aios/shadow-worktrees"] == "ignored directory"
+    assert skipped[".aios"] == "scan exclusion"
     assert skipped[".worktrees"] == "ignored directory"
     assert skipped["apps/dashboard/.next-broken-20260323-1"] == "ignored directory"
     assert skipped[".tmp"] == "ignored directory"
