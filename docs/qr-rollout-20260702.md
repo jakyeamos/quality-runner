@@ -11,8 +11,16 @@ Source report: `/private/tmp/quality-runner-readable-report-20260702.md`
 ## Controller Protocol
 
 Repo threads must work only inside their assigned repo path and report one of
-`complete`, `blocked`, or `ready-for-review` before stopping. The controller
-records the report in this ledger before starting the next wave.
+`complete` or `blocked` before stopping. The controller records the report in
+this ledger before starting the next wave.
+
+`complete` means the final Quality Runner run status is `clean`. `blocked`
+means the worker attempted full remediation and documented a concrete hard
+blocker, such as missing credentials or env secrets, an unsafe or destructive
+domain decision that requires owner input, dependency or network impossibility,
+a QR scanner limitation that cannot be configured around without disabling the
+relevant signal wholesale, or test/build failures outside touched scope after
+reasonable targeted remediation.
 
 Required thread report fields:
 
@@ -39,11 +47,11 @@ Codex project resolution:
 
 | Wave | Repo | Repo path | Total | Blockers | Baseline artifacts | Codex project status | Thread status | Thread id | Final QR status | Commit | Push | Notes |
 |---:|---|---|---:|---:|---|---|---|---|---|---|---|---|
-| 1 | tenure | `/Users/jakyeamos/projects/tenure` | 45 | 4 | `/Users/jakyeamos/projects/tenure/.quality-runner/runs/parallel-20260702T200935Z-tenure` | parent-project | running | `019f24fa-9946-7983-95be-33d1326f49ac` |  |  |  |  |
-| 1 | BidCamp | `/Users/jakyeamos/projects/BidCamp` | 39 | 2 | `/Users/jakyeamos/projects/BidCamp/.quality-runner/runs/parallel-20260702T200935Z-BidCamp` | exact-project | running | `019f24fa-d0d8-7821-a901-b186a39ecb15` |  |  |  |  |
-| 1 | Vaults | `/Users/jakyeamos/projects/Vaults` | 39 | 5 | `/Users/jakyeamos/projects/Vaults/.quality-runner/runs/parallel-20260702T200935Z-Vaults` | parent-project | running | `019f24fa-fe62-7f60-b832-798ee07f82bd` |  |  |  |  |
-| 1 | AIOS | `/Users/jakyeamos/projects/AIOS` | 34 | 1 | `/Users/jakyeamos/projects/AIOS/.quality-runner/runs/parallel-20260702T200935Z-AIOS` | parent-project | running | `019f24fb-3107-79a0-9af9-2a6de33f22ac` |  |  |  |  |
-| 1 | amos-saas | `/Users/jakyeamos/projects/amos-saas` | 34 | 2 | `/Users/jakyeamos/projects/amos-saas/.quality-runner/runs/parallel-20260702T200935Z-amos-saas` | parent-project | running | `019f24fb-5f5d-7f91-bfb8-43e9f3744be4` |  |  |  |  |
+| 1 | tenure | `/Users/jakyeamos/projects/tenure` | 45 | 4 | `/Users/jakyeamos/projects/tenure/.quality-runner/runs/parallel-20260702T200935Z-tenure` | parent-project | running | `019f24fa-9946-7983-95be-33d1326f49ac` | planned; missing capabilities resolved | `de0ece0` | pushed | Returned to worker under strict terminal rule: continue structural remediation until QR clean or blocked. |
+| 1 | BidCamp | `/Users/jakyeamos/projects/BidCamp` | 39 | 2 | `/Users/jakyeamos/projects/BidCamp/.quality-runner/runs/parallel-20260702T200935Z-BidCamp` | exact-project | running | `019f24fa-d0d8-7821-a901-b186a39ecb15` | planned; missing capabilities resolved | `729223e9` | pushed | Returned to worker under strict terminal rule: continue structural/test remediation until QR clean or blocked. |
+| 1 | Vaults | `/Users/jakyeamos/projects/Vaults` | 39 | 5 | `/Users/jakyeamos/projects/Vaults/.quality-runner/runs/parallel-20260702T200935Z-Vaults` | parent-project | complete | `019f24fa-fe62-7f60-b832-798ee07f82bd` | clean | `2f19af9` | pushed | Clean final QR run `final-20260702T-vaults-qr-clean-4`. |
+| 1 | AIOS | `/Users/jakyeamos/projects/AIOS` | 34 | 1 | `/Users/jakyeamos/projects/AIOS/.quality-runner/runs/parallel-20260702T200935Z-AIOS` | parent-project | running | `019f24fb-3107-79a0-9af9-2a6de33f22ac` | planned; missing capabilities resolved | `b05b74c` | pushed | Returned to worker under strict terminal rule: continue structural remediation until QR clean or blocked. |
+| 1 | amos-saas | `/Users/jakyeamos/projects/amos-saas` | 34 | 2 | `/Users/jakyeamos/projects/amos-saas/.quality-runner/runs/parallel-20260702T200935Z-amos-saas` | parent-project | running | `019f24fb-5f5d-7f91-bfb8-43e9f3744be4` | findings; missing capabilities resolved | `98f99a8` | pushed | Returned to worker under strict terminal rule: continue structural/lint/build remediation until QR clean or blocked. |
 | 2 | Dsci-proj | `/Users/jakyeamos/projects/Dsci-proj` | 30 | 2 | `/Users/jakyeamos/projects/Dsci-proj/.quality-runner/runs/parallel-20260702T200935Z-Dsci-proj` | parent-project | pending |  |  |  |  |  |
 | 2 | Bballedu | `/Users/jakyeamos/projects/Bballedu` | 28 | 1 | `/Users/jakyeamos/projects/Bballedu/.quality-runner/runs/parallel-20260702T200935Z-Bballedu` | parent-project | pending |  |  |  |  |  |
 | 2 | BBDSE | `/Users/jakyeamos/projects/BBDSE` | 27 | 1 | `/Users/jakyeamos/projects/BBDSE/.quality-runner/runs/parallel-20260702T200935Z-BBDSE` | exact-project | pending |  |  |  |  |  |
