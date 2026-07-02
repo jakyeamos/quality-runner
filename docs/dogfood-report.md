@@ -26,8 +26,9 @@ as the planned remediation item.
 
 Date: 2026-07-01
 
-Quality Runner was run against this repo plus four shallow-cloned public repos
-under `/Users/jakyeamos/projects/quality-runner-dogfood-repos`.
+Quality Runner was run against this repo plus four shallow-cloned public repos.
+The run table records the public repo name, commit, status, useful signal, and
+known scanner noise from that snapshot.
 
 | Repo | Category | Commit | Run status | Useful signal | Noise or gap |
 | --- | --- | --- | --- | --- | --- |

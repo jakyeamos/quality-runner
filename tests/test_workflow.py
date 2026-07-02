@@ -171,9 +171,7 @@ def test_resolution_ledger_marks_missing_prior_findings_fixed_and_preserves_acce
         encoding="utf-8",
     )
 
-    accepted_payload = run_payload(
-        repo_root=tmp_path, run_id="ledger-accepted", profile="default"
-    )
+    accepted_payload = run_payload(repo_root=tmp_path, run_id="ledger-accepted", profile="default")
     accepted_ledger = json.loads(
         Path(accepted_payload["artifact_paths"]["resolution_ledger_json"]).read_text()
     )

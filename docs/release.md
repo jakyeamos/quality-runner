@@ -51,6 +51,6 @@ the GitHub workflow.
 ## Homebrew
 
 Use `packaging/homebrew/quality-runner.rb` as the formula template after the
-PyPI source distribution for `0.2.0` is live. Recompute the `sha256` from the
-published source artifact, update the formula URL/version, run the formula
+PyPI source distribution for `0.2.0` is live. Replace the placeholder `sha256`
+with the checksum from the published source artifact, run the formula
 install/audit checks, and commit the formula update after PyPI verification.

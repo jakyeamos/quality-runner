@@ -150,9 +150,7 @@ def test_cli_init_writes_starter_config(tmp_path: Path) -> None:
         "implementation_allowed": False,
     }
     assert config_path.read_text(encoding="utf-8") == (
-        "[quality_runner]\n"
-        'default_profile = "default"\n'
-        'required_capabilities = ["lint", "tests"]\n'
+        '[quality_runner]\ndefault_profile = "default"\nrequired_capabilities = ["lint", "tests"]\n'
     )
 
 

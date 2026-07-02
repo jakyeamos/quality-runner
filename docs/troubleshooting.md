@@ -5,7 +5,7 @@
 Install as a uv tool:
 
 ```bash
-uv tool install git+ssh://git@github.com/jakyeamos/quality-runner.git
+uv tool install git+https://github.com/jakyeamos/quality-runner.git
 ```
 
 Then ensure the uv tool bin directory is on PATH:

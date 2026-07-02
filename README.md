@@ -28,22 +28,22 @@ self-audit improvements, and release-readiness proof.
 
 ## Install
 
-After the first PyPI release:
+From PyPI after the package has been published:
 
 ```bash
 uv tool install quality-runner
 ```
 
-Install from the repository while the package is pre-release:
+Until then, install from the public repository:
 
 ```bash
-uv tool install git+ssh://git@github.com/jakyeamos/quality-runner.git
+uv tool install git+https://github.com/jakyeamos/quality-runner.git
 ```
 
 For local development:
 
 ```bash
-git clone git@github.com:jakyeamos/quality-runner.git
+git clone https://github.com/jakyeamos/quality-runner.git
 cd quality-runner
 uv tool install --editable . --force
 ```

@@ -192,7 +192,7 @@ def _profile_warning(name: str, warnings: list[dict[str, str]]) -> None:
     warnings.append(
         _warning(
             "invalid_quality_runner_config_field",
-            f"quality_runner.profiles.{name} must be a table with extends = \"default\"",
+            f'quality_runner.profiles.{name} must be a table with extends = "default"',
         )
     )
 
