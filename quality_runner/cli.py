@@ -9,6 +9,7 @@ from typing import Any
 
 from quality_runner import __version__
 from quality_runner.config import CONFIG_FILE_NAME, load_repo_config
+from quality_runner.standards import DEFAULT_PROFILE
 from quality_runner.workflow import inspect_payload, run_payload
 
 DOCTOR_RESULT_SCHEMA = "quality-runner-doctor-result-v0.1"
@@ -33,7 +34,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     init_parser = subparsers.add_parser("init", help="Write a starter .quality-runner.toml")
     init_parser.add_argument("repo_path", help="Target repository path")
-    init_parser.add_argument("--profile", default="jakyeamos", help="Default standards profile")
+    init_parser.add_argument("--profile", default=DEFAULT_PROFILE, help="Default standards profile")
     init_parser.add_argument(
         "--required-capability",
         action="append",
@@ -95,7 +96,7 @@ def main(argv: list[str] | None = None) -> int:
 def _add_workflow_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("repo_path", help="Target repository path")
     parser.add_argument("--run-id", default=None, help="Stable run id")
-    parser.add_argument("--profile", default=None, help="Standards profile")
+    parser.add_argument("--profile", default=None, help="Standards profile override")
     parser.add_argument(
         "--ci-status-json",
         default=None,

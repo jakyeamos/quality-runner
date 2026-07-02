@@ -46,7 +46,7 @@ def test_run_payload_writes_audit_plan_and_handoff(tmp_path: Path) -> None:
 
     write_js_fixture(tmp_path)
 
-    payload = run_payload(repo_root=tmp_path, run_id="run-001", profile="jakyeamos")
+    payload = run_payload(repo_root=tmp_path, run_id="run-001", profile="default")
 
     assert payload["schema"] == "quality-runner-run-result-v0.1"
     assert payload["status"] == "planned"
@@ -54,11 +54,14 @@ def test_run_payload_writes_audit_plan_and_handoff(tmp_path: Path) -> None:
     artifact_paths = payload["artifact_paths"]
     assert set(artifact_paths) == {
         "repo_scan_json",
+        "code_quality_scan_json",
         "standards_json",
         "capability_matrix_json",
         "run_manifest_json",
         "quality_audit_json",
         "remediation_plan_json",
+        "resolution_ledger_json",
+        "resolution_ledger_md",
         "agent_handoff_json",
         "agent_handoff_md",
     }
@@ -70,6 +73,9 @@ def test_run_payload_writes_audit_plan_and_handoff(tmp_path: Path) -> None:
     assert Path(artifact_paths["capability_matrix_json"]).exists()
     assert Path(artifact_paths["run_manifest_json"]).exists()
     assert Path(artifact_paths["quality_audit_json"]).exists()
+    assert Path(artifact_paths["code_quality_scan_json"]).exists()
+    assert Path(artifact_paths["resolution_ledger_json"]).exists()
+    assert Path(artifact_paths["resolution_ledger_md"]).exists()
     assert Path(artifact_paths["remediation_plan_json"]).exists()
     assert Path(artifact_paths["agent_handoff_md"]).exists()
     run_dir = Path(artifact_paths["repo_scan_json"]).parent
@@ -81,6 +87,113 @@ def test_run_payload_writes_audit_plan_and_handoff(tmp_path: Path) -> None:
         "remediation-plan.md",
     }
     assert not any((run_dir / name).exists() for name in legacy_names)
+
+
+def test_run_payload_adds_structural_findings_and_groups_remediation_slices(
+    tmp_path: Path,
+) -> None:
+    from quality_runner.workflow import run_payload
+
+    write_complete_js_fixture(tmp_path)
+    source = tmp_path / "src" / "app" / "page.tsx"
+    source.parent.mkdir(parents=True)
+    source.write_text(
+        "\n".join(
+            [
+                "import { trpc } from '@/lib/trpc';",
+                "export default function Page() {",
+                "  const user = trpc.user.me.useQuery();",
+                "  const first: any = user.data;",
+                "  const second: any = user.error;",
+                '  return <main><div className="card"><div className="card">Nested</div></div></main>;',
+                "}",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    payload = run_payload(repo_root=tmp_path, run_id="structural-run", profile="default")
+
+    code_scan = json.loads(Path(payload["artifact_paths"]["code_quality_scan_json"]).read_text())
+    audit_report = json.loads(Path(payload["artifact_paths"]["quality_audit_json"]).read_text())
+    remediation_plan = json.loads(
+        Path(payload["artifact_paths"]["remediation_plan_json"]).read_text()
+    )
+    handoff = json.loads(Path(payload["artifact_paths"]["agent_handoff_json"]).read_text())
+
+    structural_rules = {finding["rule_id"] for finding in code_scan["findings"]}
+    assert {"explicit-any", "nested-card-markup"} <= structural_rules
+    audit_ids = {finding["id"] for finding in audit_report["findings"]}
+    assert any(finding_id.startswith("structural-") for finding_id in audit_ids)
+    explicit_any_slices = [
+        slice_item
+        for slice_item in remediation_plan["slices"]
+        if slice_item["id"] == "remediate-structural-harden-explicit-any"
+    ]
+    assert len(explicit_any_slices) == 1
+    assert len(explicit_any_slices[0]["findings"]) == 1
+    assert "2 findings" in explicit_any_slices[0]["actions"][0]
+    assert handoff["next_slice"]["id"] == remediation_plan["slices"][0]["id"]
+
+
+def test_resolution_ledger_marks_missing_prior_findings_fixed_and_preserves_acceptance(
+    tmp_path: Path,
+) -> None:
+    from quality_runner.workflow import run_payload
+
+    write_complete_js_fixture(tmp_path)
+    source = tmp_path / "src" / "index.ts"
+    source.parent.mkdir(parents=True)
+    source.write_text("const first: any = {};\n", encoding="utf-8")
+
+    first_payload = run_payload(repo_root=tmp_path, run_id="ledger-first", profile="default")
+    first_scan = json.loads(
+        Path(first_payload["artifact_paths"]["code_quality_scan_json"]).read_text()
+    )
+    explicit_any = next(
+        finding for finding in first_scan["findings"] if finding["rule_id"] == "explicit-any"
+    )
+
+    (tmp_path / ".quality-runner.toml").write_text(
+        "\n".join(
+            [
+                "[quality_runner]",
+                "",
+                "[[quality_runner.accepted_dispositions]]",
+                f'fingerprint = "{explicit_any["fingerprint"]}"',
+                'status = "accepted-intentional"',
+                'reason = "Fixture intentionally keeps one type escape hatch."',
+                'owner = "qa"',
+                'expires = "2999-01-01"',
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    accepted_payload = run_payload(
+        repo_root=tmp_path, run_id="ledger-accepted", profile="default"
+    )
+    accepted_ledger = json.loads(
+        Path(accepted_payload["artifact_paths"]["resolution_ledger_json"]).read_text()
+    )
+    accepted_row = next(
+        row
+        for row in accepted_ledger["entries"]
+        if row["fingerprint"] == explicit_any["fingerprint"]
+    )
+    assert accepted_row["status"] == "accepted-intentional"
+    assert accepted_row["reason"] == "Fixture intentionally keeps one type escape hatch."
+
+    source.write_text("const first: unknown = {};\n", encoding="utf-8")
+    fixed_payload = run_payload(repo_root=tmp_path, run_id="ledger-fixed", profile="default")
+    fixed_ledger = json.loads(
+        Path(fixed_payload["artifact_paths"]["resolution_ledger_json"]).read_text()
+    )
+    fixed_row = next(
+        row for row in fixed_ledger["entries"] if row["fingerprint"] == explicit_any["fingerprint"]
+    )
+    assert fixed_row["status"] == "fixed"
 
 
 def test_workflow_ingests_local_ci_status_and_attaches_check_evidence(tmp_path: Path) -> None:
@@ -187,13 +300,13 @@ def test_run_payload_writes_manifest_with_git_head(tmp_path: Path) -> None:
 
     head_sha = _git_commit(tmp_path)
 
-    payload = run_payload(repo_root=tmp_path, run_id="manifest-run", profile="jakyeamos")
+    payload = run_payload(repo_root=tmp_path, run_id="manifest-run", profile="default")
     manifest = json.loads(Path(payload["artifact_paths"]["run_manifest_json"]).read_text())
 
     assert manifest["schema"] == "quality-runner-run-manifest-v0.1"
     assert manifest["mode"] == "run"
     assert manifest["run_id"] == "manifest-run"
-    assert manifest["quality_runner_version"] == "0.1.0"
+    assert manifest["quality_runner_version"] == "0.2.0"
     assert manifest["git"]["head_sha"] == head_sha
     assert manifest["git"]["is_repo"] is True
     assert manifest["git"]["dirty"] is True
@@ -203,7 +316,7 @@ def test_run_payload_writes_manifest_with_git_head(tmp_path: Path) -> None:
 def test_run_payload_records_missing_capability_findings(tmp_path: Path) -> None:
     from quality_runner.workflow import run_payload
 
-    payload = run_payload(repo_root=tmp_path, run_id="empty-run", profile="jakyeamos")
+    payload = run_payload(repo_root=tmp_path, run_id="empty-run", profile="default")
     audit_report = json.loads(Path(payload["artifact_paths"]["quality_audit_json"]).read_text())
 
     finding_ids = {finding["id"] for finding in audit_report["findings"]}
@@ -217,7 +330,7 @@ def test_run_payload_does_not_false_positive_python_quality_gates(tmp_path: Path
 
     write_python_quality_fixture(tmp_path)
 
-    payload = run_payload(repo_root=tmp_path, run_id="python-quality-run", profile="jakyeamos")
+    payload = run_payload(repo_root=tmp_path, run_id="python-quality-run", profile="default")
     audit_report = json.loads(Path(payload["artifact_paths"]["quality_audit_json"]).read_text())
     capability_map = json.loads(
         Path(payload["artifact_paths"]["capability_matrix_json"]).read_text()
@@ -257,7 +370,7 @@ def test_run_payload_python_missing_gate_uses_python_recommendation(tmp_path: Pa
         encoding="utf-8",
     )
 
-    payload = run_payload(repo_root=tmp_path, run_id="python-missing-run", profile="jakyeamos")
+    payload = run_payload(repo_root=tmp_path, run_id="python-missing-run", profile="default")
     audit_report = json.loads(Path(payload["artifact_paths"]["quality_audit_json"]).read_text())
     lint_finding = next(
         finding for finding in audit_report["findings"] if finding["id"] == "missing-lint"
@@ -277,7 +390,7 @@ def test_run_payload_records_package_manager_mismatch_in_audit_and_plan(
     package_json["packageManager"] = "npm@10.0.0"
     package_json_path.write_text(json.dumps(package_json), encoding="utf-8")
 
-    payload = run_payload(repo_root=tmp_path, run_id="mismatch-run", profile="jakyeamos")
+    payload = run_payload(repo_root=tmp_path, run_id="mismatch-run", profile="default")
     audit_report = json.loads(Path(payload["artifact_paths"]["quality_audit_json"]).read_text())
     remediation_plan = json.loads(
         Path(payload["artifact_paths"]["remediation_plan_json"]).read_text()
@@ -307,7 +420,7 @@ def test_run_payload_records_package_manager_mismatch_in_audit_and_plan(
 def test_run_payload_records_missing_formatter_as_blocker(tmp_path: Path) -> None:
     from quality_runner.workflow import run_payload
 
-    payload = run_payload(repo_root=tmp_path, run_id="missing-formatter-run", profile="jakyeamos")
+    payload = run_payload(repo_root=tmp_path, run_id="missing-formatter-run", profile="default")
     audit_report = json.loads(Path(payload["artifact_paths"]["quality_audit_json"]).read_text())
 
     formatter_finding = next(
@@ -319,7 +432,7 @@ def test_run_payload_records_missing_formatter_as_blocker(tmp_path: Path) -> Non
 def test_inspect_payload_does_not_write_audit_plan(tmp_path: Path) -> None:
     from quality_runner.workflow import inspect_payload
 
-    payload = inspect_payload(repo_root=tmp_path, run_id="inspect-001", profile="jakyeamos")
+    payload = inspect_payload(repo_root=tmp_path, run_id="inspect-001", profile="default")
 
     assert payload["schema"] == "quality-runner-inspect-result-v0.1"
     assert Path(payload["artifact_paths"]["repo_scan_json"]).exists()
@@ -334,7 +447,7 @@ def test_inspect_payload_does_not_write_audit_plan(tmp_path: Path) -> None:
 def test_inspect_payload_writes_manifest_without_git_repo(tmp_path: Path) -> None:
     from quality_runner.workflow import inspect_payload
 
-    payload = inspect_payload(repo_root=tmp_path, run_id="inspect-manifest", profile="jakyeamos")
+    payload = inspect_payload(repo_root=tmp_path, run_id="inspect-manifest", profile="default")
     manifest = json.loads(Path(payload["artifact_paths"]["run_manifest_json"]).read_text())
 
     assert manifest["schema"] == "quality-runner-run-manifest-v0.1"
@@ -376,7 +489,7 @@ def test_run_payload_rejects_unsafe_run_ids(tmp_path: Path) -> None:
     from quality_runner.workflow import run_payload
 
     try:
-        run_payload(repo_root=tmp_path, run_id="../escape", profile="jakyeamos")
+        run_payload(repo_root=tmp_path, run_id="../escape", profile="default")
     except ValueError as error:
         assert str(error) == "run_id must be a non-empty single path segment"
     else:
@@ -387,7 +500,7 @@ def test_inspect_payload_rejects_unsafe_run_ids(tmp_path: Path) -> None:
     from quality_runner.workflow import inspect_payload
 
     try:
-        inspect_payload(repo_root=tmp_path, run_id="nested/run", profile="jakyeamos")
+        inspect_payload(repo_root=tmp_path, run_id="nested/run", profile="default")
     except ValueError as error:
         assert str(error) == "run_id must be a non-empty single path segment"
     else:
@@ -405,7 +518,7 @@ def test_run_payload_rejects_symlinked_run_dir_without_external_writes(tmp_path:
     (runs_dir / "symlink-run").symlink_to(external, target_is_directory=True)
 
     try:
-        run_payload(repo_root=tmp_path, run_id="symlink-run", profile="jakyeamos")
+        run_payload(repo_root=tmp_path, run_id="symlink-run", profile="default")
     except ValueError as error:
         assert str(error) == "artifact path component must not be a symlink"
     else:
@@ -427,7 +540,7 @@ def test_run_payload_rejects_symlinked_artifact_leaf_without_external_write(
     (run_dir / "agent-handoff.json").symlink_to(external)
 
     try:
-        run_payload(repo_root=tmp_path, run_id="leaf-symlink-run", profile="jakyeamos")
+        run_payload(repo_root=tmp_path, run_id="leaf-symlink-run", profile="default")
     except ValueError as error:
         assert str(error) == "artifact file must not be a symlink"
     else:
@@ -451,7 +564,7 @@ def test_run_payload_writes_handoff_warnings(tmp_path: Path) -> None:
 
     (tmp_path / "package.json").write_text("{not-json", encoding="utf-8")
 
-    payload = run_payload(repo_root=tmp_path, run_id="warning-run", profile="jakyeamos")
+    payload = run_payload(repo_root=tmp_path, run_id="warning-run", profile="default")
     handoff = json.loads(Path(payload["artifact_paths"]["agent_handoff_json"]).read_text())
 
     assert {
@@ -467,7 +580,7 @@ def test_run_payload_handoff_contains_next_slice_and_verification_gates(tmp_path
 
     write_js_fixture(tmp_path)
 
-    payload = run_payload(repo_root=tmp_path, run_id="handoff-context-run", profile="jakyeamos")
+    payload = run_payload(repo_root=tmp_path, run_id="handoff-context-run", profile="default")
     handoff = json.loads(Path(payload["artifact_paths"]["agent_handoff_json"]).read_text())
 
     assert validate_agent_handoff(handoff) == {"passed": True, "errors": []}
@@ -516,7 +629,7 @@ def test_run_payload_rejects_invalid_handoff_before_writing_artifacts(
     monkeypatch.setattr(workflow, "build_agent_handoff", invalid_handoff)
 
     try:
-        workflow.run_payload(repo_root=tmp_path, run_id="invalid-handoff-run", profile="jakyeamos")
+        workflow.run_payload(repo_root=tmp_path, run_id="invalid-handoff-run", profile="default")
     except ValueError as error:
         assert str(error) == (
             "invalid agent handoff: agent handoff artifact_paths must be an object; "
@@ -542,7 +655,7 @@ def test_run_payload_reports_clean_when_no_remediation_slices(tmp_path: Path) ->
 
     write_complete_js_fixture(tmp_path)
 
-    payload = run_payload(repo_root=tmp_path, run_id="clean-run", profile="jakyeamos")
+    payload = run_payload(repo_root=tmp_path, run_id="clean-run", profile="default")
     remediation_plan = json.loads(
         Path(payload["artifact_paths"]["remediation_plan_json"]).read_text()
     )
@@ -561,7 +674,7 @@ def test_generated_remediation_plan_orders_findings_and_exposes_actions(tmp_path
     from quality_runner.standards import compile_standards
 
     scan = inspect_repo(tmp_path, run_id="ordered-plan-001")
-    packet = compile_standards(repo_root=tmp_path, scan=scan, profile="jakyeamos")
+    packet = compile_standards(repo_root=tmp_path, scan=scan, profile="default")
     capability_map = detect_capabilities(scan=scan, standards_packet=packet)
     report = build_audit_report(scan=scan, standards_packet=packet, capability_map=capability_map)
 
@@ -604,7 +717,7 @@ def test_generated_audit_report_validates(tmp_path: Path) -> None:
     from quality_runner.standards import compile_standards
 
     scan = inspect_repo(tmp_path, run_id="audit-valid-001")
-    packet = compile_standards(repo_root=tmp_path, scan=scan, profile="jakyeamos")
+    packet = compile_standards(repo_root=tmp_path, scan=scan, profile="default")
     capability_map = detect_capabilities(scan=scan, standards_packet=packet)
 
     report = build_audit_report(scan=scan, standards_packet=packet, capability_map=capability_map)
@@ -732,7 +845,7 @@ def test_generated_remediation_plan_validates(tmp_path: Path) -> None:
     from quality_runner.standards import compile_standards
 
     scan = inspect_repo(tmp_path, run_id="plan-valid-001")
-    packet = compile_standards(repo_root=tmp_path, scan=scan, profile="jakyeamos")
+    packet = compile_standards(repo_root=tmp_path, scan=scan, profile="default")
     capability_map = detect_capabilities(scan=scan, standards_packet=packet)
     report = build_audit_report(scan=scan, standards_packet=packet, capability_map=capability_map)
 
@@ -747,7 +860,7 @@ def test_run_payload_only_writes_quality_runner_artifacts(tmp_path: Path) -> Non
     write_js_fixture(tmp_path)
     before = {path.relative_to(tmp_path) for path in tmp_path.rglob("*")}
 
-    run_payload(repo_root=tmp_path, run_id="write-boundary-001", profile="jakyeamos")
+    run_payload(repo_root=tmp_path, run_id="write-boundary-001", profile="default")
 
     after = {path.relative_to(tmp_path) for path in tmp_path.rglob("*")}
     created = after - before

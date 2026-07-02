@@ -9,6 +9,11 @@ from quality_runner.artifacts import prepare_artifact_dir, write_json, write_tex
 from quality_runner.audit import build_audit_report
 from quality_runner.capabilities import detect_capabilities
 from quality_runner.ci_status import load_ci_status
+from quality_runner.code_quality import (
+    build_resolution_ledger,
+    create_code_quality_scan,
+    render_resolution_ledger_markdown,
+)
 from quality_runner.config import load_repo_config
 from quality_runner.discovery import inspect_repo
 from quality_runner.findings import (
@@ -22,7 +27,7 @@ from quality_runner.planning import (
     build_remediation_plan,
     render_handoff_markdown,
 )
-from quality_runner.standards import compile_standards
+from quality_runner.standards import DEFAULT_PROFILE, compile_standards
 
 
 def generated_run_id(now: datetime | None = None, suffix: str | None = None) -> str:
@@ -39,12 +44,16 @@ def inspect_payload(
 ) -> dict[str, Any]:
     resolved_run_id = generated_run_id() if run_id is None else run_id
     run_dir = prepare_artifact_dir(repo_root, resolved_run_id)
-    scan, standards_packet, capability_map = _inspect(
+    scan, standards_packet, capability_map, config = _inspect(
         repo_root, resolved_run_id, profile, ci_status_json
     )
+    code_quality_scan = create_code_quality_scan(repo_root, scan=scan, config=config)
 
     artifact_paths = {
         "repo_scan_json": str(write_json(run_dir / "repo-scan.json", scan)),
+        "code_quality_scan_json": str(
+            write_json(run_dir / "code-quality-scan.json", code_quality_scan)
+        ),
         "standards_json": str(write_json(run_dir / "standards.json", standards_packet)),
         "capability_matrix_json": str(
             write_json(run_dir / "capability-matrix.json", capability_map)
@@ -79,14 +88,22 @@ def run_payload(
 ) -> dict[str, Any]:
     resolved_run_id = generated_run_id() if run_id is None else run_id
     run_dir = prepare_artifact_dir(repo_root, resolved_run_id)
-    scan, standards_packet, capability_map = _inspect(
+    scan, standards_packet, capability_map, config = _inspect(
         repo_root, resolved_run_id, profile, ci_status_json
+    )
+    code_quality_scan = create_code_quality_scan(repo_root, scan=scan, config=config)
+    resolution_ledger = build_resolution_ledger(
+        repo_root=repo_root,
+        run_id=resolved_run_id,
+        code_quality_scan=code_quality_scan,
+        config=config,
     )
 
     audit_report = build_audit_report(
         scan=scan,
         standards_packet=standards_packet,
         capability_map=capability_map,
+        code_quality_scan=code_quality_scan,
     )
     _require_valid("audit report", validate_audit_report(audit_report))
 
@@ -99,11 +116,14 @@ def run_payload(
 
     artifact_paths = {
         "repo_scan_json": str(run_dir / "repo-scan.json"),
+        "code_quality_scan_json": str(run_dir / "code-quality-scan.json"),
         "standards_json": str(run_dir / "standards.json"),
         "capability_matrix_json": str(run_dir / "capability-matrix.json"),
         "run_manifest_json": str(run_dir / "run-manifest.json"),
         "quality_audit_json": str(run_dir / "quality-audit.json"),
         "remediation_plan_json": str(run_dir / "remediation-plan.json"),
+        "resolution_ledger_json": str(run_dir / "resolution-ledger.json"),
+        "resolution_ledger_md": str(run_dir / "resolution-ledger.md"),
         "agent_handoff_json": str(run_dir / "agent-handoff.json"),
         "agent_handoff_md": str(run_dir / "agent-handoff.md"),
     }
@@ -115,6 +135,9 @@ def run_payload(
     _require_valid("agent handoff", validate_agent_handoff(handoff))
 
     artifact_paths["repo_scan_json"] = str(write_json(run_dir / "repo-scan.json", scan))
+    artifact_paths["code_quality_scan_json"] = str(
+        write_json(run_dir / "code-quality-scan.json", code_quality_scan)
+    )
     artifact_paths["standards_json"] = str(write_json(run_dir / "standards.json", standards_packet))
     artifact_paths["capability_matrix_json"] = str(
         write_json(run_dir / "capability-matrix.json", capability_map)
@@ -134,6 +157,15 @@ def run_payload(
     artifact_paths["remediation_plan_json"] = str(
         write_json(run_dir / "remediation-plan.json", remediation_plan)
     )
+    artifact_paths["resolution_ledger_json"] = str(
+        write_json(run_dir / "resolution-ledger.json", resolution_ledger)
+    )
+    artifact_paths["resolution_ledger_md"] = str(
+        write_text(
+            run_dir / "resolution-ledger.md",
+            render_resolution_ledger_markdown(resolution_ledger),
+        )
+    )
     artifact_paths["agent_handoff_json"] = str(write_json(run_dir / "agent-handoff.json", handoff))
     artifact_paths["agent_handoff_md"] = str(
         write_text(run_dir / "agent-handoff.md", render_handoff_markdown(handoff))
@@ -151,7 +183,7 @@ def run_payload(
 
 def _inspect(
     repo_root: Path, run_id: str, profile: str | None, ci_status_json: Path | None
-) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
+) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any], dict[str, Any]]:
     ci_checks, ci_warnings = load_ci_status(repo_root, ci_status_json)
     config = load_repo_config(repo_root)
     scan = inspect_repo(
@@ -161,12 +193,12 @@ def _inspect(
         extra_warnings=ci_warnings,
         config=config,
     )
-    resolved_profile = profile or _string_or_default(config.get("default_profile"), "jakyeamos")
+    resolved_profile = profile or _string_or_default(config.get("default_profile"), DEFAULT_PROFILE)
     standards_packet = compile_standards(
         repo_root=repo_root, scan=scan, profile=resolved_profile, config=config
     )
     capability_map = detect_capabilities(scan=scan, standards_packet=standards_packet)
-    return scan, standards_packet, capability_map
+    return scan, standards_packet, capability_map, config
 
 
 def _require_valid(name: str, result: dict[str, Any]) -> None:

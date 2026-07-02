@@ -36,6 +36,8 @@ def test_cli_run_json_writes_artifacts(tmp_path: Path) -> None:
     assert payload["run_id"] == "cli-run"
     assert payload["implementation_allowed"] is False
     assert Path(payload["artifact_paths"]["agent_handoff_md"]).exists()
+    standards = json.loads(Path(payload["artifact_paths"]["standards_json"]).read_text())
+    assert standards["profile"] == "default"
 
 
 def test_cli_inspect_json_writes_inspection_artifacts(tmp_path: Path) -> None:
@@ -114,7 +116,7 @@ def test_cli_doctor_json_reports_ready() -> None:
     payload = json.loads(result.stdout)
     assert payload["schema"] == "quality-runner-doctor-result-v0.1"
     assert payload["status"] == "ready"
-    assert payload["version"] == "0.1.0"
+    assert payload["version"] == "0.2.0"
     assert payload["environment"]["python_executable"]
 
 
@@ -149,7 +151,7 @@ def test_cli_init_writes_starter_config(tmp_path: Path) -> None:
     }
     assert config_path.read_text(encoding="utf-8") == (
         "[quality_runner]\n"
-        'default_profile = "jakyeamos"\n'
+        'default_profile = "default"\n'
         'required_capabilities = ["lint", "tests"]\n'
     )
 
@@ -173,7 +175,7 @@ def test_cli_init_refuses_existing_config_without_force(tmp_path: Path) -> None:
 def test_cli_status_json_reports_config_and_latest_run(tmp_path: Path) -> None:
     write_js_fixture(tmp_path)
     (tmp_path / ".quality-runner.toml").write_text(
-        '[quality_runner]\ndefault_profile = "jakyeamos"\n',
+        '[quality_runner]\ndefault_profile = "default"\n',
         encoding="utf-8",
     )
     subprocess.run(
@@ -341,10 +343,10 @@ def test_cli_main_reports_human_summaries_in_process(tmp_path: Path, capsys) -> 
     from quality_runner.cli import main
 
     assert main([]) == 0
-    assert "Quality Runner 0.1.0" in capsys.readouterr().out
+    assert "Quality Runner 0.2.0" in capsys.readouterr().out
 
     assert main(["doctor"]) == 0
-    assert capsys.readouterr().out.strip() == "Quality Runner 0.1.0: ready"
+    assert capsys.readouterr().out.strip() == "Quality Runner 0.2.0: ready"
 
     write_js_fixture(tmp_path)
     assert main(["inspect", str(tmp_path), "--run-id", "human-inspect"]) == 0
@@ -427,4 +429,4 @@ def test_cli_version_preserves_bare_version_output() -> None:
         text=True,
     )
 
-    assert result.stdout.strip() == "0.1.0"
+    assert result.stdout.strip() == "0.2.0"

@@ -7,6 +7,7 @@
   "properties": {
     "schema": { "const": "quality-runner-standards-packet-v0.1" },
     "profile": { "type": "string", "minLength": 1 },
+    "profile_config": { "type": "object" },
     "repo_root": { "type": "string", "minLength": 1 },
     "sources": {
       "type": "array",

@@ -10,10 +10,12 @@ def build_audit_report(
     scan: dict[str, Any],
     standards_packet: dict[str, Any],
     capability_map: dict[str, Any],
+    code_quality_scan: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     findings = [
         *_missing_capability_findings(capability_map, standards_packet),
         *_standards_requirement_findings(standards_packet, scan),
+        *_code_quality_findings(code_quality_scan),
         *_warning_findings(capability_map),
     ]
 
@@ -176,6 +178,66 @@ def _standards_requirement_findings(
                 }
             )
     return findings
+
+
+def _code_quality_findings(code_quality_scan: dict[str, Any] | None) -> list[dict[str, Any]]:
+    if not isinstance(code_quality_scan, dict):
+        return []
+    findings = code_quality_scan.get("findings")
+    if not isinstance(findings, list):
+        return []
+
+    groups: dict[tuple[str, str], list[dict[str, Any]]] = {}
+    for finding in findings:
+        if not isinstance(finding, dict):
+            continue
+        category = finding.get("category")
+        rule_id = finding.get("rule_id")
+        if isinstance(category, str) and category and isinstance(rule_id, str) and rule_id:
+            groups.setdefault((category, rule_id), []).append(finding)
+
+    audit_findings: list[dict[str, Any]] = []
+    for (category, rule_id), group in sorted(groups.items()):
+        representative = group[0]
+        expected = _string_or_default(representative.get("expected_improvement"), "Review finding.")
+        count = len(group)
+        audit_findings.append(
+            {
+                "id": f"structural-{category}-{rule_id}",
+                "severity": _structural_severity(group),
+                "category": f"structural:{category}",
+                "summary": f"{count} {rule_id} structural finding{'s' if count != 1 else ''}.",
+                "evidence": _structural_evidence(group),
+                "recommended_fix": f"{count} findings: {expected}",
+                "verification": sorted(
+                    {
+                        item
+                        for finding in group
+                        if isinstance((item := finding.get("verification")), str) and item
+                    }
+                )
+                or ["Rerun quality-runner and confirm the structural finding clears."],
+                "owner": None,
+            }
+        )
+    return audit_findings
+
+
+def _structural_severity(group: list[dict[str, Any]]) -> str:
+    return "warning" if any(item.get("severity") == "warning" for item in group) else "observation"
+
+
+def _structural_evidence(group: list[dict[str, Any]]) -> list[str]:
+    evidence = []
+    for finding in group[:5]:
+        file = _string_or_default(finding.get("file"), "unknown")
+        line = finding.get("line")
+        line_text = str(line) if isinstance(line, int) else "?"
+        rule = _string_or_default(finding.get("rule_id"), "structural")
+        evidence.append(f"{file}:{line_text}: {rule}")
+    if len(group) > 5:
+        evidence.append(f"{len(group) - 5} additional findings omitted from summary.")
+    return evidence
 
 
 def _warnings(payload: dict[str, Any]) -> list[dict[str, str]]:

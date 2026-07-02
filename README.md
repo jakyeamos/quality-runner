@@ -61,7 +61,7 @@ quality-runner doctor --json
 Run a full audit-and-plan pass against a repository:
 
 ```bash
-quality-runner run /path/to/repo --profile jakyeamos --run-id baseline-001 --json
+quality-runner run /path/to/repo --run-id baseline-001 --json
 ```
 
 Quality Runner writes artifacts under the target repo:
@@ -69,11 +69,14 @@ Quality Runner writes artifacts under the target repo:
 ```text
 /path/to/repo/.quality-runner/runs/baseline-001/
   repo-scan.json
+  code-quality-scan.json
   standards.json
   capability-matrix.json
   run-manifest.json
   quality-audit.json
   remediation-plan.json
+  resolution-ledger.json
+  resolution-ledger.md
   agent-handoff.json
   agent-handoff.md
 ```
@@ -82,9 +85,10 @@ The normal workflow is:
 
 1. Read `agent-handoff.md`.
 2. Review `quality-audit.json` for evidence-backed findings.
-3. Review `remediation-plan.json` for ordered actions and verification gates.
-4. Give an approved remediation slice to a coding agent.
-5. Rerun Quality Runner to confirm findings clear.
+3. Review `code-quality-scan.json` for structural warnings and line evidence.
+4. Review `remediation-plan.json` for ordered actions and verification gates.
+5. Give an approved remediation slice to a coding agent.
+6. Rerun Quality Runner to confirm findings clear and update the resolution ledger.
 
 ## Commands
 
@@ -92,8 +96,8 @@ The normal workflow is:
 quality-runner doctor
 quality-runner init /path/to/repo --json
 quality-runner status /path/to/repo --json
-quality-runner inspect /path/to/repo --profile jakyeamos --json
-quality-runner run /path/to/repo --profile jakyeamos --json
+quality-runner inspect /path/to/repo --json
+quality-runner run /path/to/repo --json
 quality-runner export-handoff /path/to/repo
 quality-runner-mcp
 ```
@@ -120,9 +124,32 @@ field-level guarantees.
 
 ## Standards Profiles
 
-The initial profile is `jakyeamos`. See
-[Standards Profiles](docs/standards-profiles.md) for the current behavior and
-the planned profile-extension boundary.
+The built-in profile is `default`. Repos can also save custom profiles in
+`.quality-runner.toml`:
+
+```bash
+quality-runner init /path/to/repo --json
+```
+
+```toml
+[quality_runner]
+default_profile = "team"
+
+[quality_runner.profiles.team]
+extends = "default"
+required_capabilities = ["lint", "typecheck", "tests", "dead_code"]
+allowed_package_managers = ["pnpm", "bun"]
+```
+
+After saving the config, the custom profile is selected automatically by
+`default_profile`, or explicitly with:
+
+```bash
+quality-runner run /path/to/repo --profile team --json
+```
+
+See [Standards Profiles](docs/standards-profiles.md) for the full profile and
+repo-policy reference.
 
 ## Scan Exclusions
 

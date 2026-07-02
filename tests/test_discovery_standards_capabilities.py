@@ -78,7 +78,7 @@ def test_compile_standards_does_not_warn_for_unknown_package_manager(tmp_path: P
     )
 
     scan = inspect_repo(tmp_path, run_id="unknown-package-manager-001")
-    packet = compile_standards(repo_root=tmp_path, scan=scan, profile="jakyeamos")
+    packet = compile_standards(repo_root=tmp_path, scan=scan, profile="default")
 
     assert scan["package_manager"] is None
     requirement_ids = {requirement["id"] for requirement in packet["requirements"]}
@@ -105,7 +105,7 @@ def test_compile_standards_respects_configured_package_manager_policy(tmp_path: 
     )
 
     scan = inspect_repo(tmp_path, run_id="bun-policy-001")
-    packet = compile_standards(repo_root=tmp_path, scan=scan, profile="jakyeamos")
+    packet = compile_standards(repo_root=tmp_path, scan=scan, profile="default")
 
     assert scan["package_manager"] == "bun"
     requirement_ids = {requirement["id"] for requirement in packet["requirements"]}
@@ -631,7 +631,7 @@ def test_package_json_warnings_propagate_to_standards_and_capabilities(tmp_path:
     (tmp_path / "package.json").write_text("{not-json", encoding="utf-8")
 
     scan = inspect_repo(tmp_path, run_id="invalid-package-002")
-    packet = compile_standards(repo_root=tmp_path, scan=scan, profile="jakyeamos")
+    packet = compile_standards(repo_root=tmp_path, scan=scan, profile="default")
     capability_map = detect_capabilities(scan=scan, standards_packet=packet)
 
     expected_warning = {
@@ -693,10 +693,10 @@ def test_compile_standards_preserves_profile_and_local_provenance(tmp_path: Path
     write_js_fixture(tmp_path)
     scan = inspect_repo(tmp_path, run_id="scan-001")
 
-    packet = compile_standards(repo_root=tmp_path, scan=scan, profile="jakyeamos")
+    packet = compile_standards(repo_root=tmp_path, scan=scan, profile="default")
 
     assert packet["schema"] == "quality-runner-standards-packet-v0.1"
-    assert packet["profile"] == "jakyeamos"
+    assert packet["profile"] == "default"
     sources = {source["path"] for source in packet["sources"]}
     assert "AGENTS.md" in sources
     requirement_ids = {requirement["id"] for requirement in packet["requirements"]}
@@ -724,7 +724,7 @@ def test_compile_standards_handles_malformed_package_manager() -> None:
     packet = compile_standards(
         repo_root=Path("/tmp"),
         scan={"package_manager": []},
-        profile="jakyeamos",
+        profile="default",
     )
 
     assert {
@@ -741,7 +741,7 @@ def test_detect_capabilities_includes_standards_warnings() -> None:
     from quality_runner.standards import compile_standards
 
     scan = {"package_manager": []}
-    packet = compile_standards(repo_root=Path("/tmp"), scan=scan, profile="jakyeamos")
+    packet = compile_standards(repo_root=Path("/tmp"), scan=scan, profile="default")
 
     capability_map = detect_capabilities(scan=scan, standards_packet=packet)
 
@@ -758,7 +758,7 @@ def test_detect_capabilities_records_missing_expected_surfaces(tmp_path: Path) -
     from quality_runner.standards import compile_standards
 
     scan = inspect_repo(tmp_path, run_id="empty-001")
-    packet = compile_standards(repo_root=tmp_path, scan=scan, profile="jakyeamos")
+    packet = compile_standards(repo_root=tmp_path, scan=scan, profile="default")
 
     capability_map = detect_capabilities(scan=scan, standards_packet=packet)
 
@@ -776,7 +776,7 @@ def test_detect_capabilities_accepts_python_quality_commands(tmp_path: Path) -> 
 
     write_python_quality_fixture(tmp_path)
     scan = inspect_repo(tmp_path, run_id="python-capabilities-001")
-    packet = compile_standards(repo_root=tmp_path, scan=scan, profile="jakyeamos")
+    packet = compile_standards(repo_root=tmp_path, scan=scan, profile="default")
 
     capability_map = detect_capabilities(scan=scan, standards_packet=packet)
 
@@ -813,7 +813,7 @@ def test_detect_capabilities_records_pre_cr_script_with_stable_id(tmp_path: Path
         encoding="utf-8",
     )
     scan = inspect_repo(tmp_path, run_id="pre-cr-script-001")
-    packet = compile_standards(repo_root=tmp_path, scan=scan, profile="jakyeamos")
+    packet = compile_standards(repo_root=tmp_path, scan=scan, profile="default")
 
     capability_map = detect_capabilities(scan=scan, standards_packet=packet)
 
@@ -835,7 +835,7 @@ def test_detect_capabilities_records_pre_cr_config_with_stable_id(tmp_path: Path
     )
     (tmp_path / ".pre-cr.json").write_text("{}", encoding="utf-8")
     scan = inspect_repo(tmp_path, run_id="pre-cr-config-001")
-    packet = compile_standards(repo_root=tmp_path, scan=scan, profile="jakyeamos")
+    packet = compile_standards(repo_root=tmp_path, scan=scan, profile="default")
 
     capability_map = detect_capabilities(scan=scan, standards_packet=packet)
 
@@ -850,7 +850,7 @@ def test_detect_capabilities_treats_malformed_scripts_as_missing() -> None:
 
     capability_map = detect_capabilities(
         scan={"schema": "quality-runner-repo-scan-v0.1", "scripts": "not-a-dict"},
-        standards_packet={"profile": "jakyeamos"},
+        standards_packet={"profile": "default"},
     )
 
     missing_ids = {item["id"] for item in capability_map["missing"]}
@@ -874,7 +874,7 @@ def test_detect_capabilities_ignores_malformed_quality_commands_and_requires_tru
         "invalid",
         {"id": "lint", "command": "ruff check .", "source": "pyproject.toml:tool.ruff"},
     ]
-    packet = compile_standards(repo_root=tmp_path, scan=scan, profile="jakyeamos")
+    packet = compile_standards(repo_root=tmp_path, scan=scan, profile="default")
 
     capability_map = detect_capabilities(scan=scan, standards_packet=packet)
 

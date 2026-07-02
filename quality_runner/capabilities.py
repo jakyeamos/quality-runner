@@ -277,6 +277,19 @@ def _required_capabilities(scan: dict[str, Any], standards_packet: dict[str, Any
                 and (capability in SCRIPT_CAPABILITIES or capability in FILE_CAPABILITIES)
             }
 
+    profile_config = standards_packet.get("profile_config")
+    if isinstance(profile_config, dict):
+        required_capabilities = profile_config.get("required_capabilities")
+        if profile_config.get("required_capabilities_configured") is True and isinstance(
+            required_capabilities, list
+        ):
+            return {
+                capability
+                for capability in required_capabilities
+                if isinstance(capability, str)
+                and (capability in SCRIPT_CAPABILITIES or capability in FILE_CAPABILITIES)
+            }
+
     required = {*SCRIPT_CAPABILITIES, "pre_cr"}
     if isinstance(config, dict):
         gates = config.get("gates")
@@ -298,13 +311,27 @@ def _required_by(standards_packet: dict[str, Any]) -> dict[str, str]:
     if not isinstance(config, dict):
         return {}
     required_capabilities = config.get("required_capabilities")
-    if config.get("required_capabilities_configured") is not True or not isinstance(
+    if config.get("required_capabilities_configured") is True and isinstance(
         required_capabilities, list
+    ):
+        return {
+            capability: "config"
+            for capability in required_capabilities
+            if isinstance(capability, str)
+            and (capability in SCRIPT_CAPABILITIES or capability in FILE_CAPABILITIES)
+        }
+
+    profile_config = standards_packet.get("profile_config")
+    if not isinstance(profile_config, dict):
+        return {}
+    profile_capabilities = profile_config.get("required_capabilities")
+    if profile_config.get("required_capabilities_configured") is not True or not isinstance(
+        profile_capabilities, list
     ):
         return {}
     return {
-        capability: "config"
-        for capability in required_capabilities
+        capability: "profile"
+        for capability in profile_capabilities
         if isinstance(capability, str)
         and (capability in SCRIPT_CAPABILITIES or capability in FILE_CAPABILITIES)
     }

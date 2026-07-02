@@ -6,24 +6,27 @@ from typing import Any
 from quality_runner.config import load_repo_config
 from quality_runner.schema_constants import STANDARDS_PACKET_SCHEMA
 
-SUPPORTED_PROFILES = {"jakyeamos"}
+DEFAULT_PROFILE = "default"
+SUPPORTED_PROFILES = {DEFAULT_PROFILE}
 
 
 # fmt: off
 def compile_standards(repo_root: Path, scan: dict[str, Any], profile: str, config: dict[str, Any] | None = None) -> dict[str, Any]:
 # fmt: on
-    if profile not in SUPPORTED_PROFILES:
+    resolved_config = load_repo_config(repo_root) if config is None else config
+    profile_config = _profile_config(resolved_config, profile)
+    if profile not in SUPPORTED_PROFILES and profile_config is None:
         raise ValueError(f"unsupported standards profile: {profile}")
 
-    resolved_config = load_repo_config(repo_root) if config is None else config
     warnings = [*_warnings(scan), *_warnings(resolved_config)]
     package_manager = _package_manager(scan, warnings)
 
-    allowed_package_managers = _allowed_package_managers(resolved_config)
+    allowed_package_managers = _allowed_package_managers(resolved_config, profile_config)
 
     return {
         "schema": STANDARDS_PACKET_SCHEMA,
         "profile": profile,
+        "profile_config": profile_config or {},
         "repo_root": str(repo_root.expanduser().resolve()),
         "sources": _sources(scan, profile, resolved_config),
         "config": resolved_config,
@@ -84,17 +87,32 @@ def _requirements(
             {
                 "id": "package_manager_mismatch",
                 "level": "warning",
-                "description": "Detected package manager does not match the jakyeamos pnpm standard.",
+                "description": "Detected package manager does not match the default pnpm standard.",
             }
         )
 
     return requirements
 
 
-def _allowed_package_managers(config: dict[str, Any]) -> set[str]:
+def _profile_config(config: dict[str, Any], profile: str) -> dict[str, Any] | None:
+    profiles = config.get("profiles")
+    if not isinstance(profiles, dict):
+        return None
+    configured = profiles.get(profile)
+    return configured if isinstance(configured, dict) else None
+
+
+def _allowed_package_managers(
+    config: dict[str, Any],
+    profile_config: dict[str, Any] | None,
+) -> set[str]:
     configured = config.get("allowed_package_managers")
     if isinstance(configured, list) and configured:
         return {item for item in configured if isinstance(item, str) and item}
+    if isinstance(profile_config, dict):
+        profile_configured = profile_config.get("allowed_package_managers")
+        if isinstance(profile_configured, list) and profile_configured:
+            return {item for item in profile_configured if isinstance(item, str) and item}
     return {"pnpm"}
 
 

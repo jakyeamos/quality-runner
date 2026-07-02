@@ -1,0 +1,62 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://quality-runner.dev/schemas/code-quality-scan.schema.json",
+  "title": "Quality Runner Code Quality Scan",
+  "type": "object",
+  "required": [
+    "schema",
+    "summary",
+    "accountability",
+    "findings",
+    "duplicate_clusters",
+    "skipped_files"
+  ],
+  "properties": {
+    "schema": { "const": "quality-runner-code-quality-scan-v0.1" },
+    "run_id": { "type": ["string", "null"] },
+    "repo_root": { "type": "string" },
+    "summary": { "type": "object" },
+    "accountability": { "type": "array", "items": { "type": "object" } },
+    "findings": { "type": "array", "items": { "$ref": "#/$defs/finding" } },
+    "duplicate_clusters": { "type": "array", "items": { "type": "object" } },
+    "skipped_files": { "type": "array", "items": { "type": "object" } }
+  },
+  "$defs": {
+    "finding": {
+      "type": "object",
+      "required": [
+        "id",
+        "fingerprint",
+        "category",
+        "severity",
+        "confidence",
+        "score",
+        "file",
+        "line",
+        "rule_id",
+        "evidence",
+        "expected_improvement",
+        "risk",
+        "verification",
+        "remediation_bucket"
+      ],
+      "properties": {
+        "id": { "type": "string" },
+        "fingerprint": { "type": "string", "minLength": 1 },
+        "category": { "type": "string", "minLength": 1 },
+        "severity": { "enum": ["warning", "observation"] },
+        "confidence": { "enum": ["high", "medium", "low"] },
+        "score": { "type": "integer" },
+        "file": { "type": "string", "minLength": 1 },
+        "line": { "type": "integer", "minimum": 1 },
+        "rule_id": { "type": "string", "minLength": 1 },
+        "evidence": { "type": "string" },
+        "expected_improvement": { "type": "string", "minLength": 1 },
+        "risk": { "type": "string", "minLength": 1 },
+        "verification": { "type": "string", "minLength": 1 },
+        "remediation_bucket": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": false
+    }
+  }
+}
