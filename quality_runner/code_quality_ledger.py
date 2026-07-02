@@ -3,8 +3,8 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+from quality_runner.code_quality_findings import _counts
 from quality_runner.code_quality_paths import _string_or_none
-from quality_runner.code_quality_rules import _counts
 from quality_runner.schema_constants import RESOLUTION_LEDGER_SCHEMA
 
 ACCEPTED_STATUSES = {"accepted-intentional", "accepted-false-positive", "blocked-with-prerequisite"}

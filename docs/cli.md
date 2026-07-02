@@ -33,6 +33,7 @@ quality-runner inspect /path/to/repo --ci-status-json ci-status.json --json
 Writes:
 
 - `repo-scan.json`
+- `code-quality-scan.json`
 - `standards.json`
 - `capability-matrix.json`
 
@@ -69,10 +70,13 @@ quality-runner run /path/to/repo --ci-status-json ci-status.json --json
 Writes:
 
 - `repo-scan.json`
+- `code-quality-scan.json`
 - `standards.json`
 - `capability-matrix.json`
 - `quality-audit.json`
 - `remediation-plan.json`
+- `resolution-ledger.json`
+- `resolution-ledger.md`
 - `agent-handoff.json`
 - `agent-handoff.md`
 

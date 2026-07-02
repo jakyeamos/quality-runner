@@ -6,6 +6,12 @@ from pathlib import Path
 from typing import Any
 
 from quality_runner.code_quality_duplicates import _duplicate_clusters, _extract_functions
+from quality_runner.code_quality_findings import (
+    CATEGORY_ORDER,
+    _counts,
+    _finding,
+    _finding_sort_key,
+)
 from quality_runner.code_quality_ledger import (
     build_resolution_ledger,
     render_resolution_ledger_markdown,
@@ -21,13 +27,7 @@ from quality_runner.code_quality_paths import (
     _under_generated_path,
     _verification_for_path,
 )
-from quality_runner.code_quality_rules import (
-    CATEGORY_ORDER,
-    _counts,
-    _finding,
-    _finding_sort_key,
-    _scan_file,
-)
+from quality_runner.code_quality_rules import _scan_file
 from quality_runner.schema_constants import CODE_QUALITY_SCAN_SCHEMA
 
 __all__ = [

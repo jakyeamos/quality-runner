@@ -15,6 +15,7 @@ structured artifacts:
 - what languages and quality commands exist
 - which standards profile applies
 - which gates are available or missing
+- which structural/code-quality warnings are present
 - what evidence supports each audit finding
 - which remediation slice should be handed to an implementation agent next
 
@@ -28,9 +29,12 @@ The backend pipeline is intentionally boring and inspectable:
 2. `standards` compiles the selected profile and local config into a standards
    packet.
 3. `capabilities` maps discovered evidence to required quality gates.
-4. `audit` converts missing or conflicting evidence into normalized findings.
-5. `planning` orders findings into remediation slices and an agent handoff.
-6. `workflow` writes the complete `.quality-runner/runs/<run-id>/` artifact set.
+4. `code_quality` adds deterministic structural scan evidence, duplicate
+   clusters, file accountability, and finding lifecycle data.
+5. `audit` converts missing or conflicting evidence into normalized findings.
+6. `planning` groups capability gaps and structural findings into remediation
+   buckets and an agent handoff.
+7. `workflow` writes the complete `.quality-runner/runs/<run-id>/` artifact set.
 
 This keeps each stage testable without hiding policy decisions inside CLI code.
 
@@ -62,6 +66,11 @@ The release-ready version adds language-aware command evidence:
 The result is a more credible backend platform: findings now reflect actual repo
 evidence rather than assumptions about one ecosystem.
 
+The 0.2.0 release-prep pass adds a second showpiece: Quality Runner now produces
+`code-quality-scan.json`, `resolution-ledger.json`, and `resolution-ledger.md`
+by default, then splits its own scanner internals so a self-audit does not need
+accepted dispositions for large-source-file warnings.
+
 ## Release Evidence
 
 Local verification for the release-ready branch includes:
@@ -74,11 +83,15 @@ Local verification for the release-ready branch includes:
 - `uv run --with pytest pytest -q`
 - `python3.14 scripts/run_pytest_with_lcov.py`
 - `uv build`
+- `pre-cr run --workspace . --json`
 - installed wheel smoke checks for `quality-runner`, `quality-runner doctor`, and
   `quality-runner-mcp`
+- `quality-runner run . --profile jakyeamos --run-id pre-release-self-audit --json`
+  with no capability blockers and no default structural findings
 
-Pre-CR is documented as changed-line readiness. On an unchanged workspace, its
-`no-changes` block is expected behavior rather than a release blocker.
+PyPI and Homebrew publishing remain external release steps: PyPI Trusted
+Publisher must be configured before tagging `v0.2.0`, and the Homebrew formula
+can only be finalized after the real PyPI source distribution and SHA-256 exist.
 
 ## Why It Is Hiring-Manager Ready
 

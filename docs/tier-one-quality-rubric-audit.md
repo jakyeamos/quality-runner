@@ -39,6 +39,13 @@ quality command evidence, corrected truth-file semantics, documented Pre-CR as
 changed-line readiness, and raised executable-line LCOV to 92.4%. A self-audit
 run on 2026-07-01 returned `clean`.
 
+2026-07-02 release-prep update: the 0.2.0 branch adds the structural/code-quality
+scan, resolution ledger, grouped structural remediation, accepted dispositions,
+and scanner module split. The remaining release blocker is external: PyPI
+Trusted Publisher must be configured before tagging `v0.2.0`; the Homebrew
+formula should be updated only after the published PyPI source distribution
+exists.
+
 ## Audit Findings
 
 ### P1: Self-audit misclassifies this Python repo's gates as missing
@@ -132,12 +139,14 @@ still records the PyPI Trusted Publisher setup as a pending external handoff.
 Evidence:
 
 - `uv build` successfully built `dist/quality_runner-0.1.0.tar.gz` and
-  `dist/quality_runner-0.1.0-py3-none-any.whl`.
+  `dist/quality_runner-0.1.0-py3-none-any.whl` during the original Tier 1 pass;
+  the 0.2.0 release prep must rebuild and smoke the 0.2.0 wheel before tagging.
 - A clean venv installed the wheel with `pip install --no-deps`.
 - Installed `quality-runner --version`, `quality-runner doctor --json`, and
   `quality-runner-mcp --version` all passed.
 - `docs/release.md` says the prior `v0.1.0` release run reached publish and
-  failed with `invalid-publisher`.
+  failed with `invalid-publisher`, and now requires PyPI Trusted Publisher
+  verification before tagging `v0.2.0`.
 
 Impact:
 

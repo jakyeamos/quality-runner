@@ -162,3 +162,16 @@ def test_code_quality_scan_ignores_generated_build_large_tests_and_non_frontend(
     assert "large-source-file" in rules
     assert all(finding["file"] != "tests/test_large.py" for finding in result["findings"])
     assert result["summary"]["findings_by_category"]["ui_structural"] == 0
+
+
+def test_quality_runner_source_files_stay_under_default_large_file_threshold() -> None:
+    from quality_runner.code_quality import DEFAULT_LARGE_FILE_LINES
+
+    repo_root = Path(__file__).resolve().parents[1]
+    oversized: dict[str, int] = {}
+    for path in sorted((repo_root / "quality_runner").rglob("*.py")):
+        line_count = len(path.read_text(encoding="utf-8").splitlines())
+        if line_count > DEFAULT_LARGE_FILE_LINES:
+            oversized[path.relative_to(repo_root).as_posix()] = line_count
+
+    assert oversized == {}
