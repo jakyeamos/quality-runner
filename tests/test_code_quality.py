@@ -461,6 +461,46 @@ def test_code_quality_scan_respects_config_and_generated_ignores(tmp_path: Path)
     assert any(item["path"] == "dist" for item in result["skipped_files"])
 
 
+def test_code_quality_scan_applies_configured_scan_exclusions(tmp_path: Path) -> None:
+    from quality_runner.code_quality import create_code_quality_scan
+
+    _write(tmp_path / ".planning" / "remediation.ts", "const planned: any = {};\n")
+    _write(tmp_path / "scripts" / "generated-report.ts", "const report: any = {};\n")
+    _write(tmp_path / "src" / "index.ts", "const value: any = {};\n")
+
+    result = create_code_quality_scan(
+        tmp_path,
+        scan={"run_id": "scan-001"},
+        config={"scan_exclusions": [".planning", "scripts/generated-*"]},
+    )
+
+    scanned_paths = {item["path"] for item in result["accountability"]}
+    skipped = {item["path"]: item["reason"] for item in result["skipped_files"]}
+    finding_files = {finding["file"] for finding in result["findings"]}
+
+    assert scanned_paths == {"src/index.ts"}
+    assert skipped[".planning"] == "scan exclusion"
+    assert skipped["scripts/generated-report.ts"] == "scan exclusion"
+    assert finding_files == {"src/index.ts"}
+
+
+def test_code_quality_scan_include_ignored_paths_overrides_scan_exclusions(
+    tmp_path: Path,
+) -> None:
+    from quality_runner.code_quality import create_code_quality_scan
+
+    _write(tmp_path / "docs" / "example.ts", "const documented: any = {};\n")
+
+    result = create_code_quality_scan(
+        tmp_path,
+        scan={"run_id": "scan-001"},
+        config={"structural_scan": {"include_ignored_paths": ["docs"]}},
+    )
+
+    assert {item["path"] for item in result["accountability"]} == {"docs/example.ts"}
+    assert {finding["file"] for finding in result["findings"]} == {"docs/example.ts"}
+
+
 def test_code_quality_scan_ignores_generated_build_large_tests_and_non_frontend(
     tmp_path: Path,
 ) -> None:

@@ -44,7 +44,11 @@ def is_scan_path_allowed(root: Path, path: Path, scan_exclusions: list[str]) -> 
     if any(part in ALWAYS_EXCLUDED_PATH_PARTS for part in relative.parts):
         return False
     relative_path = relative.as_posix()
-    return not any(
+    return not matches_scan_exclusion(relative_path, scan_exclusions)
+
+
+def matches_scan_exclusion(relative_path: str, scan_exclusions: list[str]) -> bool:
+    return any(
         _matches_exclusion(relative_path, pattern)
         for pattern in scan_exclusions
         if isinstance(pattern, str)

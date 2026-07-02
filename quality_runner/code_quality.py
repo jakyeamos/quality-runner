@@ -22,6 +22,7 @@ from quality_runner.code_quality_paths import (
     _check_coverage,
     _ignored_directory_reason,
     _is_generated_file,
+    _is_included_or_included_parent,
     _join_relative,
     _split_lines,
     _string_or_none,
@@ -30,6 +31,7 @@ from quality_runner.code_quality_paths import (
 )
 from quality_runner.code_quality_ponytail import ponytail_findings
 from quality_runner.code_quality_rules import _scan_file
+from quality_runner.scan_exclusions import matches_scan_exclusion, resolve_scan_exclusions
 from quality_runner.schema_constants import CODE_QUALITY_SCAN_SCHEMA
 
 __all__ = [
@@ -62,6 +64,7 @@ def create_code_quality_scan(
     policy = _structural_policy(config)
     disabled_groups = set(policy["disabled_rule_groups"])
     include_ignored_paths = set(policy["include_ignored_paths"])
+    scan_exclusions = resolve_scan_exclusions(config)
     generated_paths = _generated_paths(scan)
     skipped_files: list[dict[str, Any]] = []
     findings: list[dict[str, Any]] = []
@@ -69,7 +72,9 @@ def create_code_quality_scan(
     accountability: list[dict[str, Any]] = []
     scanned_files: list[dict[str, Any]] = []
 
-    for path in _discover_text_files(root, skipped_files, generated_paths, include_ignored_paths):
+    for path in _discover_text_files(
+        root, skipped_files, generated_paths, include_ignored_paths, scan_exclusions
+    ):
         relative_path = path.relative_to(root).as_posix()
         text = path.read_text(encoding="utf-8", errors="replace")
         lines = _split_lines(text)
@@ -177,6 +182,7 @@ def _discover_text_files(
     skipped_files: list[dict[str, Any]],
     generated_paths: set[str],
     include_ignored_paths: set[str],
+    scan_exclusions: list[str],
 ) -> list[Path]:
     files: list[Path] = []
     for current_root, dir_names, file_names in os.walk(root):
@@ -189,6 +195,12 @@ def _discover_text_files(
             reason = (
                 "generated directory"
                 if generated
+                else "scan exclusion"
+                if _is_scan_excluded(
+                    relative_name,
+                    scan_exclusions=scan_exclusions,
+                    include_ignored_paths=include_ignored_paths,
+                )
                 else _ignored_directory_reason(
                     relative_name, include_ignored_paths=include_ignored_paths
                 )
@@ -212,6 +224,14 @@ def _discover_text_files(
             if _is_generated_file(relative_path):
                 skipped_files.append({"path": relative_path, "reason": "generated file"})
                 continue
+            if _is_scan_excluded(
+                relative_path,
+                scan_exclusions=scan_exclusions,
+                include_ignored_paths=include_ignored_paths,
+            ):
+                if path.suffix in TEXT_EXTENSIONS or path.name in {"Dockerfile", "Makefile"}:
+                    skipped_files.append({"path": relative_path, "reason": "scan exclusion"})
+                continue
             if path.suffix in TEXT_EXTENSIONS or path.name in {"Dockerfile", "Makefile"}:
                 files.append(path)
     return files
@@ -231,6 +251,7 @@ def preview_ignored_paths(
         skipped_files,
         _generated_paths(scan or {}),
         set(policy["include_ignored_paths"]),
+        resolve_scan_exclusions(config),
     )
     return [
         item
@@ -267,6 +288,19 @@ def _skipped_directory_entry(root: Path, path: Path, reason: str) -> dict[str, A
         ),
     }
 
+
+def _is_scan_excluded(
+    relative_path: str,
+    *,
+    scan_exclusions: list[str],
+    include_ignored_paths: set[str],
+) -> bool:
+    normalized = relative_path.strip("/")
+    return bool(
+        normalized
+        and not _is_included_or_included_parent(normalized, include_ignored_paths)
+        and matches_scan_exclusion(normalized, scan_exclusions)
+    )
 
 def _estimate_text_files(path: Path) -> tuple[int, bool]:
     if not path.is_dir():
