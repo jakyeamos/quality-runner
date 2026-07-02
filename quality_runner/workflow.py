@@ -27,7 +27,7 @@ from quality_runner.planning import (
     build_remediation_plan,
     render_handoff_markdown,
 )
-from quality_runner.standards import compile_standards
+from quality_runner.standards import DEFAULT_PROFILE, compile_standards
 
 
 def generated_run_id(now: datetime | None = None, suffix: str | None = None) -> str:
@@ -192,7 +192,7 @@ def _inspect(
         extra_warnings=ci_warnings,
     )
     config = load_repo_config(repo_root)
-    resolved_profile = profile or _string_or_default(config.get("default_profile"), "jakyeamos")
+    resolved_profile = profile or _string_or_default(config.get("default_profile"), DEFAULT_PROFILE)
     standards_packet = compile_standards(
         repo_root=repo_root, scan=scan, profile=resolved_profile, config=config
     )

@@ -9,6 +9,9 @@ quality-runner-mcp
 The server accepts line-delimited JSON-RPC messages on stdin and writes JSON-RPC
 responses to stdout.
 
+The optional `standards` argument selects a standards profile. It defaults to
+`default`.
+
 ## Tools
 
 ### `quality_runner_doctor`
@@ -26,7 +29,6 @@ Runs the inspect-only workflow.
 ```json
 {
   "repo_root": "/path/to/repo",
-  "standards": "jakyeamos",
   "run_id": "inspect-001",
   "ci_status_json": "/path/to/repo/ci-status.json"
 }
@@ -39,7 +41,6 @@ Runs the full audit-and-plan workflow.
 ```json
 {
   "repo_root": "/path/to/repo",
-  "standards": "jakyeamos",
   "run_id": "baseline-001",
   "ci_status_json": "/path/to/repo/ci-status.json"
 }
@@ -76,7 +77,7 @@ reading.
 ```
 
 ```json
-{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"quality_runner_run","arguments":{"repo_root":"/path/to/repo","standards":"jakyeamos","run_id":"baseline-001"}}}
+{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"quality_runner_run","arguments":{"repo_root":"/path/to/repo","run_id":"baseline-001"}}}
 ```
 
 All successful tool calls return:

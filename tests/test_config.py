@@ -13,7 +13,7 @@ def test_load_repo_config_reads_default_profile_required_capabilities_and_except
         "\n".join(
             [
                 "[quality_runner]",
-                'default_profile = "jakyeamos"',
+                'default_profile = "default"',
                 'required_capabilities = ["lint", "tests"]',
                 "",
                 "[[quality_runner.accepted_exceptions]]",
@@ -32,7 +32,7 @@ def test_load_repo_config_reads_default_profile_required_capabilities_and_except
     assert config == {
         "schema": "quality-runner-config-v0.1",
         "path": ".quality-runner.toml",
-        "default_profile": "jakyeamos",
+        "default_profile": "default",
         "required_capabilities": ["lint", "tests"],
         "required_capabilities_configured": True,
         "allowed_package_managers": [],
@@ -297,7 +297,7 @@ def test_detect_capabilities_applies_required_capabilities_and_active_exceptions
     )
 
     scan = inspect_repo(tmp_path, run_id="config-001")
-    packet = compile_standards(repo_root=tmp_path, scan=scan, profile="jakyeamos")
+    packet = compile_standards(repo_root=tmp_path, scan=scan, profile="default")
     capability_map = detect_capabilities(scan=scan, standards_packet=packet)
 
     assert {item["id"] for item in capability_map["available"]} == {"lint"}
@@ -352,7 +352,7 @@ def test_configured_gates_satisfy_capabilities_and_policy_metadata_reaches_audit
     )
 
     scan = inspect_repo(tmp_path, run_id="policy-gate-001")
-    packet = compile_standards(repo_root=tmp_path, scan=scan, profile="jakyeamos")
+    packet = compile_standards(repo_root=tmp_path, scan=scan, profile="default")
     capability_map = detect_capabilities(scan=scan, standards_packet=packet)
     report = build_audit_report(scan=scan, standards_packet=packet, capability_map=capability_map)
 
@@ -418,7 +418,7 @@ def test_detect_capabilities_handles_file_sources_and_inactive_exceptions(tmp_pa
     )
 
     scan = inspect_repo(tmp_path, run_id="config-002")
-    packet = compile_standards(repo_root=tmp_path, scan=scan, profile="jakyeamos")
+    packet = compile_standards(repo_root=tmp_path, scan=scan, profile="default")
     capability_map = detect_capabilities(scan=scan, standards_packet=packet)
 
     assert capability_map["available"] == [
@@ -460,7 +460,7 @@ def test_detect_capabilities_treats_unknown_required_capabilities_as_noops(tmp_p
     )
 
     scan = inspect_repo(tmp_path, run_id="config-003")
-    packet = compile_standards(repo_root=tmp_path, scan=scan, profile="jakyeamos")
+    packet = compile_standards(repo_root=tmp_path, scan=scan, profile="default")
     capability_map = detect_capabilities(scan=scan, standards_packet=packet)
 
     assert capability_map["available"] == []
@@ -472,7 +472,7 @@ def test_workflow_uses_config_default_profile_when_profile_is_omitted(tmp_path) 
     from quality_runner.workflow import inspect_payload
 
     (tmp_path / ".quality-runner.toml").write_text(
-        '[quality_runner]\ndefault_profile = "jakyeamos"\n',
+        '[quality_runner]\ndefault_profile = "default"\n',
         encoding="utf-8",
     )
 
@@ -482,7 +482,7 @@ def test_workflow_uses_config_default_profile_when_profile_is_omitted(tmp_path) 
     )
 
     assert payload["schema"] == "quality-runner-inspect-result-v0.1"
-    assert standards["profile"] == "jakyeamos"
+    assert standards["profile"] == "default"
     assert {"type": "config", "path": ".quality-runner.toml"} in standards["sources"]
 
 
@@ -490,17 +490,17 @@ def test_workflow_allows_explicit_profile_to_override_config_default(tmp_path) -
     from quality_runner.workflow import run_payload
 
     (tmp_path / ".quality-runner.toml").write_text(
-        '[quality_runner]\ndefault_profile = "jakyeamos"\nrequired_capabilities = []\n',
+        '[quality_runner]\ndefault_profile = "someone-else"\nrequired_capabilities = []\n',
         encoding="utf-8",
     )
 
-    payload = run_payload(repo_root=tmp_path, run_id="config-run", profile="jakyeamos")
+    payload = run_payload(repo_root=tmp_path, run_id="config-run", profile="default")
     standards = json.loads(
         (tmp_path / ".quality-runner" / "runs" / "config-run" / "standards.json").read_text()
     )
 
     assert payload["status"] == "clean"
-    assert standards["profile"] == "jakyeamos"
+    assert standards["profile"] == "default"
 
 
 def test_packaged_schema_files_are_parseable() -> None:

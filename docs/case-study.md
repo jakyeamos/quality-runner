@@ -86,7 +86,7 @@ Local verification for the release-ready branch includes:
 - `pre-cr run --workspace . --json`
 - installed wheel smoke checks for `quality-runner`, `quality-runner doctor`, and
   `quality-runner-mcp`
-- `quality-runner run . --profile jakyeamos --run-id pre-release-self-audit --json`
+- `quality-runner run . --run-id pre-release-self-audit --json`
   with no capability blockers and no default structural findings
 
 PyPI and Homebrew publishing remain external release steps: PyPI Trusted

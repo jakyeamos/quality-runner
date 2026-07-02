@@ -6,7 +6,8 @@ from typing import Any
 from quality_runner.config import load_repo_config
 from quality_runner.schema_constants import STANDARDS_PACKET_SCHEMA
 
-SUPPORTED_PROFILES = {"jakyeamos"}
+DEFAULT_PROFILE = "default"
+SUPPORTED_PROFILES = {DEFAULT_PROFILE}
 
 
 # fmt: off
@@ -84,7 +85,7 @@ def _requirements(
             {
                 "id": "package_manager_mismatch",
                 "level": "warning",
-                "description": "Detected package manager does not match the jakyeamos pnpm standard.",
+                "description": "Detected package manager does not match the default pnpm standard.",
             }
         )
 

@@ -7,7 +7,7 @@ building audit findings.
 
 The current built-in profile is:
 
-- `jakyeamos`
+- `default`
 
 It expects:
 
@@ -22,7 +22,7 @@ Repos can add `.quality-runner.toml` to make local policy explicit:
 
 ```toml
 [quality_runner]
-default_profile = "jakyeamos"
+default_profile = "default"
 required_capabilities = ["lint", "tests", "dead_code"]
 allowed_package_managers = ["pnpm"]
 
@@ -65,3 +65,6 @@ rule groups, tune large-file/router thresholds, or preserve accepted disposition
 by stable finding fingerprint.
 
 Unknown profiles fail closed.
+
+CLI examples omit `--profile` because `default` is selected automatically unless
+a repo config sets a different default.

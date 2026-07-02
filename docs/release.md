@@ -21,7 +21,7 @@ the GitHub OIDC claims.
    - `pre-cr run --workspace . --json`
 2. Run a self-audit and confirm there are no capability blockers and no default
    structural findings:
-   - `quality-runner run . --profile jakyeamos --run-id pre-release-self-audit --json`
+   - `quality-runner run . --run-id pre-release-self-audit --json`
 3. Confirm the PyPI Trusted Publisher settings before tagging.
 4. Merge the verified release branch to `main`.
 5. Push `v0.2.0`.

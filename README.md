@@ -61,7 +61,7 @@ quality-runner doctor --json
 Run a full audit-and-plan pass against a repository:
 
 ```bash
-quality-runner run /path/to/repo --profile jakyeamos --run-id baseline-001 --json
+quality-runner run /path/to/repo --run-id baseline-001 --json
 ```
 
 Quality Runner writes artifacts under the target repo:
@@ -96,8 +96,8 @@ The normal workflow is:
 quality-runner doctor
 quality-runner init /path/to/repo --json
 quality-runner status /path/to/repo --json
-quality-runner inspect /path/to/repo --profile jakyeamos --json
-quality-runner run /path/to/repo --profile jakyeamos --json
+quality-runner inspect /path/to/repo --json
+quality-runner run /path/to/repo --json
 quality-runner export-handoff /path/to/repo
 quality-runner-mcp
 ```
@@ -124,7 +124,7 @@ field-level guarantees.
 
 ## Standards Profiles
 
-The initial profile is `jakyeamos`. See
+The built-in profile is `default`. See
 [Standards Profiles](docs/standards-profiles.md) for the current behavior and
 the planned profile-extension boundary.
 

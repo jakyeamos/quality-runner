@@ -19,5 +19,5 @@ Preferred MCP tools:
 CLI fallback:
 
 ```bash
-quality-runner run /path/to/repo --profile jakyeamos --json
+quality-runner run /path/to/repo --json
 ```

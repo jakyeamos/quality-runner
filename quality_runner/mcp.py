@@ -9,6 +9,7 @@ from typing import Any
 from quality_runner import __version__
 from quality_runner.artifacts import artifact_dir
 from quality_runner.cli import DOCTOR_RESULT_SCHEMA
+from quality_runner.standards import DEFAULT_PROFILE
 from quality_runner.workflow import generated_run_id, inspect_payload, run_payload
 
 MCP_PROTOCOL_VERSION = "2024-11-05"
@@ -90,7 +91,7 @@ def call_tool(name: str, arguments: dict[str, Any] | None = None) -> dict[str, A
     if name == "quality_runner_inspect_repo":
         repo_root = _validated_repo_root(args)
         run_id = _string_arg(args, "run_id") or generated_run_id()
-        profile = _string_arg(args, "standards") or "jakyeamos"
+        profile = _string_arg(args, "standards") or DEFAULT_PROFILE
         ci_status_json = _path_arg(args, "ci_status_json")
         return _tool_result(
             inspect_payload(
@@ -104,7 +105,7 @@ def call_tool(name: str, arguments: dict[str, Any] | None = None) -> dict[str, A
     if name == "quality_runner_run":
         repo_root = _validated_repo_root(args)
         run_id = _string_arg(args, "run_id") or generated_run_id()
-        profile = _string_arg(args, "standards") or "jakyeamos"
+        profile = _string_arg(args, "standards") or DEFAULT_PROFILE
         ci_status_json = _path_arg(args, "ci_status_json")
         return _tool_result(
             run_payload(

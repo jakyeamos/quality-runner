@@ -26,9 +26,12 @@ Inspects repo shape, standards, and quality capability signals without producing
 audit or remediation artifacts.
 
 ```bash
-quality-runner inspect /path/to/repo --profile jakyeamos --run-id inspect-001 --json
+quality-runner inspect /path/to/repo --run-id inspect-001 --json
 quality-runner inspect /path/to/repo --ci-status-json ci-status.json --json
 ```
+
+The standards profile defaults to `default`; use `--profile` only to override
+repo config.
 
 Writes:
 
@@ -63,9 +66,12 @@ quality-runner status /path/to/repo --json
 Runs the full audit-and-plan workflow.
 
 ```bash
-quality-runner run /path/to/repo --profile jakyeamos --run-id baseline-001 --json
+quality-runner run /path/to/repo --run-id baseline-001 --json
 quality-runner run /path/to/repo --ci-status-json ci-status.json --json
 ```
+
+The standards profile defaults to `default`; use `--profile` only to override
+repo config.
 
 Writes:
 

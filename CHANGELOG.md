@@ -17,6 +17,8 @@ All notable changes to Quality Runner are documented here.
   threshold overrides, and accepted dispositions with owner/reason metadata.
 - Completed the scanner module split so Quality Runner's own default structural
   scan no longer reports large-source-file findings for the scanner internals.
+- Renamed the built-in standards profile to `default` and simplified CLI/MCP
+  examples so profile overrides are optional.
 
 ## 0.1.0 - 2026-06-28
 

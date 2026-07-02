@@ -88,7 +88,7 @@ Remediation:
 
 Verification:
 
-- `quality-runner run . --profile jakyeamos --run-id <new-run> --json`
+- `quality-runner run . --run-id <new-run> --json`
 - Confirm the self-audit no longer emits false missing formatter, lint,
   typecheck, tests, build, dead-code, runtime-smoke, or pre-pr findings when the
   gates are discoverable from Python/CI evidence.
@@ -219,7 +219,7 @@ Local checks run on 2026-07-01:
 | `pre-cr run --workspace . --json` | Fail, gateDecision block |
 | `uv build` | Pass after network access for build-system dependency resolution |
 | Installed wheel smoke | Pass |
-| `quality-runner run . --profile jakyeamos --run-id tier-one-self-audit-2026-07-01 --json` | Planned, false-positive capability blockers |
+| `quality-runner run . --run-id tier-one-self-audit-2026-07-01 --json` | Planned, false-positive capability blockers |
 
 ## Ordered Remediation Plan
 

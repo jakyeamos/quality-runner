@@ -34,7 +34,7 @@ def test_mcp_run_returns_structured_content(tmp_path: Path) -> None:
 
     result = call_tool(
         "quality_runner_run",
-        {"repo_root": str(tmp_path), "run_id": "mcp-run", "standards": "jakyeamos"},
+        {"repo_root": str(tmp_path), "run_id": "mcp-run"},
     )
 
     assert result["isError"] is False
@@ -42,6 +42,8 @@ def test_mcp_run_returns_structured_content(tmp_path: Path) -> None:
     assert structured["schema"] == "quality-runner-run-result-v0.1"
     assert structured["implementation_allowed"] is False
     assert Path(structured["artifact_paths"]["agent_handoff_md"]).exists()
+    standards = json.loads(Path(structured["artifact_paths"]["standards_json"]).read_text())
+    assert standards["profile"] == "default"
 
 
 def test_mcp_run_accepts_ci_status_json(tmp_path: Path) -> None:
@@ -53,7 +55,7 @@ def test_mcp_run_accepts_ci_status_json(tmp_path: Path) -> None:
         {
             "repo_root": str(tmp_path),
             "run_id": "mcp-ci-run",
-            "standards": "jakyeamos",
+            "standards": "default",
             "ci_status_json": str(ci_status),
         },
     )
@@ -94,7 +96,7 @@ def test_mcp_jsonrpc_tools_call(tmp_path: Path) -> None:
                 "arguments": {
                     "repo_root": str(tmp_path),
                     "run_id": "mcp-inspect",
-                    "standards": "jakyeamos",
+                    "standards": "default",
                 },
             },
         }
