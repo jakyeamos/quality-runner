@@ -1262,6 +1262,63 @@ package/config mutation safety.
 | BBDSE | `019f2994-4d87-71a1-8d06-d7eaeceeaced` | `refresh16-20260703-BBDSE` | `parallel-20260702T200935Z-BBDSE` | `/private/tmp/qr-refresh16-BBDSE-report.json` | launched |
 | agent-router | `019f2994-9cf0-7d73-a5ce-fcfd883e52f2` | `refresh16-20260703-agent-router` | `parallel-20260702T200935Z-agent-router` | `/private/tmp/qr-refresh16-agent-router-report.json` | launched |
 
+## Refresh Wave 16 Results
+
+Wave 16 is closed. The QR hardening fixes mostly held, but the controller
+contract exposed a separate report-quality gap: four workers wrote useful
+evidence in repo-specific schemas that `quality-runner validate-report` rejected.
+
+Report validation:
+
+- Accepted: `amos-saas`, `BIP-Console`, `R-Project`, `Terrace`
+- Rejected for controller-report schema drift: `EliHealth`, `tmcp`, `BBDSE`,
+  `agent-router`
+
+| Repo | Controller report validation | Final QR result | Hardening/product verdict | Report |
+|---|---|---|---|---|
+| amos-saas | accepted | `blocked`; `environment-or-dependency-blocker`; 27 findings, delta 0 | pass: v0.2 blocked handoff has dependency-setup and read-only-policy blocker/action groups; package preflight stayed diagnostic-only; no tracked package/config mutation | `/private/tmp/qr-refresh16-amos-saas-report.json` |
+| BIP-Console | accepted | `blocked`; `read-only-gate-blocker`; executable leaf gates passed | pass: formatter is classified as read-only policy, while lint/typecheck/runtime/dead-code/tests/build all passed under QR | `/private/tmp/qr-refresh16-BIP-Console-report.json` |
+| R-Project | accepted | `passed`; `clean`; `quality-runner status` ready | pass: clean-control handoff remains `quality-runner-agent-handoff-v0.2`, `gates-clean`, `next_slice=null`, and no Action Groups section | `/private/tmp/qr-refresh16-R-Project-report.json` |
+| EliHealth | rejected | `blocked`; `workflow-timeout-blocker`; verify hit 180s after lint failed and typecheck/runtime/dead-code passed | pass for QR product: stale nested lockfile no longer crashes refresh, no tracked package/config mutation occurred, v0.2 handoff was generated, and timeout diagnostics include scan progress; worker report must be normalized to controller schema | `/private/tmp/qr-refresh16-EliHealth-report.json` |
+| Terrace | accepted | `failed`; `failing-executable-gates`; tests timed out at 93.25s | mixed: failed-gate v0.2 blocker/action groups work, but timed-out command diagnostics still lack stdout/stderr root-cause evidence; worker also observed dirty-work preservation risk in the target repo | `/private/tmp/qr-refresh16-Terrace-report.json` |
+| tmcp | rejected | `passed-with-findings`; `missing-capabilities`; gate verification passed | pass for QR product, fail for controller semantics: worker reported `complete` even though final QR was not clean and no commit/push occurred; report used nested field names instead of required top-level fields | `/private/tmp/qr-refresh16-tmcp-report.json` |
+| BBDSE | rejected | `blocked`; `workflow-timeout-blocker`; inspect hit the 300s total-refresh timeout | pass for QR product after controller artifact inspection: final v0.2 timeout handoff contains `workflow-timeout` blocker/action groups and `workflow-timeout.json` includes scan progress; worker report incorrectly checked the wrong artifact locations and missed controller schema | `/private/tmp/qr-refresh16-BBDSE-report.json` |
+| agent-router | rejected | `blocked`; `read-only-gate-blocker`; `pre_cr` skipped under read-only policy | pass for QR product: `pre-cr run --workspace .` is now classified as unknown mutating risk, skipped without fresh `.aios/audit/*` output, and routed through v0.2 read-only blocker/action groups; worker report must be normalized to controller schema | `/private/tmp/qr-refresh16-agent-router-report.json` |
+
+Product takeaways:
+
+- The Wave 15 fixes held for the core QR contract: stale nested lockfiles no
+  longer crash refresh, read-only package/config mutation was not reproduced,
+  `pre-cr run --workspace .` is no longer executed under read-only policy, and
+  workflow timeouts now finalize evidence instead of disappearing.
+- Timeout finalization is now good enough to be actionable. BBDSE timed out in
+  inspect with 9,669 visited paths, 152 skipped paths, recent path breadcrumbs,
+  a v0.2 handoff, and a grouped next action.
+- The next Tier 1 gap is controller protocol enforcement, not another QR scan
+  primitive: workers can still produce noncanonical reports, mark
+  `passed-with-findings` as `complete`, or misread nested artifacts.
+- Timed-out command diagnostics remain weak. Terrace captured a process snapshot
+  but no stdout/stderr, so the worker still had to recommend direct rerun.
+- Repo-state concurrency is still a stress risk. BBDSE changed HEAD during or
+  around the refresh window, and Terrace had substantial pre-existing dirty work.
+
+Recommended next fixes:
+
+1. Add a `quality-runner controller-report normalize` command that accepts
+   common worker report shapes and emits the strict controller schema.
+2. Add a `quality-runner controller-report lint --strict` mode that fails
+   `complete` unless final QR is clean and commit/push requirements are met.
+3. Update worker prompts to require a final self-check:
+   `quality-runner validate-report <report> --json` must pass before stopping.
+4. Add artifact path helpers or a `summarize-run --controller-report` mode so
+   workers do not hand-query the wrong fields for `blocker_groups` and
+   `action_groups`.
+5. Improve timed-out command capture with bounded stdout/stderr streaming and a
+   clearer `timeout-with-no-output` classification.
+6. Add repo-state guardrails for stress waves: record pre-run HEAD, post-run
+   HEAD, and fail the report validation if target HEAD changes mid-run without
+   an explicit concurrency note.
+
 ## Rollout Ledger
 
 | Wave | Repo | Repo path | Total | Blockers | Baseline artifacts | Codex project status | Thread status | Thread id | Final QR status | Commit | Push | Notes |
