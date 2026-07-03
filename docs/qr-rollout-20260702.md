@@ -1045,6 +1045,38 @@ the clean control.
 | BIP-Console | `019f2944-1be7-7ab1-b695-e502dbd68bdd` | `refresh13-20260703-BIP-Console` | `refresh12-20260703-BIP-Console-verify` | `/private/tmp/qr-refresh13-BIP-Console-report.json` | launched |
 | R-Project | `019f2944-2345-7250-9c7b-3fe35464062b` | `refresh13-20260703-R-Project` | `refresh12-20260703-R-Project-verify` | `/private/tmp/qr-refresh13-R-Project-report.json` | launched |
 
+## Refresh Wave 13 Results
+
+All four Wave 13 controller reports validated with
+`quality-runner validate-report <report> --json` and returned
+`status=accepted`, `errors=[]`.
+
+| Repo | Final QR result | Handoff result | Wave 13 validation verdict | Report |
+|---|---|---|---|---|
+| amos-saas | `blocked`; `environment-or-dependency-blocker`; dependency setup plus read-only formatter blocker | `gates-blocked`; primary `dependency-setup`; groups `dependency-setup: lint, typecheck, runtime_smoke, dead_code, tests, build, pre_cr`, `read-only-policy: formatter` | pass: `next_slice.action_groups` present; one dependency setup action covers all same-context gates; pnpm no-TTY cause and interactive `pnpm install --frozen-lockfile` guidance present | `/private/tmp/qr-refresh13-amos-saas-report.json` |
+| EliHealth | `blocked`; `environment-or-dependency-blocker`; dependency setup, read-only formatter, and command-failed build | `gates-blocked`; primary `dependency-setup`; groups dependency setup, read-only policy, and command failure | pass: mixed blocker grouping held; dependency setup collapsed to one `pnpm approve-builds` action for seven affected gates | `/private/tmp/qr-refresh13-EliHealth-report.json` |
+| BIP-Console | `blocked`; `read-only-gate-blocker`; 10 findings, delta 0 | `gates-blocked`; primary `read-only-policy`; group/action group `read-only-policy: formatter` | pass: read-only formatter mapping held, all executable leaf gates passed, and no dependency setup action was introduced | `/private/tmp/qr-refresh13-BIP-Console-report.json` |
+| R-Project | `passed`; `clean`; 0 findings | `gates-clean`; `next_slice=null`; blocker/action groups absent or empty | pass: clean control stayed clean and `quality-runner status --json` returned `ready` | `/private/tmp/qr-refresh13-R-Project-report.json` |
+
+Product takeaways:
+
+- The Wave 12 polish fix is validated. Controllers can now consume structured
+  `next_slice.action_groups` while older consumers can continue reading the flat
+  `actions` strings.
+- Dependency setup action dedupe works for both pnpm no-TTY install blockers
+  and pnpm ignored-build approval blockers. amos-saas reduced repeated
+  `pnpm install --frozen-lockfile` guidance to one grouped setup action;
+  EliHealth did the same for `pnpm approve-builds`.
+- The pnpm no-TTY path is now specific enough for workers: artifacts explain
+  that pnpm needs to remove/reinstall `node_modules` but cannot prompt in a
+  non-interactive gate run, and recommend one interactive
+  `pnpm install --frozen-lockfile` setup step.
+- Regression controls held. BIP-Console did not pick up a false dependency
+  setup action, and R-Project stayed clean with no next slice.
+- Remaining product polish: Markdown currently renders the flat action strings
+  but does not expose a dedicated "Action Groups" section, so humans still infer
+  grouping from ordering while controllers can read the JSON structure directly.
+
 ## Rollout Ledger
 
 | Wave | Repo | Repo path | Total | Blockers | Baseline artifacts | Codex project status | Thread status | Thread id | Final QR status | Commit | Push | Notes |
