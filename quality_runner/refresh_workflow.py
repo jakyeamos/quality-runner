@@ -13,6 +13,7 @@ from quality_runner.refresh_timeout import (
     timeout_refresh_phase,
     workflow_deadline,
 )
+from quality_runner.scan_exclusions import reset_scan_progress
 
 PayloadCallback = Callable[..., dict[str, Any]]
 
@@ -48,6 +49,7 @@ def run_refresh_payload(
         total_timeout_seconds=total_timeout_seconds,
         total_timeout_reason=total_timeout_reason,
     )
+    reset_scan_progress()
     resolved_verify_timeout = timeout_contract["verify_timeout_seconds"]
     resolved_verify_reason = timeout_contract["verify_timeout_reason"]
     resolved_total_reason = timeout_contract["total_timeout_reason"]

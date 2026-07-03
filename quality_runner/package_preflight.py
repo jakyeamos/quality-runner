@@ -18,7 +18,7 @@ LOCKFILE_MANAGERS = {
 def build_package_manager_preflight(repo_root: Path, scan: dict[str, Any]) -> dict[str, Any]:
     root = repo_root.expanduser().resolve()
     lockfiles = sorted(name for name in LOCKFILE_MANAGERS if (root / name).exists())
-    nested_lockfiles = _nested_lockfiles(root=root, scan=scan)
+    nested_lockfiles, nested_warnings = _nested_lockfiles(root=root, scan=scan)
     declared = _declared_package_manager(root)
     detected = _string_or_none(scan.get("package_manager")) or declared
     warnings = _warnings(
@@ -27,6 +27,7 @@ def build_package_manager_preflight(repo_root: Path, scan: dict[str, Any]) -> di
         lockfiles=lockfiles,
         nested_lockfiles=nested_lockfiles,
     )
+    warnings.extend(nested_warnings)
     return {
         "schema": PACKAGE_MANAGER_PREFLIGHT_SCHEMA,
         "status": "warning" if warnings else "ok",
@@ -92,14 +93,33 @@ def _warnings(
     return warnings
 
 
-def _nested_lockfiles(*, root: Path, scan: dict[str, Any]) -> list[dict[str, str]]:
+def _nested_lockfiles(
+    *,
+    root: Path,
+    scan: dict[str, Any],
+) -> tuple[list[dict[str, str]], list[dict[str, str]]]:
     workspaces = scan.get("workspaces")
     if not isinstance(workspaces, list):
-        return []
+        return [], []
     found: list[dict[str, str]] = []
+    warnings: list[dict[str, str]] = []
     for workspace in workspaces:
         if not isinstance(workspace, dict) or workspace.get("kind") != "javascript":
             continue
+        declared_lockfile = workspace.get("lockfile")
+        if isinstance(declared_lockfile, str) and declared_lockfile:
+            lockfile_path = root / declared_lockfile
+            if not lockfile_path.exists():
+                warnings.append(
+                    {
+                        "code": "missing_nested_package_manager_lockfile",
+                        "message": (
+                            "Nested JavaScript package-manager lockfile was discovered earlier "
+                            "but is no longer present."
+                        ),
+                        "path": declared_lockfile,
+                    }
+                )
         path = workspace.get("path")
         if not isinstance(path, str) or not path or path == ".":
             continue
@@ -113,7 +133,7 @@ def _nested_lockfiles(*, root: Path, scan: dict[str, Any]) -> list[dict[str, str
                         "package_manager": manager,
                     }
                 )
-    return sorted(found, key=lambda item: item["path"])
+    return sorted(found, key=lambda item: item["path"]), warnings
 
 
 def _string_or_none(value: object) -> str | None:

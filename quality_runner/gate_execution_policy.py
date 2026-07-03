@@ -153,6 +153,8 @@ def mutating_risk(*, capability_id: str, capability: dict[str, Any]) -> str:
         return "safe"
     if any(marker in command_text for marker in MUTATING_COMMAND_MARKERS):
         return "mutating"
+    if capability_id == "pre_cr" and "pre-cr run --workspace" in command_text:
+        return "unknown"
     if capability_id == "formatter":
         return "unknown"
     return "safe"

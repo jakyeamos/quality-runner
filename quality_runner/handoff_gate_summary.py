@@ -206,6 +206,7 @@ def _is_gate_blocker(gate: dict[str, Any]) -> bool:
             "environment-restricted",
             "dependency-setup-blocker",
             "read-only-mutation",
+            "workflow-timeout",
         }
         or skip_type in {"dependency-setup-blocked", "mutating-gate-not-run"}
     )
@@ -270,6 +271,9 @@ def _gate_blocker_actions(blockers: list[dict[str, Any]]) -> list[str]:
             continue
         recommended = gate.get("recommended_action")
         if isinstance(recommended, str) and recommended:
+            if gate.get("blocker_class") == "workflow-timeout":
+                actions.append(f"{recommended}.")
+                continue
             actions.append(f"For {gate_id}, {recommended}.")
             continue
         command = gate.get("command")
@@ -289,6 +293,8 @@ def _blocker_class(gate: dict[str, Any]) -> str:
         return "environment"
     if failure_type == "read-only-mutation" or skip_type == "mutating-gate-not-run":
         return "read-only-policy"
+    if failure_type == "workflow-timeout":
+        return "workflow-timeout"
     if failure_type == "command-failed" or gate.get("status") == "failed":
         return "command-failure"
     return "other"
@@ -300,6 +306,7 @@ def _primary_blocker_class(blockers: list[dict[str, Any]]) -> str | None:
         "dependency-setup",
         "environment",
         "read-only-policy",
+        "workflow-timeout",
         "command-failure",
         "other",
     ):
@@ -314,6 +321,7 @@ def _blocker_groups(blockers: list[dict[str, Any]]) -> list[dict[str, Any]]:
         "dependency-setup",
         "environment",
         "read-only-policy",
+        "workflow-timeout",
         "command-failure",
         "other",
     ):
@@ -338,6 +346,7 @@ def _gate_blocker_title(primary_blocker_class: str | None) -> str:
         "dependency-setup": "Resolve dependency setup gate blockers",
         "environment": "Resolve environment-restricted gate blockers",
         "read-only-policy": "Resolve read-only gate policy blockers",
+        "workflow-timeout": "Resolve workflow timeout blockers",
         "command-failure": "Resolve failing executable gates",
     }
     return titles.get(primary_blocker_class or "", "Resolve gate verification blockers")

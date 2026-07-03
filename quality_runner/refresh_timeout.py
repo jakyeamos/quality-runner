@@ -11,7 +11,9 @@ from typing import Any
 
 from quality_runner.artifacts import prepare_artifact_dir, write_json, write_text
 from quality_runner.manifest import build_run_manifest
+from quality_runner.planning import build_agent_handoff, render_handoff_markdown
 from quality_runner.run_summary import build_run_summary
+from quality_runner.scan_exclusions import scan_progress_snapshot
 from quality_runner.schema_constants import GATE_VERIFICATION_SCHEMA
 
 WORKFLOW_TIMEOUT_ARTIFACT_SCHEMA = "quality-runner-workflow-timeout-v0.1"
@@ -160,6 +162,7 @@ def build_timeout_verify_artifacts(
         "timeout_seconds": timeout_seconds,
         "timeout_scope": timeout_scope,
         "elapsed_seconds": round(elapsed_seconds, 3),
+        "diagnostics": _timeout_diagnostics(),
     }
     gate_verification = {
         **existing_verification,
@@ -172,7 +175,9 @@ def build_timeout_verify_artifacts(
         "reason": reason,
         "elapsed_seconds": round(elapsed_seconds, 3),
         "timeout_scope": timeout_scope,
-        "gates": _existing_gates(existing_verification),
+        "diagnostics": _timeout_diagnostics(),
+        "gates": _existing_gates(existing_verification)
+        or [_workflow_timeout_gate(phase=phase, reason=reason)],
     }
     artifact_paths = {
         "gate_execution_plan_json": str(run_dir / "gate-execution-plan.json"),
@@ -180,6 +185,8 @@ def build_timeout_verify_artifacts(
         "workflow_timeout_json": str(run_dir / "workflow-timeout.json"),
         "run_manifest_json": str(run_dir / "run-manifest.json"),
         "run_summary_json": str(run_dir / "run-summary.json"),
+        "agent_handoff_json": str(run_dir / "agent-handoff.json"),
+        "agent_handoff_md": str(run_dir / "agent-handoff.md"),
     }
     write_text(run_dir / "gate-execution-plan.json", json.dumps(existing_plan, indent=2) + "\n")
     write_json(run_dir / "gate-verification.json", gate_verification)
@@ -198,6 +205,15 @@ def build_timeout_verify_artifacts(
         run_id=run_id,
         baseline_run_id=baseline_run_id,
     )
+    handoff = build_agent_handoff(
+        audit_report=_timeout_audit_report(run_id),
+        remediation_plan=_timeout_remediation_plan(run_id),
+        artifact_paths=artifact_paths,
+        capability_map=_timeout_capability_map(),
+        gate_verification=gate_verification,
+    )
+    write_json(run_dir / "agent-handoff.json", handoff)
+    write_text(run_dir / "agent-handoff.md", render_handoff_markdown(handoff))
     verify_result = {
         "schema": "quality-runner-verify-gates-result-v0.1",
         "status": "blocked",
@@ -208,6 +224,59 @@ def build_timeout_verify_artifacts(
         "warnings": [],
     }
     return verify_result, summary
+
+
+def _workflow_timeout_gate(*, phase: str, reason: str) -> dict[str, Any]:
+    return {
+        "id": "workflow-timeout",
+        "status": "failed",
+        "failure_type": "workflow-timeout",
+        "phase": phase,
+        "reason": reason,
+        "recommended_action": (
+            "Inspect workflow-timeout.json and rerun refresh with tighter scan exclusions "
+            "or a larger total timeout"
+        ),
+    }
+
+
+def _timeout_audit_report(run_id: str) -> dict[str, Any]:
+    return {
+        "schema": "quality-runner-audit-report-v0.1",
+        "run_id": run_id,
+        "status": "findings",
+        "implementation_allowed": False,
+        "findings": [],
+    }
+
+
+def _timeout_remediation_plan(run_id: str) -> dict[str, Any]:
+    return {
+        "schema": "quality-runner-remediation-plan-v0.1",
+        "run_id": run_id,
+        "implementation_allowed": False,
+        "adoption_stage": {
+            "id": "blocked-by-workflow-timeout",
+            "title": "Blocked by workflow timeout",
+            "rationale": "Refresh timed out before normal remediation planning completed.",
+        },
+        "stopping_criteria": ["Resolve the workflow timeout before implementation work."],
+        "slices": [],
+        "warnings": [],
+    }
+
+
+def _timeout_capability_map() -> dict[str, Any]:
+    return {
+        "schema": "quality-runner-capability-map-v0.1",
+        "available": [],
+        "missing": [],
+        "warnings": [],
+    }
+
+
+def _timeout_diagnostics() -> dict[str, Any]:
+    return {"scan_progress": scan_progress_snapshot()}
 
 
 def _existing_plan(path: Path) -> list[Any]:

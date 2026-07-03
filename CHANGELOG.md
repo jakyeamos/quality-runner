@@ -11,6 +11,13 @@ All notable changes to Quality Runner are documented here.
   validator coverage for malformed action groups.
 - Clarified `refresh --help` with `gates-clean`, `gates-blocked`,
   `gates-failed`, `action_groups`, and total-timeout reason guidance.
+- Hardened refresh timeout finalization so inspect/run/verify workflow
+  timeouts write `agent-handoff.json`/`.md` with `workflow-timeout` blocker
+  groups and scan-progress diagnostics.
+- Treated stale nested package-manager lockfiles as preflight warnings instead
+  of controller exceptions.
+- Marked `pre-cr run --workspace .` as unsafe for read-only gate execution
+  unless mutating gates are explicitly allowed.
 
 ## 0.2.1 - 2026-07-02
 

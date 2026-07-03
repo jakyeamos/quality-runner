@@ -183,6 +183,12 @@ Blocked and failed handoffs include `gate_verification.blocker_groups` and
 environment restrictions, read-only policy blockers, and executable gate
 failures before launching the next worker.
 
+If inspect, run, or verify times out before normal verification completes,
+refresh still writes a final `agent-handoff.json`/`.md` with a
+`workflow-timeout` blocker group. `workflow-timeout.json` also includes scan
+progress diagnostics with the last traversal directory, recent paths, visited
+path count, and skipped path count.
+
 ## `quality-runner validate-report`
 
 Validates a controller thread completion report before the controller advances a

@@ -1220,6 +1220,30 @@ Recommended next fixes:
    known commands like `pre-cr run --workspace .` as mutating unless their output
    directory is explicitly configured as allowed evidence.
 
+## Product Fix After Refresh Wave 15
+
+Implemented the Wave 15 hardening set:
+
+- Stale nested package-manager lockfile paths now become
+  `missing_nested_package_manager_lockfile` preflight warnings instead of
+  controller exceptions.
+- Workflow timeouts in inspect, run, or verify now write a final
+  `quality-runner-agent-handoff-v0.2` handoff with a `workflow-timeout` blocker
+  group and grouped next-slice action.
+- Timeout artifacts now include scan-progress diagnostics: last traversal
+  directory, recent paths, visited path count, and skipped path count.
+- Refresh resets traversal progress at run start so timeout diagnostics do not
+  inherit stale paths from earlier scans in the same process.
+- `pre-cr run --workspace .` is treated as `unknown` mutating risk and skipped
+  under read-only gate execution unless mutating gates are explicitly allowed.
+
+Verification:
+
+- `uv run pytest tests/test_workflow_gate_preflight.py` passed: 26 tests.
+- `uv run pytest` passed: 224 tests.
+- `uv run ruff check .` passed.
+- `git diff --check` passed.
+
 ## Rollout Ledger
 
 | Wave | Repo | Repo path | Total | Blockers | Baseline artifacts | Codex project status | Thread status | Thread id | Final QR status | Commit | Push | Notes |

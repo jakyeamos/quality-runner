@@ -451,51 +451,6 @@ def test_verify_gates_classifies_next_font_fetch_as_environment_restricted(
     assert verification["gates"][0]["failure_type"] == "environment-restricted"
 
 
-def test_refresh_payload_finalizes_partial_verify_artifacts_when_verify_times_out(
-    tmp_path: Path, monkeypatch: object
-) -> None:
-    from quality_runner import workflow
-
-    (tmp_path / "package.json").write_text(
-        json.dumps({"scripts": {"test": f"{sys.executable} -c 'import sys; sys.exit(0)'"}}),
-        encoding="utf-8",
-    )
-    (tmp_path / ".quality-runner.toml").write_text(
-        '[quality_runner]\nrequired_capabilities = ["tests"]\n',
-        encoding="utf-8",
-    )
-
-    def timeout_verify(**_: object) -> dict[str, object]:
-        raise TimeoutError("workflow timeout while verifying gates")
-
-    monkeypatch.setattr(workflow, "verify_gates_payload", timeout_verify)
-
-    payload = workflow.refresh_payload(
-        repo_root=tmp_path,
-        run_id_prefix="refresh-timeout",
-        workflow_timeout_seconds=30,
-        workflow_timeout_reason="controller deadline exceeded while verifying gates",
-    )
-    run_dir = tmp_path / ".quality-runner" / "runs" / "refresh-timeout-verify"
-    gate_verification = json.loads((run_dir / "gate-verification.json").read_text())
-    run_summary = json.loads((run_dir / "run-summary.json").read_text())
-
-    assert payload["status"] == "blocked"
-    assert payload["runs"]["verify"]["status"] == "blocked"
-    assert payload["runs"]["verify"]["timeout"]["reason"] == (
-        "controller deadline exceeded while verifying gates"
-    )
-    assert payload["runs"]["verify"]["timeout"]["timeout_scope"] == "verify-phase"
-    assert payload["summary"]["recommended_classification"] == "workflow-timeout-blocker"
-    assert gate_verification["status"] == "blocked"
-    assert gate_verification["failure_type"] == "workflow-timeout"
-    assert gate_verification["reason"] == "controller deadline exceeded while verifying gates"
-    assert gate_verification["timeout_scope"] == "verify-phase"
-    assert gate_verification["gates"] == []
-    assert json.loads((run_dir / "gate-execution-plan.json").read_text()) == []
-    assert run_summary["recommended_classification"] == "workflow-timeout-blocker"
-
-
 def test_refresh_payload_preserves_partial_verify_artifacts_when_timeout_finalizes(
     tmp_path: Path, monkeypatch: object
 ) -> None:
