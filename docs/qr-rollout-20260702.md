@@ -494,6 +494,28 @@ Implemented refresh efficiency hardening:
 Validation before launch: `uv run ruff check .` and full `uv run pytest`
 passed for controller commit `614baa2`.
 
+## Refresh Wave 4 Launch
+
+Refresh wave 4 is a regression/stress wave over the same five repos from wave
+3. The goal is to test whether efficiency hardening makes runs more complete
+inside the deadline, not to remediate target repos.
+
+Shared command shape:
+
+- `--timeout-seconds 90`
+- `--workflow-timeout-seconds 180`
+- `--workflow-timeout-reason "controller refresh wave 4 efficiency regression
+  deadline after gate-ordering scan-budget partial-artifact hardening"`
+- no `--allow-mutating-gates`
+
+| Repo | Thread id | Run id prefix | Baseline | Report path | Status |
+|---|---|---|---|---|---|
+| tenure | `019f285c-d4d1-7083-87b1-be762fcea99b` | `refresh4-20260703-tenure` | `refresh3-20260703-tenure-verify` | `/private/tmp/qr-refresh4-tenure-report.json` | launched |
+| BidCamp | `019f285d-2584-7f21-8b2b-8c24aaa281a3` | `refresh4-20260703-BidCamp` | `refresh3-20260703-BidCamp-verify` | `/private/tmp/qr-refresh4-BidCamp-report.json` | launched |
+| AIOS | `019f285d-5f64-7713-9e69-593bfaf4d02b` | `refresh4-20260703-AIOS` | `refresh3-20260703-AIOS-verify` | `/private/tmp/qr-refresh4-AIOS-report.json` | launched |
+| amos-saas | `019f285d-ae2a-7822-8df0-9da2cbfe3d65` | `refresh4-20260703-amos-saas` | `refresh3-20260703-amos-saas-verify` | `/private/tmp/qr-refresh4-amos-saas-report.json` | launched |
+| Dsci-proj | `019f285e-19cc-7f41-baa5-03cacecb7c36` | `refresh4-20260703-Dsci-proj` | `refresh3-20260703-Dsci-proj-verify` | `/private/tmp/qr-refresh4-Dsci-proj-report.json` | launched |
+
 ## Rollout Ledger
 
 | Wave | Repo | Repo path | Total | Blockers | Baseline artifacts | Codex project status | Thread status | Thread id | Final QR status | Commit | Push | Notes |
