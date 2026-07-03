@@ -437,6 +437,39 @@ Implemented refresh hardening:
 Validation before launch: `uv run ruff check .`, targeted workflow/CLI/artifact
 tests, and full `uv run pytest` all pass on controller commit `8b27624`.
 
+## Refresh Wave 3 Results
+
+Refresh wave 3 reran the same five triage repos in read-only mode with
+`--workflow-timeout-seconds 180` and the explicit reason
+`controller refresh wave 3 verify deadline after wave 2 empty verify artifacts`.
+All five worker reports validated against
+`quality-runner-controller-report-validation-v0.1`.
+
+| Repo | Thread id | Report | Final status | Timeout reason captured | Result |
+|---|---|---|---|---|---|
+| tenure | `019f2676-1575-7e12-add9-8865f919cfbb` | `/private/tmp/qr-refresh3-tenure-report.json` | blocked; `workflow-timeout-blocker` | yes; `workflow-timeout.json` elapsed 180.022s | QR wrote `gate-execution-plan.json`, `gate-verification.json`, `workflow-timeout.json`, `run-manifest.json`, and `run-summary.json` instead of leaving an empty verify directory. |
+| BidCamp | `019f2676-51f1-77e1-8d81-077f48dbc989` | `/private/tmp/qr-refresh3-BidCamp-report.json` | blocked; `workflow-timeout-blocker` | yes; `workflow-timeout.json` elapsed 180.016s | QR finalized partial verify artifacts with the delegated controller reason; pre-existing tracked local edits remained untouched. |
+| AIOS | `019f2676-8a20-7ad1-93e9-c94a7bcb7d39` | `/private/tmp/qr-refresh3-AIOS-report.json` | blocked; `environment-or-runner-blocker` | not applicable | Normal verify artifacts were written. Failures were existing formatter/lint/typecheck debt plus runner-environment failures for `uv` cache access and offline font/build behavior. |
+| amos-saas | `019f2676-c290-75b3-a889-dd39f343bcd8` | `/private/tmp/qr-refresh3-amos-saas-report.json` | blocked; `environment-or-dependency-blocker` | not applicable | Normal verify artifacts were written. Gates remain blocked by `pnpm install` aborting non-interactively while removing `node_modules`; mutating gates stayed skipped under read-only policy. |
+| Dsci-proj | `019f2677-0c4e-7c22-983e-8ff4a1d6f7e4` | `/private/tmp/qr-refresh3-Dsci-proj-report.json` | failed; `failing-executable-gates` | not applicable | Normal verify artifacts were written. `runtime_smoke` passed, while formatter, lint, typecheck, tests, build, and dead-code failed on repo-owned executable-gate debt. |
+
+Product outcome:
+
+- The timeout reason is now first-class evidence. Timed-out refreshes include
+  the controller-supplied reason in `gate-verification.json`,
+  `workflow-timeout.json`, and the final summary classification.
+- The empty verify-directory failure mode is fixed for the observed Tenure and
+  BidCamp cases. Controllers now receive a blocked QR run with valid final
+  artifacts and can advance waves without manual reconstruction.
+- The remaining Tier 1 gap is deadline enforcement against child process trees.
+  The signal-based workflow timeout finalizes artifacts with the correct
+  elapsed timeout, but QR should supervise verify work in a process group and
+  terminate descendants so a stuck package command cannot delay return or keep
+  consuming resources after the workflow deadline.
+- Read-only reruns preserved target worktrees: QR generated only untracked
+  `.quality-runner/` artifacts, and the reports clearly separated pre-existing
+  local edits from QR output.
+
 ## Rollout Ledger
 
 | Wave | Repo | Repo path | Total | Blockers | Baseline artifacts | Codex project status | Thread status | Thread id | Final QR status | Commit | Push | Notes |
