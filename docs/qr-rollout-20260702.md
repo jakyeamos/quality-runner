@@ -891,6 +891,22 @@ Follow-up implementation:
   carrying dependency setup commands such as `pnpm approve-builds` into both
   JSON and Markdown handoffs.
 
+## Refresh Wave 11 Launch
+
+Wave 11 validates the handoff fix from commit `f84d51c` across the dependency
+setup cases, failed executable gate case, clean control, and QR-spawned
+test/environment stress case. Each thread must report back with final QR status,
+handoff status, classification, blocker-first next-slice verdict, controller
+report validation, files changed, and blockers.
+
+| Repo | Thread id | Run id prefix | Baseline | Report path | Status |
+|---|---|---|---|---|---|
+| EliHealth | `019f28f5-6060-7352-a133-80d24d42ebef` | `refresh11-20260703-EliHealth` | `refresh10-20260703-EliHealth-verify` | `/private/tmp/qr-refresh11-EliHealth-report.json` | launched |
+| amos-saas | `019f28f5-711f-7362-88e6-0280959e5aee` | `refresh11-20260703-amos-saas` | `refresh10-20260703-amos-saas-verify` | `/private/tmp/qr-refresh11-amos-saas-report.json` | launched |
+| AIOS | `019f28f5-9852-7372-a815-7706042bb41e` | `refresh11-20260703-AIOS` | `refresh10-20260703-AIOS-verify` | `/private/tmp/qr-refresh11-AIOS-report.json` | launched |
+| R-Project | `019f28f5-a62a-7e31-bf29-bc01c3dd1145` | `refresh11-20260703-R-Project` | `refresh10-20260703-R-Project-verify` | `/private/tmp/qr-refresh11-R-Project-report.json` | launched |
+| BIP-Console | `019f28f5-b3b7-7c31-abf4-1f6089eeec94` | `refresh11-20260703-BIP-Console` | `canary-20260703-BIP-Console-classifier-fix-verify`, fallback `stress-20260703-BIP-Console-final2-verify` | `/private/tmp/qr-refresh11-BIP-Console-report.json` | launched |
+
 ## Rollout Ledger
 
 | Wave | Repo | Repo path | Total | Blockers | Baseline artifacts | Codex project status | Thread status | Thread id | Final QR status | Commit | Push | Notes |
