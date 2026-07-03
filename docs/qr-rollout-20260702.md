@@ -115,6 +115,9 @@ Observed classifications:
   `video-pipeline`
 - Wave 3 `mixed-blocker`: `portfolio`
 - Wave 3 `env-or-dependency-blocker`: `remodelvision`
+- Wave 4 `scanner-product-issue`: `Hoopscout`
+- Wave 4 `mixed-blocker`: `pre-cr-suite-lsp`, `career-ops`, `Crimclock`,
+  `Crimclock-pr1-audit`
 
 Cross-repo lessons:
 
@@ -131,6 +134,9 @@ Cross-repo lessons:
 - Mature repos commonly move from missing capabilities to broad structural
   backlog. The case study should present this as staged adoption, not as a
   failed cleanup wave.
+- `verify-gates` exposed the next Tier 1 product seam: discovered package
+  scripts and CI-derived gates are not yet the same thing as locally executable
+  gate commands.
 
 Product fixes applied before the next triage wave:
 
@@ -182,6 +188,31 @@ ignored/generated/cache leakage, package-manager confusion, gate execution
 misclassification, misleading handoff state, invalid/missing artifacts, or
 controller-report validation gaps.
 
+Wave 4 stress takeaways:
+
+- Traversal hardening mostly held. Workers did not report stalls, and QR skipped
+  `.quality-runner`, `.git`, `node_modules`, `.next`, caches, coverage, venvs,
+  and generated files across the sample.
+- `verify-gates` should execute package scripts through the detected package
+  manager, not by shelling raw script bodies. `pre-cr-suite-lsp` and
+  `Hoopscout` both failed gates that pass under `pnpm`/`corepack pnpm` because
+  the raw command lacked package-manager bin context.
+- CI-only discovery must be separated from local execution. `Crimclock` and
+  `Crimclock-pr1-audit` discovered `github-actions pull_request quality` and
+  tried to execute it as a local shell command.
+- Gate failure artifacts need better diagnostics. At least one worker reported
+  failed gates with null stdout/stderr tails, forcing manual reruns to diagnose
+  the actual `ENOENT` cause.
+- Handoff/status semantics lag behind gate verification. `run` handoffs remain
+  `planned` and centered on missing gates even after `verify-gates` reveals
+  executable-gate failures.
+- `validate-report` correctly rejects `complete`/`ready-for-review` reports
+  with dirty `git_status_short`, but the contract should document that read-only
+  dirty-repo stress results must be `blocked`.
+- Structural heuristics still have Tier 1 precision issues. TypeScript nullish
+  coalescing, union types, regex alternation, and template expressions were
+  reported as `nested-ternary` in Crimclock repos.
+
 ## Rollout Ledger
 
 | Wave | Repo | Repo path | Total | Blockers | Baseline artifacts | Codex project status | Thread status | Thread id | Final QR status | Commit | Push | Notes |
@@ -201,11 +232,11 @@ controller-report validation gaps.
 | 3 | remodelvision | `/Users/jakyeamos/projects/remodelvision` | 22 | 2 | `/Users/jakyeamos/projects/remodelvision/.quality-runner/runs/parallel-20260702T200935Z-remodelvision` | exact-project | blocked | `019f257b-026f-7c71-835f-f54516b69f79` | planned/findings; `triage-20260702-remodelvision`; missing gates cleared | not created | not pushed | Classification `env-or-dependency-blocker`. Added `format`, `smoke`, and `audit:dead-code` scripts in `package.json`, but the worker stopped after staging before commit/push. Verification was blocked by local `eslint-plugin-anti-slop` missing module, duplicate room-upload types, Prisma client runtime failure, and missing env vars; `.quality-runner/` remained untracked. |
 | 3 | portfolio | `/Users/jakyeamos/projects/portfolio` | 20 | 2 | `/Users/jakyeamos/projects/portfolio/.quality-runner/runs/parallel-20260702T200935Z-portfolio` | exact-project | complete | `019f257b-11a2-7411-8101-c3a992165b3c` | planned; `triage-20260702-portfolio`; no missing capabilities; 17 findings | `368245c` | pushed | Classification `mixed-blocker`. Added Prettier/pnpm gate config, formatter/dead-code/smoke gates, lockfile updates, and truth update. Final QR has zero missing capabilities; `pnpm smoke` and direct `tsc` passed, while `format` and `audit:dead-code` expose broad existing debt. QR still scanned ignored untracked files under `Redesign Basketball Project Dashboard/`. |
 | 3 | video-pipeline | `/Users/jakyeamos/projects/video-pipeline` | 20 | 4 | `/Users/jakyeamos/projects/video-pipeline/.quality-runner/runs/parallel-20260702T200935Z-video-pipeline` | parent-project | complete | `019f257b-1afd-7481-bbeb-66bbeb00b6d8` | planned; `triage-20260702-video-pipeline`; no missing capabilities; 12 findings | `392ec7e`, `8a493bb` | pushed | Classification `broad-repo-debt`. Migrated quality gates to pnpm, removed npm lock, added pnpm lock/workspace build approval, and updated truth file. `pnpm install --frozen-lockfile`, `lint`, `test`, and `smoke` passed; `format` and `audit:dead-code` fail on broad existing formatting and unused-symbol debt. |
-| 4 | pre-cr-suite-lsp | `/Users/jakyeamos/projects/pre-cr-suite-lsp` | 19 | 1 | `/Users/jakyeamos/projects/pre-cr-suite-lsp/.quality-runner/runs/parallel-20260702T200935Z-pre-cr-suite-lsp` | exact-project | running | `019f25c0-d8ae-7761-ae11-f73b50a34e5d` |  |  |  | Stress wave: exercise inspect/run/verify-gates/preflight/report-validation paths and report Tier 1 product risks. |
-| 4 | Hoopscout | `/Users/jakyeamos/projects/Hoopscout` | 18 | 3 | `/Users/jakyeamos/projects/Hoopscout/.quality-runner/runs/parallel-20260702T200935Z-Hoopscout` | exact-project | running | `019f25c0-deb2-7812-b271-7d1decc0cce9` |  |  |  | Stress wave: exercise inspect/run/verify-gates/preflight/report-validation paths and report Tier 1 product risks. |
-| 4 | career-ops | `/Users/jakyeamos/projects/career-ops` | 17 | 5 | `/Users/jakyeamos/projects/career-ops/.quality-runner/runs/parallel-20260702T200935Z-career-ops` | parent-project | running | `019f25c0-e92c-7203-93a8-120be47e2e62` |  |  |  | Stress wave: exercise inspect/run/verify-gates/preflight/report-validation paths and report Tier 1 product risks. |
-| 4 | Crimclock | `/Users/jakyeamos/projects/Crimclock` | 16 | 1 | `/Users/jakyeamos/projects/Crimclock/.quality-runner/runs/parallel-20260702T200935Z-Crimclock` | exact-project | running | `019f25c0-f096-7622-b3d2-8f49bf4f2502` |  |  |  | Stress wave: exercise inspect/run/verify-gates/preflight/report-validation paths and report Tier 1 product risks. |
-| 4 | Crimclock-pr1-audit | `/Users/jakyeamos/projects/Crimclock-pr1-audit` | 16 | 1 | `/Users/jakyeamos/projects/Crimclock-pr1-audit/.quality-runner/runs/parallel-20260702T200935Z-Crimclock-pr1-audit` | parent-project | running | `019f25c0-fc94-70b0-8e64-49261fdcb525` |  |  |  | Stress wave: exercise inspect/run/verify-gates/preflight/report-validation paths and report Tier 1 product risks. |
+| 4 | pre-cr-suite-lsp | `/Users/jakyeamos/projects/pre-cr-suite-lsp` | 19 | 1 | `/Users/jakyeamos/projects/pre-cr-suite-lsp/.quality-runner/runs/parallel-20260702T200935Z-pre-cr-suite-lsp` | exact-project | blocked | `019f25c0-d8ae-7761-ae11-f73b50a34e5d` | run planned; verify failed; missing `formatter`, `runtime_smoke` | not created | not pushed | Classification `mixed-blocker`. Traversal healthy, but `verify-gates` executed raw package script bodies instead of pnpm/corepack package-manager context, causing false failures for lint/typecheck/tests; failed gate entries also lacked useful stdout/stderr diagnostics. |
+| 4 | Hoopscout | `/Users/jakyeamos/projects/Hoopscout` | 18 | 3 | `/Users/jakyeamos/projects/Hoopscout/.quality-runner/runs/parallel-20260702T200935Z-Hoopscout` | exact-project | blocked | `019f25c0-deb2-7812-b271-7d1decc0cce9` | run planned; verify failed; failed lint/typecheck/build | not created | not pushed | Classification `scanner-product-issue`. QR detected pnpm but executed raw script bodies (`eslint`, `tsc`, `next`) so local bin resolution failed even though `pnpm exec` resolved all three; `quality-runner status` also reported `ready` after latest failed verify run. |
+| 4 | career-ops | `/Users/jakyeamos/projects/career-ops` | 17 | 5 | `/Users/jakyeamos/projects/career-ops/.quality-runner/runs/parallel-20260702T200935Z-career-ops` | parent-project | blocked | `019f25c0-e92c-7203-93a8-120be47e2e62` | run planned; verify blocked; gates empty | not created | not pushed | Classification `mixed-blocker`. QR found no executable gates despite existing `.aios-quality-gate.json`; preflight detected npm from `package-lock.json` while handoff recommended pnpm; repo includes Go but capability coverage remained JavaScript-centric; console-output findings were noisy for a CLI-style repo. |
+| 4 | Crimclock | `/Users/jakyeamos/projects/Crimclock` | 16 | 1 | `/Users/jakyeamos/projects/Crimclock/.quality-runner/runs/parallel-20260702T200935Z-Crimclock` | exact-project | blocked | `019f25c0-f096-7622-b3d2-8f49bf4f2502` | run planned; verify failed; missing `dead_code`; failed formatter/tests/pre_pr | not created | not pushed | Classification `mixed-blocker`. Real repo/env blockers remain, but QR also discovered `github-actions pull_request quality` and tried to execute it locally; `nested-ternary` heuristic flagged TypeScript nullish coalescing, optional chaining fallbacks, union bars, regex alternation, and template expressions. |
+| 4 | Crimclock-pr1-audit | `/Users/jakyeamos/projects/Crimclock-pr1-audit` | 16 | 1 | `/Users/jakyeamos/projects/Crimclock-pr1-audit/.quality-runner/runs/parallel-20260702T200935Z-Crimclock-pr1-audit` | parent-project | blocked | `019f25c0-fc94-70b0-8e64-49261fdcb525` | run planned; verify failed; missing `dead_code`; failed formatter/tests/pre_pr | not created | not pushed | Classification `mixed-blocker`. Same CI-only pseudo-command issue as Crimclock; handoff `planned` is too weak after gate verification fails; run manifests lack explicit completion status/duration fields useful to controllers. |
 | 5 | frmwrklabs | `/Users/jakyeamos/projects/frmwrklabs` | 16 | 4 | `/Users/jakyeamos/projects/frmwrklabs/.quality-runner/runs/parallel-20260702T200935Z-frmwrklabs` | exact-project | pending |  |  |  |  |  |
 | 5 | BIP-Console | `/Users/jakyeamos/projects/BIP-Console` | 15 | 3 | `/Users/jakyeamos/projects/BIP-Console/.quality-runner/runs/parallel-20260702T200935Z-BIP-Console` | exact-project | pending |  |  |  |  |  |
 | 5 | Book-documents-github | `/Users/jakyeamos/projects/Book-documents-github` | 15 | 5 | `/Users/jakyeamos/projects/Book-documents-github/.quality-runner/runs/parallel-20260702T200935Z-Book-documents-github` | parent-project | pending |  |  |  |  |  |
