@@ -97,8 +97,13 @@ The normal workflow is:
 2. Review `quality-audit.json` for evidence-backed findings.
 3. Review `code-quality-scan.json` for structural warnings and line evidence.
 4. Review `remediation-plan.json` for ordered actions and verification gates.
-5. Give an approved remediation slice to a coding agent.
-6. Rerun Quality Runner to confirm findings clear and update the resolution ledger.
+5. Have the coding agent convert the QR handoff into GSD-style phases, plans,
+   ledgers, and batch summaries before editing.
+6. Execute one coherent batch at a time.
+7. Rerun Quality Runner to confirm findings clear and update the resolution ledger.
+
+See [Agent Usage](docs/agent-usage.md) for the copy-paste phase and batch
+templates agents should follow.
 
 ## Commands
 
@@ -132,6 +137,8 @@ failed. Blocked or failed handoffs include `blocker_groups` and
 `next_slice.action_groups` for structured routing. Use `--handoff-output` when
 you want the scan and the human remediation plan from one command; use
 `export-handoff` later to regenerate or copy a handoff from an existing run.
+For large remediations, agents should use QR output as evidence for a
+GSD-style phase plan rather than editing directly from the handoff.
 
 ## MCP
 
