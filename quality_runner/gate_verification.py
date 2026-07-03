@@ -22,12 +22,19 @@ ENVIRONMENT_RESTRICTED_MARKERS = (
     ".pipe",
     "socket",
 )
+TEST_SERVER_TIMEOUT_MARKERS = (
+    "server is not running",
+    "server not running",
+    "failed to start server",
+    "local server",
+)
 
 
 def verify_discovered_gates(
     *,
     repo_root: Path,
     capability_map: dict[str, Any],
+    run_id: str | None = None,
     timeout_seconds: int = DEFAULT_TIMEOUT_SECONDS,
     gate_timeouts: dict[str, int] | None = None,
 ) -> dict[str, Any]:
@@ -48,6 +55,7 @@ def verify_discovered_gates(
             passed_leaf_ids.add(capability_id)
     return {
         "schema": GATE_VERIFICATION_SCHEMA,
+        **_optional_field("run_id", run_id),
         "status": _status(gates),
         "timeout_seconds": timeout_seconds,
         "gate_timeouts": resolved_gate_timeouts,
@@ -144,6 +152,10 @@ def _verify_gate(
             timeout=timeout_seconds,
         )
     except subprocess.TimeoutExpired as error:
+        stdout = _truncate(error.stdout)
+        stderr = _truncate(error.stderr)
+        failure_type = _failure_type(command=command, stdout=stdout, stderr=stderr, timed_out=True)
+        environment_restricted = failure_type == "environment-restricted"
         return {
             "id": capability_id,
             "status": "failed",
@@ -153,16 +165,17 @@ def _verify_gate(
             "exit_code": None,
             "duration_seconds": round(time.monotonic() - started, 3),
             "timeout_seconds": timeout_seconds,
-            "stdout": _truncate(error.stdout),
-            "stderr": _truncate(error.stderr),
-            "stdout_tail": _truncate(error.stdout),
-            "stderr_tail": _truncate(error.stderr),
-            "failure_type": "timeout",
+            "stdout": stdout,
+            "stderr": stderr,
+            "stdout_tail": stdout,
+            "stderr_tail": stderr,
+            "failure_type": failure_type,
             "reason": "gate timed out",
+            **_recommended_action(environment_restricted),
         }
     stdout = _truncate(result.stdout)
     stderr = _truncate(result.stderr)
-    failure_type = _failure_type(command=command, stdout=stdout, stderr=stderr)
+    failure_type = _failure_type(command=command, stdout=stdout, stderr=stderr, timed_out=False)
     failed = result.returncode != 0
     environment_restricted = failed and failure_type == "environment-restricted"
     return {
@@ -179,12 +192,7 @@ def _verify_gate(
         "stdout_tail": stdout,
         "stderr_tail": stderr,
         **_optional_field("failure_type", failure_type if failed else None),
-        **_optional_field(
-            "recommended_action",
-            "rerun outside sandbox or with explicit network/localhost permissions"
-            if environment_restricted
-            else None,
-        ),
+        **_recommended_action(environment_restricted),
     }
 
 
@@ -277,11 +285,37 @@ def _command_mentions_gate(command: str, gate_id: str) -> bool:
     return any(alias in normalized for alias in aliases)
 
 
-def _failure_type(*, command: str, stdout: str, stderr: str) -> str | None:
+def _failure_type(*, command: str, stdout: str, stderr: str, timed_out: bool) -> str:
     combined = f"{command}\n{stdout}\n{stderr}".lower()
     if any(marker in combined for marker in ENVIRONMENT_RESTRICTED_MARKERS):
         return "environment-restricted"
+    if _looks_like_qr_spawned_test_server_timeout(command=command, combined=combined):
+        return "environment-restricted"
+    if timed_out:
+        return "timeout"
     return "command-failed"
+
+
+def _looks_like_qr_spawned_test_server_timeout(*, command: str, combined: str) -> bool:
+    lowered_command = command.lower()
+    if "test" not in lowered_command:
+        return False
+    has_timeout = "timed out" in combined or "timeout" in combined
+    has_server_marker = any(marker in combined for marker in TEST_SERVER_TIMEOUT_MARKERS)
+    return has_timeout and has_server_marker
+
+
+def _recommended_action(environment_restricted: bool) -> dict[str, Any]:
+    return _optional_field(
+        "recommended_action",
+        (
+            "rerun the exact command directly from the repo root; if it passes, treat "
+            "this as a QR runner environment mismatch and rerun outside sandbox or "
+            "with explicit network/localhost permissions"
+        )
+        if environment_restricted
+        else None,
+    )
 
 
 def _environment() -> dict[str, str | bool | None]:

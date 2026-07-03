@@ -227,6 +227,7 @@ def verify_gates_payload(
     gate_verification = verify_discovered_gates(
         repo_root=repo_root,
         capability_map=capability_map,
+        run_id=resolved_run_id,
         timeout_seconds=timeout_seconds,
         gate_timeouts=_gate_timeouts(config),
     )

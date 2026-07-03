@@ -6,6 +6,7 @@
   "required": ["schema", "status", "timeout_seconds", "gates"],
   "properties": {
     "schema": { "const": "quality-runner-gate-verification-v0.1" },
+    "run_id": { "type": "string", "minLength": 1 },
     "status": { "enum": ["passed", "failed", "blocked", "skipped-nonlocal"] },
     "timeout_seconds": { "type": "integer", "minimum": 1 },
     "gate_timeouts": {

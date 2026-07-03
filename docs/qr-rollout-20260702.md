@@ -274,11 +274,29 @@ explicit product blockers recorded.
 | 1 | `eslint-plugin-anti-slop` | Canary for pnpm gate execution, aggregate-gate skipping, CI-only/non-command skips, and regex `nested-ternary` precision. | blocked | `019f2628-b461-71b0-8377-4426e65008b0` | `passed-with-findings`; `canary-20260703-eslint-plugin-anti-slop-verify`; gates passed | accepted | Repo blocker only: `recommended_classification=broad-repo-debt`, 6 grouped findings unchanged from baseline. Product checks held: package scripts executed as `pnpm run ...`, `pre_pr` skipped as CI-only, `truth_file` skipped as evidence-only, aggregate `pre_cr` skipped, missing capabilities stayed at 0. Regex precision improved: `(?:...)` produced 0 nested-ternary hits; remaining 2 nested-ternary hits were real ternary chains. |
 | 1 | `BIP-Console` | Canary for environment-restricted QR subprocess/server failures and direct-vs-QR comparison. | blocked | `019f2628-bea5-7ec1-8178-77b12766646c` | `failed`; `canary-20260703-BIP-Console-verify2`; status `blocked` | accepted | Product blocker: direct `pnpm run test` passed 6 files / 81 tests in 4.30s, but QR-spawned `pnpm run test` failed after 108.717s with 11 timeout/server-not-running failures. QR recorded `failure_type=command-failed` with no environment-restricted classification or rerun guidance. Package-manager execution, aggregate skipping, `quality-runner status`, `summarize-run`, and ignored generated artifacts behaved correctly. |
 
-Canary result: do not expand to a full wave yet. The controller read all three
-reports and all temporary controller reports validated, but `BIP-Console`
-exposed a Tier 1 product gap in QR-spawned environment failure classification.
-Fix or explicitly scope that classifier gap before launching another broad
-stress wave.
+Initial canary result: do not expand to a full wave yet. The controller read
+all three reports and all temporary controller reports validated, but
+`BIP-Console` exposed a Tier 1 product gap in QR-spawned environment failure
+classification.
+
+Post-canary fix:
+
+- QR now treats test commands that fail with both timeout wording and
+  server/local-subprocess symptoms as `environment-restricted` and adds
+  direct-rerun guidance instead of reporting an ordinary `command-failed`.
+- `gate-verification.json` now records the verification `run_id` directly.
+- Regression tests cover the BIP-style server timeout classification and keep
+  plain assertion failures classified as `command-failed`.
+- BIP-Console rerun `canary-20260703-BIP-Console-classifier-fix-verify`
+  passed all executable gates, skipped aggregate `pre_pr`/`pre_cr`, and
+  `quality-runner status` reported `ready`. `summarize-run` reported
+  `passed-with-findings`, `recommended_classification=broad-repo-debt`, 10
+  findings unchanged from `canary-20260703-BIP-Console-verify2`, and 0 missing
+  capabilities.
+
+Expansion note: the specific QR-spawned test blocker is cleared in the latest
+BIP rerun. Any next wave should still treat broad repo debt as a triage outcome,
+not a cleanup failure.
 
 ## Rollout Ledger
 

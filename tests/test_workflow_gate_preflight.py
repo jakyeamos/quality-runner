@@ -260,8 +260,81 @@ def test_verify_gates_classifies_environment_restricted_failures(tmp_path: Path)
 
     assert payload["status"] == "blocked"
     assert verification["status"] == "blocked"
+    assert verification["run_id"] == "environment-restricted"
     assert verification["gates"][0]["failure_type"] == "environment-restricted"
     assert "rerun outside sandbox" in verification["gates"][0]["recommended_action"]
+
+
+def test_verify_gates_classifies_test_server_timeout_as_environment_restricted(
+    tmp_path: Path,
+) -> None:
+    from quality_runner.workflow import verify_gates_payload
+
+    (tmp_path / "package.json").write_text(
+        json.dumps(
+            {
+                "scripts": {
+                    "test": (
+                        f"{sys.executable} -c "
+                        "\"import sys; "
+                        "print('Error: Test timed out in 15000ms', file=sys.stderr); "
+                        "print('Error: Server is not running.', file=sys.stderr); "
+                        "sys.exit(1)\""
+                    )
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    (tmp_path / ".quality-runner.toml").write_text(
+        '[quality_runner]\nrequired_capabilities = ["tests"]\n',
+        encoding="utf-8",
+    )
+
+    payload = verify_gates_payload(repo_root=tmp_path, run_id="test-server-timeout")
+    verification = json.loads(
+        Path(payload["artifact_paths"]["gate_verification_json"]).read_text()
+    )
+
+    assert payload["status"] == "blocked"
+    assert verification["status"] == "blocked"
+    assert verification["gates"][0]["failure_type"] == "environment-restricted"
+    assert "rerun the exact command directly from the repo root" in verification["gates"][0][
+        "recommended_action"
+    ]
+
+
+def test_verify_gates_keeps_plain_test_failures_as_command_failures(tmp_path: Path) -> None:
+    from quality_runner.workflow import verify_gates_payload
+
+    (tmp_path / "package.json").write_text(
+        json.dumps(
+            {
+                "scripts": {
+                    "test": (
+                        f"{sys.executable} -c "
+                        "\"import sys; print('AssertionError: expected true', file=sys.stderr); "
+                        "sys.exit(1)\""
+                    )
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    (tmp_path / ".quality-runner.toml").write_text(
+        '[quality_runner]\nrequired_capabilities = ["tests"]\n',
+        encoding="utf-8",
+    )
+
+    payload = verify_gates_payload(repo_root=tmp_path, run_id="plain-test-failure")
+    verification = json.loads(
+        Path(payload["artifact_paths"]["gate_verification_json"]).read_text()
+    )
+
+    assert payload["status"] == "failed"
+    assert verification["status"] == "failed"
+    assert verification["gates"][0]["failure_type"] == "command-failed"
+    assert "recommended_action" not in verification["gates"][0]
 
 
 def test_verify_gates_uses_per_gate_timeout_config_and_skips_covered_aggregate(
