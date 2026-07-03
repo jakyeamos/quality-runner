@@ -11,6 +11,7 @@ from quality_runner.gate_execution_policy import (
     failure_type,
     gate_cwd,
     mutating_risk,
+    ordered_capabilities,
     recommended_action,
     timeout_diagnostics,
     valid_gate_timeouts,
@@ -32,6 +33,7 @@ def verify_discovered_gates(
     gate_timeouts: dict[str, int] | None = None,
     read_only_gates: bool = False,
     allow_mutating_gates: bool = False,
+    on_partial_result: Any | None = None,
 ) -> dict[str, Any]:
     gates: list[dict[str, Any]] = []
     passed_leaf_ids: set[str] = set()
@@ -44,7 +46,7 @@ def verify_discovered_gates(
         read_only_gates=read_only_gates,
         allow_mutating_gates=allow_mutating_gates,
     )
-    for capability in _available_capabilities(capability_map):
+    for capability in ordered_capabilities(capability_map):
         capability_id = str(capability.get("id") or "unknown")
         timeout = resolved_gate_timeouts.get(capability_id, timeout_seconds)
         gate = _verify_gate(
@@ -58,12 +60,45 @@ def verify_discovered_gates(
         gates.append(gate)
         if capability_id in LEAF_GATE_IDS and gate.get("status") == "passed":
             passed_leaf_ids.add(capability_id)
+        if on_partial_result is not None:
+            on_partial_result(
+                _verification_payload(
+                    run_id=run_id,
+                    gates=gates,
+                    timeout_seconds=timeout_seconds,
+                    gate_timeouts=resolved_gate_timeouts,
+                    read_only_gates=read_only_gates,
+                    allow_mutating_gates=allow_mutating_gates,
+                    execution_plan=execution_plan,
+                )
+            )
+    return _verification_payload(
+        run_id=run_id,
+        gates=gates,
+        timeout_seconds=timeout_seconds,
+        gate_timeouts=resolved_gate_timeouts,
+        read_only_gates=read_only_gates,
+        allow_mutating_gates=allow_mutating_gates,
+        execution_plan=execution_plan,
+    )
+
+
+def _verification_payload(
+    *,
+    run_id: str | None,
+    gates: list[dict[str, Any]],
+    timeout_seconds: int,
+    gate_timeouts: dict[str, int],
+    read_only_gates: bool,
+    allow_mutating_gates: bool,
+    execution_plan: list[dict[str, Any]],
+) -> dict[str, Any]:
     return {
         "schema": GATE_VERIFICATION_SCHEMA,
         **_optional_field("run_id", run_id),
         "status": _status(gates),
         "timeout_seconds": timeout_seconds,
-        "gate_timeouts": resolved_gate_timeouts,
+        "gate_timeouts": gate_timeouts,
         "read_only_gates": read_only_gates,
         "allow_mutating_gates": allow_mutating_gates,
         "environment": _environment(),

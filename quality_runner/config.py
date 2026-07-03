@@ -417,6 +417,11 @@ def _structural_scan(value: object, warnings: list[dict[str, str]]) -> dict[str,
         "quality_runner.structural_scan.fat_router_lines",
         warnings,
     )
+    max_text_files = _positive_int(
+        value.get("max_text_files"),
+        "quality_runner.structural_scan.max_text_files",
+        warnings,
+    )
     result: dict[str, Any] = {"disabled_rule_groups": disabled}
     if include_ignored_paths:
         result["include_ignored_paths"] = include_ignored_paths
@@ -424,6 +429,8 @@ def _structural_scan(value: object, warnings: list[dict[str, str]]) -> dict[str,
         result["large_file_lines"] = large_file_lines
     if fat_router_lines is not None:
         result["fat_router_lines"] = fat_router_lines
+    if max_text_files is not None:
+        result["max_text_files"] = max_text_files
     return result
 
 

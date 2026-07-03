@@ -566,3 +566,84 @@ def test_verify_gates_uses_per_gate_timeout_config_and_skips_covered_aggregate(
     assert verification["gates"][0]["timeout_seconds"] == 9
     assert verification["gates"][1]["reason"] == "aggregate gate covered by leaf gates"
     assert verification["gates"][1]["covered_by"] == ["lint"]
+
+
+def test_verify_gates_runs_cheap_gates_before_expensive_gates(tmp_path: Path) -> None:
+    from quality_runner.gate_verification import verify_discovered_gates
+
+    capability_map = {
+        "available": [
+            {
+                "id": "build",
+                "type": "script",
+                "command": f"{sys.executable} -c \"print('build')\"",
+                "source": "package.json",
+            },
+            {
+                "id": "lint",
+                "type": "script",
+                "command": f"{sys.executable} -c \"print('lint')\"",
+                "source": "package.json",
+            },
+            {
+                "id": "typecheck",
+                "type": "script",
+                "command": f"{sys.executable} -c \"print('typecheck')\"",
+                "source": "package.json",
+            },
+        ]
+    }
+
+    verification = verify_discovered_gates(
+        repo_root=tmp_path,
+        capability_map=capability_map,
+        run_id="ordered-gates",
+    )
+
+    assert [gate["id"] for gate in verification["gates"]] == [
+        "lint",
+        "typecheck",
+        "build",
+    ]
+    assert [gate["id"] for gate in verification["execution_plan"]] == [
+        "lint",
+        "typecheck",
+        "build",
+    ]
+
+
+def test_verify_gates_streams_partial_results_after_each_gate(tmp_path: Path) -> None:
+    from quality_runner.gate_verification import verify_discovered_gates
+
+    seen_counts: list[int] = []
+
+    def record_partial(verification: dict[str, object]) -> None:
+        gates = verification.get("gates")
+        assert isinstance(gates, list)
+        seen_counts.append(len(gates))
+
+    capability_map = {
+        "available": [
+            {
+                "id": "lint",
+                "type": "script",
+                "command": f"{sys.executable} -c \"print('lint')\"",
+                "source": "package.json",
+            },
+            {
+                "id": "typecheck",
+                "type": "script",
+                "command": f"{sys.executable} -c \"print('typecheck')\"",
+                "source": "package.json",
+            },
+        ]
+    }
+
+    verify_discovered_gates(
+        repo_root=tmp_path,
+        capability_map=capability_map,
+        run_id="partial-gates",
+        on_partial_result=record_partial,
+    )
+
+    assert seen_counts == [1, 2]

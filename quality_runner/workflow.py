@@ -243,6 +243,20 @@ def verify_gates_payload(
     )
     package_manager_preflight = build_package_manager_preflight(repo_root, scan)
     code_quality_scan = create_code_quality_scan(repo_root, scan=scan, config=config)
+    artifact_paths = {
+        "repo_scan_json": str(run_dir / "repo-scan.json"),
+        "code_quality_scan_json": str(run_dir / "code-quality-scan.json"),
+        "package_manager_preflight_json": str(run_dir / "package-manager-preflight.json"),
+        "standards_json": str(run_dir / "standards.json"),
+        "capability_matrix_json": str(run_dir / "capability-matrix.json"),
+        "gate_execution_plan_json": str(run_dir / "gate-execution-plan.json"),
+        "gate_verification_json": str(run_dir / "gate-verification.json"),
+        "quality_audit_json": str(run_dir / "quality-audit.json"),
+        "remediation_plan_json": str(run_dir / "remediation-plan.json"),
+        "agent_handoff_json": str(run_dir / "agent-handoff.json"),
+        "agent_handoff_md": str(run_dir / "agent-handoff.md"),
+        "run_manifest_json": str(run_dir / "run-manifest.json"),
+    }
     gate_execution_plan = build_gate_execution_plan(
         repo_root=repo_root,
         capability_map=capability_map,
@@ -251,6 +265,11 @@ def verify_gates_payload(
         read_only_gates=read_only_gates,
         allow_mutating_gates=allow_mutating_gates,
     )
+    write_json(run_dir / "gate-execution-plan.json", gate_execution_plan)
+
+    def write_partial_gate_verification(verification: dict[str, Any]) -> None:
+        write_json(run_dir / "gate-verification.json", verification)
+
     gate_verification = verify_discovered_gates(
         repo_root=repo_root,
         capability_map=capability_map,
@@ -259,6 +278,7 @@ def verify_gates_payload(
         gate_timeouts=gate_timeouts(config),
         read_only_gates=read_only_gates,
         allow_mutating_gates=allow_mutating_gates,
+        on_partial_result=write_partial_gate_verification,
     )
     verified_capability_map = apply_gate_verification(capability_map, gate_verification)
     audit_report = build_audit_report(
@@ -274,20 +294,6 @@ def verify_gates_payload(
     )
     _require_valid("remediation plan", validate_remediation_plan(remediation_plan))
 
-    artifact_paths = {
-        "repo_scan_json": str(run_dir / "repo-scan.json"),
-        "code_quality_scan_json": str(run_dir / "code-quality-scan.json"),
-        "package_manager_preflight_json": str(run_dir / "package-manager-preflight.json"),
-        "standards_json": str(run_dir / "standards.json"),
-        "capability_matrix_json": str(run_dir / "capability-matrix.json"),
-        "gate_execution_plan_json": str(run_dir / "gate-execution-plan.json"),
-        "gate_verification_json": str(run_dir / "gate-verification.json"),
-        "quality_audit_json": str(run_dir / "quality-audit.json"),
-        "remediation_plan_json": str(run_dir / "remediation-plan.json"),
-        "agent_handoff_json": str(run_dir / "agent-handoff.json"),
-        "agent_handoff_md": str(run_dir / "agent-handoff.md"),
-        "run_manifest_json": str(run_dir / "run-manifest.json"),
-    }
     handoff = build_agent_handoff(
         audit_report=audit_report,
         remediation_plan=remediation_plan,

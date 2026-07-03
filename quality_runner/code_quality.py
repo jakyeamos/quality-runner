@@ -49,6 +49,7 @@ DEFAULT_LARGE_FILE_LINES = 500
 DEFAULT_FAT_ROUTER_LINES = 500
 DEFAULT_GZIPPED_JS_BUNDLE_BYTES = 200_000
 DEFAULT_SKIPPED_PATH_ESTIMATE_LIMIT = 10_000
+DEFAULT_MAX_TEXT_FILES = 2_500
 ESTIMATED_SCAN_SECONDS_PER_TEXT_FILE = 0.015
 JS_BUNDLE_DIRS = (
     ".next/static/chunks",
@@ -77,7 +78,12 @@ def create_code_quality_scan(
     scanned_files: list[dict[str, Any]] = []
 
     for path in _discover_text_files(
-        root, skipped_files, generated_paths, include_ignored_paths, scan_exclusions
+        root,
+        skipped_files,
+        generated_paths,
+        include_ignored_paths,
+        scan_exclusions,
+        policy["max_text_files"],
     ):
         relative_path = path.relative_to(root).as_posix()
         text = path.read_text(encoding="utf-8", errors="replace")
@@ -151,6 +157,11 @@ def create_code_quality_scan(
                 sorted_findings, "severity", ["warning", "observation"]
             ),
             "duplicate_clusters": len(duplicate_clusters),
+            "scan_budget": _scan_budget_summary(
+                scanned_files=len(accountability),
+                max_text_files=policy["max_text_files"],
+                skipped_files=skipped_files,
+            ),
             **_skipped_path_summary(skipped_files),
         },
         "accountability": accountability,
@@ -167,6 +178,7 @@ def _structural_policy(config: dict[str, Any]) -> dict[str, Any]:
     disabled = policy.get("disabled_rule_groups")
     large_file_lines = policy.get("large_file_lines")
     fat_router_lines = policy.get("fat_router_lines")
+    max_text_files = policy.get("max_text_files")
     return {
         "disabled_rule_groups": [item for item in disabled if isinstance(item, str)]
         if isinstance(disabled, list)
@@ -178,6 +190,9 @@ def _structural_policy(config: dict[str, Any]) -> dict[str, Any]:
         "fat_router_lines": fat_router_lines
         if isinstance(fat_router_lines, int) and fat_router_lines > 0
         else DEFAULT_FAT_ROUTER_LINES,
+        "max_text_files": max_text_files
+        if isinstance(max_text_files, int) and max_text_files > 0
+        else DEFAULT_MAX_TEXT_FILES,
     }
 
 
@@ -187,11 +202,19 @@ def _discover_text_files(
     generated_paths: set[str],
     include_ignored_paths: set[str],
     scan_exclusions: list[str],
+    max_text_files: int,
 ) -> list[Path]:
     files: list[Path] = []
+    scan_budget_exceeded = False
     for current_root, dir_names, file_names in os.walk(root):
         current_path = Path(current_root)
         relative_current = current_path.relative_to(root).as_posix()
+        if scan_budget_exceeded:
+            skipped_files.append(
+                _skipped_directory_entry(root, current_path, "scan budget exceeded")
+            )
+            dir_names[:] = []
+            continue
         ignored: list[tuple[str, str]] = []
         for name in sorted(dir_names):
             relative_name = _join_relative(relative_current, name)
@@ -237,7 +260,21 @@ def _discover_text_files(
                     skipped_files.append({"path": relative_path, "reason": "scan exclusion"})
                 continue
             if path.suffix in TEXT_EXTENSIONS or path.name in {"Dockerfile", "Makefile"}:
+                if len(files) >= max_text_files:
+                    skipped_files.append({"path": relative_path, "reason": "scan budget exceeded"})
+                    scan_budget_exceeded = True
+                    continue
                 files.append(path)
+        if scan_budget_exceeded:
+            for directory_name in dir_names:
+                skipped_files.append(
+                    _skipped_directory_entry(
+                        root,
+                        current_path / directory_name,
+                        "scan budget exceeded",
+                    )
+                )
+            dir_names[:] = []
     return files
 
 
@@ -256,6 +293,7 @@ def preview_ignored_paths(
         _generated_paths(scan or {}),
         set(policy["include_ignored_paths"]),
         _effective_scan_exclusions(root, config),
+        policy["max_text_files"],
     )
     return [
         item
@@ -350,6 +388,23 @@ def _skipped_path_summary(skipped_files: list[dict[str, Any]]) -> dict[str, Any]
         "skipped_estimate_truncated": any(
             item.get("estimate_truncated") is True for item in skipped_files
         ),
+    }
+
+
+def _scan_budget_summary(
+    *,
+    scanned_files: int,
+    max_text_files: int,
+    skipped_files: list[dict[str, Any]],
+) -> dict[str, Any]:
+    skipped_by_budget = [
+        item for item in skipped_files if item.get("reason") == "scan budget exceeded"
+    ]
+    return {
+        "max_text_files": max_text_files,
+        "scanned_text_files": scanned_files,
+        "budget_exceeded": bool(skipped_by_budget),
+        "skipped_text_files": len(skipped_by_budget),
     }
 
 

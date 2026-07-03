@@ -693,6 +693,35 @@ def test_code_quality_scan_reports_estimated_cost_for_skipped_paths(tmp_path: Pa
     assert result["summary"]["skipped_estimated_scan_seconds"] > 0
 
 
+def test_code_quality_scan_stops_at_configured_file_budget(tmp_path: Path) -> None:
+    from quality_runner.code_quality import create_code_quality_scan
+
+    for index in range(5):
+        _write(tmp_path / "src" / f"file-{index}.ts", f"const value{index}: any = {{}};\n")
+
+    result = create_code_quality_scan(
+        tmp_path,
+        scan={"run_id": "scan-budget"},
+        config={"structural_scan": {"max_text_files": 2}},
+    )
+
+    scanned_paths = [item["path"] for item in result["accountability"]]
+    skipped = {item["path"]: item["reason"] for item in result["skipped_files"]}
+
+    assert scanned_paths == ["src/file-0.ts", "src/file-1.ts"]
+    assert skipped == {
+        "src/file-2.ts": "scan budget exceeded",
+        "src/file-3.ts": "scan budget exceeded",
+        "src/file-4.ts": "scan budget exceeded",
+    }
+    assert result["summary"]["scan_budget"] == {
+        "max_text_files": 2,
+        "scanned_text_files": 2,
+        "budget_exceeded": True,
+        "skipped_text_files": 3,
+    }
+
+
 def test_code_quality_scan_can_include_default_ignored_paths(tmp_path: Path) -> None:
     from quality_runner.code_quality import create_code_quality_scan
 

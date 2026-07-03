@@ -470,6 +470,30 @@ Product outcome:
   `.quality-runner/` artifacts, and the reports clearly separated pre-existing
   local edits from QR output.
 
+## Product Fixes Before Refresh Wave 4
+
+Refresh wave 3 also clarified that timeout finalization is only the fallback.
+The primary Tier 1 path is making more QR runs complete inside the delegated
+deadline.
+
+Implemented refresh efficiency hardening:
+
+- Gate execution now uses a cost-aware order. Cheap/high-signal executable
+  gates run before expensive `tests`, `build`, `pre_cr`, and `pre_pr` gates,
+  while the written `gate-execution-plan.json` matches the actual execution
+  order.
+- `verify-gates` writes `gate-execution-plan.json` before executing gates and
+  refreshes `gate-verification.json` after each gate result. If a later gate
+  stalls, the controller still receives completed-gate evidence rather than an
+  all-or-nothing artifact.
+- Structural scans now have a configurable text-file budget through
+  `quality_runner.structural_scan.max_text_files`; the default is 2,500 files.
+  When the cap is reached, skipped files and directories are recorded with
+  `scan budget exceeded` evidence and a `summary.scan_budget` payload.
+
+Validation before launch: `uv run ruff check .` and full `uv run pytest`
+passed for this efficiency change set.
+
 ## Rollout Ledger
 
 | Wave | Repo | Repo path | Total | Blockers | Baseline artifacts | Codex project status | Thread status | Thread id | Final QR status | Commit | Push | Notes |

@@ -56,7 +56,7 @@ def build_gate_execution_plan(
 ) -> list[dict[str, Any]]:
     resolved_gate_timeouts = valid_gate_timeouts(gate_timeouts)
     plan: list[dict[str, Any]] = []
-    for capability in _available_capabilities(capability_map):
+    for capability in ordered_capabilities(capability_map):
         capability_id = str(capability.get("id") or "unknown")
         command = capability.get("command")
         command_text = command if isinstance(command, str) else None
@@ -82,6 +82,10 @@ def build_gate_execution_plan(
             }
         )
     return plan
+
+
+def ordered_capabilities(capability_map: dict[str, Any]) -> list[dict[str, Any]]:
+    return sorted(_available_capabilities(capability_map), key=_gate_cost_key)
 
 
 def failure_type(*, command: str, stdout: str, stderr: str, timed_out: bool) -> str:
@@ -201,6 +205,27 @@ def _available_capabilities(capability_map: dict[str, Any]) -> list[dict[str, An
     if not isinstance(available, list):
         return []
     return [capability for capability in available if isinstance(capability, dict)]
+
+
+def _gate_cost_key(capability: dict[str, Any]) -> tuple[int, str]:
+    capability_id = str(capability.get("id") or "")
+    if _capability_kind(capability) == "evidence_file" or capability.get(
+        "local_execution"
+    ) == "ci-only":
+        cost = 95
+    else:
+        cost = {
+            "formatter": 10,
+            "lint": 20,
+            "typecheck": 30,
+            "runtime_smoke": 40,
+            "dead_code": 50,
+            "tests": 60,
+            "build": 70,
+            "pre_cr": 80,
+            "pre_pr": 90,
+        }.get(capability_id, 45)
+    return cost, capability_id
 
 
 def _capability_kind(capability: dict[str, Any]) -> str:
