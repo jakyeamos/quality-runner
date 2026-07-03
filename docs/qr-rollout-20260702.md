@@ -1030,6 +1030,21 @@ Implemented the Wave 12 polish follow-ups:
   direct interactive `pnpm install --frozen-lockfile` setup step before
   rerunning QR gates.
 
+## Refresh Wave 13 Launch
+
+Wave 13 validates the action-group and pnpm no-TTY guidance fix from commit
+`a309250`. This is a narrow canary, not a broad rollout: amos-saas validates the
+known no-TTY dependency setup path, EliHealth validates mixed blocker grouping,
+BIP-Console validates read-only-policy regression safety, and R-Project remains
+the clean control.
+
+| Repo | Thread id | Run id prefix | Baseline | Report path | Status |
+|---|---|---|---|---|---|
+| amos-saas | `019f2944-107a-7e01-8e9b-dd86f7bd4c7f` | `refresh13-20260703-amos-saas` | `refresh12-20260703-amos-saas-verify` | `/private/tmp/qr-refresh13-amos-saas-report.json` | launched |
+| EliHealth | `019f2944-15df-7292-8687-db5dc0a275ee` | `refresh13-20260703-EliHealth` | `refresh12-20260703-EliHealth-verify` | `/private/tmp/qr-refresh13-EliHealth-report.json` | launched |
+| BIP-Console | `019f2944-1be7-7ab1-b695-e502dbd68bdd` | `refresh13-20260703-BIP-Console` | `refresh12-20260703-BIP-Console-verify` | `/private/tmp/qr-refresh13-BIP-Console-report.json` | launched |
+| R-Project | `019f2944-2345-7250-9c7b-3fe35464062b` | `refresh13-20260703-R-Project` | `refresh12-20260703-R-Project-verify` | `/private/tmp/qr-refresh13-R-Project-report.json` | launched |
+
 ## Rollout Ledger
 
 | Wave | Repo | Repo path | Total | Blockers | Baseline artifacts | Codex project status | Thread status | Thread id | Final QR status | Commit | Push | Notes |
