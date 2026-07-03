@@ -1607,6 +1607,61 @@ valid report artifact.
 | BBDSE | `/Users/jakyeamos/projects/BBDSE` | `019f2a2f-f25d-70a3-a90a-3adf8f9d102a` | `refresh19-20260703-BBDSE` | `refresh18-20260703-BBDSE-verify` | `/private/tmp/qr-refresh19-BBDSE-report.json` | launched |
 | agent-router | `/Users/jakyeamos/projects/agent-router` | `019f2a30-0462-72a1-8260-a2bb1f1ba7c7` | `refresh19-20260703-agent-router` | `refresh18-20260703-agent-router-verify` | `/private/tmp/qr-refresh19-agent-router-report.json` | launched |
 
+## Refresh Wave 19 Results
+
+All eight Wave 19 workers reported back to the controller and left controller
+report artifacts. Independent controller-side checks accepted every saved
+report:
+
+- `uv run quality-runner controller-report lint <report> --strict --json`
+- `uv run quality-runner validate-report <report> --json`
+
+Wave 19 validated the post-Wave-18 hardening: every report was generated first
+without a manual `--blocker`, and automatic blocker synthesis succeeded in all
+eight repos. Every report also included `controller_status_recommendation`,
+`repo_state.dirty_state`, and `controller_command_environment` with repo-local
+`UV_CACHE_DIR` and `XDG_CACHE_HOME` values.
+
+| Repo | Thread status | Final QR | Classification | Blocker classes | Findings | Report checks | Key evidence |
+|---|---|---|---|---|---:|---|---|
+| amos-saas | blocked | blocked | mixed-gate-blocker | read-only-policy, dependency-setup, structural-findings | 27 | accepted | Auto blockers worked; dirty state grouped `.quality-runner/`; lint exposed dependency setup blocker and dependent gates were skipped. |
+| BIP-Console | blocked | blocked | read-only-gate-blocker | read-only-policy, structural-findings | 10 | accepted | All executable gates passed; blocked only by read-only formatter policy and remaining structural findings. |
+| R-Project | ready-for-review | passed | clean | none | 0 | accepted | Clean QR result; status recommendation correctly returned `ready-for-review` because this was read-only evidence with no task commit/push. |
+| EliHealth | blocked | blocked | mixed-gate-blocker | read-only-policy, command-failure, structural-findings | 24 | accepted | Auto blockers worked; lint and build failed while typecheck, runtime smoke, dead-code, and tests passed. Worker still needed escalation for the outer `uv run` cache on one summarize attempt. |
+| Terrace | blocked | passed-with-findings | missing-capabilities | missing-capabilities, structural-findings | 14 | accepted | Runtime gates passed; report captured missing formatter, dead-code, and runtime-smoke capabilities plus structural findings. |
+| tmcp | blocked | passed-with-findings | missing-capabilities | missing-capabilities, structural-findings | 10 | accepted | Clean dirty-state arrays; report captured missing repo-owned gates while `pre_cr` passed. |
+| BBDSE | blocked | blocked | workflow-timeout-blocker | workflow-timeout, command-failure | 0 | accepted | Timeout artifact now includes scan progress, skipped paths, and visited/skipped top-level counts. Last directory moved to `CLFE/data/external/nba_pbp_cache`; `.claude/worktrees` no longer appears as the last traversal directory. |
+| agent-router | blocked | blocked | read-only-gate-blocker | read-only-policy, missing-capabilities, structural-findings | 8 | accepted | Generated/agent exclusions present; dirty state grouped `.aios/` as pre-existing and `.quality-runner/` as QR artifact. |
+
+Product takeaways:
+
+- The `.claude/worktrees` exclusion fixed the specific Wave 18 traversal
+  failure mode. BBDSE now times out in a repo-owned data cache
+  (`CLFE/data/external/nba_pbp_cache`), which is a different class of problem:
+  QR needs configurable and possibly heuristic pruning for large data/cache
+  surfaces that are not dependency directories but are still poor quality-scan
+  targets.
+- Timeout diagnostics are useful in artifacts, but the controller report should
+  promote the concise timeout summary directly: timeout scope/reason, last
+  directory, visited/skipped counts, and largest top-level traversal buckets.
+  The controller should not require artifact archaeology to explain a timeout.
+- The BBDSE timeout artifact preserved the requested reason
+  (`controller refresh wave 19 hardened provenance validation`) and scope
+  (`total-refresh`), but its `elapsed_seconds` value was `9.265` despite a
+  300-second total timeout. That timing field needs clarification or correction
+  before timeout evidence is Tier 1 quality.
+- Repo-local cache environment worked for QR-spawned commands and appears in
+  reports, but EliHealth still exposed a launch ergonomics gap: worker prompts
+  invoking `uv run --project quality-runner ...` can hit the outer `uv` cache
+  before QR has a chance to apply repo-local command environment. Controller
+  launches should either prefix QR invocations with safe cache env values or use
+  a QR wrapper that owns that setup.
+- Dirty-state grouping is materially better. It distinguished pre-existing
+  artifacts from QR artifacts across the wave and highlighted a possible
+  read-only drift in BBDSE: `.quality-runner.toml` moved from ` M` to `M` and
+  was classified as `post_command_artifacts`. That deserves targeted inspection
+  before the next stress wave.
+
 ## Rollout Ledger
 
 | Wave | Repo | Repo path | Total | Blockers | Baseline artifacts | Codex project status | Thread status | Thread id | Final QR status | Commit | Push | Notes |
