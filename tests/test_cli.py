@@ -598,9 +598,12 @@ def test_cli_refresh_workflow_timeout_records_reason(tmp_path: Path) -> None:
     assert payload["runs"]["verify"]["timeout"]["reason"] == (
         "controller deadline exceeded during verify"
     )
+    assert payload["runs"]["verify"]["timeout"]["timeout_scope"] == "verify-phase"
     assert gate_verification["failure_type"] == "workflow-timeout"
     assert gate_verification["reason"] == "controller deadline exceeded during verify"
+    assert gate_verification["timeout_scope"] == "verify-phase"
     assert timeout_artifact["reason"] == "controller deadline exceeded during verify"
+    assert timeout_artifact["timeout_scope"] == "verify-phase"
 
 
 def test_cli_export_handoff_prints_latest_handoff(tmp_path: Path) -> None:

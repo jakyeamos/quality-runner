@@ -96,6 +96,7 @@ def timeout_refresh_phase(
     phase: str,
     reason: str,
     timeout_seconds: int,
+    timeout_scope: str,
 ) -> dict[str, Any]:
     return {
         "schema": "quality-runner-refresh-phase-result-v0.1",
@@ -106,6 +107,7 @@ def timeout_refresh_phase(
         "failure_type": "workflow-timeout",
         "reason": reason,
         "timeout_seconds": timeout_seconds,
+        "timeout_scope": timeout_scope,
     }
 
 
@@ -141,6 +143,7 @@ def build_timeout_verify_artifacts(
     timeout_seconds: int,
     elapsed_seconds: float,
     baseline_run_id: str | None,
+    timeout_scope: str = "verify-phase",
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     run_dir = prepare_artifact_dir(repo_root, run_id)
     plan_path = run_dir / "gate-execution-plan.json"
@@ -155,6 +158,7 @@ def build_timeout_verify_artifacts(
         "failure_type": "workflow-timeout",
         "reason": reason,
         "timeout_seconds": timeout_seconds,
+        "timeout_scope": timeout_scope,
         "elapsed_seconds": round(elapsed_seconds, 3),
     }
     gate_verification = {
@@ -167,6 +171,7 @@ def build_timeout_verify_artifacts(
         "phase": phase,
         "reason": reason,
         "elapsed_seconds": round(elapsed_seconds, 3),
+        "timeout_scope": timeout_scope,
         "gates": _existing_gates(existing_verification),
     }
     artifact_paths = {

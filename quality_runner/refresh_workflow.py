@@ -59,6 +59,7 @@ def run_refresh_payload(
         phase_started=total_started,
         timeout_seconds=total_timeout_seconds or resolved_verify_timeout,
         timeout_reason=resolved_total_reason or resolved_verify_reason,
+        timeout_scope="total-refresh" if total_timeout_seconds is not None else "verify-phase",
     )
     inspect_result = not_started_refresh_phase(inspect_run_id, "inspect")
     run_result = not_started_refresh_phase(run_run_id, "run")
@@ -79,6 +80,7 @@ def run_refresh_payload(
         current.phase_started = time.monotonic()
         current.timeout_seconds = total_timeout_seconds or resolved_verify_timeout
         current.timeout_reason = resolved_total_reason or resolved_verify_reason
+        current.timeout_scope = "total-refresh" if total_timeout_seconds is not None else "verify-phase"
         remaining = remaining_total_seconds()
         try:
             if remaining is None:
@@ -156,6 +158,7 @@ def run_refresh_payload(
                 phase="inspect",
                 reason=current.timeout_reason,
                 timeout_seconds=current.timeout_seconds,
+                timeout_scope=current.timeout_scope,
             )
         elif current.phase == "run":
             run_result = timeout_refresh_phase(
@@ -163,6 +166,7 @@ def run_refresh_payload(
                 phase="run",
                 reason=current.timeout_reason,
                 timeout_seconds=current.timeout_seconds,
+                timeout_scope=current.timeout_scope,
             )
         verify_result, summary = build_timeout_verify_artifacts(
             repo_root=repo_root,
@@ -172,6 +176,7 @@ def run_refresh_payload(
             timeout_seconds=current.timeout_seconds,
             elapsed_seconds=time.monotonic() - current.phase_started,
             baseline_run_id=baseline_run_id,
+            timeout_scope=current.timeout_scope,
         )
     return {
         "schema": "quality-runner-refresh-result-v0.1",
@@ -198,12 +203,14 @@ class _RefreshTimeoutState:
         phase_started: float,
         timeout_seconds: int,
         timeout_reason: str,
+        timeout_scope: str,
     ) -> None:
         self.phase = phase
         self.phase_key = phase_key
         self.phase_started = phase_started
         self.timeout_seconds = timeout_seconds
         self.timeout_reason = timeout_reason
+        self.timeout_scope = timeout_scope
 
 
 def _run_verify_phase(
@@ -230,11 +237,13 @@ def _run_verify_phase(
     verify_deadline = float(resolved_verify_timeout)
     current.timeout_seconds = resolved_verify_timeout
     current.timeout_reason = resolved_verify_reason
+    current.timeout_scope = "verify-phase"
     remaining = remaining_total_seconds()
     if remaining is not None and remaining < verify_deadline:
         verify_deadline = remaining
         current.timeout_seconds = total_timeout_seconds or resolved_verify_timeout
         current.timeout_reason = resolved_total_reason or resolved_verify_reason
+        current.timeout_scope = "total-refresh"
     if verify_deadline <= 0:
         raise TimeoutError(current.timeout_reason)
     with workflow_deadline(seconds=verify_deadline, reason=current.timeout_reason):

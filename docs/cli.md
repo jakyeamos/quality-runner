@@ -170,6 +170,9 @@ Timeout flags are explicit about scope:
 
 Refresh JSON includes `timeout_contract` and `phase_timings` so controllers can
 distinguish a deliberate full-evidence run from a hard end-to-end deadline.
+When a timeout fires, `workflow-timeout.json`, the verify result, and
+`gate-verification.json` include `timeout_scope` as either `verify-phase` or
+`total-refresh`.
 
 ## `quality-runner validate-report`
 

@@ -687,6 +687,17 @@ Product takeaways:
   (`verify-phase` vs `total-refresh`) so controllers do not infer scope from
   the reason string.
 
+## Product Fix After Refresh Wave 6
+
+Implemented timeout scope evidence:
+
+- Timeout artifacts now include `timeout_scope`.
+- `gate-verification.json` timeout finalization also includes `timeout_scope`.
+- Values are `verify-phase` for verify-only deadlines and `total-refresh` for
+  full refresh budget deadlines, even when the active phase remains
+  `verify-gates`.
+- The CLI docs now describe the field for controller consumers.
+
 ## Rollout Ledger
 
 | Wave | Repo | Repo path | Total | Blockers | Baseline artifacts | Codex project status | Thread status | Thread id | Final QR status | Commit | Push | Notes |

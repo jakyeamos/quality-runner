@@ -348,10 +348,12 @@ def test_refresh_payload_finalizes_partial_verify_artifacts_when_verify_times_ou
     assert payload["runs"]["verify"]["timeout"]["reason"] == (
         "controller deadline exceeded while verifying gates"
     )
+    assert payload["runs"]["verify"]["timeout"]["timeout_scope"] == "verify-phase"
     assert payload["summary"]["recommended_classification"] == "workflow-timeout-blocker"
     assert gate_verification["status"] == "blocked"
     assert gate_verification["failure_type"] == "workflow-timeout"
     assert gate_verification["reason"] == "controller deadline exceeded while verifying gates"
+    assert gate_verification["timeout_scope"] == "verify-phase"
     assert gate_verification["gates"] == []
     assert json.loads((run_dir / "gate-execution-plan.json").read_text()) == []
     assert run_summary["recommended_classification"] == "workflow-timeout-blocker"
@@ -420,6 +422,7 @@ def test_refresh_payload_preserves_partial_verify_artifacts_when_timeout_finaliz
     assert gate_verification["status"] == "blocked"
     assert gate_verification["failure_type"] == "workflow-timeout"
     assert gate_verification["reason"] == "controller deadline exceeded while verifying gates"
+    assert gate_verification["timeout_scope"] == "verify-phase"
     assert gate_verification["gates"] == [
         {
             "duration_seconds": 12.5,
@@ -509,11 +512,51 @@ def test_refresh_payload_total_timeout_finalizes_when_run_phase_is_interrupted(
     assert payload["runs"]["run"]["failure_type"] == "workflow-timeout"
     assert payload["runs"]["verify"]["timeout"]["phase"] == "run"
     assert payload["runs"]["verify"]["timeout"]["reason"] == "controller full refresh budget"
+    assert payload["runs"]["verify"]["timeout"]["timeout_scope"] == "total-refresh"
     assert payload["timeout_contract"]["total_timeout_seconds"] == 30
     assert payload["phase_timings"]["run"]["status"] == "timeout"
     assert gate_verification["phase"] == "run"
     assert gate_verification["reason"] == "controller full refresh budget"
+    assert gate_verification["timeout_scope"] == "total-refresh"
     assert timeout_artifact["phase"] == "run"
+    assert timeout_artifact["timeout_scope"] == "total-refresh"
+
+
+def test_refresh_payload_total_timeout_scope_is_distinct_from_verify_phase(
+    tmp_path: Path, monkeypatch: object
+) -> None:
+    from quality_runner import workflow
+
+    def inspect_stub(**_: object) -> dict[str, object]:
+        return {"status": "inspected", "run_id": "refresh-total-scope-inspect"}
+
+    def run_stub(**_: object) -> dict[str, object]:
+        return {"status": "planned", "run_id": "refresh-total-scope-run"}
+
+    def verify_timeout(**_: object) -> dict[str, object]:
+        raise TimeoutError("controller full refresh budget")
+
+    monkeypatch.setattr(workflow, "inspect_payload", inspect_stub)
+    monkeypatch.setattr(workflow, "run_payload", run_stub)
+    monkeypatch.setattr(workflow, "verify_gates_payload", verify_timeout)
+
+    payload = workflow.refresh_payload(
+        repo_root=tmp_path,
+        run_id_prefix="refresh-total-scope",
+        workflow_timeout_seconds=60,
+        total_timeout_seconds=30,
+        total_timeout_reason="controller full refresh budget",
+    )
+    run_dir = tmp_path / ".quality-runner" / "runs" / "refresh-total-scope-verify"
+    gate_verification = json.loads((run_dir / "gate-verification.json").read_text())
+    timeout_artifact = json.loads((run_dir / "workflow-timeout.json").read_text())
+
+    assert payload["runs"]["verify"]["timeout"]["phase"] == "verify-gates"
+    assert payload["runs"]["verify"]["timeout"]["timeout_scope"] == "total-refresh"
+    assert gate_verification["phase"] == "verify-gates"
+    assert gate_verification["timeout_scope"] == "total-refresh"
+    assert timeout_artifact["phase"] == "verify-gates"
+    assert timeout_artifact["timeout_scope"] == "total-refresh"
 
 
 def test_verify_gate_kills_process_group_when_workflow_timeout_interrupts(
