@@ -758,6 +758,52 @@ Validation:
 - `uv run pytest tests/test_workflow_gate_preflight.py tests/test_config.py tests/test_workflow.py`
 - `uv run ruff check .`
 
+## Refresh Wave 8 Launch
+
+Refresh wave 8 validates the dependency setup blocker short-circuit against two
+dependency/setup candidates and one clean control repo:
+
+- `amos-saas` checks the known non-interactive `pnpm` restoration path. Expected
+  evidence is one root `dependency-setup-blocker` per package-manager/cwd
+  context, later same-context gates skipped with
+  `skip_type=dependency-setup-blocked`, `blocked_by`, and
+  `diagnostics.dependency_setup`.
+- `EliHealth` checks a second dependency/setup-heavy repo and records whether
+  the new behavior appears or whether current failures are unrelated.
+- `R-Project` is the control path. Expected evidence is no dependency setup
+  blocker fields and no regression in the non-JS clean/control path.
+
+| Repo | Thread id | Run id prefix | Baseline | Report path | Status |
+|---|---|---|---|---|---|
+| amos-saas | `019f28c5-c1f0-7740-9d39-691fbb2d2cbc` | `refresh8-20260703-amos-saas` | `refresh6budget-20260703-amos-saas-verify` | `/private/tmp/qr-refresh8-amos-saas-report.json` | accepted |
+| EliHealth | `019f28c5-c7e7-7991-bb99-098df638dbd9` | `refresh8-20260703-EliHealth` | `triage-20260702-EliHealth` | `/private/tmp/qr-refresh8-EliHealth-report.json` | accepted |
+| R-Project | `019f28c5-d50d-7540-aa89-1d7e325151a4`; superseded locally | `refresh8-20260703-R-Project` | `stress-20260703-R-Project-final-verify` | `/private/tmp/qr-refresh8-R-Project-report.json` | accepted |
+
+## Refresh Wave 8 Results
+
+All three reports validated with
+`quality-runner validate-report <report> --json` and returned
+`status=accepted`, `errors=[]`.
+
+| Repo | Thread status | Final QR result | Dependency setup evidence | Report |
+|---|---|---|---|---|
+| amos-saas | blocked | `environment-or-dependency-blocker`; final verify `blocked` | Product fix verified. `lint` was the sole root `dependency-setup-blocker`; `typecheck`, `runtime_smoke`, `dead_code`, `tests`, `build`, and `pre_cr` skipped with `skip_type=dependency-setup-blocked`, `blocked_by=lint`, and `diagnostics.dependency_setup` including `pnpm install --frozen-lockfile`. | `/private/tmp/qr-refresh8-amos-saas-report.json` |
+| EliHealth | blocked | `read-only-gate-blocker`; final verify `blocked` | New product gap found. Repeated `ERR_PNPM_IGNORED_BUILDS` setup failures remained `command-failed`; QR emitted no dependency setup diagnostics and did not skip later same-context gates. Build also had an unrelated missing `vite/client` type failure. | `/private/tmp/qr-refresh8-EliHealth-report.json` |
+| R-Project | ready-for-review | `clean`; final verify `passed` | Control path passed. No `dependency-setup-blocker`, no `dependency-setup-blocked` skips, `tests` passed, and `pre_cr` skipped without dependency setup diagnostics. | `/private/tmp/qr-refresh8-R-Project-report.json` |
+
+Product takeaways:
+
+- The short-circuit fix works for the known amos-saas non-interactive pnpm
+  dependency restoration case and removes repeated noisy gate failures.
+- The next dependency setup classifier must cover pnpm ignored-build approval
+  failures (`ERR_PNPM_IGNORED_BUILDS`) and recommend `pnpm approve-builds`
+  before rerunning gates.
+- Once that classifier is added, the same same-context skip behavior should
+  apply so EliHealth-style runs produce one actionable dependency setup blocker
+  instead of seven repeated command failures.
+- The R-Project control run confirms the new dependency setup memory does not
+  disturb clean non-JS verification.
+
 ## Rollout Ledger
 
 | Wave | Repo | Repo path | Total | Blockers | Baseline artifacts | Codex project status | Thread status | Thread id | Final QR status | Commit | Push | Notes |
