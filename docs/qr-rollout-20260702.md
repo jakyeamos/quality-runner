@@ -46,11 +46,12 @@ Codex project resolution:
 
 ## Wave 1 Retrospective
 
-Wave 1 should not advance until every worker returns `complete` or `blocked`.
-Early worker reports used `ready-for-review` after clearing missing repo-owned
-gates but before clearing runner-provided findings. The controller tightened the
-terminal vocabulary so partial progress remains `running` and gets returned to
-the worker.
+Wave 1 is closed. Four repos were blocked by broad repo-owned structural debt
+after the fixed runner removed scanner-scope noise, and one repo (`Vaults`) ran
+clean. Early worker reports used `ready-for-review` after clearing missing
+repo-owned gates but before clearing runner-provided findings. The controller
+tightened the terminal vocabulary so partial progress remains `running` and gets
+returned to the worker.
 
 Product improvements found:
 
@@ -69,6 +70,36 @@ Product improvements found:
 - Workers need a stricter final report: if QR status is not `clean`, they must
   classify the remaining findings as a blocker with evidence, not as a
   successful completion.
+
+## Triage Wave Protocol
+
+The original cleanup-wave rollout is paused. The remaining repos should be run
+as a case-study triage sample, not as an attempt to make every mature repo
+Quality Runner clean in one pass.
+
+Triage worker objective:
+
+- Classify the repo outcome as `clean`, `missing-gates-only`,
+  `scanner-product-issue`, `broad-repo-debt`, `env-or-dependency-blocker`, or
+  `mixed-blocker`.
+- Use `/Users/jakyeamos/projects/quality-runner/.venv/bin/quality-runner` and
+  verify version `0.2.1` before running QR.
+- Remediate only missing repo-owned gates, obvious path/scope configuration
+  issues, and at most 1-3 high-signal findings that are clearly safe.
+- Stop early when QR shows broad structural debt rather than attempting a
+  sweeping refactor.
+- Do not disable whole structural rule groups to get a clean result.
+- Do not commit `.quality-runner/` artifacts unless already tracked.
+- Report classification, final QR run id/status, files changed, verification,
+  commit/push state, and product lessons back to the controller.
+
+Triage acceptance:
+
+- The sample has a terminal classification for each repo.
+- The ledger records whether QR was clean, blocked by product/scanner behavior,
+  blocked by environment/dependency access, or blocked by repo-scale debt.
+- The case study emphasizes staged adoption lessons instead of treating every
+  non-clean result as a failed cleanup.
 
 ## Wave 1 Restart Protocol
 
@@ -92,16 +123,16 @@ Worker requirements for the restart:
 
 | Wave | Repo | Repo path | Total | Blockers | Baseline artifacts | Codex project status | Thread status | Thread id | Final QR status | Commit | Push | Notes |
 |---:|---|---|---:|---:|---|---|---|---|---|---|---|---|
-| 1 | tenure | `/Users/jakyeamos/projects/tenure` | 45 | 4 | `/Users/jakyeamos/projects/tenure/.quality-runner/runs/parallel-20260702T200935Z-tenure` | parent-project | running | `019f24fa-9946-7983-95be-33d1326f49ac` | planned; post-targeted fixed-runner QR run, awaiting terminal report | `de0ece0` | pushed | Worker removed four high-signal findings and updated truth file, then stalled before commit/push/report; controller nudge sent. Wave 1 cannot close until this thread reports `complete` or `blocked`. |
+| 1 | tenure | `/Users/jakyeamos/projects/tenure` | 45 | 4 | `/Users/jakyeamos/projects/tenure/.quality-runner/runs/parallel-20260702T200935Z-tenure` | parent-project | blocked | `019f24fa-9946-7983-95be-33d1326f49ac` | findings; `wave1-restart-20260702-tenure-targeted`; no missing capabilities | `b464119d` | pushed | Targeted restart removed four findings, but final QR still had 3,678 structural instances; broad remaining buckets include nested ternary, spacing/design-token issues, deep nesting, explicit `any`, console output, and error-envelope consistency. |
 | 1 | BidCamp | `/Users/jakyeamos/projects/BidCamp` | 39 | 2 | `/Users/jakyeamos/projects/BidCamp/.quality-runner/runs/parallel-20260702T200935Z-BidCamp` | exact-project | blocked | `019f24fa-d0d8-7821-a901-b186a39ecb15` | planned; `wave1-restart-20260702-BidCamp-2` | `60ffe151` | pushed | Fixed-runner restart added scoped QR config and image dimensions; `pnpm pre-cr` and dummy-env build passed. Blocked by 3,539 structural instances, 3,039 in `src`, requiring broad source refactor rather than scoped QR cleanup. |
 | 1 | Vaults | `/Users/jakyeamos/projects/Vaults` | 39 | 5 | `/Users/jakyeamos/projects/Vaults/.quality-runner/runs/parallel-20260702T200935Z-Vaults` | parent-project | complete | `019f24fa-fe62-7f60-b832-798ee07f82bd` | clean | `2f19af9` | pushed | Restart verification clean with fixed runner: `wave1-restart-20260702-Vaults`; no new commit. |
 | 1 | AIOS | `/Users/jakyeamos/projects/AIOS` | 34 | 1 | `/Users/jakyeamos/projects/AIOS/.quality-runner/runs/parallel-20260702T200935Z-AIOS` | parent-project | blocked | `019f24fb-3107-79a0-9af9-2a6de33f22ac` | planned; findings; no missing capabilities | `4031d38` | pushed | Restart run `wave1-restart-20260702-AIOS` with fixed QR runner dropped findings from 24,572 to 666; remaining blocker is broad repo-owned source debt. |
 | 1 | amos-saas | `/Users/jakyeamos/projects/amos-saas` | 34 | 2 | `/Users/jakyeamos/projects/amos-saas/.quality-runner/runs/parallel-20260702T200935Z-amos-saas` | parent-project | blocked | `019f24fb-5f5d-7f91-bfb8-43e9f3744be4` | findings; `wave1-restart-20260702-amos-saas`; no missing capabilities | `7ad2690` | pushed | Restart produced no new commit; branch already pushed. Blocked by 27 grouped / 1,160 raw structural findings across 241 files, missing local env secrets, and dependency audit network policy. |
-| 2 | Dsci-proj | `/Users/jakyeamos/projects/Dsci-proj` | 30 | 2 | `/Users/jakyeamos/projects/Dsci-proj/.quality-runner/runs/parallel-20260702T200935Z-Dsci-proj` | parent-project | pending |  |  |  |  |  |
-| 2 | Bballedu | `/Users/jakyeamos/projects/Bballedu` | 28 | 1 | `/Users/jakyeamos/projects/Bballedu/.quality-runner/runs/parallel-20260702T200935Z-Bballedu` | parent-project | pending |  |  |  |  |  |
-| 2 | BBDSE | `/Users/jakyeamos/projects/BBDSE` | 27 | 1 | `/Users/jakyeamos/projects/BBDSE/.quality-runner/runs/parallel-20260702T200935Z-BBDSE` | exact-project | pending |  |  |  |  |  |
-| 2 | EliHealth | `/Users/jakyeamos/projects/EliHealth` | 27 | 2 | `/Users/jakyeamos/projects/EliHealth/.quality-runner/runs/parallel-20260702T200935Z-EliHealth` | exact-project | pending |  |  |  |  |  |
-| 2 | Fantasy | `/Users/jakyeamos/projects/Fantasy` | 27 | 4 | `/Users/jakyeamos/projects/Fantasy/.quality-runner/runs/parallel-20260702T200935Z-Fantasy` | exact-project | pending |  |  |  |  |  |
+| 2 | Dsci-proj | `/Users/jakyeamos/projects/Dsci-proj` | 30 | 2 | `/Users/jakyeamos/projects/Dsci-proj/.quality-runner/runs/parallel-20260702T200935Z-Dsci-proj` | parent-project | triage-running | `019f2551-cb52-7e21-8270-b0cc8f4d3619` | triage running |  |  | Triage sample branch `qr/triage-parallel-20260702T200935Z`; classification pending. |
+| 2 | Bballedu | `/Users/jakyeamos/projects/Bballedu` | 28 | 1 | `/Users/jakyeamos/projects/Bballedu/.quality-runner/runs/parallel-20260702T200935Z-Bballedu` | parent-project | triage-running | `019f2552-b117-78a0-9f9b-91d29db62d03` | triage running |  |  | Triage sample branch `qr/triage-parallel-20260702T200935Z`; classification pending. |
+| 2 | BBDSE | `/Users/jakyeamos/projects/BBDSE` | 27 | 1 | `/Users/jakyeamos/projects/BBDSE/.quality-runner/runs/parallel-20260702T200935Z-BBDSE` | exact-project | triage-running | `019f2552-b760-7b81-93f0-eefa2ecf4092` | triage running |  |  | Triage sample branch `qr/triage-parallel-20260702T200935Z`; classification pending. |
+| 2 | EliHealth | `/Users/jakyeamos/projects/EliHealth` | 27 | 2 | `/Users/jakyeamos/projects/EliHealth/.quality-runner/runs/parallel-20260702T200935Z-EliHealth` | exact-project | triage-running | `019f2552-c01f-7022-b78d-d07c0cc80255` | triage running |  |  | Triage sample branch `qr/triage-parallel-20260702T200935Z`; classification pending. |
+| 2 | Fantasy | `/Users/jakyeamos/projects/Fantasy` | 27 | 4 | `/Users/jakyeamos/projects/Fantasy/.quality-runner/runs/parallel-20260702T200935Z-Fantasy` | exact-project | triage-running | `019f2552-ca61-7be2-9570-b6ecf5ff404c` | triage running |  |  | Triage sample branch `qr/triage-parallel-20260702T200935Z`; classification pending. |
 | 3 | Book | `/Users/jakyeamos/projects/Book` | 22 | 4 | `/Users/jakyeamos/projects/Book/.quality-runner/runs/parallel-20260702T200935Z-Book` | exact-project | pending |  |  |  |  |  |
 | 3 | dispatches-from-cyberspace | `/Users/jakyeamos/projects/dispatches-from-cyberspace` | 22 | 2 | `/Users/jakyeamos/projects/dispatches-from-cyberspace/.quality-runner/runs/parallel-20260702T200935Z-dispatches-from-cyberspace` | parent-project | pending |  |  |  |  |  |
 | 3 | remodelvision | `/Users/jakyeamos/projects/remodelvision` | 22 | 2 | `/Users/jakyeamos/projects/remodelvision/.quality-runner/runs/parallel-20260702T200935Z-remodelvision` | exact-project | pending |  |  |  |  |  |
