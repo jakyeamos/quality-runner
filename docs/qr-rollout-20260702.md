@@ -298,6 +298,34 @@ Expansion note: the specific QR-spawned test blocker is cleared in the latest
 BIP rerun. Any next wave should still treat broad repo debt as a triage outcome,
 not a cleanup failure.
 
+## Shallow Evidence Refresh
+
+Previous cleanup/triage waves should be rerun shallowly before another broad
+wave. The refresh objective is current evidence with the latest QR runner, not
+remediation.
+
+Refresh worker rules:
+
+- Use `/Users/jakyeamos/projects/quality-runner/.venv/bin/quality-runner` from
+  controller commit `a585f9b`.
+- Do not edit, stage, commit, push, or remediate repo files.
+- Generated `.quality-runner/` artifacts are allowed and must remain
+  uncommitted.
+- Run `inspect`, `run`, `verify-gates`, `summarize-run --json`, and
+  `validate-report --json`.
+- Classify the final state as current `clean`, `broad-repo-debt`,
+  `environment-or-runner-blocker`, `failing-executable-gates`,
+  `missing-capabilities`, or `needs-triage`.
+- Treat broad repo debt as a valid triage outcome, not as a failed refresh.
+
+| Refresh wave | Repo | Repo path | Baseline run | Thread status | Thread id | Final QR status | Validate-report | Notes |
+|---:|---|---|---|---|---|---|---|---|
+| 1 | `tenure` | `/Users/jakyeamos/projects/tenure` | `wave1-restart-20260702-tenure-targeted` | running | `019f2646-6119-7de3-b58e-810b1c5f8d25` |  |  | Parent-project thread scoped to exact repo path. |
+| 1 | `BidCamp` | `/Users/jakyeamos/projects/BidCamp` | `wave1-restart-20260702-BidCamp-2` | running | `019f2646-69d9-7bb3-8dce-28e4003dbfcf` |  |  | Exact-project thread. |
+| 1 | `AIOS` | `/Users/jakyeamos/projects/AIOS` | `wave1-restart-20260702-AIOS` | running | `019f2646-7846-7150-986c-145d7898d1d2` |  |  | Parent-project thread scoped to exact repo path. |
+| 1 | `amos-saas` | `/Users/jakyeamos/projects/amos-saas` | `wave1-restart-20260702-amos-saas` | running | `019f2646-81b3-7091-b4d7-5d7f6c6283fd` |  |  | Parent-project thread scoped to exact repo path. |
+| 1 | `Dsci-proj` | `/Users/jakyeamos/projects/Dsci-proj` | `triage-20260702-Dsci-proj` | running | `019f2646-8a93-72d3-b68c-fe79feb6eb80` |  |  | Parent-project thread scoped to exact repo path. |
+
 ## Rollout Ledger
 
 | Wave | Repo | Repo path | Total | Blockers | Baseline artifacts | Codex project status | Thread status | Thread id | Final QR status | Commit | Push | Notes |
