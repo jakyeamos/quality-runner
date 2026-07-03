@@ -1244,6 +1244,24 @@ Verification:
 - `uv run ruff check .` passed.
 - `git diff --check` passed.
 
+## Refresh Wave 16 Launch
+
+Objective: rerun the Wave 15 target set against QR commit `4eb3539` to validate
+the hardening fixes for stale nested lockfiles, workflow-timeout handoffs,
+scan-progress diagnostics, read-only `pre-cr` classification, and tracked
+package/config mutation safety.
+
+| Repo | Thread id | Run id prefix | Baseline | Report path | Status |
+|---|---|---|---|---|---|
+| amos-saas | `019f2992-dcdf-7792-8216-08352a02b2a3` | `refresh16-20260703-amos-saas` | `refresh14-20260703-amos-saas-verify` | `/private/tmp/qr-refresh16-amos-saas-report.json` | launched |
+| BIP-Console | `019f2993-1167-7462-841b-ed8945d86c25` | `refresh16-20260703-BIP-Console` | `refresh14-20260703-BIP-Console-verify` | `/private/tmp/qr-refresh16-BIP-Console-report.json` | launched |
+| R-Project | `019f2993-5467-77e3-a91b-57b27f40f0a1` | `refresh16-20260703-R-Project` | `refresh14-20260703-R-Project-verify` | `/private/tmp/qr-refresh16-R-Project-report.json` | launched |
+| EliHealth | `019f2993-95db-74b1-bca1-5b9b95e34028` | `refresh16-20260703-EliHealth` | `refresh13-20260703-EliHealth-verify` | `/private/tmp/qr-refresh16-EliHealth-report.json` | launched |
+| Terrace | `019f2993-cf75-7980-9c78-bbb5e513e0e7` | `refresh16-20260703-Terrace` | `parallel-20260702T200935Z-Terrace` | `/private/tmp/qr-refresh16-Terrace-report.json` | launched |
+| tmcp | `019f2994-05a1-7f82-99b6-126488a948c8` | `refresh16-20260703-tmcp` | `parallel-20260702T200935Z-tmcp` | `/private/tmp/qr-refresh16-tmcp-report.json` | launched |
+| BBDSE | `019f2994-4d87-71a1-8d06-d7eaeceeaced` | `refresh16-20260703-BBDSE` | `parallel-20260702T200935Z-BBDSE` | `/private/tmp/qr-refresh16-BBDSE-report.json` | launched |
+| agent-router | `019f2994-9cf0-7d73-a5ce-fcfd883e52f2` | `refresh16-20260703-agent-router` | `parallel-20260702T200935Z-agent-router` | `/private/tmp/qr-refresh16-agent-router-report.json` | launched |
+
 ## Rollout Ledger
 
 | Wave | Repo | Repo path | Total | Blockers | Baseline artifacts | Codex project status | Thread status | Thread id | Final QR status | Commit | Push | Notes |
