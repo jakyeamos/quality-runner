@@ -60,6 +60,7 @@ def gate_blocker_slice(gate_summary: dict[str, Any] | None) -> dict[str, Any] | 
         "priority": "high",
         "findings": [_gate_blocker_finding(gate) for gate in blockers],
         "actions": _grouped_gate_blocker_actions(gate_summary, blockers),
+        "action_groups": _gate_blocker_action_groups(gate_summary, blockers),
         "verification_gates": [
             "Address the gate blockers listed in the handoff gate verification section.",
             "Rerun quality-runner verify-gates and confirm the gate verification status is passed.",
@@ -323,10 +324,30 @@ def _grouped_gate_blocker_actions(
     gate_summary: dict[str, Any],
     blockers: list[dict[str, Any]],
 ) -> list[str]:
+    action_groups = _gate_blocker_action_groups(gate_summary, blockers)
+    if action_groups:
+        return [
+            action
+            for group in action_groups
+            for action in [
+                f"Resolve {group['class']} blockers first: {', '.join(group['gate_ids'])}.",
+                *[
+                    _display_group_action(action=group_action, gate_ids=group["gate_ids"])
+                    for group_action in group["actions"]
+                ],
+            ]
+        ]
+    return _gate_blocker_actions(blockers)
+
+
+def _gate_blocker_action_groups(
+    gate_summary: dict[str, Any],
+    blockers: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
     groups = gate_summary.get("blocker_groups")
     if not isinstance(groups, list) or not groups:
-        return _gate_blocker_actions(blockers)
-    actions: list[str] = []
+        return []
+    action_groups: list[dict[str, Any]] = []
     for group in groups:
         if not isinstance(group, dict):
             continue
@@ -336,9 +357,69 @@ def _grouped_gate_blocker_actions(
         ]
         if not group_blockers:
             continue
-        actions.append(f"Resolve {blocker_class} blockers first: {', '.join(_gate_ids(group_blockers))}.")
-        actions.extend(_gate_blocker_actions(group_blockers))
-    return actions or _gate_blocker_actions(blockers)
+        group_actions = _deduped_group_actions(group_blockers)
+        if not group_actions:
+            continue
+        action_groups.append(
+            {
+                "class": blocker_class,
+                "gate_ids": _gate_ids(group_blockers),
+                "actions": group_actions,
+            }
+        )
+    return action_groups
+
+
+def _deduped_group_actions(blockers: list[dict[str, Any]]) -> list[str]:
+    setup_actions = _deduped_dependency_setup_actions(blockers)
+    if setup_actions:
+        return setup_actions + _non_dependency_gate_actions(blockers)
+    return _gate_blocker_actions(blockers)
+
+
+def _deduped_dependency_setup_actions(blockers: list[dict[str, Any]]) -> list[str]:
+    setup_groups: dict[str, list[str]] = {}
+    for gate in blockers:
+        setup = gate.get("dependency_setup")
+        if not isinstance(setup, dict):
+            continue
+        setup_command = setup.get("setup_command")
+        if not isinstance(setup_command, str) or not setup_command:
+            continue
+        gate_id = gate.get("id")
+        if not isinstance(gate_id, str) or not gate_id:
+            continue
+        setup_groups.setdefault(setup_command, []).append(gate_id)
+    return [
+        f"Run dependency setup once: {setup_command}."
+        for setup_command, gate_ids in setup_groups.items()
+        if gate_ids
+    ]
+
+
+def _non_dependency_gate_actions(blockers: list[dict[str, Any]]) -> list[str]:
+    non_dependency_blockers = [
+        gate for gate in blockers if not isinstance(gate.get("dependency_setup"), dict)
+    ]
+    if not non_dependency_blockers:
+        return []
+    return _gate_blocker_actions(non_dependency_blockers)
+
+
+def _display_group_action(*, action: object, gate_ids: object) -> str:
+    if not isinstance(action, str):
+        return ""
+    if (
+        action.startswith("Run dependency setup once: ")
+        and isinstance(gate_ids, list)
+        and all(isinstance(gate_id, str) for gate_id in gate_ids)
+    ):
+        return action.replace(
+            "Run dependency setup once: ",
+            f"Run dependency setup once for {', '.join(gate_ids)}: ",
+            1,
+        )
+    return action
 
 
 def _gate_ids(blockers: list[dict[str, Any]]) -> list[str]:

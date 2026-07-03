@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from quality_runner.dependency_setup import (
+    dependency_setup_action,
     dependency_setup_context,
     dependency_setup_skipped_gate,
     gate_diagnostics,
@@ -249,6 +250,14 @@ def _verify_gate(
             gate_failure_type = "read-only-mutation"
         environment_restricted = gate_failure_type == "environment-restricted"
         dependency_setup = gate_failure_type == "dependency-setup-blocker"
+        diagnostics = gate_diagnostics(
+            command=command,
+            cwd=gate_cwd(repo_root=repo_root, capability=capability),
+            stdout=stdout,
+            stderr=stderr,
+            timed_out=True,
+            dependency_setup=dependency_setup,
+        ) | _read_only_mutation_diagnostics(mutation)
         return {
             "id": capability_id,
             "status": "failed",
@@ -264,19 +273,12 @@ def _verify_gate(
             "stderr_tail": stderr,
             "failure_type": gate_failure_type,
             "reason": "gate timed out",
-            "diagnostics": gate_diagnostics(
-                command=command,
-                cwd=gate_cwd(repo_root=repo_root, capability=capability),
-                stdout=stdout,
-                stderr=stderr,
-                timed_out=True,
-                dependency_setup=dependency_setup,
-            )
-            | _read_only_mutation_diagnostics(mutation),
+            "diagnostics": diagnostics,
             **recommended_action(
                 environment_restricted=environment_restricted,
                 dependency_setup=dependency_setup,
             ),
+            **dependency_setup_action(diagnostics),
             **_optional_field(
                 "recommended_action",
                 _read_only_mutation_action(mutation),
@@ -292,6 +294,19 @@ def _verify_gate(
     failed = returncode != 0 or mutation is not None
     environment_restricted = failed and gate_failure_type == "environment-restricted"
     dependency_setup = failed and gate_failure_type == "dependency-setup-blocker"
+    diagnostics = (
+        gate_diagnostics(
+            command=command,
+            cwd=gate_cwd(repo_root=repo_root, capability=capability),
+            stdout=stdout,
+            stderr=stderr,
+            timed_out=False,
+            dependency_setup=dependency_setup,
+        )
+        | _read_only_mutation_diagnostics(mutation)
+        if dependency_setup or mutation is not None
+        else None
+    )
     return {
         "id": capability_id,
         "status": "failed" if failed else "passed",
@@ -308,24 +323,12 @@ def _verify_gate(
         "stdout_tail": stdout,
         "stderr_tail": stderr,
         **_optional_field("failure_type", gate_failure_type if failed else None),
-        **_optional_field(
-            "diagnostics",
-            gate_diagnostics(
-                command=command,
-                cwd=gate_cwd(repo_root=repo_root, capability=capability),
-                stdout=stdout,
-                stderr=stderr,
-                timed_out=False,
-                dependency_setup=dependency_setup,
-            )
-            | _read_only_mutation_diagnostics(mutation)
-            if dependency_setup or mutation is not None
-            else None,
-        ),
+        **_optional_field("diagnostics", diagnostics),
         **recommended_action(
             environment_restricted=environment_restricted,
             dependency_setup=dependency_setup,
         ),
+        **dependency_setup_action(diagnostics),
         **_optional_field(
             "recommended_action",
             _read_only_mutation_action(mutation),

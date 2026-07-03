@@ -310,8 +310,15 @@ def test_verify_gates_classifies_dependency_setup_blockers(tmp_path: Path) -> No
     assert verification["gates"][0]["status"] == "passed"
     assert verification["gates"][1]["id"] == "tests"
     assert verification["gates"][1]["failure_type"] == "dependency-setup-blocker"
-    assert verification["gates"][1]["diagnostics"]["dependency_setup"]["package_manager"] == "pnpm"
-    assert "dependency restoration" in verification["gates"][1]["recommended_action"]
+    setup = verification["gates"][1]["diagnostics"]["dependency_setup"]
+    assert setup["package_manager"] == "pnpm"
+    assert setup["setup_command"] == "pnpm install --frozen-lockfile"
+    assert setup["cause"] == (
+        "pnpm needs to remove and reinstall node_modules but cannot prompt "
+        "in a non-interactive gate run"
+    )
+    assert "pnpm install --frozen-lockfile" in verification["gates"][1]["recommended_action"]
+    assert "interactive shell" in verification["gates"][1]["recommended_action"]
     assert verification["gates"][2]["id"] == "build"
     assert verification["gates"][2]["status"] == "skipped"
     assert verification["gates"][2]["skip_type"] == "dependency-setup-blocked"
@@ -392,8 +399,19 @@ def test_verify_gates_classifies_pnpm_ignored_builds_as_dependency_setup(
         "Resolve dependency-setup blockers first: lint, tests."
     )
     assert handoff["next_slice"]["actions"][1] == (
-        "Run dependency setup for lint: pnpm approve-builds."
+        "Run dependency setup once for lint, tests: pnpm approve-builds."
     )
+    assert handoff["next_slice"]["actions"] == [
+        "Resolve dependency-setup blockers first: lint, tests.",
+        "Run dependency setup once for lint, tests: pnpm approve-builds.",
+    ]
+    assert handoff["next_slice"]["action_groups"] == [
+        {
+            "class": "dependency-setup",
+            "gate_ids": ["lint", "tests"],
+            "actions": ["Run dependency setup once: pnpm approve-builds."],
+        }
+    ]
     assert "Setup: `pnpm approve-builds`" in handoff_markdown
     assert "- Recommended classification: environment-or-dependency-blocker" in handoff_markdown
     assert "- Primary blocker class: dependency-setup" in handoff_markdown

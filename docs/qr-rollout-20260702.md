@@ -1013,6 +1013,23 @@ Product takeaways:
 - Clean-control behavior held. R-Project stayed `gates-clean` with empty
   blocker groups, no next slice, and ready status.
 
+## Product Fix After Refresh Wave 12
+
+Implemented the Wave 12 polish follow-ups:
+
+- Gate-blocker next slices now include structured `action_groups` by blocker
+  class while preserving the flat `actions` list for compatibility.
+- Dependency setup next-slice actions now deduplicate repeated setup commands
+  across gates. For example, same-context pnpm blockers produce one grouped
+  `pnpm install --frozen-lockfile` or `pnpm approve-builds` action instead of
+  repeating the same setup command for each skipped gate.
+- pnpm no-TTY module replacement failures now carry a specific cause:
+  `pnpm needs to remove and reinstall node_modules but cannot prompt in a
+  non-interactive gate run`.
+- Recommended actions for pnpm no-TTY setup blockers now point workers to one
+  direct interactive `pnpm install --frozen-lockfile` setup step before
+  rerunning QR gates.
+
 ## Rollout Ledger
 
 | Wave | Repo | Repo path | Total | Blockers | Baseline artifacts | Codex project status | Thread status | Thread id | Final QR status | Commit | Push | Notes |

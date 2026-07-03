@@ -7,7 +7,6 @@ from quality_runner.gate_execution_policy import (
     gate_cwd,
     mutating_risk,
     package_manager_for_command,
-    recommended_action,
     timeout_diagnostics,
 )
 
@@ -49,7 +48,7 @@ def dependency_setup_skipped_gate(
         "reason": "skipped because an earlier gate hit the same dependency setup blocker",
         "blocked_by": str(blocked_by.get("id") or "unknown"),
         "diagnostics": {"dependency_setup": dependency_setup},
-        **recommended_action(environment_restricted=False, dependency_setup=True),
+        **dependency_setup_recommended_action(dependency_setup),
     }
 
 
@@ -86,17 +85,73 @@ def dependency_setup_diagnostics(
 ) -> dict[str, str | None]:
     package_manager = package_manager_for_command(command)
     ignored_builds = _pnpm_ignored_builds(stdout=stdout, stderr=stderr)
+    no_tty_reinstall = _pnpm_no_tty_reinstall(stdout=stdout, stderr=stderr)
     return {
         "package_manager": package_manager,
         "cwd": str(cwd),
-        "setup_command": _setup_command(package_manager, ignored_builds=ignored_builds),
-        "cause": _cause(ignored_builds=ignored_builds),
+        "setup_command": _setup_command(
+            package_manager,
+            ignored_builds=ignored_builds,
+            no_tty_reinstall=no_tty_reinstall,
+        ),
+        "cause": _cause(
+            package_manager=package_manager,
+            ignored_builds=ignored_builds,
+            no_tty_reinstall=no_tty_reinstall,
+        ),
     }
 
 
-def _setup_command(package_manager: str | None, *, ignored_builds: bool) -> str | None:
+def dependency_setup_recommended_action(setup: dict[str, Any]) -> dict[str, str]:
+    setup_command = setup.get("setup_command")
+    cause = setup.get("cause")
+    if isinstance(setup_command, str) and setup_command:
+        if cause == _PNPM_NO_TTY_REINSTALL_CAUSE:
+            return {
+                "recommended_action": (
+                    f"run `{setup_command}` directly in an interactive shell to allow pnpm "
+                    "to confirm node_modules replacement before rerunning QR gates"
+                )
+            }
+        return {
+            "recommended_action": (
+                f"run `{setup_command}` directly in an interactive shell before rerunning "
+                "QR gates"
+            )
+        }
+    return {
+        "recommended_action": (
+            "run the package-manager install/setup command directly in an interactive shell "
+            "before rerunning QR gates"
+        )
+    }
+
+
+def dependency_setup_action(diagnostics: dict[str, Any] | None) -> dict[str, str]:
+    if not isinstance(diagnostics, dict):
+        return {}
+    setup = diagnostics.get("dependency_setup")
+    if not isinstance(setup, dict):
+        return {}
+    return dependency_setup_recommended_action(setup)
+
+
+_PNPM_NO_TTY_REINSTALL_CAUSE = (
+    "pnpm needs to remove and reinstall node_modules but cannot prompt "
+    "in a non-interactive gate run"
+)
+
+
+def _setup_command(
+    package_manager: str | None,
+    *,
+    ignored_builds: bool,
+    no_tty_reinstall: bool,
+) -> str | None:
     if package_manager == "pnpm" and ignored_builds:
         return "pnpm approve-builds"
+    if package_manager == "pnpm" and no_tty_reinstall:
+        return "pnpm install --frozen-lockfile"
     if package_manager == "pnpm":
         return "pnpm install --frozen-lockfile"
     if package_manager == "npm":
@@ -108,9 +163,16 @@ def _setup_command(package_manager: str | None, *, ignored_builds: bool) -> str 
     return None
 
 
-def _cause(*, ignored_builds: bool) -> str:
+def _cause(
+    *,
+    package_manager: str | None,
+    ignored_builds: bool,
+    no_tty_reinstall: bool,
+) -> str:
     if ignored_builds:
         return "package manager blocked dependency build scripts until approved"
+    if package_manager == "pnpm" and no_tty_reinstall:
+        return _PNPM_NO_TTY_REINSTALL_CAUSE
     return "package manager attempted dependency restoration in a non-interactive gate run"
 
 
@@ -120,6 +182,15 @@ def _pnpm_ignored_builds(*, stdout: str, stderr: str) -> bool:
         "err_pnpm_ignored_builds" in combined
         or "ignored build scripts" in combined
         or "pnpm approve-builds" in combined
+    )
+
+
+def _pnpm_no_tty_reinstall(*, stdout: str, stderr: str) -> bool:
+    combined = f"{stdout}\n{stderr}".lower()
+    return (
+        "err_pnpm_aborted_remove_modules_dir_no_tty" in combined
+        or "aborted_remove_modules_dir_no_tty" in combined
+        or "modules directory will be removed and reinstalled from scratch" in combined
     )
 
 

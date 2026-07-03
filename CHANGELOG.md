@@ -14,6 +14,11 @@ All notable changes to Quality Runner are documented here.
 - Added primary blocker class and blocker groups to gate handoffs so mixed
   blocker runs can route dependency setup, read-only policy, environment, and
   command failures separately.
+- Added structured gate-blocker `action_groups` on blocked/failed handoff
+  next slices and deduplicated repeated dependency setup commands across gates.
+- Improved pnpm non-interactive dependency restoration guidance so
+  `ERR_PNPM_ABORTED_REMOVE_MODULES_DIR_NO_TTY` points workers at one interactive
+  `pnpm install --frozen-lockfile` setup step before rerunning QR gates.
 - Added suggested commands for missing repo-owned gates in `agent-handoff.json`
   and `agent-handoff.md`.
 - Added ignored-path scan previews, interactive one-run inclusion prompts, and

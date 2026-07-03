@@ -116,7 +116,15 @@ that share the same package-manager/cwd context are skipped with
 `skip_type: "dependency-setup-blocked"` and `blocked_by` pointing at the first
 failed gate, so one missing install does not produce repeated noisy failures.
 For pnpm ignored build-script approval failures, the setup command points to
-`pnpm approve-builds`.
+`pnpm approve-builds`. For pnpm no-TTY module replacement failures, the setup
+guidance points at one interactive `pnpm install --frozen-lockfile` run before
+rerunning QR gates.
+
+Blocked and failed gate handoffs include `primary_blocker_class`,
+`blocker_groups`, and next-slice `action_groups`. The flat `actions` list stays
+present for backward-compatible human reading, while `action_groups` gives
+controllers structured blocker-class routing and deduplicates repeated setup
+commands across gates that share the same dependency setup blocker.
 
 ## Safety Guarantees
 
