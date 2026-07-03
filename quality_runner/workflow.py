@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import time
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -35,12 +34,7 @@ from quality_runner.planning import (
     build_remediation_plan,
     render_handoff_markdown,
 )
-from quality_runner.refresh_timeout import (
-    build_timeout_verify_artifacts,
-    default_workflow_timeout_seconds,
-    timeout_reason,
-    workflow_deadline,
-)
+from quality_runner.refresh_workflow import run_refresh_payload
 from quality_runner.run_summary import build_run_summary
 from quality_runner.standards import DEFAULT_PROFILE, compile_standards
 from quality_runner.workflow_helpers import (
@@ -357,74 +351,32 @@ def refresh_payload(
     ci_status_json: Path | None = None,
     timeout_seconds: int = 120,
     workflow_timeout_seconds: int | None = None,
+    verify_timeout_seconds: int | None = None,
     workflow_timeout_reason: str | None = None,
+    total_timeout_seconds: int | None = None,
+    total_timeout_reason: str | None = None,
     checkout_most_advanced_branch: bool = False,
     allow_mutating_gates: bool = False,
 ) -> dict[str, Any]:
-    inspect_run_id = f"{run_id_prefix}-inspect"
-    run_run_id = f"{run_id_prefix}-run"
-    verify_run_id = f"{run_id_prefix}-verify"
-    inspect_result = inspect_payload(
+    return run_refresh_payload(
         repo_root=repo_root,
-        run_id=inspect_run_id,
+        run_id_prefix=run_id_prefix,
+        baseline_run_id=baseline_run_id,
         profile=profile,
         ci_status_json=ci_status_json,
+        timeout_seconds=timeout_seconds,
+        workflow_timeout_seconds=workflow_timeout_seconds,
+        verify_timeout_seconds=verify_timeout_seconds,
+        workflow_timeout_reason=workflow_timeout_reason,
+        total_timeout_seconds=total_timeout_seconds,
+        total_timeout_reason=total_timeout_reason,
         checkout_most_advanced_branch=checkout_most_advanced_branch,
+        allow_mutating_gates=allow_mutating_gates,
+        inspect_callback=inspect_payload,
+        run_callback=run_payload,
+        verify_callback=verify_gates_payload,
+        summary_callback=build_run_summary,
     )
-    run_result = run_payload(
-        repo_root=repo_root,
-        run_id=run_run_id,
-        profile=profile,
-        ci_status_json=ci_status_json,
-        checkout_most_advanced_branch=checkout_most_advanced_branch,
-    )
-    phase = "verify-gates"
-    resolved_workflow_timeout = workflow_timeout_seconds or default_workflow_timeout_seconds(
-        timeout_seconds
-    )
-    resolved_timeout_reason = workflow_timeout_reason or timeout_reason(
-        phase=phase, timeout_seconds=resolved_workflow_timeout
-    )
-    verify_started = time.monotonic()
-    try:
-        with workflow_deadline(seconds=resolved_workflow_timeout, reason=resolved_timeout_reason):
-            verify_result = verify_gates_payload(
-                repo_root=repo_root,
-                run_id=verify_run_id,
-                profile=profile,
-                ci_status_json=ci_status_json,
-                timeout_seconds=timeout_seconds,
-                checkout_most_advanced_branch=checkout_most_advanced_branch,
-                read_only_gates=True,
-                allow_mutating_gates=allow_mutating_gates,
-            )
-        summary = build_run_summary(
-            repo_root=repo_root,
-            run_id=verify_run_id,
-            baseline_run_id=baseline_run_id,
-        )
-    except TimeoutError:
-        verify_result, summary = build_timeout_verify_artifacts(
-            repo_root=repo_root,
-            run_id=verify_run_id,
-            phase=phase,
-            reason=resolved_timeout_reason,
-            timeout_seconds=resolved_workflow_timeout,
-            elapsed_seconds=time.monotonic() - verify_started,
-            baseline_run_id=baseline_run_id,
-        )
-    return {
-        "schema": "quality-runner-refresh-result-v0.1",
-        "status": summary["status"],
-        "implementation_allowed": False,
-        "run_id_prefix": run_id_prefix,
-        "runs": {
-            "inspect": inspect_result,
-            "run": run_result,
-            "verify": verify_result,
-        },
-        "summary": summary,
-    }
 
 
 def _inspect(

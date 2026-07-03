@@ -148,6 +148,29 @@ Writes:
 - `agent-handoff.md`
 - `run-manifest.json`
 
+## `quality-runner refresh`
+
+Runs `inspect`, `run`, read-only `verify-gates`, and `summarize-run` as one
+controller-friendly workflow.
+
+```bash
+quality-runner refresh /path/to/repo --run-id-prefix refresh-001 --json
+quality-runner refresh /path/to/repo --run-id-prefix refresh-001 --verify-timeout-seconds 300 --json
+quality-runner refresh /path/to/repo --run-id-prefix refresh-001 --total-timeout-seconds 900 --json
+```
+
+Timeout flags are explicit about scope:
+
+- `--timeout-seconds` caps each individual gate command.
+- `--verify-timeout-seconds` caps the `verify-gates` phase.
+- `--workflow-timeout-seconds` is a backward-compatible alias for
+  `--verify-timeout-seconds`.
+- `--total-timeout-seconds` is optional and caps the full refresh across
+  inspect, run, and verify.
+
+Refresh JSON includes `timeout_contract` and `phase_timings` so controllers can
+distinguish a deliberate full-evidence run from a hard end-to-end deadline.
+
 ## `quality-runner validate-report`
 
 Validates a controller thread completion report before the controller advances a

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import signal
+import time
 from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
@@ -22,6 +23,90 @@ def default_workflow_timeout_seconds(per_gate_timeout_seconds: int) -> int:
 
 def timeout_reason(*, phase: str, timeout_seconds: int) -> str:
     return f"refresh workflow exceeded {timeout_seconds} seconds during {phase}"
+
+
+def resolve_refresh_timeout_contract(
+    *,
+    per_gate_timeout_seconds: int,
+    workflow_timeout_seconds: int | None,
+    verify_timeout_seconds: int | None,
+    workflow_timeout_reason: str | None,
+    total_timeout_seconds: int | None,
+    total_timeout_reason: str | None,
+) -> dict[str, Any]:
+    if (
+        workflow_timeout_seconds is not None
+        and verify_timeout_seconds is not None
+        and workflow_timeout_seconds != verify_timeout_seconds
+    ):
+        raise ValueError(
+            "--workflow-timeout-seconds and --verify-timeout-seconds must match when both are set"
+        )
+    resolved_verify_timeout = (
+        verify_timeout_seconds
+        if verify_timeout_seconds is not None
+        else workflow_timeout_seconds
+        if workflow_timeout_seconds is not None
+        else default_workflow_timeout_seconds(per_gate_timeout_seconds)
+    )
+    resolved_total_reason = (
+        total_timeout_reason
+        if total_timeout_reason is not None
+        else (
+            f"refresh exceeded {total_timeout_seconds} seconds across inspect, run, and verify"
+            if total_timeout_seconds is not None
+            else None
+        )
+    )
+    return {
+        "per_gate_timeout_seconds": per_gate_timeout_seconds,
+        "verify_timeout_seconds": resolved_verify_timeout,
+        "verify_timeout_source": (
+            "explicit"
+            if verify_timeout_seconds is not None or workflow_timeout_seconds is not None
+            else "default"
+        ),
+        "verify_timeout_reason": workflow_timeout_reason
+        or timeout_reason(phase="verify-gates", timeout_seconds=resolved_verify_timeout),
+        "total_timeout_seconds": total_timeout_seconds,
+        "total_timeout_reason": resolved_total_reason,
+    }
+
+
+def phase_timing(*, started: float, status: str) -> dict[str, Any]:
+    return {
+        "status": status,
+        "elapsed_seconds": round(time.monotonic() - started, 3),
+    }
+
+
+def not_started_refresh_phase(run_id: str, phase: str) -> dict[str, Any]:
+    return {
+        "schema": "quality-runner-refresh-phase-result-v0.1",
+        "status": "not-started",
+        "implementation_allowed": False,
+        "run_id": run_id,
+        "phase": phase,
+    }
+
+
+def timeout_refresh_phase(
+    *,
+    run_id: str,
+    phase: str,
+    reason: str,
+    timeout_seconds: int,
+) -> dict[str, Any]:
+    return {
+        "schema": "quality-runner-refresh-phase-result-v0.1",
+        "status": "blocked",
+        "implementation_allowed": False,
+        "run_id": run_id,
+        "phase": phase,
+        "failure_type": "workflow-timeout",
+        "reason": reason,
+        "timeout_seconds": timeout_seconds,
+    }
 
 
 @contextmanager

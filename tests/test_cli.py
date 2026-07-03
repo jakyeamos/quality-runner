@@ -570,7 +570,7 @@ def test_cli_refresh_workflow_timeout_records_reason(tmp_path: Path) -> None:
             "cli-refresh-timeout",
             "--timeout-seconds",
             "30",
-            "--workflow-timeout-seconds",
+            "--verify-timeout-seconds",
             "1",
             "--workflow-timeout-reason",
             "controller deadline exceeded during verify",
@@ -590,6 +590,11 @@ def test_cli_refresh_workflow_timeout_records_reason(tmp_path: Path) -> None:
 
     assert payload["status"] == "blocked"
     assert payload["summary"]["recommended_classification"] == "workflow-timeout-blocker"
+    assert payload["timeout_contract"]["per_gate_timeout_seconds"] == 30
+    assert payload["timeout_contract"]["verify_timeout_seconds"] == 1
+    assert payload["timeout_contract"]["verify_timeout_source"] == "explicit"
+    assert payload["timeout_contract"]["total_timeout_seconds"] is None
+    assert payload["phase_timings"]["verify"]["status"] == "timeout"
     assert payload["runs"]["verify"]["timeout"]["reason"] == (
         "controller deadline exceeded during verify"
     )

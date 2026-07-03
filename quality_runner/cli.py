@@ -86,12 +86,32 @@ def build_parser() -> argparse.ArgumentParser:
         "--workflow-timeout-seconds",
         type=int,
         default=None,
-        help="Overall refresh verify-phase timeout; defaults to a multiple of --timeout-seconds",
+        help=(
+            "Backward-compatible alias for --verify-timeout-seconds; "
+            "applies only to the verify-gates phase"
+        ),
+    )
+    refresh_parser.add_argument(
+        "--verify-timeout-seconds",
+        type=int,
+        default=None,
+        help="Verify-gates phase timeout; defaults to a multiple of --timeout-seconds",
     )
     refresh_parser.add_argument(
         "--workflow-timeout-reason",
         default=None,
-        help="Reason recorded when the refresh workflow timeout fires",
+        help="Reason recorded when the verify-gates timeout fires",
+    )
+    refresh_parser.add_argument(
+        "--total-timeout-seconds",
+        type=int,
+        default=None,
+        help="Optional hard deadline for the full refresh across inspect, run, and verify",
+    )
+    refresh_parser.add_argument(
+        "--total-timeout-reason",
+        default=None,
+        help="Reason recorded when the total refresh timeout fires",
     )
     refresh_parser.add_argument(
         "--allow-mutating-gates",
@@ -266,7 +286,10 @@ def _payload_for_args(args: argparse.Namespace) -> dict[str, Any]:
             ci_status_json=Path(args.ci_status_json) if args.ci_status_json else None,
             timeout_seconds=args.timeout_seconds,
             workflow_timeout_seconds=args.workflow_timeout_seconds,
+            verify_timeout_seconds=args.verify_timeout_seconds,
             workflow_timeout_reason=args.workflow_timeout_reason,
+            total_timeout_seconds=args.total_timeout_seconds,
+            total_timeout_reason=args.total_timeout_reason,
             checkout_most_advanced_branch=args.checkout_most_advanced_branch,
             allow_mutating_gates=args.allow_mutating_gates,
         )

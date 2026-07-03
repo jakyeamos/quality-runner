@@ -616,6 +616,22 @@ Product takeaways:
   artifacts were populated and scan budgets avoided dependency/generated path
   explosions.
 
+## Product Fix After Refresh Wave 5
+
+Implemented explicit refresh timeout scopes after the wave 5 timing ambiguity:
+
+- `--verify-timeout-seconds` now names the verify-gates phase timeout directly.
+- `--workflow-timeout-seconds` remains as a backward-compatible alias for the
+  verify timeout.
+- `--total-timeout-seconds` adds an optional full-refresh deadline across
+  inspect, run, and verify for controller wave budgets.
+- Refresh JSON now includes `timeout_contract` and `phase_timings`, making it
+  clear whether a long run was allowed to gather full evidence or was expected
+  to obey a hard end-to-end deadline.
+
+Validation before the next wave: `uv run ruff check .`, `uv run pytest`, and
+`git diff --check` passed locally.
+
 ## Rollout Ledger
 
 | Wave | Repo | Repo path | Total | Blockers | Baseline artifacts | Codex project status | Thread status | Thread id | Final QR status | Commit | Push | Notes |

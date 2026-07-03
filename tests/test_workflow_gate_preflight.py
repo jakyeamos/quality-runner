@@ -437,6 +437,85 @@ def test_refresh_payload_preserves_partial_verify_artifacts_when_timeout_finaliz
     ]
 
 
+def test_refresh_payload_records_timeout_contract_and_phase_timings(
+    tmp_path: Path, monkeypatch: object
+) -> None:
+    from quality_runner import workflow
+
+    def inspect_stub(**_: object) -> dict[str, object]:
+        return {"status": "inspected", "run_id": "refresh-contract-inspect"}
+
+    def run_stub(**_: object) -> dict[str, object]:
+        return {"status": "findings", "run_id": "refresh-contract-run"}
+
+    def verify_stub(**_: object) -> dict[str, object]:
+        return {"status": "passed", "run_id": "refresh-contract-verify"}
+
+    def summary_stub(**_: object) -> dict[str, object]:
+        return {"status": "clean", "run_id": "refresh-contract-verify"}
+
+    monkeypatch.setattr(workflow, "inspect_payload", inspect_stub)
+    monkeypatch.setattr(workflow, "run_payload", run_stub)
+    monkeypatch.setattr(workflow, "verify_gates_payload", verify_stub)
+    monkeypatch.setattr(workflow, "build_run_summary", summary_stub)
+
+    payload = workflow.refresh_payload(
+        repo_root=tmp_path,
+        run_id_prefix="refresh-contract",
+        timeout_seconds=9,
+        verify_timeout_seconds=17,
+        total_timeout_seconds=45,
+        total_timeout_reason="controller full refresh budget",
+    )
+
+    assert payload["timeout_contract"] == {
+        "per_gate_timeout_seconds": 9,
+        "verify_timeout_seconds": 17,
+        "verify_timeout_source": "explicit",
+        "total_timeout_seconds": 45,
+        "total_timeout_reason": "controller full refresh budget",
+    }
+    assert payload["phase_timings"].keys() == {"inspect", "run", "verify"}
+    assert all(timing["elapsed_seconds"] >= 0 for timing in payload["phase_timings"].values())
+
+
+def test_refresh_payload_total_timeout_finalizes_when_run_phase_is_interrupted(
+    tmp_path: Path, monkeypatch: object
+) -> None:
+    from quality_runner import workflow
+
+    def inspect_stub(**_: object) -> dict[str, object]:
+        return {"status": "inspected", "run_id": "refresh-total-timeout-inspect"}
+
+    def run_timeout(**_: object) -> dict[str, object]:
+        raise TimeoutError("controller full refresh budget")
+
+    monkeypatch.setattr(workflow, "inspect_payload", inspect_stub)
+    monkeypatch.setattr(workflow, "run_payload", run_timeout)
+
+    payload = workflow.refresh_payload(
+        repo_root=tmp_path,
+        run_id_prefix="refresh-total-timeout",
+        workflow_timeout_seconds=60,
+        total_timeout_seconds=30,
+        total_timeout_reason="controller full refresh budget",
+    )
+    run_dir = tmp_path / ".quality-runner" / "runs" / "refresh-total-timeout-verify"
+    gate_verification = json.loads((run_dir / "gate-verification.json").read_text())
+    timeout_artifact = json.loads((run_dir / "workflow-timeout.json").read_text())
+
+    assert payload["status"] == "blocked"
+    assert payload["runs"]["run"]["status"] == "blocked"
+    assert payload["runs"]["run"]["failure_type"] == "workflow-timeout"
+    assert payload["runs"]["verify"]["timeout"]["phase"] == "run"
+    assert payload["runs"]["verify"]["timeout"]["reason"] == "controller full refresh budget"
+    assert payload["timeout_contract"]["total_timeout_seconds"] == 30
+    assert payload["phase_timings"]["run"]["status"] == "timeout"
+    assert gate_verification["phase"] == "run"
+    assert gate_verification["reason"] == "controller full refresh budget"
+    assert timeout_artifact["phase"] == "run"
+
+
 def test_verify_gate_kills_process_group_when_workflow_timeout_interrupts(
     tmp_path: Path, monkeypatch: object
 ) -> None:
