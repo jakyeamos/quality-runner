@@ -564,6 +564,27 @@ Implemented timeout hardening:
 Validation before launch: `uv run ruff check .` and full `uv run pytest`
 passed for controller commit `225dab2`.
 
+## Refresh Wave 5 Launch
+
+Refresh wave 5 reruns the same five repos to verify timeout evidence
+preservation and process-group cleanup after controller commit `6be4dc2`.
+
+Shared command shape:
+
+- `--timeout-seconds 90`
+- `--workflow-timeout-seconds 180`
+- `--workflow-timeout-reason "controller refresh wave 5 timeout preservation
+  process-group cleanup regression"`
+- no `--allow-mutating-gates`
+
+| Repo | Thread id | Run id prefix | Baseline | Report path | Status |
+|---|---|---|---|---|---|
+| tenure | `019f286e-e00b-75f1-a8a5-3aa66deb9123` | `refresh5-20260703-tenure` | `refresh4-20260703-tenure-verify` | `/private/tmp/qr-refresh5-tenure-report.json` | launched |
+| BidCamp | `019f286f-2247-7120-9224-b4128761a293` | `refresh5-20260703-BidCamp` | `refresh4-20260703-BidCamp-verify` | `/private/tmp/qr-refresh5-BidCamp-report.json` | launched |
+| AIOS | `019f286f-61b3-7141-9f84-91aeb7b10134` | `refresh5-20260703-AIOS` | `refresh4-20260703-AIOS-verify` | `/private/tmp/qr-refresh5-AIOS-report.json` | launched |
+| amos-saas | `019f286f-9d40-76f1-9b18-ded4fce2bfe1` | `refresh5-20260703-amos-saas` | `refresh4-20260703-amos-saas-verify` | `/private/tmp/qr-refresh5-amos-saas-report.json` | launched |
+| Dsci-proj | `019f286f-dd9b-7f03-82d8-d83cdd3306d4` | `refresh5-20260703-Dsci-proj` | `refresh4-20260703-Dsci-proj-verify` | `/private/tmp/qr-refresh5-Dsci-proj-report.json` | launched |
+
 ## Rollout Ledger
 
 | Wave | Repo | Repo path | Total | Blockers | Baseline artifacts | Codex project status | Thread status | Thread id | Final QR status | Commit | Push | Notes |
