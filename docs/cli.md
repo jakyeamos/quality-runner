@@ -154,10 +154,15 @@ Runs `inspect`, `run`, read-only `verify-gates`, and `summarize-run` as one
 controller-friendly workflow.
 
 ```bash
-quality-runner refresh /path/to/repo --run-id-prefix refresh-001 --json
+quality-runner refresh /path/to/repo --run-id-prefix refresh-001 --handoff-output handoff.md --json
 quality-runner refresh /path/to/repo --run-id-prefix refresh-001 --verify-timeout-seconds 300 --json
 quality-runner refresh /path/to/repo --run-id-prefix refresh-001 --total-timeout-seconds 900 --json
 ```
+
+Use `--handoff-output` for the normal single-repo workflow where the scan and
+the human remediation plan should be produced together. Refresh still writes the
+canonical `agent-handoff.md` under `.quality-runner/runs/<prefix>-verify/`;
+`--handoff-output` copies that Markdown to the requested path.
 
 Timeout flags are explicit about scope:
 
@@ -252,7 +257,9 @@ target HEAD moving during a run.
 
 ## `quality-runner export-handoff`
 
-Prints the latest `agent-handoff.md`, or a selected run handoff.
+Prints the latest `agent-handoff.md`, or a selected run handoff. This is useful
+when regenerating or copying documentation from an existing run without running
+another scan.
 
 ```bash
 quality-runner export-handoff /path/to/repo

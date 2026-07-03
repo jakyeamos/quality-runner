@@ -58,7 +58,16 @@ quality-runner doctor --json
 
 ## Quickstart
 
-Run a full audit-and-plan pass against a repository:
+Run a full repo refresh and write the remediation handoff in the same command:
+
+```bash
+quality-runner refresh /path/to/repo \
+  --run-id-prefix baseline-001 \
+  --handoff-output /tmp/baseline-001-handoff.md \
+  --json
+```
+
+For an audit-only pass without gate verification, use `run`:
 
 ```bash
 quality-runner run /path/to/repo --run-id baseline-001 --json
@@ -100,7 +109,7 @@ quality-runner status /path/to/repo --json
 quality-runner inspect /path/to/repo --json
 quality-runner run /path/to/repo --json
 quality-runner verify-gates /path/to/repo --json
-quality-runner refresh /path/to/repo --run-id-prefix refresh-001 --json
+quality-runner refresh /path/to/repo --run-id-prefix refresh-001 --handoff-output handoff.md --json
 quality-runner validate-report worker-report.json --json
 quality-runner controller-report lint worker-report.json --strict --json
 quality-runner export-handoff /path/to/repo
@@ -120,7 +129,9 @@ handoff statuses are intended for controllers: `gates-clean` means discovered
 local gates passed, `gates-blocked` means environment/dependency/read-only
 policy blocked evidence, and `gates-failed` means executable repo gates ran and
 failed. Blocked or failed handoffs include `blocker_groups` and
-`next_slice.action_groups` for structured routing.
+`next_slice.action_groups` for structured routing. Use `--handoff-output` when
+you want the scan and the human remediation plan from one command; use
+`export-handoff` later to regenerate or copy a handoff from an existing run.
 
 ## MCP
 
