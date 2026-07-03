@@ -378,7 +378,7 @@ wave:
   summary generation as one controller-friendly workflow.
 
 Validation before launch: `uv run ruff check .`, targeted workflow/CLI/artifact
-tests, and full `uv run pytest` all pass on the controller branch.
+tests, and full `uv run pytest` all pass on controller commit `9f8d85b`.
 
 Refresh wave 2 reruns the same five repos as wave 1 with `quality-runner
 refresh`, no remediation, and no target-repo commits. The point is to stress the
