@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import time
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -34,8 +35,19 @@ from quality_runner.planning import (
     build_remediation_plan,
     render_handoff_markdown,
 )
+from quality_runner.refresh_timeout import (
+    build_timeout_verify_artifacts,
+    default_workflow_timeout_seconds,
+    timeout_reason,
+    workflow_deadline,
+)
 from quality_runner.run_summary import build_run_summary
 from quality_runner.standards import DEFAULT_PROFILE, compile_standards
+from quality_runner.workflow_helpers import (
+    combined_warnings,
+    config_with_include_overrides,
+    gate_timeouts,
+)
 
 
 def generated_run_id(now: datetime | None = None, suffix: str | None = None) -> str:
@@ -60,7 +72,7 @@ def inspect_payload(
     scan, standards_packet, capability_map, config = _inspect(
         repo_root, resolved_run_id, profile, ci_status_json, branch_warnings
     )
-    config = _config_with_include_overrides(config, include_ignored_paths)
+    config = config_with_include_overrides(config, include_ignored_paths)
     code_quality_scan = create_code_quality_scan(repo_root, scan=scan, config=config)
     package_manager_preflight = build_package_manager_preflight(repo_root, scan)
 
@@ -94,7 +106,7 @@ def inspect_payload(
         "implementation_allowed": False,
         "run_id": resolved_run_id,
         "artifact_paths": artifact_paths,
-        "warnings": _combined_warnings(scan, capability_map),
+        "warnings": combined_warnings(scan, capability_map),
     }
 
 
@@ -114,7 +126,7 @@ def run_payload(
     scan, standards_packet, capability_map, config = _inspect(
         repo_root, resolved_run_id, profile, ci_status_json, branch_warnings
     )
-    config = _config_with_include_overrides(config, include_ignored_paths)
+    config = config_with_include_overrides(config, include_ignored_paths)
     code_quality_scan = create_code_quality_scan(repo_root, scan=scan, config=config)
     package_manager_preflight = build_package_manager_preflight(repo_root, scan)
     resolution_ledger = build_resolution_ledger(
@@ -207,7 +219,7 @@ def run_payload(
         "implementation_allowed": False,
         "run_id": resolved_run_id,
         "artifact_paths": artifact_paths,
-        "warnings": _combined_warnings(scan, capability_map),
+        "warnings": combined_warnings(scan, capability_map),
     }
 
 
@@ -235,7 +247,7 @@ def verify_gates_payload(
         repo_root=repo_root,
         capability_map=capability_map,
         timeout_seconds=timeout_seconds,
-        gate_timeouts=_gate_timeouts(config),
+        gate_timeouts=gate_timeouts(config),
         read_only_gates=read_only_gates,
         allow_mutating_gates=allow_mutating_gates,
     )
@@ -244,7 +256,7 @@ def verify_gates_payload(
         capability_map=capability_map,
         run_id=resolved_run_id,
         timeout_seconds=timeout_seconds,
-        gate_timeouts=_gate_timeouts(config),
+        gate_timeouts=gate_timeouts(config),
         read_only_gates=read_only_gates,
         allow_mutating_gates=allow_mutating_gates,
     )
@@ -327,7 +339,7 @@ def verify_gates_payload(
         "implementation_allowed": False,
         "run_id": resolved_run_id,
         "artifact_paths": artifact_paths,
-        "warnings": _combined_warnings(scan, verified_capability_map),
+        "warnings": combined_warnings(scan, verified_capability_map),
     }
 
 
@@ -338,6 +350,8 @@ def refresh_payload(
     profile: str | None = None,
     ci_status_json: Path | None = None,
     timeout_seconds: int = 120,
+    workflow_timeout_seconds: int | None = None,
+    workflow_timeout_reason: str | None = None,
     checkout_most_advanced_branch: bool = False,
     allow_mutating_gates: bool = False,
 ) -> dict[str, Any]:
@@ -358,21 +372,41 @@ def refresh_payload(
         ci_status_json=ci_status_json,
         checkout_most_advanced_branch=checkout_most_advanced_branch,
     )
-    verify_result = verify_gates_payload(
-        repo_root=repo_root,
-        run_id=verify_run_id,
-        profile=profile,
-        ci_status_json=ci_status_json,
-        timeout_seconds=timeout_seconds,
-        checkout_most_advanced_branch=checkout_most_advanced_branch,
-        read_only_gates=True,
-        allow_mutating_gates=allow_mutating_gates,
+    phase = "verify-gates"
+    resolved_workflow_timeout = workflow_timeout_seconds or default_workflow_timeout_seconds(
+        timeout_seconds
     )
-    summary = build_run_summary(
-        repo_root=repo_root,
-        run_id=verify_run_id,
-        baseline_run_id=baseline_run_id,
+    resolved_timeout_reason = workflow_timeout_reason or timeout_reason(
+        phase=phase, timeout_seconds=resolved_workflow_timeout
     )
+    verify_started = time.monotonic()
+    try:
+        with workflow_deadline(seconds=resolved_workflow_timeout, reason=resolved_timeout_reason):
+            verify_result = verify_gates_payload(
+                repo_root=repo_root,
+                run_id=verify_run_id,
+                profile=profile,
+                ci_status_json=ci_status_json,
+                timeout_seconds=timeout_seconds,
+                checkout_most_advanced_branch=checkout_most_advanced_branch,
+                read_only_gates=True,
+                allow_mutating_gates=allow_mutating_gates,
+            )
+        summary = build_run_summary(
+            repo_root=repo_root,
+            run_id=verify_run_id,
+            baseline_run_id=baseline_run_id,
+        )
+    except TimeoutError:
+        verify_result, summary = build_timeout_verify_artifacts(
+            repo_root=repo_root,
+            run_id=verify_run_id,
+            phase=phase,
+            reason=resolved_timeout_reason,
+            timeout_seconds=resolved_workflow_timeout,
+            elapsed_seconds=time.monotonic() - verify_started,
+            baseline_run_id=baseline_run_id,
+        )
     return {
         "schema": "quality-runner-refresh-result-v0.1",
         "status": summary["status"],
@@ -424,59 +458,6 @@ def _require_valid(name: str, result: dict[str, Any]) -> None:
 
 def _string_or_default(value: object, default: str) -> str:
     return value if isinstance(value, str) and value else default
-
-
-def _config_with_include_overrides(
-    config: dict[str, Any],
-    include_ignored_paths: list[str] | None,
-) -> dict[str, Any]:
-    if not include_ignored_paths:
-        return config
-    merged = dict(config)
-    structural_scan = dict(merged.get("structural_scan") or {})
-    existing = structural_scan.get("include_ignored_paths")
-    paths = (
-        [item for item in existing if isinstance(item, str)] if isinstance(existing, list) else []
-    )
-    for path in include_ignored_paths:
-        if path not in paths:
-            paths.append(path)
-    structural_scan["include_ignored_paths"] = paths
-    merged["structural_scan"] = structural_scan
-    return merged
-
-
-def _combined_warnings(
-    scan: dict[str, Any], capability_map: dict[str, Any]
-) -> list[dict[str, Any]]:
-    warnings: list[dict[str, Any]] = []
-    seen: set[tuple[str, str, str]] = set()
-    for source in (scan.get("warnings"), capability_map.get("warnings")):
-        if not isinstance(source, list):
-            continue
-        for item in source:
-            if not isinstance(item, dict):
-                continue
-            code = str(item.get("code") or "")
-            message = str(item.get("message") or "")
-            path = str(item.get("path") or "")
-            key = (code, message, path)
-            if key in seen:
-                continue
-            seen.add(key)
-            warnings.append(item)
-    return warnings
-
-
-def _gate_timeouts(config: dict[str, Any]) -> dict[str, int]:
-    gate_timeouts = config.get("gate_timeouts")
-    if not isinstance(gate_timeouts, dict):
-        return {}
-    return {
-        gate_id: seconds
-        for gate_id, seconds in gate_timeouts.items()
-        if isinstance(gate_id, str) and isinstance(seconds, int) and seconds > 0
-    }
 
 
 def _verify_payload_status(

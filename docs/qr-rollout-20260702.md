@@ -412,6 +412,31 @@ Refresh wave 2 takeaways:
 - The controller report protocol is working: every worker produced an accepted
   completion report, even when the QR workflow itself hung or failed.
 
+## Product Fixes Before Refresh Wave 3
+
+Refresh wave 2 exposed the next Tier 1 blocker: `quality-runner refresh` could
+hang during `verify-gates` after writing inspect/run artifacts but before
+writing verify artifacts or final JSON.
+
+Implemented refresh hardening:
+
+- `refresh` now has an overall verify-phase workflow timeout in addition to
+  per-gate timeouts.
+- Timeout payloads always include an explicit reason, phase, configured timeout,
+  elapsed time, and `workflow-timeout` failure type.
+- If verify times out, QR writes partial but valid verify artifacts:
+  `gate-execution-plan.json`, `gate-verification.json`,
+  `workflow-timeout.json`, `run-manifest.json`, and `run-summary.json`.
+- Run summaries classify this state as `workflow-timeout-blocker`, so
+  controllers do not confuse it with repo-owned failing gates or dependency
+  setup blockers.
+- CLI callers can set `--workflow-timeout-seconds` and
+  `--workflow-timeout-reason`; the next rerun uses an explicit controller
+  reason.
+
+Validation before launch: `uv run ruff check .`, targeted workflow/CLI/artifact
+tests, and full `uv run pytest` all pass locally.
+
 ## Rollout Ledger
 
 | Wave | Repo | Repo path | Total | Blockers | Baseline artifacts | Codex project status | Thread status | Thread id | Final QR status | Commit | Push | Notes |

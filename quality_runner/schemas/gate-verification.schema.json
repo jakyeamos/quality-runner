@@ -15,6 +15,10 @@
     },
     "read_only_gates": { "type": "boolean" },
     "allow_mutating_gates": { "type": "boolean" },
+    "failure_type": { "enum": ["workflow-timeout"] },
+    "phase": { "type": "string", "minLength": 1 },
+    "reason": { "type": "string", "minLength": 1 },
+    "elapsed_seconds": { "type": "number", "minimum": 0 },
     "environment": {
       "type": "object",
       "additionalProperties": { "type": ["string", "boolean", "null"] }

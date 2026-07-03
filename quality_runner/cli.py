@@ -83,6 +83,17 @@ def build_parser() -> argparse.ArgumentParser:
         help="Per-gate command timeout",
     )
     refresh_parser.add_argument(
+        "--workflow-timeout-seconds",
+        type=int,
+        default=None,
+        help="Overall refresh verify-phase timeout; defaults to a multiple of --timeout-seconds",
+    )
+    refresh_parser.add_argument(
+        "--workflow-timeout-reason",
+        default=None,
+        help="Reason recorded when the refresh workflow timeout fires",
+    )
+    refresh_parser.add_argument(
         "--allow-mutating-gates",
         action="store_true",
         help="Allow known or suspected mutating gates to execute during refresh",
@@ -254,6 +265,8 @@ def _payload_for_args(args: argparse.Namespace) -> dict[str, Any]:
             profile=args.profile,
             ci_status_json=Path(args.ci_status_json) if args.ci_status_json else None,
             timeout_seconds=args.timeout_seconds,
+            workflow_timeout_seconds=args.workflow_timeout_seconds,
+            workflow_timeout_reason=args.workflow_timeout_reason,
             checkout_most_advanced_branch=args.checkout_most_advanced_branch,
             allow_mutating_gates=args.allow_mutating_gates,
         )

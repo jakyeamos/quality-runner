@@ -543,6 +543,61 @@ def test_cli_refresh_runs_read_only_sequence_and_persists_summary(tmp_path: Path
     assert json.loads(persisted.read_text(encoding="utf-8"))["run_id"] == "cli-refresh-verify"
 
 
+def test_cli_refresh_workflow_timeout_records_reason(tmp_path: Path) -> None:
+    (tmp_path / "package.json").write_text(
+        json.dumps(
+            {
+                "scripts": {
+                    "test": f"{sys.executable} -c 'import time; time.sleep(5)'",
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    (tmp_path / ".quality-runner.toml").write_text(
+        '[quality_runner]\nrequired_capabilities = ["tests"]\n',
+        encoding="utf-8",
+    )
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "quality_runner",
+            "refresh",
+            str(tmp_path),
+            "--run-id-prefix",
+            "cli-refresh-timeout",
+            "--timeout-seconds",
+            "30",
+            "--workflow-timeout-seconds",
+            "1",
+            "--workflow-timeout-reason",
+            "controller deadline exceeded during verify",
+            "--json",
+        ],
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+        timeout=4,
+    )
+
+    payload = json.loads(result.stdout)
+    run_dir = tmp_path / ".quality-runner" / "runs" / "cli-refresh-timeout-verify"
+    gate_verification = json.loads((run_dir / "gate-verification.json").read_text())
+    timeout_artifact = json.loads((run_dir / "workflow-timeout.json").read_text())
+
+    assert payload["status"] == "blocked"
+    assert payload["summary"]["recommended_classification"] == "workflow-timeout-blocker"
+    assert payload["runs"]["verify"]["timeout"]["reason"] == (
+        "controller deadline exceeded during verify"
+    )
+    assert gate_verification["failure_type"] == "workflow-timeout"
+    assert gate_verification["reason"] == "controller deadline exceeded during verify"
+    assert timeout_artifact["reason"] == "controller deadline exceeded during verify"
+
+
 def test_cli_export_handoff_prints_latest_handoff(tmp_path: Path) -> None:
     write_js_fixture(tmp_path)
     subprocess.run(

@@ -43,12 +43,15 @@ def _run_summary(*, repo_root: Path, run_id: str) -> dict[str, Any]:
     missing_capabilities = _missing_capabilities(capability_map)
     finding_counts = _finding_counts(audit)
     status = _summary_status(gate_verification, audit)
+    failure_type = _string_or_none(gate_verification.get("failure_type"))
     return {
         "run_id": run_id,
         "path": str(run_dir),
         "status": status,
+        **_optional_field("failure_type", failure_type),
         "recommended_classification": _recommended_classification(
             status=status,
+            failure_type=failure_type,
             gate_results=gate_results,
             missing_capabilities=missing_capabilities,
             finding_counts=finding_counts,
@@ -136,10 +139,13 @@ def _summary_status(gate_verification: dict[str, Any], audit: dict[str, Any]) ->
 def _recommended_classification(
     *,
     status: str,
+    failure_type: str | None,
     gate_results: list[dict[str, Any]],
     missing_capabilities: list[str],
     finding_counts: dict[str, Any],
 ) -> str:
+    if failure_type == "workflow-timeout":
+        return "workflow-timeout-blocker"
     if any(gate.get("failure_type") == "environment-restricted" for gate in gate_results):
         return "environment-or-runner-blocker"
     if any(gate.get("failure_type") == "dependency-setup-blocker" for gate in gate_results):
@@ -190,3 +196,9 @@ def _int_value(value: object) -> int:
 
 def _string_or_none(value: object) -> str | None:
     return value if isinstance(value, str) and value else None
+
+
+def _optional_field(key: str, value: object) -> dict[str, Any]:
+    if value is None:
+        return {}
+    return {key: value}
