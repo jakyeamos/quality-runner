@@ -492,6 +492,12 @@ def test_inspect_repo_excludes_default_fixture_corpus_vendor_and_docs_paths(
         "module example.com/vendored\n",
         encoding="utf-8",
     )
+    claude_worktree = tmp_path / ".claude" / "worktrees" / "feature-copy"
+    claude_worktree.mkdir(parents=True)
+    (claude_worktree / "package.json").write_text(
+        json.dumps({"scripts": {"test": "should-not-be-read"}}),
+        encoding="utf-8",
+    )
     terraform_dir = tmp_path / "infra" / "terraform"
     terraform_dir.mkdir(parents=True)
     (terraform_dir / "main.tf").write_text("terraform {}\n", encoding="utf-8")
@@ -525,6 +531,7 @@ def test_inspect_repo_excludes_default_fixture_corpus_vendor_and_docs_paths(
     assert "proto/service.proto" in surface_paths
     assert "src/generated" in surface_paths
     assert all(not path.startswith(("docs/", "fixtures/", "vendor/")) for path in surface_paths)
+    assert all(not path.startswith(".claude/worktrees/") for path in surface_paths)
     assert scan["generated_code"] == [{"path": "src/generated", "evidence": "generated directory"}]
 
 
@@ -558,6 +565,7 @@ def test_workflow_applies_configured_scan_exclusions(tmp_path: Path) -> None:
     scan = json.loads(Path(payload["artifact_paths"]["repo_scan_json"]).read_text())
 
     assert scan["scan_exclusions"] == [
+        ".claude/worktrees/**",
         ".aios",
         ".planning",
         ".superpowers",

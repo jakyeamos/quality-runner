@@ -36,6 +36,7 @@ IGNORED_DIRS = {
 }
 IGNORED_DIR_PREFIXES = (".next",)
 IGNORED_PATH_PREFIXES = (
+    ".claude/worktrees",
     ".aios/shadow-worktrees",
     ".worktrees",
     ".tmp",

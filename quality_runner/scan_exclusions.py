@@ -16,6 +16,7 @@ ALWAYS_EXCLUDED_PATH_PARTS = {
 }
 
 DEFAULT_SCAN_EXCLUSIONS = [
+    ".claude/worktrees/**",
     ".aios",
     ".planning",
     ".superpowers",
