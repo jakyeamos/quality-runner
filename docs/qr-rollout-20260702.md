@@ -1583,6 +1583,30 @@ Verification:
 - `uv run ruff check .` passed.
 - `git diff --check` passed.
 
+## Refresh Wave 19 Launch
+
+Launched a hardening validation wave against QR commit `c364378`. This reruns
+the Wave 18 target set and explicitly verifies the post-Wave-18 product fixes:
+automatic blocker synthesis without manual `--blocker`, controller status
+recommendations, grouped dirty-state provenance, repo-local cache environment
+fields, broader agent/generated exclusions, and richer timeout diagnostics.
+
+Wave rule: workers must first generate controller reports without explicit
+`--blocker` values. If that still fails, they must record the failure as a
+product regression and then regenerate with explicit blockers only to leave a
+valid report artifact.
+
+| Repo | Repo path | Thread id | Run id prefix | Baseline run id | Report path | Launch status |
+|---|---|---|---|---|---|---|
+| amos-saas | `/Users/jakyeamos/projects/amos-saas` | `019f2a2f-b97c-7b70-87f9-0b2a5940cd46` | `refresh19-20260703-amos-saas` | `refresh18-20260703-amos-saas-verify` | `/private/tmp/qr-refresh19-amos-saas-report.json` | launched |
+| BIP-Console | `/Users/jakyeamos/projects/BIP-Console` | `019f2a2f-befa-7230-9e3e-adcb119580f2` | `refresh19-20260703-BIP-Console` | `refresh18-20260703-BIP-Console-verify` | `/private/tmp/qr-refresh19-BIP-Console-report.json` | launched |
+| R-Project | `/Users/jakyeamos/projects/R-Project` | `019f2a2f-c600-75c3-8562-d16ae7f0aaef` | `refresh19-20260703-R-Project` | `refresh18-20260703-R-Project-verify` | `/private/tmp/qr-refresh19-R-Project-report.json` | launched |
+| EliHealth | `/Users/jakyeamos/projects/EliHealth` | `019f2a2f-d21b-7482-ac1f-713958d15e3e` | `refresh19-20260703-EliHealth` | `refresh18-20260703-EliHealth-verify` | `/private/tmp/qr-refresh19-EliHealth-report.json` | launched |
+| Terrace | `/Users/jakyeamos/projects/Terrace` | `019f2a2f-dd35-79d1-b543-fd11c74d1154` | `refresh19-20260703-Terrace` | `refresh18-20260703-Terrace-verify` | `/private/tmp/qr-refresh19-Terrace-report.json` | launched |
+| tmcp | `/Users/jakyeamos/projects/tmcp` | `019f2a2f-e60b-70f2-964d-1de89b0e68e1` | `refresh19-20260703-tmcp` | `refresh18-20260703-tmcp-verify` | `/private/tmp/qr-refresh19-tmcp-report.json` | launched |
+| BBDSE | `/Users/jakyeamos/projects/BBDSE` | `019f2a2f-f25d-70a3-a90a-3adf8f9d102a` | `refresh19-20260703-BBDSE` | `refresh18-20260703-BBDSE-verify` | `/private/tmp/qr-refresh19-BBDSE-report.json` | launched |
+| agent-router | `/Users/jakyeamos/projects/agent-router` | `019f2a30-0462-72a1-8260-a2bb1f1ba7c7` | `refresh19-20260703-agent-router` | `refresh18-20260703-agent-router-verify` | `/private/tmp/qr-refresh19-agent-router-report.json` | launched |
+
 ## Rollout Ledger
 
 | Wave | Repo | Repo path | Total | Blockers | Baseline artifacts | Codex project status | Thread status | Thread id | Final QR status | Commit | Push | Notes |
