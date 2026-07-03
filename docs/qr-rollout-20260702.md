@@ -960,6 +960,27 @@ Implemented the two Wave 11 hardening follow-ups:
 - Mixed-blocker handoffs now expose a primary blocker class while preserving the
   full blocker list for secondary fixes.
 
+## Refresh Wave 12 Launch
+
+Wave 12 validates the read-only mutation restoration and blocker grouping fixes
+from commit `b5cb45a`. The sample intentionally reuses the same dependency
+setup, failed executable gate, read-only policy, mixed-blocker, and clean-control
+repos from Wave 11 so the controller can compare behavior directly.
+
+Each worker must preserve dirty work, avoid committing `.quality-runner/`
+artifacts, validate its controller report, and stop with a structured report
+covering final QR status, handoff status, primary blocker class, blocker groups,
+read-only mutation restore verdict where applicable, files changed, commit/push
+state, and blockers.
+
+| Repo | Thread id | Run id prefix | Baseline | Report path | Status |
+|---|---|---|---|---|---|
+| AIOS | `019f292c-01d1-7591-952d-5af6f56ea99f` | `refresh12-20260703-AIOS` | `refresh11-20260703-AIOS-verify` | `/private/tmp/qr-refresh12-AIOS-report.json` | launched |
+| EliHealth | `019f292c-082f-75c3-af2f-f9f458b54d8e` | `refresh12-20260703-EliHealth` | `refresh11-20260703-EliHealth-verify` | `/private/tmp/qr-refresh12-EliHealth-report.json` | launched |
+| BIP-Console | `019f292c-0f7c-7cf0-8642-e865f92bc073` | `refresh12-20260703-BIP-Console` | `refresh11-20260703-BIP-Console-verify` | `/private/tmp/qr-refresh12-BIP-Console-report.json` | launched |
+| amos-saas | `019f292c-1769-7c12-936f-f6136b7710b0` | `refresh12-20260703-amos-saas` | `refresh11-20260703-amos-saas-verify` | `/private/tmp/qr-refresh12-amos-saas-report.json` | launched |
+| R-Project | `019f292c-1d97-7270-92cc-e5cb9275826f` | `refresh12-20260703-R-Project` | `refresh11-20260703-R-Project-verify` | `/private/tmp/qr-refresh12-R-Project-report.json` | launched |
+
 ## Rollout Ledger
 
 | Wave | Repo | Repo path | Total | Blockers | Baseline artifacts | Codex project status | Thread status | Thread id | Final QR status | Commit | Push | Notes |
