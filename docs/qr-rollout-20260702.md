@@ -516,6 +516,34 @@ Shared command shape:
 | amos-saas | `019f285d-ae2a-7822-8df0-9da2cbfe3d65` | `refresh4-20260703-amos-saas` | `refresh3-20260703-amos-saas-verify` | `/private/tmp/qr-refresh4-amos-saas-report.json` | launched |
 | Dsci-proj | `019f285e-19cc-7f41-baa5-03cacecb7c36` | `refresh4-20260703-Dsci-proj` | `refresh3-20260703-Dsci-proj-verify` | `/private/tmp/qr-refresh4-Dsci-proj-report.json` | launched |
 
+## Refresh Wave 4 Results
+
+All five wave-4 worker reports validated against
+`quality-runner-controller-report-validation-v0.1`.
+
+| Repo | Report status | Final QR status | Scan budget | Timeout | Key result |
+|---|---|---|---|---|---|
+| tenure | blocked | blocked; `workflow-timeout-blocker` | 751 / 2,500 scanned; no budget skip | yes; explicit reason | Mid-run `gate-execution-plan.json` and `gate-verification.json` held useful gate evidence, but timeout finalization overwrote both to empty terminal artifacts. |
+| BidCamp | blocked | blocked; `workflow-timeout-blocker` | 2,205 / 2,500 scanned; no budget skip | yes; explicit reason | Mid-run verification accumulated `formatter` skipped and `lint` passed, but final timeout artifacts dropped the plan and completed gate evidence. |
+| AIOS | blocked | blocked; `environment-or-runner-blocker` | 742 / 2,500 scanned; no budget skip | no | Refresh completed normal verification with usable final artifacts; remaining blockers are repo/environment gate failures. |
+| amos-saas | blocked | blocked; `workflow-timeout-blocker` | 241 / 2,500 scanned; no budget skip | yes; explicit reason | Static scan stayed efficient, but verify hit the workflow timeout before a non-empty gate plan or completed gate evidence survived. |
+| Dsci-proj | ready-for-review | failed; `failing-executable-gates` | 198 / 2,500 scanned; no budget skip | no | Efficiency hardening worked: final artifacts retained gate evidence, and failure was existing repo-owned executable gate debt. |
+
+Wave-4 product findings:
+
+- Scan-budget hardening is working across the regression set. All five repos
+  stayed under the default 2,500 text-file budget, and none produced
+  `scan budget exceeded` skipped evidence.
+- Partial gate artifacts now exist during long-running verification. Tenure and
+  BidCamp both exposed mid-run `gate-verification.json` evidence while the
+  parent refresh was still active.
+- Timeout finalization is now the blocker: when the workflow timeout fires, QR
+  rebuilds terminal `gate-execution-plan.json` and `gate-verification.json` as
+  empty artifacts, discarding the useful partial evidence.
+- The process-tree deadline issue remains. Tenure and BidCamp workers observed
+  the parent refresh running beyond the configured 180-second workflow deadline
+  before returning a timeout result.
+
 ## Rollout Ledger
 
 | Wave | Repo | Repo path | Total | Blockers | Baseline artifacts | Codex project status | Thread status | Thread id | Final QR status | Commit | Push | Notes |
