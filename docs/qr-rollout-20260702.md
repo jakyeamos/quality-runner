@@ -544,6 +544,23 @@ Wave-4 product findings:
   the parent refresh running beyond the configured 180-second workflow deadline
   before returning a timeout result.
 
+## Product Fixes Before Refresh Wave 5
+
+Refresh wave 4 showed that the new partial verification artifacts were useful
+during execution, but timeout finalization erased them. Wave 5 should verify
+that timeout artifacts now preserve completed gate evidence and that interrupted
+gate processes are cleaned up promptly.
+
+Implemented timeout hardening:
+
+- Workflow timeout finalization now preserves an existing
+  `gate-execution-plan.json` instead of replacing it with an empty array.
+- Workflow timeout finalization now merges timeout metadata into an existing
+  `gate-verification.json` while retaining any completed gate results.
+- Gate execution now launches shell commands in their own process group and
+  terminates that process group if a per-gate timeout or workflow-level
+  interruption occurs.
+
 ## Rollout Ledger
 
 | Wave | Repo | Repo path | Total | Blockers | Baseline artifacts | Codex project status | Thread status | Thread id | Final QR status | Commit | Push | Notes |

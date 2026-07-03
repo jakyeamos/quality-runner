@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 import json
+import signal
 import sys
 from pathlib import Path
+
+import pytest
 
 from test_support.quality_runner_fixtures import write_complete_js_fixture
 
@@ -352,6 +355,132 @@ def test_refresh_payload_finalizes_partial_verify_artifacts_when_verify_times_ou
     assert gate_verification["gates"] == []
     assert json.loads((run_dir / "gate-execution-plan.json").read_text()) == []
     assert run_summary["recommended_classification"] == "workflow-timeout-blocker"
+
+
+def test_refresh_payload_preserves_partial_verify_artifacts_when_timeout_finalizes(
+    tmp_path: Path, monkeypatch: object
+) -> None:
+    from quality_runner import workflow
+
+    (tmp_path / "package.json").write_text(
+        json.dumps({"scripts": {"test": f"{sys.executable} -c 'import sys; sys.exit(0)'"}}),
+        encoding="utf-8",
+    )
+    (tmp_path / ".quality-runner.toml").write_text(
+        '[quality_runner]\nrequired_capabilities = ["lint", "tests"]\n',
+        encoding="utf-8",
+    )
+
+    def timeout_verify(*, repo_root: Path, run_id: str, **_: object) -> dict[str, object]:
+        run_dir = repo_root / ".quality-runner" / "runs" / run_id
+        run_dir.mkdir(parents=True)
+        (run_dir / "gate-execution-plan.json").write_text(
+            json.dumps(
+                [
+                    {"id": "lint", "command": "pnpm lint"},
+                    {"id": "tests", "command": "pnpm test"},
+                ]
+            ),
+            encoding="utf-8",
+        )
+        (run_dir / "gate-verification.json").write_text(
+            json.dumps(
+                {
+                    "schema": "quality-runner-gate-verification-v0.1",
+                    "run_id": run_id,
+                    "status": "blocked",
+                    "timeout_seconds": 90,
+                    "gates": [
+                        {
+                            "id": "lint",
+                            "status": "passed",
+                            "duration_seconds": 12.5,
+                        }
+                    ],
+                }
+            ),
+            encoding="utf-8",
+        )
+        raise TimeoutError("workflow timeout while verifying gates")
+
+    monkeypatch.setattr(workflow, "verify_gates_payload", timeout_verify)
+
+    workflow.refresh_payload(
+        repo_root=tmp_path,
+        run_id_prefix="refresh-timeout-preserve",
+        workflow_timeout_seconds=30,
+        workflow_timeout_reason="controller deadline exceeded while verifying gates",
+    )
+    run_dir = tmp_path / ".quality-runner" / "runs" / "refresh-timeout-preserve-verify"
+    gate_plan = json.loads((run_dir / "gate-execution-plan.json").read_text())
+    gate_verification = json.loads((run_dir / "gate-verification.json").read_text())
+    run_summary = json.loads((run_dir / "run-summary.json").read_text())
+
+    assert [gate["id"] for gate in gate_plan] == ["lint", "tests"]
+    assert gate_verification["status"] == "blocked"
+    assert gate_verification["failure_type"] == "workflow-timeout"
+    assert gate_verification["reason"] == "controller deadline exceeded while verifying gates"
+    assert gate_verification["gates"] == [
+        {
+            "duration_seconds": 12.5,
+            "id": "lint",
+            "status": "passed",
+        }
+    ]
+    assert run_summary["recommended_classification"] == "workflow-timeout-blocker"
+    assert run_summary["gate_results"] == [
+        {
+            "duration_seconds": 12.5,
+            "id": "lint",
+            "status": "passed",
+        }
+    ]
+
+
+def test_verify_gate_kills_process_group_when_workflow_timeout_interrupts(
+    tmp_path: Path, monkeypatch: object
+) -> None:
+    from quality_runner import gate_verification
+
+    killed_groups: list[tuple[int, int]] = []
+
+    class FakeProcess:
+        pid = 12345
+        returncode = None
+
+        def communicate(self, timeout: int) -> tuple[str, str]:
+            assert timeout == 120
+            raise TimeoutError("workflow deadline")
+
+    def fake_popen(*_: object, **kwargs: object) -> FakeProcess:
+        assert kwargs["start_new_session"] is True
+        return FakeProcess()
+
+    monkeypatch.setattr(gate_verification.subprocess, "Popen", fake_popen)
+    monkeypatch.setattr(gate_verification.os, "getpgid", lambda pid: pid + 1)
+    monkeypatch.setattr(
+        gate_verification.os,
+        "killpg",
+        lambda pgid, sig: killed_groups.append((pgid, sig)),
+    )
+
+    with pytest.raises(TimeoutError, match="workflow deadline"):
+        gate_verification.verify_discovered_gates(
+            repo_root=tmp_path,
+            capability_map={
+                "available": [
+                    {
+                        "id": "tests",
+                        "type": "script",
+                        "command": "pnpm test",
+                        "source": "package.json",
+                    }
+                ]
+            },
+            run_id="workflow-interrupt",
+        )
+
+    assert killed_groups == [(12346, signal.SIGTERM)]
 
 
 def test_verify_gates_skips_ci_only_pseudo_gates(tmp_path: Path) -> None:

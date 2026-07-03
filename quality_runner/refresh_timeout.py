@@ -58,6 +58,10 @@ def build_timeout_verify_artifacts(
     baseline_run_id: str | None,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     run_dir = prepare_artifact_dir(repo_root, run_id)
+    plan_path = run_dir / "gate-execution-plan.json"
+    verification_path = run_dir / "gate-verification.json"
+    existing_plan = _existing_plan(plan_path)
+    existing_verification = _existing_verification(verification_path)
     timeout_payload = {
         "schema": WORKFLOW_TIMEOUT_ARTIFACT_SCHEMA,
         "status": "blocked",
@@ -69,6 +73,7 @@ def build_timeout_verify_artifacts(
         "elapsed_seconds": round(elapsed_seconds, 3),
     }
     gate_verification = {
+        **existing_verification,
         "schema": GATE_VERIFICATION_SCHEMA,
         "run_id": run_id,
         "status": "blocked",
@@ -77,7 +82,7 @@ def build_timeout_verify_artifacts(
         "phase": phase,
         "reason": reason,
         "elapsed_seconds": round(elapsed_seconds, 3),
-        "gates": [],
+        "gates": _existing_gates(existing_verification),
     }
     artifact_paths = {
         "gate_execution_plan_json": str(run_dir / "gate-execution-plan.json"),
@@ -86,7 +91,7 @@ def build_timeout_verify_artifacts(
         "run_manifest_json": str(run_dir / "run-manifest.json"),
         "run_summary_json": str(run_dir / "run-summary.json"),
     }
-    write_text(run_dir / "gate-execution-plan.json", json.dumps([], indent=2) + "\n")
+    write_text(run_dir / "gate-execution-plan.json", json.dumps(existing_plan, indent=2) + "\n")
     write_json(run_dir / "gate-verification.json", gate_verification)
     write_json(run_dir / "workflow-timeout.json", timeout_payload)
     write_json(
@@ -113,3 +118,27 @@ def build_timeout_verify_artifacts(
         "warnings": [],
     }
     return verify_result, summary
+
+
+def _existing_plan(path: Path) -> list[Any]:
+    payload = _read_existing_json(path)
+    return payload if isinstance(payload, list) else []
+
+
+def _existing_verification(path: Path) -> dict[str, Any]:
+    payload = _read_existing_json(path)
+    return payload if isinstance(payload, dict) else {}
+
+
+def _existing_gates(verification: dict[str, Any]) -> list[Any]:
+    gates = verification.get("gates")
+    return gates if isinstance(gates, list) else []
+
+
+def _read_existing_json(path: Path) -> object:
+    if not path.exists():
+        return None
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return None

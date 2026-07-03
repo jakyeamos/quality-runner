@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import os
+import signal
 import subprocess
 import sys
 import time
@@ -205,13 +207,9 @@ def _verify_gate(
 
     started = time.monotonic()
     try:
-        result = subprocess.run(
+        result = _run_shell_command(
             command,
             cwd=repo_root,
-            shell=True,
-            check=False,
-            capture_output=True,
-            text=True,
             timeout=timeout_seconds,
         )
     except subprocess.TimeoutExpired as error:
@@ -243,19 +241,20 @@ def _verify_gate(
                 dependency_setup=dependency_setup,
             ),
         }
-    stdout = _truncate(result.stdout)
-    stderr = _truncate(result.stderr)
+    stdout = _truncate(result["stdout"])
+    stderr = _truncate(result["stderr"])
     gate_failure_type = failure_type(command=command, stdout=stdout, stderr=stderr, timed_out=False)
-    failed = result.returncode != 0
+    returncode = _int_result(result["returncode"])
+    failed = returncode != 0
     environment_restricted = failed and gate_failure_type == "environment-restricted"
     dependency_setup = failed and gate_failure_type == "dependency-setup-blocker"
     return {
         "id": capability_id,
-        "status": "passed" if result.returncode == 0 else "failed",
+        "status": "passed" if returncode == 0 else "failed",
         "capability_kind": capability_kind,
         "command": command,
         "source": source,
-        "exit_code": result.returncode,
+        "exit_code": returncode,
         "duration_seconds": round(time.monotonic() - started, 3),
         "timeout_seconds": timeout_seconds,
         "cwd": str(gate_cwd(repo_root=repo_root, capability=capability)),
@@ -270,6 +269,52 @@ def _verify_gate(
             dependency_setup=dependency_setup,
         ),
     }
+
+
+def _run_shell_command(command: str, *, cwd: Path, timeout: int) -> dict[str, object]:
+    process = subprocess.Popen(
+        command,
+        cwd=cwd,
+        shell=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        start_new_session=True,
+    )
+    try:
+        stdout, stderr = process.communicate(timeout=timeout)
+    except subprocess.TimeoutExpired:
+        _terminate_process_group(process)
+        raise
+    except BaseException:
+        _terminate_process_group(process)
+        raise
+    return {
+        "stdout": stdout,
+        "stderr": stderr,
+        "returncode": process.returncode,
+    }
+
+
+def _terminate_process_group(process: subprocess.Popen[Any]) -> None:
+    try:
+        process_group_id = os.getpgid(process.pid)
+    except ProcessLookupError:
+        return
+    try:
+        os.killpg(process_group_id, signal.SIGTERM)
+    except ProcessLookupError:
+        return
+    wait = getattr(process, "wait", None)
+    if not callable(wait):
+        return
+    try:
+        wait(timeout=0.2)
+    except subprocess.TimeoutExpired:
+        try:
+            os.killpg(process_group_id, signal.SIGKILL)
+        except ProcessLookupError:
+            return
 
 
 def _available_capabilities(capability_map: dict[str, Any]) -> list[dict[str, Any]]:
@@ -367,3 +412,7 @@ def _optional_field(key: str, value: object) -> dict[str, Any]:
     if value is None:
         return {}
     return {key: value}
+
+
+def _int_result(value: object) -> int:
+    return value if isinstance(value, int) else 1
