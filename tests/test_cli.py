@@ -762,6 +762,7 @@ def test_cli_main_new_commands_in_process(tmp_path: Path, capsys) -> None:
     assert lint_payload["status"] == "accepted"
     assert lint_payload["normalized_report"]["repo_path"] == str(tmp_path)
 
+    controller_report_path = tmp_path / "direct-controller-report.json"
     assert (
         main(
             [
@@ -774,6 +775,10 @@ def test_cli_main_new_commands_in_process(tmp_path: Path, capsys) -> None:
                 "--controller-report",
                 "--branch-name",
                 "qr/example",
+                "--report-output",
+                str(controller_report_path),
+                "--lint-report",
+                "--validate-report",
                 "--json",
             ]
         )
@@ -785,6 +790,22 @@ def test_cli_main_new_commands_in_process(tmp_path: Path, capsys) -> None:
     assert controller_report_payload["baseline_artifact_path"].endswith(
         "/.quality-runner/runs/direct-cli-run"
     )
+    assert isinstance(controller_report_payload["target_head"], str)
+    assert controller_report_payload["commit_created_by_task"] is False
+    assert controller_report_payload["self_checks"] == [
+        {
+            "command": f"quality-runner controller-report lint {controller_report_path.resolve()} --strict --json",
+            "errors": [],
+            "status": "accepted",
+        },
+        {
+            "command": f"quality-runner validate-report {controller_report_path.resolve()} --json",
+            "errors": [],
+            "status": "accepted",
+        },
+    ]
+    persisted_report = json.loads(controller_report_path.read_text(encoding="utf-8"))
+    assert persisted_report["self_checks"] == controller_report_payload["self_checks"]
 
     rejected_report_path = tmp_path / "rejected-worker-report.json"
     rejected_payload = json.loads(report_path.read_text(encoding="utf-8"))

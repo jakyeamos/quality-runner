@@ -44,6 +44,12 @@ def _run_summary(*, repo_root: Path, run_id: str) -> dict[str, Any]:
     finding_counts = _finding_counts(audit)
     status = _summary_status(gate_verification, audit)
     failure_type = _string_or_none(gate_verification.get("failure_type"))
+    blocker_classes = _blocker_classes(
+        failure_type=failure_type,
+        gate_results=gate_results,
+        missing_capabilities=missing_capabilities,
+        finding_counts=finding_counts,
+    )
     return {
         "run_id": run_id,
         "path": str(run_dir),
@@ -55,7 +61,9 @@ def _run_summary(*, repo_root: Path, run_id: str) -> dict[str, Any]:
             gate_results=gate_results,
             missing_capabilities=missing_capabilities,
             finding_counts=finding_counts,
+            blocker_classes=blocker_classes,
         ),
+        "blocker_classes": blocker_classes,
         "gate_results": gate_results,
         "missing_capabilities": missing_capabilities,
         "finding_counts": finding_counts,
@@ -143,9 +151,15 @@ def _recommended_classification(
     gate_results: list[dict[str, Any]],
     missing_capabilities: list[str],
     finding_counts: dict[str, Any],
+    blocker_classes: list[str],
 ) -> str:
     if failure_type == "workflow-timeout":
         return "workflow-timeout-blocker"
+    if len(blocker_classes) > 1 and any(
+        blocker_class in blocker_classes
+        for blocker_class in ("command-failure", "environment-or-runner", "dependency-setup")
+    ):
+        return "mixed-gate-blocker"
     if any(gate.get("failure_type") == "environment-restricted" for gate in gate_results):
         return "environment-or-runner-blocker"
     if any(gate.get("failure_type") == "dependency-setup-blocker" for gate in gate_results):
@@ -165,6 +179,33 @@ def _recommended_classification(
     if status in {"passed", "clean"}:
         return "clean"
     return "needs-triage"
+
+
+def _blocker_classes(
+    *,
+    failure_type: str | None,
+    gate_results: list[dict[str, Any]],
+    missing_capabilities: list[str],
+    finding_counts: dict[str, Any],
+) -> list[str]:
+    classes: list[str] = []
+    if failure_type == "workflow-timeout":
+        classes.append("workflow-timeout")
+    for gate in gate_results:
+        gate_failure_type = gate.get("failure_type")
+        if gate_failure_type == "environment-restricted":
+            _append_unique(classes, "environment-or-runner")
+        elif gate_failure_type == "dependency-setup-blocker":
+            _append_unique(classes, "dependency-setup")
+        elif gate_failure_type == "read-only-mutation" or gate.get("skip_type") == "mutating-gate-not-run":
+            _append_unique(classes, "read-only-policy")
+        elif gate.get("status") == "failed":
+            _append_unique(classes, "command-failure")
+    if missing_capabilities:
+        _append_unique(classes, "missing-capabilities")
+    if int(finding_counts.get("total") or 0) > 0:
+        _append_unique(classes, "structural-findings")
+    return classes
 
 
 def _summary_delta(*, baseline: dict[str, Any], final: dict[str, Any]) -> dict[str, Any]:
@@ -206,3 +247,8 @@ def _optional_field(key: str, value: object) -> dict[str, Any]:
     if value is None:
         return {}
     return {key: value}
+
+
+def _append_unique(values: list[str], value: str) -> None:
+    if value not in values:
+        values.append(value)

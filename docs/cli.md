@@ -233,13 +233,22 @@ baseline delta.
 quality-runner summarize-run /path/to/repo --run-id final-001 --json
 quality-runner summarize-run /path/to/repo --run-id final-001 --baseline-run-id baseline-001 --json
 quality-runner summarize-run /path/to/repo --run-id final-001 --baseline-run-id baseline-001 --controller-report --branch-name qr/example --json
+quality-runner summarize-run /path/to/repo --run-id final-001 --baseline-run-id baseline-001 --controller-report --report-output worker-report.json --lint-report --validate-report --json
 ```
 
 With `--controller-report`, the command emits a strict controller-report
 skeleton using the run summary, current git status, branch name, baseline path,
 and inferred blockers. Workers can add explicit `--blocker`, `--file-changed`,
-`--commit-hash`, `--push-status`, and `--thread-status` values before running
-`quality-runner validate-report`.
+`--commit-hash`, `--push-status`, and `--thread-status` values.
+
+Use `--report-output` to write the generated report to disk. With
+`--lint-report` and `--validate-report`, the command runs the same strict
+self-checks expected by controller waves and records their results under
+`self_checks`. Generated controller reports also include `target_head`,
+`commit_created_by_task`, `repo_state`, and expected lint/validate commands in
+`verification`. Pass `--pre-head`, `--pre-git-status-short`, and
+`--concurrency-note` when a worker captured pre-run repo state or observed the
+target HEAD moving during a run.
 
 ## `quality-runner export-handoff`
 

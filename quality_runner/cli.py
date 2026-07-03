@@ -13,6 +13,7 @@ from quality_runner.cli_controller_reports import (
     add_controller_report_summary_arguments,
     controller_report_command_payload,
     controller_report_from_summary_payload,
+    has_rejected_self_check,
     load_controller_report_json,
 )
 from quality_runner.cli_status import (
@@ -213,6 +214,8 @@ def main(argv: list[str] | None = None) -> int:
     else:
         print(_human_summary(payload))
     if parsed.command in {"validate-report", "controller-report"} and payload.get("status") == "rejected":
+        return 1
+    if parsed.command == "summarize-run" and has_rejected_self_check(payload):
         return 1
     return 0
 

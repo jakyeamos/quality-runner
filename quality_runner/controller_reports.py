@@ -2,11 +2,13 @@ from __future__ import annotations
 
 from typing import Any
 
+from quality_runner.controller_report_builder import build_controller_report_from_summary
 from quality_runner.schema_constants import CONTROLLER_REPORT_VALIDATION_SCHEMA
 
 CONTROLLER_REPORT_LINT_SCHEMA = "quality-runner-controller-report-lint-v0.1"
 CONTROLLER_REPORT_SCHEMA = "quality-runner-controller-report-v0.1"
 TERMINAL_STATUSES = {"ready-for-review", "blocked", "complete"}
+__all__ = ["build_controller_report_from_summary", "lint_controller_report", "validate_controller_report"]
 
 
 def validate_controller_report(report: dict[str, Any]) -> dict[str, Any]:
@@ -88,9 +90,12 @@ def normalize_controller_report(report: dict[str, Any]) -> dict[str, Any]:
         "files_changed": _normalized_files_changed(report.get("files_changed")),
         "verification": _normalized_verification(report),
         "commit_hash": _normalized_commit_hash(report),
+        "target_head": _normalized_target_head(report),
+        "commit_created_by_task": _normalized_commit_created_by_task(report),
         "push_status": _normalized_push_status(report),
         "git_status_short": _normalized_git_status_short(report),
         "ignored_generated_artifacts": _normalized_ignored_generated_artifacts(report),
+        "repo_state": _normalized_repo_state(report),
         "blockers": blockers if status == "blocked" or blockers else _inferred_blockers(final_qr),
     }
 
@@ -106,58 +111,6 @@ def lint_controller_report(report: dict[str, Any], *, strict: bool = False) -> d
         "status": "rejected" if errors else "accepted",
         "errors": errors,
         "normalized_report": normalized,
-    }
-
-
-def build_controller_report_from_summary(
-    *,
-    repo_path: str,
-    branch_name: str,
-    summary: dict[str, Any],
-    baseline_run_id: str | None,
-    git_status_short: str,
-    files_changed: list[str] | None = None,
-    verification: list[dict[str, str]] | None = None,
-    blockers: list[str] | None = None,
-    commit_hash: str | None = None,
-    push_status: str = "not-pushed",
-    ignored_generated_artifacts: list[str] | None = None,
-    status: str | None = None,
-) -> dict[str, Any]:
-    final_qr = {
-        "run_id": summary.get("run_id"),
-        "status": summary.get("status"),
-        "classification": summary.get("recommended_classification"),
-        "artifact_path": summary.get("path"),
-        "gate_verification_status": summary.get("gate_verification_status"),
-        "audit_status": summary.get("audit_status"),
-        "findings_total": _nested(summary, "finding_counts", "total"),
-        "missing_capabilities": summary.get("missing_capabilities", []),
-    }
-    normalized_blockers = blockers if blockers is not None else _inferred_blockers(final_qr)
-    resolved_status = status or _status_from_summary(final_qr, commit_hash=commit_hash, push_status=push_status)
-    return {
-        "schema": CONTROLLER_REPORT_SCHEMA,
-        "repo_path": repo_path,
-        "branch_name": branch_name,
-        "status": resolved_status,
-        "baseline_artifact_path": _baseline_path(repo_path=repo_path, baseline_run_id=baseline_run_id)
-        or str(summary.get("path") or ""),
-        "final_qr": {key: value for key, value in final_qr.items() if value is not None},
-        "files_changed": files_changed or [],
-        "verification": verification
-        or [
-            {
-                "command": f"quality-runner summarize-run {repo_path} --run-id {summary.get('run_id')}",
-                "result": str(summary.get("status") or "unknown"),
-            }
-        ],
-        "commit_hash": commit_hash,
-        "push_status": push_status,
-        "git_status_short": git_status_short,
-        "ignored_generated_artifacts": ignored_generated_artifacts
-        or _default_ignored_generated_artifacts(git_status_short),
-        "blockers": normalized_blockers if resolved_status == "blocked" else blockers or [],
     }
 
 
@@ -317,6 +270,32 @@ def _normalized_commit_hash(report: dict[str, Any]) -> str | None:
     return value or None
 
 
+def _normalized_target_head(report: dict[str, Any]) -> str | None:
+    return _first_string(
+        report.get("target_head"),
+        _nested(report, "repo_state", "post_head"),
+        _nested(report, "repo_state", "target_head"),
+        _nested(report, "target", "target_head"),
+        _nested(report, "target", "head_sha"),
+        _nested(report, "target", "target_commit"),
+        _nested(report, "run", "target_commit"),
+    ) or None
+
+
+def _normalized_commit_created_by_task(report: dict[str, Any]) -> bool:
+    value = report.get("commit_created_by_task")
+    if isinstance(value, bool):
+        return value
+    for nested in (
+        _nested(report, "commit_push", "commit_created"),
+        _nested(report, "commit_push", "committed"),
+        _nested(report, "commit_push", "performed_by_this_task"),
+    ):
+        if isinstance(nested, bool):
+            return nested
+    return False
+
+
 def _normalized_push_status(report: dict[str, Any]) -> str:
     value = report.get("push_status")
     if isinstance(value, str) and value:
@@ -358,6 +337,35 @@ def _default_ignored_generated_artifacts(git_status: str) -> list[str]:
     return [".quality-runner/"] if ".quality-runner/" in git_status else []
 
 
+def _normalized_repo_state(report: dict[str, Any]) -> dict[str, Any]:
+    repo_state = report.get("repo_state")
+    if isinstance(repo_state, dict):
+        return dict(repo_state)
+    return _compact(
+        {
+            "pre_head": _first_string(
+                _nested(report, "target", "pre_head"),
+                _nested(report, "target", "initial_head"),
+                _nested(report, "target", "verify_manifest_head_sha"),
+            ),
+            "post_head": _first_string(
+                report.get("target_head"),
+                _nested(report, "target", "post_head"),
+                _nested(report, "target", "head_sha"),
+            ),
+            "pre_git_status_short": _first_string(
+                _nested(report, "target", "initial_git_status_short"),
+                _nested(report, "git_status", "before", "all_short"),
+            ),
+            "post_git_status_short": _normalized_git_status_short(report),
+            "concurrency_note": _first_string(
+                _nested(report, "target", "concurrent_head_change_observed", "note"),
+                _nested(report, "repo_state", "concurrency_note"),
+            ),
+        }
+    )
+
+
 def _normalized_blockers(value: object) -> list[str]:
     if not isinstance(value, list):
         return []
@@ -386,7 +394,9 @@ def _strict_errors(*, raw: dict[str, Any], normalized: dict[str, Any]) -> list[s
     errors: list[str] = []
     if raw.get("status") == "complete" and not _final_qr_clean(normalized.get("final_qr", {})):
         errors.append("complete reports must have final_qr status clean/passed")
-    if _head_changed_without_note(raw):
+    if normalized.get("status") == "complete" and normalized.get("commit_created_by_task") is not True:
+        errors.append("complete reports must set commit_created_by_task true")
+    if _head_changed_without_note(normalized):
         errors.append("reports with target HEAD changes must include an explicit concurrency note")
     return errors
 
@@ -405,17 +415,6 @@ def _head_changed_without_note(report: dict[str, Any]) -> bool:
     if not before or not after or before == after:
         return False
     return not _first_string(repo_state.get("concurrency_note"), repo_state.get("note"))
-
-
-def _status_from_summary(
-    final_qr: dict[str, Any],
-    *,
-    commit_hash: str | None,
-    push_status: str,
-) -> str:
-    if _final_qr_clean(final_qr):
-        return "complete" if commit_hash and push_status == "pushed" else "ready-for-review"
-    return "blocked"
 
 
 def _final_qr_clean(final_qr: object) -> bool:

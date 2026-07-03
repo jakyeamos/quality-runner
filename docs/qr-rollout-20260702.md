@@ -1435,6 +1435,35 @@ Recommended next fixes:
    read-only skips are both visible in `final_qr.classification` or a grouped
    `blocker_classes` field.
 
+## Product Fix After Refresh Wave 17
+
+Implemented the Wave 17 provenance and classification polish:
+
+- `summarize-run --controller-report` now includes the report-generation command
+  and expected lint/validate self-check commands in `verification`.
+- Added `--report-output`, `--lint-report`, and `--validate-report` so workers
+  can write a controller report and run strict report checks in one CLI flow.
+- Generated controller reports now include `target_head`,
+  `commit_created_by_task`, and `repo_state` with pre/post HEAD and dirty-status
+  fields; strict lint rejects target HEAD movement unless a concurrency note is
+  present.
+- Preserved backward-compatible `commit_hash` while clarifying that generated
+  read-only reports should use `target_head` for the target repository HEAD and
+  reserve `commit_hash` for commits created by the worker task.
+- Run summaries now emit `blocker_classes`, and mixed read-only plus executable
+  command failures classify as `mixed-gate-blocker` instead of hiding command
+  failures behind a read-only-policy label.
+- Extracted controller-report builder logic into its own module so QR keeps its
+  own source files under the default large-file threshold.
+
+Verification:
+
+- `uv run pytest tests/test_controller_reports.py tests/test_cli.py -q` passed:
+  36 tests.
+- `uv run pytest` passed: 233 tests.
+- `uv run ruff check .` passed.
+- `git diff --check` passed.
+
 ## Rollout Ledger
 
 | Wave | Repo | Repo path | Total | Blockers | Baseline artifacts | Codex project status | Thread status | Thread id | Final QR status | Commit | Push | Notes |

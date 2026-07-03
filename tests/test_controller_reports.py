@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
 
 def test_controller_report_validation_rejects_completed_dirty_worktree() -> None:
@@ -143,6 +144,30 @@ def test_controller_report_strict_lint_rejects_head_change_without_note() -> Non
     assert "reports with target HEAD changes must include an explicit concurrency note" in result["errors"]
 
 
+def test_controller_report_strict_lint_rejects_complete_without_task_commit() -> None:
+    from quality_runner.controller_reports import lint_controller_report
+
+    report = {
+        "repo_path": "/repos/example",
+        "branch_name": "qr/example",
+        "status": "complete",
+        "baseline_artifact_path": "/repos/example/.quality-runner/runs/baseline",
+        "final_qr": {"run_id": "verify", "status": "passed", "classification": "clean"},
+        "files_changed": ["package.json"],
+        "verification": [{"command": "quality-runner summarize-run .", "result": "passed"}],
+        "commit_hash": "abc1234",
+        "commit_created_by_task": False,
+        "push_status": "pushed",
+        "git_status_short": "",
+        "blockers": [],
+    }
+
+    result = lint_controller_report(report, strict=True)
+
+    assert result["status"] == "rejected"
+    assert "complete reports must set commit_created_by_task true" in result["errors"]
+
+
 def test_controller_report_from_summary_builds_valid_blocked_report() -> None:
     from quality_runner.controller_reports import (
         build_controller_report_from_summary,
@@ -158,19 +183,67 @@ def test_controller_report_from_summary_builds_valid_blocked_report() -> None:
             "path": "/repos/example/.quality-runner/runs/verify",
             "status": "blocked",
             "recommended_classification": "workflow-timeout-blocker",
+            "blocker_classes": ["workflow-timeout"],
             "gate_verification_status": "blocked",
             "audit_status": "findings",
             "finding_counts": {"total": 0},
             "missing_capabilities": [],
         },
         git_status_short="?? .quality-runner/",
+        target_head="abc123",
+        pre_head="abc123",
+        report_path="/private/tmp/report.json",
     )
 
     result = validate_controller_report(report)
 
     assert report["status"] == "blocked"
+    assert report["target_head"] == "abc123"
+    assert report["commit_created_by_task"] is False
+    assert report["repo_state"]["pre_head"] == "abc123"
+    assert report["final_qr"]["blocker_classes"] == ["workflow-timeout"]
     assert report["ignored_generated_artifacts"] == [".quality-runner/"]
     assert report["blockers"] == ["workflow-timeout-blocker"]
+    assert report["verification"][-2:] == [
+        {
+            "command": "quality-runner controller-report lint /private/tmp/report.json --strict --json",
+            "result": "expected accepted",
+        },
+        {
+            "command": "quality-runner validate-report /private/tmp/report.json --json",
+            "result": "expected accepted",
+        },
+    ]
+    assert result["status"] == "accepted"
+
+
+def test_controller_report_strict_lint_allows_head_change_with_note() -> None:
+    from quality_runner.controller_reports import (
+        build_controller_report_from_summary,
+        lint_controller_report,
+    )
+
+    report = build_controller_report_from_summary(
+        repo_path="/repos/example",
+        branch_name="qr/example",
+        baseline_run_id="baseline",
+        summary={
+            "run_id": "verify",
+            "path": "/repos/example/.quality-runner/runs/verify",
+            "status": "blocked",
+            "recommended_classification": "workflow-timeout-blocker",
+            "blocker_classes": ["workflow-timeout"],
+            "finding_counts": {"total": 0},
+            "missing_capabilities": [],
+        },
+        git_status_short="",
+        target_head="def456",
+        pre_head="abc123",
+        concurrency_note="target owner advanced the branch during the evidence run",
+    )
+
+    result = lint_controller_report(report, strict=True)
+
     assert result["status"] == "accepted"
 
 
@@ -199,6 +272,46 @@ def test_normalized_controller_report_is_json_serializable() -> None:
 
     json.dumps(normalized)
     assert normalized["status"] == "blocked"
+
+
+def test_run_summary_reports_mixed_gate_blocker_classes(tmp_path: Path) -> None:
+    from quality_runner.run_summary import build_run_summary
+
+    run_dir = tmp_path / ".quality-runner" / "runs" / "mixed-verify"
+    run_dir.mkdir(parents=True)
+    (run_dir / "quality-audit.json").write_text(
+        json.dumps({"status": "findings", "findings": []}),
+        encoding="utf-8",
+    )
+    (run_dir / "capability-matrix.json").write_text(
+        json.dumps({"missing": []}),
+        encoding="utf-8",
+    )
+    (run_dir / "gate-verification.json").write_text(
+        json.dumps(
+            {
+                "status": "blocked",
+                "gates": [
+                    {
+                        "id": "formatter",
+                        "status": "skipped",
+                        "skip_type": "mutating-gate-not-run",
+                    },
+                    {
+                        "id": "lint",
+                        "status": "failed",
+                        "failure_type": "command-failed",
+                    },
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    summary = build_run_summary(repo_root=tmp_path, run_id="mixed-verify", persist=False)
+
+    assert summary["recommended_classification"] == "mixed-gate-blocker"
+    assert summary["blocker_classes"] == ["read-only-policy", "command-failure"]
 
 
 def test_controller_report_validation_accepts_ignored_generated_artifacts_for_completion() -> None:
