@@ -205,6 +205,41 @@ def test_cli_inspect_accepts_ci_status_json(tmp_path: Path) -> None:
     ]
 
 
+def test_cli_verify_gates_json_executes_discovered_gates(tmp_path: Path) -> None:
+    (tmp_path / "package.json").write_text(
+        json.dumps({"scripts": {"lint": f"{sys.executable} -c 'import sys; sys.exit(0)'"}}),
+        encoding="utf-8",
+    )
+    (tmp_path / ".quality-runner.toml").write_text(
+        '[quality_runner]\nrequired_capabilities = ["lint"]\n',
+        encoding="utf-8",
+    )
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "quality_runner",
+            "verify-gates",
+            str(tmp_path),
+            "--run-id",
+            "cli-verify-gates",
+            "--json",
+        ],
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+    payload = json.loads(result.stdout)
+    verification = json.loads(Path(payload["artifact_paths"]["gate_verification_json"]).read_text())
+
+    assert payload["schema"] == "quality-runner-verify-gates-result-v0.1"
+    assert payload["status"] == "passed"
+    assert verification["gates"][0]["status"] == "passed"
+
+
 def test_cli_inspect_can_checkout_most_advanced_branch(tmp_path: Path) -> None:
     write_js_fixture(tmp_path)
     _git(tmp_path, "init", "-b", "main")
@@ -455,6 +490,41 @@ def test_cli_main_new_commands_in_process(tmp_path: Path, capsys) -> None:
     assert main(["status", str(tmp_path), "--json"]) == 0
     status_payload = json.loads(capsys.readouterr().out)
     assert status_payload["latest_run"]["run_id"] == "direct-cli-run"
+
+    report_path = tmp_path / "worker-report.json"
+    report_path.write_text(
+        json.dumps(
+            {
+                "repo_path": str(tmp_path),
+                "branch_name": "qr/example",
+                "status": "blocked",
+                "baseline_artifact_path": str(tmp_path / ".quality-runner" / "runs"),
+                "final_qr": {"run_id": "direct-cli-run", "status": "blocked"},
+                "files_changed": [],
+                "verification": [{"command": "quality-runner run .", "result": "blocked"}],
+                "commit_hash": None,
+                "push_status": "not-pushed",
+                "git_status_short": "",
+                "blockers": ["fixture blocker"],
+            }
+        ),
+        encoding="utf-8",
+    )
+    assert main(["validate-report", str(report_path), "--json"]) == 0
+    validation_payload = json.loads(capsys.readouterr().out)
+    assert validation_payload["status"] == "accepted"
+
+    rejected_report_path = tmp_path / "rejected-worker-report.json"
+    rejected_payload = json.loads(report_path.read_text(encoding="utf-8"))
+    rejected_payload["status"] = "complete"
+    rejected_payload["commit_hash"] = "abc1234"
+    rejected_payload["push_status"] = "pushed"
+    rejected_payload["git_status_short"] = " M package.json"
+    rejected_report_path.write_text(json.dumps(rejected_payload), encoding="utf-8")
+
+    assert main(["validate-report", str(rejected_report_path), "--json"]) == 1
+    rejected_validation = json.loads(capsys.readouterr().out)
+    assert rejected_validation["status"] == "rejected"
 
     assert main(["export-handoff", str(tmp_path), "--run-id", "direct-cli-run"]) == 0
     assert capsys.readouterr().out.startswith("# Quality Runner Agent Handoff\n")

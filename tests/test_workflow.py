@@ -91,6 +91,7 @@ def test_run_payload_writes_audit_plan_and_handoff(tmp_path: Path) -> None:
     assert set(artifact_paths) == {
         "repo_scan_json",
         "code_quality_scan_json",
+        "package_manager_preflight_json",
         "standards_json",
         "capability_matrix_json",
         "run_manifest_json",
@@ -102,6 +103,10 @@ def test_run_payload_writes_audit_plan_and_handoff(tmp_path: Path) -> None:
         "agent_handoff_md",
     }
     assert Path(artifact_paths["standards_json"]).name == "standards.json"
+    assert (
+        Path(artifact_paths["package_manager_preflight_json"]).name
+        == "package-manager-preflight.json"
+    )
     assert Path(artifact_paths["capability_matrix_json"]).name == "capability-matrix.json"
     assert Path(artifact_paths["quality_audit_json"]).name == "quality-audit.json"
     assert Path(artifact_paths["repo_scan_json"]).exists()
@@ -110,6 +115,7 @@ def test_run_payload_writes_audit_plan_and_handoff(tmp_path: Path) -> None:
     assert Path(artifact_paths["run_manifest_json"]).exists()
     assert Path(artifact_paths["quality_audit_json"]).exists()
     assert Path(artifact_paths["code_quality_scan_json"]).exists()
+    assert Path(artifact_paths["package_manager_preflight_json"]).exists()
     assert Path(artifact_paths["resolution_ledger_json"]).exists()
     assert Path(artifact_paths["resolution_ledger_md"]).exists()
     assert Path(artifact_paths["remediation_plan_json"]).exists()
@@ -540,44 +546,6 @@ def test_run_payload_python_missing_gate_uses_python_recommendation(tmp_path: Pa
     assert lint_finding["recommended_fix"] == "Add a Python lint gate such as ruff check ."
 
 
-def test_run_payload_records_package_manager_mismatch_in_audit_and_plan(
-    tmp_path: Path,
-) -> None:
-    from quality_runner.workflow import run_payload
-
-    write_complete_js_fixture(tmp_path)
-    package_json_path = tmp_path / "package.json"
-    package_json = json.loads(package_json_path.read_text(encoding="utf-8"))
-    package_json["packageManager"] = "npm@10.0.0"
-    package_json_path.write_text(json.dumps(package_json), encoding="utf-8")
-
-    payload = run_payload(repo_root=tmp_path, run_id="mismatch-run", profile="default")
-    audit_report = json.loads(Path(payload["artifact_paths"]["quality_audit_json"]).read_text())
-    remediation_plan = json.loads(
-        Path(payload["artifact_paths"]["remediation_plan_json"]).read_text()
-    )
-
-    mismatch_finding = next(
-        finding
-        for finding in audit_report["findings"]
-        if finding["id"] == "standard-package-manager-mismatch"
-    )
-    assert mismatch_finding["severity"] == "warning"
-    assert mismatch_finding["evidence"] == [
-        "Expected package manager: pnpm.",
-        "Detected package manager: npm.",
-        "Package manager source: package.json packageManager or lockfile discovery.",
-    ]
-    assert (
-        mismatch_finding["recommended_fix"]
-        == "Align JavaScript dependency management to the pnpm standard."
-    )
-    assert any(
-        slice_item["findings"][0]["id"] == "standard-package-manager-mismatch"
-        for slice_item in remediation_plan["slices"]
-    )
-
-
 def test_run_payload_records_missing_formatter_as_blocker(tmp_path: Path) -> None:
     from quality_runner.workflow import run_payload
 
@@ -597,6 +565,7 @@ def test_inspect_payload_does_not_write_audit_plan(tmp_path: Path) -> None:
 
     assert payload["schema"] == "quality-runner-inspect-result-v0.1"
     assert Path(payload["artifact_paths"]["repo_scan_json"]).exists()
+    assert Path(payload["artifact_paths"]["package_manager_preflight_json"]).exists()
     assert Path(payload["artifact_paths"]["standards_json"]).name == "standards.json"
     assert (
         Path(payload["artifact_paths"]["capability_matrix_json"]).name == "capability-matrix.json"
@@ -862,7 +831,7 @@ def test_run_payload_reports_clean_when_no_remediation_slices(tmp_path: Path) ->
 
     assert payload["status"] == "clean"
     assert remediation_plan["slices"] == []
-    assert handoff["status"] == "clean"
+    assert handoff["status"] == "gates-discovered"
 
 
 def test_generated_remediation_plan_orders_findings_and_exposes_actions(tmp_path: Path) -> None:

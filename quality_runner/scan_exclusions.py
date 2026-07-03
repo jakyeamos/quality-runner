@@ -53,6 +53,7 @@ def is_scan_path_allowed(root: Path, path: Path, scan_exclusions: list[str]) -> 
 
 
 def iter_allowed_paths(root: Path, scan_exclusions: list[str]) -> Iterator[Path]:
+    effective_exclusions = _unique([*scan_exclusions, *gitignore_scan_exclusions(root)])
     stack = [root]
     while stack:
         directory = stack.pop()
@@ -61,7 +62,7 @@ def iter_allowed_paths(root: Path, scan_exclusions: list[str]) -> Iterator[Path]
         except OSError:
             continue
         for child in children:
-            if not is_scan_path_allowed(root, child, scan_exclusions):
+            if not is_scan_path_allowed(root, child, effective_exclusions):
                 continue
             yield child
             if child.is_dir():
@@ -105,3 +106,21 @@ def _unique(values: list[object]) -> list[str]:
             unique.append(value)
             seen.add(value)
     return unique
+
+
+def gitignore_scan_exclusions(root: Path) -> list[str]:
+    gitignore = root / ".gitignore"
+    if not gitignore.exists() or gitignore.is_symlink():
+        return []
+    try:
+        lines = gitignore.read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return []
+
+    patterns: list[str] = []
+    for line in lines:
+        stripped = line.strip()
+        if not stripped or stripped.startswith(("#", "!")):
+            continue
+        patterns.append(stripped.lstrip("/").rstrip("/"))
+    return _unique(patterns)

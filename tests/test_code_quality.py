@@ -484,6 +484,28 @@ def test_code_quality_scan_applies_configured_scan_exclusions(tmp_path: Path) ->
     assert finding_files == {"src/index.ts"}
 
 
+def test_code_quality_scan_applies_root_gitignore_exclusions(tmp_path: Path) -> None:
+    from quality_runner.code_quality import create_code_quality_scan
+
+    (tmp_path / ".gitignore").write_text("Ignored Dashboard/\n", encoding="utf-8")
+    _write(tmp_path / "Ignored Dashboard" / "page.tsx", "const ignored: any = {};\n")
+    _write(tmp_path / "src" / "index.ts", "const value: any = {};\n")
+
+    result = create_code_quality_scan(
+        tmp_path,
+        scan={"run_id": "scan-001"},
+        config={},
+    )
+
+    scanned_paths = {item["path"] for item in result["accountability"]}
+    skipped = {item["path"]: item["reason"] for item in result["skipped_files"]}
+    finding_files = {finding["file"] for finding in result["findings"]}
+
+    assert scanned_paths == {"src/index.ts"}
+    assert skipped["Ignored Dashboard"] == "scan exclusion"
+    assert finding_files == {"src/index.ts"}
+
+
 def test_code_quality_scan_excludes_hidden_operational_dirs_by_default(
     tmp_path: Path,
 ) -> None:

@@ -7,7 +7,9 @@
   "properties": {
     "schema": { "const": "quality-runner-agent-handoff-v0.1" },
     "run_id": { "type": ["string", "null"] },
-    "status": { "enum": ["clean", "planned"] },
+    "status": {
+      "enum": ["clean", "planned", "gates-discovered", "gates-executed", "gates-clean"]
+    },
     "implementation_allowed": { "const": false },
     "artifact_paths": {
       "type": "object",

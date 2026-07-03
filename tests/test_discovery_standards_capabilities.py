@@ -418,6 +418,28 @@ def test_inspect_repo_discovery_prunes_excluded_trees_before_recursive_walk(
     assert scan["quality_commands"][0]["source"] == "package.json:scripts.test"
 
 
+def test_inspect_repo_prunes_gitignored_untracked_directories(tmp_path: Path) -> None:
+    from quality_runner.discovery import inspect_repo
+
+    (tmp_path / ".gitignore").write_text("ignored-workspaces/\n", encoding="utf-8")
+    (tmp_path / "app" / "package.json").parent.mkdir(parents=True)
+    (tmp_path / "app" / "package.json").write_text(
+        json.dumps({"scripts": {"test": "vitest run"}}),
+        encoding="utf-8",
+    )
+    (tmp_path / "ignored-workspaces" / "demo" / "package.json").parent.mkdir(parents=True)
+    (tmp_path / "ignored-workspaces" / "demo" / "package.json").write_text(
+        json.dumps({"scripts": {"test": "should-not-be-read"}}),
+        encoding="utf-8",
+    )
+
+    scan = inspect_repo(tmp_path, run_id="gitignore-prune-001")
+
+    assert scan["workspaces"] == [
+        {"path": "app", "kind": "javascript", "manifest": "app/package.json"}
+    ]
+
+
 def test_inspect_repo_excludes_default_fixture_corpus_vendor_and_docs_paths(
     tmp_path: Path,
 ) -> None:

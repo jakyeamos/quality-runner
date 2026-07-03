@@ -1,0 +1,34 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://quality-runner.dev/schemas/gate-verification.schema.json",
+  "title": "Quality Runner Gate Verification",
+  "type": "object",
+  "required": ["schema", "status", "timeout_seconds", "gates"],
+  "properties": {
+    "schema": { "const": "quality-runner-gate-verification-v0.1" },
+    "status": { "enum": ["passed", "failed", "blocked"] },
+    "timeout_seconds": { "type": "integer", "minimum": 1 },
+    "gates": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/gate" }
+    }
+  },
+  "$defs": {
+    "gate": {
+      "type": "object",
+      "required": ["id", "status"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "status": { "enum": ["passed", "failed", "skipped"] },
+        "command": { "type": "string", "minLength": 1 },
+        "source": { "type": ["string", "null"] },
+        "exit_code": { "type": ["integer", "null"] },
+        "duration_seconds": { "type": "number", "minimum": 0 },
+        "stdout": { "type": "string" },
+        "stderr": { "type": "string" },
+        "reason": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": false
+    }
+  }
+}

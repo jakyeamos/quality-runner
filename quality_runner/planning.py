@@ -9,6 +9,7 @@ from quality_runner.adoption import (
     stopping_criteria,
 )
 from quality_runner.findings import AGENT_HANDOFF_SCHEMA, REMEDIATION_PLAN_SCHEMA
+from quality_runner.handoff_status import handoff_status
 
 PRIORITY_ORDER = {"high": 0, "medium": 1, "low": 2}
 
@@ -90,7 +91,12 @@ def build_agent_handoff(
     artifact_paths: dict[str, str],
     capability_map: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    status = "clean" if not _slices(remediation_plan) else "planned"
+    missing_gates = _missing_repo_owned_gates(capability_map)
+    status = handoff_status(
+        remediation_plan=remediation_plan,
+        capability_map=capability_map,
+        missing_repo_owned_gates=missing_gates,
+    )
     next_slice = _next_slice(remediation_plan)
     adoption_stage = handoff_adoption_stage(remediation_plan)
     return {
@@ -102,7 +108,7 @@ def build_agent_handoff(
         "warnings": _warnings(remediation_plan),
         "finding_ids": [finding["id"] for finding in _findings(audit_report)],
         "slice_ids": [slice_item["id"] for slice_item in _slices(remediation_plan)],
-        "missing_repo_owned_gates": _missing_repo_owned_gates(capability_map),
+        "missing_repo_owned_gates": missing_gates,
         "runner_provided_checks": _runner_provided_checks(audit_report),
         "adoption_stage": adoption_stage,
         "stopping_criteria": stopping_criteria(adoption_stage),

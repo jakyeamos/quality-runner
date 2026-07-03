@@ -31,7 +31,11 @@ from quality_runner.code_quality_paths import (
 )
 from quality_runner.code_quality_ponytail import ponytail_findings
 from quality_runner.code_quality_rules import _scan_file
-from quality_runner.scan_exclusions import matches_scan_exclusion, resolve_scan_exclusions
+from quality_runner.scan_exclusions import (
+    gitignore_scan_exclusions,
+    matches_scan_exclusion,
+    resolve_scan_exclusions,
+)
 from quality_runner.schema_constants import CODE_QUALITY_SCAN_SCHEMA
 
 __all__ = [
@@ -64,7 +68,7 @@ def create_code_quality_scan(
     policy = _structural_policy(config)
     disabled_groups = set(policy["disabled_rule_groups"])
     include_ignored_paths = set(policy["include_ignored_paths"])
-    scan_exclusions = resolve_scan_exclusions(config)
+    scan_exclusions = _effective_scan_exclusions(root, config)
     generated_paths = _generated_paths(scan)
     skipped_files: list[dict[str, Any]] = []
     findings: list[dict[str, Any]] = []
@@ -251,7 +255,7 @@ def preview_ignored_paths(
         skipped_files,
         _generated_paths(scan or {}),
         set(policy["include_ignored_paths"]),
-        resolve_scan_exclusions(config),
+        _effective_scan_exclusions(root, config),
     )
     return [
         item
@@ -272,6 +276,10 @@ def _generated_paths(scan: dict[str, Any]) -> set[str]:
         if isinstance(path, str) and path:
             paths.add(path.strip("/"))
     return paths
+
+
+def _effective_scan_exclusions(root: Path, config: dict[str, Any]) -> list[str]:
+    return [*resolve_scan_exclusions(config), *gitignore_scan_exclusions(root)]
 
 
 def _skipped_directory_entry(root: Path, path: Path, reason: str) -> dict[str, Any]:

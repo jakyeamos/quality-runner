@@ -70,6 +70,7 @@ Quality Runner writes artifacts under the target repo:
 /path/to/repo/.quality-runner/runs/baseline-001/
   repo-scan.json
   code-quality-scan.json
+  package-manager-preflight.json
   standards.json
   capability-matrix.json
   run-manifest.json
@@ -98,6 +99,8 @@ quality-runner init /path/to/repo --json
 quality-runner status /path/to/repo --json
 quality-runner inspect /path/to/repo --json
 quality-runner run /path/to/repo --json
+quality-runner verify-gates /path/to/repo --json
+quality-runner validate-report worker-report.json --json
 quality-runner export-handoff /path/to/repo
 quality-runner-mcp
 ```

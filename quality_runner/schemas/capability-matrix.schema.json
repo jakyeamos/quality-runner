@@ -86,7 +86,7 @@
         },
         "execution": {
           "type": "string",
-          "enum": ["not-run", "ci-executed"]
+          "enum": ["not-run", "ci-executed", "local-executed"]
         },
         "result": {
           "type": "string",

@@ -137,8 +137,18 @@ Product fixes applied before the next triage wave:
 - Discovery and mature-surface detection now use a pruned recursive iterator so
   dependency, generated, cache, vendored, fixture, and configured exclusions are
   skipped before descent rather than filtered after `rglob`.
+- Root `.gitignore` entries are now folded into traversal pruning so untracked
+  ignored dependency/generated/cache trees do not become repo surfaces.
 - Capability artifacts now include `verification_state`, separating discovery
   evidence from command execution evidence and pass/fail evidence.
+- `quality-runner verify-gates` now executes discovered command-backed gates and
+  writes `gate-verification.json`; inspect/run remain discovery and planning
+  workflows.
+- `package-manager-preflight.json` now records package-manager declaration,
+  lockfiles, and mixed-lockfile warnings for every inspect/run/verify workflow.
+- `quality-runner validate-report` now rejects controller reports that claim
+  terminal completion while `git_status_short` still contains staged or
+  uncommitted changes.
 - Remediation plans and agent handoffs now include adoption stage and stopping
   criteria so threads know whether to stop after gates, scope fixes, high-signal
   findings, or debt classification.

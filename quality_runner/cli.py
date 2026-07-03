@@ -10,8 +10,9 @@ from typing import Any
 from quality_runner import __version__
 from quality_runner.code_quality import preview_ignored_paths
 from quality_runner.config import CONFIG_FILE_NAME, load_repo_config
+from quality_runner.controller_reports import validate_controller_report
 from quality_runner.standards import DEFAULT_PROFILE
-from quality_runner.workflow import inspect_payload, run_payload
+from quality_runner.workflow import inspect_payload, run_payload, verify_gates_payload
 
 DOCTOR_RESULT_SCHEMA = "quality-runner-doctor-result-v0.1"
 EXPORT_HANDOFF_RESULT_SCHEMA = "quality-runner-export-handoff-result-v0.1"
@@ -36,6 +37,15 @@ def build_parser() -> argparse.ArgumentParser:
     inspect_parser = subparsers.add_parser("inspect", help="Inspect a repo without audit planning")
     _add_workflow_arguments(inspect_parser)
 
+    verify_parser = subparsers.add_parser("verify-gates", help="Execute discovered repo gates")
+    _add_workflow_arguments(verify_parser)
+    verify_parser.add_argument(
+        "--timeout-seconds",
+        type=int,
+        default=120,
+        help="Per-gate command timeout",
+    )
+
     init_parser = subparsers.add_parser("init", help="Write a starter .quality-runner.toml")
     init_parser.add_argument("repo_path", help="Target repository path")
     init_parser.add_argument("--profile", default=DEFAULT_PROFILE, help="Default standards profile")
@@ -57,6 +67,12 @@ def build_parser() -> argparse.ArgumentParser:
     export_parser.add_argument("--run-id", default=None, help="Run id to export")
     export_parser.add_argument("--output", default=None, help="Write handoff markdown to this path")
     export_parser.add_argument("--json", action="store_true", help="Emit JSON output")
+
+    validate_report_parser = subparsers.add_parser(
+        "validate-report", help="Validate a controller thread completion report"
+    )
+    validate_report_parser.add_argument("report_json", help="Controller report JSON path")
+    validate_report_parser.add_argument("--json", action="store_true", help="Emit JSON output")
 
     doctor_parser = subparsers.add_parser("doctor", help="Check Quality Runner readiness")
     doctor_parser.add_argument("--json", action="store_true", help="Emit JSON output")
@@ -94,6 +110,8 @@ def main(argv: list[str] | None = None) -> int:
         print(json.dumps(payload, indent=2, sort_keys=True))
     else:
         print(_human_summary(payload))
+    if parsed.command == "validate-report" and payload.get("status") == "rejected":
+        return 1
     return 0
 
 
@@ -137,6 +155,8 @@ def _payload_for_args(args: argparse.Namespace) -> dict[str, Any]:
             run_id=args.run_id,
             output_path=Path(args.output).expanduser().resolve() if args.output else None,
         )
+    if args.command == "validate-report":
+        return validate_controller_report(_load_report_json(Path(args.report_json)))
     if args.command == "run":
         repo_root = _validated_repo_path(args.repo_path)
         return run_payload(
@@ -155,6 +175,16 @@ def _payload_for_args(args: argparse.Namespace) -> dict[str, Any]:
             profile=args.profile,
             ci_status_json=Path(args.ci_status_json) if args.ci_status_json else None,
             include_ignored_paths=_interactive_include_ignored_paths(args, repo_root),
+            checkout_most_advanced_branch=args.checkout_most_advanced_branch,
+        )
+    if args.command == "verify-gates":
+        repo_root = _validated_repo_path(args.repo_path)
+        return verify_gates_payload(
+            repo_root=repo_root,
+            run_id=args.run_id,
+            profile=args.profile,
+            ci_status_json=Path(args.ci_status_json) if args.ci_status_json else None,
+            timeout_seconds=args.timeout_seconds,
             checkout_most_advanced_branch=args.checkout_most_advanced_branch,
         )
     raise ValueError(f"unsupported command: {args.command}")
@@ -243,6 +273,16 @@ def _export_handoff_payload(
         output_path.parent.mkdir(parents=True, exist_ok=True)
         output_path.write_text(content, encoding="utf-8")
         payload["output_path"] = str(output_path)
+    return payload
+
+
+def _load_report_json(path: Path) -> dict[str, Any]:
+    try:
+        payload = json.loads(path.expanduser().read_text(encoding="utf-8"))
+    except json.JSONDecodeError as error:
+        raise ValueError(f"controller report is not valid JSON: {path}") from error
+    if not isinstance(payload, dict):
+        raise ValueError("controller report JSON must contain an object")
     return payload
 
 

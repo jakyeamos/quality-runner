@@ -311,10 +311,7 @@ def test_validate_agent_handoff_rejects_unknown_status() -> None:
     result = validate_agent_handoff(handoff)
 
     assert result["passed"] is False
-    assert result["errors"] == [
-        "agent handoff status is not in the allowed vocabulary",
-        "agent handoff next_slice must be a remediation slice object",
-    ]
+    assert result["errors"] == ["agent handoff status is not in the allowed vocabulary"]
 
 
 def test_validate_agent_handoff_rejects_next_slice_unknown_priority() -> None:

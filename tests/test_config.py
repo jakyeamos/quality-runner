@@ -642,9 +642,12 @@ def test_packaged_schema_files_are_parseable() -> None:
         "repo-scan.schema.json",
         "standards.schema.json",
         "capability-matrix.schema.json",
+        "package-manager-preflight.schema.json",
+        "gate-verification.schema.json",
         "quality-audit.schema.json",
         "remediation-plan.schema.json",
         "agent-handoff.schema.json",
+        "controller-report-validation.schema.json",
         "run-manifest.schema.json",
         "run-result.schema.json",
     }
@@ -689,11 +692,17 @@ def test_artifact_schema_additions_remain_optional_for_v01_compatibility() -> No
         "ci_status",
         "verification_state",
     }.issubset(capability_properties)
+    assert "local-executed" in capability_matrix["$defs"]["verificationState"]["properties"][
+        "execution"
+    ]["enum"]
     assert remediation_plan["properties"]["schema"]["const"] == (
         "quality-runner-remediation-plan-v0.1"
     )
     assert "adoption_stage" not in remediation_plan["required"]
     assert "stopping_criteria" not in remediation_plan["required"]
     assert agent_handoff["properties"]["schema"]["const"] == "quality-runner-agent-handoff-v0.1"
+    assert "gates-discovered" in agent_handoff["properties"]["status"]["enum"]
+    assert "gates-executed" in agent_handoff["properties"]["status"]["enum"]
+    assert "gates-clean" in agent_handoff["properties"]["status"]["enum"]
     assert "adoption_stage" not in agent_handoff["required"]
     assert "stopping_criteria" not in agent_handoff["required"]

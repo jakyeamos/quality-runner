@@ -11,7 +11,13 @@ from quality_runner.schema_constants import (
 ValidationResult = dict[str, Any]
 ALLOWED_SEVERITIES = {"critical", "blocker", "warning", "observation"}
 ALLOWED_PRIORITIES = {"high", "medium", "low"}
-ALLOWED_HANDOFF_STATUSES = {"clean", "planned"}
+ALLOWED_HANDOFF_STATUSES = {
+    "clean",
+    "planned",
+    "gates-discovered",
+    "gates-executed",
+    "gates-clean",
+}
 
 
 def validate_audit_report(report: dict[str, Any]) -> ValidationResult:
@@ -106,12 +112,13 @@ def validate_agent_handoff(handoff: dict[str, Any]) -> ValidationResult:
         errors.append("agent handoff slice_ids must be a string list")
 
     next_slice = handoff.get("next_slice")
-    if status == "clean":
+    if status in {"clean", "gates-clean"}:
         if next_slice is not None:
             errors.append("agent handoff next_slice must be null for clean status")
-    elif (status == "planned" and not _slice_item(next_slice)) or (
-        status not in {"clean", "planned"} and next_slice is not None
-    ):
+    elif status in {"planned", "gates-discovered", "gates-executed"} and next_slice is not None:
+        if not _slice_item(next_slice):
+            errors.append("agent handoff next_slice must be a remediation slice object")
+    elif status in {"planned", "gates-executed"} and next_slice is None:
         errors.append("agent handoff next_slice must be a remediation slice object")
 
     if not _string_list(handoff.get("verification_gates")):

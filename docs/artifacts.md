@@ -22,6 +22,8 @@ Artifacts are written under:
 - `code-quality-scan.json`: deterministic structural/code-quality findings,
   line accountability, duplicate clusters, skipped generated/vendor paths, and
   non-blocking remediation buckets.
+- `package-manager-preflight.json`: detected package-manager state, declared
+  `packageManager`, lockfiles, and non-blocking warnings such as mixed lockfiles.
 - `standards.json`: compiled standards packet for the selected profile,
   including saved custom profile settings when a repo-defined profile is used.
 - `capability-matrix.json`: available and missing repo-owned quality gates.
@@ -55,6 +57,24 @@ Artifacts are written under:
   gate. It also names the staged-adoption stopping point so a mature repo can
   add gates, scope scans, classify debt, or fix high-signal findings without
   treating one-pass QR clean as the only successful outcome.
+
+## Gate Verification Artifacts
+
+`quality-runner verify-gates` executes discovered command-backed capabilities
+and writes:
+
+- `repo-scan.json`
+- `package-manager-preflight.json`
+- `standards.json`
+- `capability-matrix.json`: updated so locally executed gates have
+  `verification_state.execution = "local-executed"` and result `passed` or
+  `failed`.
+- `gate-verification.json`: per-gate command, source, exit code, duration,
+  bounded stdout/stderr, and status.
+- `run-manifest.json`
+
+This command is intentionally separate from `inspect` and `run` so capability
+discovery, command execution, and command pass/fail are distinguishable.
 
 ## Safety Guarantees
 
@@ -107,6 +127,10 @@ Discovery skips common non-product trees by default: `docs`, `fixtures`,
 `corpus`, `generated-corpus`, `generated-corpora`, `vendor`, `vendors`,
 `vendored`, and `third_party`, alongside tool output directories such as
 `.git`, `.quality-runner`, `node_modules`, `dist`, and `build`.
+
+Root `.gitignore` entries are also applied during traversal, so untracked
+ignored dependency, cache, generated, or nested-project directories are pruned
+before recursive descent.
 
 Repos can add more patterns in `.quality-runner.toml`:
 
