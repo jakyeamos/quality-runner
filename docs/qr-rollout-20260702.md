@@ -907,6 +907,42 @@ report validation, files changed, and blockers.
 | R-Project | `019f28f5-a62a-7e31-bf29-bc01c3dd1145` | `refresh11-20260703-R-Project` | `refresh10-20260703-R-Project-verify` | `/private/tmp/qr-refresh11-R-Project-report.json` | launched |
 | BIP-Console | `019f28f5-b3b7-7c31-abf4-1f6089eeec94` | `refresh11-20260703-BIP-Console` | `canary-20260703-BIP-Console-classifier-fix-verify`, fallback `stress-20260703-BIP-Console-final2-verify` | `/private/tmp/qr-refresh11-BIP-Console-report.json` | launched |
 
+## Refresh Wave 11 Results
+
+All five Wave 11 reports validated with
+`quality-runner validate-report <report> --json` and returned
+`status=accepted`, `errors=[]`.
+
+| Repo | Final QR result | Handoff result | Consistency verdict | Report |
+|---|---|---|---|---|
+| EliHealth | `blocked`; `environment-or-dependency-blocker`; 24 findings, delta 0 | `gates-blocked`; dependency setup blockers include `pnpm approve-builds`; next slice `resolve-gate-verification-blockers` | consistent | `/private/tmp/qr-refresh11-EliHealth-report.json` |
+| amos-saas | `blocked`; `environment-or-dependency-blocker`; 27 findings, delta 0 | `gates-blocked`; dependency setup blockers include `pnpm install --frozen-lockfile`; next slice `resolve-gate-verification-blockers` | pass | `/private/tmp/qr-refresh11-amos-saas-report.json` |
+| AIOS | `failed`; `failing-executable-gates`; 22 findings, delta 0 | `gates-failed`; failed formatter/lint/typecheck blockers; next slice `resolve-gate-verification-blockers` | passed | `/private/tmp/qr-refresh11-AIOS-report.json` |
+| R-Project | `passed`; `clean`; 0 findings | `gates-clean`; `next_slice=null`; no blockers; status JSON `ready` | consistent | `/private/tmp/qr-refresh11-R-Project-report.json` |
+| BIP-Console | `blocked`; `read-only-gate-blocker`; 10 findings, delta 0 | `gates-blocked`; formatter skipped as `mutating-gate-not-run`; next slice `resolve-gate-verification-blockers`; all non-mutating executable gates passed | consistent | `/private/tmp/qr-refresh11-BIP-Console-report.json` |
+
+Product takeaways:
+
+- The handoff fix is validated. Blocked dependency/setup runs now say
+  `gates-blocked`, failed executable-gate runs say `gates-failed`, and clean
+  runs still say `gates-clean`.
+- `agent-handoff.json` and `.md` now expose the final gate classification,
+  blocker list, setup commands, and gate-blocker next slice before structural
+  remediation across all tested states.
+- Next Tier 1 gap: read-only verification can still mutate tracked repo files
+  through non-mutating-looking commands. AIOS gate execution regenerated tracked
+  log files and the worker restored the pre-refresh patch manually. QR should
+  detect and report post-gate tracked mutations, and ideally run verification in
+  an isolated worktree or restore/snapshot tracked files when `--read-only-gates`
+  is active.
+- Handoff blocker ordering is correct but still coarse for mixed-blocker cases.
+  EliHealth grouped read-only formatter skip, dependency setup blockers, and a
+  command-failed build in one gate-blocker slice. The next polish is to mark a
+  primary blocker class and group actions by dependency setup, read-only policy,
+  command failures, and structural debt.
+- BIP-Console no longer reproduced the earlier QR-spawned test timeout: tests
+  passed in the refresh, and the only blocker was read-only formatter policy.
+
 ## Rollout Ledger
 
 | Wave | Repo | Repo path | Total | Blockers | Baseline artifacts | Codex project status | Thread status | Thread id | Final QR status | Commit | Push | Notes |
