@@ -561,6 +561,9 @@ Implemented timeout hardening:
   terminates that process group if a per-gate timeout or workflow-level
   interruption occurs.
 
+Validation before launch: `uv run ruff check .` and full `uv run pytest`
+passed for controller commit `225dab2`.
+
 ## Rollout Ledger
 
 | Wave | Repo | Repo path | Total | Blockers | Baseline artifacts | Codex project status | Thread status | Thread id | Final QR status | Commit | Push | Notes |
