@@ -171,6 +171,17 @@ Worker requirements for the restart:
 - Terminal status remains only `complete` when final QR is clean, or `blocked`
   with a hard blocker and evidence.
 
+## Wave 4 Stress Protocol
+
+Wave 4 is a product stress wave, not a cleanup wave. Workers should preserve
+dirty repo work, avoid broad remediation, and exercise the current runner's
+`inspect`, `run`, `verify-gates`, `package-manager-preflight.json`,
+`gate-verification.json`, handoff status, and `validate-report` paths. The
+primary output is a Tier 1 product-risk finding list: traversal failures,
+ignored/generated/cache leakage, package-manager confusion, gate execution
+misclassification, misleading handoff state, invalid/missing artifacts, or
+controller-report validation gaps.
+
 ## Rollout Ledger
 
 | Wave | Repo | Repo path | Total | Blockers | Baseline artifacts | Codex project status | Thread status | Thread id | Final QR status | Commit | Push | Notes |
@@ -190,11 +201,11 @@ Worker requirements for the restart:
 | 3 | remodelvision | `/Users/jakyeamos/projects/remodelvision` | 22 | 2 | `/Users/jakyeamos/projects/remodelvision/.quality-runner/runs/parallel-20260702T200935Z-remodelvision` | exact-project | blocked | `019f257b-026f-7c71-835f-f54516b69f79` | planned/findings; `triage-20260702-remodelvision`; missing gates cleared | not created | not pushed | Classification `env-or-dependency-blocker`. Added `format`, `smoke`, and `audit:dead-code` scripts in `package.json`, but the worker stopped after staging before commit/push. Verification was blocked by local `eslint-plugin-anti-slop` missing module, duplicate room-upload types, Prisma client runtime failure, and missing env vars; `.quality-runner/` remained untracked. |
 | 3 | portfolio | `/Users/jakyeamos/projects/portfolio` | 20 | 2 | `/Users/jakyeamos/projects/portfolio/.quality-runner/runs/parallel-20260702T200935Z-portfolio` | exact-project | complete | `019f257b-11a2-7411-8101-c3a992165b3c` | planned; `triage-20260702-portfolio`; no missing capabilities; 17 findings | `368245c` | pushed | Classification `mixed-blocker`. Added Prettier/pnpm gate config, formatter/dead-code/smoke gates, lockfile updates, and truth update. Final QR has zero missing capabilities; `pnpm smoke` and direct `tsc` passed, while `format` and `audit:dead-code` expose broad existing debt. QR still scanned ignored untracked files under `Redesign Basketball Project Dashboard/`. |
 | 3 | video-pipeline | `/Users/jakyeamos/projects/video-pipeline` | 20 | 4 | `/Users/jakyeamos/projects/video-pipeline/.quality-runner/runs/parallel-20260702T200935Z-video-pipeline` | parent-project | complete | `019f257b-1afd-7481-bbeb-66bbeb00b6d8` | planned; `triage-20260702-video-pipeline`; no missing capabilities; 12 findings | `392ec7e`, `8a493bb` | pushed | Classification `broad-repo-debt`. Migrated quality gates to pnpm, removed npm lock, added pnpm lock/workspace build approval, and updated truth file. `pnpm install --frozen-lockfile`, `lint`, `test`, and `smoke` passed; `format` and `audit:dead-code` fail on broad existing formatting and unused-symbol debt. |
-| 4 | pre-cr-suite-lsp | `/Users/jakyeamos/projects/pre-cr-suite-lsp` | 19 | 1 | `/Users/jakyeamos/projects/pre-cr-suite-lsp/.quality-runner/runs/parallel-20260702T200935Z-pre-cr-suite-lsp` | exact-project | pending |  |  |  |  |  |
-| 4 | Hoopscout | `/Users/jakyeamos/projects/Hoopscout` | 18 | 3 | `/Users/jakyeamos/projects/Hoopscout/.quality-runner/runs/parallel-20260702T200935Z-Hoopscout` | exact-project | pending |  |  |  |  |  |
-| 4 | career-ops | `/Users/jakyeamos/projects/career-ops` | 17 | 5 | `/Users/jakyeamos/projects/career-ops/.quality-runner/runs/parallel-20260702T200935Z-career-ops` | parent-project | pending |  |  |  |  |  |
-| 4 | Crimclock | `/Users/jakyeamos/projects/Crimclock` | 16 | 1 | `/Users/jakyeamos/projects/Crimclock/.quality-runner/runs/parallel-20260702T200935Z-Crimclock` | exact-project | pending |  |  |  |  |  |
-| 4 | Crimclock-pr1-audit | `/Users/jakyeamos/projects/Crimclock-pr1-audit` | 16 | 1 | `/Users/jakyeamos/projects/Crimclock-pr1-audit/.quality-runner/runs/parallel-20260702T200935Z-Crimclock-pr1-audit` | parent-project | pending |  |  |  |  |  |
+| 4 | pre-cr-suite-lsp | `/Users/jakyeamos/projects/pre-cr-suite-lsp` | 19 | 1 | `/Users/jakyeamos/projects/pre-cr-suite-lsp/.quality-runner/runs/parallel-20260702T200935Z-pre-cr-suite-lsp` | exact-project | running | `019f25c0-d8ae-7761-ae11-f73b50a34e5d` |  |  |  | Stress wave: exercise inspect/run/verify-gates/preflight/report-validation paths and report Tier 1 product risks. |
+| 4 | Hoopscout | `/Users/jakyeamos/projects/Hoopscout` | 18 | 3 | `/Users/jakyeamos/projects/Hoopscout/.quality-runner/runs/parallel-20260702T200935Z-Hoopscout` | exact-project | running | `019f25c0-deb2-7812-b271-7d1decc0cce9` |  |  |  | Stress wave: exercise inspect/run/verify-gates/preflight/report-validation paths and report Tier 1 product risks. |
+| 4 | career-ops | `/Users/jakyeamos/projects/career-ops` | 17 | 5 | `/Users/jakyeamos/projects/career-ops/.quality-runner/runs/parallel-20260702T200935Z-career-ops` | parent-project | running | `019f25c0-e92c-7203-93a8-120be47e2e62` |  |  |  | Stress wave: exercise inspect/run/verify-gates/preflight/report-validation paths and report Tier 1 product risks. |
+| 4 | Crimclock | `/Users/jakyeamos/projects/Crimclock` | 16 | 1 | `/Users/jakyeamos/projects/Crimclock/.quality-runner/runs/parallel-20260702T200935Z-Crimclock` | exact-project | running | `019f25c0-f096-7622-b3d2-8f49bf4f2502` |  |  |  | Stress wave: exercise inspect/run/verify-gates/preflight/report-validation paths and report Tier 1 product risks. |
+| 4 | Crimclock-pr1-audit | `/Users/jakyeamos/projects/Crimclock-pr1-audit` | 16 | 1 | `/Users/jakyeamos/projects/Crimclock-pr1-audit/.quality-runner/runs/parallel-20260702T200935Z-Crimclock-pr1-audit` | parent-project | running | `019f25c0-fc94-70b0-8e64-49261fdcb525` |  |  |  | Stress wave: exercise inspect/run/verify-gates/preflight/report-validation paths and report Tier 1 product risks. |
 | 5 | frmwrklabs | `/Users/jakyeamos/projects/frmwrklabs` | 16 | 4 | `/Users/jakyeamos/projects/frmwrklabs/.quality-runner/runs/parallel-20260702T200935Z-frmwrklabs` | exact-project | pending |  |  |  |  |  |
 | 5 | BIP-Console | `/Users/jakyeamos/projects/BIP-Console` | 15 | 3 | `/Users/jakyeamos/projects/BIP-Console/.quality-runner/runs/parallel-20260702T200935Z-BIP-Console` | exact-project | pending |  |  |  |  |  |
 | 5 | Book-documents-github | `/Users/jakyeamos/projects/Book-documents-github` | 15 | 5 | `/Users/jakyeamos/projects/Book-documents-github/.quality-runner/runs/parallel-20260702T200935Z-Book-documents-github` | parent-project | pending |  |  |  |  |  |
