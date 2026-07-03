@@ -1167,6 +1167,59 @@ before starting another wave.
 | BBDSE | `019f297a-ee2b-7fd0-b50e-ebdf77147cbc` | `refresh15-20260703-BBDSE` | `parallel-20260702T200935Z-BBDSE` | `/private/tmp/qr-refresh15-BBDSE-report.json` | launched |
 | agent-router | `019f297b-3107-7db1-914c-716fe740416f` | `refresh15-20260703-agent-router` | `parallel-20260702T200935Z-agent-router` | `/private/tmp/qr-refresh15-agent-router-report.json` | launched |
 
+## Refresh Wave 15 Results
+
+All eight Wave 15 controller reports validated with
+`quality-runner validate-report <report> --json` and returned
+`status=accepted`, `errors=[]`.
+
+| Repo | Controller report | Final QR result | Handoff/product verdict | Report |
+|---|---|---|---|---|
+| amos-saas | `blocked` | `blocked`; `environment-or-dependency-blocker`; 27 findings, delta 0 | pass: `quality-runner-agent-handoff-v0.2`, `gates-blocked`, dependency setup and read-only policy `blocker_groups`, and matching `next_slice.action_groups` | `/private/tmp/qr-refresh15-amos-saas-report.json` |
+| BIP-Console | `ready-for-review` | `blocked`; `read-only-gate-blocker`; executable leaf gates passed | pass: `v0.2` handoff preserved read-only formatter routing as `read-only-policy` while lint/typecheck/runtime/dead-code/tests/build passed | `/private/tmp/qr-refresh15-BIP-Console-report.json` |
+| R-Project | `ready-for-review` | `passed`; `clean`; status `ready` | pass: clean-control handoff is `v0.2`, `gates-clean`, `next_slice=null`, and no Action Groups section | `/private/tmp/qr-refresh15-R-Project-report.json` |
+| EliHealth | `blocked` | `command-failed`; controller exception before verify completed | fail: run-phase handoff is `v0.2`, but refresh crashed opening missing `web/package-lock.json`; no final verify handoff/action groups were emitted, and QR temporarily rewrote package-manager files in a read-only wave | `/private/tmp/qr-refresh15-EliHealth-report.json` |
+| Terrace | `blocked` | `failed`; `failing-executable-gates`; `tests` timed out at 91.398s | pass with product note: `v0.2`, `gates-failed`, `command-failure: tests` blocker/action groups present; timeout diagnostics still lack useful stdout/stderr, and ecosystem detection was empty despite pnpm preflight | `/private/tmp/qr-refresh15-Terrace-report.json` |
+| tmcp | `ready-for-review` | `passed-with-findings`; `missing-capabilities`; gate verification passed | pass: `v0.2`, `gates-executed`, empty blocker groups, no action groups because selected next slice is missing-capability remediation | `/private/tmp/qr-refresh15-tmcp-report.json` |
+| BBDSE | `blocked` | `blocked`; `workflow-timeout-blocker`; inspect hit total-refresh timeout at 300.061s | fail: no final handoff generated, so `v0.2` action/blocker grouping was not exercised; traversal exclusions still did not prevent the generated/cache stall condition | `/private/tmp/qr-refresh15-BBDSE-report.json` |
+| agent-router | `ready-for-review` | `failed`; `failing-executable-gates`; `pre_cr` failed in 4.431s | pass with product note: `v0.2` failed-gate handoff exposed `command-failure` action group for `pre_cr`; read-only classification missed that `pre-cr run --workspace .` generated untracked `.aios/audit/*` evidence | `/private/tmp/qr-refresh15-agent-router-report.json` |
+
+Product takeaways:
+
+- The schema/docs/help polish held across the expected completed-run states:
+  clean, gate-executed-with-findings, read-only blocked, dependency blocked, and
+  failed executable gates all emitted or intentionally omitted `action_groups`
+  in the correct places.
+- The highest-priority remaining gap is refresh-side mutation safety before
+  gate verification. EliHealth showed package-manager preflight/refresh code can
+  rewrite lockfile/package-manager state even in a read-only controller wave,
+  then crash on a missing nested lockfile.
+- BBDSE shows inspect still needs stronger traversal observability and earlier
+  pruning: the total-refresh timeout finalized a blocked summary, but no final
+  handoff was generated because inspect never completed.
+- Agent-router exposed a mutating-risk classification miss: `pre-cr run
+  --workspace .` can write `.aios/audit/*` even though QR treated it as safe
+  under read-only gates.
+- Terrace confirms failed-gate action grouping works, but timed-out commands
+  still need better partial evidence capture so workers can distinguish a hung
+  test runner from a test suite that is simply slow.
+
+Recommended next fixes:
+
+1. Make refresh and status strictly read-only with respect to repo config and
+   package-manager files unless an explicit write flag is passed.
+2. Harden package-manager preflight against stale nested lockfile paths:
+   missing candidate files should become diagnostics, not controller
+   exceptions.
+3. Emit a minimal final handoff for inspect/run/verify workflow timeout paths
+   so controllers always receive `quality-runner-agent-handoff-v0.2` routing
+   evidence, even when the workflow stops before normal handoff generation.
+4. Add traversal progress breadcrumbs for inspect timeouts: current directory,
+   last N roots, skip reason counters, file count, and slow-path candidates.
+5. Extend read-only mutation detection to untracked generated outputs, or mark
+   known commands like `pre-cr run --workspace .` as mutating unless their output
+   directory is explicitly configured as allowed evidence.
+
 ## Rollout Ledger
 
 | Wave | Repo | Repo path | Total | Blockers | Baseline artifacts | Codex project status | Thread status | Thread id | Final QR status | Commit | Push | Notes |
