@@ -130,7 +130,7 @@ For each batch:
 
 ## Changes
 
-- 
+- TBD
 
 ## Verification
 
@@ -147,7 +147,7 @@ For each batch:
 
 ## Blockers
 
-- 
+- TBD
 
 ## Commit
 
