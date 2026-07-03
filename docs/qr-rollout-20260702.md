@@ -585,6 +585,37 @@ Shared command shape:
 | amos-saas | `019f286f-9d40-76f1-9b18-ded4fce2bfe1` | `refresh5-20260703-amos-saas` | `refresh4-20260703-amos-saas-verify` | `/private/tmp/qr-refresh5-amos-saas-report.json` | launched |
 | Dsci-proj | `019f286f-dd9b-7f03-82d8-d83cdd3306d4` | `refresh5-20260703-Dsci-proj` | `refresh4-20260703-Dsci-proj-verify` | `/private/tmp/qr-refresh5-Dsci-proj-report.json` | launched |
 
+## Refresh Wave 5 Results
+
+All five worker reports validated with
+`quality-runner validate-report <report> --json` and returned
+`status=accepted`, `errors=[]`.
+
+| Repo | Thread status | Final QR run/status | Timeout path | Final artifacts | Command elapsed | Report |
+|---|---|---|---|---|---:|---|
+| tenure | blocked | `refresh5-20260703-tenure-verify` / `workflow-timeout-blocker` | exercised; reason preserved; verify elapsed `180.134s` | preserved 9 planned gates and 4 recorded gate outcomes after timeout | `410s` | `/private/tmp/qr-refresh5-tenure-report.json` |
+| BidCamp | blocked | `refresh5-20260703-BidCamp-verify` / `workflow-timeout-blocker` | exercised; reason preserved; verify elapsed `180.223s` | preserved 10 planned gates and 4 recorded gate outcomes after timeout | `384s` | `/private/tmp/qr-refresh5-BidCamp-report.json` |
+| AIOS | blocked | `refresh5-20260703-AIOS-verify` / `environment-or-runner-blocker` | not exercised; completed before 180s | preserved final 10-gate plan and 10 gate outcomes | `157.13s` | `/private/tmp/qr-refresh5-AIOS-report.json` |
+| amos-saas | blocked | `refresh5-20260703-amos-saas-verify` / `environment-or-dependency-blocker` | not exercised; completed before 180s | preserved final 9-gate plan and 9 gate outcomes | `80s` | `/private/tmp/qr-refresh5-amos-saas-report.json` |
+| Dsci-proj | ready-for-review | `refresh5-20260703-Dsci-proj-verify` / `failing-executable-gates` | not exercised; completed before 180s | preserved final 10-gate plan and 10 gate outcomes | `48.54s` | `/private/tmp/qr-refresh5-Dsci-proj-report.json` |
+
+Product takeaways:
+
+- Timeout finalization no longer destroys useful verify evidence. Tenure and
+  BidCamp both wrote `workflow-timeout.json` with the explicit controller
+  reason and preserved non-empty `gate-execution-plan.json` and
+  `gate-verification.json` after timing out.
+- Process-group cleanup at the individual gate command layer was not enough to
+  make the full refresh invocation return near the requested 180-second
+  deadline. Tenure took about `410s` and BidCamp took about `384s` end to end
+  because inspect/run phases occurred before the verify-phase timeout window.
+- The next Tier 1 hardening target is a top-level refresh deadline that spans
+  inspect, audit run, and verify, with phase-level timing in the final JSON so
+  controllers can distinguish scan cost from gate execution cost.
+- The non-timeout repos still provided useful regression evidence: final verify
+  artifacts were populated and scan budgets avoided dependency/generated path
+  explosions.
+
 ## Rollout Ledger
 
 | Wave | Repo | Repo path | Total | Blockers | Baseline artifacts | Codex project status | Thread status | Thread id | Final QR status | Commit | Push | Notes |
