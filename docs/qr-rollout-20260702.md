@@ -1489,6 +1489,71 @@ validation rejection is documented.
 | BBDSE | `/Users/jakyeamos/projects/BBDSE` | `019f29f7-25b4-7721-81e2-6dc281d3fa41` | `refresh18-20260703-BBDSE` | `refresh17-20260703-BBDSE-verify` | `/private/tmp/qr-refresh18-BBDSE-report.json` | launched |
 | agent-router | `/Users/jakyeamos/projects/agent-router` | `019f29f7-3128-7d82-adcf-35b8192a2ef0` | `refresh18-20260703-agent-router` | `refresh17-20260703-agent-router-verify` | `/private/tmp/qr-refresh18-agent-router-report.json` | launched |
 
+## Refresh Wave 18 Results
+
+All eight worker threads reported back and all eight persisted controller reports
+passed strict controller-side lint plus semantic `validate-report`.
+
+Controller-side verification:
+
+- `uv run quality-runner controller-report lint <report> --strict --json`
+  accepted all eight reports.
+- `uv run quality-runner validate-report <report> --json` accepted all eight
+  reports.
+
+| Repo | Thread status | Final QR status | Classification | Blocker classes | Findings | Report path | Notes |
+|---|---|---|---|---|---:|---|---|
+| amos-saas | blocked | blocked | mixed-gate-blocker | read-only-policy, dependency-setup, structural-findings | 27 | `/private/tmp/qr-refresh18-amos-saas-report.json` | Lint failed as a dependency setup blocker; downstream gates skipped as dependency-setup-blocked. |
+| BIP-Console | blocked | blocked | read-only-gate-blocker | read-only-policy, structural-findings | 10 | `/private/tmp/qr-refresh18-BIP-Console-report.json` | Executable gates passed, but read-only policy and structural findings kept the run blocked. |
+| R-Project | ready-for-review | passed | clean | none | 0 | `/private/tmp/qr-refresh18-R-Project-report.json` | Clean final QR with unchanged target HEAD and only untracked `.quality-runner/`. |
+| EliHealth | blocked | blocked | mixed-gate-blocker | read-only-policy, command-failure, structural-findings | 24 | `/private/tmp/qr-refresh18-EliHealth-report.json` | Lint and build failed; report generation also exposed sandbox `uv` cache permission friction. |
+| Terrace | blocked | passed-with-findings | missing-capabilities | missing-capabilities, structural-findings | 14 | `/private/tmp/qr-refresh18-Terrace-report.json` | Gates passed, but formatter, dead-code, and runtime-smoke capabilities remain missing. |
+| tmcp | blocked | passed-with-findings | missing-capabilities | missing-capabilities, structural-findings | 10 | `/private/tmp/qr-refresh18-tmcp-report.json` | Clean working tree preserved; missing standard capability set remains the blocker. |
+| BBDSE | blocked | blocked | workflow-timeout-blocker | workflow-timeout, command-failure | 0 | `/private/tmp/qr-refresh18-BBDSE-report.json` | Verify phase hit the 300s total timeout around `.claude/worktrees` after 9,673 visited paths; read-only run also observed additional repo-generated artifact drift. |
+| agent-router | blocked | blocked | read-only-gate-blocker | read-only-policy, missing-capabilities, structural-findings | 8 | `/private/tmp/qr-refresh18-agent-router-report.json` | Missing all standard capabilities plus read-only `pre_cr` skip. |
+
+Product lessons:
+
+1. The provenance additions worked across clean, blocked, timeout, dirty-tree,
+   and read-only cases: every accepted report carried `target_head`,
+   `repo_state`, `commit_created_by_task`, and embedded self-check evidence.
+2. `summarize-run --controller-report` still needs first-class blocker
+   synthesis. Six workers hit the same first-pass rejection: blocked reports were
+   generated with an empty `blockers` array and then had to be regenerated with
+   manual `--blocker` values.
+3. The status mapping is still too operator-dependent for
+   `passed-with-findings`. Terrace and tmcp were QR `passed-with-findings` but
+   controller `blocked` because missing capabilities were present; the CLI
+   should explain or compute that mapping directly.
+4. BBDSE remains the stress case for traversal economics. The timeout evidence
+   is now persisted, but the scan still spent too much time under
+   `.claude/worktrees`; generated worktree/cache directories need earlier
+   pruning and better progress telemetry.
+5. Read-only evidence runs can still reveal target artifact drift from invoked
+   repo commands. BBDSE's post-run dirty state grew with report/backtest
+   artifacts, so QR should distinguish pre-existing dirty work, QR artifacts,
+   and command-generated target artifacts.
+6. Worker report generation still encountered `uv` home-cache permission errors
+   in sandboxed Codex threads. QR should provide a documented or automatic
+   project-local cache mode for controller commands.
+
+Suggested next improvements:
+
+1. Auto-populate controller-report `blockers` from `final_qr.status`,
+   `classification`, `blocker_classes`, failed gates, timeout diagnostics, and
+   missing capabilities when no explicit `--blocker` is supplied.
+2. Add an explicit `controller_status_recommendation` to `summarize-run` so
+   workers do not guess how `passed`, `passed-with-findings`, `blocked`, and
+   read-only outcomes map to `ready-for-review`, `blocked`, or `complete`.
+3. Extend default traversal exclusions to skip `.claude/worktrees`, nested
+   worktrees, generated report caches, and other agent scratch directories
+   before path walking.
+4. Record artifact-drift groups in `repo_state`: `pre_existing_dirty`,
+   `quality_runner_artifacts`, and `post_command_artifacts`.
+5. Add a QR-owned `--local-cache-dir` or environment setup wrapper for spawned
+   controller commands so sandboxed threads do not need escalation for `uv`
+   cache reads.
+
 ## Rollout Ledger
 
 | Wave | Repo | Repo path | Total | Blockers | Baseline artifacts | Codex project status | Thread status | Thread id | Final QR status | Commit | Push | Notes |
