@@ -8,17 +8,26 @@ from pathlib import Path
 from typing import Any
 
 from quality_runner import __version__
+from quality_runner.cli_status import (
+    EXPORT_HANDOFF_RESULT_SCHEMA,
+    STATUS_RESULT_SCHEMA,
+    export_handoff_payload,
+    status_payload,
+)
 from quality_runner.code_quality import preview_ignored_paths
 from quality_runner.config import CONFIG_FILE_NAME, load_repo_config
 from quality_runner.controller_reports import validate_controller_report
 from quality_runner.run_summary import RUN_SUMMARY_SCHEMA, build_run_summary
 from quality_runner.standards import DEFAULT_PROFILE
-from quality_runner.workflow import inspect_payload, run_payload, verify_gates_payload
+from quality_runner.workflow import (
+    inspect_payload,
+    refresh_payload,
+    run_payload,
+    verify_gates_payload,
+)
 
 DOCTOR_RESULT_SCHEMA = "quality-runner-doctor-result-v0.1"
-EXPORT_HANDOFF_RESULT_SCHEMA = "quality-runner-export-handoff-result-v0.1"
 INIT_RESULT_SCHEMA = "quality-runner-init-result-v0.1"
-STATUS_RESULT_SCHEMA = "quality-runner-status-result-v0.1"
 EXPENSIVE_IGNORED_PATH_TEXT_FILE_THRESHOLD = 100
 EXPENSIVE_IGNORED_PATH_SECONDS_THRESHOLD = 5.0
 MAX_INTERACTIVE_IGNORED_PATHS = 10
@@ -45,6 +54,38 @@ def build_parser() -> argparse.ArgumentParser:
         type=int,
         default=120,
         help="Per-gate command timeout",
+    )
+    verify_parser.add_argument(
+        "--read-only-gates",
+        action="store_true",
+        help="Skip gates that are known or likely to mutate source files",
+    )
+    verify_parser.add_argument(
+        "--allow-mutating-gates",
+        action="store_true",
+        help="Allow known or suspected mutating gates to execute",
+    )
+
+    refresh_parser = subparsers.add_parser(
+        "refresh", help="Run inspect, run, verify-gates, and summarize in read-only mode"
+    )
+    _add_workflow_arguments(refresh_parser)
+    refresh_parser.add_argument(
+        "--run-id-prefix",
+        required=True,
+        help="Prefix used to create <prefix>-inspect, <prefix>-run, and <prefix>-verify runs",
+    )
+    refresh_parser.add_argument("--baseline-run-id", default=None, help="Baseline run id for deltas")
+    refresh_parser.add_argument(
+        "--timeout-seconds",
+        type=int,
+        default=120,
+        help="Per-gate command timeout",
+    )
+    refresh_parser.add_argument(
+        "--allow-mutating-gates",
+        action="store_true",
+        help="Allow known or suspected mutating gates to execute during refresh",
     )
 
     init_parser = subparsers.add_parser("init", help="Write a starter .quality-runner.toml")
@@ -157,7 +198,7 @@ def _payload_for_args(args: argparse.Namespace) -> dict[str, Any]:
             force=args.force,
         )
     if args.command == "status":
-        return _status_payload(repo_root=_validated_repo_path(args.repo_path))
+        return status_payload(repo_root=_validated_repo_path(args.repo_path))
     if args.command == "summarize-run":
         return build_run_summary(
             repo_root=_validated_repo_path(args.repo_path),
@@ -165,7 +206,7 @@ def _payload_for_args(args: argparse.Namespace) -> dict[str, Any]:
             baseline_run_id=args.baseline_run_id,
         )
     if args.command == "export-handoff":
-        return _export_handoff_payload(
+        return export_handoff_payload(
             repo_root=_validated_repo_path(args.repo_path),
             run_id=args.run_id,
             output_path=Path(args.output).expanduser().resolve() if args.output else None,
@@ -201,6 +242,20 @@ def _payload_for_args(args: argparse.Namespace) -> dict[str, Any]:
             ci_status_json=Path(args.ci_status_json) if args.ci_status_json else None,
             timeout_seconds=args.timeout_seconds,
             checkout_most_advanced_branch=args.checkout_most_advanced_branch,
+            read_only_gates=args.read_only_gates,
+            allow_mutating_gates=args.allow_mutating_gates,
+        )
+    if args.command == "refresh":
+        repo_root = _validated_repo_path(args.repo_path)
+        return refresh_payload(
+            repo_root=repo_root,
+            run_id_prefix=args.run_id_prefix,
+            baseline_run_id=args.baseline_run_id,
+            profile=args.profile,
+            ci_status_json=Path(args.ci_status_json) if args.ci_status_json else None,
+            timeout_seconds=args.timeout_seconds,
+            checkout_most_advanced_branch=args.checkout_most_advanced_branch,
+            allow_mutating_gates=args.allow_mutating_gates,
         )
     raise ValueError(f"unsupported command: {args.command}")
 
@@ -245,50 +300,6 @@ def _init_payload(
         "config_path": str(config_path),
         "implementation_allowed": False,
     }
-
-
-def _status_payload(repo_root: Path) -> dict[str, Any]:
-    latest_run = _latest_run(repo_root)
-    status = _repo_status(latest_run)
-    return {
-        "schema": STATUS_RESULT_SCHEMA,
-        "status": status,
-        "repo_root": str(repo_root),
-        "implementation_allowed": False,
-        "config": load_repo_config(repo_root),
-        "latest_run": latest_run,
-    }
-
-
-def _export_handoff_payload(
-    *,
-    repo_root: Path,
-    run_id: str | None,
-    output_path: Path | None,
-) -> dict[str, Any]:
-    resolved_run_id = _latest_run_id(repo_root) if run_id is None else run_id
-    if resolved_run_id is None:
-        raise FileNotFoundError("no Quality Runner runs found")
-
-    handoff_path = repo_root / ".quality-runner" / "runs" / resolved_run_id / "agent-handoff.md"
-    if not handoff_path.exists():
-        raise FileNotFoundError(f"agent handoff does not exist for run: {resolved_run_id}")
-    content = handoff_path.read_text(encoding="utf-8")
-
-    payload = {
-        "schema": EXPORT_HANDOFF_RESULT_SCHEMA,
-        "status": "exported",
-        "run_id": resolved_run_id,
-        "source_path": str(handoff_path),
-        "implementation_allowed": False,
-    }
-    if output_path is None:
-        payload["content"] = content
-    else:
-        output_path.parent.mkdir(parents=True, exist_ok=True)
-        output_path.write_text(content, encoding="utf-8")
-        payload["output_path"] = str(output_path)
-    return payload
 
 
 def _load_report_json(path: Path) -> dict[str, Any]:
@@ -373,54 +384,6 @@ def _float_value(value: object) -> float:
     return float(value) if isinstance(value, int | float) else 0.0
 
 
-def _latest_run(repo_root: Path) -> dict[str, Any] | None:
-    run_id = _latest_run_id(repo_root)
-    if run_id is None:
-        return None
-    run_dir = repo_root / ".quality-runner" / "runs" / run_id
-    gate_verification_status = _gate_verification_status(run_dir)
-    return {
-        "run_id": run_id,
-        "path": str(run_dir),
-        "has_handoff": (run_dir / "agent-handoff.md").exists(),
-        "has_audit": (run_dir / "quality-audit.json").exists(),
-        "has_gate_verification": gate_verification_status is not None,
-        "gate_verification_status": gate_verification_status,
-    }
-
-
-def _repo_status(latest_run: dict[str, Any] | None) -> str:
-    if latest_run is None:
-        return "initialized"
-    gate_status = latest_run.get("gate_verification_status")
-    if gate_status in {"failed", "blocked"}:
-        return "blocked"
-    return "ready"
-
-
-def _gate_verification_status(run_dir: Path) -> str | None:
-    path = run_dir / "gate-verification.json"
-    if not path.exists():
-        return None
-    try:
-        payload = json.loads(path.read_text(encoding="utf-8"))
-    except json.JSONDecodeError:
-        return "blocked"
-    status = payload.get("status")
-    return status if isinstance(status, str) and status else "blocked"
-
-
-def _latest_run_id(repo_root: Path) -> str | None:
-    runs_dir = repo_root / ".quality-runner" / "runs"
-    if not runs_dir.exists() or not runs_dir.is_dir():
-        return None
-    candidates = [path for path in runs_dir.iterdir() if path.is_dir()]
-    if not candidates:
-        return None
-    latest = max(candidates, key=lambda path: (path.stat().st_mtime_ns, path.name))
-    return latest.name
-
-
 def _unique_strings(values: list[str]) -> list[str]:
     unique: list[str] = []
     seen: set[str] = set()
@@ -449,6 +412,10 @@ def _human_summary(payload: dict[str, Any]) -> str:
         return f"handoff: {payload.get('source_path')}"
     if payload.get("schema") == RUN_SUMMARY_SCHEMA:
         return f"status: {status}\nrun id: {payload.get('run_id')}"
+    if payload.get("schema") == "quality-runner-refresh-result-v0.1":
+        summary = payload.get("summary")
+        run_id = summary.get("run_id") if isinstance(summary, dict) else payload.get("run_id_prefix")
+        return f"status: {status}\nrun id: {run_id}"
 
     lines = [f"status: {status}"]
     run_id = payload.get("run_id")

@@ -13,9 +13,15 @@
       "type": "object",
       "additionalProperties": { "type": "integer", "minimum": 1 }
     },
+    "read_only_gates": { "type": "boolean" },
+    "allow_mutating_gates": { "type": "boolean" },
     "environment": {
       "type": "object",
       "additionalProperties": { "type": ["string", "boolean", "null"] }
+    },
+    "execution_plan": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/executionPlanItem" }
     },
     "gates": {
       "type": "array",
@@ -32,6 +38,8 @@
         "capability_kind": { "enum": ["local_command", "ci_only", "evidence_file"] },
         "command": { "type": "string", "minLength": 1 },
         "source": { "type": ["string", "null"] },
+        "cwd": { "type": "string", "minLength": 1 },
+        "mutating_risk": { "enum": ["safe", "unknown", "mutating"] },
         "exit_code": { "type": ["integer", "null"] },
         "duration_seconds": { "type": "number", "minimum": 0 },
         "timeout_seconds": { "type": "integer", "minimum": 1 },
@@ -40,12 +48,52 @@
         "stdout_tail": { "type": "string" },
         "stderr_tail": { "type": "string" },
         "reason": { "type": "string", "minLength": 1 },
-        "failure_type": { "enum": ["command-failed", "timeout", "environment-restricted"] },
+        "failure_type": {
+          "enum": [
+            "command-failed",
+            "timeout",
+            "environment-restricted",
+            "dependency-setup-blocker"
+          ]
+        },
+        "skip_type": { "enum": ["mutating-gate-not-run"] },
         "recommended_action": { "type": "string", "minLength": 1 },
+        "diagnostics": { "type": "object" },
         "covered_by": {
           "type": "array",
           "items": { "type": "string", "minLength": 1 }
         }
+      },
+      "additionalProperties": false
+    },
+    "executionPlanItem": {
+      "type": "object",
+      "required": [
+        "id",
+        "cwd",
+        "capability_kind",
+        "mutating_risk",
+        "local_execution_status",
+        "timeout_seconds"
+      ],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "command": { "type": ["string", "null"] },
+        "cwd": { "type": "string", "minLength": 1 },
+        "source": { "type": ["string", "null"] },
+        "capability_kind": { "enum": ["local_command", "ci_only", "evidence_file"] },
+        "package_manager": { "type": ["string", "null"] },
+        "mutating_risk": { "enum": ["safe", "unknown", "mutating"] },
+        "local_execution_status": {
+          "enum": [
+            "will-execute",
+            "mutating-skipped",
+            "ci-only-skipped",
+            "evidence-only-skipped",
+            "no-command-skipped"
+          ]
+        },
+        "timeout_seconds": { "type": "integer", "minimum": 1 }
       },
       "additionalProperties": false
     }

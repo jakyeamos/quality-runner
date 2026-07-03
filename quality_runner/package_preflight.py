@@ -18,15 +18,22 @@ LOCKFILE_MANAGERS = {
 def build_package_manager_preflight(repo_root: Path, scan: dict[str, Any]) -> dict[str, Any]:
     root = repo_root.expanduser().resolve()
     lockfiles = sorted(name for name in LOCKFILE_MANAGERS if (root / name).exists())
+    nested_lockfiles = _nested_lockfiles(root=root, scan=scan)
     declared = _declared_package_manager(root)
     detected = _string_or_none(scan.get("package_manager")) or declared
-    warnings = _warnings(declared=declared, detected=detected, lockfiles=lockfiles)
+    warnings = _warnings(
+        declared=declared,
+        detected=detected,
+        lockfiles=lockfiles,
+        nested_lockfiles=nested_lockfiles,
+    )
     return {
         "schema": PACKAGE_MANAGER_PREFLIGHT_SCHEMA,
         "status": "warning" if warnings else "ok",
         "package_manager": detected,
         "declared_package_manager": declared,
         "lockfiles": lockfiles,
+        "nested_lockfiles": nested_lockfiles,
         "warnings": warnings,
     }
 
@@ -52,6 +59,7 @@ def _warnings(
     declared: str | None,
     detected: str | None,
     lockfiles: list[str],
+    nested_lockfiles: list[dict[str, str]],
 ) -> list[dict[str, str]]:
     warnings: list[dict[str, str]] = []
     lockfile_managers = {LOCKFILE_MANAGERS[name] for name in lockfiles}
@@ -71,7 +79,41 @@ def _warnings(
                 "path": "package.json",
             }
         )
+    root_managers = {LOCKFILE_MANAGERS[name] for name in lockfiles}
+    nested_managers = {item["package_manager"] for item in nested_lockfiles}
+    if nested_managers - root_managers:
+        warnings.append(
+            {
+                "code": "nested_package_manager_lockfiles",
+                "message": "Nested JavaScript package-manager lockfiles are present.",
+                "path": ".",
+            }
+        )
     return warnings
+
+
+def _nested_lockfiles(*, root: Path, scan: dict[str, Any]) -> list[dict[str, str]]:
+    workspaces = scan.get("workspaces")
+    if not isinstance(workspaces, list):
+        return []
+    found: list[dict[str, str]] = []
+    for workspace in workspaces:
+        if not isinstance(workspace, dict) or workspace.get("kind") != "javascript":
+            continue
+        path = workspace.get("path")
+        if not isinstance(path, str) or not path or path == ".":
+            continue
+        workspace_root = root / path
+        for lockfile, manager in LOCKFILE_MANAGERS.items():
+            lockfile_path = workspace_root / lockfile
+            if lockfile_path.exists():
+                found.append(
+                    {
+                        "path": f"{path}/{lockfile}",
+                        "package_manager": manager,
+                    }
+                )
+    return sorted(found, key=lambda item: item["path"])
 
 
 def _string_or_none(value: object) -> str | None:

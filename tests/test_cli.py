@@ -493,6 +493,54 @@ def test_cli_summarize_run_reports_final_artifact_summary_and_delta(tmp_path: Pa
     assert payload["delta"]["baseline_run_id"] == "summary-baseline"
     assert "missing_capabilities" in payload["delta"]
     assert "findings_total" in payload["delta"]
+    persisted = tmp_path / ".quality-runner" / "runs" / "summary-final" / "run-summary.json"
+    assert json.loads(persisted.read_text(encoding="utf-8"))["run_id"] == "summary-final"
+
+
+def test_cli_refresh_runs_read_only_sequence_and_persists_summary(tmp_path: Path) -> None:
+    (tmp_path / "package.json").write_text(
+        json.dumps(
+            {
+                "packageManager": "pnpm@10.0.0",
+                "scripts": {
+                    "format": "eslint --fix .",
+                    "test": f"{sys.executable} -c 'import sys; sys.exit(0)'",
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    (tmp_path / "pnpm-lock.yaml").write_text("lockfileVersion: '9.0'\n", encoding="utf-8")
+    (tmp_path / ".quality-runner.toml").write_text(
+        '[quality_runner]\nrequired_capabilities = ["formatter", "tests"]\n',
+        encoding="utf-8",
+    )
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "quality_runner",
+            "refresh",
+            str(tmp_path),
+            "--run-id-prefix",
+            "cli-refresh",
+            "--json",
+        ],
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+    payload = json.loads(result.stdout)
+    assert payload["schema"] == "quality-runner-refresh-result-v0.1"
+    assert payload["runs"]["inspect"]["run_id"] == "cli-refresh-inspect"
+    assert payload["runs"]["run"]["run_id"] == "cli-refresh-run"
+    assert payload["runs"]["verify"]["run_id"] == "cli-refresh-verify"
+    assert payload["summary"]["recommended_classification"] == "read-only-gate-blocker"
+    persisted = tmp_path / ".quality-runner" / "runs" / "cli-refresh-verify" / "run-summary.json"
+    assert json.loads(persisted.read_text(encoding="utf-8"))["run_id"] == "cli-refresh-verify"
 
 
 def test_cli_export_handoff_prints_latest_handoff(tmp_path: Path) -> None:

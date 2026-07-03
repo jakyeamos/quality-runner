@@ -21,7 +21,11 @@ from quality_runner.findings import (
     validate_audit_report,
     validate_remediation_plan,
 )
-from quality_runner.gate_verification import apply_gate_verification, verify_discovered_gates
+from quality_runner.gate_verification import (
+    apply_gate_verification,
+    build_gate_execution_plan,
+    verify_discovered_gates,
+)
 from quality_runner.git_branches import prepare_scan_branch
 from quality_runner.manifest import build_run_manifest
 from quality_runner.package_preflight import build_package_manager_preflight
@@ -30,6 +34,7 @@ from quality_runner.planning import (
     build_remediation_plan,
     render_handoff_markdown,
 )
+from quality_runner.run_summary import build_run_summary
 from quality_runner.standards import DEFAULT_PROFILE, compile_standards
 
 
@@ -213,6 +218,8 @@ def verify_gates_payload(
     ci_status_json: Path | None = None,
     timeout_seconds: int = 120,
     checkout_most_advanced_branch: bool = False,
+    read_only_gates: bool = False,
+    allow_mutating_gates: bool = False,
 ) -> dict[str, Any]:
     resolved_run_id = generated_run_id() if run_id is None else run_id
     branch_warnings = prepare_scan_branch(
@@ -224,12 +231,22 @@ def verify_gates_payload(
     )
     package_manager_preflight = build_package_manager_preflight(repo_root, scan)
     code_quality_scan = create_code_quality_scan(repo_root, scan=scan, config=config)
+    gate_execution_plan = build_gate_execution_plan(
+        repo_root=repo_root,
+        capability_map=capability_map,
+        timeout_seconds=timeout_seconds,
+        gate_timeouts=_gate_timeouts(config),
+        read_only_gates=read_only_gates,
+        allow_mutating_gates=allow_mutating_gates,
+    )
     gate_verification = verify_discovered_gates(
         repo_root=repo_root,
         capability_map=capability_map,
         run_id=resolved_run_id,
         timeout_seconds=timeout_seconds,
         gate_timeouts=_gate_timeouts(config),
+        read_only_gates=read_only_gates,
+        allow_mutating_gates=allow_mutating_gates,
     )
     verified_capability_map = apply_gate_verification(capability_map, gate_verification)
     audit_report = build_audit_report(
@@ -251,6 +268,7 @@ def verify_gates_payload(
         "package_manager_preflight_json": str(run_dir / "package-manager-preflight.json"),
         "standards_json": str(run_dir / "standards.json"),
         "capability_matrix_json": str(run_dir / "capability-matrix.json"),
+        "gate_execution_plan_json": str(run_dir / "gate-execution-plan.json"),
         "gate_verification_json": str(run_dir / "gate-verification.json"),
         "quality_audit_json": str(run_dir / "quality-audit.json"),
         "remediation_plan_json": str(run_dir / "remediation-plan.json"),
@@ -276,6 +294,9 @@ def verify_gates_payload(
     artifact_paths["standards_json"] = str(write_json(run_dir / "standards.json", standards_packet))
     artifact_paths["capability_matrix_json"] = str(
         write_json(run_dir / "capability-matrix.json", verified_capability_map)
+    )
+    artifact_paths["gate_execution_plan_json"] = str(
+        write_json(run_dir / "gate-execution-plan.json", gate_execution_plan)
     )
     artifact_paths["gate_verification_json"] = str(
         write_json(run_dir / "gate-verification.json", gate_verification)
@@ -307,6 +328,62 @@ def verify_gates_payload(
         "run_id": resolved_run_id,
         "artifact_paths": artifact_paths,
         "warnings": _combined_warnings(scan, verified_capability_map),
+    }
+
+
+def refresh_payload(
+    repo_root: Path,
+    run_id_prefix: str,
+    baseline_run_id: str | None = None,
+    profile: str | None = None,
+    ci_status_json: Path | None = None,
+    timeout_seconds: int = 120,
+    checkout_most_advanced_branch: bool = False,
+    allow_mutating_gates: bool = False,
+) -> dict[str, Any]:
+    inspect_run_id = f"{run_id_prefix}-inspect"
+    run_run_id = f"{run_id_prefix}-run"
+    verify_run_id = f"{run_id_prefix}-verify"
+    inspect_result = inspect_payload(
+        repo_root=repo_root,
+        run_id=inspect_run_id,
+        profile=profile,
+        ci_status_json=ci_status_json,
+        checkout_most_advanced_branch=checkout_most_advanced_branch,
+    )
+    run_result = run_payload(
+        repo_root=repo_root,
+        run_id=run_run_id,
+        profile=profile,
+        ci_status_json=ci_status_json,
+        checkout_most_advanced_branch=checkout_most_advanced_branch,
+    )
+    verify_result = verify_gates_payload(
+        repo_root=repo_root,
+        run_id=verify_run_id,
+        profile=profile,
+        ci_status_json=ci_status_json,
+        timeout_seconds=timeout_seconds,
+        checkout_most_advanced_branch=checkout_most_advanced_branch,
+        read_only_gates=True,
+        allow_mutating_gates=allow_mutating_gates,
+    )
+    summary = build_run_summary(
+        repo_root=repo_root,
+        run_id=verify_run_id,
+        baseline_run_id=baseline_run_id,
+    )
+    return {
+        "schema": "quality-runner-refresh-result-v0.1",
+        "status": summary["status"],
+        "implementation_allowed": False,
+        "run_id_prefix": run_id_prefix,
+        "runs": {
+            "inspect": inspect_result,
+            "run": run_result,
+            "verify": verify_result,
+        },
+        "summary": summary,
     }
 
 

@@ -10,6 +10,10 @@
     "package_manager": { "type": ["string", "null"] },
     "declared_package_manager": { "type": ["string", "null"] },
     "lockfiles": { "type": "array", "items": { "type": "string" } },
+    "nested_lockfiles": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/nestedLockfile" }
+    },
     "warnings": {
       "type": "array",
       "items": { "$ref": "#/$defs/warning" }
@@ -23,6 +27,15 @@
         "code": { "type": "string", "minLength": 1 },
         "message": { "type": "string", "minLength": 1 },
         "path": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": false
+    },
+    "nestedLockfile": {
+      "type": "object",
+      "required": ["path", "package_manager"],
+      "properties": {
+        "path": { "type": "string", "minLength": 1 },
+        "package_manager": { "type": "string", "minLength": 1 }
       },
       "additionalProperties": false
     }

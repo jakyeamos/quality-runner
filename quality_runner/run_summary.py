@@ -12,6 +12,7 @@ def build_run_summary(
     repo_root: Path,
     run_id: str,
     baseline_run_id: str | None = None,
+    persist: bool = True,
 ) -> dict[str, Any]:
     summary = _run_summary(repo_root=repo_root, run_id=run_id)
     payload = {
@@ -22,6 +23,12 @@ def build_run_summary(
     if baseline_run_id is not None:
         baseline = _run_summary(repo_root=repo_root, run_id=baseline_run_id)
         payload["delta"] = _summary_delta(baseline=baseline, final=summary)
+    if persist:
+        run_dir = repo_root / ".quality-runner" / "runs" / run_id
+        (run_dir / "run-summary.json").write_text(
+            json.dumps(payload, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
     return payload
 
 
@@ -76,6 +83,7 @@ def _gate_results(gate_verification: dict[str, Any]) -> list[dict[str, Any]]:
             "id": gate.get("id"),
             "status": gate.get("status"),
             "failure_type": gate.get("failure_type"),
+            "skip_type": gate.get("skip_type"),
             "duration_seconds": gate.get("duration_seconds"),
         }
         results.append({key: value for key, value in result.items() if value is not None})
@@ -134,6 +142,10 @@ def _recommended_classification(
 ) -> str:
     if any(gate.get("failure_type") == "environment-restricted" for gate in gate_results):
         return "environment-or-runner-blocker"
+    if any(gate.get("failure_type") == "dependency-setup-blocker" for gate in gate_results):
+        return "environment-or-dependency-blocker"
+    if any(gate.get("skip_type") == "mutating-gate-not-run" for gate in gate_results):
+        return "read-only-gate-blocker"
     if status == "failed":
         return "failing-executable-gates"
     if missing_capabilities:

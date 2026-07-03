@@ -347,6 +347,44 @@ Refresh wave 1 takeaways:
   showed subproject lockfiles and local `.bin` resolution gaps; `amos-saas`
   showed pnpm non-TTY install/purge behavior before scripts could run.
 
+## Product Fixes Before Refresh Wave 2
+
+The ten requested QR improvements are implemented before rerunning the shallow
+wave:
+
+- `verify-gates --read-only-gates` and `refresh` default to a read-only gate
+  policy that skips formatter or unknown-risk commands instead of mutating the
+  target repo.
+- `verify-gates --allow-mutating-gates` is the explicit override for mutating
+  gates, giving controller threads a visible approval point.
+- Formatter scripts now carry mutating-risk metadata when discovery can tell a
+  script is mutating or ambiguous.
+- Gate verification writes `gate-execution-plan.json` and embeds the plan in
+  `gate-verification.json`, including cwd, package manager, timeout, mutating
+  risk, and local execution status.
+- Google Fonts, `next/font`, fetch, DNS, localhost/socket, and sandbox-style
+  failures classify as `environment-restricted` with direct rerun guidance.
+- pnpm non-TTY module purge/install failures classify as
+  `dependency-setup-blocker`, not ordinary command failure.
+- Nested JavaScript workspaces use their own lockfile/package-manager context
+  when discovering scripts.
+- Package-manager preflight records nested lockfiles so controller reports can
+  distinguish root package-manager state from subproject state.
+- `summarize-run` persists `.quality-runner/runs/<run-id>/run-summary.json` for
+  downstream controller evidence.
+- Timeout diagnostics now include captured output lengths and a process snapshot
+  to separate stuck commands from QR environment mismatches.
+- `quality-runner refresh` runs inspect, run, read-only verify-gates, and
+  summary generation as one controller-friendly workflow.
+
+Validation before launch: `uv run ruff check .`, targeted workflow/CLI/artifact
+tests, and full `uv run pytest` all pass on the controller branch.
+
+Refresh wave 2 reruns the same five repos as wave 1 with `quality-runner
+refresh`, no remediation, and no target-repo commits. The point is to stress the
+new read-only execution policy and classification behavior against the known
+failure cases.
+
 ## Rollout Ledger
 
 | Wave | Repo | Repo path | Total | Blockers | Baseline artifacts | Codex project status | Thread status | Thread id | Final QR status | Commit | Push | Notes |

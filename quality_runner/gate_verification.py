@@ -6,28 +6,21 @@ import time
 from pathlib import Path
 from typing import Any
 
+from quality_runner.gate_execution_policy import (
+    build_gate_execution_plan,
+    failure_type,
+    gate_cwd,
+    mutating_risk,
+    recommended_action,
+    timeout_diagnostics,
+    valid_gate_timeouts,
+)
 from quality_runner.schema_constants import GATE_VERIFICATION_SCHEMA
 
 MAX_OUTPUT_CHARS = 4000
 DEFAULT_TIMEOUT_SECONDS = 120
 AGGREGATE_GATE_IDS = {"pre_cr", "pre_pr"}
 LEAF_GATE_IDS = ("formatter", "lint", "typecheck", "tests", "build", "dead_code", "runtime_smoke")
-ENVIRONMENT_RESTRICTED_MARKERS = (
-    "eperm",
-    "eacces",
-    "permission denied",
-    "operation not permitted",
-    "listen eperm",
-    "127.0.0.1",
-    ".pipe",
-    "socket",
-)
-TEST_SERVER_TIMEOUT_MARKERS = (
-    "server is not running",
-    "server not running",
-    "failed to start server",
-    "local server",
-)
 
 
 def verify_discovered_gates(
@@ -37,10 +30,20 @@ def verify_discovered_gates(
     run_id: str | None = None,
     timeout_seconds: int = DEFAULT_TIMEOUT_SECONDS,
     gate_timeouts: dict[str, int] | None = None,
+    read_only_gates: bool = False,
+    allow_mutating_gates: bool = False,
 ) -> dict[str, Any]:
     gates: list[dict[str, Any]] = []
     passed_leaf_ids: set[str] = set()
-    resolved_gate_timeouts = _valid_gate_timeouts(gate_timeouts)
+    resolved_gate_timeouts = valid_gate_timeouts(gate_timeouts)
+    execution_plan = build_gate_execution_plan(
+        repo_root=repo_root,
+        capability_map=capability_map,
+        timeout_seconds=timeout_seconds,
+        gate_timeouts=resolved_gate_timeouts,
+        read_only_gates=read_only_gates,
+        allow_mutating_gates=allow_mutating_gates,
+    )
     for capability in _available_capabilities(capability_map):
         capability_id = str(capability.get("id") or "unknown")
         timeout = resolved_gate_timeouts.get(capability_id, timeout_seconds)
@@ -49,6 +52,8 @@ def verify_discovered_gates(
             capability=capability,
             timeout_seconds=timeout,
             covered_by=_covered_by(capability, passed_leaf_ids),
+            read_only_gates=read_only_gates,
+            allow_mutating_gates=allow_mutating_gates,
         )
         gates.append(gate)
         if capability_id in LEAF_GATE_IDS and gate.get("status") == "passed":
@@ -59,7 +64,10 @@ def verify_discovered_gates(
         "status": _status(gates),
         "timeout_seconds": timeout_seconds,
         "gate_timeouts": resolved_gate_timeouts,
+        "read_only_gates": read_only_gates,
+        "allow_mutating_gates": allow_mutating_gates,
         "environment": _environment(),
+        "execution_plan": execution_plan,
         "gates": gates,
     }
 
@@ -101,6 +109,8 @@ def _verify_gate(
     capability: dict[str, Any],
     timeout_seconds: int,
     covered_by: list[str],
+    read_only_gates: bool,
+    allow_mutating_gates: bool,
 ) -> dict[str, Any]:
     command = capability.get("command")
     capability_id = str(capability.get("id") or "unknown")
@@ -139,6 +149,24 @@ def _verify_gate(
             "reason": "capability has no executable command",
             "source": source,
         }
+    risk = mutating_risk(capability_id=capability_id, capability=capability)
+    if (
+        read_only_gates
+        and not allow_mutating_gates
+        and risk in {"mutating", "unknown"}
+    ):
+        return {
+            "id": capability_id,
+            "status": "skipped",
+            "capability_kind": capability_kind,
+            "command": command,
+            "source": source,
+            "cwd": str(gate_cwd(repo_root=repo_root, capability=capability)),
+            "mutating_risk": risk,
+            "skip_type": "mutating-gate-not-run",
+            "reason": "read-only gate policy skipped a possibly mutating command",
+            "recommended_action": "rerun with --allow-mutating-gates only when source changes are allowed",
+        }
 
     started = time.monotonic()
     try:
@@ -154,8 +182,11 @@ def _verify_gate(
     except subprocess.TimeoutExpired as error:
         stdout = _truncate(error.stdout)
         stderr = _truncate(error.stderr)
-        failure_type = _failure_type(command=command, stdout=stdout, stderr=stderr, timed_out=True)
-        environment_restricted = failure_type == "environment-restricted"
+        gate_failure_type = failure_type(
+            command=command, stdout=stdout, stderr=stderr, timed_out=True
+        )
+        environment_restricted = gate_failure_type == "environment-restricted"
+        dependency_setup = gate_failure_type == "dependency-setup-blocker"
         return {
             "id": capability_id,
             "status": "failed",
@@ -169,15 +200,20 @@ def _verify_gate(
             "stderr": stderr,
             "stdout_tail": stdout,
             "stderr_tail": stderr,
-            "failure_type": failure_type,
+            "failure_type": gate_failure_type,
             "reason": "gate timed out",
-            **_recommended_action(environment_restricted),
+            "diagnostics": timeout_diagnostics(command=command, stdout=stdout, stderr=stderr),
+            **recommended_action(
+                environment_restricted=environment_restricted,
+                dependency_setup=dependency_setup,
+            ),
         }
     stdout = _truncate(result.stdout)
     stderr = _truncate(result.stderr)
-    failure_type = _failure_type(command=command, stdout=stdout, stderr=stderr, timed_out=False)
+    gate_failure_type = failure_type(command=command, stdout=stdout, stderr=stderr, timed_out=False)
     failed = result.returncode != 0
-    environment_restricted = failed and failure_type == "environment-restricted"
+    environment_restricted = failed and gate_failure_type == "environment-restricted"
+    dependency_setup = failed and gate_failure_type == "dependency-setup-blocker"
     return {
         "id": capability_id,
         "status": "passed" if result.returncode == 0 else "failed",
@@ -187,12 +223,17 @@ def _verify_gate(
         "exit_code": result.returncode,
         "duration_seconds": round(time.monotonic() - started, 3),
         "timeout_seconds": timeout_seconds,
+        "cwd": str(gate_cwd(repo_root=repo_root, capability=capability)),
+        "mutating_risk": risk,
         "stdout": stdout,
         "stderr": stderr,
         "stdout_tail": stdout,
         "stderr_tail": stderr,
-        **_optional_field("failure_type", failure_type if failed else None),
-        **_recommended_action(environment_restricted),
+        **_optional_field("failure_type", gate_failure_type if failed else None),
+        **recommended_action(
+            environment_restricted=environment_restricted,
+            dependency_setup=dependency_setup,
+        ),
     }
 
 
@@ -204,7 +245,11 @@ def _available_capabilities(capability_map: dict[str, Any]) -> list[dict[str, An
 
 
 def _status(gates: list[dict[str, Any]]) -> str:
-    if any(gate.get("failure_type") == "environment-restricted" for gate in gates):
+    if any(
+        gate.get("failure_type") in {"environment-restricted", "dependency-setup-blocker"}
+        or gate.get("skip_type") == "mutating-gate-not-run"
+        for gate in gates
+    ):
         return "blocked"
     if any(gate.get("status") == "failed" for gate in gates):
         return "failed"
@@ -246,16 +291,6 @@ def _capability_kind(capability: dict[str, Any]) -> str:
     return "local_command"
 
 
-def _valid_gate_timeouts(gate_timeouts: dict[str, int] | None) -> dict[str, int]:
-    if not isinstance(gate_timeouts, dict):
-        return {}
-    return {
-        gate_id: seconds
-        for gate_id, seconds in gate_timeouts.items()
-        if isinstance(gate_id, str) and gate_id and isinstance(seconds, int) and seconds > 0
-    }
-
-
 def _covered_by(capability: dict[str, Any], passed_leaf_ids: set[str]) -> list[str]:
     capability_id = str(capability.get("id") or "")
     command = capability.get("command")
@@ -283,39 +318,6 @@ def _command_mentions_gate(command: str, gate_id: str) -> bool:
     }.get(gate_id, ())
     normalized = command.lower()
     return any(alias in normalized for alias in aliases)
-
-
-def _failure_type(*, command: str, stdout: str, stderr: str, timed_out: bool) -> str:
-    combined = f"{command}\n{stdout}\n{stderr}".lower()
-    if any(marker in combined for marker in ENVIRONMENT_RESTRICTED_MARKERS):
-        return "environment-restricted"
-    if _looks_like_qr_spawned_test_server_timeout(command=command, combined=combined):
-        return "environment-restricted"
-    if timed_out:
-        return "timeout"
-    return "command-failed"
-
-
-def _looks_like_qr_spawned_test_server_timeout(*, command: str, combined: str) -> bool:
-    lowered_command = command.lower()
-    if "test" not in lowered_command:
-        return False
-    has_timeout = "timed out" in combined or "timeout" in combined
-    has_server_marker = any(marker in combined for marker in TEST_SERVER_TIMEOUT_MARKERS)
-    return has_timeout and has_server_marker
-
-
-def _recommended_action(environment_restricted: bool) -> dict[str, Any]:
-    return _optional_field(
-        "recommended_action",
-        (
-            "rerun the exact command directly from the repo root; if it passes, treat "
-            "this as a QR runner environment mismatch and rerun outside sandbox or "
-            "with explicit network/localhost permissions"
-        )
-        if environment_restricted
-        else None,
-    )
 
 
 def _environment() -> dict[str, str | bool | None]:

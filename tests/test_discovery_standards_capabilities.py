@@ -384,6 +384,32 @@ def test_inspect_repo_detects_nested_workspaces_and_quality_aliases(tmp_path: Pa
     )
 
 
+def test_nested_javascript_workspace_uses_its_own_lockfile_package_manager(
+    tmp_path: Path,
+) -> None:
+    from quality_runner.discovery import inspect_repo
+
+    dashboard = tmp_path / "dashboard"
+    dashboard.mkdir()
+    (dashboard / "package.json").write_text(
+        json.dumps({"scripts": {"build": "next build", "typecheck": "tsc --noEmit"}}),
+        encoding="utf-8",
+    )
+    (dashboard / "package-lock.json").write_text("{}\n", encoding="utf-8")
+
+    scan = inspect_repo(tmp_path, run_id="nested-npm-workspace")
+
+    commands = {(command["id"], command["source"]): command for command in scan["quality_commands"]}
+    assert (
+        commands[("build", "dashboard/package.json:scripts.build")]["command"]
+        == "cd dashboard && npm run build"
+    )
+    assert (
+        commands[("typecheck", "dashboard/package.json:scripts.typecheck")]["command"]
+        == "cd dashboard && npm run typecheck"
+    )
+
+
 def test_inspect_repo_discovery_prunes_excluded_trees_before_recursive_walk(
     tmp_path: Path,
     monkeypatch,

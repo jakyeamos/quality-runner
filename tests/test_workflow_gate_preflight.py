@@ -69,6 +69,38 @@ def test_inspect_payload_writes_package_manager_preflight_artifact(tmp_path: Pat
     ]
 
 
+def test_package_manager_preflight_reports_nested_lockfiles(tmp_path: Path) -> None:
+    from quality_runner.workflow import inspect_payload
+
+    (tmp_path / "package.json").write_text(
+        json.dumps({"packageManager": "pnpm@10.0.0", "scripts": {"test": "vitest run"}}),
+        encoding="utf-8",
+    )
+    (tmp_path / "pnpm-lock.yaml").write_text("lockfileVersion: '9.0'\n", encoding="utf-8")
+    dashboard = tmp_path / "dashboard"
+    dashboard.mkdir()
+    (dashboard / "package.json").write_text(
+        json.dumps({"scripts": {"build": "next build"}}),
+        encoding="utf-8",
+    )
+    (dashboard / "package-lock.json").write_text("{}\n", encoding="utf-8")
+
+    payload = inspect_payload(repo_root=tmp_path, run_id="nested-lockfile-preflight")
+    preflight = json.loads(
+        Path(payload["artifact_paths"]["package_manager_preflight_json"]).read_text()
+    )
+
+    assert preflight["status"] == "warning"
+    assert preflight["nested_lockfiles"] == [
+        {"path": "dashboard/package-lock.json", "package_manager": "npm"}
+    ]
+    assert {
+        "code": "nested_package_manager_lockfiles",
+        "message": "Nested JavaScript package-manager lockfiles are present.",
+        "path": ".",
+    } in preflight["warnings"]
+
+
 def test_verify_gates_payload_executes_discovered_gates_and_marks_capabilities(
     tmp_path: Path,
 ) -> None:
@@ -170,6 +202,113 @@ def test_verify_gates_runs_package_scripts_through_detected_package_manager(
     assert payload["status"] == "passed"
     assert verification["gates"][0]["command"] == "pnpm run lint"
     assert "package-bin-ok\n" in verification["gates"][0]["stdout_tail"]
+
+
+def test_verify_gates_read_only_mode_skips_mutating_formatter(tmp_path: Path) -> None:
+    from quality_runner.workflow import verify_gates_payload
+
+    (tmp_path / "package.json").write_text(
+        json.dumps(
+            {
+                "packageManager": "pnpm@10.0.0",
+                "scripts": {
+                    "format": "eslint --fix .",
+                    "test": f"{sys.executable} -c 'import sys; sys.exit(0)'",
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    (tmp_path / "pnpm-lock.yaml").write_text("lockfileVersion: '9.0'\n", encoding="utf-8")
+    (tmp_path / ".quality-runner.toml").write_text(
+        '[quality_runner]\nrequired_capabilities = ["formatter", "tests"]\n',
+        encoding="utf-8",
+    )
+
+    payload = verify_gates_payload(
+        repo_root=tmp_path,
+        run_id="read-only-mutating",
+        read_only_gates=True,
+    )
+    verification = json.loads(
+        Path(payload["artifact_paths"]["gate_verification_json"]).read_text()
+    )
+    plan = json.loads(Path(payload["artifact_paths"]["gate_execution_plan_json"]).read_text())
+
+    assert payload["status"] == "blocked"
+    assert verification["status"] == "blocked"
+    assert verification["gates"][0]["status"] == "skipped"
+    assert verification["gates"][0]["skip_type"] == "mutating-gate-not-run"
+    assert verification["gates"][0]["mutating_risk"] == "mutating"
+    assert verification["gates"][1]["status"] == "passed"
+    assert plan[0]["local_execution_status"] == "mutating-skipped"
+
+
+def test_verify_gates_classifies_dependency_setup_blockers(tmp_path: Path) -> None:
+    from quality_runner.workflow import verify_gates_payload
+
+    (tmp_path / "package.json").write_text(
+        json.dumps(
+            {
+                "scripts": {
+                    "test": (
+                        f"{sys.executable} -c "
+                        "\"import sys; "
+                        "print('ERR_PNPM_ABORTED_REMOVE_MODULES_DIR_NO_TTY', file=sys.stderr); "
+                        "sys.exit(1)\""
+                    )
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    (tmp_path / ".quality-runner.toml").write_text(
+        '[quality_runner]\nrequired_capabilities = ["tests"]\n',
+        encoding="utf-8",
+    )
+
+    payload = verify_gates_payload(repo_root=tmp_path, run_id="dependency-setup")
+    verification = json.loads(
+        Path(payload["artifact_paths"]["gate_verification_json"]).read_text()
+    )
+
+    assert payload["status"] == "blocked"
+    assert verification["gates"][0]["failure_type"] == "dependency-setup-blocker"
+    assert "dependency restoration" in verification["gates"][0]["recommended_action"]
+
+
+def test_verify_gates_classifies_next_font_fetch_as_environment_restricted(
+    tmp_path: Path,
+) -> None:
+    from quality_runner.workflow import verify_gates_payload
+
+    (tmp_path / "package.json").write_text(
+        json.dumps(
+            {
+                "scripts": {
+                    "build": (
+                        f"{sys.executable} -c "
+                        "\"import sys; "
+                        "print('next/font failed to fetch fonts.googleapis.com', file=sys.stderr); "
+                        "sys.exit(1)\""
+                    )
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    (tmp_path / ".quality-runner.toml").write_text(
+        '[quality_runner]\nrequired_capabilities = ["build"]\n',
+        encoding="utf-8",
+    )
+
+    payload = verify_gates_payload(repo_root=tmp_path, run_id="next-font-fetch")
+    verification = json.loads(
+        Path(payload["artifact_paths"]["gate_verification_json"]).read_text()
+    )
+
+    assert payload["status"] == "blocked"
+    assert verification["gates"][0]["failure_type"] == "environment-restricted"
 
 
 def test_verify_gates_skips_ci_only_pseudo_gates(tmp_path: Path) -> None:

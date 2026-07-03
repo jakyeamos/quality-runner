@@ -79,6 +79,13 @@ def _javascript_quality_commands(
                         source_type="package_script",
                         source=f"{manifest_path}:scripts.{script_name}",
                         language="javascript",
+                        mutating_risk=_reported_mutating_risk(
+                            _mutating_risk(
+                                capability_id=capability_id,
+                                command=command,
+                                script_command=command,
+                            )
+                        ),
                     )
                 )
                 break
@@ -195,7 +202,11 @@ def _workspace_quality_commands(
                 _javascript_quality_commands(
                     _package_scripts(package_json),
                     manifest_path=manifest,
-                    package_manager=_detect_package_manager(root, package_json),
+                    package_manager=_detect_package_manager(
+                        root,
+                        package_json,
+                        workspace_path=_workspace_path_from_manifest(manifest),
+                    ),
                 )
             )
     return commands
@@ -235,6 +246,9 @@ def _pre_cr_quality_commands(root: Path, pre_cr_config: str | None) -> list[dict
             if command != "pre-cr run --workspace ."
             else pre_cr_config,
             language="python" if "pytest" in command or "python" in command else "unknown",
+            mutating_risk=_reported_mutating_risk(
+                _mutating_risk(capability_id="pre_cr", command=command)
+            ),
         )
     ]
 
@@ -306,6 +320,8 @@ def _quality_command(
     source: str,
     language: str,
     local_execution: str | None = None,
+    cwd: str | None = None,
+    mutating_risk: str | None = None,
 ) -> dict[str, str]:
     return {
         "id": capability_id,
@@ -314,6 +330,8 @@ def _quality_command(
         "source": source,
         "language": language,
         **({"local_execution": local_execution} if local_execution else {}),
+        **({"cwd": cwd} if cwd else {}),
+        **({"mutating_risk": mutating_risk} if mutating_risk else {}),
     }
 
 
@@ -340,10 +358,13 @@ def _javascript_command(
     return _workspace_command(workspace_path, f"{package_manager} run {script_name}")
 
 
-def _detect_package_manager(root: Path, package_json: dict[str, Any]) -> str | None:
+def _detect_package_manager(
+    root: Path, package_json: dict[str, Any], workspace_path: str = ""
+) -> str | None:
     declared = package_json.get("packageManager")
     if isinstance(declared, str) and declared:
         return declared.split("@", maxsplit=1)[0]
+    workspace_root = root / workspace_path if workspace_path else root
     for lockfile, manager in (
         ("pnpm-lock.yaml", "pnpm"),
         ("yarn.lock", "yarn"),
@@ -351,6 +372,25 @@ def _detect_package_manager(root: Path, package_json: dict[str, Any]) -> str | N
         ("bun.lockb", "bun"),
         ("bun.lock", "bun"),
     ):
-        if (root / lockfile).exists():
+        if (workspace_root / lockfile).exists():
             return manager
     return None
+
+
+def _mutating_risk(
+    *, capability_id: str, command: str, script_command: str | None = None
+) -> str:
+    inspected = f"{command}\n{script_command or ''}".lower()
+    if capability_id == "formatter":
+        if any(marker in inspected for marker in ("--check", "--list-different", "check-format")):
+            return "safe"
+        if any(marker in inspected for marker in ("--fix", "--write", "eslint", "prettier", "ruff format")):
+            return "mutating"
+        return "unknown"
+    if any(marker in inspected for marker in ("--fix", "--write", " write", "format")):
+        return "mutating"
+    return "safe"
+
+
+def _reported_mutating_risk(risk: str) -> str | None:
+    return risk if risk in {"mutating", "unknown"} else None
