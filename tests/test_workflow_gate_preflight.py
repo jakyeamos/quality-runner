@@ -294,6 +294,57 @@ def test_verify_gates_classifies_dependency_setup_blockers(tmp_path: Path) -> No
     assert verification["gates"][2]["diagnostics"]["dependency_setup"]["package_manager"] == "pnpm"
 
 
+def test_verify_gates_classifies_pnpm_ignored_builds_as_dependency_setup(
+    tmp_path: Path,
+) -> None:
+    from quality_runner.workflow import verify_gates_payload
+
+    (tmp_path / "package.json").write_text(
+        json.dumps(
+            {
+                "packageManager": "pnpm@10.0.0",
+                "scripts": {
+                    "lint": (
+                        f"{sys.executable} -c "
+                        "\"import sys; "
+                        "print('[ERR_PNPM_IGNORED_BUILDS] Ignored build scripts: sharp'); "
+                        "print('Run \\'pnpm approve-builds\\' to pick which dependencies should be allowed'); "
+                        "sys.exit(1)\""
+                    ),
+                    "test": f"{sys.executable} -c 'import sys; sys.exit(0)'",
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    (tmp_path / "pnpm-lock.yaml").write_text("lockfileVersion: '9.0'\n", encoding="utf-8")
+    (tmp_path / ".quality-runner.toml").write_text(
+        '[quality_runner]\nrequired_capabilities = ["lint", "tests"]\n',
+        encoding="utf-8",
+    )
+
+    payload = verify_gates_payload(repo_root=tmp_path, run_id="pnpm-ignored-builds")
+    verification = json.loads(
+        Path(payload["artifact_paths"]["gate_verification_json"]).read_text()
+    )
+
+    assert payload["status"] == "blocked"
+    assert verification["gates"][0]["id"] == "lint"
+    assert verification["gates"][0]["failure_type"] == "dependency-setup-blocker"
+    setup = verification["gates"][0]["diagnostics"]["dependency_setup"]
+    assert setup["package_manager"] == "pnpm"
+    assert setup["setup_command"] == "pnpm approve-builds"
+    assert "approve-builds" in verification["gates"][0]["recommended_action"]
+    assert verification["gates"][1]["id"] == "tests"
+    assert verification["gates"][1]["status"] == "skipped"
+    assert verification["gates"][1]["skip_type"] == "dependency-setup-blocked"
+    assert verification["gates"][1]["blocked_by"] == "lint"
+    assert (
+        verification["gates"][1]["diagnostics"]["dependency_setup"]["setup_command"]
+        == "pnpm approve-builds"
+    )
+
+
 def test_verify_gates_classifies_next_font_fetch_as_environment_restricted(
     tmp_path: Path,
 ) -> None:

@@ -103,6 +103,8 @@ package manager, gate cwd, recommended setup command, and cause. Later gates
 that share the same package-manager/cwd context are skipped with
 `skip_type: "dependency-setup-blocked"` and `blocked_by` pointing at the first
 failed gate, so one missing install does not produce repeated noisy failures.
+For pnpm ignored build-script approval failures, the setup command points to
+`pnpm approve-builds`.
 
 ## Safety Guarantees
 

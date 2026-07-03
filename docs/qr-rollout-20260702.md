@@ -804,6 +804,48 @@ Product takeaways:
 - The R-Project control run confirms the new dependency setup memory does not
   disturb clean non-JS verification.
 
+## Product Fix After Refresh Wave 8
+
+Implemented pnpm ignored-build dependency setup handling:
+
+- `ERR_PNPM_IGNORED_BUILDS`, `Ignored build scripts`, and
+  `pnpm approve-builds` output now classify as `dependency-setup-blocker`.
+- Dependency setup diagnostics now point pnpm ignored-build failures at
+  `pnpm approve-builds` instead of the generic install command.
+- Later same package-manager/cwd gates reuse the root setup diagnostic when
+  skipped with `skip_type=dependency-setup-blocked`, so downstream gates retain
+  the specific approval command.
+
+Validation:
+
+- `uv run pytest tests/test_workflow_gate_preflight.py -k 'dependency_setup or pnpm_ignored_builds'`
+- `uv run pytest tests/test_workflow_gate_preflight.py tests/test_config.py tests/test_workflow.py`
+- `uv run ruff check .`
+
+## Refresh Wave 9 EliHealth Canary
+
+Ran a focused read-only EliHealth canary after adding pnpm ignored-build
+classification:
+
+- Run id prefix: `refresh9-20260703-EliHealth`
+- Baseline: `refresh8-20260703-EliHealth-verify`
+- Final verify: `refresh9-20260703-EliHealth-verify`
+- Final classification: `environment-or-dependency-blocker`
+- Result: `lint` became the root `dependency-setup-blocker` with
+  `diagnostics.dependency_setup.setup_command=pnpm approve-builds`.
+- Same-context pnpm gates `typecheck`, `runtime_smoke`, `dead_code`, `tests`,
+  `pre_cr`, and `pre_pr` skipped with `skip_type=dependency-setup-blocked`,
+  `blocked_by=lint`, and the same `pnpm approve-builds` diagnostic.
+- The unrelated `build` gate still failed as `command-failed` because `web`
+  is missing the `vite/client` type definition.
+
+Validation:
+
+- `uv run quality-runner refresh /Users/jakyeamos/projects/EliHealth --run-id-prefix refresh9-20260703-EliHealth --baseline-run-id refresh8-20260703-EliHealth-verify --timeout-seconds 90 --verify-timeout-seconds 180 --total-timeout-seconds 240 --total-timeout-reason "controller refresh wave 9 pnpm ignored builds validation" --json`
+- `jq '.gates | map({id,status,failure_type,skip_type,blocked_by,setup:(.diagnostics.dependency_setup // null), recommended_action})' /Users/jakyeamos/projects/EliHealth/.quality-runner/runs/refresh9-20260703-EliHealth-verify/gate-verification.json`
+- `uv run pytest`
+- `uv run ruff check .`
+
 ## Rollout Ledger
 
 | Wave | Repo | Repo path | Total | Blockers | Baseline artifacts | Codex project status | Thread status | Thread id | Final QR status | Commit | Push | Notes |

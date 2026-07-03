@@ -27,8 +27,11 @@ ENVIRONMENT_RESTRICTED_MARKERS = (
 )
 DEPENDENCY_SETUP_MARKERS = (
     "err_pnpm_aborted_remove_modules_dir_no_tty",
+    "err_pnpm_ignored_builds",
     "aborted_remove_modules_dir_no_tty",
+    "ignored build scripts",
     "modules directory will be removed and reinstalled from scratch",
+    "pnpm approve-builds",
 )
 TEST_SERVER_TIMEOUT_MARKERS = (
     "server is not running",
@@ -106,7 +109,8 @@ def recommended_action(*, environment_restricted: bool, dependency_setup: bool) 
         return {
             "recommended_action": (
                 "run the package-manager install/setup command directly in an interactive shell "
-                "or approve dependency restoration before rerunning QR gates"
+                "or approve dependency restoration before rerunning QR gates; for pnpm ignored "
+                "build scripts, run pnpm approve-builds"
             )
         }
     if not environment_restricted:
