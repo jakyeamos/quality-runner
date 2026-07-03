@@ -714,6 +714,28 @@ Refresh wave 7 is a focused two-repo verification after adding
 | tenure | `019f28ac-2a8e-7260-8290-c43dfeb4f79b` | `refresh7full-20260703-tenure`, `refresh7budget-20260703-tenure` | `refresh6full-20260703-tenure-verify`, `refresh6budget-20260703-tenure-verify` | `/private/tmp/qr-refresh7-tenure-report.json` | launched |
 | AIOS | `019f28ac-721a-7d03-a790-b2b03e484dfb` | `refresh7budget-20260703-AIOS` | `refresh6budget-20260703-AIOS-verify` | `/private/tmp/qr-refresh7-AIOS-report.json` | launched |
 
+## Refresh Wave 7 Results
+
+Both worker reports validated with
+`quality-runner validate-report <report> --json` and returned
+`status=accepted`, `errors=[]`.
+
+| Repo | Thread status | Final QR result | Scope evidence | Report |
+|---|---|---|---|---|
+| tenure | blocked | Full mode `340.77s`; budget mode `240.67s`; both `workflow-timeout-blocker` | Full mode wrote `timeout_scope=verify-phase`; budget mode wrote `timeout_scope=total-refresh`; both preserved the 9-entry gate plan and gate verification evidence. | `/private/tmp/qr-refresh7-tenure-report.json` |
+| AIOS | ready-for-review | `120.38s`; `environment-or-runner-blocker`; no workflow timeout | Non-timeout refresh retained `timeout_contract` and `phase_timings`, wrote no `workflow-timeout.json`, and had no timeout-scope artifact fields. | `/private/tmp/qr-refresh7-AIOS-report.json` |
+
+Product takeaways:
+
+- The timeout-scope polish is verified. Controllers no longer need to parse
+  timeout reason strings to distinguish verify-phase budget exhaustion from
+  total-refresh budget exhaustion.
+- Non-timeout runs remain cleanly modeled: they expose the selected timeout
+  contract and phase timings, but do not fabricate timeout-scope artifacts.
+- Timeout work is now complete enough to stop focused timeout waves. The next
+  Tier 1 product gap is dependency/setup blocker handling, especially repeated
+  non-interactive `pnpm` dependency restoration failures.
+
 ## Rollout Ledger
 
 | Wave | Repo | Repo path | Total | Blockers | Baseline artifacts | Codex project status | Thread status | Thread id | Final QR status | Commit | Push | Notes |
