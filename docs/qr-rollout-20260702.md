@@ -385,6 +385,33 @@ refresh`, no remediation, and no target-repo commits. The point is to stress the
 new read-only execution policy and classification behavior against the known
 failure cases.
 
+| Refresh wave | Repo | Repo path | Baseline run | Thread status | Thread id | Final QR status | Validate-report | Notes |
+|---:|---|---|---|---|---|---|---|---|
+| 2 | `tenure` | `/Users/jakyeamos/projects/tenure` | `refresh-20260703-tenure-verify` | blocked | `019f2662-b93c-7b12-8911-acdc9aa9f034` | `interrupted_after_hang`; requested `refresh2-20260703-tenure-verify` | accepted | `refresh` produced `refresh2-20260703-tenure-run` with `findings` and 31 findings, then hung inside gate verification beyond the 120s gate timeout. The verify directory exists but is empty: no `gate-execution-plan.json`, `gate-verification.json`, or `run-summary.json`. No new tracked file paths appeared; pre-existing `.aios/audit/*` modifications and untracked `.quality-runner/` remained. |
+| 2 | `BidCamp` | `/Users/jakyeamos/projects/BidCamp` | `refresh-20260703-BidCamp-verify` | blocked | `019f2662-f159-7a62-983d-db9ef9d923e5` | `blocked`; requested `refresh2-20260703-BidCamp-verify` | accepted | `refresh` produced inspect/run artifacts, but the verify directory is empty and the process had to be terminated after exceeding the delegated timeout with no final JSON. Last complete run `refresh2-20260703-BidCamp-run` reported findings and 2,476 unresolved ledger entries. No new tracked changes; pre-existing script modifications and untracked `.quality-runner/`/`data/` remained. |
+| 2 | `AIOS` | `/Users/jakyeamos/projects/AIOS` | `refresh-20260703-AIOS-verify` | blocked | `019f2663-26df-7ab0-b2c3-f1ec56d92c4f` | `blocked`; `refresh2-20260703-AIOS-verify` | accepted | Read-only refresh completed and wrote the execution plan, verification, and summary. Classification `environment-or-runner-blocker`; 22 findings, delta 0, missing capabilities 0. Formatter/lint/typecheck failed as command failures; `uv` cache permission errors and Google Fonts fetch failures were classified as environment restrictions. No tracked file changes. |
+| 2 | `amos-saas` | `/Users/jakyeamos/projects/amos-saas` | `refresh-20260703-amos-saas-verify` | blocked | `019f2663-5d6a-7803-a3b5-76682f3aec21` | `blocked`; `refresh2-20260703-amos-saas-verify` | accepted | Read-only refresh completed and classified pnpm non-TTY dependency restoration as `dependency-setup-blocker`. Formatter and `pre_cr` were skipped with `mutating-gate-not-run`; findings stayed at 27 with zero baseline delta and no missing capabilities. No tracked file changes. |
+| 2 | `Dsci-proj` | `/Users/jakyeamos/projects/Dsci-proj` | `refresh-20260703-Dsci-proj-verify` | blocked | `019f2663-9562-7f00-9ef0-4c4892726848` | `failed`; `refresh2-20260703-Dsci-proj-verify` | accepted | Read-only refresh completed with final classification `failing-executable-gates`; 13 findings, delta 0, missing capabilities 0. Runtime smoke passed; formatter, lint, typecheck, tests, build, and dead-code failed. Dashboard gates still execute through discovered npm commands inside the nested dashboard, so package-manager normalization remains incomplete. No tracked file changes. |
+
+Refresh wave 2 takeaways:
+
+- The read-only policy worked: no worker reported QR-created tracked source
+  edits, and known/ambiguous mutating gates were skipped rather than executed.
+- The pnpm non-TTY case is now correctly classified as
+  `dependency-setup-blocker`, which turns the amos-saas failure from a noisy
+  command failure into actionable dependency setup evidence.
+- Google Fonts/`next/font` and `uv` cache failures are now grouped under
+  environment or runner blockers in completed verification artifacts.
+- `refresh` needs a workflow-level timeout and partial-result finalization.
+  Tenure and BidCamp hung after run artifacts were written but before verify
+  artifacts and final JSON existed, forcing manual interruption.
+- Nested package-manager handling improved enough to surface more explicit
+  evidence, but Dsci-proj still shows npm command discovery in a nested
+  dashboard, so package-manager normalization should rewrite discovered nested
+  npm scripts to the repo's configured/lockfile-backed manager where possible.
+- The controller report protocol is working: every worker produced an accepted
+  completion report, even when the QR workflow itself hung or failed.
+
 ## Rollout Ledger
 
 | Wave | Repo | Repo path | Total | Blockers | Baseline artifacts | Codex project status | Thread status | Thread id | Final QR status | Commit | Push | Notes |
