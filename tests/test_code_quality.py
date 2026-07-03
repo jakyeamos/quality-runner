@@ -630,6 +630,12 @@ def test_code_quality_scan_ignores_shadow_vendor_cache_and_build_variants(
         "const claude_copy: any = {};\n",
     )
     _write(
+        tmp_path / ".codex" / "worktrees" / "feature-copy" / "src" / "copy.ts",
+        "const codex_copy: any = {};\n",
+    )
+    for agent_dir in (".aider", ".continue", ".cursor"):
+        _write(tmp_path / agent_dir / "scratch.ts", "const scratch: any = {};\n")
+    _write(
         tmp_path / "apps" / "dashboard" / ".next-broken-20260323-1" / "server" / "_error.js",
         "eval(userInput);\n",
     )
@@ -666,6 +672,10 @@ def test_code_quality_scan_ignores_shadow_vendor_cache_and_build_variants(
     assert scanned_paths == {"src/data/model.ts", "src/index.ts"}
     assert skipped[".aios"] == "scan exclusion"
     assert skipped[".claude/worktrees"] == "scan exclusion"
+    assert skipped[".codex/worktrees"] == "scan exclusion"
+    assert skipped[".aider"] == "scan exclusion"
+    assert skipped[".continue"] == "scan exclusion"
+    assert skipped[".cursor"] == "scan exclusion"
     assert skipped[".worktrees"] == "ignored directory"
     assert skipped["apps/dashboard/.next-broken-20260323-1"] == "ignored directory"
     assert skipped[".tmp"] == "ignored directory"

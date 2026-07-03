@@ -2,6 +2,13 @@ from __future__ import annotations
 
 from typing import Any
 
+from quality_runner.controller_report_defaults import (
+    controller_command_environment,
+    controller_status_recommendation,
+    inferred_blockers,
+    repo_state,
+)
+
 CONTROLLER_REPORT_SCHEMA = "quality-runner-controller-report-v0.1"
 
 
@@ -37,19 +44,30 @@ def build_controller_report_from_summary(
         "audit_status": summary.get("audit_status"),
         "findings_total": _nested(summary, "finding_counts", "total"),
         "missing_capabilities": summary.get("missing_capabilities", []),
+        "gate_results": summary.get("gate_results", []),
+        "failure_type": summary.get("failure_type"),
     }
-    normalized_blockers = blockers if blockers is not None else _inferred_blockers(final_qr)
-    resolved_status = status or _status_from_summary(
+    normalized_blockers = blockers if blockers else inferred_blockers(final_qr)
+    recommendation = controller_status_recommendation(
         final_qr,
         commit_hash=commit_hash,
         commit_created_by_task=commit_created_by_task,
         push_status=push_status,
+    )
+    resolved_status = status or recommendation["status"]
+    resolved_repo_state = repo_state(
+        pre_head=pre_head or target_head,
+        post_head=target_head,
+        pre_git_status_short=pre_git_status_short,
+        post_git_status_short=git_status_short,
+        concurrency_note=concurrency_note,
     )
     return {
         "schema": CONTROLLER_REPORT_SCHEMA,
         "repo_path": repo_path,
         "branch_name": branch_name,
         "status": resolved_status,
+        "controller_status_recommendation": recommendation,
         "baseline_artifact_path": _baseline_path(repo_path=repo_path, baseline_run_id=baseline_run_id)
         or str(summary.get("path") or ""),
         "final_qr": {key: value for key, value in final_qr.items() if value is not None},
@@ -68,17 +86,10 @@ def build_controller_report_from_summary(
         "commit_created_by_task": commit_created_by_task,
         "push_status": push_status,
         "git_status_short": git_status_short,
+        "controller_command_environment": controller_command_environment(repo_path),
         "ignored_generated_artifacts": ignored_generated_artifacts
         or _default_ignored_generated_artifacts(git_status_short),
-        "repo_state": _compact(
-            {
-                "pre_head": pre_head or target_head,
-                "post_head": target_head,
-                "pre_git_status_short": pre_git_status_short,
-                "post_git_status_short": git_status_short,
-                "concurrency_note": concurrency_note,
-            }
-        ),
+        "repo_state": resolved_repo_state,
         "blockers": normalized_blockers if resolved_status == "blocked" else blockers or [],
     }
 
@@ -114,28 +125,6 @@ def _controller_report_verification(
     return verification
 
 
-def _status_from_summary(
-    final_qr: dict[str, Any],
-    *,
-    commit_hash: str | None,
-    commit_created_by_task: bool,
-    push_status: str,
-) -> str:
-    if _final_qr_clean(final_qr):
-        return "complete" if commit_hash and commit_created_by_task and push_status == "pushed" else "ready-for-review"
-    return "blocked"
-
-
-def _inferred_blockers(final_qr: dict[str, Any]) -> list[str]:
-    classification = _first_string(final_qr.get("classification"), final_qr.get("recommended_classification"))
-    status = _first_string(final_qr.get("status"))
-    if classification and classification != "clean":
-        return [classification]
-    if status and not _final_qr_clean(final_qr):
-        return [status]
-    return []
-
-
 def _summarize_controller_report_command(
     *,
     repo_path: str,
@@ -158,25 +147,6 @@ def _default_ignored_generated_artifacts(git_status: str) -> list[str]:
     return [".quality-runner/"] if ".quality-runner/" in git_status else []
 
 
-def _final_qr_clean(final_qr: object) -> bool:
-    if not isinstance(final_qr, dict):
-        return False
-    status = str(final_qr.get("status") or "")
-    classification = str(final_qr.get("classification") or final_qr.get("recommended_classification") or "")
-    return status in {"clean", "passed"} or classification == "clean"
-
-
 def _nested(payload: dict[str, Any], key: str, nested_key: str) -> object:
     value = payload.get(key)
     return value.get(nested_key) if isinstance(value, dict) else None
-
-
-def _first_string(*values: object) -> str:
-    for value in values:
-        if isinstance(value, str) and value:
-            return value
-    return ""
-
-
-def _compact(payload: dict[str, Any]) -> dict[str, Any]:
-    return {key: value for key, value in payload.items() if value not in (None, "", [])}

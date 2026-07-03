@@ -3,6 +3,13 @@ from __future__ import annotations
 from typing import Any
 
 from quality_runner.controller_report_builder import build_controller_report_from_summary
+from quality_runner.controller_report_defaults import (
+    dirty_state_groups,
+    final_qr_clean,
+    inferred_blockers,
+    normalized_controller_command_environment,
+    normalized_controller_status_recommendation,
+)
 from quality_runner.schema_constants import CONTROLLER_REPORT_VALIDATION_SCHEMA
 
 CONTROLLER_REPORT_LINT_SCHEMA = "quality-runner-controller-report-lint-v0.1"
@@ -85,6 +92,11 @@ def normalize_controller_report(report: dict[str, Any]) -> dict[str, Any]:
             _nested(report, "run", "controller_branch"),
         ),
         "status": status,
+        "controller_status_recommendation": normalized_controller_status_recommendation(
+            report,
+            status=status,
+            final_qr=final_qr,
+        ),
         "baseline_artifact_path": _normalized_baseline_artifact_path(report, repo_path),
         "final_qr": final_qr,
         "files_changed": _normalized_files_changed(report.get("files_changed")),
@@ -94,9 +106,13 @@ def normalize_controller_report(report: dict[str, Any]) -> dict[str, Any]:
         "commit_created_by_task": _normalized_commit_created_by_task(report),
         "push_status": _normalized_push_status(report),
         "git_status_short": _normalized_git_status_short(report),
+        "controller_command_environment": normalized_controller_command_environment(
+            report,
+            repo_path=repo_path,
+        ),
         "ignored_generated_artifacts": _normalized_ignored_generated_artifacts(report),
         "repo_state": _normalized_repo_state(report),
-        "blockers": blockers if status == "blocked" or blockers else _inferred_blockers(final_qr),
+        "blockers": blockers if status == "blocked" or blockers else inferred_blockers(final_qr),
     }
 
 
@@ -191,14 +207,14 @@ def _normalized_status(
     if raw_status in {"blocked", "ready-for-review"}:
         return str(raw_status)
     if raw_status == "complete":
-        if _final_qr_clean(final_qr) and _normalized_push_status(report) == "pushed":
+        if final_qr_clean(final_qr) and _normalized_push_status(report) == "pushed":
             return "complete"
         if blockers or final_status in {"blocked", "failed"}:
             return "blocked"
         return "ready-for-review"
     if blockers or final_status in {"blocked", "failed"}:
         return "blocked"
-    if _final_qr_clean(final_qr):
+    if final_qr_clean(final_qr):
         return "ready-for-review"
     return "blocked" if final_qr else ""
 
@@ -340,7 +356,23 @@ def _default_ignored_generated_artifacts(git_status: str) -> list[str]:
 def _normalized_repo_state(report: dict[str, Any]) -> dict[str, Any]:
     repo_state = report.get("repo_state")
     if isinstance(repo_state, dict):
-        return dict(repo_state)
+        normalized = dict(repo_state)
+        normalized.setdefault(
+            "dirty_state",
+            dirty_state_groups(
+                pre_git_status_short=_first_string(repo_state.get("pre_git_status_short")),
+                post_git_status_short=_first_string(
+                    repo_state.get("post_git_status_short"),
+                    _normalized_git_status_short(report),
+                ),
+            ),
+        )
+        return normalized
+    pre_git_status_short = _first_string(
+        _nested(report, "target", "initial_git_status_short"),
+        _nested(report, "git_status", "before", "all_short"),
+    )
+    post_git_status_short = _normalized_git_status_short(report)
     return _compact(
         {
             "pre_head": _first_string(
@@ -353,14 +385,15 @@ def _normalized_repo_state(report: dict[str, Any]) -> dict[str, Any]:
                 _nested(report, "target", "post_head"),
                 _nested(report, "target", "head_sha"),
             ),
-            "pre_git_status_short": _first_string(
-                _nested(report, "target", "initial_git_status_short"),
-                _nested(report, "git_status", "before", "all_short"),
-            ),
-            "post_git_status_short": _normalized_git_status_short(report),
+            "pre_git_status_short": pre_git_status_short,
+            "post_git_status_short": post_git_status_short,
             "concurrency_note": _first_string(
                 _nested(report, "target", "concurrent_head_change_observed", "note"),
                 _nested(report, "repo_state", "concurrency_note"),
+            ),
+            "dirty_state": dirty_state_groups(
+                pre_git_status_short=pre_git_status_short,
+                post_git_status_short=post_git_status_short,
             ),
         }
     )
@@ -380,19 +413,9 @@ def _normalized_blockers(value: object) -> list[str]:
     return blockers
 
 
-def _inferred_blockers(final_qr: dict[str, Any]) -> list[str]:
-    classification = _first_string(final_qr.get("classification"), final_qr.get("recommended_classification"))
-    status = _first_string(final_qr.get("status"))
-    if classification and classification != "clean":
-        return [classification]
-    if status and not _final_qr_clean(final_qr):
-        return [status]
-    return []
-
-
 def _strict_errors(*, raw: dict[str, Any], normalized: dict[str, Any]) -> list[str]:
     errors: list[str] = []
-    if raw.get("status") == "complete" and not _final_qr_clean(normalized.get("final_qr", {})):
+    if raw.get("status") == "complete" and not final_qr_clean(normalized.get("final_qr", {})):
         errors.append("complete reports must have final_qr status clean/passed")
     if normalized.get("status") == "complete" and normalized.get("commit_created_by_task") is not True:
         errors.append("complete reports must set commit_created_by_task true")
@@ -415,14 +438,6 @@ def _head_changed_without_note(report: dict[str, Any]) -> bool:
     if not before or not after or before == after:
         return False
     return not _first_string(repo_state.get("concurrency_note"), repo_state.get("note"))
-
-
-def _final_qr_clean(final_qr: object) -> bool:
-    if not isinstance(final_qr, dict):
-        return False
-    status = str(final_qr.get("status") or "")
-    classification = str(final_qr.get("classification") or final_qr.get("recommended_classification") or "")
-    return status in {"clean", "passed"} or classification == "clean"
 
 
 def _looks_like_git_status_line(value: object) -> bool:

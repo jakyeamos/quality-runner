@@ -1554,6 +1554,35 @@ Suggested next improvements:
    controller commands so sandboxed threads do not need escalation for `uv`
    cache reads.
 
+## Product Fix After Refresh Wave 18
+
+Implemented the Wave 18 hardening set:
+
+- Controller reports now synthesize blockers from final QR status,
+  classification, blocker classes, missing capabilities, failed/skipped gates,
+  workflow timeout state, and structural finding counts when workers do not
+  supply explicit `--blocker` values.
+- Controller reports now include `controller_status_recommendation` so workers
+  can see whether QR recommends `blocked`, `ready-for-review`, or `complete`
+  and why.
+- `repo_state` now groups dirty state into pre-existing dirty work, QR artifacts,
+  and post-command target artifacts.
+- QR-spawned shell commands now default `UV_CACHE_DIR` and `XDG_CACHE_HOME` to a
+  repo-local `.quality-runner/cache` path; generated controller reports also
+  expose that environment for worker command reuse.
+- Default traversal exclusions now cover `.claude/worktrees/**`,
+  `.codex/worktrees/**`, `.aider`, `.continue`, and `.cursor` in addition to the
+  existing operational/generated paths.
+- Workflow timeout diagnostics now include recent skipped paths and top-level
+  visited/skipped path counts so bad traversal surfaces are visible without log
+  archaeology.
+
+Verification:
+
+- `uv run pytest` passed: 234 tests.
+- `uv run ruff check .` passed.
+- `git diff --check` passed.
+
 ## Rollout Ledger
 
 | Wave | Repo | Repo path | Total | Blockers | Baseline artifacts | Codex project status | Thread status | Thread id | Final QR status | Commit | Push | Notes |

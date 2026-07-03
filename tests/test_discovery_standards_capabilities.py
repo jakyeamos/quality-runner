@@ -498,6 +498,19 @@ def test_inspect_repo_excludes_default_fixture_corpus_vendor_and_docs_paths(
         json.dumps({"scripts": {"test": "should-not-be-read"}}),
         encoding="utf-8",
     )
+    codex_worktree = tmp_path / ".codex" / "worktrees" / "feature-copy"
+    codex_worktree.mkdir(parents=True)
+    (codex_worktree / "package.json").write_text(
+        json.dumps({"scripts": {"test": "should-not-be-read"}}),
+        encoding="utf-8",
+    )
+    for agent_dir in (".aider", ".continue", ".cursor"):
+        agent_path = tmp_path / agent_dir / "scratch"
+        agent_path.mkdir(parents=True)
+        (agent_path / "package.json").write_text(
+            json.dumps({"scripts": {"test": "should-not-be-read"}}),
+            encoding="utf-8",
+        )
     terraform_dir = tmp_path / "infra" / "terraform"
     terraform_dir.mkdir(parents=True)
     (terraform_dir / "main.tf").write_text("terraform {}\n", encoding="utf-8")
@@ -531,7 +544,10 @@ def test_inspect_repo_excludes_default_fixture_corpus_vendor_and_docs_paths(
     assert "proto/service.proto" in surface_paths
     assert "src/generated" in surface_paths
     assert all(not path.startswith(("docs/", "fixtures/", "vendor/")) for path in surface_paths)
-    assert all(not path.startswith(".claude/worktrees/") for path in surface_paths)
+    assert all(
+        not path.startswith((".claude/worktrees/", ".codex/worktrees/", ".aider/", ".continue/", ".cursor/"))
+        for path in surface_paths
+    )
     assert scan["generated_code"] == [{"path": "src/generated", "evidence": "generated directory"}]
 
 
@@ -566,7 +582,11 @@ def test_workflow_applies_configured_scan_exclusions(tmp_path: Path) -> None:
 
     assert scan["scan_exclusions"] == [
         ".claude/worktrees/**",
+        ".codex/worktrees/**",
+        ".aider",
         ".aios",
+        ".continue",
+        ".cursor",
         ".planning",
         ".superpowers",
         ".tracker",

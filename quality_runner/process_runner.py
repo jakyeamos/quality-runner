@@ -16,6 +16,7 @@ def run_shell_command(command: str, *, cwd: Path, timeout: int) -> dict[str, obj
         stderr=subprocess.PIPE,
         text=True,
         start_new_session=True,
+        env=local_command_env(cwd),
     )
     try:
         stdout, stderr = process.communicate(timeout=timeout)
@@ -69,3 +70,11 @@ def _communicate_after_termination(process: subprocess.Popen[Any]) -> tuple[str,
 
 def _text_value(value: object) -> str:
     return value if isinstance(value, str) else ""
+
+
+def local_command_env(cwd: Path) -> dict[str, str]:
+    env = dict(os.environ)
+    cache_root = cwd / ".quality-runner" / "cache"
+    env.setdefault("UV_CACHE_DIR", str(cache_root / "uv"))
+    env.setdefault("XDG_CACHE_HOME", str(cache_root / "xdg"))
+    return env

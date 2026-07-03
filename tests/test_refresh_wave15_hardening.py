@@ -170,3 +170,6 @@ def test_refresh_payload_total_timeout_writes_agent_handoff_when_inspect_times_o
     assert timeout_artifact["phase"] == "inspect"
     assert timeout_artifact["diagnostics"]["scan_progress"]["last_directory"] is None
     assert timeout_artifact["diagnostics"]["scan_progress"]["last_paths"] == []
+    assert timeout_artifact["diagnostics"]["scan_progress"]["last_skipped_paths"] == []
+    assert timeout_artifact["diagnostics"]["scan_progress"]["visited_top_level_counts"] == {}
+    assert timeout_artifact["diagnostics"]["scan_progress"]["skipped_top_level_counts"] == {}

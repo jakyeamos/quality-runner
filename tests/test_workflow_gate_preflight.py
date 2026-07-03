@@ -668,6 +668,8 @@ def test_verify_gate_kills_process_group_when_workflow_timeout_interrupts(
 
     def fake_popen(*_: object, **kwargs: object) -> FakeProcess:
         assert kwargs["start_new_session"] is True
+        assert kwargs["env"]["UV_CACHE_DIR"] == str(tmp_path / ".quality-runner" / "cache" / "uv")
+        assert kwargs["env"]["XDG_CACHE_HOME"] == str(tmp_path / ".quality-runner" / "cache" / "xdg")
         return FakeProcess()
 
     monkeypatch.setattr(process_runner.subprocess, "Popen", fake_popen)

@@ -6,7 +6,10 @@ from pathlib import Path
 CODE_EXTENSIONS = {".cjs", ".css", ".html", ".js", ".jsx", ".mjs", ".py", ".sh", ".ts", ".tsx"}
 TEXT_EXTENSIONS = {*CODE_EXTENSIONS, ".json", ".md", ".toml", ".yaml", ".yml"}
 IGNORED_DIRS = {
+    ".aider",
     ".cache",
+    ".continue",
+    ".cursor",
     ".git",
     ".mypy_cache",
     ".next",
@@ -37,6 +40,7 @@ IGNORED_DIRS = {
 IGNORED_DIR_PREFIXES = (".next",)
 IGNORED_PATH_PREFIXES = (
     ".claude/worktrees",
+    ".codex/worktrees",
     ".aios/shadow-worktrees",
     ".worktrees",
     ".tmp",

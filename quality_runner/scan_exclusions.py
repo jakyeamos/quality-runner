@@ -17,7 +17,11 @@ ALWAYS_EXCLUDED_PATH_PARTS = {
 
 DEFAULT_SCAN_EXCLUSIONS = [
     ".claude/worktrees/**",
+    ".codex/worktrees/**",
+    ".aider",
     ".aios",
+    ".continue",
+    ".cursor",
     ".planning",
     ".superpowers",
     ".tracker",
@@ -35,8 +39,11 @@ MAX_SCAN_PROGRESS_PATHS = 20
 _SCAN_PROGRESS: dict[str, Any] = {
     "last_directory": None,
     "last_paths": [],
+    "last_skipped_paths": [],
     "visited_paths": 0,
     "skipped_paths": 0,
+    "visited_top_level_counts": {},
+    "skipped_top_level_counts": {},
 }
 
 
@@ -73,7 +80,7 @@ def iter_allowed_paths(root: Path, scan_exclusions: list[str]) -> Iterator[Path]
             continue
         for child in children:
             if not is_scan_path_allowed(root, child, effective_exclusions):
-                _record_skipped()
+                _record_skipped(root, child)
                 continue
             _record_path(root, child)
             yield child
@@ -141,16 +148,22 @@ def gitignore_scan_exclusions(root: Path) -> list[str]:
 def reset_scan_progress() -> None:
     _SCAN_PROGRESS["last_directory"] = None
     _SCAN_PROGRESS["last_paths"] = []
+    _SCAN_PROGRESS["last_skipped_paths"] = []
     _SCAN_PROGRESS["visited_paths"] = 0
     _SCAN_PROGRESS["skipped_paths"] = 0
+    _SCAN_PROGRESS["visited_top_level_counts"] = {}
+    _SCAN_PROGRESS["skipped_top_level_counts"] = {}
 
 
 def scan_progress_snapshot() -> dict[str, Any]:
     return {
         "last_directory": _SCAN_PROGRESS["last_directory"],
         "last_paths": list(_SCAN_PROGRESS["last_paths"]),
+        "last_skipped_paths": list(_SCAN_PROGRESS["last_skipped_paths"]),
         "visited_paths": _SCAN_PROGRESS["visited_paths"],
         "skipped_paths": _SCAN_PROGRESS["skipped_paths"],
+        "visited_top_level_counts": dict(_SCAN_PROGRESS["visited_top_level_counts"]),
+        "skipped_top_level_counts": dict(_SCAN_PROGRESS["skipped_top_level_counts"]),
     }
 
 
@@ -160,6 +173,7 @@ def _record_directory(root: Path, directory: Path) -> None:
 
 def _record_path(root: Path, path: Path) -> None:
     _SCAN_PROGRESS["visited_paths"] += 1
+    _increment_count("visited_top_level_counts", _top_level(root, path))
     paths = _SCAN_PROGRESS["last_paths"]
     if not isinstance(paths, list):
         paths = []
@@ -168,8 +182,33 @@ def _record_path(root: Path, path: Path) -> None:
     del paths[:-MAX_SCAN_PROGRESS_PATHS]
 
 
-def _record_skipped() -> None:
+def _record_skipped(root: Path, path: Path) -> None:
     _SCAN_PROGRESS["skipped_paths"] += 1
+    _increment_count("skipped_top_level_counts", _top_level(root, path))
+    paths = _SCAN_PROGRESS["last_skipped_paths"]
+    if not isinstance(paths, list):
+        paths = []
+        _SCAN_PROGRESS["last_skipped_paths"] = paths
+    paths.append(_relative_path(root, path))
+    del paths[:-MAX_SCAN_PROGRESS_PATHS]
+
+
+def _increment_count(key: str, value: str | None) -> None:
+    if value is None:
+        return
+    counts = _SCAN_PROGRESS[key]
+    if not isinstance(counts, dict):
+        counts = {}
+        _SCAN_PROGRESS[key] = counts
+    counts[value] = int(counts.get(value, 0)) + 1
+
+
+def _top_level(root: Path, path: Path) -> str | None:
+    try:
+        relative = path.relative_to(root)
+    except ValueError:
+        return None
+    return relative.parts[0] if relative.parts else "."
 
 
 def _relative_path(root: Path, path: Path) -> str | None:

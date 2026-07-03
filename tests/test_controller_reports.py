@@ -188,6 +188,13 @@ def test_controller_report_from_summary_builds_valid_blocked_report() -> None:
             "audit_status": "findings",
             "finding_counts": {"total": 0},
             "missing_capabilities": [],
+            "gate_results": [
+                {
+                    "id": "tests",
+                    "status": "failed",
+                    "failure_type": "command-failed",
+                }
+            ],
         },
         git_status_short="?? .quality-runner/",
         target_head="abc123",
@@ -201,9 +208,22 @@ def test_controller_report_from_summary_builds_valid_blocked_report() -> None:
     assert report["target_head"] == "abc123"
     assert report["commit_created_by_task"] is False
     assert report["repo_state"]["pre_head"] == "abc123"
+    assert report["repo_state"]["dirty_state"] == {
+        "pre_existing_dirty": [],
+        "quality_runner_artifacts": ["?? .quality-runner/"],
+        "post_command_artifacts": [],
+    }
     assert report["final_qr"]["blocker_classes"] == ["workflow-timeout"]
     assert report["ignored_generated_artifacts"] == [".quality-runner/"]
-    assert report["blockers"] == ["workflow-timeout-blocker"]
+    assert report["controller_status_recommendation"]["status"] == "blocked"
+    assert report["controller_command_environment"] == {
+        "UV_CACHE_DIR": "/repos/example/.quality-runner/cache/uv",
+        "XDG_CACHE_HOME": "/repos/example/.quality-runner/cache/xdg",
+    }
+    assert report["blockers"] == [
+        "Final QR is not clean: status=blocked; classification=workflow-timeout-blocker; blocker_classes=workflow-timeout.",
+        "Failed gates: tests (command-failed).",
+    ]
     assert report["verification"][-2:] == [
         {
             "command": "quality-runner controller-report lint /private/tmp/report.json --strict --json",
@@ -215,6 +235,35 @@ def test_controller_report_from_summary_builds_valid_blocked_report() -> None:
         },
     ]
     assert result["status"] == "accepted"
+
+
+def test_controller_report_from_summary_groups_post_command_artifacts() -> None:
+    from quality_runner.controller_reports import build_controller_report_from_summary
+
+    report = build_controller_report_from_summary(
+        repo_path="/repos/example",
+        branch_name="qr/example",
+        baseline_run_id="baseline",
+        summary={
+            "run_id": "verify",
+            "path": "/repos/example/.quality-runner/runs/verify",
+            "status": "blocked",
+            "recommended_classification": "read-only-gate-blocker",
+            "blocker_classes": ["read-only-policy"],
+            "finding_counts": {"total": 0},
+            "missing_capabilities": [],
+        },
+        pre_git_status_short=" M existing.txt",
+        git_status_short=" M existing.txt\n?? .quality-runner/\n?? reports/generated.csv",
+        target_head="abc123",
+        pre_head="abc123",
+    )
+
+    assert report["repo_state"]["dirty_state"] == {
+        "pre_existing_dirty": [" M existing.txt"],
+        "quality_runner_artifacts": ["?? .quality-runner/"],
+        "post_command_artifacts": ["?? reports/generated.csv"],
+    }
 
 
 def test_controller_report_strict_lint_allows_head_change_with_note() -> None:

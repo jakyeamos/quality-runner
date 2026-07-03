@@ -122,7 +122,7 @@ def controller_report_from_summary_payload(
         baseline_run_id=args.baseline_run_id,
         git_status_short=_git_status_short(repo_root),
         files_changed=args.file_changed,
-        blockers=args.blocker,
+        blockers=args.blocker or None,
         commit_hash=args.commit_hash,
         target_head=target_head,
         commit_created_by_task=bool(args.commit_hash),
