@@ -2,6 +2,12 @@ from __future__ import annotations
 
 from typing import Any
 
+from quality_runner.adoption import (
+    adoption_stage_markdown,
+    build_adoption_stage,
+    handoff_adoption_stage,
+    stopping_criteria,
+)
 from quality_runner.findings import AGENT_HANDOFF_SCHEMA, REMEDIATION_PLAN_SCHEMA
 
 PRIORITY_ORDER = {"high": 0, "medium": 1, "low": 2}
@@ -14,12 +20,19 @@ def build_remediation_plan(
 ) -> dict[str, Any]:
     findings = sorted(_findings(audit_report), key=_finding_sort_key)
     slices = [_slice_for_finding(finding) for finding in findings]
+    adoption_stage = build_adoption_stage(
+        findings=findings,
+        missing_gates=_missing_repo_owned_gates(capability_map),
+        warnings=_warnings(capability_map),
+    )
 
     return {
         "schema": REMEDIATION_PLAN_SCHEMA,
         "run_id": _string_or_none(audit_report.get("run_id")),
         "profile": _string_or_none(audit_report.get("profile")),
         "implementation_allowed": False,
+        "adoption_stage": adoption_stage,
+        "stopping_criteria": stopping_criteria(adoption_stage),
         "slices": slices,
         "warnings": _warnings(capability_map),
     }
@@ -31,6 +44,14 @@ def render_plan_markdown(plan: dict[str, Any]) -> str:
         "",
         f"- Schema: {plan.get('schema')}",
         f"- Implementation allowed: {str(plan.get('implementation_allowed')).lower()}",
+        "",
+        "## Adoption Stage",
+        "",
+        *adoption_stage_markdown(plan.get("adoption_stage")),
+        "",
+        "## Stopping Criteria",
+        "",
+        *_markdown_items(plan.get("stopping_criteria")),
         "",
         "## Slices",
         "",
@@ -71,6 +92,7 @@ def build_agent_handoff(
 ) -> dict[str, Any]:
     status = "clean" if not _slices(remediation_plan) else "planned"
     next_slice = _next_slice(remediation_plan)
+    adoption_stage = handoff_adoption_stage(remediation_plan)
     return {
         "schema": AGENT_HANDOFF_SCHEMA,
         "run_id": _string_or_none(audit_report.get("run_id")),
@@ -82,6 +104,8 @@ def build_agent_handoff(
         "slice_ids": [slice_item["id"] for slice_item in _slices(remediation_plan)],
         "missing_repo_owned_gates": _missing_repo_owned_gates(capability_map),
         "runner_provided_checks": _runner_provided_checks(audit_report),
+        "adoption_stage": adoption_stage,
+        "stopping_criteria": stopping_criteria(adoption_stage),
         "next_slice": next_slice,
         "verification_gates": _slice_verification_gates(next_slice),
     }
@@ -156,6 +180,12 @@ def render_handoff_markdown(handoff: dict[str, Any]) -> str:
                 lines.append(line + ".")
     else:
         lines.append("No runner-provided structural checks produced findings.")
+
+    lines.extend(["", "## Adoption Stage", ""])
+    lines.extend(adoption_stage_markdown(handoff.get("adoption_stage")))
+
+    lines.extend(["", "## Stopping Criteria", ""])
+    lines.extend(_markdown_items(handoff.get("stopping_criteria")))
 
     lines.extend(["", "## Next Slice", ""])
 

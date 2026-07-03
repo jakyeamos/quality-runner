@@ -429,6 +429,11 @@ def test_configured_gates_satisfy_capabilities_and_policy_metadata_reaches_audit
             "required_by": "config",
             "owner": "platform",
             "severity": "blocker",
+            "verification_state": {
+                "discovery": "command-discovered",
+                "execution": "not-run",
+                "result": "unknown",
+            },
         }
     ]
     assert capability_map["missing"] == [
@@ -492,12 +497,22 @@ def test_detect_capabilities_handles_file_sources_and_inactive_exceptions(tmp_pa
             "command": "pre-cr run",
             "language": "javascript",
             "required_by": "config",
+            "verification_state": {
+                "discovery": "command-discovered",
+                "execution": "not-run",
+                "result": "unknown",
+            },
         },
         {
             "id": "truth_file",
             "type": "file",
             "source": ".tracker/PROJECT_TRUTH.md",
             "required_by": "config",
+            "verification_state": {
+                "discovery": "file-discovered",
+                "execution": "not-run",
+                "result": "unknown",
+            },
         },
     ]
     assert capability_map["missing"] == [
@@ -653,6 +668,8 @@ def test_artifact_schema_additions_remain_optional_for_v01_compatibility() -> No
     capability_matrix = json.loads(
         schema_root.joinpath("capability-matrix.schema.json").read_text()
     )
+    remediation_plan = json.loads(schema_root.joinpath("remediation-plan.schema.json").read_text())
+    agent_handoff = json.loads(schema_root.joinpath("agent-handoff.schema.json").read_text())
 
     assert repo_scan["properties"]["schema"]["const"] == "quality-runner-repo-scan-v0.1"
     assert "workspaces" not in repo_scan["required"]
@@ -665,4 +682,18 @@ def test_artifact_schema_additions_remain_optional_for_v01_compatibility() -> No
         "quality-runner-capability-map-v0.1"
     )
     capability_properties = capability_matrix["$defs"]["capability"]["properties"]
-    assert {"required_by", "owner", "severity", "ci_status"}.issubset(capability_properties)
+    assert {
+        "required_by",
+        "owner",
+        "severity",
+        "ci_status",
+        "verification_state",
+    }.issubset(capability_properties)
+    assert remediation_plan["properties"]["schema"]["const"] == (
+        "quality-runner-remediation-plan-v0.1"
+    )
+    assert "adoption_stage" not in remediation_plan["required"]
+    assert "stopping_criteria" not in remediation_plan["required"]
+    assert agent_handoff["properties"]["schema"]["const"] == "quality-runner-agent-handoff-v0.1"
+    assert "adoption_stage" not in agent_handoff["required"]
+    assert "stopping_criteria" not in agent_handoff["required"]

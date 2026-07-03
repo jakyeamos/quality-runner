@@ -5,7 +5,7 @@ import tomllib
 from pathlib import Path
 from typing import Any
 
-from quality_runner.scan_exclusions import is_scan_path_allowed
+from quality_runner.scan_exclusions import is_scan_path_allowed, iter_allowed_paths
 
 MAX_DISCOVERY_TEXT_BYTES = 1_000_000
 MAX_WORKSPACES = 200
@@ -90,8 +90,13 @@ def _workspace_manifests(
         ("Cargo.toml", "rust"),
         ("go.mod", "go"),
     ):
-        for manifest in sorted(root.rglob(manifest_name)):
-            if manifest.parent == root or not is_scan_path_allowed(root, manifest, scan_exclusions):
+        for manifest in iter_allowed_paths(root, scan_exclusions):
+            if (
+                manifest.name != manifest_name
+                or manifest.parent == root
+                or not manifest.is_file()
+                or not is_scan_path_allowed(root, manifest, scan_exclusions)
+            ):
                 continue
             relative_manifest = manifest.relative_to(root).as_posix()
             if relative_manifest in seen_paths:

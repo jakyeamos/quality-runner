@@ -127,6 +127,17 @@ Cross-repo lessons:
   backlog. The case study should present this as staged adoption, not as a
   failed cleanup wave.
 
+Product fixes applied before the next triage wave:
+
+- Discovery and mature-surface detection now use a pruned recursive iterator so
+  dependency, generated, cache, vendored, fixture, and configured exclusions are
+  skipped before descent rather than filtered after `rglob`.
+- Capability artifacts now include `verification_state`, separating discovery
+  evidence from command execution evidence and pass/fail evidence.
+- Remediation plans and agent handoffs now include adoption stage and stopping
+  criteria so threads know whether to stop after gates, scope fixes, high-signal
+  findings, or debt classification.
+
 ## Wave 1 Restart Protocol
 
 Wave 1 is being restarted after Quality Runner product fixes on branch

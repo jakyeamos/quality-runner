@@ -9,6 +9,12 @@
     "run_id": { "type": ["string", "null"] },
     "profile": { "type": ["string", "null"] },
     "implementation_allowed": { "const": false },
+    "adoption_stage": { "$ref": "#/$defs/adoptionStage" },
+    "stopping_criteria": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "default": []
+    },
     "slices": {
       "type": "array",
       "items": { "$ref": "#/$defs/slice" }
@@ -16,6 +22,18 @@
     "warnings": { "$ref": "#/$defs/warnings" }
   },
   "$defs": {
+    "adoptionStage": {
+      "type": "object",
+      "required": ["id", "title", "rationale"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "title": { "type": "string", "minLength": 1 },
+        "rationale": { "type": "string", "minLength": 1 },
+        "structural_finding_groups": { "type": "integer", "minimum": 0 },
+        "structural_score": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": false
+    },
     "slice": {
       "type": "object",
       "required": ["id", "title", "priority", "findings", "actions", "verification_gates"],

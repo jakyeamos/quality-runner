@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Iterator
 from fnmatch import fnmatchcase
 from pathlib import Path
 from typing import Any
@@ -49,6 +50,22 @@ def is_scan_path_allowed(root: Path, path: Path, scan_exclusions: list[str]) -> 
         return False
     relative_path = relative.as_posix()
     return not matches_scan_exclusion(relative_path, scan_exclusions)
+
+
+def iter_allowed_paths(root: Path, scan_exclusions: list[str]) -> Iterator[Path]:
+    stack = [root]
+    while stack:
+        directory = stack.pop()
+        try:
+            children = sorted(directory.iterdir(), key=lambda path: path.name)
+        except OSError:
+            continue
+        for child in children:
+            if not is_scan_path_allowed(root, child, scan_exclusions):
+                continue
+            yield child
+            if child.is_dir():
+                stack.append(child)
 
 
 def matches_scan_exclusion(relative_path: str, scan_exclusions: list[str]) -> bool:

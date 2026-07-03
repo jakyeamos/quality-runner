@@ -3,7 +3,10 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-from quality_runner.scan_exclusions import is_scan_path_allowed, resolve_scan_exclusions
+from quality_runner.scan_exclusions import (
+    iter_allowed_paths,
+    resolve_scan_exclusions,
+)
 
 QUALITY_TARGETS = {
     "format": "formatter",
@@ -156,8 +159,8 @@ def _detect_terraform(
     terraform_dirs = sorted(
         {
             path.parent
-            for path in root.rglob("*.tf")
-            if path.is_file() and is_scan_path_allowed(root, path, scan_exclusions)
+            for path in iter_allowed_paths(root, scan_exclusions)
+            if path.is_file() and path.suffix == ".tf"
         }
     )
     if not terraform_dirs:
@@ -230,8 +233,8 @@ def _detect_contracts(
 
     proto_files = sorted(
         path
-        for path in root.rglob("*.proto")
-        if path.is_file() and is_scan_path_allowed(root, path, scan_exclusions)
+        for path in iter_allowed_paths(root, scan_exclusions)
+        if path.is_file() and path.suffix == ".proto"
     )
     if proto_files:
         surfaces.append(
@@ -253,10 +256,8 @@ def _detect_generated(
 ) -> None:
     generated_dirs = sorted(
         path
-        for path in root.rglob("*")
-        if path.is_dir()
-        and path.name in {"generated", "__generated__", "gen"}
-        and is_scan_path_allowed(root, path, scan_exclusions)
+        for path in iter_allowed_paths(root, scan_exclusions)
+        if path.is_dir() and path.name in {"generated", "__generated__", "gen"}
     )
     if not generated_dirs:
         return

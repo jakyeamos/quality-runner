@@ -27,7 +27,8 @@ Artifacts are written under:
 - `capability-matrix.json`: available and missing repo-owned quality gates.
   Available command-backed capabilities include the command, source, detected
   language, optional owner/severity policy, required-by provenance, and local CI
-  status evidence.
+  status evidence. `verification_state` separates discovery evidence from
+  command execution evidence and pass/fail evidence.
 - `run-manifest.json`: run metadata, Quality Runner version, artifact paths, and
   git HEAD/branch/dirty state when the target is a git repo.
 
@@ -38,20 +39,22 @@ Artifacts are written under:
 - `quality-audit.json`: evidence-backed findings with severity, optional owner,
   category, evidence, recommended fix, verification, and optional aggregate
   score for grouped structural findings.
-- `remediation-plan.json`: ordered remediation slices with priority, actions,
-  findings, and verification gates.
+- `remediation-plan.json`: adoption stage, stopping criteria, and ordered
+  remediation slices with priority, actions, findings, and verification gates.
 - `resolution-ledger.json`: current finding lifecycle state by stable
   fingerprint, preserving accepted dispositions and marking disappeared
   findings fixed on later runs.
 - `resolution-ledger.md`: human-readable resolution ledger summary.
-- `agent-handoff.json`: machine-readable next-slice handoff, including missing
-  repo-owned gates with suggested commands and runner-provided structural checks
-  that produced findings.
+- `agent-handoff.json`: machine-readable next-slice handoff, including adoption
+  stage, stopping criteria, missing repo-owned gates with suggested commands,
+  and runner-provided structural checks that produced findings.
 - `agent-handoff.md`: human-readable handoff for a coding agent. The Markdown
   intentionally separates missing repo-owned gates such as `pnpm test` or
   `pnpm typecheck` from Quality Runner's built-in structural checks so readers
   do not mistake a runner heuristic for a repo-native test, build, or typecheck
-  gate.
+  gate. It also names the staged-adoption stopping point so a mature repo can
+  add gates, scope scans, classify debt, or fix high-signal findings without
+  treating one-pass QR clean as the only successful outcome.
 
 ## Safety Guarantees
 

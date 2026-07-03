@@ -324,7 +324,17 @@ def test_workflow_ingests_local_ci_status_and_attaches_check_evidence(tmp_path: 
         "conclusion": "success",
         "url": "https://example.invalid/check/lint",
     }
+    assert available["lint"]["verification_state"] == {
+        "discovery": "command-discovered",
+        "execution": "ci-executed",
+        "result": "passed",
+    }
     assert available["tests"]["ci_status"]["conclusion"] == "failure"
+    assert available["tests"]["verification_state"] == {
+        "discovery": "command-discovered",
+        "execution": "ci-executed",
+        "result": "failed",
+    }
 
 
 def test_workflow_warns_on_malformed_local_ci_status(tmp_path: Path) -> None:

@@ -35,7 +35,8 @@
         "required_by": { "type": "string", "minLength": 1 },
         "owner": { "type": "string", "minLength": 1 },
         "severity": { "type": "string", "minLength": 1 },
-        "ci_status": { "$ref": "#/$defs/ciStatus" }
+        "ci_status": { "$ref": "#/$defs/ciStatus" },
+        "verification_state": { "$ref": "#/$defs/verificationState" }
       },
       "additionalProperties": false
     },
@@ -72,6 +73,25 @@
         "status": { "type": ["string", "null"] },
         "conclusion": { "type": ["string", "null"] },
         "url": { "type": ["string", "null"] }
+      },
+      "additionalProperties": false
+    },
+    "verificationState": {
+      "type": "object",
+      "required": ["discovery", "execution", "result"],
+      "properties": {
+        "discovery": {
+          "type": "string",
+          "enum": ["command-discovered", "script-discovered", "file-discovered"]
+        },
+        "execution": {
+          "type": "string",
+          "enum": ["not-run", "ci-executed"]
+        },
+        "result": {
+          "type": "string",
+          "enum": ["unknown", "passed", "failed"]
+        }
       },
       "additionalProperties": false
     },

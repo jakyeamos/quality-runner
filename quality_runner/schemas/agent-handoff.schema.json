@@ -26,10 +26,28 @@
       "items": { "$ref": "#/$defs/runnerProvidedCheck" },
       "default": []
     },
+    "adoption_stage": { "$ref": "#/$defs/adoptionStage" },
+    "stopping_criteria": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "default": []
+    },
     "next_slice": { "type": ["object", "null"] },
     "verification_gates": { "type": "array", "items": { "type": "string" } }
   },
   "$defs": {
+    "adoptionStage": {
+      "type": "object",
+      "required": ["id", "title", "rationale"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "title": { "type": "string", "minLength": 1 },
+        "rationale": { "type": "string", "minLength": 1 },
+        "structural_finding_groups": { "type": "integer", "minimum": 0 },
+        "structural_score": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": false
+    },
     "missingRepoOwnedGate": {
       "type": "object",
       "required": ["id", "severity", "reason", "suggested_command"],

@@ -384,6 +384,40 @@ def test_inspect_repo_detects_nested_workspaces_and_quality_aliases(tmp_path: Pa
     )
 
 
+def test_inspect_repo_discovery_prunes_excluded_trees_before_recursive_walk(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    from pathlib import Path as PathClass
+
+    from quality_runner.discovery import inspect_repo
+
+    (tmp_path / "package.json").write_text(
+        json.dumps({"scripts": {"test": "vitest run"}}),
+        encoding="utf-8",
+    )
+    (tmp_path / "node_modules" / "fixture" / "package.json").parent.mkdir(parents=True)
+    (tmp_path / "node_modules" / "fixture" / "package.json").write_text(
+        json.dumps({"scripts": {"test": "should-not-be-read"}}),
+        encoding="utf-8",
+    )
+    (tmp_path / "docs" / "sample" / "pyproject.toml").parent.mkdir(parents=True)
+    (tmp_path / "docs" / "sample" / "pyproject.toml").write_text(
+        '[project]\nname = "docs-sample"\nversion = "0.1.0"\n',
+        encoding="utf-8",
+    )
+
+    def fail_rglob(self: PathClass, pattern: str):  # noqa: ANN001
+        raise AssertionError(f"discovery should not call Path.rglob({pattern!r})")
+
+    monkeypatch.setattr(PathClass, "rglob", fail_rglob)
+
+    scan = inspect_repo(tmp_path, run_id="pruned-discovery-001")
+
+    assert scan["workspaces"] == []
+    assert scan["quality_commands"][0]["source"] == "package.json:scripts.test"
+
+
 def test_inspect_repo_excludes_default_fixture_corpus_vendor_and_docs_paths(
     tmp_path: Path,
 ) -> None:
@@ -804,6 +838,11 @@ def test_detect_capabilities_accepts_python_quality_commands(tmp_path: Path) -> 
         "source": "pyproject.toml:tool.ruff",
         "command": "ruff check .",
         "language": "python",
+        "verification_state": {
+            "discovery": "command-discovered",
+            "execution": "not-run",
+            "result": "unknown",
+        },
     }
 
 
