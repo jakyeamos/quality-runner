@@ -66,6 +66,7 @@ def detect_capabilities(
                 {
                     "id": capability_id,
                     "type": "script",
+                    "capability_kind": "local_command",
                     "source": f"package.json:scripts.{script_name}",
                     **_optional_field("required_by", required_by.get(capability_id)),
                     **_optional_field("ci_status", ci_status),
@@ -230,7 +231,10 @@ def _record_file_capability(*, available: list[dict[str, Any]], missing: list[di
             {
                 "id": capability_id,
                 "type": "script",
+                "capability_kind": "local_command",
                 "source": f"package.json:scripts.{script_name}",
+                "command": scripts[script_name],
+                "language": _primary_language(scan),
                 **_optional_field("required_by", required_by),
                 **_optional_field("ci_status", ci_status),
                 "verification_state": verification_state(
@@ -245,6 +249,7 @@ def _record_file_capability(*, available: list[dict[str, Any]], missing: list[di
                 {
                     "id": capability_id,
                     "type": "file",
+                    "capability_kind": "evidence_file",
                     "source": path,
                     **_optional_field("required_by", required_by),
                     "verification_state": verification_state(
@@ -426,6 +431,7 @@ def _available_command(
     return {
         "id": capability_id,
         "type": "command",
+        "capability_kind": "ci_only" if command.get("local_execution") == "ci-only" else "local_command",
         "source": command["source"],
         "command": command["command"],
         "language": command["language"],

@@ -237,15 +237,16 @@ Wave 5 stress takeaways:
 - Scoped cleanup could clear repo-owned missing capabilities in all five repos.
   Four repos still ended blocked by broad structural findings or an environment
   execution issue; `R-Project` reached clean audit and passed gate verification.
-- `truth_file` and other non-executable file capabilities should not block
-  `verify-gates` when executable gates are clean. `R-Project` had to remove
-  `truth_file` from required executable capabilities to reach a passed verify.
-- Localhost and subprocess-heavy tests remain a Tier 1 stress point. QR-spawned
-  execution hit sandbox or timeout failures for smoke/server tests in
-  `Book-documents-github` and `BIP-Console` even when direct repo commands
-  passed.
-- `nested-ternary` precision improved for optional/nullish TypeScript syntax,
-  but regex non-capturing groups like `(?:...)` are still false positives.
+- Follow-up fixes after Wave 5 separated local commands from evidence/file
+  capabilities so `truth_file` no longer blocks `verify-gates`, added
+  per-gate timeouts, skipped already-covered aggregate gates, added environment
+  restriction classification, and introduced `summarize-run` for controller
+  reports and baseline deltas.
+- Localhost and subprocess-heavy tests remain a Tier 1 stress point, but
+  QR-spawned `EPERM`/pipe/listen failures are now classified as environment
+  restrictions with rerun guidance instead of ordinary repo gate failures.
+- `nested-ternary` precision improved for optional/nullish TypeScript syntax
+  and regex non-capturing groups like `(?:...)`.
 
 ## Rollout Ledger
 

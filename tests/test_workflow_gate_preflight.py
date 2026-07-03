@@ -191,12 +191,123 @@ def test_verify_gates_skips_ci_only_pseudo_gates(tmp_path: Path) -> None:
         Path(payload["artifact_paths"]["gate_verification_json"]).read_text()
     )
 
-    assert payload["status"] == "blocked"
+    assert payload["status"] == "skipped-nonlocal"
     assert verification["gates"] == [
         {
             "id": "pre_pr",
             "status": "skipped",
+            "capability_kind": "ci_only",
             "reason": "capability is CI-only and has no local executor",
             "source": ".github/workflows",
         }
     ]
+
+
+def test_verify_gates_does_not_block_on_file_evidence_capabilities(tmp_path: Path) -> None:
+    from quality_runner.workflow import verify_gates_payload
+
+    tracker = tmp_path / ".tracker"
+    tracker.mkdir()
+    (tracker / "PROJECT_TRUTH.md").write_text("# Truth\n", encoding="utf-8")
+    (tmp_path / "package.json").write_text(
+        json.dumps({"scripts": {"test": f"{sys.executable} -c 'import sys; sys.exit(0)'"}}),
+        encoding="utf-8",
+    )
+    (tmp_path / ".quality-runner.toml").write_text(
+        '[quality_runner]\nrequired_capabilities = ["tests", "truth_file"]\n',
+        encoding="utf-8",
+    )
+
+    payload = verify_gates_payload(repo_root=tmp_path, run_id="file-evidence")
+    verification = json.loads(
+        Path(payload["artifact_paths"]["gate_verification_json"]).read_text()
+    )
+
+    assert payload["status"] == "passed"
+    assert [(gate["id"], gate["status"]) for gate in verification["gates"]] == [
+        ("tests", "passed"),
+        ("truth_file", "skipped"),
+    ]
+    assert verification["gates"][1]["capability_kind"] == "evidence_file"
+    assert verification["gates"][1]["reason"] == "capability is file evidence, not an executable gate"
+
+
+def test_verify_gates_classifies_environment_restricted_failures(tmp_path: Path) -> None:
+    from quality_runner.workflow import verify_gates_payload
+
+    (tmp_path / "package.json").write_text(
+        json.dumps(
+            {
+                "scripts": {
+                    "test": (
+                        f"{sys.executable} -c "
+                        "\"import sys; print('listen EPERM 127.0.0.1', file=sys.stderr); sys.exit(1)\""
+                    )
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    (tmp_path / ".quality-runner.toml").write_text(
+        '[quality_runner]\nrequired_capabilities = ["tests"]\n',
+        encoding="utf-8",
+    )
+
+    payload = verify_gates_payload(repo_root=tmp_path, run_id="environment-restricted")
+    verification = json.loads(
+        Path(payload["artifact_paths"]["gate_verification_json"]).read_text()
+    )
+
+    assert payload["status"] == "blocked"
+    assert verification["status"] == "blocked"
+    assert verification["gates"][0]["failure_type"] == "environment-restricted"
+    assert "rerun outside sandbox" in verification["gates"][0]["recommended_action"]
+
+
+def test_verify_gates_uses_per_gate_timeout_config_and_skips_covered_aggregate(
+    tmp_path: Path,
+) -> None:
+    from quality_runner.workflow import verify_gates_payload
+
+    (tmp_path / "package.json").write_text(
+        json.dumps(
+            {
+                "packageManager": "pnpm@10.0.0",
+                "scripts": {
+                    "lint": f"{sys.executable} -c 'import sys; sys.exit(0)'",
+                    "pre-cr": "pnpm run lint",
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    (tmp_path / "pnpm-lock.yaml").write_text("lockfileVersion: '9.0'\n", encoding="utf-8")
+    (tmp_path / ".quality-runner.toml").write_text(
+        "\n".join(
+            [
+                "[quality_runner]",
+                'required_capabilities = ["lint", "pre_cr"]',
+                "",
+                "[quality_runner.gate_timeouts]",
+                "lint = 9",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    payload = verify_gates_payload(repo_root=tmp_path, run_id="aggregate-skip")
+    verification = json.loads(
+        Path(payload["artifact_paths"]["gate_verification_json"]).read_text()
+    )
+
+    assert payload["status"] == "passed"
+    assert verification["timeout_seconds"] == 120
+    assert verification["gate_timeouts"] == {"lint": 9}
+    assert [(gate["id"], gate["status"]) for gate in verification["gates"]] == [
+        ("lint", "passed"),
+        ("pre_cr", "skipped"),
+    ]
+    assert verification["gates"][0]["timeout_seconds"] == 9
+    assert verification["gates"][1]["reason"] == "aggregate gate covered by leaf gates"
+    assert verification["gates"][1]["covered_by"] == ["lint"]

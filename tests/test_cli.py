@@ -427,6 +427,74 @@ def test_cli_status_reports_latest_verify_gate_failure(tmp_path: Path) -> None:
     assert payload["latest_run"]["gate_verification_status"] == "failed"
 
 
+def test_cli_summarize_run_reports_final_artifact_summary_and_delta(tmp_path: Path) -> None:
+    write_js_fixture(tmp_path)
+    subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "quality_runner",
+            "run",
+            str(tmp_path),
+            "--run-id",
+            "summary-baseline",
+            "--json",
+        ],
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "quality_runner",
+            "verify-gates",
+            str(tmp_path),
+            "--run-id",
+            "summary-final",
+            "--json",
+        ],
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "quality_runner",
+            "summarize-run",
+            str(tmp_path),
+            "--run-id",
+            "summary-final",
+            "--baseline-run-id",
+            "summary-baseline",
+            "--json",
+        ],
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+    payload = json.loads(result.stdout)
+
+    assert payload["schema"] == "quality-runner-run-summary-v0.1"
+    assert payload["run_id"] == "summary-final"
+    assert payload["status"] in {"passed-with-findings", "blocked", "failed"}
+    assert "recommended_classification" in payload
+    assert "gate_results" in payload
+    assert "missing_capabilities" in payload
+    assert "finding_counts" in payload
+    assert payload["delta"]["baseline_run_id"] == "summary-baseline"
+    assert "missing_capabilities" in payload["delta"]
+    assert "findings_total" in payload["delta"]
+
+
 def test_cli_export_handoff_prints_latest_handoff(tmp_path: Path) -> None:
     write_js_fixture(tmp_path)
     subprocess.run(

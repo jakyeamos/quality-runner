@@ -48,6 +48,7 @@ def test_load_repo_config_reads_default_profile_required_capabilities_and_except
         ],
         "accepted_dispositions": [],
         "gates": [],
+        "gate_timeouts": {},
         "severity_overrides": {},
         "structural_scan": {},
         "warnings": [],
@@ -67,6 +68,10 @@ def test_load_repo_config_reads_gates_and_severity_overrides(tmp_path) -> None:
                 "[quality_runner.severity_overrides]",
                 'missing-tests = "critical"',
                 'lint = "warning"',
+                "",
+                "[quality_runner.gate_timeouts]",
+                "tests = 240",
+                "pre_cr = 600",
                 "",
                 "[[quality_runner.gates]]",
                 'id = "lint"',
@@ -103,6 +108,7 @@ def test_load_repo_config_reads_gates_and_severity_overrides(tmp_path) -> None:
     ]
     assert config["allowed_package_managers"] == ["bun", "pnpm"]
     assert config["scan_exclusions"] == []
+    assert config["gate_timeouts"] == {"tests": 240, "pre_cr": 600}
     assert config["severity_overrides"] == {"missing-tests": "critical", "lint": "warning"}
     assert config["accepted_exceptions"] == [
         {
@@ -209,6 +215,7 @@ def test_load_repo_config_reports_missing_invalid_and_malformed_values(tmp_path)
         "accepted_exceptions": [],
         "accepted_dispositions": [],
         "gates": [],
+        "gate_timeouts": {},
         "severity_overrides": {},
         "structural_scan": {},
         "warnings": [],
@@ -255,6 +262,7 @@ def test_load_repo_config_reports_missing_invalid_and_malformed_values(tmp_path)
     assert malformed["scan_exclusions"] == []
     assert malformed["required_capabilities_configured"] is True
     assert malformed["accepted_exceptions"] == []
+    assert malformed["gate_timeouts"] == {}
     assert [warning["code"] for warning in malformed["warnings"]] == [
         "invalid_quality_runner_config_field",
         "invalid_quality_runner_config_field",
@@ -426,6 +434,7 @@ def test_configured_gates_satisfy_capabilities_and_policy_metadata_reaches_audit
             "source": ".quality-runner.toml:quality_runner.gates[0]",
             "command": 'python -c "raise SystemExit(99)"',
             "language": "python",
+            "capability_kind": "local_command",
             "required_by": "config",
             "owner": "platform",
             "severity": "blocker",
@@ -493,6 +502,7 @@ def test_detect_capabilities_handles_file_sources_and_inactive_exceptions(tmp_pa
         {
             "id": "pre_cr",
             "type": "command",
+            "capability_kind": "local_command",
             "source": "package.json:scripts.pre-cr",
             "command": "pre-cr run",
             "language": "javascript",
@@ -506,6 +516,7 @@ def test_detect_capabilities_handles_file_sources_and_inactive_exceptions(tmp_pa
         {
             "id": "truth_file",
             "type": "file",
+            "capability_kind": "evidence_file",
             "source": ".tracker/PROJECT_TRUTH.md",
             "required_by": "config",
             "verification_state": {
@@ -650,6 +661,7 @@ def test_packaged_schema_files_are_parseable() -> None:
         "controller-report-validation.schema.json",
         "run-manifest.schema.json",
         "run-result.schema.json",
+        "run-summary.schema.json",
     }
 
     loaded = {}
@@ -689,6 +701,7 @@ def test_artifact_schema_additions_remain_optional_for_v01_compatibility() -> No
         "required_by",
         "owner",
         "severity",
+        "capability_kind",
         "local_execution",
         "ci_status",
         "verification_state",

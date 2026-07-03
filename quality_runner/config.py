@@ -55,6 +55,9 @@ def load_repo_config(repo_root: Path) -> dict[str, Any]:
     gates = _gates(section.get("gates"), warnings)
     exceptions = _accepted_exceptions(section.get("accepted_exceptions"), warnings)
     accepted_dispositions = _accepted_dispositions(section.get("accepted_dispositions"), warnings)
+    gate_timeouts = _positive_int_mapping(
+        section.get("gate_timeouts"), "quality_runner.gate_timeouts", warnings
+    )
     severity_overrides = _string_mapping(
         section.get("severity_overrides"), "quality_runner.severity_overrides", warnings
     )
@@ -70,6 +73,7 @@ def load_repo_config(repo_root: Path) -> dict[str, Any]:
         accepted_exceptions=exceptions,
         accepted_dispositions=accepted_dispositions,
         gates=gates,
+        gate_timeouts=gate_timeouts,
         severity_overrides=severity_overrides,
         structural_scan=structural_scan,
         warnings=warnings,
@@ -78,10 +82,10 @@ def load_repo_config(repo_root: Path) -> dict[str, Any]:
 
 # fmt: off
 def _config(
-    *, path: str | None, default_profile: str | None, profiles: dict[str, dict[str, Any]], required_capabilities: list[str], required_capabilities_configured: bool, allowed_package_managers: list[str], scan_exclusions: list[str], accepted_exceptions: list[dict[str, str]], accepted_dispositions: list[dict[str, str]], gates: list[dict[str, Any]], severity_overrides: dict[str, str], structural_scan: dict[str, Any], warnings: list[dict[str, str]],
+    *, path: str | None, default_profile: str | None, profiles: dict[str, dict[str, Any]], required_capabilities: list[str], required_capabilities_configured: bool, allowed_package_managers: list[str], scan_exclusions: list[str], accepted_exceptions: list[dict[str, str]], accepted_dispositions: list[dict[str, str]], gates: list[dict[str, Any]], gate_timeouts: dict[str, int], severity_overrides: dict[str, str], structural_scan: dict[str, Any], warnings: list[dict[str, str]],
 ) -> dict[str, Any]:
     return dict(
-        schema=CONFIG_SCHEMA, path=path, default_profile=default_profile, profiles=profiles, required_capabilities=required_capabilities, required_capabilities_configured=required_capabilities_configured, allowed_package_managers=allowed_package_managers, scan_exclusions=scan_exclusions, accepted_exceptions=accepted_exceptions, accepted_dispositions=accepted_dispositions, gates=gates, severity_overrides=severity_overrides, structural_scan=structural_scan, warnings=warnings,
+        schema=CONFIG_SCHEMA, path=path, default_profile=default_profile, profiles=profiles, required_capabilities=required_capabilities, required_capabilities_configured=required_capabilities_configured, allowed_package_managers=allowed_package_managers, scan_exclusions=scan_exclusions, accepted_exceptions=accepted_exceptions, accepted_dispositions=accepted_dispositions, gates=gates, gate_timeouts=gate_timeouts, severity_overrides=severity_overrides, structural_scan=structural_scan, warnings=warnings,
     )
 # fmt: on
 
@@ -98,6 +102,7 @@ def _empty_config(*, path: str | None, warnings: list[dict[str, str]]) -> dict[s
         accepted_exceptions=[],
         accepted_dispositions=[],
         gates=[],
+        gate_timeouts={},
         severity_overrides={},
         structural_scan={},
         warnings=warnings,
@@ -145,6 +150,27 @@ def _string_mapping(
         _warning(
             "invalid_quality_runner_config_field",
             f"{field} must be a table of non-empty string values",
+        )
+    )
+    return {}
+
+
+def _positive_int_mapping(
+    value: object,
+    field: str,
+    warnings: list[dict[str, str]],
+) -> dict[str, int]:
+    if value is None:
+        return {}
+    if isinstance(value, dict) and all(
+        isinstance(key, str) and key and isinstance(item, int) and item > 0
+        for key, item in value.items()
+    ):
+        return dict(value)
+    warnings.append(
+        _warning(
+            "invalid_quality_runner_config_field",
+            f"{field} must be a table of positive integer seconds",
         )
     )
     return {}

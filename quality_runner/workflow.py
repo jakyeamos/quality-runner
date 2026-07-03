@@ -228,6 +228,7 @@ def verify_gates_payload(
         repo_root=repo_root,
         capability_map=capability_map,
         timeout_seconds=timeout_seconds,
+        gate_timeouts=_gate_timeouts(config),
     )
     verified_capability_map = apply_gate_verification(capability_map, gate_verification)
     audit_report = build_audit_report(
@@ -300,7 +301,7 @@ def verify_gates_payload(
 
     return {
         "schema": "quality-runner-verify-gates-result-v0.1",
-        "status": gate_verification["status"],
+        "status": _verify_payload_status(gate_verification, remediation_plan),
         "implementation_allowed": False,
         "run_id": resolved_run_id,
         "artifact_paths": artifact_paths,
@@ -387,3 +388,24 @@ def _combined_warnings(
             seen.add(key)
             warnings.append(item)
     return warnings
+
+
+def _gate_timeouts(config: dict[str, Any]) -> dict[str, int]:
+    gate_timeouts = config.get("gate_timeouts")
+    if not isinstance(gate_timeouts, dict):
+        return {}
+    return {
+        gate_id: seconds
+        for gate_id, seconds in gate_timeouts.items()
+        if isinstance(gate_id, str) and isinstance(seconds, int) and seconds > 0
+    }
+
+
+def _verify_payload_status(
+    gate_verification: dict[str, Any],
+    remediation_plan: dict[str, Any],
+) -> str:
+    gate_status = gate_verification.get("status")
+    if gate_status == "passed" and remediation_plan.get("slices"):
+        return "passed-with-findings"
+    return gate_status if isinstance(gate_status, str) else "blocked"

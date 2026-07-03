@@ -122,6 +122,7 @@ def test_nested_ternary_rule_ignores_typescript_non_ternary_question_marks(
                 "type Maybe<T> = T | null | undefined;",
                 "const label = input?.profile?.name ?? fallback ?? 'Unknown';",
                 "const matcher = /open|closed|pending/;",
+                "const groupMatcher = /^(?:open|closed)$/;",
                 "const optional = input?.profile?.name ? 'Known' : 'Unknown';",
                 "const actual = items ? items.length ? 'a' : 'b' : 'c';",
             ]
@@ -131,7 +132,7 @@ def test_nested_ternary_rule_ignores_typescript_non_ternary_question_marks(
     result = create_code_quality_scan(tmp_path, scan={"run_id": "scan-001"}, config={})
     nested = [finding for finding in result["findings"] if finding["rule_id"] == "nested-ternary"]
 
-    assert [finding["line"] for finding in nested] == [6]
+    assert [finding["line"] for finding in nested] == [7]
 
 
 def test_code_quality_scan_detects_trpc_and_zod_patterns_outside_fixed_api_paths(

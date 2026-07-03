@@ -115,12 +115,24 @@ Writes:
 Executes discovered command-backed repo gates and records local pass/fail
 evidence without applying remediation. JavaScript package scripts execute
 through the detected package manager, and CI-only gates without a local executor
-are reported as skipped.
+are reported as skipped. File/evidence capabilities such as a truth file are
+kept in the capability matrix but do not block executable gate verification.
 
 ```bash
 quality-runner verify-gates /path/to/repo --run-id verify-001 --json
 quality-runner verify-gates /path/to/repo --timeout-seconds 300 --json
 ```
+
+Repos can override individual gate timeouts in `.quality-runner.toml`:
+
+```toml
+[quality_runner.gate_timeouts]
+tests = 300
+pre_cr = 600
+```
+
+Possible verification statuses include `passed`, `passed-with-findings`,
+`failed`, `blocked`, and `skipped-nonlocal`.
 
 Writes:
 
@@ -146,7 +158,20 @@ quality-runner validate-report worker-report.json --json
 ```
 
 Completed reports must have a clean `git_status_short`, a `commit_hash`, and
-`push_status` set to `pushed`. Blocked reports must include explicit blockers.
+`push_status` set to `pushed`. Generated artifacts such as `.quality-runner/`
+can be listed under `ignored_generated_artifacts` when they are the only dirty
+paths. Blocked reports must include explicit blockers.
+
+## `quality-runner summarize-run`
+
+Prints a controller-friendly run summary with final status, gate table, missing
+capabilities, finding counts, a recommended classification, and an optional
+baseline delta.
+
+```bash
+quality-runner summarize-run /path/to/repo --run-id final-001 --json
+quality-runner summarize-run /path/to/repo --run-id final-001 --baseline-run-id baseline-001 --json
+```
 
 ## `quality-runner export-handoff`
 

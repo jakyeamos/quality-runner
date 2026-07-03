@@ -11,6 +11,7 @@ from quality_runner import __version__
 from quality_runner.code_quality import preview_ignored_paths
 from quality_runner.config import CONFIG_FILE_NAME, load_repo_config
 from quality_runner.controller_reports import validate_controller_report
+from quality_runner.run_summary import RUN_SUMMARY_SCHEMA, build_run_summary
 from quality_runner.standards import DEFAULT_PROFILE
 from quality_runner.workflow import inspect_payload, run_payload, verify_gates_payload
 
@@ -61,6 +62,14 @@ def build_parser() -> argparse.ArgumentParser:
     status_parser = subparsers.add_parser("status", help="Show repo Quality Runner state")
     status_parser.add_argument("repo_path", help="Target repository path")
     status_parser.add_argument("--json", action="store_true", help="Emit JSON output")
+
+    summary_parser = subparsers.add_parser(
+        "summarize-run", help="Summarize a Quality Runner run and optional baseline delta"
+    )
+    summary_parser.add_argument("repo_path", help="Target repository path")
+    summary_parser.add_argument("--run-id", required=True, help="Run id to summarize")
+    summary_parser.add_argument("--baseline-run-id", default=None, help="Baseline run id for deltas")
+    summary_parser.add_argument("--json", action="store_true", help="Emit JSON output")
 
     export_parser = subparsers.add_parser("export-handoff", help="Print or write an agent handoff")
     export_parser.add_argument("repo_path", help="Target repository path")
@@ -149,6 +158,12 @@ def _payload_for_args(args: argparse.Namespace) -> dict[str, Any]:
         )
     if args.command == "status":
         return _status_payload(repo_root=_validated_repo_path(args.repo_path))
+    if args.command == "summarize-run":
+        return build_run_summary(
+            repo_root=_validated_repo_path(args.repo_path),
+            run_id=args.run_id,
+            baseline_run_id=args.baseline_run_id,
+        )
     if args.command == "export-handoff":
         return _export_handoff_payload(
             repo_root=_validated_repo_path(args.repo_path),
@@ -432,6 +447,8 @@ def _human_summary(payload: dict[str, Any]) -> str:
         if isinstance(output_path, str):
             return f"handoff: {output_path}"
         return f"handoff: {payload.get('source_path')}"
+    if payload.get("schema") == RUN_SUMMARY_SCHEMA:
+        return f"status: {status}\nrun id: {payload.get('run_id')}"
 
     lines = [f"status: {status}"]
     run_id = payload.get("run_id")

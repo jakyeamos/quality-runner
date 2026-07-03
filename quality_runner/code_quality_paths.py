@@ -158,6 +158,7 @@ def _nested_ternary(line: str) -> bool:
 
 
 def _ternary_question_count(line: str) -> int:
+    line = _mask_regex_literals(line)
     count = 0
     for index, char in enumerate(line):
         if char != "?":
@@ -168,6 +169,68 @@ def _ternary_question_count(line: str) -> int:
             continue
         count += 1
     return count
+
+
+def _mask_regex_literals(line: str) -> str:
+    masked: list[str] = []
+    index = 0
+    previous_significant = ""
+    while index < len(line):
+        char = line[index]
+        next_char = line[index + 1] if index + 1 < len(line) else ""
+        if char == "/" and next_char not in {"/", "*"} and previous_significant in {
+            "",
+            "(",
+            "=",
+            ":",
+            ",",
+            "[",
+            "{",
+            "!",
+            "&",
+            "|",
+            "?",
+            "return",
+        }:
+            end = _regex_literal_end(line, index + 1)
+            if end is not None:
+                masked.append("/" + ("x" * (end - index - 1)))
+                index = end + 1
+                previous_significant = "/"
+                continue
+        masked.append(char)
+        if not char.isspace():
+            previous_significant = _previous_token(previous_significant, char)
+        index += 1
+    return "".join(masked)
+
+
+def _regex_literal_end(line: str, start: int) -> int | None:
+    escaped = False
+    in_class = False
+    for index in range(start, len(line)):
+        char = line[index]
+        if escaped:
+            escaped = False
+            continue
+        if char == "\\":
+            escaped = True
+            continue
+        if char == "[":
+            in_class = True
+            continue
+        if char == "]":
+            in_class = False
+            continue
+        if char == "/" and not in_class:
+            return index
+    return None
+
+
+def _previous_token(previous: str, char: str) -> str:
+    if char.isalnum() or char == "_":
+        return f"{previous}{char}"[-6:]
+    return char
 
 
 def _is_source_file(relative_path: str) -> bool:

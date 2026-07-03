@@ -857,6 +857,7 @@ def test_detect_capabilities_accepts_python_quality_commands(tmp_path: Path) -> 
     assert available["lint"] == {
         "id": "lint",
         "type": "command",
+        "capability_kind": "local_command",
         "source": "pyproject.toml:tool.ruff",
         "command": "ruff check .",
         "language": "python",

@@ -31,7 +31,9 @@ Artifacts are written under:
   language, optional owner/severity policy, required-by provenance, and local CI
   status evidence. `verification_state` separates discovery evidence from
   command execution evidence and pass/fail evidence. CI-only gates that have no
-  local executor are marked with `local_execution: "ci-only"`.
+  local executor are marked with `local_execution: "ci-only"`. Capabilities also
+  include `capability_kind` so local commands, CI-only gates, and file/evidence
+  capabilities can be handled independently.
 - `run-manifest.json`: run metadata, Quality Runner version, artifact paths, and
   git HEAD/branch/dirty state when the target is a git repo.
 
@@ -62,7 +64,8 @@ Artifacts are written under:
 ## Gate Verification Artifacts
 
 `quality-runner verify-gates` executes discovered command-backed capabilities,
-skips CI-only capabilities that have no local executor, and writes:
+skips CI-only capabilities that have no local executor, skips non-executable
+file/evidence capabilities without blocking, and writes:
 
 - `repo-scan.json`
 - `code-quality-scan.json`
@@ -72,7 +75,8 @@ skips CI-only capabilities that have no local executor, and writes:
   `verification_state.execution = "local-executed"` and result `passed` or
   `failed`.
 - `gate-verification.json`: per-gate command, source, exit code, duration,
-  bounded stdout/stderr tail fields, skipped reason, and status.
+  timeout, capability kind, bounded stdout/stderr tail fields, skipped reason,
+  failure type, recommended environment action, and status.
 - `quality-audit.json`
 - `remediation-plan.json`
 - `agent-handoff.json`
@@ -84,6 +88,13 @@ discovery, command execution, and command pass/fail are distinguishable. For
 JavaScript package scripts, the executable command runs through the detected
 package manager, for example `pnpm run lint`, so local `node_modules/.bin`
 resolution matches normal developer usage.
+
+Aggregate gates such as `pre_cr` and `pre_pr` are skipped when already-covered
+leaf gates have passed, which avoids rerunning the same formatter, lint,
+typecheck, test, build, dead-code, or smoke commands in one verification pass.
+Environment-sensitive failures such as localhost bind denials, pipe permission
+errors, and sandbox-like permission failures are classified as blocked
+environment restrictions rather than ordinary repo gate failures.
 
 ## Safety Guarantees
 

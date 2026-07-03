@@ -25,11 +25,18 @@ def validate_controller_report(report: dict[str, Any]) -> dict[str, Any]:
         errors.append("verification must be a list")
     if not isinstance(report.get("blockers"), list):
         errors.append("blockers must be a list")
+    ignored_generated_artifacts = report.get("ignored_generated_artifacts")
+    if ignored_generated_artifacts is not None and not _string_list(ignored_generated_artifacts):
+        errors.append("ignored_generated_artifacts must be a list of non-empty strings")
 
     git_status = report.get("git_status_short")
     if not isinstance(git_status, str):
         errors.append("git_status_short must be a string")
-    elif status in {"complete", "ready-for-review"} and git_status.strip():
+    elif (
+        status in {"complete", "ready-for-review"}
+        and git_status.strip()
+        and not _only_ignored_generated_artifacts(git_status, ignored_generated_artifacts)
+    ):
         errors.append("completed reports must have a clean git_status_short field")
 
     if status == "complete":
@@ -51,3 +58,23 @@ def validate_controller_report(report: dict[str, Any]) -> dict[str, Any]:
 
 def _non_empty_string(value: object) -> bool:
     return isinstance(value, str) and bool(value)
+
+
+def _string_list(value: object) -> bool:
+    return isinstance(value, list) and all(isinstance(item, str) and item for item in value)
+
+
+def _only_ignored_generated_artifacts(git_status: str, ignored: object) -> bool:
+    if not _string_list(ignored):
+        return False
+    ignored_paths = [item.rstrip("/") for item in ignored]
+    lines = [line for line in git_status.splitlines() if line.strip()]
+    if not lines:
+        return True
+    return all(_line_is_ignored(line, ignored_paths) for line in lines)
+
+
+def _line_is_ignored(line: str, ignored_paths: list[str]) -> bool:
+    path = line[3:].strip() if len(line) > 3 else line.strip()
+    normalized = path.rstrip("/")
+    return any(normalized == ignored or normalized.startswith(f"{ignored}/") for ignored in ignored_paths)
