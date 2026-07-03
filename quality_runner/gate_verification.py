@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import os
-import signal
 import subprocess
 import sys
 import time
@@ -23,6 +21,7 @@ from quality_runner.gate_execution_policy import (
     recommended_action,
     valid_gate_timeouts,
 )
+from quality_runner.process_runner import run_shell_command
 from quality_runner.read_only_git import restore_if_changed, tracked_snapshot
 from quality_runner.schema_constants import GATE_VERIFICATION_SCHEMA
 
@@ -234,7 +233,7 @@ def _verify_gate(
         tracked_snapshot(repo_root) if read_only_gates and not allow_mutating_gates else None
     )
     try:
-        result = _run_shell_command(
+        result = run_shell_command(
             command,
             cwd=repo_root,
             timeout=timeout_seconds,
@@ -257,7 +256,7 @@ def _verify_gate(
             stderr=stderr,
             timed_out=True,
             dependency_setup=dependency_setup,
-        ) | _read_only_mutation_diagnostics(mutation)
+        ) | _timeout_output_diagnostics(stdout=stdout, stderr=stderr) | _read_only_mutation_diagnostics(mutation)
         return {
             "id": capability_id,
             "status": "failed",
@@ -334,52 +333,6 @@ def _verify_gate(
             _read_only_mutation_action(mutation),
         ),
     }
-
-
-def _run_shell_command(command: str, *, cwd: Path, timeout: int) -> dict[str, object]:
-    process = subprocess.Popen(
-        command,
-        cwd=cwd,
-        shell=True,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        text=True,
-        start_new_session=True,
-    )
-    try:
-        stdout, stderr = process.communicate(timeout=timeout)
-    except subprocess.TimeoutExpired:
-        _terminate_process_group(process)
-        raise
-    except BaseException:
-        _terminate_process_group(process)
-        raise
-    return {
-        "stdout": stdout,
-        "stderr": stderr,
-        "returncode": process.returncode,
-    }
-
-
-def _terminate_process_group(process: subprocess.Popen[Any]) -> None:
-    try:
-        process_group_id = os.getpgid(process.pid)
-    except ProcessLookupError:
-        return
-    try:
-        os.killpg(process_group_id, signal.SIGTERM)
-    except ProcessLookupError:
-        return
-    wait = getattr(process, "wait", None)
-    if not callable(wait):
-        return
-    try:
-        wait(timeout=0.2)
-    except subprocess.TimeoutExpired:
-        try:
-            os.killpg(process_group_id, signal.SIGKILL)
-        except ProcessLookupError:
-            return
 
 
 def _available_capabilities(capability_map: dict[str, Any]) -> list[dict[str, Any]]:
@@ -492,6 +445,12 @@ def _read_only_mutation_action(mutation: dict[str, Any] | None) -> str | None:
     if mutation.get("restored") is True:
         return "gate mutated tracked files during read-only verification; QR restored the pre-gate tracked diff, rerun directly only when source changes are allowed"
     return "gate mutated tracked files during read-only verification and QR could not fully restore them; inspect the tracked diff before continuing"
+
+
+def _timeout_output_diagnostics(*, stdout: str, stderr: str) -> dict[str, Any]:
+    if stdout or stderr:
+        return {"timeout_output_status": "captured-partial-output"}
+    return {"timeout_output_status": "timeout-with-no-output"}
 
 
 def _int_result(value: object) -> int:

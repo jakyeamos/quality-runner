@@ -102,6 +102,7 @@ quality-runner run /path/to/repo --json
 quality-runner verify-gates /path/to/repo --json
 quality-runner refresh /path/to/repo --run-id-prefix refresh-001 --json
 quality-runner validate-report worker-report.json --json
+quality-runner controller-report lint worker-report.json --strict --json
 quality-runner export-handoff /path/to/repo
 quality-runner-mcp
 ```

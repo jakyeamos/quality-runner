@@ -8,6 +8,13 @@ from pathlib import Path
 from typing import Any
 
 from quality_runner import __version__
+from quality_runner.cli_controller_reports import (
+    add_controller_report_command,
+    add_controller_report_summary_arguments,
+    controller_report_command_payload,
+    controller_report_from_summary_payload,
+    load_controller_report_json,
+)
 from quality_runner.cli_status import (
     EXPORT_HANDOFF_RESULT_SCHEMA,
     STATUS_RESULT_SCHEMA,
@@ -152,6 +159,7 @@ def build_parser() -> argparse.ArgumentParser:
     summary_parser.add_argument("repo_path", help="Target repository path")
     summary_parser.add_argument("--run-id", required=True, help="Run id to summarize")
     summary_parser.add_argument("--baseline-run-id", default=None, help="Baseline run id for deltas")
+    add_controller_report_summary_arguments(summary_parser)
     summary_parser.add_argument("--json", action="store_true", help="Emit JSON output")
 
     export_parser = subparsers.add_parser("export-handoff", help="Print or write an agent handoff")
@@ -165,6 +173,8 @@ def build_parser() -> argparse.ArgumentParser:
     )
     validate_report_parser.add_argument("report_json", help="Controller report JSON path")
     validate_report_parser.add_argument("--json", action="store_true", help="Emit JSON output")
+
+    add_controller_report_command(subparsers)
 
     doctor_parser = subparsers.add_parser("doctor", help="Check Quality Runner readiness")
     doctor_parser.add_argument("--json", action="store_true", help="Emit JSON output")
@@ -202,7 +212,7 @@ def main(argv: list[str] | None = None) -> int:
         print(json.dumps(payload, indent=2, sort_keys=True))
     else:
         print(_human_summary(payload))
-    if parsed.command == "validate-report" and payload.get("status") == "rejected":
+    if parsed.command in {"validate-report", "controller-report"} and payload.get("status") == "rejected":
         return 1
     return 0
 
@@ -242,11 +252,21 @@ def _payload_for_args(args: argparse.Namespace) -> dict[str, Any]:
     if args.command == "status":
         return status_payload(repo_root=_validated_repo_path(args.repo_path))
     if args.command == "summarize-run":
-        return build_run_summary(
-            repo_root=_validated_repo_path(args.repo_path),
+        repo_root = _validated_repo_path(args.repo_path)
+        summary = build_run_summary(
+            repo_root=repo_root,
             run_id=args.run_id,
             baseline_run_id=args.baseline_run_id,
         )
+        if args.controller_report:
+            return controller_report_from_summary_payload(
+                args=args,
+                repo_root=repo_root,
+                summary=summary,
+            )
+        return summary
+    if args.command == "controller-report":
+        return controller_report_command_payload(args)
     if args.command == "export-handoff":
         return export_handoff_payload(
             repo_root=_validated_repo_path(args.repo_path),
@@ -254,7 +274,7 @@ def _payload_for_args(args: argparse.Namespace) -> dict[str, Any]:
             output_path=Path(args.output).expanduser().resolve() if args.output else None,
         )
     if args.command == "validate-report":
-        return validate_controller_report(_load_report_json(Path(args.report_json)))
+        return validate_controller_report(load_controller_report_json(Path(args.report_json)))
     if args.command == "run":
         repo_root = _validated_repo_path(args.repo_path)
         return run_payload(
@@ -347,16 +367,6 @@ def _init_payload(
         "config_path": str(config_path),
         "implementation_allowed": False,
     }
-
-
-def _load_report_json(path: Path) -> dict[str, Any]:
-    try:
-        payload = json.loads(path.expanduser().read_text(encoding="utf-8"))
-    except json.JSONDecodeError as error:
-        raise ValueError(f"controller report is not valid JSON: {path}") from error
-    if not isinstance(payload, dict):
-        raise ValueError("controller report JSON must contain an object")
-    return payload
 
 
 def _validated_repo_path(repo_path: str) -> Path:

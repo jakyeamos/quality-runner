@@ -752,6 +752,40 @@ def test_cli_main_new_commands_in_process(tmp_path: Path, capsys) -> None:
     validation_payload = json.loads(capsys.readouterr().out)
     assert validation_payload["status"] == "accepted"
 
+    assert main(["controller-report", "normalize", str(report_path), "--json"]) == 0
+    normalized_payload = json.loads(capsys.readouterr().out)
+    assert normalized_payload["schema"] == "quality-runner-controller-report-v0.1"
+    assert normalized_payload["status"] == "blocked"
+
+    assert main(["controller-report", "lint", str(report_path), "--strict", "--json"]) == 0
+    lint_payload = json.loads(capsys.readouterr().out)
+    assert lint_payload["status"] == "accepted"
+    assert lint_payload["normalized_report"]["repo_path"] == str(tmp_path)
+
+    assert (
+        main(
+            [
+                "summarize-run",
+                str(tmp_path),
+                "--run-id",
+                "direct-cli-run",
+                "--baseline-run-id",
+                "direct-cli-run",
+                "--controller-report",
+                "--branch-name",
+                "qr/example",
+                "--json",
+            ]
+        )
+        == 0
+    )
+    controller_report_payload = json.loads(capsys.readouterr().out)
+    assert controller_report_payload["schema"] == "quality-runner-controller-report-v0.1"
+    assert controller_report_payload["branch_name"] == "qr/example"
+    assert controller_report_payload["baseline_artifact_path"].endswith(
+        "/.quality-runner/runs/direct-cli-run"
+    )
+
     rejected_report_path = tmp_path / "rejected-worker-report.json"
     rejected_payload = json.loads(report_path.read_text(encoding="utf-8"))
     rejected_payload["status"] = "complete"

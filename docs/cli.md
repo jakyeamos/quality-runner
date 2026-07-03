@@ -203,6 +203,26 @@ Completed reports must have a clean `git_status_short`, a `commit_hash`, and
 can be listed under `ignored_generated_artifacts` when they are the only dirty
 paths. Blocked reports must include explicit blockers.
 
+Worker threads should run this as their final self-check before reporting back
+to a controller. The command is intentionally strict and does not normalize
+repo-specific report shapes.
+
+## `quality-runner controller-report`
+
+Normalizes or lints controller thread reports.
+
+```bash
+quality-runner controller-report normalize worker-report.json --json
+quality-runner controller-report normalize worker-report.json --output normalized-report.json
+quality-runner controller-report lint worker-report.json --strict --json
+```
+
+`normalize` accepts common nested worker report shapes and emits the strict
+`quality-runner-controller-report-v0.1` shape expected by `validate-report`.
+`lint --strict` also enforces controller semantics: `complete` requires a clean
+final QR result plus commit/push evidence, and reports that observe target HEAD
+changes must include an explicit concurrency note.
+
 ## `quality-runner summarize-run`
 
 Prints a controller-friendly run summary with final status, gate table, missing
@@ -212,7 +232,14 @@ baseline delta.
 ```bash
 quality-runner summarize-run /path/to/repo --run-id final-001 --json
 quality-runner summarize-run /path/to/repo --run-id final-001 --baseline-run-id baseline-001 --json
+quality-runner summarize-run /path/to/repo --run-id final-001 --baseline-run-id baseline-001 --controller-report --branch-name qr/example --json
 ```
+
+With `--controller-report`, the command emits a strict controller-report
+skeleton using the run summary, current git status, branch name, baseline path,
+and inferred blockers. Workers can add explicit `--blocker`, `--file-changed`,
+`--commit-hash`, `--push-status`, and `--thread-status` values before running
+`quality-runner validate-report`.
 
 ## `quality-runner export-handoff`
 

@@ -1319,6 +1319,36 @@ Recommended next fixes:
    HEAD, and fail the report validation if target HEAD changes mid-run without
    an explicit concurrency note.
 
+## Product Fix After Refresh Wave 16
+
+Implemented the Wave 16 controller-report hardening set:
+
+- Added `quality-runner controller-report normalize` to convert common nested
+  worker report shapes into the strict `quality-runner-controller-report-v0.1`
+  shape.
+- Added `quality-runner controller-report lint --strict` to validate normalized
+  reports while enforcing controller semantics: `complete` requires a clean
+  final QR result plus commit/push evidence, and target HEAD changes require an
+  explicit concurrency note.
+- Added `quality-runner summarize-run --controller-report` so workers can
+  generate controller-report skeletons from QR artifacts instead of hand-querying
+  nested handoff fields.
+- Clarified CLI docs that workers should run `quality-runner validate-report
+  <report> --json` as their final self-check before reporting back.
+- Moved shell command execution into a process helper that captures partial
+  stdout/stderr after subprocess timeouts and records `timeout_output_status`
+  diagnostics for timed-out gates.
+- Kept `cli.py` and `gate_verification.py` under QR's own large-file threshold
+  by extracting controller-report CLI helpers and process supervision helpers.
+
+Verification:
+
+- `uv run pytest tests/test_controller_reports.py tests/test_cli.py
+  tests/test_workflow_gate_preflight.py -q` passed: 56 tests.
+- `uv run pytest` passed: 230 tests.
+- `uv run ruff check .` passed.
+- `git diff --check` passed.
+
 ## Rollout Ledger
 
 | Wave | Repo | Repo path | Total | Blockers | Baseline artifacts | Codex project status | Thread status | Thread id | Final QR status | Commit | Push | Notes |

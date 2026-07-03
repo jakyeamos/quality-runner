@@ -654,7 +654,7 @@ def test_refresh_payload_total_timeout_scope_is_distinct_from_verify_phase(
 def test_verify_gate_kills_process_group_when_workflow_timeout_interrupts(
     tmp_path: Path, monkeypatch: object
 ) -> None:
-    from quality_runner import gate_verification
+    from quality_runner import gate_verification, process_runner
 
     killed_groups: list[tuple[int, int]] = []
 
@@ -670,10 +670,10 @@ def test_verify_gate_kills_process_group_when_workflow_timeout_interrupts(
         assert kwargs["start_new_session"] is True
         return FakeProcess()
 
-    monkeypatch.setattr(gate_verification.subprocess, "Popen", fake_popen)
-    monkeypatch.setattr(gate_verification.os, "getpgid", lambda pid: pid + 1)
+    monkeypatch.setattr(process_runner.subprocess, "Popen", fake_popen)
+    monkeypatch.setattr(process_runner.os, "getpgid", lambda pid: pid + 1)
     monkeypatch.setattr(
-        gate_verification.os,
+        process_runner.os,
         "killpg",
         lambda pgid, sig: killed_groups.append((pgid, sig)),
     )
@@ -695,6 +695,36 @@ def test_verify_gate_kills_process_group_when_workflow_timeout_interrupts(
         )
 
     assert killed_groups == [(12346, signal.SIGTERM)]
+
+
+def test_verify_gate_captures_partial_output_after_timeout(tmp_path: Path) -> None:
+    from quality_runner.gate_verification import verify_discovered_gates
+
+    command = (
+        f"{sys.executable} -c "
+        "\"import time; print('partial stdout', flush=True); time.sleep(5)\""
+    )
+
+    verification = verify_discovered_gates(
+        repo_root=tmp_path,
+        capability_map={
+            "available": [
+                {
+                    "id": "tests",
+                    "type": "script",
+                    "command": command,
+                    "source": "package.json",
+                }
+            ]
+        },
+        timeout_seconds=1,
+    )
+
+    gate = verification["gates"][0]
+    assert gate["status"] == "failed"
+    assert gate["failure_type"] == "timeout"
+    assert "partial stdout" in gate["stdout_tail"]
+    assert gate["diagnostics"]["timeout_output_status"] == "captured-partial-output"
 
 
 def test_verify_gates_skips_ci_only_pseudo_gates(tmp_path: Path) -> None:
