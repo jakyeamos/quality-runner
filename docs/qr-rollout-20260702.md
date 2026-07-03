@@ -981,6 +981,38 @@ state, and blockers.
 | amos-saas | `019f292c-1769-7c12-936f-f6136b7710b0` | `refresh12-20260703-amos-saas` | `refresh11-20260703-amos-saas-verify` | `/private/tmp/qr-refresh12-amos-saas-report.json` | launched |
 | R-Project | `019f292c-1d97-7270-92cc-e5cb9275826f` | `refresh12-20260703-R-Project` | `refresh11-20260703-R-Project-verify` | `/private/tmp/qr-refresh12-R-Project-report.json` | launched |
 
+## Refresh Wave 12 Results
+
+All five Wave 12 controller reports validated with
+`quality-runner validate-report <report> --json` and returned
+`status=accepted`, `errors=[]`.
+
+| Repo | Final QR result | Handoff result | Wave 12 validation verdict | Report |
+|---|---|---|---|---|
+| AIOS | `blocked`; `read-only-gate-blocker`; `tests` exited `0` with 1092 passed but mutated 12 tracked log/session files; formatter/lint/typecheck also failed | `gates-blocked`; primary `read-only-policy`; groups `read-only-policy: tests`, `command-failure: formatter, lint, typecheck` | pass: QR detected `read-only-mutation`, recorded `restored: true`, and pre/post tracked diff snapshots were byte-identical | `/private/tmp/qr-refresh12-AIOS-report.json` |
+| EliHealth | `blocked`; `environment-or-dependency-blocker`; 24 findings, delta 0 | `gates-blocked`; primary `dependency-setup`; groups dependency setup, read-only policy, and command failure | pass with schema note: blocker groups are correct and next-slice actions are class ordered inside one action array | `/private/tmp/qr-refresh12-EliHealth-report.json` |
+| BIP-Console | `blocked`; `read-only-gate-blocker`; 10 findings, delta 0 | `gates-blocked`; primary `read-only-policy`; group `read-only-policy: formatter` | pass: formatter is the only blocker; lint, typecheck, runtime smoke, dead-code, tests, and build all passed; aggregate gates skipped as covered | `/private/tmp/qr-refresh12-BIP-Console-report.json` |
+| amos-saas | `blocked`; `environment-or-dependency-blocker`; 27 findings, delta 0 | `gates-blocked`; primary `dependency-setup`; groups `dependency-setup: lint, typecheck, runtime_smoke, dead_code, tests, build, pre_cr`, `read-only-policy: formatter` | partial: primary class, blocker groups, and `pnpm install --frozen-lockfile` are present, but `next_slice.actions` still repeats the same setup command once per gate | `/private/tmp/qr-refresh12-amos-saas-report.json` |
+| R-Project | `passed`; `clean`; 0 findings | `gates-clean`; `blocker_groups=[]`; `next_slice=null` | pass: clean control stayed clean and `quality-runner status --json` returned `ready` | `/private/tmp/qr-refresh12-R-Project-report.json` |
+
+Product takeaways:
+
+- Read-only mutation restoration is validated on a real repo. AIOS confirmed
+  QR can detect a passing command that mutates tracked files, restore the
+  pre-gate tracked diff, and still classify the run as a read-only gate blocker.
+- Primary blocker class and blocker groups are useful enough for controller
+  routing. The wave separated read-only policy, dependency setup, and command
+  failure blockers without losing secondary blockers.
+- The remaining polish gap is action-level grouping. `blocker_groups` is
+  structured, but `next_slice.actions` is still a flat string list and can
+  repeat the same setup command per gate. The next fix should make actions
+  structured by blocker class and deduplicate repeated setup commands.
+- Dependency setup blockers need non-interactive pnpm guidance. amos-saas hit
+  `ERR_PNPM_ABORTED_REMOVE_MODULES_DIR_NO_TTY`, which should route to a clearer
+  setup recommendation instead of a repeated generic install action.
+- Clean-control behavior held. R-Project stayed `gates-clean` with empty
+  blocker groups, no next slice, and ready status.
+
 ## Rollout Ledger
 
 | Wave | Repo | Repo path | Total | Blockers | Baseline artifacts | Codex project status | Thread status | Thread id | Final QR status | Commit | Push | Notes |
