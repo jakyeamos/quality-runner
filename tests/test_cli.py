@@ -559,6 +559,71 @@ def test_cli_refresh_runs_read_only_sequence_and_persists_summary(tmp_path: Path
     assert json.loads(persisted.read_text(encoding="utf-8"))["run_id"] == "cli-refresh-verify"
 
 
+def test_cli_refresh_can_export_handoff_in_same_command(tmp_path: Path) -> None:
+    write_js_fixture(tmp_path)
+    output_path = tmp_path / "remediation-plan.md"
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "quality_runner",
+            "refresh",
+            str(tmp_path),
+            "--run-id-prefix",
+            "cli-refresh-handoff",
+            "--handoff-output",
+            str(output_path),
+            "--json",
+        ],
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+    payload = json.loads(result.stdout)
+    canonical_handoff = (
+        tmp_path / ".quality-runner" / "runs" / "cli-refresh-handoff-verify" / "agent-handoff.md"
+    )
+
+    assert payload["schema"] == "quality-runner-refresh-result-v0.1"
+    assert payload["handoff_export"]["schema"] == "quality-runner-export-handoff-result-v0.1"
+    assert payload["handoff_export"]["run_id"] == "cli-refresh-handoff-verify"
+    assert payload["handoff_export"]["source_path"] == str(canonical_handoff)
+    assert payload["handoff_export"]["output_path"] == str(output_path)
+    assert output_path.read_text(encoding="utf-8") == canonical_handoff.read_text(
+        encoding="utf-8"
+    )
+    assert output_path.read_text(encoding="utf-8").startswith("# Quality Runner Agent Handoff\n")
+
+
+def test_cli_refresh_human_summary_includes_handoff_output(tmp_path: Path) -> None:
+    write_js_fixture(tmp_path)
+    output_path = tmp_path / "remediation-plan.md"
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "quality_runner",
+            "refresh",
+            str(tmp_path),
+            "--run-id-prefix",
+            "cli-refresh-human-handoff",
+            "--handoff-output",
+            str(output_path),
+        ],
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+    assert f"handoff: {output_path}" in result.stdout
+    assert output_path.read_text(encoding="utf-8").startswith("# Quality Runner Agent Handoff\n")
+
+
 def test_cli_refresh_workflow_timeout_records_reason(tmp_path: Path) -> None:
     (tmp_path / "package.json").write_text(
         json.dumps(

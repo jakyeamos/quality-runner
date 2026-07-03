@@ -15,6 +15,11 @@ from quality_runner.planning import build_agent_handoff, render_handoff_markdown
 from quality_runner.run_summary import build_run_summary
 from quality_runner.scan_exclusions import scan_progress_snapshot
 from quality_runner.schema_constants import GATE_VERIFICATION_SCHEMA
+from quality_runner.timeout_diagnostics import (
+    concise_timeout_diagnostics,
+    timeout_diagnostics_payload,
+    timeout_recommended_action,
+)
 
 WORKFLOW_TIMEOUT_ARTIFACT_SCHEMA = "quality-runner-workflow-timeout-v0.1"
 
@@ -152,6 +157,7 @@ def build_timeout_verify_artifacts(
     verification_path = run_dir / "gate-verification.json"
     existing_plan = _existing_plan(plan_path)
     existing_verification = _existing_verification(verification_path)
+    diagnostics = _timeout_diagnostics()
     timeout_payload = {
         "schema": WORKFLOW_TIMEOUT_ARTIFACT_SCHEMA,
         "status": "blocked",
@@ -162,7 +168,7 @@ def build_timeout_verify_artifacts(
         "timeout_seconds": timeout_seconds,
         "timeout_scope": timeout_scope,
         "elapsed_seconds": round(elapsed_seconds, 3),
-        "diagnostics": _timeout_diagnostics(),
+        "diagnostics": diagnostics,
     }
     gate_verification = {
         **existing_verification,
@@ -175,9 +181,16 @@ def build_timeout_verify_artifacts(
         "reason": reason,
         "elapsed_seconds": round(elapsed_seconds, 3),
         "timeout_scope": timeout_scope,
-        "diagnostics": _timeout_diagnostics(),
+        "diagnostics": diagnostics,
         "gates": _existing_gates(existing_verification)
-        or [_workflow_timeout_gate(phase=phase, reason=reason)],
+        or [
+            _workflow_timeout_gate(
+                phase=phase,
+                reason=reason,
+                timeout_seconds=timeout_seconds,
+                timeout_payload=timeout_payload,
+            )
+        ],
     }
     artifact_paths = {
         "gate_execution_plan_json": str(run_dir / "gate-execution-plan.json"),
@@ -226,16 +239,24 @@ def build_timeout_verify_artifacts(
     return verify_result, summary
 
 
-def _workflow_timeout_gate(*, phase: str, reason: str) -> dict[str, Any]:
+def _workflow_timeout_gate(
+    *,
+    phase: str,
+    reason: str,
+    timeout_seconds: int,
+    timeout_payload: dict[str, Any],
+) -> dict[str, Any]:
+    diagnostics = concise_timeout_diagnostics(timeout_payload)
     return {
         "id": "workflow-timeout",
         "status": "failed",
         "failure_type": "workflow-timeout",
         "phase": phase,
         "reason": reason,
-        "recommended_action": (
-            "Inspect workflow-timeout.json and rerun refresh with tighter scan exclusions "
-            "or a larger total timeout"
+        "timeout_diagnostics": diagnostics,
+        "recommended_action": timeout_recommended_action(
+            timeout_seconds=timeout_seconds,
+            diagnostics=timeout_payload["diagnostics"],
         ),
     }
 
@@ -276,7 +297,7 @@ def _timeout_capability_map() -> dict[str, Any]:
 
 
 def _timeout_diagnostics() -> dict[str, Any]:
-    return {"scan_progress": scan_progress_snapshot()}
+    return timeout_diagnostics_payload(scan_progress_snapshot())
 
 
 def _existing_plan(path: Path) -> list[Any]:

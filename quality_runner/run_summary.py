@@ -4,6 +4,8 @@ import json
 from pathlib import Path
 from typing import Any
 
+from quality_runner.timeout_diagnostics import concise_timeout_diagnostics
+
 RUN_SUMMARY_SCHEMA = "quality-runner-run-summary-v0.1"
 
 
@@ -69,6 +71,10 @@ def _run_summary(*, repo_root: Path, run_id: str) -> dict[str, Any]:
         "finding_counts": finding_counts,
         "audit_status": _string_or_none(audit.get("status")),
         "gate_verification_status": _string_or_none(gate_verification.get("status")),
+        **_optional_field(
+            "timeout_diagnostics",
+            _timeout_diagnostics(gate_verification, failure_type=failure_type),
+        ),
     }
 
 
@@ -247,6 +253,17 @@ def _optional_field(key: str, value: object) -> dict[str, Any]:
     if value is None:
         return {}
     return {key: value}
+
+
+def _timeout_diagnostics(
+    gate_verification: dict[str, Any],
+    *,
+    failure_type: str | None,
+) -> dict[str, Any] | None:
+    if failure_type != "workflow-timeout":
+        return None
+    diagnostics = concise_timeout_diagnostics(gate_verification)
+    return diagnostics if diagnostics else None
 
 
 def _append_unique(values: list[str], value: str) -> None:

@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from quality_runner.timeout_diagnostics import timeout_diagnostics_markdown
+
 
 def action_group_markdown(value: object) -> list[str]:
     if not isinstance(value, list) or not value:
@@ -140,6 +142,7 @@ def gate_verification_markdown(value: object) -> list[str]:
             recommended = gate.get("recommended_action")
             if isinstance(recommended, str) and recommended:
                 lines.append(f"  - Action: {recommended}")
+            lines.extend(timeout_diagnostics_markdown(gate.get("timeout_diagnostics")))
     else:
         lines.append("No gate blockers.")
     return lines
@@ -167,6 +170,7 @@ def _gate_summaries(gate_verification: dict[str, Any]) -> list[dict[str, Any]]:
                 **_optional_string("command", gate.get("command")),
                 **_optional_string("recommended_action", gate.get("recommended_action")),
                 **_optional_value("dependency_setup", _dependency_setup(gate)),
+                **_optional_value("timeout_diagnostics", _timeout_diagnostics(gate)),
                 "blocker_class": _blocker_class(gate),
             }
         )
@@ -188,6 +192,11 @@ def _dependency_setup(gate: dict[str, Any]) -> dict[str, str] | None:
         and value
     }
     return normalized or None
+
+
+def _timeout_diagnostics(gate: dict[str, Any]) -> dict[str, Any] | None:
+    diagnostics = gate.get("timeout_diagnostics")
+    return diagnostics if isinstance(diagnostics, dict) else None
 
 
 def _gate_blockers(gates: list[dict[str, Any]]) -> list[dict[str, Any]]:

@@ -115,10 +115,37 @@ def inferred_blockers(final_qr: dict[str, Any]) -> list[str]:
         blockers.append(f"Structural findings remain: {findings_total}.")
 
     failure_type = first_string(final_qr.get("failure_type"))
-    if failure_type == "workflow-timeout" and not any("workflow-timeout" in blocker for blocker in blockers):
-        blockers.append("Workflow timeout prevented complete evidence collection.")
+    if failure_type == "workflow-timeout":
+        timeout_blockers = workflow_timeout_blockers(final_qr.get("timeout_diagnostics"))
+        if timeout_blockers:
+            blockers.extend(timeout_blockers)
+        elif not any("workflow-timeout" in blocker for blocker in blockers):
+            blockers.append("Workflow timeout prevented complete evidence collection.")
 
     return blockers or ([classification] if classification else [status] if status else [])
+
+
+def workflow_timeout_blockers(timeout_diagnostics: object) -> list[str]:
+    if not isinstance(timeout_diagnostics, dict):
+        return []
+    blockers: list[str] = []
+    timeout_scope = first_string(timeout_diagnostics.get("timeout_scope"))
+    last_directory = first_string(timeout_diagnostics.get("last_directory"))
+    visited_paths = timeout_diagnostics.get("visited_paths")
+    if timeout_scope and last_directory and isinstance(visited_paths, int):
+        blockers.append(
+            f"Workflow timeout: {timeout_scope} timed out at {last_directory} "
+            f"after {visited_paths} visited paths."
+        )
+    recommendations = timeout_diagnostics.get("pruning_recommendations")
+    if isinstance(recommendations, list):
+        for recommendation in recommendations:
+            if not isinstance(recommendation, dict):
+                continue
+            pattern = recommendation.get("pattern")
+            if isinstance(pattern, str) and pattern:
+                blockers.append(f"Suggested scan exclusion: {pattern}.")
+    return blockers
 
 
 def repo_state(

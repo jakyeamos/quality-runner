@@ -16,6 +16,7 @@ from quality_runner.cli_controller_reports import (
     has_rejected_self_check,
     load_controller_report_json,
 )
+from quality_runner.cli_refresh import refresh_command_payload
 from quality_runner.cli_status import (
     EXPORT_HANDOFF_RESULT_SCHEMA,
     STATUS_RESULT_SCHEMA,
@@ -29,7 +30,6 @@ from quality_runner.run_summary import RUN_SUMMARY_SCHEMA, build_run_summary
 from quality_runner.standards import DEFAULT_PROFILE
 from quality_runner.workflow import (
     inspect_payload,
-    refresh_payload,
     run_payload,
     verify_gates_payload,
 )
@@ -76,9 +76,10 @@ def build_parser() -> argparse.ArgumentParser:
 
     refresh_parser = subparsers.add_parser(
         "refresh",
-        help="Run inspect, run, verify-gates, and summarize in read-only mode",
+        help="Run inspect, run, verify-gates, summarize, and optionally export a handoff",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=(
+            "Use --handoff-output to write a remediation handoff in the same command.\n\n"
             "Refresh emits gate handoff statuses for controller routing:\n"
             "  gates-clean    all discovered local gates passed\n"
             "  gates-blocked  environment, dependency setup, or read-only policy blocked evidence\n"
@@ -136,6 +137,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--allow-mutating-gates",
         action="store_true",
         help="Allow known or suspected mutating gates to execute during refresh",
+    )
+    refresh_parser.add_argument(
+        "--handoff-output",
+        default=None,
+        help="Write the generated remediation handoff markdown to this path",
     )
 
     init_parser = subparsers.add_parser("init", help="Write a starter .quality-runner.toml")
@@ -312,21 +318,7 @@ def _payload_for_args(args: argparse.Namespace) -> dict[str, Any]:
         )
     if args.command == "refresh":
         repo_root = _validated_repo_path(args.repo_path)
-        return refresh_payload(
-            repo_root=repo_root,
-            run_id_prefix=args.run_id_prefix,
-            baseline_run_id=args.baseline_run_id,
-            profile=args.profile,
-            ci_status_json=Path(args.ci_status_json) if args.ci_status_json else None,
-            timeout_seconds=args.timeout_seconds,
-            workflow_timeout_seconds=args.workflow_timeout_seconds,
-            verify_timeout_seconds=args.verify_timeout_seconds,
-            workflow_timeout_reason=args.workflow_timeout_reason,
-            total_timeout_seconds=args.total_timeout_seconds,
-            total_timeout_reason=args.total_timeout_reason,
-            checkout_most_advanced_branch=args.checkout_most_advanced_branch,
-            allow_mutating_gates=args.allow_mutating_gates,
-        )
+        return refresh_command_payload(args, repo_root)
     raise ValueError(f"unsupported command: {args.command}")
 
 
@@ -475,7 +467,13 @@ def _human_summary(payload: dict[str, Any]) -> str:
     if payload.get("schema") == "quality-runner-refresh-result-v0.1":
         summary = payload.get("summary")
         run_id = summary.get("run_id") if isinstance(summary, dict) else payload.get("run_id_prefix")
-        return f"status: {status}\nrun id: {run_id}"
+        lines = [f"status: {status}", f"run id: {run_id}"]
+        handoff_export = payload.get("handoff_export")
+        if isinstance(handoff_export, dict):
+            output_path = handoff_export.get("output_path")
+            if isinstance(output_path, str):
+                lines.append(f"handoff: {output_path}")
+        return "\n".join(lines)
 
     lines = [f"status: {status}"]
     run_id = payload.get("run_id")

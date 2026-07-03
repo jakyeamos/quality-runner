@@ -46,6 +46,7 @@ def build_controller_report_from_summary(
         "missing_capabilities": summary.get("missing_capabilities", []),
         "gate_results": summary.get("gate_results", []),
         "failure_type": summary.get("failure_type"),
+        "timeout_diagnostics": summary.get("timeout_diagnostics"),
     }
     normalized_blockers = blockers if blockers else inferred_blockers(final_qr)
     recommendation = controller_status_recommendation(

@@ -266,6 +266,57 @@ def test_controller_report_from_summary_groups_post_command_artifacts() -> None:
     }
 
 
+def test_controller_report_promotes_timeout_diagnostics_from_summary() -> None:
+    from quality_runner.controller_reports import build_controller_report_from_summary
+
+    timeout_diagnostics = {
+        "timeout_scope": "total-refresh",
+        "reason": "controller full refresh budget",
+        "last_directory": "CLFE/data/external/nba_pbp_cache",
+        "visited_paths": 7728,
+        "skipped_paths": 145,
+        "visited_top_level_counts": {"CLFE": 5419},
+        "skipped_top_level_counts": {"CLFE": 10},
+        "pruning_recommendations": [
+            {
+                "kind": "scan-exclusion",
+                "path": "CLFE/data/external/nba_pbp_cache",
+                "pattern": "CLFE/data/external/nba_pbp_cache/**",
+                "top_level": "CLFE",
+                "top_level_visited_paths": 5419,
+                "reason": "timeout ended inside a data/cache-like path after 7728 visited paths",
+            }
+        ],
+    }
+
+    report = build_controller_report_from_summary(
+        repo_path="/repos/example",
+        branch_name="qr/example",
+        baseline_run_id="baseline",
+        summary={
+            "run_id": "verify",
+            "path": "/repos/example/.quality-runner/runs/verify",
+            "status": "blocked",
+            "recommended_classification": "workflow-timeout-blocker",
+            "blocker_classes": ["workflow-timeout"],
+            "failure_type": "workflow-timeout",
+            "finding_counts": {"total": 0},
+            "missing_capabilities": [],
+            "timeout_diagnostics": timeout_diagnostics,
+        },
+        git_status_short="",
+        target_head="abc123",
+        pre_head="abc123",
+    )
+
+    assert report["final_qr"]["timeout_diagnostics"] == timeout_diagnostics
+    assert report["blockers"] == [
+        "Final QR is not clean: status=blocked; classification=workflow-timeout-blocker; blocker_classes=workflow-timeout.",
+        "Workflow timeout: total-refresh timed out at CLFE/data/external/nba_pbp_cache after 7728 visited paths.",
+        "Suggested scan exclusion: CLFE/data/external/nba_pbp_cache/**.",
+    ]
+
+
 def test_controller_report_strict_lint_allows_head_change_with_note() -> None:
     from quality_runner.controller_reports import (
         build_controller_report_from_summary,

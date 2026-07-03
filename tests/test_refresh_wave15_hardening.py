@@ -110,19 +110,25 @@ def test_refresh_payload_finalizes_partial_verify_artifacts_when_verify_times_ou
     assert gate_verification["failure_type"] == "workflow-timeout"
     assert gate_verification["reason"] == "controller deadline exceeded while verifying gates"
     assert gate_verification["timeout_scope"] == "verify-phase"
-    assert gate_verification["gates"] == [
-        {
-            "failure_type": "workflow-timeout",
-            "id": "workflow-timeout",
-            "phase": "verify-gates",
-            "reason": "controller deadline exceeded while verifying gates",
-            "recommended_action": (
-                "Inspect workflow-timeout.json and rerun refresh with tighter scan exclusions "
-                "or a larger total timeout"
-            ),
-            "status": "failed",
-        }
-    ]
+    assert len(gate_verification["gates"]) == 1
+    timeout_gate = gate_verification["gates"][0]
+    assert {
+        key: timeout_gate[key]
+        for key in ("failure_type", "id", "phase", "reason", "recommended_action", "status")
+    } == {
+        "failure_type": "workflow-timeout",
+        "id": "workflow-timeout",
+        "phase": "verify-gates",
+        "reason": "controller deadline exceeded while verifying gates",
+        "recommended_action": (
+            "Inspect workflow-timeout.json and rerun refresh with tighter scan exclusions "
+            "or a larger total timeout"
+        ),
+        "status": "failed",
+    }
+    assert timeout_gate["timeout_diagnostics"]["reason"] == (
+        "controller deadline exceeded while verifying gates"
+    )
     assert json.loads((run_dir / "gate-execution-plan.json").read_text()) == []
     assert run_summary["recommended_classification"] == "workflow-timeout-blocker"
 
@@ -173,3 +179,65 @@ def test_refresh_payload_total_timeout_writes_agent_handoff_when_inspect_times_o
     assert timeout_artifact["diagnostics"]["scan_progress"]["last_skipped_paths"] == []
     assert timeout_artifact["diagnostics"]["scan_progress"]["visited_top_level_counts"] == {}
     assert timeout_artifact["diagnostics"]["scan_progress"]["skipped_top_level_counts"] == {}
+
+
+def test_timeout_handoff_recommends_excluding_large_data_cache_surface(
+    tmp_path: Path, monkeypatch: object
+) -> None:
+    from quality_runner import refresh_timeout
+
+    monkeypatch.setattr(
+        refresh_timeout,
+        "scan_progress_snapshot",
+        lambda: {
+            "last_directory": "CLFE/data/external/nba_pbp_cache",
+            "last_paths": ["CLFE/data/external/nba_pbp_cache/0022400539.csv"],
+            "last_skipped_paths": ["CLFE/.venv"],
+            "visited_paths": 7728,
+            "skipped_paths": 145,
+            "visited_top_level_counts": {"CLFE": 5419, "LIS": 897},
+            "skipped_top_level_counts": {"CLFE": 10, "LIS": 28},
+        },
+    )
+
+    refresh_timeout.build_timeout_verify_artifacts(
+        repo_root=tmp_path,
+        run_id="data-cache-timeout",
+        phase="run",
+        reason="controller full refresh budget",
+        timeout_seconds=300,
+        elapsed_seconds=300.25,
+        baseline_run_id=None,
+        timeout_scope="total-refresh",
+    )
+    run_dir = tmp_path / ".quality-runner" / "runs" / "data-cache-timeout"
+    gate_verification = json.loads((run_dir / "gate-verification.json").read_text())
+    run_summary = json.loads((run_dir / "run-summary.json").read_text())
+    timeout_artifact = json.loads((run_dir / "workflow-timeout.json").read_text())
+    handoff = json.loads((run_dir / "agent-handoff.json").read_text())
+    handoff_markdown = (run_dir / "agent-handoff.md").read_text()
+
+    recommendation = {
+        "kind": "scan-exclusion",
+        "path": "CLFE/data/external/nba_pbp_cache",
+        "pattern": "CLFE/data/external/nba_pbp_cache/**",
+        "top_level": "CLFE",
+        "top_level_visited_paths": 5419,
+        "reason": "timeout ended inside a data/cache-like path after 7728 visited paths",
+    }
+    assert timeout_artifact["diagnostics"]["pruning_recommendations"] == [recommendation]
+    assert gate_verification["diagnostics"]["pruning_recommendations"] == [recommendation]
+    assert run_summary["timeout_diagnostics"]["pruning_recommendations"] == [recommendation]
+    assert gate_verification["gates"][0]["timeout_diagnostics"]["last_directory"] == (
+        "CLFE/data/external/nba_pbp_cache"
+    )
+    assert gate_verification["gates"][0]["recommended_action"] == (
+        "Add `CLFE/data/external/nba_pbp_cache/**` to scan_exclusions, rerun refresh, "
+        "and keep the 300s total timeout only if the pruned run still needs more evidence"
+    )
+    assert handoff["next_slice"]["action_groups"][0]["actions"] == [
+        "Add `CLFE/data/external/nba_pbp_cache/**` to scan_exclusions, rerun refresh, "
+        "and keep the 300s total timeout only if the pruned run still needs more evidence."
+    ]
+    assert "Last traversal directory: `CLFE/data/external/nba_pbp_cache`" in handoff_markdown
+    assert "Suggested scan exclusion: `CLFE/data/external/nba_pbp_cache/**`" in handoff_markdown

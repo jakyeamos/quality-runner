@@ -1662,6 +1662,34 @@ Product takeaways:
   was classified as `post_command_artifacts`. That deserves targeted inspection
   before the next stress wave.
 
+## Product Fix After Refresh Wave 19
+
+Implemented the Wave 19 follow-up hardening:
+
+- Workflow timeout artifacts now include `pruning_recommendations` derived from
+  scan progress. When a timeout ends inside a data/cache-like path, QR suggests
+  a concrete `scan_exclusions` pattern for that path.
+- Synthetic workflow-timeout gate results now carry concise
+  `timeout_diagnostics`, including timeout scope/reason, last traversal
+  directory, visited/skipped path counts, top-level traversal buckets, and
+  pruning recommendations.
+- Agent handoff Markdown now renders timeout diagnostics directly in the
+  remediation plan, so a user can run QR and work from the exported handoff
+  without opening `workflow-timeout.json` manually.
+- Run summaries and controller reports now promote timeout diagnostics into
+  `final_qr.timeout_diagnostics`; inferred blockers include the timeout scope,
+  last traversal directory, visited path count, and suggested scan exclusion.
+- `quality-runner refresh` now supports `--handoff-output <path>` to write the
+  generated `agent-handoff.md` to a user-selected remediation-plan path during
+  the same command.
+
+Verification:
+
+- Focused timeout/controller/handoff suites passed.
+- Full `uv run pytest` passed: 238 tests.
+- `uv run ruff check .` passed.
+- `git diff --check` passed.
+
 ## Rollout Ledger
 
 | Wave | Repo | Repo path | Total | Blockers | Baseline artifacts | Codex project status | Thread status | Thread id | Final QR status | Commit | Push | Notes |
