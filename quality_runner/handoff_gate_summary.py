@@ -3,6 +3,29 @@ from __future__ import annotations
 from typing import Any
 
 
+def action_group_markdown(value: object) -> list[str]:
+    if not isinstance(value, list) or not value:
+        return []
+    lines = ["", "### Action Groups", ""]
+    for group in value:
+        if not isinstance(group, dict):
+            continue
+        blocker_class = group.get("class")
+        gate_ids = group.get("gate_ids")
+        actions = group.get("actions")
+        if not isinstance(blocker_class, str) or not isinstance(gate_ids, list):
+            continue
+        ids = [gate_id for gate_id in gate_ids if isinstance(gate_id, str) and gate_id]
+        if not ids:
+            continue
+        lines.append(f"- {blocker_class}: {', '.join(ids)}")
+        if isinstance(actions, list):
+            for action in actions:
+                if isinstance(action, str) and action:
+                    lines.append(f"  - {action}")
+    return lines if len(lines) > 3 else []
+
+
 def build_gate_verification_summary(
     *,
     gate_verification: dict[str, Any] | None,

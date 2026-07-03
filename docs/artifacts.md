@@ -124,7 +124,9 @@ Blocked and failed gate handoffs include `primary_blocker_class`,
 `blocker_groups`, and next-slice `action_groups`. The flat `actions` list stays
 present for backward-compatible human reading, while `action_groups` gives
 controllers structured blocker-class routing and deduplicates repeated setup
-commands across gates that share the same dependency setup blocker.
+commands across gates that share the same dependency setup blocker. The
+Markdown handoff renders these groups under the next slice's `Action Groups`
+section so human workers see the same grouping without inspecting JSON.
 
 ## Safety Guarantees
 

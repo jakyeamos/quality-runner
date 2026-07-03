@@ -1073,9 +1073,18 @@ Product takeaways:
   `pnpm install --frozen-lockfile` setup step.
 - Regression controls held. BIP-Console did not pick up a false dependency
   setup action, and R-Project stayed clean with no next slice.
-- Remaining product polish: Markdown currently renders the flat action strings
-  but does not expose a dedicated "Action Groups" section, so humans still infer
-  grouping from ordering while controllers can read the JSON structure directly.
+
+## Product Fix After Refresh Wave 13
+
+Implemented the Wave 13 polish follow-up:
+
+- `agent-handoff.md` now renders a dedicated `Action Groups` section under the
+  next slice whenever `next_slice.action_groups` is present.
+- Each Markdown action group shows the blocker class, affected gate ids, and
+  grouped/deduplicated actions, while the existing flat `Actions` section
+  remains present for compatibility.
+- Clean handoffs remain unchanged because `gates-clean` runs keep
+  `next_slice=null`.
 
 ## Rollout Ledger
 

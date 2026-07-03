@@ -16,6 +16,9 @@ All notable changes to Quality Runner are documented here.
   command failures separately.
 - Added structured gate-blocker `action_groups` on blocked/failed handoff
   next slices and deduplicated repeated dependency setup commands across gates.
+- Added an Action Groups section to `agent-handoff.md` so human readers see the
+  same blocker-class grouping and deduped actions that controllers read from
+  `agent-handoff.json`.
 - Improved pnpm non-interactive dependency restoration guidance so
   `ERR_PNPM_ABORTED_REMOVE_MODULES_DIR_NO_TTY` points workers at one interactive
   `pnpm install --frozen-lockfile` setup step before rerunning QR gates.

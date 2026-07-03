@@ -14,6 +14,7 @@ from quality_runner.handoff_gate_suggestions import (
     suggested_gate_command,
 )
 from quality_runner.handoff_gate_summary import (
+    action_group_markdown,
     build_gate_verification_summary,
     gate_blocker_slice,
     gate_handoff_status,
@@ -225,6 +226,7 @@ def render_handoff_markdown(handoff: dict[str, Any]) -> str:
                 *_finding_markdown_items(next_slice.get("findings")),
                 "- Actions:",
                 *_markdown_items(next_slice.get("actions")),
+                *action_group_markdown(next_slice.get("action_groups")),
             ]
         )
     else:

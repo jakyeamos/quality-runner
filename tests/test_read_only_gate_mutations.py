@@ -85,3 +85,7 @@ def test_verify_gates_read_only_mode_restores_tracked_mutations(tmp_path: Path) 
     assert handoff["next_slice"]["title"] == "Resolve read-only gate policy blockers"
     assert "Primary blocker class: read-only-policy" in handoff_markdown
     assert "- read-only-policy: tests" in handoff_markdown
+    assert "### Action Groups" in handoff_markdown
+    assert "  - For tests, gate mutated tracked files during read-only verification" in (
+        handoff_markdown
+    )
