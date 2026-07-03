@@ -52,14 +52,19 @@ Artifacts are written under:
 - `resolution-ledger.md`: human-readable resolution ledger summary.
 - `agent-handoff.json`: machine-readable next-slice handoff, including adoption
   stage, stopping criteria, missing repo-owned gates with suggested commands,
-  and runner-provided structural checks that produced findings.
+  gate verification status/classification for verified runs, gate blockers with
+  setup guidance, and runner-provided structural checks that produced findings.
 - `agent-handoff.md`: human-readable handoff for a coding agent. The Markdown
   intentionally separates missing repo-owned gates such as `pnpm test` or
   `pnpm typecheck` from Quality Runner's built-in structural checks so readers
   do not mistake a runner heuristic for a repo-native test, build, or typecheck
-  gate. It also names the staged-adoption stopping point so a mature repo can
-  add gates, scope scans, classify debt, or fix high-signal findings without
-  treating one-pass QR clean as the only successful outcome.
+  gate. For blocked or failed verification runs, it puts gate blockers before
+  structural remediation and uses `gates-blocked` or `gates-failed` status so
+  controllers can route the next slice to dependency setup, environment
+  remediation, or failing executable gates first. It also names the
+  staged-adoption stopping point so a mature repo can add gates, scope scans,
+  classify debt, or fix high-signal findings without treating one-pass QR clean
+  as the only successful outcome.
 
 ## Gate Verification Artifacts
 

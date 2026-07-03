@@ -9,6 +9,16 @@ from quality_runner.adoption import (
     stopping_criteria,
 )
 from quality_runner.findings import AGENT_HANDOFF_SCHEMA, REMEDIATION_PLAN_SCHEMA
+from quality_runner.handoff_gate_suggestions import (
+    gate_severity,
+    suggested_gate_command,
+)
+from quality_runner.handoff_gate_summary import (
+    build_gate_verification_summary,
+    gate_blocker_slice,
+    gate_handoff_status,
+    gate_verification_markdown,
+)
 from quality_runner.handoff_status import handoff_status
 
 PRIORITY_ORDER = {"high": 0, "medium": 1, "low": 2}
@@ -90,14 +100,20 @@ def build_agent_handoff(
     remediation_plan: dict[str, Any],
     artifact_paths: dict[str, str],
     capability_map: dict[str, Any] | None = None,
+    gate_verification: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     missing_gates = _missing_repo_owned_gates(capability_map)
-    status = handoff_status(
+    gate_summary = build_gate_verification_summary(
+        gate_verification=gate_verification,
+        finding_count=len(_findings(audit_report)),
+        missing_capability_count=len(missing_gates),
+    )
+    status = gate_handoff_status(gate_summary) or handoff_status(
         remediation_plan=remediation_plan,
         capability_map=capability_map,
         missing_repo_owned_gates=missing_gates,
     )
-    next_slice = _next_slice(remediation_plan)
+    next_slice = gate_blocker_slice(gate_summary) or _next_slice(remediation_plan)
     adoption_stage = handoff_adoption_stage(remediation_plan)
     return {
         "schema": AGENT_HANDOFF_SCHEMA,
@@ -112,6 +128,7 @@ def build_agent_handoff(
         "runner_provided_checks": _runner_provided_checks(audit_report),
         "adoption_stage": adoption_stage,
         "stopping_criteria": stopping_criteria(adoption_stage),
+        **_optional_value("gate_verification", gate_summary),
         "next_slice": next_slice,
         "verification_gates": _slice_verification_gates(next_slice),
     }
@@ -124,6 +141,8 @@ def render_handoff_markdown(handoff: dict[str, Any]) -> str:
         f"- Schema: {handoff.get('schema')}",
         f"- Status: {handoff.get('status')}",
         f"- Implementation allowed: {str(handoff.get('implementation_allowed')).lower()}",
+        "",
+        *(gate_verification_markdown(handoff.get("gate_verification"))),
         "",
         "## Artifacts",
         "",
@@ -268,9 +287,9 @@ def _missing_repo_owned_gates(capability_map: dict[str, Any] | None) -> list[dic
         gates.append(
             {
                 "id": capability_id,
-                "severity": _gate_severity(capability_id),
+                "severity": gate_severity(capability_id),
                 "reason": reason if isinstance(reason, str) and reason else "gate was not found",
-                "suggested_command": _suggested_gate_command(capability_id, language),
+                "suggested_command": suggested_gate_command(capability_id, language),
                 **_optional_string("required_by", required_by),
             }
         )
@@ -295,41 +314,6 @@ def _runner_provided_checks(audit_report: dict[str, Any]) -> list[dict[str, Any]
     ]
 
 
-def _gate_severity(capability_id: str) -> str:
-    if capability_id in {"formatter", "lint", "typecheck", "tests", "dead_code", "truth_file"}:
-        return "blocker"
-    return "warning"
-
-
-def _suggested_gate_command(capability_id: str, language: object) -> str:
-    python_commands = {
-        "formatter": "ruff format --check .",
-        "lint": "ruff check .",
-        "typecheck": "basedpyright",
-        "tests": "pytest -q",
-        "build": "uv build",
-        "dead_code": "vulture . --min-confidence 70",
-        "runtime_smoke": "python -m <package_or_console_script>",
-        "pre_pr": "quality-runner run . --json",
-        "pre_cr": "pre-cr run --workspace . --json",
-        "truth_file": "maintain .tracker/PROJECT_TRUTH.md",
-    }
-    javascript_commands = {
-        "formatter": "pnpm format",
-        "lint": "pnpm lint",
-        "typecheck": "pnpm typecheck",
-        "tests": "pnpm test",
-        "build": "pnpm build",
-        "dead_code": "pnpm audit:dead-code",
-        "runtime_smoke": "pnpm smoke",
-        "pre_pr": "pnpm pre-pr",
-        "pre_cr": "pnpm pre-cr",
-        "truth_file": "maintain .tracker/PROJECT_TRUTH.md",
-    }
-    commands = python_commands if language == "python" else javascript_commands
-    return commands.get(capability_id, f"add a {capability_id} gate")
-
-
 def _runner_check_description(check_id: str) -> str:
     descriptions = {
         "clarify": "readability and naming clarity heuristics",
@@ -348,6 +332,12 @@ def _optional_string(key: str, value: object) -> dict[str, str]:
     if isinstance(value, str) and value:
         return {key: value}
     return {}
+
+
+def _optional_value(key: str, value: object) -> dict[str, object]:
+    if value is None:
+        return {}
+    return {key: value}
 
 
 def _findings(audit_report: dict[str, Any]) -> list[dict[str, Any]]:

@@ -293,6 +293,7 @@ def verify_gates_payload(
         remediation_plan=remediation_plan,
         artifact_paths=artifact_paths,
         capability_map=verified_capability_map,
+        gate_verification=gate_verification,
     )
     _require_valid("agent handoff", validate_agent_handoff(handoff))
 

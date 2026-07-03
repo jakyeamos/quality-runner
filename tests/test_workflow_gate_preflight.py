@@ -139,6 +139,7 @@ def test_verify_gates_payload_executes_discovered_gates_and_marks_capabilities(
         Path(payload["artifact_paths"]["capability_matrix_json"]).read_text()
     )
     handoff = json.loads(Path(payload["artifact_paths"]["agent_handoff_json"]).read_text())
+    handoff_markdown = Path(payload["artifact_paths"]["agent_handoff_md"]).read_text()
 
     assert payload["schema"] == "quality-runner-verify-gates-result-v0.1"
     assert payload["status"] == "failed"
@@ -168,8 +169,27 @@ def test_verify_gates_payload_executes_discovered_gates_and_marks_capabilities(
         "execution": "local-executed",
         "result": "failed",
     }
-    assert handoff["status"] == "gates-executed"
+    assert handoff["status"] == "gates-failed"
     assert "gate_verification_json" in handoff["artifact_paths"]
+    assert handoff["gate_verification"] == {
+        "status": "failed",
+        "recommended_classification": "failing-executable-gates",
+        "blockers": [
+            {
+                "id": "tests",
+                "status": "failed",
+                "failure_type": "command-failed",
+                "command": f"{sys.executable} -c 'import sys; sys.exit(1)'",
+            }
+        ],
+    }
+    assert handoff["next_slice"]["id"] == "resolve-gate-verification-blockers"
+    assert handoff["next_slice"]["title"] == "Resolve failing executable gates"
+    assert handoff["next_slice"]["findings"][0]["id"] == "gate-tests"
+    assert "Run `" in handoff["next_slice"]["actions"][0]
+    assert "## Gate Verification" in handoff_markdown
+    assert "- Recommended classification: failing-executable-gates" in handoff_markdown
+    assert "- tests: failed (command-failed)." in handoff_markdown
 
 
 def test_verify_gates_runs_package_scripts_through_detected_package_manager(
@@ -327,6 +347,8 @@ def test_verify_gates_classifies_pnpm_ignored_builds_as_dependency_setup(
     verification = json.loads(
         Path(payload["artifact_paths"]["gate_verification_json"]).read_text()
     )
+    handoff = json.loads(Path(payload["artifact_paths"]["agent_handoff_json"]).read_text())
+    handoff_markdown = Path(payload["artifact_paths"]["agent_handoff_md"]).read_text()
 
     assert payload["status"] == "blocked"
     assert verification["gates"][0]["id"] == "lint"
@@ -343,6 +365,23 @@ def test_verify_gates_classifies_pnpm_ignored_builds_as_dependency_setup(
         verification["gates"][1]["diagnostics"]["dependency_setup"]["setup_command"]
         == "pnpm approve-builds"
     )
+    assert handoff["gate_verification"]["recommended_classification"] == (
+        "environment-or-dependency-blocker"
+    )
+    assert handoff["status"] == "gates-blocked"
+    assert handoff["gate_verification"]["blockers"][0]["dependency_setup"] == {
+        "package_manager": "pnpm",
+        "setup_command": "pnpm approve-builds",
+    }
+    assert handoff["gate_verification"]["blockers"][1]["skip_type"] == "dependency-setup-blocked"
+    assert handoff["gate_verification"]["blockers"][1]["blocked_by"] == "lint"
+    assert handoff["next_slice"]["id"] == "resolve-gate-verification-blockers"
+    assert handoff["next_slice"]["title"] == "Resolve dependency or environment gate blockers"
+    assert handoff["next_slice"]["actions"][0] == (
+        "Run dependency setup for lint: pnpm approve-builds."
+    )
+    assert "Setup: `pnpm approve-builds`" in handoff_markdown
+    assert "- Recommended classification: environment-or-dependency-blocker" in handoff_markdown
 
 
 def test_verify_gates_classifies_next_font_fetch_as_environment_restricted(

@@ -717,6 +717,8 @@ def test_artifact_schema_additions_remain_optional_for_v01_compatibility() -> No
     assert agent_handoff["properties"]["schema"]["const"] == "quality-runner-agent-handoff-v0.1"
     assert "gates-discovered" in agent_handoff["properties"]["status"]["enum"]
     assert "gates-executed" in agent_handoff["properties"]["status"]["enum"]
+    assert "gates-blocked" in agent_handoff["properties"]["status"]["enum"]
+    assert "gates-failed" in agent_handoff["properties"]["status"]["enum"]
     assert "gates-clean" in agent_handoff["properties"]["status"]["enum"]
     assert "adoption_stage" not in agent_handoff["required"]
     assert "stopping_criteria" not in agent_handoff["required"]

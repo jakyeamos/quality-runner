@@ -8,7 +8,7 @@
     "schema": { "const": "quality-runner-agent-handoff-v0.1" },
     "run_id": { "type": ["string", "null"] },
     "status": {
-      "enum": ["clean", "planned", "gates-discovered", "gates-executed", "gates-clean"]
+      "enum": ["clean", "planned", "gates-discovered", "gates-executed", "gates-blocked", "gates-failed", "gates-clean"]
     },
     "implementation_allowed": { "const": false },
     "artifact_paths": {
@@ -34,6 +34,7 @@
       "items": { "type": "string", "minLength": 1 },
       "default": []
     },
+    "gate_verification": { "$ref": "#/$defs/gateVerificationSummary" },
     "next_slice": { "type": ["object", "null"] },
     "verification_gates": { "type": "array", "items": { "type": "string" } }
   },
@@ -69,6 +70,43 @@
         "id": { "type": "string", "minLength": 1 },
         "finding_count": { "type": "integer", "minimum": 0 },
         "description": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": false
+    },
+    "gateVerificationSummary": {
+      "type": "object",
+      "required": ["status", "recommended_classification", "blockers"],
+      "properties": {
+        "status": { "type": "string", "minLength": 1 },
+        "recommended_classification": { "type": "string", "minLength": 1 },
+        "failure_type": { "type": "string", "minLength": 1 },
+        "blockers": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/gateBlocker" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "gateBlocker": {
+      "type": "object",
+      "required": ["id", "status"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "status": { "type": "string", "minLength": 1 },
+        "failure_type": { "type": "string", "minLength": 1 },
+        "skip_type": { "type": "string", "minLength": 1 },
+        "blocked_by": { "type": "string", "minLength": 1 },
+        "command": { "type": "string", "minLength": 1 },
+        "recommended_action": { "type": "string", "minLength": 1 },
+        "dependency_setup": {
+          "type": "object",
+          "properties": {
+            "package_manager": { "type": "string", "minLength": 1 },
+            "setup_command": { "type": "string", "minLength": 1 },
+            "reason": { "type": "string", "minLength": 1 }
+          },
+          "additionalProperties": false
+        }
       },
       "additionalProperties": false
     },

@@ -6,6 +6,9 @@ All notable changes to Quality Runner are documented here.
 
 - Clarified handoff output by separating missing repo-owned quality gates from
   runner-provided structural checks.
+- Added explicit `gates-blocked` and `gates-failed` handoff statuses with
+  gate-verification classification, blocker summaries, and dependency setup
+  commands in `agent-handoff.json` and `agent-handoff.md`.
 - Added suggested commands for missing repo-owned gates in `agent-handoff.json`
   and `agent-handoff.md`.
 - Added ignored-path scan previews, interactive one-run inclusion prompts, and

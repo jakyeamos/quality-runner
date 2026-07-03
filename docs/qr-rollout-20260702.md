@@ -879,6 +879,18 @@ Product takeaways:
   `agent-handoff.md`; for blocked/failed gates, handoff should make the gate
   blocker the next slice before broad structural debt.
 
+Follow-up implementation:
+
+- `agent-handoff.json` now includes a `gate_verification` summary for verified
+  runs with final status, recommended classification, and failed/blocked gate
+  blockers.
+- Blocked and failed verification runs now use explicit `gates-blocked` and
+  `gates-failed` handoff statuses instead of generic `gates-executed`.
+- Blocked and failed verification runs now queue
+  `resolve-gate-verification-blockers` as the next slice before structural debt,
+  carrying dependency setup commands such as `pnpm approve-builds` into both
+  JSON and Markdown handoffs.
+
 ## Rollout Ledger
 
 | Wave | Repo | Repo path | Total | Blockers | Baseline artifacts | Codex project status | Thread status | Thread id | Final QR status | Commit | Push | Notes |

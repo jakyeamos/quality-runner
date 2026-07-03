@@ -326,6 +326,18 @@ def test_validate_agent_handoff_rejects_next_slice_unknown_priority() -> None:
     assert result["errors"] == ["agent handoff next_slice must be a remediation slice object"]
 
 
+def test_validate_agent_handoff_requires_next_slice_for_blocked_gate_status() -> None:
+    from quality_runner.findings import validate_agent_handoff
+
+    handoff = _valid_agent_handoff(status="gates-blocked")
+    handoff["next_slice"] = None
+
+    result = validate_agent_handoff(handoff)
+
+    assert result["passed"] is False
+    assert result["errors"] == ["agent handoff next_slice must be a remediation slice object"]
+
+
 def _valid_remediation_slice(priority: str = "high") -> dict[str, object]:
     return {
         "id": "slice-001",
