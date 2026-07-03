@@ -632,6 +632,29 @@ Implemented explicit refresh timeout scopes after the wave 5 timing ambiguity:
 Validation before the next wave: `uv run ruff check .`, `uv run pytest`, and
 `git diff --check` passed locally.
 
+## Refresh Wave 6 Launch
+
+Refresh wave 6 reruns the same five repos in two modes to verify the new timeout
+contract:
+
+- Full-evidence mode: `--verify-timeout-seconds 180` and no
+  `--total-timeout-seconds`.
+- Controller-budget mode: `--verify-timeout-seconds 180`,
+  `--total-timeout-seconds 240`, and explicit total timeout reason
+  `controller refresh wave 6 total budget`.
+
+Each worker must compare `timeout_contract`, `phase_timings`, timeout artifact
+phase/reason, artifact preservation, scan budget, and target git status across
+both modes.
+
+| Repo | Thread id | Full run id prefix | Budget run id prefix | Baseline | Report path | Status |
+|---|---|---|---|---|---|---|
+| tenure | `019f2888-965b-7080-8b5a-d61122165ee3` | `refresh6full-20260703-tenure` | `refresh6budget-20260703-tenure` | `refresh5-20260703-tenure-verify` | `/private/tmp/qr-refresh6-tenure-report.json` | launched |
+| BidCamp | `019f2888-d027-78d1-8a23-bcaea6cea3a3` | `refresh6full-20260703-BidCamp` | `refresh6budget-20260703-BidCamp` | `refresh5-20260703-BidCamp-verify` | `/private/tmp/qr-refresh6-BidCamp-report.json` | launched |
+| AIOS | `019f2889-1688-7f93-be30-1cd44e4026ee` | `refresh6full-20260703-AIOS` | `refresh6budget-20260703-AIOS` | `refresh5-20260703-AIOS-verify` | `/private/tmp/qr-refresh6-AIOS-report.json` | launched |
+| amos-saas | `019f2889-510f-7882-9f6a-f5b58a1174c0` | `refresh6full-20260703-amos-saas` | `refresh6budget-20260703-amos-saas` | `refresh5-20260703-amos-saas-verify` | `/private/tmp/qr-refresh6-amos-saas-report.json` | launched |
+| Dsci-proj | `019f2889-8e89-7472-a39f-d4c7ed7b4c1c` | `refresh6full-20260703-Dsci-proj` | `refresh6budget-20260703-Dsci-proj` | `refresh5-20260703-Dsci-proj-verify` | `/private/tmp/qr-refresh6-Dsci-proj-report.json` | launched |
+
 ## Rollout Ledger
 
 | Wave | Repo | Repo path | Total | Blockers | Baseline artifacts | Codex project status | Thread status | Thread id | Final QR status | Commit | Push | Notes |
