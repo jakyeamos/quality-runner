@@ -1144,6 +1144,29 @@ Verification:
 - `uv run ruff check .` passed.
 - `git diff --check` passed.
 
+## Refresh Wave 15 Launch
+
+Objective: broader stress/control evidence against pushed QR commit `3b4c56a`,
+focused on the `quality-runner-agent-handoff-v0.2` contract, refresh help/docs
+polish, blocker/action-group routing, timeout-reason evidence, and regression
+coverage for prior traversal/dependency/read-only findings.
+
+Wave rule: workers report `ready-for-review` for read-only evidence runs,
+`blocked` only for an actual blocker, and `complete` only if target-repo changes
+are committed and pushed. The controller should record each terminal report
+before starting another wave.
+
+| Repo | Thread id | Run id prefix | Baseline | Report path | Status |
+|---|---|---|---|---|---|
+| amos-saas | `019f2979-7171-7b32-a615-f628c03af268` | `refresh15-20260703-amos-saas` | `refresh14-20260703-amos-saas-verify` | `/private/tmp/qr-refresh15-amos-saas-report.json` | launched |
+| BIP-Console | `019f2979-bde5-7fb2-b35d-3bad34c69e6e` | `refresh15-20260703-BIP-Console` | `refresh14-20260703-BIP-Console-verify` | `/private/tmp/qr-refresh15-BIP-Console-report.json` | launched |
+| R-Project | `019f297a-051c-7f80-bd07-723d9a4801d1` | `refresh15-20260703-R-Project` | `refresh14-20260703-R-Project-verify` | `/private/tmp/qr-refresh15-R-Project-report.json` | launched |
+| EliHealth | `019f297a-3bb8-7fa1-852c-be5c4b74959d` | `refresh15-20260703-EliHealth` | `refresh13-20260703-EliHealth-verify` | `/private/tmp/qr-refresh15-EliHealth-report.json` | launched |
+| Terrace | `019f297a-75eb-7643-b804-2e7b09398138` | `refresh15-20260703-Terrace` | `parallel-20260702T200935Z-Terrace` | `/private/tmp/qr-refresh15-Terrace-report.json` | launched |
+| tmcp | `019f297a-b5a2-75b1-839a-12b81afa6eba` | `refresh15-20260703-tmcp` | `parallel-20260702T200935Z-tmcp` | `/private/tmp/qr-refresh15-tmcp-report.json` | launched |
+| BBDSE | `019f297a-ee2b-7fd0-b50e-ebdf77147cbc` | `refresh15-20260703-BBDSE` | `parallel-20260702T200935Z-BBDSE` | `/private/tmp/qr-refresh15-BBDSE-report.json` | launched |
+| agent-router | `019f297b-3107-7db1-914c-716fe740416f` | `refresh15-20260703-agent-router` | `parallel-20260702T200935Z-agent-router` | `/private/tmp/qr-refresh15-agent-router-report.json` | launched |
+
 ## Rollout Ledger
 
 | Wave | Repo | Repo path | Total | Blockers | Baseline artifacts | Codex project status | Thread status | Thread id | Final QR status | Commit | Push | Notes |
