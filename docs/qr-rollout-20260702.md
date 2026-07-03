@@ -1124,6 +1124,26 @@ Product takeaways:
   productization rather than another immediate bug fix: schema versioning for
   the expanded handoff shape, CLI/docs polish, and then a broader evidence wave.
 
+## Product Fix After Refresh Wave 14
+
+Implemented the productization polish identified by Wave 14:
+
+- Bumped generated agent handoffs to `quality-runner-agent-handoff-v0.2` so
+  controllers can distinguish the expanded routing contract from earlier
+  generic handoffs.
+- Added packaged schema coverage for `next_slice.action_groups` and validator
+  coverage for malformed action groups, while keeping the flat `actions` list
+  available for backward-compatible readers.
+- Clarified `quality-runner refresh --help`, README, CLI docs, artifact docs,
+  and changelog around `gates-clean`, `gates-blocked`, `gates-failed`,
+  `blocker_groups`, `action_groups`, and timeout-reason fields.
+
+Verification:
+
+- `uv run pytest` passed: 221 tests.
+- `uv run ruff check .` passed.
+- `git diff --check` passed.
+
 ## Rollout Ledger
 
 | Wave | Repo | Repo path | Total | Blockers | Baseline artifacts | Codex project status | Thread status | Thread id | Final QR status | Commit | Push | Notes |

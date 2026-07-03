@@ -240,6 +240,22 @@ def test_cli_verify_gates_json_executes_discovered_gates(tmp_path: Path) -> None
     assert verification["gates"][0]["status"] == "passed"
 
 
+def test_cli_refresh_help_names_statuses_action_groups_and_timeout_reasons() -> None:
+    result = subprocess.run(
+        [sys.executable, "-m", "quality_runner", "refresh", "--help"],
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+    assert "gates-blocked" in result.stdout
+    assert "gates-failed" in result.stdout
+    assert "gates-clean" in result.stdout
+    assert "action_groups" in result.stdout
+    assert "--total-timeout-reason" in result.stdout
+
+
 def test_cli_inspect_can_checkout_most_advanced_branch(tmp_path: Path) -> None:
     write_js_fixture(tmp_path)
     _git(tmp_path, "init", "-b", "main")

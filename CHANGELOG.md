@@ -2,6 +2,16 @@
 
 All notable changes to Quality Runner are documented here.
 
+## Unreleased
+
+- Bumped the agent handoff artifact contract to
+  `quality-runner-agent-handoff-v0.2` and documented the expanded
+  controller-facing routing fields.
+- Added packaged JSON Schema coverage for `next_slice.action_groups` and
+  validator coverage for malformed action groups.
+- Clarified `refresh --help` with `gates-clean`, `gates-blocked`,
+  `gates-failed`, `action_groups`, and total-timeout reason guidance.
+
 ## 0.2.1 - 2026-07-02
 
 - Clarified handoff output by separating missing repo-owned quality gates from

@@ -175,6 +175,7 @@ def _slice_item(value: object) -> bool:
         and value.get("priority") in ALLOWED_PRIORITIES
         and _non_empty_finding_list(value.get("findings"))
         and _non_empty_string_list(value.get("actions"))
+        and _optional_action_group_list(value.get("action_groups"))
         and _non_empty_string_list(value.get("verification_gates"))
     )
 
@@ -194,6 +195,22 @@ def _gate_blocker(value: object) -> bool:
     if not isinstance(value, dict):
         return False
     return _non_empty_string(value.get("id")) and _non_empty_string(value.get("status"))
+
+
+def _optional_action_group_list(value: object) -> bool:
+    if value is None:
+        return True
+    return isinstance(value, list) and all(_action_group(item) for item in value)
+
+
+def _action_group(value: object) -> bool:
+    if not isinstance(value, dict):
+        return False
+    return (
+        _non_empty_string(value.get("class"))
+        and _non_empty_string_list(value.get("gate_ids"))
+        and _non_empty_string_list(value.get("actions"))
+    )
 
 
 def _warning_list(value: object) -> bool:

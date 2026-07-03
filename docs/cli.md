@@ -167,12 +167,21 @@ Timeout flags are explicit about scope:
   `--verify-timeout-seconds`.
 - `--total-timeout-seconds` is optional and caps the full refresh across
   inspect, run, and verify.
+- `--workflow-timeout-reason` records why the verify-phase deadline exists.
+- `--total-timeout-reason` records why the full refresh deadline exists.
 
 Refresh JSON includes `timeout_contract` and `phase_timings` so controllers can
 distinguish a deliberate full-evidence run from a hard end-to-end deadline.
 When a timeout fires, `workflow-timeout.json`, the verify result, and
 `gate-verification.json` include `timeout_scope` as either `verify-phase` or
 `total-refresh`.
+
+Agent handoffs from refresh use `quality-runner-agent-handoff-v0.2` and route
+verified gate outcomes with `gates-clean`, `gates-blocked`, and `gates-failed`.
+Blocked and failed handoffs include `gate_verification.blocker_groups` and
+`next_slice.action_groups` so controllers can distinguish dependency setup,
+environment restrictions, read-only policy blockers, and executable gate
+failures before launching the next worker.
 
 ## `quality-runner validate-report`
 

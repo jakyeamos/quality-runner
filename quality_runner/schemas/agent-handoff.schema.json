@@ -1,11 +1,11 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://quality-runner.dev/schemas/agent-handoff.schema.json",
+  "$id": "https://quality-runner.dev/schemas/agent-handoff-v0.2.schema.json",
   "title": "Quality Runner Agent Handoff",
   "type": "object",
   "required": ["schema", "status", "implementation_allowed", "artifact_paths", "warnings", "finding_ids", "slice_ids", "verification_gates"],
   "properties": {
-    "schema": { "const": "quality-runner-agent-handoff-v0.1" },
+    "schema": { "const": "quality-runner-agent-handoff-v0.2" },
     "run_id": { "type": ["string", "null"] },
     "status": {
       "enum": ["clean", "planned", "gates-discovered", "gates-executed", "gates-blocked", "gates-failed", "gates-clean"]
@@ -35,7 +35,12 @@
       "default": []
     },
     "gate_verification": { "$ref": "#/$defs/gateVerificationSummary" },
-    "next_slice": { "type": ["object", "null"] },
+    "next_slice": {
+      "oneOf": [
+        { "type": "null" },
+        { "$ref": "#/$defs/remediationSlice" }
+      ]
+    },
     "verification_gates": { "type": "array", "items": { "type": "string" } }
   },
   "$defs": {
@@ -70,6 +75,64 @@
         "id": { "type": "string", "minLength": 1 },
         "finding_count": { "type": "integer", "minimum": 0 },
         "description": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": false
+    },
+    "remediationSlice": {
+      "type": "object",
+      "required": ["id", "title", "priority", "findings", "actions", "verification_gates"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "title": { "type": "string", "minLength": 1 },
+        "priority": { "enum": ["high", "medium", "low"] },
+        "findings": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/remediationFinding" },
+          "minItems": 1
+        },
+        "actions": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "minItems": 1
+        },
+        "action_groups": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/actionGroup" }
+        },
+        "verification_gates": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "minItems": 1
+        }
+      },
+      "additionalProperties": true
+    },
+    "remediationFinding": {
+      "type": "object",
+      "required": ["id", "severity", "category", "summary"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "severity": { "enum": ["critical", "blocker", "warning", "observation"] },
+        "category": { "type": "string", "minLength": 1 },
+        "summary": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": true
+    },
+    "actionGroup": {
+      "type": "object",
+      "required": ["class", "gate_ids", "actions"],
+      "properties": {
+        "class": { "type": "string", "minLength": 1 },
+        "gate_ids": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "minItems": 1
+        },
+        "actions": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "minItems": 1
+        }
       },
       "additionalProperties": false
     },

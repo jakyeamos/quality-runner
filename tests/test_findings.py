@@ -338,6 +338,26 @@ def test_validate_agent_handoff_requires_next_slice_for_blocked_gate_status() ->
     assert result["errors"] == ["agent handoff next_slice must be a remediation slice object"]
 
 
+def test_validate_agent_handoff_rejects_malformed_action_groups() -> None:
+    from quality_runner.findings import validate_agent_handoff
+
+    handoff = _valid_agent_handoff(status="gates-blocked")
+    next_slice = handoff["next_slice"]
+    assert isinstance(next_slice, dict)
+    next_slice["action_groups"] = [
+        {
+            "class": "dependency-setup",
+            "gate_ids": ["lint"],
+            "actions": [],
+        }
+    ]
+
+    result = validate_agent_handoff(handoff)
+
+    assert result["passed"] is False
+    assert result["errors"] == ["agent handoff next_slice must be a remediation slice object"]
+
+
 def _valid_remediation_slice(priority: str = "high") -> dict[str, object]:
     return {
         "id": "slice-001",
@@ -358,7 +378,7 @@ def _valid_remediation_slice(priority: str = "high") -> dict[str, object]:
 
 def _valid_agent_handoff(status: str = "planned") -> dict[str, object]:
     return {
-        "schema": "quality-runner-agent-handoff-v0.1",
+        "schema": "quality-runner-agent-handoff-v0.2",
         "status": status,
         "implementation_allowed": False,
         "artifact_paths": {"agent_handoff_json": "/tmp/agent-handoff.json"},

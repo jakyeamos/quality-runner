@@ -67,7 +67,18 @@ def build_parser() -> argparse.ArgumentParser:
     )
 
     refresh_parser = subparsers.add_parser(
-        "refresh", help="Run inspect, run, verify-gates, and summarize in read-only mode"
+        "refresh",
+        help="Run inspect, run, verify-gates, and summarize in read-only mode",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog=(
+            "Refresh emits gate handoff statuses for controller routing:\n"
+            "  gates-clean    all discovered local gates passed\n"
+            "  gates-blocked  environment, dependency setup, or read-only policy blocked evidence\n"
+            "  gates-failed   executable repo gates ran and failed\n\n"
+            "Blocked and failed handoffs include gate_verification.blocker_groups and\n"
+            "next_slice.action_groups. Use --total-timeout-reason to record why a\n"
+            "full refresh deadline was applied when --total-timeout-seconds is set."
+        ),
     )
     _add_workflow_arguments(refresh_parser)
     refresh_parser.add_argument(

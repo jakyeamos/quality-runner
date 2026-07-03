@@ -50,7 +50,8 @@ Artifacts are written under:
   fingerprint, preserving accepted dispositions and marking disappeared
   findings fixed on later runs.
 - `resolution-ledger.md`: human-readable resolution ledger summary.
-- `agent-handoff.json`: machine-readable next-slice handoff, including adoption
+- `agent-handoff.json`: machine-readable next-slice handoff using schema
+  `quality-runner-agent-handoff-v0.2`, including adoption
   stage, stopping criteria, missing repo-owned gates with suggested commands,
   gate verification status/classification for verified runs, gate blockers with
   setup guidance, primary blocker class, grouped blocker routing, and
@@ -143,13 +144,22 @@ directory. `inspect` and `run` can explicitly switch branches first with
 
 ## Compatibility Policy
 
-Artifact schema ids stay on `v0.1` while changes are additive and old consumers
-can continue to read previous fields unchanged. New optional fields may appear
-in artifacts and schemas, but existing required fields keep their meaning.
+Most artifact schema ids stay on `v0.1` while changes are additive and old
+consumers can continue to read previous fields unchanged. New optional fields
+may appear in artifacts and schemas, but existing required fields keep their
+meaning.
 
 A schema id must move to the next minor version before a release that removes a
 field, changes a field meaning, changes a required field type, or makes an
 optional field required.
+
+`agent-handoff.json` moved to `quality-runner-agent-handoff-v0.2` because the
+controller-facing routing contract expanded from a generic planned/executed
+handoff into explicit `gates-blocked`, `gates-failed`, and `gates-clean`
+statuses plus structured `gate_verification.blocker_groups` and
+`next_slice.action_groups`. The new fields are still optional for consumers
+that only read the flat `actions` list, but controllers should key new routing
+logic off the `v0.2` schema id.
 
 ## Local CI Status
 

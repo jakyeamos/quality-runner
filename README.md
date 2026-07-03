@@ -100,6 +100,7 @@ quality-runner status /path/to/repo --json
 quality-runner inspect /path/to/repo --json
 quality-runner run /path/to/repo --json
 quality-runner verify-gates /path/to/repo --json
+quality-runner refresh /path/to/repo --run-id-prefix refresh-001 --json
 quality-runner validate-report worker-report.json --json
 quality-runner export-handoff /path/to/repo
 quality-runner-mcp
@@ -112,6 +113,13 @@ branch is neither `main` nor the local branch with the highest commit count,
 before scanning; the worktree must be clean.
 
 See [CLI Reference](docs/cli.md) for command details.
+
+`refresh` runs inspect, run, verify, and summarize in read-only mode. Its
+handoff statuses are intended for controllers: `gates-clean` means discovered
+local gates passed, `gates-blocked` means environment/dependency/read-only
+policy blocked evidence, and `gates-failed` means executable repo gates ran and
+failed. Blocked or failed handoffs include `blocker_groups` and
+`next_slice.action_groups` for structured routing.
 
 ## MCP
 

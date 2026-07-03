@@ -789,7 +789,7 @@ def test_run_payload_rejects_invalid_handoff_before_writing_artifacts(
 
     def invalid_handoff(**_: object) -> dict[str, object]:
         return {
-            "schema": "quality-runner-agent-handoff-v0.1",
+            "schema": "quality-runner-agent-handoff-v0.2",
             "status": "planned",
             "implementation_allowed": False,
         }
@@ -955,7 +955,7 @@ def test_audit_and_plan_markdown_render_findings_and_clean_states() -> None:
     )
     handoff_markdown = render_handoff_markdown(
         {
-            "schema": "quality-runner-agent-handoff-v0.1",
+            "schema": "quality-runner-agent-handoff-v0.2",
             "status": "planned",
             "implementation_allowed": False,
             "artifact_paths": {"quality_audit_json": "/tmp/audit.json"},
@@ -985,7 +985,7 @@ def test_audit_and_plan_markdown_render_findings_and_clean_states() -> None:
     )
     clean_handoff_markdown = render_handoff_markdown(
         {
-            "schema": "quality-runner-agent-handoff-v0.1",
+            "schema": "quality-runner-agent-handoff-v0.2",
             "status": "clean",
             "implementation_allowed": False,
             "artifact_paths": {},

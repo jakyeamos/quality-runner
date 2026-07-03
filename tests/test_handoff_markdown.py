@@ -6,7 +6,7 @@ def test_render_handoff_markdown_includes_next_slice_action_groups() -> None:
 
     markdown = render_handoff_markdown(
         {
-            "schema": "quality-runner-agent-handoff-v0.1",
+            "schema": "quality-runner-agent-handoff-v0.2",
             "status": "gates-blocked",
             "implementation_allowed": False,
             "artifact_paths": {"agent_handoff_json": "/tmp/agent-handoff.json"},

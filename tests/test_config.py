@@ -677,7 +677,7 @@ def test_packaged_schema_files_are_parseable() -> None:
     assert all(payload["type"] == "object" for payload in loaded.values())
 
 
-def test_artifact_schema_additions_remain_optional_for_v01_compatibility() -> None:
+def test_artifact_schema_additions_remain_optional_and_agent_handoff_versioned() -> None:
     schema_root = resources.files("quality_runner").joinpath("schemas")
     repo_scan = json.loads(schema_root.joinpath("repo-scan.schema.json").read_text())
     capability_matrix = json.loads(
@@ -714,11 +714,23 @@ def test_artifact_schema_additions_remain_optional_for_v01_compatibility() -> No
     )
     assert "adoption_stage" not in remediation_plan["required"]
     assert "stopping_criteria" not in remediation_plan["required"]
-    assert agent_handoff["properties"]["schema"]["const"] == "quality-runner-agent-handoff-v0.1"
+    assert agent_handoff["properties"]["schema"]["const"] == "quality-runner-agent-handoff-v0.2"
     assert "gates-discovered" in agent_handoff["properties"]["status"]["enum"]
     assert "gates-executed" in agent_handoff["properties"]["status"]["enum"]
     assert "gates-blocked" in agent_handoff["properties"]["status"]["enum"]
     assert "gates-failed" in agent_handoff["properties"]["status"]["enum"]
     assert "gates-clean" in agent_handoff["properties"]["status"]["enum"]
+    assert agent_handoff["properties"]["next_slice"]["oneOf"] == [
+        {"type": "null"},
+        {"$ref": "#/$defs/remediationSlice"},
+    ]
+    action_group = agent_handoff["$defs"]["actionGroup"]
+    assert action_group["required"] == ["class", "gate_ids", "actions"]
+    assert (
+        agent_handoff["$defs"]["remediationSlice"]["properties"]["action_groups"]["items"][
+            "$ref"
+        ]
+        == "#/$defs/actionGroup"
+    )
     assert "adoption_stage" not in agent_handoff["required"]
     assert "stopping_criteria" not in agent_handoff["required"]
