@@ -655,6 +655,38 @@ both modes.
 | amos-saas | `019f2889-510f-7882-9f6a-f5b58a1174c0` | `refresh6full-20260703-amos-saas` | `refresh6budget-20260703-amos-saas` | `refresh5-20260703-amos-saas-verify` | `/private/tmp/qr-refresh6-amos-saas-report.json` | launched |
 | Dsci-proj | `019f2889-8e89-7472-a39f-d4c7ed7b4c1c` | `refresh6full-20260703-Dsci-proj` | `refresh6budget-20260703-Dsci-proj` | `refresh5-20260703-Dsci-proj-verify` | `/private/tmp/qr-refresh6-Dsci-proj-report.json` | launched |
 
+## Refresh Wave 6 Results
+
+All five worker reports validated with
+`quality-runner validate-report <report> --json` and returned
+`status=accepted`, `errors=[]`.
+
+| Repo | Thread status | Full-evidence result | Budget result | Contract signal | Report |
+|---|---|---|---|---|---|
+| tenure | blocked | `361.73s`; `workflow-timeout-blocker`; verify timeout reason | `240.36s`; `workflow-timeout-blocker`; total-budget reason | Full mode omitted total timeout; budget mode stopped at the 240s controller budget and preserved partial gate evidence. | `/private/tmp/qr-refresh6-tenure-report.json` |
+| BidCamp | blocked | `341s`; `workflow-timeout-blocker`; 6 gate results | `240s`; `workflow-timeout-blocker`; 5 gate results | Budget mode stopped at the controller budget and captured less gate evidence by design. | `/private/tmp/qr-refresh6-BidCamp-report.json` |
+| AIOS | ready-for-review | `135.09s`; `environment-or-runner-blocker`; no timeout | `112.72s`; `environment-or-runner-blocker`; no timeout | Budget contract was present in JSON but did not fire because the run completed before 240s. | `/private/tmp/qr-refresh6-AIOS-report.json` |
+| amos-saas | ready-for-review | `56.24s`; `environment-or-dependency-blocker`; no timeout | `43.31s`; `environment-or-dependency-blocker`; no timeout | Both modes completed before timeout; dependency setup blocker remained the actual result. | `/private/tmp/qr-refresh6-amos-saas-report.json` |
+| Dsci-proj | ready-for-review | `34.71s`; `failing-executable-gates`; no timeout | `30.86s`; `failing-executable-gates`; no timeout | Both modes completed before timeout; executable gate failures remained the actual result. | `/private/tmp/qr-refresh6-Dsci-proj-report.json` |
+
+Product takeaways:
+
+- The timeout contract split worked. Full-evidence mode now clearly reports no
+  total timeout in `timeout_contract`, while budget mode carries
+  `total_timeout_seconds=240` and the explicit controller reason.
+- The optional total budget did what controller waves need on the long-running
+  repos: Tenure and BidCamp returned near 240 seconds instead of running 340+
+  seconds, while preserving non-empty gate plans and partial gate verification
+  evidence.
+- The user-facing product choice is now defensible: default/no-total-timeout
+  collects more evidence; controller-budget mode trades some late-gate evidence
+  for predictable wall time.
+- Remaining polish: timeout artifacts still report the active phase as
+  `verify-gates` even when the deadline source is the total refresh budget.
+  The artifact should add an explicit `deadline_scope` or `timeout_scope` field
+  (`verify-phase` vs `total-refresh`) so controllers do not infer scope from
+  the reason string.
+
 ## Rollout Ledger
 
 | Wave | Repo | Repo path | Total | Blockers | Baseline artifacts | Codex project status | Thread status | Thread id | Final QR status | Commit | Push | Notes |
