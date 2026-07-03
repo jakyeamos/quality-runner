@@ -1099,6 +1099,31 @@ not render an Action Groups section.
 | BIP-Console | `019f2968-e5e3-7053-bd01-ded342708059` | `refresh14-20260703-BIP-Console` | `refresh13-20260703-BIP-Console-verify` | `/private/tmp/qr-refresh14-BIP-Console-report.json` | launched |
 | R-Project | `019f2968-eca5-75b0-aaf5-d8970b9d3af4` | `refresh14-20260703-R-Project` | `refresh13-20260703-R-Project-verify` | `/private/tmp/qr-refresh14-R-Project-report.json` | launched |
 
+## Refresh Wave 14 Results
+
+All three Wave 14 controller reports validated with
+`quality-runner validate-report <report> --json` and returned
+`status=accepted`, `errors=[]`.
+
+| Repo | Final QR result | Handoff result | Wave 14 validation verdict | Report |
+|---|---|---|---|---|
+| amos-saas | `blocked`; `environment-or-dependency-blocker`; 27 findings, delta 0 | `gates-blocked`; primary `dependency-setup`; JSON action groups for dependency setup and read-only policy | pass: Markdown has `### Action Groups`, shows dependency setup gates, and renders one deduped `pnpm install --frozen-lockfile` action matching JSON | `/private/tmp/qr-refresh14-amos-saas-report.json` |
+| BIP-Console | `blocked`; `read-only-gate-blocker`; 10 findings, delta 0 | `gates-blocked`; primary `read-only-policy`; JSON action group `read-only-policy: formatter` | pass: Markdown has `### Action Groups`, shows `read-only-policy: formatter`, matches JSON, and executable leaf gates still pass | `/private/tmp/qr-refresh14-BIP-Console-report.json` |
+| R-Project | `passed`; `clean`; 0 findings | `gates-clean`; `next_slice=null` | pass: clean control stayed clean, status JSON returned `ready`, and Markdown does not render `### Action Groups` | `/private/tmp/qr-refresh14-R-Project-report.json` |
+
+Product takeaways:
+
+- Markdown Action Groups are validated for both dependency setup and read-only
+  policy handoffs. Human workers now see the same grouped remediation structure
+  that controllers read from `agent-handoff.json`.
+- Backward-compatible flat `Actions` rendering still exists, while the new
+  `### Action Groups` section makes deduped setup commands explicit.
+- Clean-control behavior held: `gates-clean` handoffs keep `next_slice=null` and
+  do not render an Action Groups section.
+- No new Tier 1 blocker surfaced in this canary. The remaining work is now
+  productization rather than another immediate bug fix: schema versioning for
+  the expanded handoff shape, CLI/docs polish, and then a broader evidence wave.
+
 ## Rollout Ledger
 
 | Wave | Repo | Repo path | Total | Blockers | Baseline artifacts | Codex project status | Thread status | Thread id | Final QR status | Commit | Push | Notes |
