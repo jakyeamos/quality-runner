@@ -1349,6 +1349,31 @@ Verification:
 - `uv run ruff check .` passed.
 - `git diff --check` passed.
 
+## Refresh Wave 17 Launch
+
+Objective: rerun the Wave 16 target set against QR commit `b70ffa5` to validate
+the controller-report hardening fixes under live worker conditions:
+`controller-report normalize`, `controller-report lint --strict`,
+`summarize-run --controller-report`, final `validate-report` self-checks,
+strict `complete` semantics, target HEAD concurrency notes, and timeout partial
+output diagnostics.
+
+Wave rule: workers must produce a strict report at the listed `/private/tmp`
+path and run both `quality-runner controller-report lint <report> --strict
+--json` and `quality-runner validate-report <report> --json` before stopping.
+Reports that do not validate must record the validator rejection as a blocker.
+
+| Repo | Thread id | Run id prefix | Baseline | Report path | Status |
+|---|---|---|---|---|---|
+| amos-saas | `019f29dd-8b8e-7061-b337-714b552b8084` | `refresh17-20260703-amos-saas` | `refresh16-20260703-amos-saas-verify` | `/private/tmp/qr-refresh17-amos-saas-report.json` | launched |
+| BIP-Console | `019f29dd-9540-72a1-8028-612b693d02e6` | `refresh17-20260703-BIP-Console` | `refresh16-20260703-BIP-Console-verify` | `/private/tmp/qr-refresh17-BIP-Console-report.json` | launched |
+| R-Project | `019f29dd-a4a7-7220-bf37-3fae00cd75b3` | `refresh17-20260703-R-Project` | `refresh16-20260703-R-Project-verify` | `/private/tmp/qr-refresh17-R-Project-report.json` | launched |
+| EliHealth | `019f29dd-b081-7d60-8514-f79c2367d1a8` | `refresh17-20260703-EliHealth` | `refresh16-20260703-EliHealth-verify` | `/private/tmp/qr-refresh17-EliHealth-report.json` | launched |
+| Terrace | `019f29de-98cd-76a2-87f1-db888f45e4ce` | `refresh17-20260703-Terrace` | `refresh16-20260703-Terrace-verify` | `/private/tmp/qr-refresh17-Terrace-report.json` | launched |
+| tmcp | `019f29de-b307-7122-833c-d6067f309527` | `refresh17-20260703-tmcp` | `refresh16-20260703-tmcp-verify` | `/private/tmp/qr-refresh17-tmcp-report.json` | launched |
+| BBDSE | `019f29de-c214-7053-b2aa-43a0b8a92d7b` | `refresh17-20260703-BBDSE` | `refresh16-20260703-BBDSE-verify` | `/private/tmp/qr-refresh17-BBDSE-report.json` | launched |
+| agent-router | `019f29de-d322-7350-93f2-d3808cb1482d` | `refresh17-20260703-agent-router` | `refresh16-20260703-agent-router-verify` | `/private/tmp/qr-refresh17-agent-router-report.json` | launched |
+
 ## Rollout Ledger
 
 | Wave | Repo | Repo path | Total | Blockers | Baseline artifacts | Codex project status | Thread status | Thread id | Final QR status | Commit | Push | Notes |
