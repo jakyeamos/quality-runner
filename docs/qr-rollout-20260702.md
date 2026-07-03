@@ -846,6 +846,39 @@ Validation:
 - `uv run pytest`
 - `uv run ruff check .`
 
+## Refresh Wave 10 Classification Consistency
+
+Refresh wave 10 compared `gate-verification.json`, `run-summary.json`,
+`quality-runner status --json`, controller report validation, and handoff
+artifacts across two dependency setup repos, one clean control, and one
+failing-executable-gates control.
+
+All four reports validated with
+`quality-runner validate-report <report> --json` and returned
+`status=accepted`, `errors=[]`.
+
+| Repo | Final QR result | Status JSON | Handoff result | Report |
+|---|---|---|---|---|
+| EliHealth | `blocked`; `environment-or-dependency-blocker`; root `lint` dependency setup blocker; same-context pnpm gates skipped with `blocked_by=lint` and `pnpm approve-builds` diagnostics | `status=blocked`; latest verify `refresh10-20260703-EliHealth-verify` | inconsistent: `Status: gates-executed`, no final classification, no dependency setup blocker, structural next slice shown first | `/private/tmp/qr-refresh10-EliHealth-report.json` |
+| amos-saas | `blocked`; `environment-or-dependency-blocker`; root `lint` dependency setup blocker; same-context pnpm gates skipped with `blocked_by=lint` and `pnpm install --frozen-lockfile` diagnostics | `status=blocked`; latest verify `refresh10-20260703-amos-saas-verify` | inconsistent: `Status: gates-executed`, no final classification, no dependency setup blocker, structural next slice shown first | `/private/tmp/qr-refresh10-amos-saas-report.json` |
+| R-Project | `passed`; `clean`; tests passed and aggregate pre-CR skipped | `status=ready`; latest verify `refresh10-20260703-R-Project-verify` | consistent: `Status: gates-clean` and clean baseline next slice | `/private/tmp/qr-refresh10-R-Project-report.json` |
+| AIOS | `failed`; `failing-executable-gates`; formatter/lint/typecheck/build failed as command failures, runtime smoke/dead-code/tests passed | `status=blocked`; latest verify `refresh10-20260703-AIOS-verify` | inconsistent: `Status: gates-executed`, no final classification, failed executable gates not shown first, structural next slice shown first | `/private/tmp/qr-refresh10-AIOS-report.json` |
+
+Product takeaways:
+
+- `gate-verification.json`, `run-summary.json`, `quality-runner status --json`,
+  and controller report validation are now consistent for clean, dependency
+  setup, and failing executable gate outcomes.
+- The remaining Tier 1 consistency gap is handoff generation. Blocked/failed
+  verify runs still emit `Status: gates-executed` and prioritize structural
+  remediation, even when the real stopping point is dependency setup or failed
+  executable gates.
+- Next product fix: include final gate verification status, recommended
+  classification, failed/blocked gate summary, dependency setup diagnostics,
+  and recommended setup command in `agent-handoff.json` and
+  `agent-handoff.md`; for blocked/failed gates, handoff should make the gate
+  blocker the next slice before broad structural debt.
+
 ## Rollout Ledger
 
 | Wave | Repo | Repo path | Total | Blockers | Baseline artifacts | Codex project status | Thread status | Thread id | Final QR status | Commit | Push | Notes |
