@@ -248,6 +248,31 @@ Wave 5 stress takeaways:
 - `nested-ternary` precision improved for optional/nullish TypeScript syntax
   and regex non-capturing groups like `(?:...)`.
 
+## Post-Wave 5 Canary
+
+Before launching the next full cleanup wave, run a 3-repo canary against the
+QR product fixes in controller commit `ace0e1f`. The canary should prefer
+read-only verification over remediation and must use:
+
+- `quality-runner inspect`, `run`, and `verify-gates` with `canary-20260703-*`
+  run ids.
+- `quality-runner summarize-run --baseline-run-id ... --json` in every worker
+  report.
+- `quality-runner validate-report --json` against a temporary controller report.
+- Separate final sections for repo outcome and QR product observations.
+- `ignored_generated_artifacts = [".quality-runner/"]` when generated QR
+  artifacts are the only dirty paths.
+
+Canary advancement rule: do not launch the next full wave until all three
+canary reports are read by the controller and either validate cleanly or have
+explicit product blockers recorded.
+
+| Canary | Repo | Purpose | Thread status | Thread id | Final QR status | Validate-report | Notes |
+|---:|---|---|---|---|---|---|---|
+| 1 | `R-Project` | No-remediation canary for non-JS gates, file/evidence capabilities, and clean summary output. | running | `019f2628-af18-7a92-8367-29f7c0597462` |  |  | Parent-project thread scoped to `/Users/jakyeamos/projects/R-Project`; use Wave 5 final run as baseline if present. |
+| 1 | `eslint-plugin-anti-slop` | Canary for pnpm gate execution, aggregate-gate skipping, CI-only/non-command skips, and regex `nested-ternary` precision. | running | `019f2628-b461-71b0-8377-4426e65008b0` |  |  | Exact-project thread; use `stress-20260703-eslint-plugin-anti-slop-final2-verify` as baseline if present. |
+| 1 | `BIP-Console` | Canary for environment-restricted QR subprocess/server failures and direct-vs-QR comparison. | running | `019f2628-bea5-7ec1-8178-77b12766646c` |  |  | Exact-project thread; use `stress-20260703-BIP-Console-final2-verify` as baseline if present. |
+
 ## Rollout Ledger
 
 | Wave | Repo | Repo path | Total | Blockers | Baseline artifacts | Codex project status | Thread status | Thread id | Final QR status | Commit | Push | Notes |
