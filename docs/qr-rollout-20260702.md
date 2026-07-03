@@ -242,9 +242,10 @@ Wave 5 stress takeaways:
   per-gate timeouts, skipped already-covered aggregate gates, added environment
   restriction classification, and introduced `summarize-run` for controller
   reports and baseline deltas.
-- Localhost and subprocess-heavy tests remain a Tier 1 stress point, but
-  QR-spawned `EPERM`/pipe/listen failures are now classified as environment
-  restrictions with rerun guidance instead of ordinary repo gate failures.
+- Localhost and subprocess-heavy tests remain a Tier 1 stress point. The
+  follow-up classifier handles some QR-spawned environment failures, but the
+  post-Wave 5 canary below showed that server/test timeouts can still be
+  reported as ordinary command failures when the same command passes directly.
 - `nested-ternary` precision improved for optional/nullish TypeScript syntax
   and regex non-capturing groups like `(?:...)`.
 
@@ -269,9 +270,15 @@ explicit product blockers recorded.
 
 | Canary | Repo | Purpose | Thread status | Thread id | Final QR status | Validate-report | Notes |
 |---:|---|---|---|---|---|---|---|
-| 1 | `R-Project` | No-remediation canary for non-JS gates, file/evidence capabilities, and clean summary output. | running | `019f2628-af18-7a92-8367-29f7c0597462` |  |  | Parent-project thread scoped to `/Users/jakyeamos/projects/R-Project`; use Wave 5 final run as baseline if present. |
-| 1 | `eslint-plugin-anti-slop` | Canary for pnpm gate execution, aggregate-gate skipping, CI-only/non-command skips, and regex `nested-ternary` precision. | running | `019f2628-b461-71b0-8377-4426e65008b0` |  |  | Exact-project thread; use `stress-20260703-eslint-plugin-anti-slop-final2-verify` as baseline if present. |
-| 1 | `BIP-Console` | Canary for environment-restricted QR subprocess/server failures and direct-vs-QR comparison. | running | `019f2628-bea5-7ec1-8178-77b12766646c` |  |  | Exact-project thread; use `stress-20260703-BIP-Console-final2-verify` as baseline if present. |
+| 1 | `R-Project` | No-remediation canary for non-JS gates, file/evidence capabilities, and clean summary output. | complete | `019f2628-af18-7a92-8367-29f7c0597462` | `passed`; `canary-20260703-R-Project-verify`; audit `clean` | accepted | No blocker. `summarize-run` reported `recommended_classification=clean`, 0 findings, 0 missing capabilities, and no baseline deltas. `verify-gates` skipped evidence/file-only `truth_file`, recorded environment and timeout metadata, and passed the executable R gate. Product note: `gate-verification.json` still has top-level `run_id: null`, though manifest and summary carry the run id. |
+| 1 | `eslint-plugin-anti-slop` | Canary for pnpm gate execution, aggregate-gate skipping, CI-only/non-command skips, and regex `nested-ternary` precision. | blocked | `019f2628-b461-71b0-8377-4426e65008b0` | `passed-with-findings`; `canary-20260703-eslint-plugin-anti-slop-verify`; gates passed | accepted | Repo blocker only: `recommended_classification=broad-repo-debt`, 6 grouped findings unchanged from baseline. Product checks held: package scripts executed as `pnpm run ...`, `pre_pr` skipped as CI-only, `truth_file` skipped as evidence-only, aggregate `pre_cr` skipped, missing capabilities stayed at 0. Regex precision improved: `(?:...)` produced 0 nested-ternary hits; remaining 2 nested-ternary hits were real ternary chains. |
+| 1 | `BIP-Console` | Canary for environment-restricted QR subprocess/server failures and direct-vs-QR comparison. | blocked | `019f2628-bea5-7ec1-8178-77b12766646c` | `failed`; `canary-20260703-BIP-Console-verify2`; status `blocked` | accepted | Product blocker: direct `pnpm run test` passed 6 files / 81 tests in 4.30s, but QR-spawned `pnpm run test` failed after 108.717s with 11 timeout/server-not-running failures. QR recorded `failure_type=command-failed` with no environment-restricted classification or rerun guidance. Package-manager execution, aggregate skipping, `quality-runner status`, `summarize-run`, and ignored generated artifacts behaved correctly. |
+
+Canary result: do not expand to a full wave yet. The controller read all three
+reports and all temporary controller reports validated, but `BIP-Console`
+exposed a Tier 1 product gap in QR-spawned environment failure classification.
+Fix or explicitly scope that classifier gap before launching another broad
+stress wave.
 
 ## Rollout Ledger
 
