@@ -492,7 +492,7 @@ Implemented refresh efficiency hardening:
   `scan budget exceeded` evidence and a `summary.scan_budget` payload.
 
 Validation before launch: `uv run ruff check .` and full `uv run pytest`
-passed for this efficiency change set.
+passed for controller commit `614baa2`.
 
 ## Rollout Ledger
 
