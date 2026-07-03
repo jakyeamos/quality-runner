@@ -698,6 +698,22 @@ Implemented timeout scope evidence:
   `verify-gates`.
 - The CLI docs now describe the field for controller consumers.
 
+## Refresh Wave 7 Launch
+
+Refresh wave 7 is a focused two-repo verification after adding
+`timeout_scope`:
+
+- Tenure checks both timeout scopes: full-evidence verify timeout should emit
+  `timeout_scope=verify-phase`; controller-budget timeout should emit
+  `timeout_scope=total-refresh`.
+- AIOS checks the non-timeout path: budget contract and phase timings should
+  remain present while no timeout artifact is written.
+
+| Repo | Thread id | Run id prefix | Baseline | Report path | Status |
+|---|---|---|---|---|---|
+| tenure | `019f28ac-2a8e-7260-8290-c43dfeb4f79b` | `refresh7full-20260703-tenure`, `refresh7budget-20260703-tenure` | `refresh6full-20260703-tenure-verify`, `refresh6budget-20260703-tenure-verify` | `/private/tmp/qr-refresh7-tenure-report.json` | launched |
+| AIOS | `019f28ac-721a-7d03-a790-b2b03e484dfb` | `refresh7budget-20260703-AIOS` | `refresh6budget-20260703-AIOS-verify` | `/private/tmp/qr-refresh7-AIOS-report.json` | launched |
+
 ## Rollout Ledger
 
 | Wave | Repo | Repo path | Total | Blockers | Baseline artifacts | Codex project status | Thread status | Thread id | Final QR status | Commit | Push | Notes |
