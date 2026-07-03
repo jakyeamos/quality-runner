@@ -30,7 +30,8 @@ Artifacts are written under:
   Available command-backed capabilities include the command, source, detected
   language, optional owner/severity policy, required-by provenance, and local CI
   status evidence. `verification_state` separates discovery evidence from
-  command execution evidence and pass/fail evidence.
+  command execution evidence and pass/fail evidence. CI-only gates that have no
+  local executor are marked with `local_execution: "ci-only"`.
 - `run-manifest.json`: run metadata, Quality Runner version, artifact paths, and
   git HEAD/branch/dirty state when the target is a git repo.
 
@@ -60,21 +61,29 @@ Artifacts are written under:
 
 ## Gate Verification Artifacts
 
-`quality-runner verify-gates` executes discovered command-backed capabilities
-and writes:
+`quality-runner verify-gates` executes discovered command-backed capabilities,
+skips CI-only capabilities that have no local executor, and writes:
 
 - `repo-scan.json`
+- `code-quality-scan.json`
 - `package-manager-preflight.json`
 - `standards.json`
 - `capability-matrix.json`: updated so locally executed gates have
   `verification_state.execution = "local-executed"` and result `passed` or
   `failed`.
 - `gate-verification.json`: per-gate command, source, exit code, duration,
-  bounded stdout/stderr, and status.
+  bounded stdout/stderr tail fields, skipped reason, and status.
+- `quality-audit.json`
+- `remediation-plan.json`
+- `agent-handoff.json`
+- `agent-handoff.md`
 - `run-manifest.json`
 
 This command is intentionally separate from `inspect` and `run` so capability
-discovery, command execution, and command pass/fail are distinguishable.
+discovery, command execution, and command pass/fail are distinguishable. For
+JavaScript package scripts, the executable command runs through the detected
+package manager, for example `pnpm run lint`, so local `node_modules/.bin`
+resolution matches normal developer usage.
 
 ## Safety Guarantees
 

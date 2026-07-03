@@ -103,10 +103,18 @@ def test_verify_gates_payload_executes_discovered_gates_and_marks_capabilities(
     capability_map = json.loads(
         Path(payload["artifact_paths"]["capability_matrix_json"]).read_text()
     )
+    handoff = json.loads(Path(payload["artifact_paths"]["agent_handoff_json"]).read_text())
 
     assert payload["schema"] == "quality-runner-verify-gates-result-v0.1"
     assert payload["status"] == "failed"
     assert verification["schema"] == "quality-runner-gate-verification-v0.1"
+    assert [
+        (gate["id"], gate["status"], gate["exit_code"], gate["stderr_tail"])
+        for gate in verification["gates"]
+    ] == [
+        ("lint", "passed", 0, ""),
+        ("tests", "failed", 1, ""),
+    ]
     assert [(gate["id"], gate["status"], gate["exit_code"]) for gate in verification["gates"]] == [
         ("lint", "passed", 0),
         ("tests", "failed", 1),
@@ -125,3 +133,70 @@ def test_verify_gates_payload_executes_discovered_gates_and_marks_capabilities(
         "execution": "local-executed",
         "result": "failed",
     }
+    assert handoff["status"] == "gates-executed"
+    assert "gate_verification_json" in handoff["artifact_paths"]
+
+
+def test_verify_gates_runs_package_scripts_through_detected_package_manager(
+    tmp_path: Path,
+) -> None:
+    from quality_runner.workflow import verify_gates_payload
+
+    bin_dir = tmp_path / "node_modules" / ".bin"
+    bin_dir.mkdir(parents=True)
+    fake_lint = bin_dir / "fake-lint"
+    fake_lint.write_text("#!/bin/sh\necho package-bin-ok\n", encoding="utf-8")
+    fake_lint.chmod(0o755)
+    (tmp_path / "package.json").write_text(
+        json.dumps(
+            {
+                "packageManager": "pnpm@10.0.0",
+                "scripts": {"lint": "fake-lint"},
+            }
+        ),
+        encoding="utf-8",
+    )
+    (tmp_path / "pnpm-lock.yaml").write_text("lockfileVersion: '9.0'\n", encoding="utf-8")
+    (tmp_path / ".quality-runner.toml").write_text(
+        '[quality_runner]\nrequired_capabilities = ["lint"]\n',
+        encoding="utf-8",
+    )
+
+    payload = verify_gates_payload(repo_root=tmp_path, run_id="package-manager-gates")
+    verification = json.loads(
+        Path(payload["artifact_paths"]["gate_verification_json"]).read_text()
+    )
+
+    assert payload["status"] == "passed"
+    assert verification["gates"][0]["command"] == "pnpm run lint"
+    assert "package-bin-ok\n" in verification["gates"][0]["stdout_tail"]
+
+
+def test_verify_gates_skips_ci_only_pseudo_gates(tmp_path: Path) -> None:
+    from quality_runner.workflow import verify_gates_payload
+
+    workflows = tmp_path / ".github" / "workflows"
+    workflows.mkdir(parents=True)
+    (workflows / "ci.yml").write_text(
+        "on:\n  pull_request:\njobs:\n  quality:\n    runs-on: ubuntu-latest\n",
+        encoding="utf-8",
+    )
+    (tmp_path / ".quality-runner.toml").write_text(
+        '[quality_runner]\nrequired_capabilities = ["pre_pr"]\n',
+        encoding="utf-8",
+    )
+
+    payload = verify_gates_payload(repo_root=tmp_path, run_id="ci-only-gates")
+    verification = json.loads(
+        Path(payload["artifact_paths"]["gate_verification_json"]).read_text()
+    )
+
+    assert payload["status"] == "blocked"
+    assert verification["gates"] == [
+        {
+            "id": "pre_pr",
+            "status": "skipped",
+            "reason": "capability is CI-only and has no local executor",
+            "source": ".github/workflows",
+        }
+    ]

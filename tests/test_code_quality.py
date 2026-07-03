@@ -109,6 +109,31 @@ def test_code_quality_scan_reports_deterministic_rule_groups_and_fingerprints(
     assert result["summary"]["findings_by_category"]["ui_structural"] >= 6
 
 
+def test_nested_ternary_rule_ignores_typescript_non_ternary_question_marks(
+    tmp_path: Path,
+) -> None:
+    from quality_runner.code_quality import create_code_quality_scan
+
+    _write(
+        tmp_path / "src" / "syntax.ts",
+        "\n".join(
+            [
+                "type Status = 'open' | 'closed' | 'pending';",
+                "type Maybe<T> = T | null | undefined;",
+                "const label = input?.profile?.name ?? fallback ?? 'Unknown';",
+                "const matcher = /open|closed|pending/;",
+                "const optional = input?.profile?.name ? 'Known' : 'Unknown';",
+                "const actual = items ? items.length ? 'a' : 'b' : 'c';",
+            ]
+        ),
+    )
+
+    result = create_code_quality_scan(tmp_path, scan={"run_id": "scan-001"}, config={})
+    nested = [finding for finding in result["findings"] if finding["rule_id"] == "nested-ternary"]
+
+    assert [finding["line"] for finding in nested] == [6]
+
+
 def test_code_quality_scan_detects_trpc_and_zod_patterns_outside_fixed_api_paths(
     tmp_path: Path,
 ) -> None:

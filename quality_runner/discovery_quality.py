@@ -17,6 +17,7 @@ from quality_runner.surfaces import quality_commands_from_surfaces
 def _quality_commands(
     *,
     root: Path,
+    package_json: dict[str, Any],
     scripts: dict[str, str],
     pyproject: dict[str, Any],
     pre_cr_config: str | None,
@@ -24,8 +25,15 @@ def _quality_commands(
     workspaces: list[dict[str, str]],
     scan_exclusions: list[str],
 ) -> list[dict[str, str]]:
+    package_manager = _detect_package_manager(root, package_json)
     commands: list[dict[str, str]] = [
-        *(_javascript_quality_commands(scripts, manifest_path="package.json")),
+        *(
+            _javascript_quality_commands(
+                scripts,
+                manifest_path="package.json",
+                package_manager=package_manager,
+            )
+        ),
         *(_python_pyproject_quality_commands(pyproject, manifest_path="pyproject.toml")),
         *(_workspace_quality_commands(root, workspaces)),
         *(_pre_cr_quality_commands(root, pre_cr_config)),
@@ -40,6 +48,7 @@ def _javascript_quality_commands(
     scripts: dict[str, str],
     *,
     manifest_path: str,
+    package_manager: str | None,
 ) -> list[dict[str, str]]:
     script_capabilities = {
         "formatter": ("format", "fmt", "prettier"),
@@ -61,7 +70,12 @@ def _javascript_quality_commands(
                 commands.append(
                     _quality_command(
                         capability_id=capability_id,
-                        command=_workspace_command(workspace_path, command),
+                        command=_javascript_command(
+                            workspace_path=workspace_path,
+                            script_name=script_name,
+                            script_command=command,
+                            package_manager=package_manager,
+                        ),
                         source_type="package_script",
                         source=f"{manifest_path}:scripts.{script_name}",
                         language="javascript",
@@ -181,6 +195,7 @@ def _workspace_quality_commands(
                 _javascript_quality_commands(
                     _package_scripts(package_json),
                     manifest_path=manifest,
+                    package_manager=_detect_package_manager(root, package_json),
                 )
             )
     return commands
@@ -277,6 +292,7 @@ def _ci_quality_commands(
                 source_type="github_workflow",
                 source=".github/workflows",
                 language="unknown",
+                local_execution="ci-only",
             )
         )
     return commands
@@ -289,6 +305,7 @@ def _quality_command(
     source_type: str,
     source: str,
     language: str,
+    local_execution: str | None = None,
 ) -> dict[str, str]:
     return {
         "id": capability_id,
@@ -296,6 +313,7 @@ def _quality_command(
         "source_type": source_type,
         "source": source,
         "language": language,
+        **({"local_execution": local_execution} if local_execution else {}),
     }
 
 
@@ -308,3 +326,31 @@ def _workspace_command(workspace_path: str, command: str) -> str:
     if not workspace_path:
         return command
     return f"cd {workspace_path} && {command}"
+
+
+def _javascript_command(
+    *,
+    workspace_path: str,
+    script_name: str,
+    script_command: str,
+    package_manager: str | None,
+) -> str:
+    if package_manager is None:
+        return _workspace_command(workspace_path, script_command)
+    return _workspace_command(workspace_path, f"{package_manager} run {script_name}")
+
+
+def _detect_package_manager(root: Path, package_json: dict[str, Any]) -> str | None:
+    declared = package_json.get("packageManager")
+    if isinstance(declared, str) and declared:
+        return declared.split("@", maxsplit=1)[0]
+    for lockfile, manager in (
+        ("pnpm-lock.yaml", "pnpm"),
+        ("yarn.lock", "yarn"),
+        ("package-lock.json", "npm"),
+        ("bun.lockb", "bun"),
+        ("bun.lock", "bun"),
+    ):
+        if (root / lockfile).exists():
+            return manager
+    return None

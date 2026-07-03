@@ -35,6 +35,7 @@
         "required_by": { "type": "string", "minLength": 1 },
         "owner": { "type": "string", "minLength": 1 },
         "severity": { "type": "string", "minLength": 1 },
+        "local_execution": { "enum": ["ci-only"] },
         "ci_status": { "$ref": "#/$defs/ciStatus" },
         "verification_state": { "$ref": "#/$defs/verificationState" }
       },

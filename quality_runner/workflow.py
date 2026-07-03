@@ -219,26 +219,55 @@ def verify_gates_payload(
         repo_root, checkout_most_advanced_branch=checkout_most_advanced_branch
     )
     run_dir = prepare_artifact_dir(repo_root, resolved_run_id)
-    scan, standards_packet, capability_map, _config = _inspect(
+    scan, standards_packet, capability_map, config = _inspect(
         repo_root, resolved_run_id, profile, ci_status_json, branch_warnings
     )
     package_manager_preflight = build_package_manager_preflight(repo_root, scan)
+    code_quality_scan = create_code_quality_scan(repo_root, scan=scan, config=config)
     gate_verification = verify_discovered_gates(
         repo_root=repo_root,
         capability_map=capability_map,
         timeout_seconds=timeout_seconds,
     )
     verified_capability_map = apply_gate_verification(capability_map, gate_verification)
+    audit_report = build_audit_report(
+        scan=scan,
+        standards_packet=standards_packet,
+        capability_map=verified_capability_map,
+        code_quality_scan=code_quality_scan,
+    )
+    _require_valid("audit report", validate_audit_report(audit_report))
+    remediation_plan = build_remediation_plan(
+        audit_report=audit_report,
+        capability_map=verified_capability_map,
+    )
+    _require_valid("remediation plan", validate_remediation_plan(remediation_plan))
 
     artifact_paths = {
         "repo_scan_json": str(run_dir / "repo-scan.json"),
+        "code_quality_scan_json": str(run_dir / "code-quality-scan.json"),
         "package_manager_preflight_json": str(run_dir / "package-manager-preflight.json"),
         "standards_json": str(run_dir / "standards.json"),
         "capability_matrix_json": str(run_dir / "capability-matrix.json"),
         "gate_verification_json": str(run_dir / "gate-verification.json"),
+        "quality_audit_json": str(run_dir / "quality-audit.json"),
+        "remediation_plan_json": str(run_dir / "remediation-plan.json"),
+        "agent_handoff_json": str(run_dir / "agent-handoff.json"),
+        "agent_handoff_md": str(run_dir / "agent-handoff.md"),
         "run_manifest_json": str(run_dir / "run-manifest.json"),
     }
+    handoff = build_agent_handoff(
+        audit_report=audit_report,
+        remediation_plan=remediation_plan,
+        artifact_paths=artifact_paths,
+        capability_map=verified_capability_map,
+    )
+    _require_valid("agent handoff", validate_agent_handoff(handoff))
+
     artifact_paths["repo_scan_json"] = str(write_json(run_dir / "repo-scan.json", scan))
+    artifact_paths["code_quality_scan_json"] = str(
+        write_json(run_dir / "code-quality-scan.json", code_quality_scan)
+    )
     artifact_paths["package_manager_preflight_json"] = str(
         write_json(run_dir / "package-manager-preflight.json", package_manager_preflight)
     )
@@ -248,6 +277,16 @@ def verify_gates_payload(
     )
     artifact_paths["gate_verification_json"] = str(
         write_json(run_dir / "gate-verification.json", gate_verification)
+    )
+    artifact_paths["quality_audit_json"] = str(
+        write_json(run_dir / "quality-audit.json", audit_report)
+    )
+    artifact_paths["remediation_plan_json"] = str(
+        write_json(run_dir / "remediation-plan.json", remediation_plan)
+    )
+    artifact_paths["agent_handoff_json"] = str(write_json(run_dir / "agent-handoff.json", handoff))
+    artifact_paths["agent_handoff_md"] = str(
+        write_text(run_dir / "agent-handoff.md", render_handoff_markdown(handoff))
     )
     run_manifest = build_run_manifest(
         repo_root=repo_root,

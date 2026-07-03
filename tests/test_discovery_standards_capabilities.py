@@ -376,11 +376,11 @@ def test_inspect_repo_detects_nested_workspaces_and_quality_aliases(tmp_path: Pa
     )
     assert (
         commands[("lint", "frontend/package.json:scripts.check")]["command"]
-        == "cd frontend && ultracite check"
+        == "cd frontend && pnpm run check"
     )
     assert (
         commands[("typecheck", "frontend/package.json:scripts.build:ts")]["command"]
-        == "cd frontend && tsc -b tsconfig.project.json"
+        == "cd frontend && pnpm run build:ts"
     )
 
 

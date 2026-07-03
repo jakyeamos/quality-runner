@@ -382,6 +382,49 @@ def test_cli_status_json_reports_config_and_latest_run(tmp_path: Path) -> None:
     assert payload["config"]["path"] == ".quality-runner.toml"
     assert payload["latest_run"]["run_id"] == "cli-status-run"
     assert payload["latest_run"]["has_handoff"] is True
+    assert payload["latest_run"]["has_gate_verification"] is False
+
+
+def test_cli_status_reports_latest_verify_gate_failure(tmp_path: Path) -> None:
+    (tmp_path / "package.json").write_text(
+        json.dumps({"scripts": {"lint": f"{sys.executable} -c 'import sys; sys.exit(1)'"}}),
+        encoding="utf-8",
+    )
+    (tmp_path / ".quality-runner.toml").write_text(
+        '[quality_runner]\nrequired_capabilities = ["lint"]\n',
+        encoding="utf-8",
+    )
+    subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "quality_runner",
+            "verify-gates",
+            str(tmp_path),
+            "--run-id",
+            "cli-status-verify",
+            "--json",
+        ],
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+    result = subprocess.run(
+        [sys.executable, "-m", "quality_runner", "status", str(tmp_path), "--json"],
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+    payload = json.loads(result.stdout)
+
+    assert payload["status"] == "blocked"
+    assert payload["latest_run"]["run_id"] == "cli-status-verify"
+    assert payload["latest_run"]["has_gate_verification"] is True
+    assert payload["latest_run"]["gate_verification_status"] == "failed"
 
 
 def test_cli_export_handoff_prints_latest_handoff(tmp_path: Path) -> None:

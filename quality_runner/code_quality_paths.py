@@ -154,7 +154,20 @@ def _is_deep_nesting(stripped: str, block_depth: int) -> bool:
 
 
 def _nested_ternary(line: str) -> bool:
-    return line.count("?") >= 2 and ":" in line
+    return _ternary_question_count(line) >= 2 and ":" in line
+
+
+def _ternary_question_count(line: str) -> int:
+    count = 0
+    for index, char in enumerate(line):
+        if char != "?":
+            continue
+        previous_char = line[index - 1] if index > 0 else ""
+        next_char = line[index + 1] if index + 1 < len(line) else ""
+        if previous_char == "?" or next_char in {"?", ".", ":"}:
+            continue
+        count += 1
+    return count
 
 
 def _is_source_file(relative_path: str) -> bool:

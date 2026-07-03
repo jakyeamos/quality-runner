@@ -68,6 +68,13 @@ def _verify_gate(
 ) -> dict[str, Any]:
     command = capability.get("command")
     capability_id = str(capability.get("id") or "unknown")
+    if capability.get("local_execution") == "ci-only":
+        return {
+            "id": capability_id,
+            "status": "skipped",
+            "reason": "capability is CI-only and has no local executor",
+            "source": _string_or_none(capability.get("source")),
+        }
     if not isinstance(command, str) or not command:
         return {
             "id": capability_id,
@@ -97,8 +104,12 @@ def _verify_gate(
             "duration_seconds": round(time.monotonic() - started, 3),
             "stdout": _truncate(error.stdout),
             "stderr": _truncate(error.stderr),
+            "stdout_tail": _truncate(error.stdout),
+            "stderr_tail": _truncate(error.stderr),
             "reason": "gate timed out",
         }
+    stdout = _truncate(result.stdout)
+    stderr = _truncate(result.stderr)
     return {
         "id": capability_id,
         "status": "passed" if result.returncode == 0 else "failed",
@@ -106,8 +117,10 @@ def _verify_gate(
         "source": _string_or_none(capability.get("source")),
         "exit_code": result.returncode,
         "duration_seconds": round(time.monotonic() - started, 3),
-        "stdout": _truncate(result.stdout),
-        "stderr": _truncate(result.stderr),
+        "stdout": stdout,
+        "stderr": stderr,
+        "stdout_tail": stdout,
+        "stderr_tail": stderr,
     }
 
 

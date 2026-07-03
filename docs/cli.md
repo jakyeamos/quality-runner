@@ -113,7 +113,9 @@ Writes:
 ## `quality-runner verify-gates`
 
 Executes discovered command-backed repo gates and records local pass/fail
-evidence without applying remediation.
+evidence without applying remediation. JavaScript package scripts execute
+through the detected package manager, and CI-only gates without a local executor
+are reported as skipped.
 
 ```bash
 quality-runner verify-gates /path/to/repo --run-id verify-001 --json
@@ -123,10 +125,15 @@ quality-runner verify-gates /path/to/repo --timeout-seconds 300 --json
 Writes:
 
 - `repo-scan.json`
+- `code-quality-scan.json`
 - `package-manager-preflight.json`
 - `standards.json`
 - `capability-matrix.json`
 - `gate-verification.json`
+- `quality-audit.json`
+- `remediation-plan.json`
+- `agent-handoff.json`
+- `agent-handoff.md`
 - `run-manifest.json`
 
 ## `quality-runner validate-report`

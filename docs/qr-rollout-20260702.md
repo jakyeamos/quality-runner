@@ -213,6 +213,21 @@ Wave 4 stress takeaways:
   coalescing, union types, regex alternation, and template expressions were
   reported as `nested-ternary` in Crimclock repos.
 
+Product fixes applied after Wave 4:
+
+- JavaScript package-script gates now execute through the detected package
+  manager, for example `pnpm run lint`, instead of shelling raw script bodies.
+- Generic pull-request workflow discovery is marked `local_execution:
+  "ci-only"` and `verify-gates` skips it rather than attempting to execute a
+  fake local `github-actions` command.
+- `verify-gates` now writes audit/remediation/handoff artifacts using the
+  verified capability matrix, and `quality-runner status` reports failed or
+  blocked gate verification as repo status `blocked`.
+- `gate-verification.json` now includes bounded `stdout_tail` and `stderr_tail`
+  fields for executed gates.
+- The `nested-ternary` rule now ignores optional chaining, nullish coalescing,
+  and optional TypeScript property markers when counting ternary operators.
+
 ## Rollout Ledger
 
 | Wave | Repo | Repo path | Total | Blockers | Baseline artifacts | Codex project status | Thread status | Thread id | Final QR status | Commit | Push | Notes |

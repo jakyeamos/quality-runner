@@ -119,6 +119,7 @@ def _quality_commands(scan: dict[str, Any]) -> list[dict[str, str]]:
         language = command.get("language")
         owner = command.get("owner")
         severity = command.get("severity")
+        local_execution = command.get("local_execution")
         if (
             isinstance(capability_id, str)
             and capability_id
@@ -137,6 +138,7 @@ def _quality_commands(scan: dict[str, Any]) -> list[dict[str, str]]:
                     "language": language,
                     **_optional_field("owner", owner),
                     **_optional_field("severity", severity),
+                    **_optional_field("local_execution", local_execution),
                 }
             )
     return normalized
@@ -430,6 +432,7 @@ def _available_command(
         **_optional_field("required_by", required_by),
         **_optional_field("owner", command.get("owner")),
         **_optional_field("severity", command.get("severity")),
+        **_optional_field("local_execution", command.get("local_execution")),
         **_optional_field("ci_status", ci_status),
         "verification_state": verification_state(
             discovery="command-discovered",

@@ -59,6 +59,7 @@ def inspect_repo(
         "scripts": scripts,
         "quality_commands": _quality_commands(
             root=root,
+            package_json=package_json,
             scripts=scripts,
             pyproject=pyproject,
             pre_cr_config=pre_cr_config,

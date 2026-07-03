@@ -118,7 +118,7 @@ def validate_agent_handoff(handoff: dict[str, Any]) -> ValidationResult:
     elif status in {"planned", "gates-discovered", "gates-executed"} and next_slice is not None:
         if not _slice_item(next_slice):
             errors.append("agent handoff next_slice must be a remediation slice object")
-    elif status in {"planned", "gates-executed"} and next_slice is None:
+    elif status == "planned" and next_slice is None:
         errors.append("agent handoff next_slice must be a remediation slice object")
 
     if not _string_list(handoff.get("verification_gates")):
