@@ -53,7 +53,8 @@ Artifacts are written under:
 - `agent-handoff.json`: machine-readable next-slice handoff, including adoption
   stage, stopping criteria, missing repo-owned gates with suggested commands,
   gate verification status/classification for verified runs, gate blockers with
-  setup guidance, and runner-provided structural checks that produced findings.
+  setup guidance, primary blocker class, grouped blocker routing, and
+  runner-provided structural checks that produced findings.
 - `agent-handoff.md`: human-readable handoff for a coding agent. The Markdown
   intentionally separates missing repo-owned gates such as `pnpm test` or
   `pnpm typecheck` from Quality Runner's built-in structural checks so readers
@@ -87,6 +88,12 @@ file/evidence capabilities without blocking, and writes:
 - `agent-handoff.json`
 - `agent-handoff.md`
 - `run-manifest.json`
+
+When `read_only_gates` is active, QR snapshots the tracked git diff before each
+executed local command. If a safe-looking command mutates tracked files, QR
+restores the pre-gate tracked diff, marks the gate with
+`failure_type=read-only-mutation`, and classifies the run as a
+`read-only-gate-blocker`.
 
 This command is intentionally separate from `inspect` and `run` so capability
 discovery, command execution, and command pass/fail are distinguishable. For

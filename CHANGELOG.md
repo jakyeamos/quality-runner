@@ -9,6 +9,11 @@ All notable changes to Quality Runner are documented here.
 - Added explicit `gates-blocked` and `gates-failed` handoff statuses with
   gate-verification classification, blocker summaries, and dependency setup
   commands in `agent-handoff.json` and `agent-handoff.md`.
+- Added read-only gate mutation detection for tracked files, including
+  pre-gate diff restoration and `read-only-mutation` gate diagnostics.
+- Added primary blocker class and blocker groups to gate handoffs so mixed
+  blocker runs can route dependency setup, read-only policy, environment, and
+  command failures separately.
 - Added suggested commands for missing repo-owned gates in `agent-handoff.json`
   and `agent-handoff.md`.
 - Added ignored-path scan previews, interactive one-run inclusion prompts, and

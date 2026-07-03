@@ -16,6 +16,8 @@ def build_gate_verification_summary(
         return None
     failure_type = _string_or_none(gate_verification.get("failure_type"))
     gates = _gate_summaries(gate_verification)
+    blockers = _gate_blockers(gates)
+    primary_blocker_class = _primary_blocker_class(blockers)
     return {
         "status": status,
         "recommended_classification": _recommended_gate_classification(
@@ -26,7 +28,9 @@ def build_gate_verification_summary(
             finding_count=finding_count,
         ),
         **_optional_string("failure_type", failure_type),
-        "blockers": _gate_blockers(gates),
+        **_optional_string("primary_blocker_class", primary_blocker_class),
+        "blocker_groups": _blocker_groups(blockers),
+        "blockers": blockers,
     }
 
 
@@ -49,23 +53,13 @@ def gate_blocker_slice(gate_summary: dict[str, Any] | None) -> dict[str, Any] | 
     blockers = gate_summary.get("blockers")
     if not isinstance(blockers, list) or not blockers:
         return None
-    classification = _string_or_none(gate_summary.get("recommended_classification"))
-    title = (
-        "Resolve dependency or environment gate blockers"
-        if classification
-        in {
-            "environment-or-dependency-blocker",
-            "environment-or-runner-blocker",
-            "read-only-gate-blocker",
-        }
-        else "Resolve failing executable gates"
-    )
+    primary_blocker_class = _string_or_none(gate_summary.get("primary_blocker_class"))
     return {
         "id": "resolve-gate-verification-blockers",
-        "title": title,
+        "title": _gate_blocker_title(primary_blocker_class),
         "priority": "high",
         "findings": [_gate_blocker_finding(gate) for gate in blockers],
-        "actions": _gate_blocker_actions(blockers),
+        "actions": _grouped_gate_blocker_actions(gate_summary, blockers),
         "verification_gates": [
             "Address the gate blockers listed in the handoff gate verification section.",
             "Rerun quality-runner verify-gates and confirm the gate verification status is passed.",
@@ -82,9 +76,23 @@ def gate_verification_markdown(value: object) -> list[str]:
         f"- Status: {value.get('status')}",
         f"- Recommended classification: {value.get('recommended_classification')}",
     ]
+    primary = value.get("primary_blocker_class")
+    if isinstance(primary, str):
+        lines.append(f"- Primary blocker class: {primary}")
     failure_type = value.get("failure_type")
     if isinstance(failure_type, str):
         lines.append(f"- Failure type: {failure_type}")
+    groups = value.get("blocker_groups")
+    if isinstance(groups, list) and groups:
+        lines.extend(["", "### Gate Blocker Groups", ""])
+        for group in groups:
+            if not isinstance(group, dict):
+                continue
+            blocker_class = group.get("class")
+            gate_ids = group.get("gate_ids")
+            if isinstance(blocker_class, str) and isinstance(gate_ids, list):
+                ids = ", ".join(str(gate_id) for gate_id in gate_ids)
+                lines.append(f"- {blocker_class}: {ids}")
     lines.extend(["", "### Gate Blockers", ""])
     blockers = value.get("blockers")
     if isinstance(blockers, list) and blockers:
@@ -135,6 +143,7 @@ def _gate_summaries(gate_verification: dict[str, Any]) -> list[dict[str, Any]]:
                 **_optional_string("command", gate.get("command")),
                 **_optional_string("recommended_action", gate.get("recommended_action")),
                 **_optional_value("dependency_setup", _dependency_setup(gate)),
+                "blocker_class": _blocker_class(gate),
             }
         )
     return summaries
@@ -168,7 +177,12 @@ def _is_gate_blocker(gate: dict[str, Any]) -> bool:
     return (
         status == "failed"
         or failure_type
-        in {"command-failed", "environment-restricted", "dependency-setup-blocker"}
+        in {
+            "command-failed",
+            "environment-restricted",
+            "dependency-setup-blocker",
+            "read-only-mutation",
+        }
         or skip_type in {"dependency-setup-blocked", "mutating-gate-not-run"}
     )
 
@@ -191,7 +205,11 @@ def _recommended_gate_classification(
         for gate in gates
     ):
         return "environment-or-dependency-blocker"
-    if any(gate.get("skip_type") == "mutating-gate-not-run" for gate in gates):
+    if any(
+        gate.get("skip_type") == "mutating-gate-not-run"
+        or gate.get("failure_type") == "read-only-mutation"
+        for gate in gates
+    ):
         return "read-only-gate-blocker"
     if status == "failed":
         return "failing-executable-gates"
@@ -236,6 +254,99 @@ def _gate_blocker_actions(blockers: list[dict[str, Any]]) -> list[str]:
         else:
             actions.append(f"Resolve the {gate_id} gate blocker.")
     return actions or ["Resolve the blocked or failed gate verification result."]
+
+
+def _blocker_class(gate: dict[str, Any]) -> str:
+    failure_type = gate.get("failure_type")
+    skip_type = gate.get("skip_type")
+    if failure_type == "dependency-setup-blocker" or skip_type == "dependency-setup-blocked":
+        return "dependency-setup"
+    if failure_type == "environment-restricted":
+        return "environment"
+    if failure_type == "read-only-mutation" or skip_type == "mutating-gate-not-run":
+        return "read-only-policy"
+    if failure_type == "command-failed" or gate.get("status") == "failed":
+        return "command-failure"
+    return "other"
+
+
+def _primary_blocker_class(blockers: list[dict[str, Any]]) -> str | None:
+    classes = {_blocker_class(gate) for gate in blockers}
+    for blocker_class in (
+        "dependency-setup",
+        "environment",
+        "read-only-policy",
+        "command-failure",
+        "other",
+    ):
+        if blocker_class in classes:
+            return blocker_class
+    return None
+
+
+def _blocker_groups(blockers: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    groups: list[dict[str, Any]] = []
+    for blocker_class in (
+        "dependency-setup",
+        "environment",
+        "read-only-policy",
+        "command-failure",
+        "other",
+    ):
+        group = [gate for gate in blockers if _blocker_class(gate) == blocker_class]
+        if not group:
+            continue
+        groups.append(
+            {
+                "class": blocker_class,
+                "gate_ids": [
+                    str(gate["id"])
+                    for gate in group
+                    if isinstance(gate.get("id"), str) and gate["id"]
+                ],
+            }
+        )
+    return groups
+
+
+def _gate_blocker_title(primary_blocker_class: str | None) -> str:
+    titles = {
+        "dependency-setup": "Resolve dependency setup gate blockers",
+        "environment": "Resolve environment-restricted gate blockers",
+        "read-only-policy": "Resolve read-only gate policy blockers",
+        "command-failure": "Resolve failing executable gates",
+    }
+    return titles.get(primary_blocker_class or "", "Resolve gate verification blockers")
+
+
+def _grouped_gate_blocker_actions(
+    gate_summary: dict[str, Any],
+    blockers: list[dict[str, Any]],
+) -> list[str]:
+    groups = gate_summary.get("blocker_groups")
+    if not isinstance(groups, list) or not groups:
+        return _gate_blocker_actions(blockers)
+    actions: list[str] = []
+    for group in groups:
+        if not isinstance(group, dict):
+            continue
+        blocker_class = group.get("class")
+        group_blockers = [
+            gate for gate in blockers if isinstance(blocker_class, str) and gate.get("blocker_class") == blocker_class
+        ]
+        if not group_blockers:
+            continue
+        actions.append(f"Resolve {blocker_class} blockers first: {', '.join(_gate_ids(group_blockers))}.")
+        actions.extend(_gate_blocker_actions(group_blockers))
+    return actions or _gate_blocker_actions(blockers)
+
+
+def _gate_ids(blockers: list[dict[str, Any]]) -> list[str]:
+    return [
+        str(gate["id"])
+        for gate in blockers
+        if isinstance(gate.get("id"), str) and gate["id"]
+    ]
 
 
 def _string_or_none(value: object) -> str | None:

@@ -943,6 +943,23 @@ Product takeaways:
 - BIP-Console no longer reproduced the earlier QR-spawned test timeout: tests
   passed in the refresh, and the only blocker was read-only formatter policy.
 
+## Product Fix After Refresh Wave 11
+
+Implemented the two Wave 11 hardening follow-ups:
+
+- Read-only gate execution now snapshots the tracked git diff before each local
+  command. If a safe-looking command mutates tracked files, QR restores the
+  pre-gate tracked diff and records `failure_type=read-only-mutation` with
+  `diagnostics.read_only_mutation`.
+- `read-only-mutation` maps to the existing `read-only-gate-blocker`
+  classification so controllers can route it with read-only policy issues
+  without confusing it for repo test failure.
+- Gate handoffs now include `primary_blocker_class` and `blocker_groups`, and
+  the gate-blocker next slice groups actions by dependency setup, environment,
+  read-only policy, command failure, and other blockers.
+- Mixed-blocker handoffs now expose a primary blocker class while preserving the
+  full blocker list for secondary fixes.
+
 ## Rollout Ledger
 
 | Wave | Repo | Repo path | Total | Blockers | Baseline artifacts | Codex project status | Thread status | Thread id | Final QR status | Commit | Push | Notes |

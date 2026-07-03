@@ -59,7 +59,8 @@
             "command-failed",
             "timeout",
             "environment-restricted",
-            "dependency-setup-blocker"
+            "dependency-setup-blocker",
+            "read-only-mutation"
           ]
         },
         "skip_type": { "enum": ["mutating-gate-not-run", "dependency-setup-blocked"] },

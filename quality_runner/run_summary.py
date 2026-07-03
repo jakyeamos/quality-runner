@@ -150,7 +150,11 @@ def _recommended_classification(
         return "environment-or-runner-blocker"
     if any(gate.get("failure_type") == "dependency-setup-blocker" for gate in gate_results):
         return "environment-or-dependency-blocker"
-    if any(gate.get("skip_type") == "mutating-gate-not-run" for gate in gate_results):
+    if any(
+        gate.get("skip_type") == "mutating-gate-not-run"
+        or gate.get("failure_type") == "read-only-mutation"
+        for gate in gate_results
+    ):
         return "read-only-gate-blocker"
     if status == "failed":
         return "failing-executable-gates"

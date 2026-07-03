@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import signal
+import subprocess
 import sys
 from pathlib import Path
 
@@ -171,22 +172,28 @@ def test_verify_gates_payload_executes_discovered_gates_and_marks_capabilities(
     }
     assert handoff["status"] == "gates-failed"
     assert "gate_verification_json" in handoff["artifact_paths"]
-    assert handoff["gate_verification"] == {
-        "status": "failed",
-        "recommended_classification": "failing-executable-gates",
-        "blockers": [
-            {
-                "id": "tests",
-                "status": "failed",
-                "failure_type": "command-failed",
-                "command": f"{sys.executable} -c 'import sys; sys.exit(1)'",
-            }
-        ],
-    }
+    assert handoff["gate_verification"]["status"] == "failed"
+    assert handoff["gate_verification"]["recommended_classification"] == (
+        "failing-executable-gates"
+    )
+    assert handoff["gate_verification"]["primary_blocker_class"] == "command-failure"
+    assert handoff["gate_verification"]["blocker_groups"] == [
+        {"class": "command-failure", "gate_ids": ["tests"]}
+    ]
+    assert handoff["gate_verification"]["blockers"] == [
+        {
+            "id": "tests",
+            "status": "failed",
+            "failure_type": "command-failed",
+            "command": f"{sys.executable} -c 'import sys; sys.exit(1)'",
+            "blocker_class": "command-failure",
+        }
+    ]
     assert handoff["next_slice"]["id"] == "resolve-gate-verification-blockers"
     assert handoff["next_slice"]["title"] == "Resolve failing executable gates"
     assert handoff["next_slice"]["findings"][0]["id"] == "gate-tests"
-    assert "Run `" in handoff["next_slice"]["actions"][0]
+    assert handoff["next_slice"]["actions"][0] == "Resolve command-failure blockers first: tests."
+    assert "Run `" in handoff["next_slice"]["actions"][1]
     assert "## Gate Verification" in handoff_markdown
     assert "- Recommended classification: failing-executable-gates" in handoff_markdown
     assert "- tests: failed (command-failed)." in handoff_markdown
@@ -265,6 +272,87 @@ def test_verify_gates_read_only_mode_skips_mutating_formatter(tmp_path: Path) ->
     assert verification["gates"][0]["mutating_risk"] == "mutating"
     assert verification["gates"][1]["status"] == "passed"
     assert plan[0]["local_execution_status"] == "mutating-skipped"
+
+
+def test_verify_gates_read_only_mode_restores_tracked_mutations(tmp_path: Path) -> None:
+    from quality_runner.workflow import verify_gates_payload
+
+    tracked_file = tmp_path / "tracked.txt"
+    tracked_file.write_text("original\n", encoding="utf-8")
+    subprocess.run(["git", "init"], cwd=tmp_path, check=True, capture_output=True, text=True)
+    subprocess.run(["git", "add", "tracked.txt"], cwd=tmp_path, check=True)
+    subprocess.run(
+        [
+            "git",
+            "-c",
+            "user.email=quality-runner@example.com",
+            "-c",
+            "user.name=Quality Runner",
+            "commit",
+            "-m",
+            "Initial commit",
+        ],
+        cwd=tmp_path,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    command = (
+        f"{sys.executable} -c "
+        "\"from pathlib import Path; Path('tracked.txt').write_text('mutated\\\\n')\""
+    )
+    (tmp_path / ".quality-runner.toml").write_text(
+        "\n".join(
+            [
+                "[quality_runner]",
+                'required_capabilities = ["tests"]',
+                "",
+                "[[quality_runner.gates]]",
+                'id = "tests"',
+                f"command = {json.dumps(command)}",
+                'ecosystem = "python"',
+                'source = "local policy"',
+                'owner = "qa"',
+                "required = true",
+                'severity = "blocker"',
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    payload = verify_gates_payload(
+        repo_root=tmp_path,
+        run_id="read-only-tracked-mutation",
+        read_only_gates=True,
+    )
+    verification = json.loads(
+        Path(payload["artifact_paths"]["gate_verification_json"]).read_text()
+    )
+    handoff = json.loads(Path(payload["artifact_paths"]["agent_handoff_json"]).read_text())
+    handoff_markdown = Path(payload["artifact_paths"]["agent_handoff_md"]).read_text()
+
+    assert tracked_file.read_text(encoding="utf-8") == "original\n"
+    assert payload["status"] == "blocked"
+    gate = verification["gates"][0]
+    assert gate["status"] == "failed"
+    assert gate["failure_type"] == "read-only-mutation"
+    assert gate["exit_code"] == 0
+    assert gate["diagnostics"]["read_only_mutation"] == {
+        "restored": True,
+        "tracked_files": ["tracked.txt"],
+    }
+    assert "mutated tracked files" in gate["recommended_action"]
+    assert handoff["status"] == "gates-blocked"
+    assert handoff["gate_verification"]["recommended_classification"] == "read-only-gate-blocker"
+    assert handoff["gate_verification"]["primary_blocker_class"] == "read-only-policy"
+    assert handoff["gate_verification"]["blocker_groups"] == [
+        {"class": "read-only-policy", "gate_ids": ["tests"]}
+    ]
+    assert handoff["gate_verification"]["blockers"][0]["blocker_class"] == "read-only-policy"
+    assert handoff["next_slice"]["title"] == "Resolve read-only gate policy blockers"
+    assert "Primary blocker class: read-only-policy" in handoff_markdown
+    assert "- read-only-policy: tests" in handoff_markdown
 
 
 def test_verify_gates_classifies_dependency_setup_blockers(tmp_path: Path) -> None:
@@ -369,19 +457,28 @@ def test_verify_gates_classifies_pnpm_ignored_builds_as_dependency_setup(
         "environment-or-dependency-blocker"
     )
     assert handoff["status"] == "gates-blocked"
+    assert handoff["gate_verification"]["primary_blocker_class"] == "dependency-setup"
+    assert handoff["gate_verification"]["blocker_groups"] == [
+        {"class": "dependency-setup", "gate_ids": ["lint", "tests"]}
+    ]
     assert handoff["gate_verification"]["blockers"][0]["dependency_setup"] == {
         "package_manager": "pnpm",
         "setup_command": "pnpm approve-builds",
     }
+    assert handoff["gate_verification"]["blockers"][0]["blocker_class"] == "dependency-setup"
     assert handoff["gate_verification"]["blockers"][1]["skip_type"] == "dependency-setup-blocked"
     assert handoff["gate_verification"]["blockers"][1]["blocked_by"] == "lint"
     assert handoff["next_slice"]["id"] == "resolve-gate-verification-blockers"
-    assert handoff["next_slice"]["title"] == "Resolve dependency or environment gate blockers"
+    assert handoff["next_slice"]["title"] == "Resolve dependency setup gate blockers"
     assert handoff["next_slice"]["actions"][0] == (
+        "Resolve dependency-setup blockers first: lint, tests."
+    )
+    assert handoff["next_slice"]["actions"][1] == (
         "Run dependency setup for lint: pnpm approve-builds."
     )
     assert "Setup: `pnpm approve-builds`" in handoff_markdown
     assert "- Recommended classification: environment-or-dependency-blocker" in handoff_markdown
+    assert "- Primary blocker class: dependency-setup" in handoff_markdown
 
 
 def test_verify_gates_classifies_next_font_fetch_as_environment_restricted(

@@ -80,9 +80,26 @@
         "status": { "type": "string", "minLength": 1 },
         "recommended_classification": { "type": "string", "minLength": 1 },
         "failure_type": { "type": "string", "minLength": 1 },
+        "primary_blocker_class": { "type": "string", "minLength": 1 },
+        "blocker_groups": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/gateBlockerGroup" }
+        },
         "blockers": {
           "type": "array",
           "items": { "$ref": "#/$defs/gateBlocker" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "gateBlockerGroup": {
+      "type": "object",
+      "required": ["class", "gate_ids"],
+      "properties": {
+        "class": { "type": "string", "minLength": 1 },
+        "gate_ids": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
         }
       },
       "additionalProperties": false
@@ -93,6 +110,7 @@
       "properties": {
         "id": { "type": "string", "minLength": 1 },
         "status": { "type": "string", "minLength": 1 },
+        "blocker_class": { "type": "string", "minLength": 1 },
         "failure_type": { "type": "string", "minLength": 1 },
         "skip_type": { "type": "string", "minLength": 1 },
         "blocked_by": { "type": "string", "minLength": 1 },

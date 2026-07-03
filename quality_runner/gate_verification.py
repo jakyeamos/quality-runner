@@ -22,6 +22,7 @@ from quality_runner.gate_execution_policy import (
     recommended_action,
     valid_gate_timeouts,
 )
+from quality_runner.read_only_git import restore_if_changed, tracked_snapshot
 from quality_runner.schema_constants import GATE_VERIFICATION_SCHEMA
 
 MAX_OUTPUT_CHARS = 4000
@@ -228,6 +229,9 @@ def _verify_gate(
         }
 
     started = time.monotonic()
+    readonly_snapshot = (
+        tracked_snapshot(repo_root) if read_only_gates and not allow_mutating_gates else None
+    )
     try:
         result = _run_shell_command(
             command,
@@ -240,6 +244,9 @@ def _verify_gate(
         gate_failure_type = failure_type(
             command=command, stdout=stdout, stderr=stderr, timed_out=True
         )
+        mutation = restore_if_changed(repo_root, readonly_snapshot)
+        if mutation is not None:
+            gate_failure_type = "read-only-mutation"
         environment_restricted = gate_failure_type == "environment-restricted"
         dependency_setup = gate_failure_type == "dependency-setup-blocker"
         return {
@@ -264,22 +271,30 @@ def _verify_gate(
                 stderr=stderr,
                 timed_out=True,
                 dependency_setup=dependency_setup,
-            ),
+            )
+            | _read_only_mutation_diagnostics(mutation),
             **recommended_action(
                 environment_restricted=environment_restricted,
                 dependency_setup=dependency_setup,
+            ),
+            **_optional_field(
+                "recommended_action",
+                _read_only_mutation_action(mutation),
             ),
         }
     stdout = _truncate(result["stdout"])
     stderr = _truncate(result["stderr"])
     gate_failure_type = failure_type(command=command, stdout=stdout, stderr=stderr, timed_out=False)
     returncode = _int_result(result["returncode"])
-    failed = returncode != 0
+    mutation = restore_if_changed(repo_root, readonly_snapshot)
+    if mutation is not None:
+        gate_failure_type = "read-only-mutation"
+    failed = returncode != 0 or mutation is not None
     environment_restricted = failed and gate_failure_type == "environment-restricted"
     dependency_setup = failed and gate_failure_type == "dependency-setup-blocker"
     return {
         "id": capability_id,
-        "status": "passed" if returncode == 0 else "failed",
+        "status": "failed" if failed else "passed",
         "capability_kind": capability_kind,
         "command": command,
         "source": source,
@@ -303,12 +318,17 @@ def _verify_gate(
                 timed_out=False,
                 dependency_setup=dependency_setup,
             )
-            if dependency_setup
+            | _read_only_mutation_diagnostics(mutation)
+            if dependency_setup or mutation is not None
             else None,
         ),
         **recommended_action(
             environment_restricted=environment_restricted,
             dependency_setup=dependency_setup,
+        ),
+        **_optional_field(
+            "recommended_action",
+            _read_only_mutation_action(mutation),
         ),
     }
 
@@ -368,7 +388,8 @@ def _available_capabilities(capability_map: dict[str, Any]) -> list[dict[str, An
 
 def _status(gates: list[dict[str, Any]]) -> str:
     if any(
-        gate.get("failure_type") in {"environment-restricted", "dependency-setup-blocker"}
+        gate.get("failure_type")
+        in {"environment-restricted", "dependency-setup-blocker", "read-only-mutation"}
         or gate.get("skip_type") == "mutating-gate-not-run"
         for gate in gates
     ):
@@ -454,6 +475,20 @@ def _optional_field(key: str, value: object) -> dict[str, Any]:
     if value is None:
         return {}
     return {key: value}
+
+
+def _read_only_mutation_diagnostics(mutation: dict[str, Any] | None) -> dict[str, Any]:
+    if mutation is None:
+        return {}
+    return {"read_only_mutation": mutation}
+
+
+def _read_only_mutation_action(mutation: dict[str, Any] | None) -> str | None:
+    if mutation is None:
+        return None
+    if mutation.get("restored") is True:
+        return "gate mutated tracked files during read-only verification; QR restored the pre-gate tracked diff, rerun directly only when source changes are allowed"
+    return "gate mutated tracked files during read-only verification and QR could not fully restore them; inspect the tracked diff before continuing"
 
 
 def _int_result(value: object) -> int:
