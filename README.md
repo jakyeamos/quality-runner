@@ -115,6 +115,7 @@ quality-runner inspect /path/to/repo --json
 quality-runner run /path/to/repo --json
 quality-runner verify-gates /path/to/repo --json
 quality-runner refresh /path/to/repo --run-id-prefix refresh-001 --handoff-output handoff.md --json
+quality-runner release-smoke --json
 quality-runner validate-report worker-report.json --json
 quality-runner controller-report lint worker-report.json --strict --json
 quality-runner export-handoff /path/to/repo
@@ -139,6 +140,10 @@ you want the scan and the human remediation plan from one command; use
 `export-handoff` later to regenerate or copy a handoff from an existing run.
 For large remediations, agents should use QR output as evidence for a
 GSD-style phase plan rather than editing directly from the handoff.
+
+Before release, run `quality-runner release-smoke --json` to verify the public
+CLI happy path, installed handoff export behavior, and report compatibility
+checks in one command.
 
 ## MCP
 

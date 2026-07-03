@@ -16,17 +16,17 @@ from quality_runner.cli_controller_reports import (
     has_rejected_self_check,
     load_controller_report_json,
 )
+from quality_runner.cli_human_summary import human_summary
 from quality_runner.cli_refresh import refresh_command_payload
 from quality_runner.cli_status import (
-    EXPORT_HANDOFF_RESULT_SCHEMA,
-    STATUS_RESULT_SCHEMA,
     export_handoff_payload,
     status_payload,
 )
 from quality_runner.code_quality import preview_ignored_paths
 from quality_runner.config import CONFIG_FILE_NAME, load_repo_config
 from quality_runner.controller_reports import validate_controller_report
-from quality_runner.run_summary import RUN_SUMMARY_SCHEMA, build_run_summary
+from quality_runner.release_smoke import release_smoke_payload
+from quality_runner.run_summary import build_run_summary
 from quality_runner.standards import DEFAULT_PROFILE
 from quality_runner.workflow import (
     inspect_payload,
@@ -186,6 +186,17 @@ def build_parser() -> argparse.ArgumentParser:
     doctor_parser = subparsers.add_parser("doctor", help="Check Quality Runner readiness")
     doctor_parser.add_argument("--json", action="store_true", help="Emit JSON output")
 
+    release_smoke_parser = subparsers.add_parser(
+        "release-smoke",
+        help="Run pre-release CLI, refresh, handoff, and schema smoke checks",
+    )
+    release_smoke_parser.add_argument(
+        "--work-dir",
+        default=None,
+        help="Directory for temporary release-smoke repo and handoff outputs",
+    )
+    release_smoke_parser.add_argument("--json", action="store_true", help="Emit JSON output")
+
     return parser
 
 
@@ -214,12 +225,14 @@ def main(argv: list[str] | None = None) -> int:
         if isinstance(content, str):
             print(content, end="" if content.endswith("\n") else "\n")
         else:
-            print(_human_summary(payload))
+            print(human_summary(payload))
     elif getattr(parsed, "json", False):
         print(json.dumps(payload, indent=2, sort_keys=True))
     else:
-        print(_human_summary(payload))
+        print(human_summary(payload))
     if parsed.command in {"validate-report", "controller-report"} and payload.get("status") == "rejected":
+        return 1
+    if parsed.command == "release-smoke" and payload.get("status") != "passed":
         return 1
     if parsed.command == "summarize-run" and has_rejected_self_check(payload):
         return 1
@@ -251,6 +264,11 @@ def _add_workflow_arguments(parser: argparse.ArgumentParser) -> None:
 def _payload_for_args(args: argparse.Namespace) -> dict[str, Any]:
     if args.command == "doctor":
         return _doctor_payload()
+    if args.command == "release-smoke":
+        return release_smoke_payload(
+            work_dir=Path(args.work_dir) if args.work_dir else None,
+            help_text=build_parser().format_help(),
+        )
     if args.command == "init":
         return _init_payload(
             repo_root=_validated_repo_path(args.repo_path),
@@ -444,54 +462,6 @@ def _unique_strings(values: list[str]) -> list[str]:
             unique.append(value)
             seen.add(value)
     return unique
-
-
-def _human_summary(payload: dict[str, Any]) -> str:
-    status = payload.get("status", "unknown")
-    if payload.get("schema") == DOCTOR_RESULT_SCHEMA:
-        version = payload.get("version", __version__)
-        return f"Quality Runner {version}: {status}"
-    if payload.get("schema") == INIT_RESULT_SCHEMA:
-        return f"config: {payload.get('config_path')}"
-    if payload.get("schema") == STATUS_RESULT_SCHEMA:
-        latest = payload.get("latest_run")
-        run_id = latest.get("run_id") if isinstance(latest, dict) else "none"
-        return f"status: {status}\nlatest run: {run_id}"
-    if payload.get("schema") == EXPORT_HANDOFF_RESULT_SCHEMA:
-        output_path = payload.get("output_path")
-        if isinstance(output_path, str):
-            return f"handoff: {output_path}"
-        return f"handoff: {payload.get('source_path')}"
-    if payload.get("schema") == RUN_SUMMARY_SCHEMA:
-        return f"status: {status}\nrun id: {payload.get('run_id')}"
-    if payload.get("schema") == "quality-runner-refresh-result-v0.1":
-        summary = payload.get("summary")
-        run_id = summary.get("run_id") if isinstance(summary, dict) else payload.get("run_id_prefix")
-        lines = [f"status: {status}", f"run id: {run_id}"]
-        handoff_export = payload.get("handoff_export")
-        if isinstance(handoff_export, dict):
-            output_path = handoff_export.get("output_path")
-            if isinstance(output_path, str):
-                lines.append(f"handoff: {output_path}")
-        return "\n".join(lines)
-
-    lines = [f"status: {status}"]
-    run_id = payload.get("run_id")
-    if isinstance(run_id, str):
-        lines.append(f"run id: {run_id}")
-
-    artifact_paths = payload.get("artifact_paths")
-    if isinstance(artifact_paths, dict):
-        handoff_path = artifact_paths.get("agent_handoff_md")
-        audit_path = artifact_paths.get("quality_audit_json")
-        repo_scan_path = artifact_paths.get("repo_scan_json")
-        if isinstance(handoff_path, str):
-            lines.append(f"handoff: {handoff_path}")
-        if isinstance(audit_path, str):
-            lines.append(f"audit: {audit_path}")
-        elif isinstance(repo_scan_path, str):
-            lines.append(f"repo scan: {repo_scan_path}")
-    return "\n".join(lines)
 
 
 if __name__ == "__main__":

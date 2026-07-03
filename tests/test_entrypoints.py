@@ -162,8 +162,24 @@ def test_packaged_console_script_invokes_cli(tmp_path: Path) -> None:
         capture_output=True,
         text=True,
     )
+    smoke_result = subprocess.run(
+        [
+            str(quality_runner),
+            "release-smoke",
+            "--work-dir",
+            str(tmp_path / "installed-release-smoke"),
+            "--json",
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
 
     assert version_result.stdout.strip() == "0.2.1"
     doctor_payload = json.loads(doctor_result.stdout)
     assert doctor_payload["schema"] == "quality-runner-doctor-result-v0.1"
     assert doctor_payload["status"] == "ready"
+    smoke_payload = json.loads(smoke_result.stdout)
+    assert smoke_payload["schema"] == "quality-runner-release-smoke-result-v0.1"
+    assert smoke_payload["status"] == "passed"
+    assert Path(smoke_payload["handoff_output"]).exists()

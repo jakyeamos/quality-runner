@@ -124,3 +124,22 @@ Evidence:
 Result: Quality Runner no longer reports its fixture corpus as nested
 workspaces by default, while standalone fixture-corpus tests still run against
 those repos explicitly.
+
+## Pre-Release Refresh Handoff Dogfood
+
+Date: 2026-07-03
+
+This pass targeted the release-critical user workflow: run QR with
+`refresh --handoff-output`, then work from the generated remediation handoff
+without opening raw JSON first.
+
+| Repo shape | Command | Result | Handoff | Signal |
+| --- | --- | --- | --- | --- |
+| Small generated repo | `quality-runner release-smoke --work-dir /private/tmp/qr-release-smoke-self --json` | passed | `/private/tmp/qr-release-smoke-self/release-smoke-handoff.md` | Help, doctor, refresh handoff export, export-handoff, and controller report schema compatibility all passed. |
+| JS app (`BIP-Console`) | `quality-runner refresh /Users/jakyeamos/projects/BIP-Console --run-id-prefix prerelease-dogfood-bip-20260703 --handoff-output /private/tmp/qr-prerelease-bip-handoff.md --timeout-seconds 60 --verify-timeout-seconds 180 --total-timeout-seconds 300 --total-timeout-reason "pre-release dogfood JS app evidence budget" --json` | blocked | `/private/tmp/qr-prerelease-bip-handoff.md` | All executable JS gates passed; QR correctly blocked on read-only formatter policy and 10 structural findings. |
+| Large messy repo (`BBDSE`) | `quality-runner refresh /Users/jakyeamos/projects/BBDSE --run-id-prefix prerelease-dogfood-bbdse-20260703 --handoff-output /private/tmp/qr-prerelease-bbdse-handoff.md --timeout-seconds 30 --verify-timeout-seconds 90 --total-timeout-seconds 120 --total-timeout-reason "pre-release dogfood large repo traversal budget" --json` | blocked | `/private/tmp/qr-prerelease-bbdse-handoff.md` | Timeout evidence now reports total elapsed around 120s, includes phase elapsed, top-level traversal counts, and confirms `.claude/worktrees` is skipped. |
+
+Release takeaway: the public workflow is shippable for small repos and normal JS
+apps. Large-repo timeout evidence is now trustworthy and readable, but BBDSE
+still needs repo-specific scan policy for large source/data surfaces before it
+can complete under a bounded release-smoke budget.

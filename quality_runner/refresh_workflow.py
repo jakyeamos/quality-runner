@@ -176,7 +176,13 @@ def run_refresh_payload(
             phase=current.phase,
             reason=current.timeout_reason,
             timeout_seconds=current.timeout_seconds,
-            elapsed_seconds=time.monotonic() - current.phase_started,
+            elapsed_seconds=_timeout_elapsed_seconds(
+                current=current,
+                total_started=total_started,
+            ),
+            phase_elapsed_seconds=time.monotonic() - current.phase_started
+            if current.timeout_scope == "total-refresh"
+            else None,
             baseline_run_id=baseline_run_id,
             timeout_scope=current.timeout_scope,
         )
@@ -264,6 +270,16 @@ def _run_verify_phase(
         status=str(verify_result.get("status", "completed")),
     )
     return verify_result
+
+
+def _timeout_elapsed_seconds(
+    *,
+    current: _RefreshTimeoutState,
+    total_started: float,
+) -> float:
+    if current.timeout_scope == "total-refresh":
+        return time.monotonic() - total_started
+    return time.monotonic() - current.phase_started
 
 
 def _public_timeout_contract(contract: dict[str, Any]) -> dict[str, Any]:

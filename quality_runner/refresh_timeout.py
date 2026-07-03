@@ -151,6 +151,7 @@ def build_timeout_verify_artifacts(
     elapsed_seconds: float,
     baseline_run_id: str | None,
     timeout_scope: str = "verify-phase",
+    phase_elapsed_seconds: float | None = None,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     run_dir = prepare_artifact_dir(repo_root, run_id)
     plan_path = run_dir / "gate-execution-plan.json"
@@ -168,6 +169,7 @@ def build_timeout_verify_artifacts(
         "timeout_seconds": timeout_seconds,
         "timeout_scope": timeout_scope,
         "elapsed_seconds": round(elapsed_seconds, 3),
+        **_optional_seconds("phase_elapsed_seconds", phase_elapsed_seconds),
         "diagnostics": diagnostics,
     }
     gate_verification = {
@@ -180,6 +182,7 @@ def build_timeout_verify_artifacts(
         "phase": phase,
         "reason": reason,
         "elapsed_seconds": round(elapsed_seconds, 3),
+        **_optional_seconds("phase_elapsed_seconds", phase_elapsed_seconds),
         "timeout_scope": timeout_scope,
         "diagnostics": diagnostics,
         "gates": _existing_gates(existing_verification)
@@ -322,3 +325,7 @@ def _read_existing_json(path: Path) -> object:
         return json.loads(path.read_text(encoding="utf-8"))
     except json.JSONDecodeError:
         return None
+
+
+def _optional_seconds(key: str, value: float | None) -> dict[str, float]:
+    return {key: round(value, 3)} if value is not None else {}

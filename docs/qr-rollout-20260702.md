@@ -1690,6 +1690,24 @@ Verification:
 - `uv run ruff check .` passed.
 - `git diff --check` passed.
 
+## Pre-Release Hardening Pass
+
+Implemented the release-readiness polish requested before rerelease:
+
+- Added `quality-runner release-smoke`, a repeatable CLI smoke that creates a
+  tiny sample repo and verifies help registration, doctor readiness,
+  `refresh --handoff-output`, `export-handoff`, and legacy/new controller report
+  compatibility.
+- Extended installed-wheel smoke coverage so the packaged console script runs
+  `release-smoke` inside a fresh venv.
+- Corrected total-refresh timeout elapsed semantics: timeout artifacts now use
+  total elapsed for `timeout_scope=total-refresh` and include
+  `phase_elapsed_seconds` separately.
+- Updated release/CLI/README docs and added clean, blocked, and timeout handoff
+  examples under `docs/examples/`.
+- Dogfooded the public refresh handoff workflow against a small generated repo,
+  `BIP-Console`, and `BBDSE`; results are recorded in `docs/dogfood-report.md`.
+
 ## Rollout Ledger
 
 | Wave | Repo | Repo path | Total | Blockers | Baseline artifacts | Codex project status | Thread status | Thread id | Final QR status | Commit | Push | Notes |

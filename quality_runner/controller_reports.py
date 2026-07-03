@@ -112,7 +112,7 @@ def normalize_controller_report(report: dict[str, Any]) -> dict[str, Any]:
         ),
         "ignored_generated_artifacts": _normalized_ignored_generated_artifacts(report),
         "repo_state": _normalized_repo_state(report),
-        "blockers": blockers if status == "blocked" or blockers else inferred_blockers(final_qr),
+        "blockers": blockers or inferred_blockers(final_qr),
     }
 
 

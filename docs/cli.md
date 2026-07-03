@@ -194,6 +194,23 @@ refresh still writes a final `agent-handoff.json`/`.md` with a
 progress diagnostics with the last traversal directory, recent paths, visited
 path count, and skipped path count.
 
+## `quality-runner release-smoke`
+
+Runs the pre-release CLI smoke path against a generated tiny repository. This is
+the repeatable check for the public happy path: help text, doctor readiness,
+`refresh --handoff-output`, `export-handoff`, and legacy/new controller report
+schema compatibility.
+
+```bash
+quality-runner release-smoke --json
+quality-runner release-smoke --work-dir /tmp/quality-runner-release-smoke --json
+```
+
+The JSON result uses `quality-runner-release-smoke-result-v0.1` and includes
+per-check statuses plus the generated handoff path. The handoff examples in
+[`docs/examples`](examples/) show representative clean, blocked, and timeout
+outputs for manual release review.
+
 ## `quality-runner validate-report`
 
 Validates a controller thread completion report before the controller advances a

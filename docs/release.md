@@ -10,6 +10,7 @@ configured for the GitHub OIDC claims. `v0.2.0` was published on 2026-07-02.
 ## PyPI
 
 1. Confirm the local ladder passes:
+   - `quality-runner release-smoke --json`
    - `python3.14 -m pytest -q`
    - `ruff check .`
    - `ruff format --check .`
@@ -31,7 +32,17 @@ configured for the GitHub OIDC claims. `v0.2.0` was published on 2026-07-02.
    - `uv tool install quality-runner==0.2.1 --force`
    - `quality-runner --version`
    - `quality-runner doctor --json`
-   - `quality-runner run /path/to/small/repo --run-id release-smoke --json`
+   - `quality-runner release-smoke --json`
+   - `quality-runner refresh /path/to/small/repo --run-id-prefix release-smoke --handoff-output /tmp/release-smoke-handoff.md --json`
+
+## Handoff Examples
+
+Use these examples when checking whether generated handoffs are readable without
+opening raw JSON artifacts:
+
+- [Clean handoff](examples/handoff-clean.md)
+- [Blocked handoff](examples/handoff-blocked.md)
+- [Timeout handoff](examples/handoff-timeout.md)
 
 ### Trusted Publisher Settings
 

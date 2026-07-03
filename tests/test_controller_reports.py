@@ -317,6 +317,58 @@ def test_controller_report_promotes_timeout_diagnostics_from_summary() -> None:
     ]
 
 
+def test_controller_report_lint_accepts_legacy_and_timeout_diagnostic_shapes() -> None:
+    from quality_runner.controller_reports import lint_controller_report
+
+    legacy_report = {
+        "schema": "quality-runner-controller-report-v0.1",
+        "repo_path": "/repos/example",
+        "branch_name": "qr/example",
+        "status": "blocked",
+        "baseline_artifact_path": "/repos/example/.quality-runner/runs/baseline",
+        "final_qr": {
+            "run_id": "verify",
+            "status": "blocked",
+            "classification": "workflow-timeout-blocker",
+            "blocker_classes": ["workflow-timeout"],
+            "failure_type": "workflow-timeout",
+        },
+        "files_changed": [],
+        "verification": [{"command": "quality-runner summarize-run /repos/example", "result": "blocked"}],
+        "commit_hash": None,
+        "target_head": "abc123",
+        "commit_created_by_task": False,
+        "push_status": "not-pushed",
+        "git_status_short": "",
+        "blockers": ["Workflow timeout prevented complete evidence collection."],
+    }
+    timeout_report = {
+        **legacy_report,
+        "final_qr": {
+            **legacy_report["final_qr"],
+            "timeout_diagnostics": {
+                "timeout_scope": "total-refresh",
+                "last_directory": "data/cache",
+                "visited_paths": 5000,
+                "pruning_recommendations": [
+                    {
+                        "kind": "scan-exclusion",
+                        "path": "data/cache",
+                        "pattern": "data/cache/**",
+                    }
+                ],
+            },
+        },
+        "blockers": [],
+    }
+
+    assert lint_controller_report(legacy_report, strict=True)["status"] == "accepted"
+    timeout_result = lint_controller_report(timeout_report, strict=True)
+
+    assert timeout_result["status"] == "accepted"
+    assert "Suggested scan exclusion: data/cache/**." in timeout_result["normalized_report"]["blockers"]
+
+
 def test_controller_report_strict_lint_allows_head_change_with_note() -> None:
     from quality_runner.controller_reports import (
         build_controller_report_from_summary,

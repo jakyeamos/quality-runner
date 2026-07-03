@@ -40,8 +40,9 @@ def timeout_recommended_action(*, timeout_seconds: int, diagnostics: dict[str, A
     pattern = first.get("pattern") if isinstance(first, dict) else None
     if isinstance(pattern, str) and pattern:
         return (
-            f"Add `{pattern}` to scan_exclusions, rerun refresh, and keep the "
-            f"{timeout_seconds}s total timeout only if the pruned run still needs more evidence"
+            f"Add `{pattern}` to scan_exclusions only if it is generated/cache data rather "
+            f"than source-owned code, rerun refresh, and keep the {timeout_seconds}s total "
+            "timeout only if the pruned run still needs more evidence"
         )
     return "Inspect workflow-timeout.json and rerun refresh with tighter scan exclusions or a larger total timeout"
 

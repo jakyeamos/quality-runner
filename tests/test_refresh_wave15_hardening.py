@@ -232,12 +232,14 @@ def test_timeout_handoff_recommends_excluding_large_data_cache_surface(
         "CLFE/data/external/nba_pbp_cache"
     )
     assert gate_verification["gates"][0]["recommended_action"] == (
-        "Add `CLFE/data/external/nba_pbp_cache/**` to scan_exclusions, rerun refresh, "
-        "and keep the 300s total timeout only if the pruned run still needs more evidence"
+        "Add `CLFE/data/external/nba_pbp_cache/**` to scan_exclusions only if it is "
+        "generated/cache data rather than source-owned code, rerun refresh, and keep the "
+        "300s total timeout only if the pruned run still needs more evidence"
     )
     assert handoff["next_slice"]["action_groups"][0]["actions"] == [
-        "Add `CLFE/data/external/nba_pbp_cache/**` to scan_exclusions, rerun refresh, "
-        "and keep the 300s total timeout only if the pruned run still needs more evidence."
+        "Add `CLFE/data/external/nba_pbp_cache/**` to scan_exclusions only if it is "
+        "generated/cache data rather than source-owned code, rerun refresh, and keep the "
+        "300s total timeout only if the pruned run still needs more evidence."
     ]
     assert "Last traversal directory: `CLFE/data/external/nba_pbp_cache`" in handoff_markdown
     assert "Suggested scan exclusion: `CLFE/data/external/nba_pbp_cache/**`" in handoff_markdown
