@@ -435,7 +435,7 @@ Implemented refresh hardening:
   reason.
 
 Validation before launch: `uv run ruff check .`, targeted workflow/CLI/artifact
-tests, and full `uv run pytest` all pass locally.
+tests, and full `uv run pytest` all pass on controller commit `8b27624`.
 
 ## Rollout Ledger
 
