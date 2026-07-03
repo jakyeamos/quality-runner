@@ -320,11 +320,32 @@ Refresh worker rules:
 
 | Refresh wave | Repo | Repo path | Baseline run | Thread status | Thread id | Final QR status | Validate-report | Notes |
 |---:|---|---|---|---|---|---|---|---|
-| 1 | `tenure` | `/Users/jakyeamos/projects/tenure` | `wave1-restart-20260702-tenure-targeted` | running | `019f2646-6119-7de3-b58e-810b1c5f8d25` |  |  | Parent-project thread scoped to exact repo path. |
-| 1 | `BidCamp` | `/Users/jakyeamos/projects/BidCamp` | `wave1-restart-20260702-BidCamp-2` | running | `019f2646-69d9-7bb3-8dce-28e4003dbfcf` |  |  | Exact-project thread. |
-| 1 | `AIOS` | `/Users/jakyeamos/projects/AIOS` | `wave1-restart-20260702-AIOS` | running | `019f2646-7846-7150-986c-145d7898d1d2` |  |  | Parent-project thread scoped to exact repo path. |
-| 1 | `amos-saas` | `/Users/jakyeamos/projects/amos-saas` | `wave1-restart-20260702-amos-saas` | running | `019f2646-81b3-7091-b4d7-5d7f6c6283fd` |  |  | Parent-project thread scoped to exact repo path. |
-| 1 | `Dsci-proj` | `/Users/jakyeamos/projects/Dsci-proj` | `triage-20260702-Dsci-proj` | running | `019f2646-8a93-72d3-b68c-fe79feb6eb80` |  |  | Parent-project thread scoped to exact repo path. |
+| 1 | `tenure` | `/Users/jakyeamos/projects/tenure` | `wave1-restart-20260702-tenure-targeted` | blocked | `019f2646-6119-7de3-b58e-810b1c5f8d25` | `blocked`; `refresh-20260703-tenure-verify` | accepted | Classification `mixed-blocker`. Findings unchanged at 31 grouped, 0 missing capabilities. `lint`, `typecheck`, `dead_code`, and `runtime_smoke` passed; `formatter` and `build` timed out; `tests` was `environment-restricted` from localhost/server-port failures. Product issue: QR `formatter` gate mutated tracked files during a read-only refresh; worker restored QR-created formatter changes while preserving pre-existing `.aios/audit/*` dirtiness. |
+| 1 | `BidCamp` | `/Users/jakyeamos/projects/BidCamp` | `wave1-restart-20260702-BidCamp-2` | blocked | `019f2646-69d9-7bb3-8dce-28e4003dbfcf` | `failed`; `refresh-20260703-BidCamp-verify` | accepted | Classification `mixed-blocker`. Findings unchanged at 30 grouped, 0 missing capabilities. Build failed on restricted Google Fonts fetches; formatter/lint/typecheck/tests/dead-code/runtime-smoke passed. Product issue: QR `formatter` gate ran `eslint --fix .` and mutated five clean files; worker restored those and preserved pre-existing script/data dirtiness. |
+| 1 | `AIOS` | `/Users/jakyeamos/projects/AIOS` | `wave1-restart-20260702-AIOS` | blocked | `019f2646-7846-7150-986c-145d7898d1d2` | `blocked`; `refresh-20260703-AIOS-verify` | accepted | Classification `environment-or-runner-blocker`. Findings dropped from 23 to 22 grouped, 0 missing capabilities. Four gates were `environment-restricted` due to `uv` cache access under sandbox permissions; formatter/lint/typecheck expose repo-owned debt; build also hit blocked Google Fonts fetches and a Turbopack/NFT trace warning. |
+| 1 | `amos-saas` | `/Users/jakyeamos/projects/amos-saas` | `wave1-restart-20260702-amos-saas` | blocked | `019f2646-81b3-7091-b4d7-5d7f6c6283fd` | `failed`; `refresh-20260703-amos-saas-verify` | accepted | Classification `mixed-blocker`. Findings unchanged at 27 grouped, 0 missing capabilities, 972 raw findings across 241 scanned files. All local `pnpm run ...` gates failed before scripts because pnpm attempted non-TTY module purge/install and raised `ERR_PNPM_ABORTED_REMOVE_MODULES_DIR_NO_TTY`; `pre_pr` skipped as CI-only. |
+| 1 | `Dsci-proj` | `/Users/jakyeamos/projects/Dsci-proj` | `triage-20260702-Dsci-proj` | blocked | `019f2646-8a93-72d3-b68c-fe79feb6eb80` | `failed`; `refresh-20260703-Dsci-proj-verify` | accepted | Classification `failing-executable-gates`. Findings unchanged at 13 grouped, 0 missing capabilities. Ruff format/lint failed in `pipeline`; dashboard tests failed because `jsdom` is missing; dashboard build/typecheck/dead-code gates failed under QR with `tsc`/`next` not found. Product issue: package-manager preflight missed nested dashboard `package-lock.json`, and QR executed subproject script bodies without local `.bin` resolution. |
+
+Refresh wave 1 takeaways:
+
+- Current runner evidence is materially better than the original cleanup waves:
+  all five workers produced summaries, baseline deltas, and accepted controller
+  reports.
+- None of the refreshed repos are clean. The sample is useful as current
+  blocker evidence rather than advancement evidence.
+- Broad structural debt is stable across the sample: `tenure`, `BidCamp`,
+  `amos-saas`, and `Dsci-proj` had unchanged grouped finding counts; `AIOS`
+  improved by one grouped finding.
+- `verify-gates` is not safe for read-only refresh when a formatter script is
+  mutating, such as `eslint --fix` or equivalent. QR needs either a non-mutating
+  formatter detection mode or a read-only gate policy before broader evidence
+  sweeps.
+- Environment/network classification is improving, but still incomplete:
+  localhost/server-port and `uv` cache failures were classified, while Google
+  Fonts fetch failures remained ordinary command failures in some gates.
+- Package-manager handling still needs nested-project hardening. `Dsci-proj`
+  showed subproject lockfiles and local `.bin` resolution gaps; `amos-saas`
+  showed pnpm non-TTY install/purge behavior before scripts could run.
 
 ## Rollout Ledger
 
