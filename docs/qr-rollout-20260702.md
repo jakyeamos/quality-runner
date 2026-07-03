@@ -1086,6 +1086,19 @@ Implemented the Wave 13 polish follow-up:
 - Clean handoffs remain unchanged because `gates-clean` runs keep
   `next_slice=null`.
 
+## Refresh Wave 14 Launch
+
+Wave 14 validates the Markdown Action Groups fix from commit `0c1f920`.
+amos-saas validates dependency setup Markdown, BIP-Console validates
+read-only-policy Markdown, and R-Project remains the clean control that should
+not render an Action Groups section.
+
+| Repo | Thread id | Run id prefix | Baseline | Report path | Status |
+|---|---|---|---|---|---|
+| amos-saas | `019f2968-df6c-71c2-be46-5c449e26b3c0` | `refresh14-20260703-amos-saas` | `refresh13-20260703-amos-saas-verify` | `/private/tmp/qr-refresh14-amos-saas-report.json` | launched |
+| BIP-Console | `019f2968-e5e3-7053-bd01-ded342708059` | `refresh14-20260703-BIP-Console` | `refresh13-20260703-BIP-Console-verify` | `/private/tmp/qr-refresh14-BIP-Console-report.json` | launched |
+| R-Project | `019f2968-eca5-75b0-aaf5-d8970b9d3af4` | `refresh14-20260703-R-Project` | `refresh13-20260703-R-Project-verify` | `/private/tmp/qr-refresh14-R-Project-report.json` | launched |
+
 ## Rollout Ledger
 
 | Wave | Repo | Repo path | Total | Blockers | Baseline artifacts | Codex project status | Thread status | Thread id | Final QR status | Commit | Push | Notes |
