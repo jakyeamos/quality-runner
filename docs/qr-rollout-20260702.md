@@ -1374,6 +1374,67 @@ Reports that do not validate must record the validator rejection as a blocker.
 | BBDSE | `019f29de-c214-7053-b2aa-43a0b8a92d7b` | `refresh17-20260703-BBDSE` | `refresh16-20260703-BBDSE-verify` | `/private/tmp/qr-refresh17-BBDSE-report.json` | launched |
 | agent-router | `019f29de-d322-7350-93f2-d3808cb1482d` | `refresh17-20260703-agent-router` | `refresh16-20260703-agent-router-verify` | `/private/tmp/qr-refresh17-agent-router-report.json` | launched |
 
+## Refresh Wave 17 Results
+
+Wave 17 is closed. All eight worker reports passed the strict controller-report
+contract that failed in Wave 16.
+
+Controller checks:
+
+- `quality-runner validate-report <report> --json`: accepted for all eight
+  reports.
+- `quality-runner controller-report lint <report> --strict --json`: accepted
+  for all eight reports.
+
+| Repo | Controller report | Final QR result | Product verdict | Report |
+|---|---|---|---|---|
+| amos-saas | `blocked`; lint/validate accepted | `blocked`; `environment-or-dependency-blocker`; 27 findings | pass: strict report shape held; remaining blocker is pnpm dependency setup aborting non-interactive `node_modules` removal | `/private/tmp/qr-refresh17-amos-saas-report.json` |
+| BIP-Console | `blocked`; lint/validate accepted | `blocked`; `read-only-gate-blocker`; 10 findings | pass: executable gates passed and report semantics no longer drift; remaining structural/read-only blocker is repo evidence, not controller reporting | `/private/tmp/qr-refresh17-BIP-Console-report.json` |
+| R-Project | `ready-for-review`; lint/validate accepted | `passed`; `clean`; 0 findings | pass: clean read-only evidence is no longer mislabeled `complete` because no commit/push occurred | `/private/tmp/qr-refresh17-R-Project-report.json` |
+| EliHealth | `blocked`; lint/validate accepted | `blocked`; `read-only-gate-blocker`; 24 findings | mixed: report shape fixed, but classification priority is weak because lint/build command failures are present while the top classification is read-only policy | `/private/tmp/qr-refresh17-EliHealth-report.json` |
+| Terrace | `ready-for-review`; lint/validate accepted | `passed-with-findings`; `missing-capabilities`; 14 findings | pass: Wave 16 false test-timeout behavior did not recur; report correctly avoids `complete` for passed-with-findings | `/private/tmp/qr-refresh17-Terrace-report.json` |
+| tmcp | `ready-for-review`; lint/validate accepted | `passed-with-findings`; `missing-capabilities`; 10 findings | pass: the Wave 16 false `complete` problem is fixed; missing capabilities remain explicit evidence | `/private/tmp/qr-refresh17-tmcp-report.json` |
+| BBDSE | `blocked`; lint/validate accepted | `blocked`; `workflow-timeout-blocker`; inspect/refresh hit 300s total timeout | pass with product note: timeout report validates, but dirty-repo/concurrency guard was not exercised because the generated report did not include pre/post HEAD fields | `/private/tmp/qr-refresh17-BBDSE-report.json` |
+| agent-router | `blocked`; lint/validate accepted | `blocked`; `read-only-gate-blocker`; 8 findings | pass: read-only `pre_cr` classification remains stable and report validation no longer fails on nested worker shape | `/private/tmp/qr-refresh17-agent-router-report.json` |
+
+Product takeaways:
+
+- The Wave 16 report hardening worked under live thread conditions. The four
+  repos that previously produced schema-invalid handoffs now produced strict
+  controller reports that both lint and validate.
+- `summarize-run --controller-report` fixed the most important workflow gap:
+  workers no longer have to hand-build top-level report fields from nested QR
+  artifacts.
+- Strict completion semantics held: clean read-only evidence (`R-Project`) and
+  passed-with-findings evidence (`Terrace`, `tmcp`) were not mislabeled
+  `complete`.
+- The next gap is provenance inside the report. Worker reports did not include
+  the lint/validate commands in their `verification` arrays, even though the
+  controller could verify them afterward.
+- The repo-state guardrail needs first-class data capture. BBDSE had extensive
+  dirty work, but the strict linter can only detect target HEAD movement when
+  the report includes pre/post HEAD or an explicit concurrency observation.
+- Classification priority still needs refinement. EliHealth showed command
+  failures for lint/build while the final classification remained
+  `read-only-gate-blocker`; mixed gate failures should surface all blocker
+  classes or prefer executable command failures over a skipped formatter.
+
+Recommended next fixes:
+
+1. Have `summarize-run --controller-report` include its own generation command
+   and expected follow-up self-check commands in `verification`.
+2. Add `--report-output <path>` to `summarize-run --controller-report` so the
+   CLI can write the report and then optionally lint/validate it in one flow.
+3. Add pre/post HEAD and dirty-status capture to generated controller reports,
+   then make `controller-report lint --strict` enforce concurrency notes from
+   those fields automatically.
+4. Split `commit_hash` into `target_head` and `commit_created_by_task` so
+   read-only blocked reports do not carry stale prior commit hashes as if they
+   were task output.
+5. Improve mixed-blocker classification priority so command failures and
+   read-only skips are both visible in `final_qr.classification` or a grouped
+   `blocker_classes` field.
+
 ## Rollout Ledger
 
 | Wave | Repo | Repo path | Total | Blockers | Baseline artifacts | Codex project status | Thread status | Thread id | Final QR status | Commit | Push | Notes |
