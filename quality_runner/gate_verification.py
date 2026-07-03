@@ -8,6 +8,11 @@ import time
 from pathlib import Path
 from typing import Any
 
+from quality_runner.dependency_setup import (
+    dependency_setup_context,
+    dependency_setup_skipped_gate,
+    gate_diagnostics,
+)
 from quality_runner.gate_execution_policy import (
     build_gate_execution_plan,
     failure_type,
@@ -15,7 +20,6 @@ from quality_runner.gate_execution_policy import (
     mutating_risk,
     ordered_capabilities,
     recommended_action,
-    timeout_diagnostics,
     valid_gate_timeouts,
 )
 from quality_runner.schema_constants import GATE_VERIFICATION_SCHEMA
@@ -39,6 +43,7 @@ def verify_discovered_gates(
 ) -> dict[str, Any]:
     gates: list[dict[str, Any]] = []
     passed_leaf_ids: set[str] = set()
+    dependency_setup_blockers: dict[tuple[str, str], dict[str, Any]] = {}
     resolved_gate_timeouts = valid_gate_timeouts(gate_timeouts)
     execution_plan = build_gate_execution_plan(
         repo_root=repo_root,
@@ -51,17 +56,34 @@ def verify_discovered_gates(
     for capability in ordered_capabilities(capability_map):
         capability_id = str(capability.get("id") or "unknown")
         timeout = resolved_gate_timeouts.get(capability_id, timeout_seconds)
-        gate = _verify_gate(
-            repo_root=repo_root,
-            capability=capability,
-            timeout_seconds=timeout,
-            covered_by=_covered_by(capability, passed_leaf_ids),
-            read_only_gates=read_only_gates,
-            allow_mutating_gates=allow_mutating_gates,
+        blocked_by_setup = dependency_setup_blockers.get(
+            dependency_setup_context(repo_root=repo_root, capability=capability)
         )
+        if blocked_by_setup is None:
+            gate = _verify_gate(
+                repo_root=repo_root,
+                capability=capability,
+                timeout_seconds=timeout,
+                covered_by=_covered_by(capability, passed_leaf_ids),
+                read_only_gates=read_only_gates,
+                allow_mutating_gates=allow_mutating_gates,
+            )
+        else:
+            gate = dependency_setup_skipped_gate(
+                repo_root=repo_root,
+                capability=capability,
+                timeout_seconds=timeout,
+                blocked_by=blocked_by_setup,
+            )
         gates.append(gate)
         if capability_id in LEAF_GATE_IDS and gate.get("status") == "passed":
             passed_leaf_ids.add(capability_id)
+        if gate.get("failure_type") == "dependency-setup-blocker" and gate.get(
+            "status"
+        ) == "failed":
+            dependency_setup_blockers[
+                dependency_setup_context(repo_root=repo_root, capability=capability)
+            ] = gate
         if on_partial_result is not None:
             on_partial_result(
                 _verification_payload(
@@ -235,7 +257,14 @@ def _verify_gate(
             "stderr_tail": stderr,
             "failure_type": gate_failure_type,
             "reason": "gate timed out",
-            "diagnostics": timeout_diagnostics(command=command, stdout=stdout, stderr=stderr),
+            "diagnostics": gate_diagnostics(
+                command=command,
+                cwd=gate_cwd(repo_root=repo_root, capability=capability),
+                stdout=stdout,
+                stderr=stderr,
+                timed_out=True,
+                dependency_setup=dependency_setup,
+            ),
             **recommended_action(
                 environment_restricted=environment_restricted,
                 dependency_setup=dependency_setup,
@@ -264,6 +293,19 @@ def _verify_gate(
         "stdout_tail": stdout,
         "stderr_tail": stderr,
         **_optional_field("failure_type", gate_failure_type if failed else None),
+        **_optional_field(
+            "diagnostics",
+            gate_diagnostics(
+                command=command,
+                cwd=gate_cwd(repo_root=repo_root, capability=capability),
+                stdout=stdout,
+                stderr=stderr,
+                timed_out=False,
+                dependency_setup=dependency_setup,
+            )
+            if dependency_setup
+            else None,
+        ),
         **recommended_action(
             environment_restricted=environment_restricted,
             dependency_setup=dependency_setup,

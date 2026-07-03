@@ -736,6 +736,28 @@ Product takeaways:
   Tier 1 product gap is dependency/setup blocker handling, especially repeated
   non-interactive `pnpm` dependency restoration failures.
 
+## Product Fix After Refresh Wave 7
+
+Implemented dependency setup blocker short-circuiting:
+
+- Gate verification now remembers the first `dependency-setup-blocker` for each
+  package-manager/cwd context.
+- Later gates in the same context are skipped as
+  `skip_type=dependency-setup-blocked` with `blocked_by` pointing at the first
+  failed gate.
+- Failed and skipped dependency setup gates now include
+  `diagnostics.dependency_setup` with package manager, cwd, recommended setup
+  command, and cause.
+- This keeps amos-saas-style non-interactive `pnpm` restoration failures
+  actionable without repeatedly spawning gates that cannot pass until
+  dependency setup is repaired.
+
+Validation:
+
+- `uv run pytest tests/test_workflow_gate_preflight.py -k dependency_setup_blockers`
+- `uv run pytest tests/test_workflow_gate_preflight.py tests/test_config.py tests/test_workflow.py`
+- `uv run ruff check .`
+
 ## Rollout Ledger
 
 | Wave | Repo | Repo path | Total | Blockers | Baseline artifacts | Codex project status | Thread status | Thread id | Final QR status | Commit | Push | Notes |

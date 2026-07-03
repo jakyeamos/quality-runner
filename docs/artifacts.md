@@ -96,6 +96,14 @@ Environment-sensitive failures such as localhost bind denials, pipe permission
 errors, and sandbox-like permission failures are classified as blocked
 environment restrictions rather than ordinary repo gate failures.
 
+Dependency setup failures are also classified separately from ordinary command
+failures. When a package manager reports non-interactive dependency
+restoration, the failed gate includes `diagnostics.dependency_setup` with the
+package manager, gate cwd, recommended setup command, and cause. Later gates
+that share the same package-manager/cwd context are skipped with
+`skip_type: "dependency-setup-blocked"` and `blocked_by` pointing at the first
+failed gate, so one missing install does not produce repeated noisy failures.
+
 ## Safety Guarantees
 
 Quality Runner rejects:

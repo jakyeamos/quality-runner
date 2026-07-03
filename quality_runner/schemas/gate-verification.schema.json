@@ -53,6 +53,7 @@
         "stdout_tail": { "type": "string" },
         "stderr_tail": { "type": "string" },
         "reason": { "type": "string", "minLength": 1 },
+        "blocked_by": { "type": "string", "minLength": 1 },
         "failure_type": {
           "enum": [
             "command-failed",
@@ -61,7 +62,7 @@
             "dependency-setup-blocker"
           ]
         },
-        "skip_type": { "enum": ["mutating-gate-not-run"] },
+        "skip_type": { "enum": ["mutating-gate-not-run", "dependency-setup-blocked"] },
         "recommended_action": { "type": "string", "minLength": 1 },
         "diagnostics": { "type": "object" },
         "covered_by": {
