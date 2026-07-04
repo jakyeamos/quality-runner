@@ -21,6 +21,9 @@ packages when those APIs are still imported by active tools:
 
 New public positioning and new integrations should lead with `quality-runner`.
 
+The README install section now points directly to the live PyPI package page and
+keeps the repository install path as the alternate source-checkout route.
+
 Current package-mining state:
 
 - The `quality-runner` wheel includes `quality_evidence_contract`,
@@ -34,3 +37,8 @@ Current package-mining state:
 - `quality-runner rollout` is the first-class multi-repo controller workflow
   for safe sequential refreshes, repo-list parsing, per-repo controller reports,
   validation artifacts, and rollout ledgers for all-projects stress passes.
+
+Current verification:
+
+- 2026-07-04: `uv run ruff check .`, `uv run basedpyright`, and
+  `uv run pytest` passed after the README install documentation update.
