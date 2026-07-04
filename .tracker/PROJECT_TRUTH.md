@@ -6,6 +6,10 @@ Quality Runner is the public, installable quality orchestration package. It owns
 the CLI/MCP workflow for repo inspection, gate evidence, audit generation,
 remediation planning, handoff export, and controller report validation.
 
+Quality Runner now also has DOI-ready software-methods metadata and release
+docs: `CITATION.cff`, `.zenodo.json`, `RESEARCH_READY.md`, and
+`docs/release-notes/v0.3.1-doi.md`.
+
 Version `0.3.1` is the compatibility release candidate for replacing direct
 `quality-evidence-contract` and `repo-quality-certifier` consumers with the
 single Quality Runner package.
@@ -41,6 +45,11 @@ Current package-mining state:
 
 Current verification:
 
+- 2026-07-04: Added DOI-ready software-methods metadata and release notes.
+  Verified the passing DOI path with `uv run ruff check quality_runner tests`,
+  `uv run pytest -q`, and `uv run quality-runner release-smoke --json`.
+  DOI minting is still blocked by the placeholder ORCID, existing format drift
+  in five files, and existing basedpyright debt in tests.
 - 2026-07-04: QR now excludes generated artifact surfaces from both recursive
   discovery and structural source scanning: build/test outputs, local caches,
   top-level artifact output dirs, lockfiles/build metadata, and
