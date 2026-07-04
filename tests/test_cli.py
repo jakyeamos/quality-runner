@@ -1,13 +1,43 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
 
+import pytest
+
 from test_support.quality_runner_fixtures import write_js_fixture
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+def _install_fake_pnpm(repo_root: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    bin_dir = repo_root / "fake-bin"
+    bin_dir.mkdir()
+    fake_pnpm = bin_dir / "pnpm"
+    fake_pnpm.write_text(
+        "\n".join(
+            [
+                "#!/usr/bin/env python3",
+                "import json",
+                "import os",
+                "import subprocess",
+                "import sys",
+                "if len(sys.argv) >= 3 and sys.argv[1] == 'run':",
+                "    scripts = json.load(open('package.json', encoding='utf-8'))['scripts']",
+                "    env = dict(os.environ)",
+                "    env['PATH'] = os.path.abspath('node_modules/.bin') + os.pathsep + env.get('PATH', '')",
+                "    raise SystemExit(subprocess.run(scripts[sys.argv[2]], shell=True, env=env).returncode)",
+                "raise SystemExit(0)",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    fake_pnpm.chmod(0o755)
+    monkeypatch.setenv("PATH", f"{bin_dir}:{os.environ.get('PATH', '')}")
 
 
 def _git(repo_root: Path, *args: str) -> str:
@@ -514,7 +544,11 @@ def test_cli_summarize_run_reports_final_artifact_summary_and_delta(tmp_path: Pa
     assert json.loads(persisted.read_text(encoding="utf-8"))["run_id"] == "summary-final"
 
 
-def test_cli_refresh_runs_read_only_sequence_and_persists_summary(tmp_path: Path) -> None:
+def test_cli_refresh_runs_read_only_sequence_and_persists_summary(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _install_fake_pnpm(tmp_path, monkeypatch)
+
     (tmp_path / "package.json").write_text(
         json.dumps(
             {

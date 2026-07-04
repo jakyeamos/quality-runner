@@ -75,6 +75,6 @@ def _text_value(value: object) -> str:
 def local_command_env(cwd: Path) -> dict[str, str]:
     env = dict(os.environ)
     cache_root = cwd / ".quality-runner" / "cache"
-    env.setdefault("UV_CACHE_DIR", str(cache_root / "uv"))
-    env.setdefault("XDG_CACHE_HOME", str(cache_root / "xdg"))
+    env["UV_CACHE_DIR"] = str(cache_root / "uv")
+    env["XDG_CACHE_HOME"] = str(cache_root / "xdg")
     return env
