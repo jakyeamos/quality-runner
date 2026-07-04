@@ -1,0 +1,10 @@
+{
+  "workflow": {
+    "research_enabled": false,
+    "plan_checker_enabled": true,
+    "nyquist_validation": false,
+    "auto_advance": false,
+    "post_planning_gaps": true
+  },
+  "commit_docs": true
+}

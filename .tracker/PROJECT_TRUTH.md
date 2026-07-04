@@ -62,3 +62,7 @@ Current verification:
   `agent-eval-contract` that returned no warnings.
 - 2026-07-04: `uv run ruff check .`, `uv run basedpyright`, and
   `uv run pytest` passed after the README install documentation update.
+
+## QR Remediation Planning
+
+- 2026-07-04: Added GSD Phase 1 for QR remediation from qr-fleet-continue-20260704-quality-runner; 1 plan(s) created from quality-runner.md. Execution has not started.
