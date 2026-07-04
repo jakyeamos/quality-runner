@@ -6,6 +6,10 @@ Quality Runner is the public, installable quality orchestration package. It owns
 the CLI/MCP workflow for repo inspection, gate evidence, audit generation,
 remediation planning, handoff export, and controller report validation.
 
+Version `0.3.1` is the compatibility release candidate for replacing direct
+`quality-evidence-contract` and `repo-quality-certifier` consumers with the
+single Quality Runner package.
+
 The package also carries compatibility surfaces for earlier extracted quality
 packages when those APIs are still imported by active tools:
 
