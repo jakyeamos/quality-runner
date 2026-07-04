@@ -183,6 +183,14 @@ Quality Runner writes versioned JSON and Markdown artifacts. See
 [Artifact Contract](docs/artifacts.md) for the current v1 artifact set and
 field-level guarantees.
 
+## DOI-Ready Research Release
+
+Quality Runner is prepared as an independent software-methods artifact. See
+[RESEARCH_READY.md](RESEARCH_READY.md) and
+[docs/release-notes/v0.3.1-doi.md](docs/release-notes/v0.3.1-doi.md) for the
+citable artifact boundary, validation path, data-availability policy, and claim
+limits.
+
 ## Standards Profiles
 
 The built-in profile is `default`. Repos can also save custom profiles in

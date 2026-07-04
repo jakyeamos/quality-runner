@@ -1,0 +1,27 @@
+{
+  "title": "Quality Runner",
+  "upload_type": "software",
+  "description": "Software-methods artifact for a local-first repository quality orchestrator. The archived release includes source code, CLI/MCP docs, artifact contracts, case-study and dogfood reports, release-smoke evidence, and release metadata. Generated .quality-runner outputs from target repositories remain run artifacts unless deliberately attached as examples.",
+  "creators": [
+    {
+      "name": "Amos, Jakye",
+      "affiliation": "Case Western Reserve University",
+      "orcid": "0000-0000-0000-0000"
+    }
+  ],
+  "license": "MIT",
+  "keywords": [
+    "repository quality",
+    "agentic coding",
+    "release readiness",
+    "quality gates"
+  ],
+  "related_identifiers": [
+    {
+      "identifier": "https://github.com/jakyeamos/quality-runner",
+      "relation": "isSupplementTo",
+      "scheme": "url"
+    }
+  ],
+  "notes": "Replace the placeholder ORCID before minting the DOI."
+}

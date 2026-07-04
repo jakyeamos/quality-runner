@@ -1,0 +1,21 @@
+cff-version: 1.2.0
+message: "If you use Quality Runner or its release-readiness reports, please cite it using the metadata in this file."
+title: "Quality Runner"
+version: "0.3.1"
+date-released: "2026-07-04"
+type: software
+authors:
+  - family-names: Amos
+    given-names: Jakye
+    affiliation: "Case Western Reserve University"
+    orcid: "https://orcid.org/0000-0000-0000-0000"
+repository-code: "https://github.com/jakyeamos/quality-runner"
+url: "https://github.com/jakyeamos/quality-runner"
+license: MIT
+keywords:
+  - repository quality
+  - agentic coding
+  - release readiness
+  - quality gates
+  - evidence-backed findings
+abstract: "A local-first audit-and-plan quality orchestrator that inspects repositories, compiles standards, detects quality gates, normalizes evidence-backed findings, writes versioned artifacts, and produces ordered remediation plans for human or agent review."
