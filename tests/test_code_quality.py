@@ -655,6 +655,10 @@ def test_code_quality_scan_ignores_shadow_vendor_cache_and_build_variants(
         "const dependency: any = {};\n",
     )
     _write(tmp_path / ".pnpm-store" / "index.ts", "const store: any = {};\n")
+    _write(
+        tmp_path / ".uv-cache" / "archive-v0" / "setuptools" / "dist.py",
+        "value = any([True])\n",
+    )
     _write(tmp_path / "data" / "fixture.json", '{"value": "not source"}\n')
     _write(tmp_path / "logs" / "run.md", "const logged: any = {};\n")
     _write(tmp_path / "staging" / "takeout" / "raw.md", "const staged: any = {};\n")
@@ -680,6 +684,7 @@ def test_code_quality_scan_ignores_shadow_vendor_cache_and_build_variants(
     assert skipped["apps/dashboard/.next-broken-20260323-1"] == "ignored directory"
     assert skipped[".tmp"] == "ignored directory"
     assert skipped[".pnpm-store"] == "ignored directory"
+    assert skipped[".uv-cache"] == "artifact directory"
     assert skipped["data"] == "ignored directory"
     assert skipped["logs"] == "ignored directory"
     assert skipped["staging"] == "ignored directory"

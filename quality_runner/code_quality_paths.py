@@ -30,6 +30,7 @@ IGNORED_DIRS = {
     ".ruff_cache",
     ".svelte-kit",
     ".turbo",
+    ".uv-cache",
     ".vercel",
     ".venv",
     ".vite",

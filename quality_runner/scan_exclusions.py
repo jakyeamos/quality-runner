@@ -26,6 +26,7 @@ ARTIFACT_DIRECTORY_NAMES = {
     ".ruff_cache",
     ".svelte-kit",
     ".turbo",
+    ".uv-cache",
     ".vercel",
     ".vite",
     "coverage",

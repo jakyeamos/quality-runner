@@ -611,6 +611,7 @@ def test_workflow_applies_configured_scan_exclusions(tmp_path: Path) -> None:
         ".ruff_cache",
         ".svelte-kit",
         ".turbo",
+        ".uv-cache",
         ".vercel",
         ".vite",
         "coverage",
