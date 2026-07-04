@@ -15,6 +15,14 @@ Repo threads must work only inside their assigned repo path and report one of
 `complete` or `blocked` before stopping. The controller records the report in
 this ledger before starting the next wave.
 
+AIOS launch shortcut: `/Users/jakyeamos/projects/AIOS` exposes
+`aios quality rollout` as a thin adapter over this Quality Runner workflow. It
+does not replace the controller protocol; it launches `quality_runner.rollout`,
+writes the normal rollout ledger/controller-report artifacts, adds
+`aios-rollout-artifact-index.json` beside them, and records an AIOS evidence
+pointer for operator lookup. Operator docs live at
+`/Users/jakyeamos/projects/AIOS/docs/quality/quality-runner-rollout-operator-flow.md`.
+
 `complete` means the final Quality Runner run status is `clean`. `blocked`
 means the worker attempted full remediation and documented a concrete hard
 blocker, such as missing credentials or env secrets, an unsafe or destructive

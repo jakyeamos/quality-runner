@@ -42,9 +42,16 @@ Current package-mining state:
   for safe sequential refreshes, repo-list parsing, per-repo controller reports,
   validation artifacts, rollout ledgers, per-repo planning summaries, and
   fleet remediation phase drafts for all-projects stress passes.
+- AIOS now exposes `aios quality rollout` as a thin launch-and-capture adapter
+  over this workflow; Quality Runner still owns the controller protocol and
+  artifact contract.
 
 Current verification:
 
+- 2026-07-04: Documented the AIOS launch shortcut in the rollout controller
+  notes. Verified with `uv run pytest -q tests/test_rollout.py
+  tests/test_release_docs.py` and `uv run ruff check docs/qr-rollout-20260702.md`
+  (Ruff reported no Python files under the Markdown path and exited cleanly).
 - 2026-07-04: Added DOI-ready software-methods metadata and release notes.
   Verified the passing DOI path with `uv run ruff check quality_runner tests`,
   `uv run pytest -q`, and `uv run quality-runner release-smoke --json`.
