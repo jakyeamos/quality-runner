@@ -8,6 +8,8 @@ import sys
 import zipfile
 from pathlib import Path
 
+from quality_runner import __version__
+
 ROOT = Path(__file__).resolve().parents[1]
 
 
@@ -25,7 +27,7 @@ def test_package_imports_without_aios() -> None:
         text=True,
     )
 
-    assert result.stdout.strip() == "0.3.0"
+    assert result.stdout.strip() == __version__
 
 
 def test_module_entrypoint_exits_successfully() -> None:
@@ -62,7 +64,7 @@ def test_module_entrypoint_version_exits_successfully() -> None:
         text=True,
     )
 
-    assert result.stdout.strip() == "0.3.0"
+    assert result.stdout.strip() == __version__
 
 
 def test_module_entrypoint_rejects_unknown_commands() -> None:
@@ -132,7 +134,9 @@ def test_packaged_console_script_invokes_cli(tmp_path: Path) -> None:
 
     with zipfile.ZipFile(wheel_path) as wheel:
         wheel_names = wheel.namelist()
-        entry_points = wheel.read("quality_runner-0.3.0.dist-info/entry_points.txt").decode()
+        entry_points = wheel.read(
+            f"quality_runner-{__version__}.dist-info/entry_points.txt"
+        ).decode()
     assert "quality-runner = quality_runner.cli:main" in entry_points
     assert "quality-runner-mcp = quality_runner.mcp:main" in entry_points
     assert "quality_runner/plugin/manifest.json" in wheel_names
@@ -175,7 +179,7 @@ def test_packaged_console_script_invokes_cli(tmp_path: Path) -> None:
         text=True,
     )
 
-    assert version_result.stdout.strip() == "0.3.0"
+    assert version_result.stdout.strip() == __version__
     doctor_payload = json.loads(doctor_result.stdout)
     assert doctor_payload["schema"] == "quality-runner-doctor-result-v0.1"
     assert doctor_payload["status"] == "ready"

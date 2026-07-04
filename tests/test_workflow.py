@@ -4,6 +4,7 @@ import json
 import subprocess
 from pathlib import Path
 
+from quality_runner import __version__
 from test_support.quality_runner_fixtures import (
     write_complete_js_fixture,
     write_js_fixture,
@@ -369,7 +370,7 @@ def test_run_payload_writes_manifest_with_git_head(tmp_path: Path) -> None:
     assert manifest["schema"] == "quality-runner-run-manifest-v0.1"
     assert manifest["mode"] == "run"
     assert manifest["run_id"] == "manifest-run"
-    assert manifest["quality_runner_version"] == "0.3.0"
+    assert manifest["quality_runner_version"] == __version__
     assert manifest["git"]["head_sha"] == head_sha
     assert manifest["git"]["is_repo"] is True
     assert manifest["git"]["dirty"] is True

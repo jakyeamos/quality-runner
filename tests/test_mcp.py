@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from quality_runner import __version__
 from quality_runner.mcp import call_tool, handle_jsonrpc_message, list_tools, main
 from test_support.quality_runner_fixtures import write_js_fixture
 
@@ -114,7 +115,7 @@ def test_mcp_initialize_and_tools_list_jsonrpc() -> None:
     tools = handle_jsonrpc_message({"jsonrpc": "2.0", "id": "tools", "method": "tools/list"})
 
     assert initialize is not None
-    assert initialize["result"]["serverInfo"] == {"name": "quality-runner", "version": "0.3.0"}
+    assert initialize["result"]["serverInfo"] == {"name": "quality-runner", "version": __version__}
     assert initialize["result"]["capabilities"] == {"tools": {"listChanged": False}}
     assert tools is not None
     assert len(tools["result"]["tools"]) == 5
@@ -291,7 +292,7 @@ def test_mcp_main_preserves_version_behavior(capsys) -> None:
     exit_code = main(["--version"])
 
     assert exit_code == 0
-    assert capsys.readouterr().out.strip() == "0.3.0"
+    assert capsys.readouterr().out.strip() == __version__
 
 
 def test_mcp_main_stdio_loop_writes_jsonrpc_response(monkeypatch, capsys) -> None:

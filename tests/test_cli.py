@@ -8,6 +8,7 @@ from pathlib import Path
 
 import pytest
 
+from quality_runner import __version__
 from test_support.quality_runner_fixtures import write_js_fixture
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -338,7 +339,7 @@ def test_cli_doctor_json_reports_ready() -> None:
     payload = json.loads(result.stdout)
     assert payload["schema"] == "quality-runner-doctor-result-v0.1"
     assert payload["status"] == "ready"
-    assert payload["version"] == "0.3.0"
+    assert payload["version"] == __version__
     assert payload["environment"]["python_executable"]
 
 
@@ -942,10 +943,10 @@ def test_cli_main_reports_human_summaries_in_process(tmp_path: Path, capsys) -> 
     from quality_runner.cli import main
 
     assert main([]) == 0
-    assert "Quality Runner 0.3.0" in capsys.readouterr().out
+    assert f"Quality Runner {__version__}" in capsys.readouterr().out
 
     assert main(["doctor"]) == 0
-    assert capsys.readouterr().out.strip() == "Quality Runner 0.3.0: ready"
+    assert capsys.readouterr().out.strip() == f"Quality Runner {__version__}: ready"
 
     write_js_fixture(tmp_path)
     assert main(["inspect", str(tmp_path), "--run-id", "human-inspect"]) == 0
@@ -1028,4 +1029,4 @@ def test_cli_version_preserves_bare_version_output() -> None:
         text=True,
     )
 
-    assert result.stdout.strip() == "0.3.0"
+    assert result.stdout.strip() == __version__

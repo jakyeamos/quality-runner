@@ -2,12 +2,15 @@
 
 All notable changes to Quality Runner are documented here.
 
-## 0.3.0 - 2026-07-04
+## 0.3.1 - 2026-07-04
 
 - Added compatibility imports, console scripts, MCP tools, and packaged plugin
   metadata for prior `quality-evidence-contract` and `repo-quality-certifier`
   consumers so Quality Runner can supersede those packages as the installable
   surface.
+
+## 0.3.0 - 2026-07-04
+
 - Bumped the agent handoff artifact contract to
   `quality-runner-agent-handoff-v0.2` and documented the expanded
   controller-facing routing fields.
