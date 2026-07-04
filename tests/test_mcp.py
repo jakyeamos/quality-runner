@@ -114,7 +114,7 @@ def test_mcp_initialize_and_tools_list_jsonrpc() -> None:
     tools = handle_jsonrpc_message({"jsonrpc": "2.0", "id": "tools", "method": "tools/list"})
 
     assert initialize is not None
-    assert initialize["result"]["serverInfo"] == {"name": "quality-runner", "version": "0.2.1"}
+    assert initialize["result"]["serverInfo"] == {"name": "quality-runner", "version": "0.3.0"}
     assert initialize["result"]["capabilities"] == {"tools": {"listChanged": False}}
     assert tools is not None
     assert len(tools["result"]["tools"]) == 5
@@ -291,7 +291,7 @@ def test_mcp_main_preserves_version_behavior(capsys) -> None:
     exit_code = main(["--version"])
 
     assert exit_code == 0
-    assert capsys.readouterr().out.strip() == "0.2.1"
+    assert capsys.readouterr().out.strip() == "0.3.0"
 
 
 def test_mcp_main_stdio_loop_writes_jsonrpc_response(monkeypatch, capsys) -> None:

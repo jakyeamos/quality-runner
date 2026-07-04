@@ -83,7 +83,7 @@ Triage worker objective:
   `scanner-product-issue`, `broad-repo-debt`, `env-or-dependency-blocker`, or
   `mixed-blocker`.
 - Use `/Users/jakyeamos/projects/quality-runner/.venv/bin/quality-runner` and
-  verify version `0.2.1` before running QR.
+  verify version `0.3.0` before running QR.
 - Remediate only missing repo-owned gates, obvious path/scope configuration
   issues, and at most 1-3 high-signal findings that are clearly safe.
 - Stop early when QR shows broad structural debt rather than attempting a
@@ -168,7 +168,7 @@ Worker requirements for the restart:
 
 - Use `/Users/jakyeamos/projects/quality-runner/.venv/bin/quality-runner` for
   every final QR run, not a globally installed `quality-runner` binary.
-- Run `quality-runner --version` first and require version `0.2.1`.
+- Run `quality-runner --version` first and require version `0.3.0`.
 - Preserve existing repo branch commits and unrelated dirty work.
 - Continue from the existing QR branch when present.
 - Do not disable whole structural rule groups merely to make QR green unless

@@ -2,7 +2,7 @@
 
 All notable changes to Quality Runner are documented here.
 
-## Unreleased
+## 0.3.0 - 2026-07-04
 
 - Bumped the agent handoff artifact contract to
   `quality-runner-agent-handoff-v0.2` and documented the expanded
@@ -18,6 +18,13 @@ All notable changes to Quality Runner are documented here.
   of controller exceptions.
 - Marked `pre-cr run --workspace .` as unsafe for read-only gate execution
   unless mutating gates are explicitly allowed.
+- Added `quality-runner release-smoke` to exercise help, doctor, refresh
+  handoff, export handoff, and schema compatibility before release.
+- Added example clean, blocked, and timeout handoffs for release review.
+- Improved workflow timeout evidence so total refresh timeouts preserve both
+  full elapsed time and phase elapsed time.
+- Improved timeout diagnostics to separate generated/cache pruning guidance
+  from source-owned structural debt.
 
 ## 0.2.1 - 2026-07-02
 

@@ -5,7 +5,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def test_release_docs_describe_current_release_plan_and_0_2_0_history() -> None:
+def test_release_docs_describe_current_release_plan_and_release_history() -> None:
     changelog = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
     cli_docs = (ROOT / "docs" / "cli.md").read_text(encoding="utf-8")
     release_docs = (ROOT / "docs" / "release.md").read_text(encoding="utf-8")
@@ -28,7 +28,11 @@ def test_release_docs_describe_current_release_plan_and_0_2_0_history() -> None:
     assert "repo-owned quality gates" in changelog
     assert "Ponytail-debt rules" in changelog
 
-    assert "v0.2.1" in release_docs
+    assert "## 0.3.0 - 2026-07-04" in changelog
+    assert "release-smoke" in changelog
+    assert "total refresh timeouts" in changelog
+
+    assert "v0.3.0" in release_docs
     assert "Do not reuse `v0.1.0` or `v0.2.0`" in release_docs
     assert "Do not reuse `v0.1.0`" in release_docs
     assert "Trusted Publisher" in release_docs

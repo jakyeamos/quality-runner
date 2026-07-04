@@ -369,7 +369,7 @@ def test_run_payload_writes_manifest_with_git_head(tmp_path: Path) -> None:
     assert manifest["schema"] == "quality-runner-run-manifest-v0.1"
     assert manifest["mode"] == "run"
     assert manifest["run_id"] == "manifest-run"
-    assert manifest["quality_runner_version"] == "0.2.1"
+    assert manifest["quality_runner_version"] == "0.3.0"
     assert manifest["git"]["head_sha"] == head_sha
     assert manifest["git"]["is_repo"] is True
     assert manifest["git"]["dirty"] is True
