@@ -8,15 +8,34 @@ from pathlib import Path
 from typing import Any
 
 from quality_runner import __version__
+from quality_runner.cli_controller_reports import (
+    add_controller_report_command,
+    add_controller_report_summary_arguments,
+    controller_report_command_payload,
+    controller_report_from_summary_payload,
+    has_rejected_self_check,
+    load_controller_report_json,
+)
+from quality_runner.cli_human_summary import human_summary
+from quality_runner.cli_refresh import refresh_command_payload
+from quality_runner.cli_status import (
+    export_handoff_payload,
+    status_payload,
+)
 from quality_runner.code_quality import preview_ignored_paths
 from quality_runner.config import CONFIG_FILE_NAME, load_repo_config
+from quality_runner.controller_reports import validate_controller_report
+from quality_runner.release_smoke import release_smoke_payload
+from quality_runner.run_summary import build_run_summary
 from quality_runner.standards import DEFAULT_PROFILE
-from quality_runner.workflow import inspect_payload, run_payload
+from quality_runner.workflow import (
+    inspect_payload,
+    run_payload,
+    verify_gates_payload,
+)
 
 DOCTOR_RESULT_SCHEMA = "quality-runner-doctor-result-v0.1"
-EXPORT_HANDOFF_RESULT_SCHEMA = "quality-runner-export-handoff-result-v0.1"
 INIT_RESULT_SCHEMA = "quality-runner-init-result-v0.1"
-STATUS_RESULT_SCHEMA = "quality-runner-status-result-v0.1"
 EXPENSIVE_IGNORED_PATH_TEXT_FILE_THRESHOLD = 100
 EXPENSIVE_IGNORED_PATH_SECONDS_THRESHOLD = 5.0
 MAX_INTERACTIVE_IGNORED_PATHS = 10
@@ -36,6 +55,95 @@ def build_parser() -> argparse.ArgumentParser:
     inspect_parser = subparsers.add_parser("inspect", help="Inspect a repo without audit planning")
     _add_workflow_arguments(inspect_parser)
 
+    verify_parser = subparsers.add_parser("verify-gates", help="Execute discovered repo gates")
+    _add_workflow_arguments(verify_parser)
+    verify_parser.add_argument(
+        "--timeout-seconds",
+        type=int,
+        default=120,
+        help="Per-gate command timeout",
+    )
+    verify_parser.add_argument(
+        "--read-only-gates",
+        action="store_true",
+        help="Skip gates that are known or likely to mutate source files",
+    )
+    verify_parser.add_argument(
+        "--allow-mutating-gates",
+        action="store_true",
+        help="Allow known or suspected mutating gates to execute",
+    )
+
+    refresh_parser = subparsers.add_parser(
+        "refresh",
+        help="Run inspect, run, verify-gates, summarize, and optionally export a handoff",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog=(
+            "Use --handoff-output to write a remediation handoff in the same command.\n\n"
+            "Refresh emits gate handoff statuses for controller routing:\n"
+            "  gates-clean    all discovered local gates passed\n"
+            "  gates-blocked  environment, dependency setup, or read-only policy blocked evidence\n"
+            "  gates-failed   executable repo gates ran and failed\n\n"
+            "Blocked and failed handoffs include gate_verification.blocker_groups and\n"
+            "next_slice.action_groups. Use --total-timeout-reason to record why a\n"
+            "full refresh deadline was applied when --total-timeout-seconds is set."
+        ),
+    )
+    _add_workflow_arguments(refresh_parser)
+    refresh_parser.add_argument(
+        "--run-id-prefix",
+        required=True,
+        help="Prefix used to create <prefix>-inspect, <prefix>-run, and <prefix>-verify runs",
+    )
+    refresh_parser.add_argument("--baseline-run-id", default=None, help="Baseline run id for deltas")
+    refresh_parser.add_argument(
+        "--timeout-seconds",
+        type=int,
+        default=120,
+        help="Per-gate command timeout",
+    )
+    refresh_parser.add_argument(
+        "--workflow-timeout-seconds",
+        type=int,
+        default=None,
+        help=(
+            "Backward-compatible alias for --verify-timeout-seconds; "
+            "applies only to the verify-gates phase"
+        ),
+    )
+    refresh_parser.add_argument(
+        "--verify-timeout-seconds",
+        type=int,
+        default=None,
+        help="Verify-gates phase timeout; defaults to a multiple of --timeout-seconds",
+    )
+    refresh_parser.add_argument(
+        "--workflow-timeout-reason",
+        default=None,
+        help="Reason recorded when the verify-gates timeout fires",
+    )
+    refresh_parser.add_argument(
+        "--total-timeout-seconds",
+        type=int,
+        default=None,
+        help="Optional hard deadline for the full refresh across inspect, run, and verify",
+    )
+    refresh_parser.add_argument(
+        "--total-timeout-reason",
+        default=None,
+        help="Reason recorded when the total refresh timeout fires",
+    )
+    refresh_parser.add_argument(
+        "--allow-mutating-gates",
+        action="store_true",
+        help="Allow known or suspected mutating gates to execute during refresh",
+    )
+    refresh_parser.add_argument(
+        "--handoff-output",
+        default=None,
+        help="Write the generated remediation handoff markdown to this path",
+    )
+
     init_parser = subparsers.add_parser("init", help="Write a starter .quality-runner.toml")
     init_parser.add_argument("repo_path", help="Target repository path")
     init_parser.add_argument("--profile", default=DEFAULT_PROFILE, help="Default standards profile")
@@ -52,14 +160,42 @@ def build_parser() -> argparse.ArgumentParser:
     status_parser.add_argument("repo_path", help="Target repository path")
     status_parser.add_argument("--json", action="store_true", help="Emit JSON output")
 
+    summary_parser = subparsers.add_parser(
+        "summarize-run", help="Summarize a Quality Runner run and optional baseline delta"
+    )
+    summary_parser.add_argument("repo_path", help="Target repository path")
+    summary_parser.add_argument("--run-id", required=True, help="Run id to summarize")
+    summary_parser.add_argument("--baseline-run-id", default=None, help="Baseline run id for deltas")
+    add_controller_report_summary_arguments(summary_parser)
+    summary_parser.add_argument("--json", action="store_true", help="Emit JSON output")
+
     export_parser = subparsers.add_parser("export-handoff", help="Print or write an agent handoff")
     export_parser.add_argument("repo_path", help="Target repository path")
     export_parser.add_argument("--run-id", default=None, help="Run id to export")
     export_parser.add_argument("--output", default=None, help="Write handoff markdown to this path")
     export_parser.add_argument("--json", action="store_true", help="Emit JSON output")
 
+    validate_report_parser = subparsers.add_parser(
+        "validate-report", help="Validate a controller thread completion report"
+    )
+    validate_report_parser.add_argument("report_json", help="Controller report JSON path")
+    validate_report_parser.add_argument("--json", action="store_true", help="Emit JSON output")
+
+    add_controller_report_command(subparsers)
+
     doctor_parser = subparsers.add_parser("doctor", help="Check Quality Runner readiness")
     doctor_parser.add_argument("--json", action="store_true", help="Emit JSON output")
+
+    release_smoke_parser = subparsers.add_parser(
+        "release-smoke",
+        help="Run pre-release CLI, refresh, handoff, and schema smoke checks",
+    )
+    release_smoke_parser.add_argument(
+        "--work-dir",
+        default=None,
+        help="Directory for temporary release-smoke repo and handoff outputs",
+    )
+    release_smoke_parser.add_argument("--json", action="store_true", help="Emit JSON output")
 
     return parser
 
@@ -89,11 +225,17 @@ def main(argv: list[str] | None = None) -> int:
         if isinstance(content, str):
             print(content, end="" if content.endswith("\n") else "\n")
         else:
-            print(_human_summary(payload))
+            print(human_summary(payload))
     elif getattr(parsed, "json", False):
         print(json.dumps(payload, indent=2, sort_keys=True))
     else:
-        print(_human_summary(payload))
+        print(human_summary(payload))
+    if parsed.command in {"validate-report", "controller-report"} and payload.get("status") == "rejected":
+        return 1
+    if parsed.command == "release-smoke" and payload.get("status") != "passed":
+        return 1
+    if parsed.command == "summarize-run" and has_rejected_self_check(payload):
+        return 1
     return 0
 
 
@@ -122,6 +264,11 @@ def _add_workflow_arguments(parser: argparse.ArgumentParser) -> None:
 def _payload_for_args(args: argparse.Namespace) -> dict[str, Any]:
     if args.command == "doctor":
         return _doctor_payload()
+    if args.command == "release-smoke":
+        return release_smoke_payload(
+            work_dir=Path(args.work_dir) if args.work_dir else None,
+            help_text=build_parser().format_help(),
+        )
     if args.command == "init":
         return _init_payload(
             repo_root=_validated_repo_path(args.repo_path),
@@ -130,13 +277,31 @@ def _payload_for_args(args: argparse.Namespace) -> dict[str, Any]:
             force=args.force,
         )
     if args.command == "status":
-        return _status_payload(repo_root=_validated_repo_path(args.repo_path))
+        return status_payload(repo_root=_validated_repo_path(args.repo_path))
+    if args.command == "summarize-run":
+        repo_root = _validated_repo_path(args.repo_path)
+        summary = build_run_summary(
+            repo_root=repo_root,
+            run_id=args.run_id,
+            baseline_run_id=args.baseline_run_id,
+        )
+        if args.controller_report:
+            return controller_report_from_summary_payload(
+                args=args,
+                repo_root=repo_root,
+                summary=summary,
+            )
+        return summary
+    if args.command == "controller-report":
+        return controller_report_command_payload(args)
     if args.command == "export-handoff":
-        return _export_handoff_payload(
+        return export_handoff_payload(
             repo_root=_validated_repo_path(args.repo_path),
             run_id=args.run_id,
             output_path=Path(args.output).expanduser().resolve() if args.output else None,
         )
+    if args.command == "validate-report":
+        return validate_controller_report(load_controller_report_json(Path(args.report_json)))
     if args.command == "run":
         repo_root = _validated_repo_path(args.repo_path)
         return run_payload(
@@ -157,6 +322,21 @@ def _payload_for_args(args: argparse.Namespace) -> dict[str, Any]:
             include_ignored_paths=_interactive_include_ignored_paths(args, repo_root),
             checkout_most_advanced_branch=args.checkout_most_advanced_branch,
         )
+    if args.command == "verify-gates":
+        repo_root = _validated_repo_path(args.repo_path)
+        return verify_gates_payload(
+            repo_root=repo_root,
+            run_id=args.run_id,
+            profile=args.profile,
+            ci_status_json=Path(args.ci_status_json) if args.ci_status_json else None,
+            timeout_seconds=args.timeout_seconds,
+            checkout_most_advanced_branch=args.checkout_most_advanced_branch,
+            read_only_gates=args.read_only_gates,
+            allow_mutating_gates=args.allow_mutating_gates,
+        )
+    if args.command == "refresh":
+        repo_root = _validated_repo_path(args.repo_path)
+        return refresh_command_payload(args, repo_root)
     raise ValueError(f"unsupported command: {args.command}")
 
 
@@ -200,50 +380,6 @@ def _init_payload(
         "config_path": str(config_path),
         "implementation_allowed": False,
     }
-
-
-def _status_payload(repo_root: Path) -> dict[str, Any]:
-    latest_run = _latest_run(repo_root)
-    status = "ready" if latest_run is not None else "initialized"
-    return {
-        "schema": STATUS_RESULT_SCHEMA,
-        "status": status,
-        "repo_root": str(repo_root),
-        "implementation_allowed": False,
-        "config": load_repo_config(repo_root),
-        "latest_run": latest_run,
-    }
-
-
-def _export_handoff_payload(
-    *,
-    repo_root: Path,
-    run_id: str | None,
-    output_path: Path | None,
-) -> dict[str, Any]:
-    resolved_run_id = _latest_run_id(repo_root) if run_id is None else run_id
-    if resolved_run_id is None:
-        raise FileNotFoundError("no Quality Runner runs found")
-
-    handoff_path = repo_root / ".quality-runner" / "runs" / resolved_run_id / "agent-handoff.md"
-    if not handoff_path.exists():
-        raise FileNotFoundError(f"agent handoff does not exist for run: {resolved_run_id}")
-    content = handoff_path.read_text(encoding="utf-8")
-
-    payload = {
-        "schema": EXPORT_HANDOFF_RESULT_SCHEMA,
-        "status": "exported",
-        "run_id": resolved_run_id,
-        "source_path": str(handoff_path),
-        "implementation_allowed": False,
-    }
-    if output_path is None:
-        payload["content"] = content
-    else:
-        output_path.parent.mkdir(parents=True, exist_ok=True)
-        output_path.write_text(content, encoding="utf-8")
-        payload["output_path"] = str(output_path)
-    return payload
 
 
 def _validated_repo_path(repo_path: str) -> Path:
@@ -318,30 +454,6 @@ def _float_value(value: object) -> float:
     return float(value) if isinstance(value, int | float) else 0.0
 
 
-def _latest_run(repo_root: Path) -> dict[str, Any] | None:
-    run_id = _latest_run_id(repo_root)
-    if run_id is None:
-        return None
-    run_dir = repo_root / ".quality-runner" / "runs" / run_id
-    return {
-        "run_id": run_id,
-        "path": str(run_dir),
-        "has_handoff": (run_dir / "agent-handoff.md").exists(),
-        "has_audit": (run_dir / "quality-audit.json").exists(),
-    }
-
-
-def _latest_run_id(repo_root: Path) -> str | None:
-    runs_dir = repo_root / ".quality-runner" / "runs"
-    if not runs_dir.exists() or not runs_dir.is_dir():
-        return None
-    candidates = [path for path in runs_dir.iterdir() if path.is_dir()]
-    if not candidates:
-        return None
-    latest = max(candidates, key=lambda path: (path.stat().st_mtime_ns, path.name))
-    return latest.name
-
-
 def _unique_strings(values: list[str]) -> list[str]:
     unique: list[str] = []
     seen: set[str] = set()
@@ -350,42 +462,6 @@ def _unique_strings(values: list[str]) -> list[str]:
             unique.append(value)
             seen.add(value)
     return unique
-
-
-def _human_summary(payload: dict[str, Any]) -> str:
-    status = payload.get("status", "unknown")
-    if payload.get("schema") == DOCTOR_RESULT_SCHEMA:
-        version = payload.get("version", __version__)
-        return f"Quality Runner {version}: {status}"
-    if payload.get("schema") == INIT_RESULT_SCHEMA:
-        return f"config: {payload.get('config_path')}"
-    if payload.get("schema") == STATUS_RESULT_SCHEMA:
-        latest = payload.get("latest_run")
-        run_id = latest.get("run_id") if isinstance(latest, dict) else "none"
-        return f"status: {status}\nlatest run: {run_id}"
-    if payload.get("schema") == EXPORT_HANDOFF_RESULT_SCHEMA:
-        output_path = payload.get("output_path")
-        if isinstance(output_path, str):
-            return f"handoff: {output_path}"
-        return f"handoff: {payload.get('source_path')}"
-
-    lines = [f"status: {status}"]
-    run_id = payload.get("run_id")
-    if isinstance(run_id, str):
-        lines.append(f"run id: {run_id}")
-
-    artifact_paths = payload.get("artifact_paths")
-    if isinstance(artifact_paths, dict):
-        handoff_path = artifact_paths.get("agent_handoff_md")
-        audit_path = artifact_paths.get("quality_audit_json")
-        repo_scan_path = artifact_paths.get("repo_scan_json")
-        if isinstance(handoff_path, str):
-            lines.append(f"handoff: {handoff_path}")
-        if isinstance(audit_path, str):
-            lines.append(f"audit: {audit_path}")
-        elif isinstance(repo_scan_path, str):
-            lines.append(f"repo scan: {repo_scan_path}")
-    return "\n".join(lines)
 
 
 if __name__ == "__main__":

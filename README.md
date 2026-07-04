@@ -58,7 +58,16 @@ quality-runner doctor --json
 
 ## Quickstart
 
-Run a full audit-and-plan pass against a repository:
+Run a full repo refresh and write the remediation handoff in the same command:
+
+```bash
+quality-runner refresh /path/to/repo \
+  --run-id-prefix baseline-001 \
+  --handoff-output /tmp/baseline-001-handoff.md \
+  --json
+```
+
+For an audit-only pass without gate verification, use `run`:
 
 ```bash
 quality-runner run /path/to/repo --run-id baseline-001 --json
@@ -70,6 +79,7 @@ Quality Runner writes artifacts under the target repo:
 /path/to/repo/.quality-runner/runs/baseline-001/
   repo-scan.json
   code-quality-scan.json
+  package-manager-preflight.json
   standards.json
   capability-matrix.json
   run-manifest.json
@@ -87,8 +97,13 @@ The normal workflow is:
 2. Review `quality-audit.json` for evidence-backed findings.
 3. Review `code-quality-scan.json` for structural warnings and line evidence.
 4. Review `remediation-plan.json` for ordered actions and verification gates.
-5. Give an approved remediation slice to a coding agent.
-6. Rerun Quality Runner to confirm findings clear and update the resolution ledger.
+5. Have the coding agent convert the QR handoff into GSD-style phases, plans,
+   ledgers, and batch summaries before editing.
+6. Execute one coherent batch at a time.
+7. Rerun Quality Runner to confirm findings clear and update the resolution ledger.
+
+See [Agent Usage](docs/agent-usage.md) for the copy-paste phase and batch
+templates agents should follow.
 
 ## Commands
 
@@ -98,6 +113,11 @@ quality-runner init /path/to/repo --json
 quality-runner status /path/to/repo --json
 quality-runner inspect /path/to/repo --json
 quality-runner run /path/to/repo --json
+quality-runner verify-gates /path/to/repo --json
+quality-runner refresh /path/to/repo --run-id-prefix refresh-001 --handoff-output handoff.md --json
+quality-runner release-smoke --json
+quality-runner validate-report worker-report.json --json
+quality-runner controller-report lint worker-report.json --strict --json
 quality-runner export-handoff /path/to/repo
 quality-runner-mcp
 ```
@@ -109,6 +129,21 @@ branch is neither `main` nor the local branch with the highest commit count,
 before scanning; the worktree must be clean.
 
 See [CLI Reference](docs/cli.md) for command details.
+
+`refresh` runs inspect, run, verify, and summarize in read-only mode. Its
+handoff statuses are intended for controllers: `gates-clean` means discovered
+local gates passed, `gates-blocked` means environment/dependency/read-only
+policy blocked evidence, and `gates-failed` means executable repo gates ran and
+failed. Blocked or failed handoffs include `blocker_groups` and
+`next_slice.action_groups` for structured routing. Use `--handoff-output` when
+you want the scan and the human remediation plan from one command; use
+`export-handoff` later to regenerate or copy a handoff from an existing run.
+For large remediations, agents should use QR output as evidence for a
+GSD-style phase plan rather than editing directly from the handoff.
+
+Before release, run `quality-runner release-smoke --json` to verify the public
+CLI happy path, installed handoff export behavior, and report compatibility
+checks in one command.
 
 ## MCP
 

@@ -43,6 +43,7 @@ Writes:
 
 - `repo-scan.json`
 - `code-quality-scan.json`
+- `package-manager-preflight.json`
 - `standards.json`
 - `capability-matrix.json`
 
@@ -99,6 +100,7 @@ Writes:
 
 - `repo-scan.json`
 - `code-quality-scan.json`
+- `package-manager-preflight.json`
 - `standards.json`
 - `capability-matrix.json`
 - `quality-audit.json`
@@ -108,9 +110,173 @@ Writes:
 - `agent-handoff.json`
 - `agent-handoff.md`
 
+## `quality-runner verify-gates`
+
+Executes discovered command-backed repo gates and records local pass/fail
+evidence without applying remediation. JavaScript package scripts execute
+through the detected package manager, and CI-only gates without a local executor
+are reported as skipped. File/evidence capabilities such as a truth file are
+kept in the capability matrix but do not block executable gate verification.
+
+```bash
+quality-runner verify-gates /path/to/repo --run-id verify-001 --json
+quality-runner verify-gates /path/to/repo --timeout-seconds 300 --json
+```
+
+Repos can override individual gate timeouts in `.quality-runner.toml`:
+
+```toml
+[quality_runner.gate_timeouts]
+tests = 300
+pre_cr = 600
+```
+
+Possible verification statuses include `passed`, `passed-with-findings`,
+`failed`, `blocked`, and `skipped-nonlocal`.
+
+Writes:
+
+- `repo-scan.json`
+- `code-quality-scan.json`
+- `package-manager-preflight.json`
+- `standards.json`
+- `capability-matrix.json`
+- `gate-verification.json`
+- `quality-audit.json`
+- `remediation-plan.json`
+- `agent-handoff.json`
+- `agent-handoff.md`
+- `run-manifest.json`
+
+## `quality-runner refresh`
+
+Runs `inspect`, `run`, read-only `verify-gates`, and `summarize-run` as one
+controller-friendly workflow.
+
+```bash
+quality-runner refresh /path/to/repo --run-id-prefix refresh-001 --handoff-output handoff.md --json
+quality-runner refresh /path/to/repo --run-id-prefix refresh-001 --verify-timeout-seconds 300 --json
+quality-runner refresh /path/to/repo --run-id-prefix refresh-001 --total-timeout-seconds 900 --json
+```
+
+Use `--handoff-output` for the normal single-repo workflow where the scan and
+the human remediation plan should be produced together. Refresh still writes the
+canonical `agent-handoff.md` under `.quality-runner/runs/<prefix>-verify/`;
+`--handoff-output` copies that Markdown to the requested path.
+
+Timeout flags are explicit about scope:
+
+- `--timeout-seconds` caps each individual gate command.
+- `--verify-timeout-seconds` caps the `verify-gates` phase.
+- `--workflow-timeout-seconds` is a backward-compatible alias for
+  `--verify-timeout-seconds`.
+- `--total-timeout-seconds` is optional and caps the full refresh across
+  inspect, run, and verify.
+- `--workflow-timeout-reason` records why the verify-phase deadline exists.
+- `--total-timeout-reason` records why the full refresh deadline exists.
+
+Refresh JSON includes `timeout_contract` and `phase_timings` so controllers can
+distinguish a deliberate full-evidence run from a hard end-to-end deadline.
+When a timeout fires, `workflow-timeout.json`, the verify result, and
+`gate-verification.json` include `timeout_scope` as either `verify-phase` or
+`total-refresh`.
+
+Agent handoffs from refresh use `quality-runner-agent-handoff-v0.2` and route
+verified gate outcomes with `gates-clean`, `gates-blocked`, and `gates-failed`.
+Blocked and failed handoffs include `gate_verification.blocker_groups` and
+`next_slice.action_groups` so controllers can distinguish dependency setup,
+environment restrictions, read-only policy blockers, and executable gate
+failures before launching the next worker.
+
+If inspect, run, or verify times out before normal verification completes,
+refresh still writes a final `agent-handoff.json`/`.md` with a
+`workflow-timeout` blocker group. `workflow-timeout.json` also includes scan
+progress diagnostics with the last traversal directory, recent paths, visited
+path count, and skipped path count.
+
+## `quality-runner release-smoke`
+
+Runs the pre-release CLI smoke path against a generated tiny repository. This is
+the repeatable check for the public happy path: help text, doctor readiness,
+`refresh --handoff-output`, `export-handoff`, and legacy/new controller report
+schema compatibility.
+
+```bash
+quality-runner release-smoke --json
+quality-runner release-smoke --work-dir /tmp/quality-runner-release-smoke --json
+```
+
+The JSON result uses `quality-runner-release-smoke-result-v0.1` and includes
+per-check statuses plus the generated handoff path. The handoff examples in
+[`docs/examples`](examples/) show representative clean, blocked, and timeout
+outputs for manual release review.
+
+## `quality-runner validate-report`
+
+Validates a controller thread completion report before the controller advances a
+wave.
+
+```bash
+quality-runner validate-report worker-report.json --json
+```
+
+Completed reports must have a clean `git_status_short`, a `commit_hash`, and
+`push_status` set to `pushed`. Generated artifacts such as `.quality-runner/`
+can be listed under `ignored_generated_artifacts` when they are the only dirty
+paths. Blocked reports must include explicit blockers.
+
+Worker threads should run this as their final self-check before reporting back
+to a controller. The command is intentionally strict and does not normalize
+repo-specific report shapes.
+
+## `quality-runner controller-report`
+
+Normalizes or lints controller thread reports.
+
+```bash
+quality-runner controller-report normalize worker-report.json --json
+quality-runner controller-report normalize worker-report.json --output normalized-report.json
+quality-runner controller-report lint worker-report.json --strict --json
+```
+
+`normalize` accepts common nested worker report shapes and emits the strict
+`quality-runner-controller-report-v0.1` shape expected by `validate-report`.
+`lint --strict` also enforces controller semantics: `complete` requires a clean
+final QR result plus commit/push evidence, and reports that observe target HEAD
+changes must include an explicit concurrency note.
+
+## `quality-runner summarize-run`
+
+Prints a controller-friendly run summary with final status, gate table, missing
+capabilities, finding counts, a recommended classification, and an optional
+baseline delta.
+
+```bash
+quality-runner summarize-run /path/to/repo --run-id final-001 --json
+quality-runner summarize-run /path/to/repo --run-id final-001 --baseline-run-id baseline-001 --json
+quality-runner summarize-run /path/to/repo --run-id final-001 --baseline-run-id baseline-001 --controller-report --branch-name qr/example --json
+quality-runner summarize-run /path/to/repo --run-id final-001 --baseline-run-id baseline-001 --controller-report --report-output worker-report.json --lint-report --validate-report --json
+```
+
+With `--controller-report`, the command emits a strict controller-report
+skeleton using the run summary, current git status, branch name, baseline path,
+and inferred blockers. Workers can add explicit `--blocker`, `--file-changed`,
+`--commit-hash`, `--push-status`, and `--thread-status` values.
+
+Use `--report-output` to write the generated report to disk. With
+`--lint-report` and `--validate-report`, the command runs the same strict
+self-checks expected by controller waves and records their results under
+`self_checks`. Generated controller reports also include `target_head`,
+`commit_created_by_task`, `repo_state`, and expected lint/validate commands in
+`verification`. Pass `--pre-head`, `--pre-git-status-short`, and
+`--concurrency-note` when a worker captured pre-run repo state or observed the
+target HEAD moving during a run.
+
 ## `quality-runner export-handoff`
 
-Prints the latest `agent-handoff.md`, or a selected run handoff.
+Prints the latest `agent-handoff.md`, or a selected run handoff. This is useful
+when regenerating or copying documentation from an existing run without running
+another scan.
 
 ```bash
 quality-runner export-handoff /path/to/repo

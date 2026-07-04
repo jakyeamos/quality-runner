@@ -59,6 +59,7 @@ def inspect_repo(
         "scripts": scripts,
         "quality_commands": _quality_commands(
             root=root,
+            package_json=package_json,
             scripts=scripts,
             pyproject=pyproject,
             pre_cr_config=pre_cr_config,
@@ -171,7 +172,8 @@ def _detect_quality_contract(
             instruction_text,
             ("dead-code", "dead code", "dead-code scans", "dead code scans"),
         )
-        or "dead-code" in scripts,
+        or "dead-code" in scripts
+        or "audit:dead-code" in scripts,
         "truth_file": _has_instruction_term(
             instruction_text,
             ("project_truth.md", "project truth", ".tracker/project_truth.md"),

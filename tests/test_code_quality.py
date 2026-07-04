@@ -109,6 +109,32 @@ def test_code_quality_scan_reports_deterministic_rule_groups_and_fingerprints(
     assert result["summary"]["findings_by_category"]["ui_structural"] >= 6
 
 
+def test_nested_ternary_rule_ignores_typescript_non_ternary_question_marks(
+    tmp_path: Path,
+) -> None:
+    from quality_runner.code_quality import create_code_quality_scan
+
+    _write(
+        tmp_path / "src" / "syntax.ts",
+        "\n".join(
+            [
+                "type Status = 'open' | 'closed' | 'pending';",
+                "type Maybe<T> = T | null | undefined;",
+                "const label = input?.profile?.name ?? fallback ?? 'Unknown';",
+                "const matcher = /open|closed|pending/;",
+                "const groupMatcher = /^(?:open|closed)$/;",
+                "const optional = input?.profile?.name ? 'Known' : 'Unknown';",
+                "const actual = items ? items.length ? 'a' : 'b' : 'c';",
+            ]
+        ),
+    )
+
+    result = create_code_quality_scan(tmp_path, scan={"run_id": "scan-001"}, config={})
+    nested = [finding for finding in result["findings"] if finding["rule_id"] == "nested-ternary"]
+
+    assert [finding["line"] for finding in nested] == [7]
+
+
 def test_code_quality_scan_detects_trpc_and_zod_patterns_outside_fixed_api_paths(
     tmp_path: Path,
 ) -> None:
@@ -461,6 +487,97 @@ def test_code_quality_scan_respects_config_and_generated_ignores(tmp_path: Path)
     assert any(item["path"] == "dist" for item in result["skipped_files"])
 
 
+def test_code_quality_scan_applies_configured_scan_exclusions(tmp_path: Path) -> None:
+    from quality_runner.code_quality import create_code_quality_scan
+
+    _write(tmp_path / ".planning" / "remediation.ts", "const planned: any = {};\n")
+    _write(tmp_path / "scripts" / "generated-report.ts", "const report: any = {};\n")
+    _write(tmp_path / "src" / "index.ts", "const value: any = {};\n")
+
+    result = create_code_quality_scan(
+        tmp_path,
+        scan={"run_id": "scan-001"},
+        config={"scan_exclusions": [".planning", "scripts/generated-*"]},
+    )
+
+    scanned_paths = {item["path"] for item in result["accountability"]}
+    skipped = {item["path"]: item["reason"] for item in result["skipped_files"]}
+    finding_files = {finding["file"] for finding in result["findings"]}
+
+    assert scanned_paths == {"src/index.ts"}
+    assert skipped[".planning"] == "scan exclusion"
+    assert skipped["scripts/generated-report.ts"] == "scan exclusion"
+    assert finding_files == {"src/index.ts"}
+
+
+def test_code_quality_scan_applies_root_gitignore_exclusions(tmp_path: Path) -> None:
+    from quality_runner.code_quality import create_code_quality_scan
+
+    (tmp_path / ".gitignore").write_text("Ignored Dashboard/\n", encoding="utf-8")
+    _write(tmp_path / "Ignored Dashboard" / "page.tsx", "const ignored: any = {};\n")
+    _write(tmp_path / "src" / "index.ts", "const value: any = {};\n")
+
+    result = create_code_quality_scan(
+        tmp_path,
+        scan={"run_id": "scan-001"},
+        config={},
+    )
+
+    scanned_paths = {item["path"] for item in result["accountability"]}
+    skipped = {item["path"]: item["reason"] for item in result["skipped_files"]}
+    finding_files = {finding["file"] for finding in result["findings"]}
+
+    assert scanned_paths == {"src/index.ts"}
+    assert skipped["Ignored Dashboard"] == "scan exclusion"
+    assert finding_files == {"src/index.ts"}
+
+
+def test_code_quality_scan_excludes_hidden_operational_dirs_by_default(
+    tmp_path: Path,
+) -> None:
+    from quality_runner.code_quality import create_code_quality_scan
+
+    for directory in (".aios", ".planning", ".superpowers", ".tracker"):
+        _write(tmp_path / directory / "notes.ts", "const hidden: any = {};\n")
+    _write(tmp_path / "src" / "index.ts", "const value: any = {};\n")
+
+    result = create_code_quality_scan(
+        tmp_path,
+        scan={"run_id": "scan-001"},
+        config={},
+    )
+
+    scanned_paths = {item["path"] for item in result["accountability"]}
+    skipped = {item["path"]: item["reason"] for item in result["skipped_files"]}
+    finding_files = {finding["file"] for finding in result["findings"]}
+
+    assert scanned_paths == {"src/index.ts"}
+    assert skipped == {
+        ".aios": "scan exclusion",
+        ".planning": "scan exclusion",
+        ".superpowers": "scan exclusion",
+        ".tracker": "scan exclusion",
+    }
+    assert finding_files == {"src/index.ts"}
+
+
+def test_code_quality_scan_include_ignored_paths_overrides_scan_exclusions(
+    tmp_path: Path,
+) -> None:
+    from quality_runner.code_quality import create_code_quality_scan
+
+    _write(tmp_path / "docs" / "example.ts", "const documented: any = {};\n")
+
+    result = create_code_quality_scan(
+        tmp_path,
+        scan={"run_id": "scan-001"},
+        config={"structural_scan": {"include_ignored_paths": ["docs"]}},
+    )
+
+    assert {item["path"] for item in result["accountability"]} == {"docs/example.ts"}
+    assert {finding["file"] for finding in result["findings"]} == {"docs/example.ts"}
+
+
 def test_code_quality_scan_ignores_generated_build_large_tests_and_non_frontend(
     tmp_path: Path,
 ) -> None:
@@ -509,6 +626,16 @@ def test_code_quality_scan_ignores_shadow_vendor_cache_and_build_variants(
         "const copy: any = {};\n",
     )
     _write(
+        tmp_path / ".claude" / "worktrees" / "feature-copy" / "src" / "copy.ts",
+        "const claude_copy: any = {};\n",
+    )
+    _write(
+        tmp_path / ".codex" / "worktrees" / "feature-copy" / "src" / "copy.ts",
+        "const codex_copy: any = {};\n",
+    )
+    for agent_dir in (".aider", ".continue", ".cursor"):
+        _write(tmp_path / agent_dir / "scratch.ts", "const scratch: any = {};\n")
+    _write(
         tmp_path / "apps" / "dashboard" / ".next-broken-20260323-1" / "server" / "_error.js",
         "eval(userInput);\n",
     )
@@ -543,7 +670,12 @@ def test_code_quality_scan_ignores_shadow_vendor_cache_and_build_variants(
     finding_files = {finding["file"] for finding in result["findings"]}
 
     assert scanned_paths == {"src/data/model.ts", "src/index.ts"}
-    assert skipped[".aios/shadow-worktrees"] == "ignored directory"
+    assert skipped[".aios"] == "scan exclusion"
+    assert skipped[".claude/worktrees"] == "scan exclusion"
+    assert skipped[".codex/worktrees"] == "scan exclusion"
+    assert skipped[".aider"] == "scan exclusion"
+    assert skipped[".continue"] == "scan exclusion"
+    assert skipped[".cursor"] == "scan exclusion"
     assert skipped[".worktrees"] == "ignored directory"
     assert skipped["apps/dashboard/.next-broken-20260323-1"] == "ignored directory"
     assert skipped[".tmp"] == "ignored directory"
@@ -574,6 +706,35 @@ def test_code_quality_scan_reports_estimated_cost_for_skipped_paths(tmp_path: Pa
     )
     assert result["summary"]["skipped_estimated_text_files"] == 3
     assert result["summary"]["skipped_estimated_scan_seconds"] > 0
+
+
+def test_code_quality_scan_stops_at_configured_file_budget(tmp_path: Path) -> None:
+    from quality_runner.code_quality import create_code_quality_scan
+
+    for index in range(5):
+        _write(tmp_path / "src" / f"file-{index}.ts", f"const value{index}: any = {{}};\n")
+
+    result = create_code_quality_scan(
+        tmp_path,
+        scan={"run_id": "scan-budget"},
+        config={"structural_scan": {"max_text_files": 2}},
+    )
+
+    scanned_paths = [item["path"] for item in result["accountability"]]
+    skipped = {item["path"]: item["reason"] for item in result["skipped_files"]}
+
+    assert scanned_paths == ["src/file-0.ts", "src/file-1.ts"]
+    assert skipped == {
+        "src/file-2.ts": "scan budget exceeded",
+        "src/file-3.ts": "scan budget exceeded",
+        "src/file-4.ts": "scan budget exceeded",
+    }
+    assert result["summary"]["scan_budget"] == {
+        "max_text_files": 2,
+        "scanned_text_files": 2,
+        "budget_exceeded": True,
+        "skipped_text_files": 3,
+    }
 
 
 def test_code_quality_scan_can_include_default_ignored_paths(tmp_path: Path) -> None:

@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://quality-runner.dev/schemas/controller-report-validation.schema.json",
+  "title": "Quality Runner Controller Report Validation",
+  "type": "object",
+  "required": ["schema", "status", "errors"],
+  "properties": {
+    "schema": { "const": "quality-runner-controller-report-validation-v0.1" },
+    "status": { "enum": ["accepted", "rejected"] },
+    "errors": { "type": "array", "items": { "type": "string" } }
+  }
+}

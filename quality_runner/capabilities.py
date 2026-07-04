@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import date
 from typing import Any
 
+from quality_runner.capability_state import matching_ci_status, verification_state
 from quality_runner.schema_constants import CAPABILITY_MAP_SCHEMA
 
 SCRIPT_CAPABILITIES = {
@@ -11,7 +12,7 @@ SCRIPT_CAPABILITIES = {
     "typecheck": ("typecheck", "type-check", "check-types"),
     "tests": ("test", "tests"),
     "build": ("build",),
-    "dead_code": ("dead-code", "dead_code", "knip", "vulture", "unused"),
+    "dead_code": ("dead-code", "dead_code", "audit:dead-code", "knip", "vulture", "unused"),
     "runtime_smoke": ("smoke", "runtime-smoke", "smoke-test"),
     "pre_pr": ("pre-pr", "prepr"),
 }
@@ -37,12 +38,13 @@ def detect_capabilities(
         command = _first_quality_command(quality_commands, capability_id)
         script_name = _first_matching_script(scripts, script_names)
         if command is not None:
+            ci_status = matching_ci_status(scan, capability_id)
             available.append(
                 _available_command(
                     capability_id=capability_id,
                     command=command,
                     required_by=required_by.get(capability_id),
-                    ci_status=_matching_ci_status(scan, capability_id),
+                    ci_status=ci_status,
                 )
             )
         elif script_name is None:
@@ -59,13 +61,19 @@ def detect_capabilities(
                 ),
             )
         else:
+            ci_status = matching_ci_status(scan, capability_id)
             available.append(
                 {
                     "id": capability_id,
                     "type": "script",
+                    "capability_kind": "local_command",
                     "source": f"package.json:scripts.{script_name}",
                     **_optional_field("required_by", required_by.get(capability_id)),
-                    **_optional_field("ci_status", _matching_ci_status(scan, capability_id)),
+                    **_optional_field("ci_status", ci_status),
+                    "verification_state": verification_state(
+                        discovery="script-discovered",
+                        ci_status=ci_status,
+                    ),
                 }
             )
 
@@ -112,6 +120,9 @@ def _quality_commands(scan: dict[str, Any]) -> list[dict[str, str]]:
         language = command.get("language")
         owner = command.get("owner")
         severity = command.get("severity")
+        local_execution = command.get("local_execution")
+        cwd = command.get("cwd")
+        mutating_risk = command.get("mutating_risk")
         if (
             isinstance(capability_id, str)
             and capability_id
@@ -130,6 +141,9 @@ def _quality_commands(scan: dict[str, Any]) -> list[dict[str, str]]:
                     "language": language,
                     **_optional_field("owner", owner),
                     **_optional_field("severity", severity),
+                    **_optional_field("local_execution", local_execution),
+                    **_optional_field("cwd", cwd),
+                    **_optional_field("mutating_risk", mutating_risk),
                 }
             )
     return normalized
@@ -203,25 +217,34 @@ def _record_file_capability(*, available: list[dict[str, Any]], missing: list[di
 # fmt: on
     command = _first_quality_command(quality_commands, capability_id)
     if command is not None:
+        ci_status = matching_ci_status(scan, capability_id)
         available.append(
             _available_command(
                 capability_id=capability_id,
                 command=command,
                 required_by=required_by,
-                ci_status=_matching_ci_status(scan, capability_id),
+                ci_status=ci_status,
             )
         )
         return
 
     script_name = _first_matching_script(scripts, script_names)
     if script_name is not None:
+        ci_status = matching_ci_status(scan, capability_id)
         available.append(
             {
                 "id": capability_id,
                 "type": "script",
+                "capability_kind": "local_command",
                 "source": f"package.json:scripts.{script_name}",
+                "command": scripts[script_name],
+                "language": _primary_language(scan),
                 **_optional_field("required_by", required_by),
-                **_optional_field("ci_status", _matching_ci_status(scan, capability_id)),
+                **_optional_field("ci_status", ci_status),
+                "verification_state": verification_state(
+                    discovery="script-discovered",
+                    ci_status=ci_status,
+                ),
             }
         )
     elif isinstance(path, str) and path:
@@ -230,8 +253,13 @@ def _record_file_capability(*, available: list[dict[str, Any]], missing: list[di
                 {
                     "id": capability_id,
                     "type": "file",
+                    "capability_kind": "evidence_file",
                     "source": path,
                     **_optional_field("required_by", required_by),
+                    "verification_state": verification_state(
+                        discovery="file-discovered",
+                        ci_status=None,
+                    ),
                 }
             )
     elif not _has_capability(available, capability_id):
@@ -407,53 +435,22 @@ def _available_command(
     return {
         "id": capability_id,
         "type": "command",
+        "capability_kind": "ci_only" if command.get("local_execution") == "ci-only" else "local_command",
         "source": command["source"],
         "command": command["command"],
         "language": command["language"],
         **_optional_field("required_by", required_by),
         **_optional_field("owner", command.get("owner")),
         **_optional_field("severity", command.get("severity")),
+        **_optional_field("local_execution", command.get("local_execution")),
+        **_optional_field("cwd", command.get("cwd")),
+        **_optional_field("mutating_risk", command.get("mutating_risk")),
         **_optional_field("ci_status", ci_status),
+        "verification_state": verification_state(
+            discovery="command-discovered",
+            ci_status=ci_status,
+        ),
     }
-
-
-def _matching_ci_status(
-    scan: dict[str, Any],
-    capability_id: str,
-) -> dict[str, str | None] | None:
-    checks = scan.get("ci_checks")
-    if not isinstance(checks, list):
-        return None
-    terms = {
-        "formatter": ("format", "fmt", "prettier"),
-        "lint": ("lint",),
-        "typecheck": ("typecheck", "type-check", "types"),
-        "tests": ("test", "tests"),
-        "build": ("build",),
-        "dead_code": ("dead", "unused", "knip", "vulture"),
-        "runtime_smoke": ("smoke",),
-        "pre_pr": ("pull request", "pre-pr", "pre pr"),
-        "pre_cr": ("pre-cr", "pre cr"),
-    }.get(capability_id, (capability_id,))
-    for check in checks:
-        if not isinstance(check, dict):
-            continue
-        name = check.get("name")
-        if not isinstance(name, str):
-            continue
-        normalized = name.lower()
-        if any(term in normalized for term in terms):
-            return {
-                "name": name,
-                "status": _optional_string(check.get("status")),
-                "conclusion": _optional_string(check.get("conclusion")),
-                "url": _optional_string(check.get("url")),
-            }
-    return None
-
-
-def _optional_string(value: object) -> str | None:
-    return value if isinstance(value, str) and value else None
 
 
 def _optional_field(key: str, value: object) -> dict[str, Any]:

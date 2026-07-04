@@ -376,12 +376,94 @@ def test_inspect_repo_detects_nested_workspaces_and_quality_aliases(tmp_path: Pa
     )
     assert (
         commands[("lint", "frontend/package.json:scripts.check")]["command"]
-        == "cd frontend && ultracite check"
+        == "cd frontend && pnpm run check"
     )
     assert (
         commands[("typecheck", "frontend/package.json:scripts.build:ts")]["command"]
-        == "cd frontend && tsc -b tsconfig.project.json"
+        == "cd frontend && pnpm run build:ts"
     )
+
+
+def test_nested_javascript_workspace_uses_its_own_lockfile_package_manager(
+    tmp_path: Path,
+) -> None:
+    from quality_runner.discovery import inspect_repo
+
+    dashboard = tmp_path / "dashboard"
+    dashboard.mkdir()
+    (dashboard / "package.json").write_text(
+        json.dumps({"scripts": {"build": "next build", "typecheck": "tsc --noEmit"}}),
+        encoding="utf-8",
+    )
+    (dashboard / "package-lock.json").write_text("{}\n", encoding="utf-8")
+
+    scan = inspect_repo(tmp_path, run_id="nested-npm-workspace")
+
+    commands = {(command["id"], command["source"]): command for command in scan["quality_commands"]}
+    assert (
+        commands[("build", "dashboard/package.json:scripts.build")]["command"]
+        == "cd dashboard && npm run build"
+    )
+    assert (
+        commands[("typecheck", "dashboard/package.json:scripts.typecheck")]["command"]
+        == "cd dashboard && npm run typecheck"
+    )
+
+
+def test_inspect_repo_discovery_prunes_excluded_trees_before_recursive_walk(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    from pathlib import Path as PathClass
+
+    from quality_runner.discovery import inspect_repo
+
+    (tmp_path / "package.json").write_text(
+        json.dumps({"scripts": {"test": "vitest run"}}),
+        encoding="utf-8",
+    )
+    (tmp_path / "node_modules" / "fixture" / "package.json").parent.mkdir(parents=True)
+    (tmp_path / "node_modules" / "fixture" / "package.json").write_text(
+        json.dumps({"scripts": {"test": "should-not-be-read"}}),
+        encoding="utf-8",
+    )
+    (tmp_path / "docs" / "sample" / "pyproject.toml").parent.mkdir(parents=True)
+    (tmp_path / "docs" / "sample" / "pyproject.toml").write_text(
+        '[project]\nname = "docs-sample"\nversion = "0.1.0"\n',
+        encoding="utf-8",
+    )
+
+    def fail_rglob(self: PathClass, pattern: str):  # noqa: ANN001
+        raise AssertionError(f"discovery should not call Path.rglob({pattern!r})")
+
+    monkeypatch.setattr(PathClass, "rglob", fail_rglob)
+
+    scan = inspect_repo(tmp_path, run_id="pruned-discovery-001")
+
+    assert scan["workspaces"] == []
+    assert scan["quality_commands"][0]["source"] == "package.json:scripts.test"
+
+
+def test_inspect_repo_prunes_gitignored_untracked_directories(tmp_path: Path) -> None:
+    from quality_runner.discovery import inspect_repo
+
+    (tmp_path / ".gitignore").write_text("ignored-workspaces/\n", encoding="utf-8")
+    (tmp_path / "app" / "package.json").parent.mkdir(parents=True)
+    (tmp_path / "app" / "package.json").write_text(
+        json.dumps({"scripts": {"test": "vitest run"}}),
+        encoding="utf-8",
+    )
+    (tmp_path / "ignored-workspaces" / "demo" / "package.json").parent.mkdir(parents=True)
+    (tmp_path / "ignored-workspaces" / "demo" / "package.json").write_text(
+        json.dumps({"scripts": {"test": "should-not-be-read"}}),
+        encoding="utf-8",
+    )
+
+    scan = inspect_repo(tmp_path, run_id="gitignore-prune-001")
+
+    assert scan["workspaces"] == [
+        {"path": "app", "kind": "javascript", "manifest": "app/package.json"}
+    ]
 
 
 def test_inspect_repo_excludes_default_fixture_corpus_vendor_and_docs_paths(
@@ -410,6 +492,25 @@ def test_inspect_repo_excludes_default_fixture_corpus_vendor_and_docs_paths(
         "module example.com/vendored\n",
         encoding="utf-8",
     )
+    claude_worktree = tmp_path / ".claude" / "worktrees" / "feature-copy"
+    claude_worktree.mkdir(parents=True)
+    (claude_worktree / "package.json").write_text(
+        json.dumps({"scripts": {"test": "should-not-be-read"}}),
+        encoding="utf-8",
+    )
+    codex_worktree = tmp_path / ".codex" / "worktrees" / "feature-copy"
+    codex_worktree.mkdir(parents=True)
+    (codex_worktree / "package.json").write_text(
+        json.dumps({"scripts": {"test": "should-not-be-read"}}),
+        encoding="utf-8",
+    )
+    for agent_dir in (".aider", ".continue", ".cursor"):
+        agent_path = tmp_path / agent_dir / "scratch"
+        agent_path.mkdir(parents=True)
+        (agent_path / "package.json").write_text(
+            json.dumps({"scripts": {"test": "should-not-be-read"}}),
+            encoding="utf-8",
+        )
     terraform_dir = tmp_path / "infra" / "terraform"
     terraform_dir.mkdir(parents=True)
     (terraform_dir / "main.tf").write_text("terraform {}\n", encoding="utf-8")
@@ -443,6 +544,10 @@ def test_inspect_repo_excludes_default_fixture_corpus_vendor_and_docs_paths(
     assert "proto/service.proto" in surface_paths
     assert "src/generated" in surface_paths
     assert all(not path.startswith(("docs/", "fixtures/", "vendor/")) for path in surface_paths)
+    assert all(
+        not path.startswith((".claude/worktrees/", ".codex/worktrees/", ".aider/", ".continue/", ".cursor/"))
+        for path in surface_paths
+    )
     assert scan["generated_code"] == [{"path": "src/generated", "evidence": "generated directory"}]
 
 
@@ -476,6 +581,15 @@ def test_workflow_applies_configured_scan_exclusions(tmp_path: Path) -> None:
     scan = json.loads(Path(payload["artifact_paths"]["repo_scan_json"]).read_text())
 
     assert scan["scan_exclusions"] == [
+        ".claude/worktrees/**",
+        ".codex/worktrees/**",
+        ".aider",
+        ".aios",
+        ".continue",
+        ".cursor",
+        ".planning",
+        ".superpowers",
+        ".tracker",
         "docs",
         "fixtures",
         "corpus",
@@ -797,9 +911,15 @@ def test_detect_capabilities_accepts_python_quality_commands(tmp_path: Path) -> 
     assert available["lint"] == {
         "id": "lint",
         "type": "command",
+        "capability_kind": "local_command",
         "source": "pyproject.toml:tool.ruff",
         "command": "ruff check .",
         "language": "python",
+        "verification_state": {
+            "discovery": "command-discovered",
+            "execution": "not-run",
+            "result": "unknown",
+        },
     }
 
 
@@ -822,6 +942,26 @@ def test_detect_capabilities_records_pre_cr_script_with_stable_id(tmp_path: Path
     assert "pre_cr" in available_ids
     assert "pre_cr" not in missing_ids
     assert "pre_pr" in missing_ids
+
+
+def test_detect_capabilities_accepts_recommended_dead_code_script_name(tmp_path: Path) -> None:
+    from quality_runner.capabilities import detect_capabilities
+    from quality_runner.discovery import inspect_repo
+    from quality_runner.standards import compile_standards
+
+    (tmp_path / "package.json").write_text(
+        json.dumps({"scripts": {"audit:dead-code": "knip --production"}}),
+        encoding="utf-8",
+    )
+    scan = inspect_repo(tmp_path, run_id="dead-code-script-001")
+    packet = compile_standards(repo_root=tmp_path, scan=scan, profile="default")
+
+    capability_map = detect_capabilities(scan=scan, standards_packet=packet)
+
+    available = {item["id"]: item for item in capability_map["available"]}
+    missing_ids = {item["id"] for item in capability_map["missing"]}
+    assert available["dead_code"]["source"] == "package.json:scripts.audit:dead-code"
+    assert "dead_code" not in missing_ids
 
 
 def test_detect_capabilities_records_pre_cr_config_with_stable_id(tmp_path: Path) -> None:

@@ -205,6 +205,58 @@ def test_cli_inspect_accepts_ci_status_json(tmp_path: Path) -> None:
     ]
 
 
+def test_cli_verify_gates_json_executes_discovered_gates(tmp_path: Path) -> None:
+    (tmp_path / "package.json").write_text(
+        json.dumps({"scripts": {"lint": f"{sys.executable} -c 'import sys; sys.exit(0)'"}}),
+        encoding="utf-8",
+    )
+    (tmp_path / ".quality-runner.toml").write_text(
+        '[quality_runner]\nrequired_capabilities = ["lint"]\n',
+        encoding="utf-8",
+    )
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "quality_runner",
+            "verify-gates",
+            str(tmp_path),
+            "--run-id",
+            "cli-verify-gates",
+            "--json",
+        ],
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+    payload = json.loads(result.stdout)
+    verification = json.loads(Path(payload["artifact_paths"]["gate_verification_json"]).read_text())
+
+    assert payload["schema"] == "quality-runner-verify-gates-result-v0.1"
+    assert payload["status"] == "passed"
+    assert verification["gates"][0]["status"] == "passed"
+
+
+def test_cli_refresh_help_names_statuses_action_groups_and_timeout_reasons() -> None:
+    result = subprocess.run(
+        [sys.executable, "-m", "quality_runner", "refresh", "--help"],
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+    assert "gates-blocked" in result.stdout
+    assert "gates-failed" in result.stdout
+    assert "gates-clean" in result.stdout
+    assert "action_groups" in result.stdout
+    assert "--handoff-output" in result.stdout
+    assert "--total-timeout-reason" in result.stdout
+
+
 def test_cli_inspect_can_checkout_most_advanced_branch(tmp_path: Path) -> None:
     write_js_fixture(tmp_path)
     _git(tmp_path, "init", "-b", "main")
@@ -256,7 +308,7 @@ def test_cli_doctor_json_reports_ready() -> None:
     payload = json.loads(result.stdout)
     assert payload["schema"] == "quality-runner-doctor-result-v0.1"
     assert payload["status"] == "ready"
-    assert payload["version"] == "0.2.1"
+    assert payload["version"] == "0.3.0"
     assert payload["environment"]["python_executable"]
 
 
@@ -347,6 +399,293 @@ def test_cli_status_json_reports_config_and_latest_run(tmp_path: Path) -> None:
     assert payload["config"]["path"] == ".quality-runner.toml"
     assert payload["latest_run"]["run_id"] == "cli-status-run"
     assert payload["latest_run"]["has_handoff"] is True
+    assert payload["latest_run"]["has_gate_verification"] is False
+
+
+def test_cli_status_reports_latest_verify_gate_failure(tmp_path: Path) -> None:
+    (tmp_path / "package.json").write_text(
+        json.dumps({"scripts": {"lint": f"{sys.executable} -c 'import sys; sys.exit(1)'"}}),
+        encoding="utf-8",
+    )
+    (tmp_path / ".quality-runner.toml").write_text(
+        '[quality_runner]\nrequired_capabilities = ["lint"]\n',
+        encoding="utf-8",
+    )
+    subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "quality_runner",
+            "verify-gates",
+            str(tmp_path),
+            "--run-id",
+            "cli-status-verify",
+            "--json",
+        ],
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+    result = subprocess.run(
+        [sys.executable, "-m", "quality_runner", "status", str(tmp_path), "--json"],
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+    payload = json.loads(result.stdout)
+
+    assert payload["status"] == "blocked"
+    assert payload["latest_run"]["run_id"] == "cli-status-verify"
+    assert payload["latest_run"]["has_gate_verification"] is True
+    assert payload["latest_run"]["gate_verification_status"] == "failed"
+
+
+def test_cli_summarize_run_reports_final_artifact_summary_and_delta(tmp_path: Path) -> None:
+    write_js_fixture(tmp_path)
+    subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "quality_runner",
+            "run",
+            str(tmp_path),
+            "--run-id",
+            "summary-baseline",
+            "--json",
+        ],
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "quality_runner",
+            "verify-gates",
+            str(tmp_path),
+            "--run-id",
+            "summary-final",
+            "--json",
+        ],
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "quality_runner",
+            "summarize-run",
+            str(tmp_path),
+            "--run-id",
+            "summary-final",
+            "--baseline-run-id",
+            "summary-baseline",
+            "--json",
+        ],
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+    payload = json.loads(result.stdout)
+
+    assert payload["schema"] == "quality-runner-run-summary-v0.1"
+    assert payload["run_id"] == "summary-final"
+    assert payload["status"] in {"passed-with-findings", "blocked", "failed"}
+    assert "recommended_classification" in payload
+    assert "gate_results" in payload
+    assert "missing_capabilities" in payload
+    assert "finding_counts" in payload
+    assert payload["delta"]["baseline_run_id"] == "summary-baseline"
+    assert "missing_capabilities" in payload["delta"]
+    assert "findings_total" in payload["delta"]
+    persisted = tmp_path / ".quality-runner" / "runs" / "summary-final" / "run-summary.json"
+    assert json.loads(persisted.read_text(encoding="utf-8"))["run_id"] == "summary-final"
+
+
+def test_cli_refresh_runs_read_only_sequence_and_persists_summary(tmp_path: Path) -> None:
+    (tmp_path / "package.json").write_text(
+        json.dumps(
+            {
+                "packageManager": "pnpm@10.0.0",
+                "scripts": {
+                    "format": "eslint --fix .",
+                    "test": f"{sys.executable} -c 'import sys; sys.exit(0)'",
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    (tmp_path / "pnpm-lock.yaml").write_text("lockfileVersion: '9.0'\n", encoding="utf-8")
+    (tmp_path / ".quality-runner.toml").write_text(
+        '[quality_runner]\nrequired_capabilities = ["formatter", "tests"]\n',
+        encoding="utf-8",
+    )
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "quality_runner",
+            "refresh",
+            str(tmp_path),
+            "--run-id-prefix",
+            "cli-refresh",
+            "--json",
+        ],
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+    payload = json.loads(result.stdout)
+    assert payload["schema"] == "quality-runner-refresh-result-v0.1"
+    assert payload["runs"]["inspect"]["run_id"] == "cli-refresh-inspect"
+    assert payload["runs"]["run"]["run_id"] == "cli-refresh-run"
+    assert payload["runs"]["verify"]["run_id"] == "cli-refresh-verify"
+    assert payload["summary"]["recommended_classification"] == "read-only-gate-blocker"
+    persisted = tmp_path / ".quality-runner" / "runs" / "cli-refresh-verify" / "run-summary.json"
+    assert json.loads(persisted.read_text(encoding="utf-8"))["run_id"] == "cli-refresh-verify"
+
+
+def test_cli_refresh_can_export_handoff_in_same_command(tmp_path: Path) -> None:
+    write_js_fixture(tmp_path)
+    output_path = tmp_path / "remediation-plan.md"
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "quality_runner",
+            "refresh",
+            str(tmp_path),
+            "--run-id-prefix",
+            "cli-refresh-handoff",
+            "--handoff-output",
+            str(output_path),
+            "--json",
+        ],
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+    payload = json.loads(result.stdout)
+    canonical_handoff = (
+        tmp_path / ".quality-runner" / "runs" / "cli-refresh-handoff-verify" / "agent-handoff.md"
+    )
+
+    assert payload["schema"] == "quality-runner-refresh-result-v0.1"
+    assert payload["handoff_export"]["schema"] == "quality-runner-export-handoff-result-v0.1"
+    assert payload["handoff_export"]["run_id"] == "cli-refresh-handoff-verify"
+    assert payload["handoff_export"]["source_path"] == str(canonical_handoff)
+    assert payload["handoff_export"]["output_path"] == str(output_path)
+    assert output_path.read_text(encoding="utf-8") == canonical_handoff.read_text(
+        encoding="utf-8"
+    )
+    assert output_path.read_text(encoding="utf-8").startswith("# Quality Runner Agent Handoff\n")
+
+
+def test_cli_refresh_human_summary_includes_handoff_output(tmp_path: Path) -> None:
+    write_js_fixture(tmp_path)
+    output_path = tmp_path / "remediation-plan.md"
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "quality_runner",
+            "refresh",
+            str(tmp_path),
+            "--run-id-prefix",
+            "cli-refresh-human-handoff",
+            "--handoff-output",
+            str(output_path),
+        ],
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+    assert f"handoff: {output_path}" in result.stdout
+    assert output_path.read_text(encoding="utf-8").startswith("# Quality Runner Agent Handoff\n")
+
+
+def test_cli_refresh_workflow_timeout_records_reason(tmp_path: Path) -> None:
+    (tmp_path / "package.json").write_text(
+        json.dumps(
+            {
+                "scripts": {
+                    "test": f"{sys.executable} -c 'import time; time.sleep(5)'",
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    (tmp_path / ".quality-runner.toml").write_text(
+        '[quality_runner]\nrequired_capabilities = ["tests"]\n',
+        encoding="utf-8",
+    )
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "quality_runner",
+            "refresh",
+            str(tmp_path),
+            "--run-id-prefix",
+            "cli-refresh-timeout",
+            "--timeout-seconds",
+            "30",
+            "--verify-timeout-seconds",
+            "1",
+            "--workflow-timeout-reason",
+            "controller deadline exceeded during verify",
+            "--json",
+        ],
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+        timeout=4,
+    )
+
+    payload = json.loads(result.stdout)
+    run_dir = tmp_path / ".quality-runner" / "runs" / "cli-refresh-timeout-verify"
+    gate_verification = json.loads((run_dir / "gate-verification.json").read_text())
+    timeout_artifact = json.loads((run_dir / "workflow-timeout.json").read_text())
+
+    assert payload["status"] == "blocked"
+    assert payload["summary"]["recommended_classification"] == "workflow-timeout-blocker"
+    assert payload["timeout_contract"]["per_gate_timeout_seconds"] == 30
+    assert payload["timeout_contract"]["verify_timeout_seconds"] == 1
+    assert payload["timeout_contract"]["verify_timeout_source"] == "explicit"
+    assert payload["timeout_contract"]["total_timeout_seconds"] is None
+    assert payload["phase_timings"]["verify"]["status"] == "timeout"
+    assert payload["runs"]["verify"]["timeout"]["reason"] == (
+        "controller deadline exceeded during verify"
+    )
+    assert payload["runs"]["verify"]["timeout"]["timeout_scope"] == "verify-phase"
+    assert gate_verification["failure_type"] == "workflow-timeout"
+    assert gate_verification["reason"] == "controller deadline exceeded during verify"
+    assert gate_verification["timeout_scope"] == "verify-phase"
+    assert timeout_artifact["reason"] == "controller deadline exceeded during verify"
+    assert timeout_artifact["timeout_scope"] == "verify-phase"
 
 
 def test_cli_export_handoff_prints_latest_handoff(tmp_path: Path) -> None:
@@ -456,6 +795,96 @@ def test_cli_main_new_commands_in_process(tmp_path: Path, capsys) -> None:
     status_payload = json.loads(capsys.readouterr().out)
     assert status_payload["latest_run"]["run_id"] == "direct-cli-run"
 
+    report_path = tmp_path / "worker-report.json"
+    report_path.write_text(
+        json.dumps(
+            {
+                "repo_path": str(tmp_path),
+                "branch_name": "qr/example",
+                "status": "blocked",
+                "baseline_artifact_path": str(tmp_path / ".quality-runner" / "runs"),
+                "final_qr": {"run_id": "direct-cli-run", "status": "blocked"},
+                "files_changed": [],
+                "verification": [{"command": "quality-runner run .", "result": "blocked"}],
+                "commit_hash": None,
+                "push_status": "not-pushed",
+                "git_status_short": "",
+                "blockers": ["fixture blocker"],
+            }
+        ),
+        encoding="utf-8",
+    )
+    assert main(["validate-report", str(report_path), "--json"]) == 0
+    validation_payload = json.loads(capsys.readouterr().out)
+    assert validation_payload["status"] == "accepted"
+
+    assert main(["controller-report", "normalize", str(report_path), "--json"]) == 0
+    normalized_payload = json.loads(capsys.readouterr().out)
+    assert normalized_payload["schema"] == "quality-runner-controller-report-v0.1"
+    assert normalized_payload["status"] == "blocked"
+
+    assert main(["controller-report", "lint", str(report_path), "--strict", "--json"]) == 0
+    lint_payload = json.loads(capsys.readouterr().out)
+    assert lint_payload["status"] == "accepted"
+    assert lint_payload["normalized_report"]["repo_path"] == str(tmp_path)
+
+    controller_report_path = tmp_path / "direct-controller-report.json"
+    assert (
+        main(
+            [
+                "summarize-run",
+                str(tmp_path),
+                "--run-id",
+                "direct-cli-run",
+                "--baseline-run-id",
+                "direct-cli-run",
+                "--controller-report",
+                "--branch-name",
+                "qr/example",
+                "--report-output",
+                str(controller_report_path),
+                "--lint-report",
+                "--validate-report",
+                "--json",
+            ]
+        )
+        == 0
+    )
+    controller_report_payload = json.loads(capsys.readouterr().out)
+    assert controller_report_payload["schema"] == "quality-runner-controller-report-v0.1"
+    assert controller_report_payload["branch_name"] == "qr/example"
+    assert controller_report_payload["baseline_artifact_path"].endswith(
+        "/.quality-runner/runs/direct-cli-run"
+    )
+    assert isinstance(controller_report_payload["target_head"], str)
+    assert controller_report_payload["commit_created_by_task"] is False
+    assert controller_report_payload["self_checks"] == [
+        {
+            "command": f"quality-runner controller-report lint {controller_report_path.resolve()} --strict --json",
+            "errors": [],
+            "status": "accepted",
+        },
+        {
+            "command": f"quality-runner validate-report {controller_report_path.resolve()} --json",
+            "errors": [],
+            "status": "accepted",
+        },
+    ]
+    persisted_report = json.loads(controller_report_path.read_text(encoding="utf-8"))
+    assert persisted_report["self_checks"] == controller_report_payload["self_checks"]
+
+    rejected_report_path = tmp_path / "rejected-worker-report.json"
+    rejected_payload = json.loads(report_path.read_text(encoding="utf-8"))
+    rejected_payload["status"] = "complete"
+    rejected_payload["commit_hash"] = "abc1234"
+    rejected_payload["push_status"] = "pushed"
+    rejected_payload["git_status_short"] = " M package.json"
+    rejected_report_path.write_text(json.dumps(rejected_payload), encoding="utf-8")
+
+    assert main(["validate-report", str(rejected_report_path), "--json"]) == 1
+    rejected_validation = json.loads(capsys.readouterr().out)
+    assert rejected_validation["status"] == "rejected"
+
     assert main(["export-handoff", str(tmp_path), "--run-id", "direct-cli-run"]) == 0
     assert capsys.readouterr().out.startswith("# Quality Runner Agent Handoff\n")
 
@@ -481,10 +910,10 @@ def test_cli_main_reports_human_summaries_in_process(tmp_path: Path, capsys) -> 
     from quality_runner.cli import main
 
     assert main([]) == 0
-    assert "Quality Runner 0.2.1" in capsys.readouterr().out
+    assert "Quality Runner 0.3.0" in capsys.readouterr().out
 
     assert main(["doctor"]) == 0
-    assert capsys.readouterr().out.strip() == "Quality Runner 0.2.1: ready"
+    assert capsys.readouterr().out.strip() == "Quality Runner 0.3.0: ready"
 
     write_js_fixture(tmp_path)
     assert main(["inspect", str(tmp_path), "--run-id", "human-inspect"]) == 0
@@ -567,4 +996,4 @@ def test_cli_version_preserves_bare_version_output() -> None:
         text=True,
     )
 
-    assert result.stdout.strip() == "0.2.1"
+    assert result.stdout.strip() == "0.3.0"

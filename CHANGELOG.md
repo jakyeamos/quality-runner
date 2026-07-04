@@ -2,10 +2,50 @@
 
 All notable changes to Quality Runner are documented here.
 
+## 0.3.0 - 2026-07-04
+
+- Bumped the agent handoff artifact contract to
+  `quality-runner-agent-handoff-v0.2` and documented the expanded
+  controller-facing routing fields.
+- Added packaged JSON Schema coverage for `next_slice.action_groups` and
+  validator coverage for malformed action groups.
+- Clarified `refresh --help` with `gates-clean`, `gates-blocked`,
+  `gates-failed`, `action_groups`, and total-timeout reason guidance.
+- Hardened refresh timeout finalization so inspect/run/verify workflow
+  timeouts write `agent-handoff.json`/`.md` with `workflow-timeout` blocker
+  groups and scan-progress diagnostics.
+- Treated stale nested package-manager lockfiles as preflight warnings instead
+  of controller exceptions.
+- Marked `pre-cr run --workspace .` as unsafe for read-only gate execution
+  unless mutating gates are explicitly allowed.
+- Added `quality-runner release-smoke` to exercise help, doctor, refresh
+  handoff, export handoff, and schema compatibility before release.
+- Added example clean, blocked, and timeout handoffs for release review.
+- Improved workflow timeout evidence so total refresh timeouts preserve both
+  full elapsed time and phase elapsed time.
+- Improved timeout diagnostics to separate generated/cache pruning guidance
+  from source-owned structural debt.
+
 ## 0.2.1 - 2026-07-02
 
 - Clarified handoff output by separating missing repo-owned quality gates from
   runner-provided structural checks.
+- Added explicit `gates-blocked` and `gates-failed` handoff statuses with
+  gate-verification classification, blocker summaries, and dependency setup
+  commands in `agent-handoff.json` and `agent-handoff.md`.
+- Added read-only gate mutation detection for tracked files, including
+  pre-gate diff restoration and `read-only-mutation` gate diagnostics.
+- Added primary blocker class and blocker groups to gate handoffs so mixed
+  blocker runs can route dependency setup, read-only policy, environment, and
+  command failures separately.
+- Added structured gate-blocker `action_groups` on blocked/failed handoff
+  next slices and deduplicated repeated dependency setup commands across gates.
+- Added an Action Groups section to `agent-handoff.md` so human readers see the
+  same blocker-class grouping and deduped actions that controllers read from
+  `agent-handoff.json`.
+- Improved pnpm non-interactive dependency restoration guidance so
+  `ERR_PNPM_ABORTED_REMOVE_MODULES_DIR_NO_TTY` points workers at one interactive
+  `pnpm install --frozen-lockfile` setup step before rerunning QR gates.
 - Added suggested commands for missing repo-owned gates in `agent-handoff.json`
   and `agent-handoff.md`.
 - Added ignored-path scan previews, interactive one-run inclusion prompts, and

@@ -29,13 +29,18 @@
       "properties": {
         "id": { "type": "string", "minLength": 1 },
         "type": { "type": "string", "minLength": 1 },
+        "capability_kind": { "enum": ["local_command", "ci_only", "evidence_file"] },
         "source": { "type": "string", "minLength": 1 },
         "command": { "type": "string", "minLength": 1 },
         "language": { "type": "string", "minLength": 1 },
+        "cwd": { "type": "string", "minLength": 1 },
+        "mutating_risk": { "enum": ["safe", "unknown", "mutating"] },
         "required_by": { "type": "string", "minLength": 1 },
         "owner": { "type": "string", "minLength": 1 },
         "severity": { "type": "string", "minLength": 1 },
-        "ci_status": { "$ref": "#/$defs/ciStatus" }
+        "local_execution": { "enum": ["ci-only"] },
+        "ci_status": { "$ref": "#/$defs/ciStatus" },
+        "verification_state": { "$ref": "#/$defs/verificationState" }
       },
       "additionalProperties": false
     },
@@ -72,6 +77,25 @@
         "status": { "type": ["string", "null"] },
         "conclusion": { "type": ["string", "null"] },
         "url": { "type": ["string", "null"] }
+      },
+      "additionalProperties": false
+    },
+    "verificationState": {
+      "type": "object",
+      "required": ["discovery", "execution", "result"],
+      "properties": {
+        "discovery": {
+          "type": "string",
+          "enum": ["command-discovered", "script-discovered", "file-discovered"]
+        },
+        "execution": {
+          "type": "string",
+          "enum": ["not-run", "ci-executed", "local-executed"]
+        },
+        "result": {
+          "type": "string",
+          "enum": ["unknown", "passed", "failed"]
+        }
       },
       "additionalProperties": false
     },

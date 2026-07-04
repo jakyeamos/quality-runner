@@ -1,7 +1,7 @@
 {
   "schema": "quality-runner-plugin-manifest-v0.1",
   "name": "quality-runner",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "description": "Standalone audit-and-plan quality orchestration for repositories.",
   "commands": {
     "inspect": {

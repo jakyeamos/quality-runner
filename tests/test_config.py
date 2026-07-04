@@ -48,6 +48,7 @@ def test_load_repo_config_reads_default_profile_required_capabilities_and_except
         ],
         "accepted_dispositions": [],
         "gates": [],
+        "gate_timeouts": {},
         "severity_overrides": {},
         "structural_scan": {},
         "warnings": [],
@@ -67,6 +68,10 @@ def test_load_repo_config_reads_gates_and_severity_overrides(tmp_path) -> None:
                 "[quality_runner.severity_overrides]",
                 'missing-tests = "critical"',
                 'lint = "warning"',
+                "",
+                "[quality_runner.gate_timeouts]",
+                "tests = 240",
+                "pre_cr = 600",
                 "",
                 "[[quality_runner.gates]]",
                 'id = "lint"',
@@ -103,6 +108,7 @@ def test_load_repo_config_reads_gates_and_severity_overrides(tmp_path) -> None:
     ]
     assert config["allowed_package_managers"] == ["bun", "pnpm"]
     assert config["scan_exclusions"] == []
+    assert config["gate_timeouts"] == {"tests": 240, "pre_cr": 600}
     assert config["severity_overrides"] == {"missing-tests": "critical", "lint": "warning"}
     assert config["accepted_exceptions"] == [
         {
@@ -209,6 +215,7 @@ def test_load_repo_config_reports_missing_invalid_and_malformed_values(tmp_path)
         "accepted_exceptions": [],
         "accepted_dispositions": [],
         "gates": [],
+        "gate_timeouts": {},
         "severity_overrides": {},
         "structural_scan": {},
         "warnings": [],
@@ -255,6 +262,7 @@ def test_load_repo_config_reports_missing_invalid_and_malformed_values(tmp_path)
     assert malformed["scan_exclusions"] == []
     assert malformed["required_capabilities_configured"] is True
     assert malformed["accepted_exceptions"] == []
+    assert malformed["gate_timeouts"] == {}
     assert [warning["code"] for warning in malformed["warnings"]] == [
         "invalid_quality_runner_config_field",
         "invalid_quality_runner_config_field",
@@ -426,9 +434,15 @@ def test_configured_gates_satisfy_capabilities_and_policy_metadata_reaches_audit
             "source": ".quality-runner.toml:quality_runner.gates[0]",
             "command": 'python -c "raise SystemExit(99)"',
             "language": "python",
+            "capability_kind": "local_command",
             "required_by": "config",
             "owner": "platform",
             "severity": "blocker",
+            "verification_state": {
+                "discovery": "command-discovered",
+                "execution": "not-run",
+                "result": "unknown",
+            },
         }
     ]
     assert capability_map["missing"] == [
@@ -488,16 +502,28 @@ def test_detect_capabilities_handles_file_sources_and_inactive_exceptions(tmp_pa
         {
             "id": "pre_cr",
             "type": "command",
+            "capability_kind": "local_command",
             "source": "package.json:scripts.pre-cr",
             "command": "pre-cr run",
             "language": "javascript",
             "required_by": "config",
+            "verification_state": {
+                "discovery": "command-discovered",
+                "execution": "not-run",
+                "result": "unknown",
+            },
         },
         {
             "id": "truth_file",
             "type": "file",
+            "capability_kind": "evidence_file",
             "source": ".tracker/PROJECT_TRUTH.md",
             "required_by": "config",
+            "verification_state": {
+                "discovery": "file-discovered",
+                "execution": "not-run",
+                "result": "unknown",
+            },
         },
     ]
     assert capability_map["missing"] == [
@@ -627,11 +653,15 @@ def test_packaged_schema_files_are_parseable() -> None:
         "repo-scan.schema.json",
         "standards.schema.json",
         "capability-matrix.schema.json",
+        "package-manager-preflight.schema.json",
+        "gate-verification.schema.json",
         "quality-audit.schema.json",
         "remediation-plan.schema.json",
         "agent-handoff.schema.json",
+        "controller-report-validation.schema.json",
         "run-manifest.schema.json",
         "run-result.schema.json",
+        "run-summary.schema.json",
     }
 
     loaded = {}
@@ -647,12 +677,14 @@ def test_packaged_schema_files_are_parseable() -> None:
     assert all(payload["type"] == "object" for payload in loaded.values())
 
 
-def test_artifact_schema_additions_remain_optional_for_v01_compatibility() -> None:
+def test_artifact_schema_additions_remain_optional_and_agent_handoff_versioned() -> None:
     schema_root = resources.files("quality_runner").joinpath("schemas")
     repo_scan = json.loads(schema_root.joinpath("repo-scan.schema.json").read_text())
     capability_matrix = json.loads(
         schema_root.joinpath("capability-matrix.schema.json").read_text()
     )
+    remediation_plan = json.loads(schema_root.joinpath("remediation-plan.schema.json").read_text())
+    agent_handoff = json.loads(schema_root.joinpath("agent-handoff.schema.json").read_text())
 
     assert repo_scan["properties"]["schema"]["const"] == "quality-runner-repo-scan-v0.1"
     assert "workspaces" not in repo_scan["required"]
@@ -665,4 +697,40 @@ def test_artifact_schema_additions_remain_optional_for_v01_compatibility() -> No
         "quality-runner-capability-map-v0.1"
     )
     capability_properties = capability_matrix["$defs"]["capability"]["properties"]
-    assert {"required_by", "owner", "severity", "ci_status"}.issubset(capability_properties)
+    assert {
+        "required_by",
+        "owner",
+        "severity",
+        "capability_kind",
+        "local_execution",
+        "ci_status",
+        "verification_state",
+    }.issubset(capability_properties)
+    assert "local-executed" in capability_matrix["$defs"]["verificationState"]["properties"][
+        "execution"
+    ]["enum"]
+    assert remediation_plan["properties"]["schema"]["const"] == (
+        "quality-runner-remediation-plan-v0.1"
+    )
+    assert "adoption_stage" not in remediation_plan["required"]
+    assert "stopping_criteria" not in remediation_plan["required"]
+    assert agent_handoff["properties"]["schema"]["const"] == "quality-runner-agent-handoff-v0.2"
+    assert "gates-discovered" in agent_handoff["properties"]["status"]["enum"]
+    assert "gates-executed" in agent_handoff["properties"]["status"]["enum"]
+    assert "gates-blocked" in agent_handoff["properties"]["status"]["enum"]
+    assert "gates-failed" in agent_handoff["properties"]["status"]["enum"]
+    assert "gates-clean" in agent_handoff["properties"]["status"]["enum"]
+    assert agent_handoff["properties"]["next_slice"]["oneOf"] == [
+        {"type": "null"},
+        {"$ref": "#/$defs/remediationSlice"},
+    ]
+    action_group = agent_handoff["$defs"]["actionGroup"]
+    assert action_group["required"] == ["class", "gate_ids", "actions"]
+    assert (
+        agent_handoff["$defs"]["remediationSlice"]["properties"]["action_groups"]["items"][
+            "$ref"
+        ]
+        == "#/$defs/actionGroup"
+    )
+    assert "adoption_stage" not in agent_handoff["required"]
+    assert "stopping_criteria" not in agent_handoff["required"]

@@ -1,0 +1,108 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://quality-runner.dev/schemas/gate-verification.schema.json",
+  "title": "Quality Runner Gate Verification",
+  "type": "object",
+  "required": ["schema", "status", "timeout_seconds", "gates"],
+  "properties": {
+    "schema": { "const": "quality-runner-gate-verification-v0.1" },
+    "run_id": { "type": "string", "minLength": 1 },
+    "status": { "enum": ["passed", "failed", "blocked", "skipped-nonlocal"] },
+    "timeout_seconds": { "type": "integer", "minimum": 1 },
+    "gate_timeouts": {
+      "type": "object",
+      "additionalProperties": { "type": "integer", "minimum": 1 }
+    },
+    "read_only_gates": { "type": "boolean" },
+    "allow_mutating_gates": { "type": "boolean" },
+    "failure_type": { "enum": ["workflow-timeout"] },
+    "timeout_scope": { "enum": ["verify-phase", "total-refresh"] },
+    "phase": { "type": "string", "minLength": 1 },
+    "reason": { "type": "string", "minLength": 1 },
+    "elapsed_seconds": { "type": "number", "minimum": 0 },
+    "environment": {
+      "type": "object",
+      "additionalProperties": { "type": ["string", "boolean", "null"] }
+    },
+    "execution_plan": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/executionPlanItem" }
+    },
+    "gates": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/gate" }
+    }
+  },
+  "$defs": {
+    "gate": {
+      "type": "object",
+      "required": ["id", "status"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "status": { "enum": ["passed", "failed", "skipped"] },
+        "capability_kind": { "enum": ["local_command", "ci_only", "evidence_file"] },
+        "command": { "type": "string", "minLength": 1 },
+        "source": { "type": ["string", "null"] },
+        "cwd": { "type": "string", "minLength": 1 },
+        "mutating_risk": { "enum": ["safe", "unknown", "mutating"] },
+        "exit_code": { "type": ["integer", "null"] },
+        "duration_seconds": { "type": "number", "minimum": 0 },
+        "timeout_seconds": { "type": "integer", "minimum": 1 },
+        "stdout": { "type": "string" },
+        "stderr": { "type": "string" },
+        "stdout_tail": { "type": "string" },
+        "stderr_tail": { "type": "string" },
+        "reason": { "type": "string", "minLength": 1 },
+        "blocked_by": { "type": "string", "minLength": 1 },
+        "failure_type": {
+          "enum": [
+            "command-failed",
+            "timeout",
+            "environment-restricted",
+            "dependency-setup-blocker",
+            "read-only-mutation"
+          ]
+        },
+        "skip_type": { "enum": ["mutating-gate-not-run", "dependency-setup-blocked"] },
+        "recommended_action": { "type": "string", "minLength": 1 },
+        "diagnostics": { "type": "object" },
+        "covered_by": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        }
+      },
+      "additionalProperties": false
+    },
+    "executionPlanItem": {
+      "type": "object",
+      "required": [
+        "id",
+        "cwd",
+        "capability_kind",
+        "mutating_risk",
+        "local_execution_status",
+        "timeout_seconds"
+      ],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "command": { "type": ["string", "null"] },
+        "cwd": { "type": "string", "minLength": 1 },
+        "source": { "type": ["string", "null"] },
+        "capability_kind": { "enum": ["local_command", "ci_only", "evidence_file"] },
+        "package_manager": { "type": ["string", "null"] },
+        "mutating_risk": { "enum": ["safe", "unknown", "mutating"] },
+        "local_execution_status": {
+          "enum": [
+            "will-execute",
+            "mutating-skipped",
+            "ci-only-skipped",
+            "evidence-only-skipped",
+            "no-command-skipped"
+          ]
+        },
+        "timeout_seconds": { "type": "integer", "minimum": 1 }
+      },
+      "additionalProperties": false
+    }
+  }
+}

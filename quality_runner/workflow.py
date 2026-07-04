@@ -21,14 +21,27 @@ from quality_runner.findings import (
     validate_audit_report,
     validate_remediation_plan,
 )
+from quality_runner.gate_verification import (
+    apply_gate_verification,
+    build_gate_execution_plan,
+    verify_discovered_gates,
+)
 from quality_runner.git_branches import prepare_scan_branch
 from quality_runner.manifest import build_run_manifest
+from quality_runner.package_preflight import build_package_manager_preflight
 from quality_runner.planning import (
     build_agent_handoff,
     build_remediation_plan,
     render_handoff_markdown,
 )
+from quality_runner.refresh_workflow import run_refresh_payload
+from quality_runner.run_summary import build_run_summary
 from quality_runner.standards import DEFAULT_PROFILE, compile_standards
+from quality_runner.workflow_helpers import (
+    combined_warnings,
+    config_with_include_overrides,
+    gate_timeouts,
+)
 
 
 def generated_run_id(now: datetime | None = None, suffix: str | None = None) -> str:
@@ -53,13 +66,17 @@ def inspect_payload(
     scan, standards_packet, capability_map, config = _inspect(
         repo_root, resolved_run_id, profile, ci_status_json, branch_warnings
     )
-    config = _config_with_include_overrides(config, include_ignored_paths)
+    config = config_with_include_overrides(config, include_ignored_paths)
     code_quality_scan = create_code_quality_scan(repo_root, scan=scan, config=config)
+    package_manager_preflight = build_package_manager_preflight(repo_root, scan)
 
     artifact_paths = {
         "repo_scan_json": str(write_json(run_dir / "repo-scan.json", scan)),
         "code_quality_scan_json": str(
             write_json(run_dir / "code-quality-scan.json", code_quality_scan)
+        ),
+        "package_manager_preflight_json": str(
+            write_json(run_dir / "package-manager-preflight.json", package_manager_preflight)
         ),
         "standards_json": str(write_json(run_dir / "standards.json", standards_packet)),
         "capability_matrix_json": str(
@@ -83,7 +100,7 @@ def inspect_payload(
         "implementation_allowed": False,
         "run_id": resolved_run_id,
         "artifact_paths": artifact_paths,
-        "warnings": _combined_warnings(scan, capability_map),
+        "warnings": combined_warnings(scan, capability_map),
     }
 
 
@@ -103,8 +120,9 @@ def run_payload(
     scan, standards_packet, capability_map, config = _inspect(
         repo_root, resolved_run_id, profile, ci_status_json, branch_warnings
     )
-    config = _config_with_include_overrides(config, include_ignored_paths)
+    config = config_with_include_overrides(config, include_ignored_paths)
     code_quality_scan = create_code_quality_scan(repo_root, scan=scan, config=config)
+    package_manager_preflight = build_package_manager_preflight(repo_root, scan)
     resolution_ledger = build_resolution_ledger(
         repo_root=repo_root,
         run_id=resolved_run_id,
@@ -130,6 +148,7 @@ def run_payload(
     artifact_paths = {
         "repo_scan_json": str(run_dir / "repo-scan.json"),
         "code_quality_scan_json": str(run_dir / "code-quality-scan.json"),
+        "package_manager_preflight_json": str(run_dir / "package-manager-preflight.json"),
         "standards_json": str(run_dir / "standards.json"),
         "capability_matrix_json": str(run_dir / "capability-matrix.json"),
         "run_manifest_json": str(run_dir / "run-manifest.json"),
@@ -151,6 +170,9 @@ def run_payload(
     artifact_paths["repo_scan_json"] = str(write_json(run_dir / "repo-scan.json", scan))
     artifact_paths["code_quality_scan_json"] = str(
         write_json(run_dir / "code-quality-scan.json", code_quality_scan)
+    )
+    artifact_paths["package_manager_preflight_json"] = str(
+        write_json(run_dir / "package-manager-preflight.json", package_manager_preflight)
     )
     artifact_paths["standards_json"] = str(write_json(run_dir / "standards.json", standards_packet))
     artifact_paths["capability_matrix_json"] = str(
@@ -191,8 +213,171 @@ def run_payload(
         "implementation_allowed": False,
         "run_id": resolved_run_id,
         "artifact_paths": artifact_paths,
-        "warnings": _combined_warnings(scan, capability_map),
+        "warnings": combined_warnings(scan, capability_map),
     }
+
+
+def verify_gates_payload(
+    repo_root: Path,
+    run_id: str | None = None,
+    profile: str | None = None,
+    ci_status_json: Path | None = None,
+    timeout_seconds: int = 120,
+    checkout_most_advanced_branch: bool = False,
+    read_only_gates: bool = False,
+    allow_mutating_gates: bool = False,
+) -> dict[str, Any]:
+    resolved_run_id = generated_run_id() if run_id is None else run_id
+    branch_warnings = prepare_scan_branch(
+        repo_root, checkout_most_advanced_branch=checkout_most_advanced_branch
+    )
+    run_dir = prepare_artifact_dir(repo_root, resolved_run_id)
+    scan, standards_packet, capability_map, config = _inspect(
+        repo_root, resolved_run_id, profile, ci_status_json, branch_warnings
+    )
+    package_manager_preflight = build_package_manager_preflight(repo_root, scan)
+    code_quality_scan = create_code_quality_scan(repo_root, scan=scan, config=config)
+    artifact_paths = {
+        "repo_scan_json": str(run_dir / "repo-scan.json"),
+        "code_quality_scan_json": str(run_dir / "code-quality-scan.json"),
+        "package_manager_preflight_json": str(run_dir / "package-manager-preflight.json"),
+        "standards_json": str(run_dir / "standards.json"),
+        "capability_matrix_json": str(run_dir / "capability-matrix.json"),
+        "gate_execution_plan_json": str(run_dir / "gate-execution-plan.json"),
+        "gate_verification_json": str(run_dir / "gate-verification.json"),
+        "quality_audit_json": str(run_dir / "quality-audit.json"),
+        "remediation_plan_json": str(run_dir / "remediation-plan.json"),
+        "agent_handoff_json": str(run_dir / "agent-handoff.json"),
+        "agent_handoff_md": str(run_dir / "agent-handoff.md"),
+        "run_manifest_json": str(run_dir / "run-manifest.json"),
+    }
+    gate_execution_plan = build_gate_execution_plan(
+        repo_root=repo_root,
+        capability_map=capability_map,
+        timeout_seconds=timeout_seconds,
+        gate_timeouts=gate_timeouts(config),
+        read_only_gates=read_only_gates,
+        allow_mutating_gates=allow_mutating_gates,
+    )
+    write_json(run_dir / "gate-execution-plan.json", gate_execution_plan)
+
+    def write_partial_gate_verification(verification: dict[str, Any]) -> None:
+        write_json(run_dir / "gate-verification.json", verification)
+
+    gate_verification = verify_discovered_gates(
+        repo_root=repo_root,
+        capability_map=capability_map,
+        run_id=resolved_run_id,
+        timeout_seconds=timeout_seconds,
+        gate_timeouts=gate_timeouts(config),
+        read_only_gates=read_only_gates,
+        allow_mutating_gates=allow_mutating_gates,
+        on_partial_result=write_partial_gate_verification,
+    )
+    verified_capability_map = apply_gate_verification(capability_map, gate_verification)
+    audit_report = build_audit_report(
+        scan=scan,
+        standards_packet=standards_packet,
+        capability_map=verified_capability_map,
+        code_quality_scan=code_quality_scan,
+    )
+    _require_valid("audit report", validate_audit_report(audit_report))
+    remediation_plan = build_remediation_plan(
+        audit_report=audit_report,
+        capability_map=verified_capability_map,
+    )
+    _require_valid("remediation plan", validate_remediation_plan(remediation_plan))
+
+    handoff = build_agent_handoff(
+        audit_report=audit_report,
+        remediation_plan=remediation_plan,
+        artifact_paths=artifact_paths,
+        capability_map=verified_capability_map,
+        gate_verification=gate_verification,
+    )
+    _require_valid("agent handoff", validate_agent_handoff(handoff))
+
+    artifact_paths["repo_scan_json"] = str(write_json(run_dir / "repo-scan.json", scan))
+    artifact_paths["code_quality_scan_json"] = str(
+        write_json(run_dir / "code-quality-scan.json", code_quality_scan)
+    )
+    artifact_paths["package_manager_preflight_json"] = str(
+        write_json(run_dir / "package-manager-preflight.json", package_manager_preflight)
+    )
+    artifact_paths["standards_json"] = str(write_json(run_dir / "standards.json", standards_packet))
+    artifact_paths["capability_matrix_json"] = str(
+        write_json(run_dir / "capability-matrix.json", verified_capability_map)
+    )
+    artifact_paths["gate_execution_plan_json"] = str(
+        write_json(run_dir / "gate-execution-plan.json", gate_execution_plan)
+    )
+    artifact_paths["gate_verification_json"] = str(
+        write_json(run_dir / "gate-verification.json", gate_verification)
+    )
+    artifact_paths["quality_audit_json"] = str(
+        write_json(run_dir / "quality-audit.json", audit_report)
+    )
+    artifact_paths["remediation_plan_json"] = str(
+        write_json(run_dir / "remediation-plan.json", remediation_plan)
+    )
+    artifact_paths["agent_handoff_json"] = str(write_json(run_dir / "agent-handoff.json", handoff))
+    artifact_paths["agent_handoff_md"] = str(
+        write_text(run_dir / "agent-handoff.md", render_handoff_markdown(handoff))
+    )
+    run_manifest = build_run_manifest(
+        repo_root=repo_root,
+        run_id=resolved_run_id,
+        mode="verify-gates",
+        artifact_paths=artifact_paths,
+    )
+    artifact_paths["run_manifest_json"] = str(
+        write_json(run_dir / "run-manifest.json", run_manifest)
+    )
+
+    return {
+        "schema": "quality-runner-verify-gates-result-v0.1",
+        "status": _verify_payload_status(gate_verification, remediation_plan),
+        "implementation_allowed": False,
+        "run_id": resolved_run_id,
+        "artifact_paths": artifact_paths,
+        "warnings": combined_warnings(scan, verified_capability_map),
+    }
+
+
+def refresh_payload(
+    repo_root: Path,
+    run_id_prefix: str,
+    baseline_run_id: str | None = None,
+    profile: str | None = None,
+    ci_status_json: Path | None = None,
+    timeout_seconds: int = 120,
+    workflow_timeout_seconds: int | None = None,
+    verify_timeout_seconds: int | None = None,
+    workflow_timeout_reason: str | None = None,
+    total_timeout_seconds: int | None = None,
+    total_timeout_reason: str | None = None,
+    checkout_most_advanced_branch: bool = False,
+    allow_mutating_gates: bool = False,
+) -> dict[str, Any]:
+    return run_refresh_payload(
+        repo_root=repo_root,
+        run_id_prefix=run_id_prefix,
+        baseline_run_id=baseline_run_id,
+        profile=profile,
+        ci_status_json=ci_status_json,
+        timeout_seconds=timeout_seconds,
+        workflow_timeout_seconds=workflow_timeout_seconds,
+        verify_timeout_seconds=verify_timeout_seconds,
+        workflow_timeout_reason=workflow_timeout_reason,
+        total_timeout_seconds=total_timeout_seconds,
+        total_timeout_reason=total_timeout_reason,
+        checkout_most_advanced_branch=checkout_most_advanced_branch,
+        allow_mutating_gates=allow_mutating_gates,
+        inspect_callback=inspect_payload,
+        run_callback=run_payload,
+        verify_callback=verify_gates_payload,
+        summary_callback=build_run_summary,
+    )
 
 
 def _inspect(
@@ -234,43 +419,11 @@ def _string_or_default(value: object, default: str) -> str:
     return value if isinstance(value, str) and value else default
 
 
-def _config_with_include_overrides(
-    config: dict[str, Any],
-    include_ignored_paths: list[str] | None,
-) -> dict[str, Any]:
-    if not include_ignored_paths:
-        return config
-    merged = dict(config)
-    structural_scan = dict(merged.get("structural_scan") or {})
-    existing = structural_scan.get("include_ignored_paths")
-    paths = (
-        [item for item in existing if isinstance(item, str)] if isinstance(existing, list) else []
-    )
-    for path in include_ignored_paths:
-        if path not in paths:
-            paths.append(path)
-    structural_scan["include_ignored_paths"] = paths
-    merged["structural_scan"] = structural_scan
-    return merged
-
-
-def _combined_warnings(
-    scan: dict[str, Any], capability_map: dict[str, Any]
-) -> list[dict[str, Any]]:
-    warnings: list[dict[str, Any]] = []
-    seen: set[tuple[str, str, str]] = set()
-    for source in (scan.get("warnings"), capability_map.get("warnings")):
-        if not isinstance(source, list):
-            continue
-        for item in source:
-            if not isinstance(item, dict):
-                continue
-            code = str(item.get("code") or "")
-            message = str(item.get("message") or "")
-            path = str(item.get("path") or "")
-            key = (code, message, path)
-            if key in seen:
-                continue
-            seen.add(key)
-            warnings.append(item)
-    return warnings
+def _verify_payload_status(
+    gate_verification: dict[str, Any],
+    remediation_plan: dict[str, Any],
+) -> str:
+    gate_status = gate_verification.get("status")
+    if gate_status == "passed" and remediation_plan.get("slices"):
+        return "passed-with-findings"
+    return gate_status if isinstance(gate_status, str) else "blocked"

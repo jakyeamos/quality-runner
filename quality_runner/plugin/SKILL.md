@@ -19,5 +19,24 @@ Preferred MCP tools:
 CLI fallback:
 
 ```bash
-quality-runner run /path/to/repo --json
+quality-runner refresh /path/to/repo \
+  --run-id-prefix qr-<date-or-task> \
+  --handoff-output /tmp/qr-handoff.md \
+  --json
 ```
+
+Agent workflow:
+
+1. Run QR before editing source.
+2. Read `/tmp/qr-handoff.md` and the referenced `.quality-runner/runs/<run-id>/` artifacts.
+3. Before editing, write or update GSD-style planning artifacts in the target repo.
+   Use the repo's existing planning folder if present; otherwise use `.planning/`.
+4. The plan must include phases, batches, evidence, expected touched files,
+   verification commands, stop conditions, and expected QR/scanner improvement.
+5. Execute one coherent batch at a time. Do not mix unrelated QR finding families.
+6. After each batch, run focused verification, run QR or scanner proof when practical,
+   update the phase ledger/summary, then commit the coherent change set if source changed.
+7. Do not commit `.quality-runner/` artifacts unless the repo already tracks them.
+8. Preserve pre-existing dirty work.
+
+For the planning template, follow `docs/agent-usage.md` in the Quality Runner repo.

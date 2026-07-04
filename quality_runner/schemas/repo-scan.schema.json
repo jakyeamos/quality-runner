@@ -79,7 +79,10 @@
         "command": { "type": "string", "minLength": 1 },
         "source_type": { "type": "string", "minLength": 1 },
         "source": { "type": "string", "minLength": 1 },
-        "language": { "type": "string", "minLength": 1 }
+        "language": { "type": "string", "minLength": 1 },
+        "cwd": { "type": "string", "minLength": 1 },
+        "mutating_risk": { "enum": ["safe", "unknown", "mutating"] },
+        "local_execution": { "enum": ["ci-only"] }
       },
       "additionalProperties": false
     },
