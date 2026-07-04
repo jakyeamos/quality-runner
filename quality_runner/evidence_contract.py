@@ -1,20 +1,23 @@
 from __future__ import annotations
 
-from quality_runner.evidence_contract import (
+from quality_evidence_contract.core import (
+    BLOCKING_LEVELS,
+    FINDING_LEVELS,
     QUALITY_EVIDENCE_SCHEMA,
     QUALITY_FINDING_SCHEMA,
+    FindingLevel,
     normalize_evidence_items,
     normalize_quality_finding,
     quality_finding_counts,
     validate_quality_finding,
 )
 
-__version__ = "0.3.0"
-
 __all__ = [
+    "BLOCKING_LEVELS",
+    "FINDING_LEVELS",
     "QUALITY_EVIDENCE_SCHEMA",
     "QUALITY_FINDING_SCHEMA",
-    "__version__",
+    "FindingLevel",
     "normalize_evidence_items",
     "normalize_quality_finding",
     "quality_finding_counts",

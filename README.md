@@ -56,6 +56,15 @@ quality-runner-mcp --version
 quality-runner doctor --json
 ```
 
+Quality Runner also carries compatibility surfaces for the two smaller extracted
+packages it supersedes publicly:
+
+- `quality_evidence_contract` imports remain available for shared evidence and
+  finding schema normalization.
+- `repo-quality-certifier`, `repo-quality-certifier-mcp`, and
+  `repo_quality_certifier` remain available for existing gate-certification
+  callers while new work should lead with `quality-runner`.
+
 ## Quickstart
 
 Run a full repo refresh and write the remediation handoff in the same command:
@@ -120,6 +129,8 @@ quality-runner validate-report worker-report.json --json
 quality-runner controller-report lint worker-report.json --strict --json
 quality-runner export-handoff /path/to/repo
 quality-runner-mcp
+repo-quality-certifier plan --repo-root /path/to/repo --json
+repo-quality-certifier-mcp
 ```
 
 `inspect` and `run` scan the currently checked-out branch by default. If that
@@ -154,6 +165,12 @@ The MCP server exposes:
 - `quality_runner_run`
 - `quality_runner_status`
 - `quality_runner_export_handoff`
+
+For compatibility with prior Repo Quality Certifier consumers, the
+`repo-quality-certifier-mcp` command remains packaged and exposes:
+
+- `repo_quality_certifier_plan`
+- `repo_quality_certifier_doc_quality`
 
 See [MCP Integration](docs/mcp.md) for JSON-RPC examples and tool payloads.
 

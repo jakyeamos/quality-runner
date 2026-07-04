@@ -31,12 +31,15 @@ build-backend = "setuptools.build_meta"
 [project.scripts]
 quality-runner = "quality_runner.cli:main"
 quality-runner-mcp = "quality_runner.mcp:main"
+repo-quality-certifier = "repo_quality_certifier.cli:main"
+repo-quality-certifier-mcp = "repo_quality_certifier.mcp:main"
 
 [tool.setuptools.package-data]
 quality_runner = ["plugin/*.json", "plugin/*.md", "schemas/*.json"]
+repo_quality_certifier = ["plugin/*.json", "plugin/*.md"]
 
 [tool.setuptools.packages.find]
-include = ["quality_runner*"]
+include = ["quality_runner*", "quality_evidence_contract*", "repo_quality_certifier*"]
 
 [tool.pytest.ini_options]
 pythonpath = ["."]

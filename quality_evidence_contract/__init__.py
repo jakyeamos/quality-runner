@@ -1,20 +1,19 @@
-from __future__ import annotations
+"""Portable quality evidence and finding contracts."""
 
-from quality_runner.evidence_contract import (
+from quality_evidence_contract.core import (
     QUALITY_EVIDENCE_SCHEMA,
     QUALITY_FINDING_SCHEMA,
+    FindingLevel,
     normalize_evidence_items,
     normalize_quality_finding,
     quality_finding_counts,
     validate_quality_finding,
 )
 
-__version__ = "0.3.0"
-
 __all__ = [
+    "FindingLevel",
     "QUALITY_EVIDENCE_SCHEMA",
     "QUALITY_FINDING_SCHEMA",
-    "__version__",
     "normalize_evidence_items",
     "normalize_quality_finding",
     "quality_finding_counts",

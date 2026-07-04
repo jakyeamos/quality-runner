@@ -1,9 +1,15 @@
 # CLI Reference
 
-Quality Runner provides two console scripts:
+Quality Runner provides two primary console scripts:
 
 - `quality-runner`
 - `quality-runner-mcp`
+
+It also packages compatibility console scripts for existing Repo Quality
+Certifier callers:
+
+- `repo-quality-certifier`
+- `repo-quality-certifier-mcp`
 
 ## `quality-runner doctor`
 
@@ -282,6 +288,20 @@ another scan.
 quality-runner export-handoff /path/to/repo
 quality-runner export-handoff /path/to/repo --run-id baseline-001 --output handoff.md --json
 ```
+
+## `repo-quality-certifier` Compatibility
+
+The compatibility command preserves the prior Repo Quality Certifier verbs while
+Quality Runner becomes the package to install and lead with publicly.
+
+```bash
+repo-quality-certifier plan --repo-root /path/to/repo --run-id certify-001 --json
+repo-quality-certifier doc-quality --repo-root /path/to/repo --run-id certify-001 --json
+```
+
+The command writes gate-certification artifacts to
+`AIOS-backfill/gate-adoption/<run-id>` by default, matching the historical
+contract used by existing callers.
 
 ## Exit Behavior
 

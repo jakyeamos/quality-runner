@@ -14,6 +14,8 @@ The optional `standards` argument selects a standards profile. It defaults to
 
 ## Tools
 
+Primary `quality-runner-mcp` tools:
+
 ### `quality_runner_doctor`
 
 Checks readiness.
@@ -85,3 +87,15 @@ All successful tool calls return:
 - `isError`
 - `content`
 - `structuredContent`
+
+## Repo Quality Certifier Compatibility
+
+Quality Runner also installs `repo-quality-certifier-mcp` for existing
+Repo Quality Certifier integrations. It exposes:
+
+- `repo_quality_certifier_plan`
+- `repo_quality_certifier_doc_quality`
+
+Use these tools only for compatibility with callers that still expect the old
+certifier schema names. New integrations should prefer `quality_runner_run`,
+`quality_runner_status`, and `quality_runner_export_handoff`.
