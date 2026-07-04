@@ -139,8 +139,12 @@ def test_packaged_console_script_invokes_cli(tmp_path: Path) -> None:
         ).decode()
     assert "quality-runner = quality_runner.cli:main" in entry_points
     assert "quality-runner-mcp = quality_runner.mcp:main" in entry_points
+    assert "repo-quality-certifier = repo_quality_certifier.cli:main" in entry_points
+    assert "repo-quality-certifier-mcp = repo_quality_certifier.mcp:main" in entry_points
     assert "quality_runner/plugin/manifest.json" in wheel_names
     assert "quality_runner/plugin/SKILL.md" in wheel_names
+    assert "repo_quality_certifier/plugin/manifest.json" in wheel_names
+    assert "repo_quality_certifier/plugin/SKILL.md" in wheel_names
     assert not any(name.startswith("test_support/") for name in wheel_names)
 
     venv_dir = tmp_path / "venv"
@@ -178,6 +182,43 @@ def test_packaged_console_script_invokes_cli(tmp_path: Path) -> None:
         capture_output=True,
         text=True,
     )
+    compat_import_result = subprocess.run(
+        [
+            str(venv_python),
+            "-c",
+            "from quality_evidence_contract import QUALITY_FINDING_SCHEMA; "
+            "from repo_quality_certifier import GATE_MATRIX_SCHEMA; "
+            "print(QUALITY_FINDING_SCHEMA, GATE_MATRIX_SCHEMA)",
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    repo_quality_certifier = venv_dir / "bin" / "repo-quality-certifier"
+    certifier_result = subprocess.run(
+        [
+            str(repo_quality_certifier),
+            "plan",
+            "--repo-root",
+            str(ROOT / "fixtures" / "corpus" / "complete-js"),
+            "--run-id",
+            "installed-certifier-smoke",
+            "--output-dir",
+            str(tmp_path / "installed-certifier-smoke"),
+            "--json",
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    certifier_mcp = venv_dir / "bin" / "repo-quality-certifier-mcp"
+    mcp_result = subprocess.run(
+        [str(certifier_mcp)],
+        input='{"jsonrpc":"2.0","id":1,"method":"tools/list"}\n',
+        check=True,
+        capture_output=True,
+        text=True,
+    )
 
     assert version_result.stdout.strip() == __version__
     doctor_payload = json.loads(doctor_result.stdout)
@@ -187,3 +228,16 @@ def test_packaged_console_script_invokes_cli(tmp_path: Path) -> None:
     assert smoke_payload["schema"] == "quality-runner-release-smoke-result-v0.1"
     assert smoke_payload["status"] == "passed"
     assert Path(smoke_payload["handoff_output"]).exists()
+    assert compat_import_result.stdout.strip() == (
+        "quality-finding-v0.1 aios-repo-gate-matrix-v0.1"
+    )
+    certifier_payload = json.loads(certifier_result.stdout)
+    assert certifier_payload["schema"] == "repo-quality-certifier-plan-result-v0.1"
+    assert Path(certifier_payload["artifact_paths"]["gate_matrix_json"]).exists()
+    mcp_payload = json.loads(mcp_result.stdout)
+    assert {
+        tool["name"] for tool in mcp_payload["result"]["tools"]
+    } == {
+        "repo_quality_certifier_plan",
+        "repo_quality_certifier_doc_quality",
+    }

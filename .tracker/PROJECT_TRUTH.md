@@ -20,3 +20,14 @@ packages when those APIs are still imported by active tools:
   older gate-certification callers.
 
 New public positioning and new integrations should lead with `quality-runner`.
+
+Current package-mining state:
+
+- The `quality-runner` wheel includes `quality_evidence_contract`,
+  `repo_quality_certifier`, both repo-quality-certifier console scripts, and
+  the certifier plugin manifest/skill package data.
+- `quality-runner release-smoke` now verifies compatibility imports,
+  repo-quality-certifier artifact generation, certifier MCP tool metadata, and
+  packaged plugin manifests.
+- Release docs target `v0.3.1` and include post-install checks for the
+  compatibility imports, CLI, MCP, and release smoke before archiving old repos.

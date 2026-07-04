@@ -205,7 +205,10 @@ path count, and skipped path count.
 Runs the pre-release CLI smoke path against a generated tiny repository. This is
 the repeatable check for the public happy path: help text, doctor readiness,
 `refresh --handoff-output`, `export-handoff`, and legacy/new controller report
-schema compatibility.
+schema compatibility. It also verifies the compatibility package surfaces that
+ship inside `quality-runner`: `quality_evidence_contract` imports,
+`repo_quality_certifier` imports, certifier artifact generation, certifier MCP
+tool metadata, and packaged plugin manifests.
 
 ```bash
 quality-runner release-smoke --json

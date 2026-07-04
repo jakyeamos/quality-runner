@@ -153,8 +153,9 @@ For large remediations, agents should use QR output as evidence for a
 GSD-style phase plan rather than editing directly from the handoff.
 
 Before release, run `quality-runner release-smoke --json` to verify the public
-CLI happy path, installed handoff export behavior, and report compatibility
-checks in one command.
+CLI happy path, installed handoff export behavior, report compatibility checks,
+and the packaged `quality_evidence_contract` / `repo_quality_certifier`
+compatibility surfaces in one command.
 
 ## MCP
 

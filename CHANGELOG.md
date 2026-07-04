@@ -8,6 +8,9 @@ All notable changes to Quality Runner are documented here.
   metadata for prior `quality-evidence-contract` and `repo-quality-certifier`
   consumers so Quality Runner can supersede those packages as the installable
   surface.
+- Expanded release smoke and wheel smoke coverage to prove the compatibility
+  imports, `repo-quality-certifier` CLI, `repo-quality-certifier-mcp`, and
+  packaged plugin data work from the `quality-runner` install.
 
 ## 0.3.0 - 2026-07-04
 
