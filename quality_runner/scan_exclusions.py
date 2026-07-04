@@ -15,6 +15,40 @@ ALWAYS_EXCLUDED_PATH_PARTS = {
     "node_modules",
 }
 
+ARTIFACT_DIRECTORY_NAMES = {
+    ".cache",
+    ".local",
+    ".mypy_cache",
+    ".next",
+    ".nuxt",
+    ".parcel-cache",
+    ".pytest_cache",
+    ".ruff_cache",
+    ".svelte-kit",
+    ".turbo",
+    ".vercel",
+    ".vite",
+    "coverage",
+    "htmlcov",
+    "out",
+    "playwright-report",
+    "test-results",
+}
+TOP_LEVEL_ARTIFACT_DIRECTORY_NAMES = {
+    "artifact",
+    "artifacts",
+    "checkpoints",
+    "data",
+    "figures",
+    "logs",
+    "notebooks",
+    "output",
+    "outputs",
+    "plots",
+    "reports",
+    "staging",
+}
+
 DEFAULT_SCAN_EXCLUSIONS = [
     ".claude/worktrees/**",
     ".codex/worktrees/**",
@@ -34,6 +68,8 @@ DEFAULT_SCAN_EXCLUSIONS = [
     "vendors",
     "vendored",
     "third_party",
+    *sorted(ARTIFACT_DIRECTORY_NAMES),
+    *[f"{name}/**" for name in sorted(TOP_LEVEL_ARTIFACT_DIRECTORY_NAMES)],
 ]
 MAX_SCAN_PROGRESS_PATHS = 20
 _SCAN_PROGRESS: dict[str, Any] = {

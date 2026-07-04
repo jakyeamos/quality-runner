@@ -41,6 +41,13 @@ Current package-mining state:
 
 Current verification:
 
+- 2026-07-04: QR now excludes generated artifact surfaces from both recursive
+  discovery and structural source scanning: build/test outputs, local caches,
+  top-level artifact output dirs, lockfiles/build metadata, and
+  `generated-*` source artifacts. Verified with regression tests, full
+  `uv run ruff check .`, `uv run basedpyright`, full `uv run pytest -q`, and a
+  non-mutating BBDSE `BBDS-Analytics-Product-Suite` smoke where discovery took
+  0.544s and code-quality scanning took 6.437s.
 - 2026-07-04: `quality-runner rollout` now writes fleet planning documents by
   default: `per-repo-summaries/INDEX.md`, one per-repo summary document per
   rollout entry, and `fleet-remediation-phases.md`. Verified with focused

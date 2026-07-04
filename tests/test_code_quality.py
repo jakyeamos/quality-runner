@@ -708,6 +708,56 @@ def test_code_quality_scan_reports_estimated_cost_for_skipped_paths(tmp_path: Pa
     assert result["summary"]["skipped_estimated_scan_seconds"] > 0
 
 
+def test_code_quality_scan_skips_top_level_artifact_output_dirs(tmp_path: Path) -> None:
+    from quality_runner.code_quality import create_code_quality_scan
+
+    _write(tmp_path / "src" / "index.ts", "const source: any = {};\n")
+    _write(tmp_path / ".local" / "court-vision" / "scratch.ts", "const local: any = {};\n")
+    _write(tmp_path / "artifacts" / "audit" / "report.ts", "const artifact: any = {};\n")
+    _write(tmp_path / "outputs" / "run" / "summary.md", "const output: any = {};\n")
+    _write(tmp_path / "reports" / "figures" / "chart.ts", "const report: any = {};\n")
+    _write(tmp_path / "figures" / "chart.ts", "const figure: any = {};\n")
+    _write(tmp_path / "plots" / "chart.ts", "const plot: any = {};\n")
+
+    result = create_code_quality_scan(tmp_path, scan={"run_id": "scan-001"}, config={})
+
+    scanned_paths = {item["path"] for item in result["accountability"]}
+    skipped = {item["path"]: item["reason"] for item in result["skipped_files"]}
+    finding_files = {finding["file"] for finding in result["findings"]}
+
+    assert scanned_paths == {"src/index.ts"}
+    assert skipped[".local"] == "artifact directory"
+    assert skipped["artifacts"] == "artifact directory"
+    assert skipped["outputs"] == "artifact directory"
+    assert skipped["reports"] == "artifact directory"
+    assert skipped["figures"] == "artifact directory"
+    assert skipped["plots"] == "artifact directory"
+    assert finding_files == {"src/index.ts"}
+
+
+def test_code_quality_scan_skips_generated_lock_and_build_metadata_files(
+    tmp_path: Path,
+) -> None:
+    from quality_runner.code_quality import create_code_quality_scan
+
+    _write(tmp_path / "src" / "index.ts", "const source: any = {};\n")
+    _write(tmp_path / "pnpm-lock.yaml", "lockfileVersion: 9\n# const lock: any = {}\n")
+    _write(tmp_path / "package-lock.json", '{"packages": {"x": "const lock: any = {}"}}\n')
+    _write(tmp_path / "src" / "lib" / "generated-leaderboard.ts", "const generated: any = {};\n")
+    _write(tmp_path / "tsconfig.tsbuildinfo", '{"program": "generated"}\n')
+
+    result = create_code_quality_scan(tmp_path, scan={"run_id": "scan-001"}, config={})
+
+    scanned_paths = {item["path"] for item in result["accountability"]}
+    skipped = {item["path"]: item["reason"] for item in result["skipped_files"]}
+
+    assert scanned_paths == {"src/index.ts"}
+    assert skipped["pnpm-lock.yaml"] == "generated file"
+    assert skipped["package-lock.json"] == "generated file"
+    assert skipped["src/lib/generated-leaderboard.ts"] == "generated file"
+    assert skipped["tsconfig.tsbuildinfo"] == "generated file"
+
+
 def test_code_quality_scan_stops_at_configured_file_budget(tmp_path: Path) -> None:
     from quality_runner.code_quality import create_code_quality_scan
 

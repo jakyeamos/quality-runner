@@ -19,6 +19,7 @@ from quality_runner.code_quality_ledger import (
 )
 from quality_runner.code_quality_paths import (
     TEXT_EXTENSIONS,
+    _artifact_directory_reason,
     _check_coverage,
     _ignored_directory_reason,
     _is_generated_file,
@@ -26,6 +27,7 @@ from quality_runner.code_quality_paths import (
     _join_relative,
     _split_lines,
     _string_or_none,
+    _top_level_ignored_directory_reason,
     _under_generated_path,
     _verification_for_path,
 )
@@ -219,9 +221,16 @@ def _discover_text_files(
         for name in sorted(dir_names):
             relative_name = _join_relative(relative_current, name)
             generated = _under_generated_path(relative_name, generated_paths)
+            preferred_reason = _artifact_directory_reason(
+                relative_name, include_ignored_paths=include_ignored_paths
+            ) or _top_level_ignored_directory_reason(
+                relative_name, include_ignored_paths=include_ignored_paths
+            )
             reason = (
                 "generated directory"
                 if generated
+                else preferred_reason
+                if preferred_reason is not None
                 else "scan exclusion"
                 if _is_scan_excluded(
                     relative_name,
@@ -248,9 +257,6 @@ def _discover_text_files(
                 continue
             if not path.is_file():
                 continue
-            if _is_generated_file(relative_path):
-                skipped_files.append({"path": relative_path, "reason": "generated file"})
-                continue
             if _is_scan_excluded(
                 relative_path,
                 scan_exclusions=scan_exclusions,
@@ -258,6 +264,9 @@ def _discover_text_files(
             ):
                 if path.suffix in TEXT_EXTENSIONS or path.name in {"Dockerfile", "Makefile"}:
                     skipped_files.append({"path": relative_path, "reason": "scan exclusion"})
+                continue
+            if _is_generated_file(relative_path):
+                skipped_files.append({"path": relative_path, "reason": "generated file"})
                 continue
             if path.suffix in TEXT_EXTENSIONS or path.name in {"Dockerfile", "Makefile"}:
                 if len(files) >= max_text_files:

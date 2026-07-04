@@ -3,8 +3,18 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
+from quality_runner.scan_exclusions import (
+    ARTIFACT_DIRECTORY_NAMES,
+    TOP_LEVEL_ARTIFACT_DIRECTORY_NAMES,
+)
+
 CODE_EXTENSIONS = {".cjs", ".css", ".html", ".js", ".jsx", ".mjs", ".py", ".sh", ".ts", ".tsx"}
 TEXT_EXTENSIONS = {*CODE_EXTENSIONS, ".json", ".md", ".toml", ".yaml", ".yml"}
+STRUCTURAL_ARTIFACT_TOP_LEVEL_DIRS = TOP_LEVEL_ARTIFACT_DIRECTORY_NAMES - {
+    "data",
+    "logs",
+    "staging",
+}
 IGNORED_DIRS = {
     ".aider",
     ".cache",
@@ -62,18 +72,23 @@ def _ignored_directory_reason(
     *,
     include_ignored_paths: set[str],
 ) -> str | None:
+    artifact_reason = _artifact_directory_reason(
+        relative_path, include_ignored_paths=include_ignored_paths
+    )
+    if artifact_reason is not None:
+        return artifact_reason
+    top_level_reason = _top_level_ignored_directory_reason(
+        relative_path, include_ignored_paths=include_ignored_paths
+    )
+    if top_level_reason is not None:
+        return top_level_reason
+
     normalized = relative_path.strip("/")
     if not normalized or _is_included_or_included_parent(normalized, include_ignored_paths):
         return None
 
     name = Path(normalized).name
     parts = set(Path(normalized).parts)
-    top_level = "/" not in normalized
-    if top_level and (
-        name in IGNORED_TOP_LEVEL_DIRS
-        or any(name.endswith(suffix) for suffix in IGNORED_TOP_LEVEL_SUFFIXES)
-    ):
-        return "ignored directory"
     if name in IGNORED_DIRS:
         return "ignored directory"
     if any(name.startswith(prefix) for prefix in IGNORED_DIR_PREFIXES):
@@ -84,6 +99,40 @@ def _ignored_directory_reason(
     ):
         return "ignored directory"
     if parts & IGNORED_PATH_PARTS:
+        return "ignored directory"
+    return None
+
+
+def _artifact_directory_reason(
+    relative_path: str,
+    *,
+    include_ignored_paths: set[str],
+) -> str | None:
+    normalized = relative_path.strip("/")
+    if not normalized or _is_included_or_included_parent(normalized, include_ignored_paths):
+        return None
+    name = Path(normalized).name
+    top_level = "/" not in normalized
+    if name in ARTIFACT_DIRECTORY_NAMES or (
+        top_level and name in STRUCTURAL_ARTIFACT_TOP_LEVEL_DIRS
+    ):
+        return "artifact directory"
+    return None
+
+
+def _top_level_ignored_directory_reason(
+    relative_path: str,
+    *,
+    include_ignored_paths: set[str],
+) -> str | None:
+    normalized = relative_path.strip("/")
+    if not normalized or _is_included_or_included_parent(normalized, include_ignored_paths):
+        return None
+    name = Path(normalized).name
+    if "/" not in normalized and (
+        name in IGNORED_TOP_LEVEL_DIRS
+        or any(name.endswith(suffix) for suffix in IGNORED_TOP_LEVEL_SUFFIXES)
+    ):
         return "ignored directory"
     return None
 
@@ -109,6 +158,26 @@ def _join_relative(parent: str, child: str) -> str:
 
 def _is_generated_file(relative_path: str) -> bool:
     name = Path(relative_path).name
+    generated_names = {
+        ".pnp.cjs",
+        ".pnp.loader.mjs",
+        "bun.lock",
+        "bun.lockb",
+        "Cargo.lock",
+        "composer.lock",
+        "Gemfile.lock",
+        "package-lock.json",
+        "Pipfile.lock",
+        "pnpm-lock.yaml",
+        "poetry.lock",
+        "tsconfig.tsbuildinfo",
+        "uv.lock",
+        "yarn.lock",
+    }
+    if name in generated_names:
+        return True
+    if name.startswith(("generated-", "generated_")):
+        return True
     generated_suffixes = (
         ".d.ts",
         ".gen.js",
@@ -117,7 +186,9 @@ def _is_generated_file(relative_path: str) -> bool:
         ".generated.js",
         ".generated.ts",
         ".generated.tsx",
+        ".lock",
         ".pb.go",
+        ".tsbuildinfo",
         "_pb2.py",
         "_pb2_grpc.py",
     )
