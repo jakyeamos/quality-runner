@@ -37,6 +37,7 @@
           "enum": [
             "unresolved",
             "fixed",
+            "superseded-by-current-scan",
             "accepted-intentional",
             "accepted-false-positive",
             "blocked-with-prerequisite"

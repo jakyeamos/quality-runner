@@ -141,6 +141,7 @@ def run_payload(
     remediation_plan = build_remediation_plan(
         audit_report=audit_report,
         capability_map=capability_map,
+        code_quality_scan=code_quality_scan,
     )
     _require_valid("remediation plan", validate_remediation_plan(remediation_plan))
     status = "clean" if not remediation_plan["slices"] else "planned"
@@ -285,6 +286,7 @@ def verify_gates_payload(
     remediation_plan = build_remediation_plan(
         audit_report=audit_report,
         capability_map=verified_capability_map,
+        code_quality_scan=code_quality_scan,
     )
     _require_valid("remediation plan", validate_remediation_plan(remediation_plan))
 

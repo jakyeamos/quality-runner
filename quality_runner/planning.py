@@ -21,6 +21,8 @@ from quality_runner.handoff_gate_summary import (
     gate_verification_markdown,
 )
 from quality_runner.handoff_status import handoff_status
+from quality_runner.remediation_clusters import structural_cluster_slices
+from quality_runner.runner_checks import runner_provided_checks
 
 PRIORITY_ORDER = {"high": 0, "medium": 1, "low": 2}
 
@@ -29,9 +31,21 @@ def build_remediation_plan(
     *,
     audit_report: dict[str, Any],
     capability_map: dict[str, Any],
+    code_quality_scan: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     findings = sorted(_findings(audit_report), key=_finding_sort_key)
-    slices = [_slice_for_finding(finding) for finding in findings]
+    structural_slices = structural_cluster_slices(code_quality_scan)
+    slices = sorted(
+        [
+            *[
+                _slice_for_finding(finding)
+                for finding in findings
+                if structural_slices == [] or not finding["category"].startswith("structural:")
+            ],
+            *structural_slices,
+        ],
+        key=_slice_sort_key,
+    )
     adoption_stage = build_adoption_stage(
         findings=findings,
         missing_gates=_missing_repo_owned_gates(capability_map),
@@ -126,7 +140,7 @@ def build_agent_handoff(
         "finding_ids": [finding["id"] for finding in _findings(audit_report)],
         "slice_ids": [slice_item["id"] for slice_item in _slices(remediation_plan)],
         "missing_repo_owned_gates": missing_gates,
-        "runner_provided_checks": _runner_provided_checks(audit_report),
+        "runner_provided_checks": runner_provided_checks(_findings(audit_report)),
         "adoption_stage": adoption_stage,
         "stopping_criteria": stopping_criteria(adoption_stage),
         **_optional_value("gate_verification", gate_summary),
@@ -269,6 +283,13 @@ def _slice_for_finding(finding: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _slice_sort_key(slice_item: dict[str, Any]) -> tuple[int, int, str]:
+    priority = str(slice_item.get("priority") or "")
+    score = slice_item.get("score")
+    ranking_score = score if isinstance(score, int) else 0
+    return PRIORITY_ORDER.get(priority, 99), -ranking_score, str(slice_item.get("id") or "")
+
+
 def _missing_repo_owned_gates(capability_map: dict[str, Any] | None) -> list[dict[str, str]]:
     if not isinstance(capability_map, dict):
         return []
@@ -296,38 +317,6 @@ def _missing_repo_owned_gates(capability_map: dict[str, Any] | None) -> list[dic
             }
         )
     return gates
-
-
-def _runner_provided_checks(audit_report: dict[str, Any]) -> list[dict[str, Any]]:
-    counts: dict[str, int] = {}
-    for finding in _findings(audit_report):
-        category = finding["category"]
-        if not category.startswith("structural:"):
-            continue
-        check_id = category.removeprefix("structural:")
-        counts[check_id] = counts.get(check_id, 0) + 1
-    return [
-        {
-            "id": check_id,
-            "finding_count": counts[check_id],
-            "description": _runner_check_description(check_id),
-        }
-        for check_id in sorted(counts)
-    ]
-
-
-def _runner_check_description(check_id: str) -> str:
-    descriptions = {
-        "clarify": "readability and naming clarity heuristics",
-        "deduplicate": "duplicate and near-duplicate detection",
-        "harden": "API, error handling, and boundary hardening heuristics",
-        "improve-tests": "test quality and coverage structure heuristics",
-        "ponytail": "standard-library and native-platform replacement heuristics",
-        "simplify": "complexity and nesting heuristics",
-        "speed": "performance and unnecessary work heuristics",
-        "ui_structural": "UI structure and frontend maintainability heuristics",
-    }
-    return descriptions.get(check_id, "Quality Runner structural heuristic")
 
 
 def _optional_string(key: str, value: object) -> dict[str, str]:
@@ -406,7 +395,7 @@ def _next_slice(plan: dict[str, Any]) -> dict[str, Any] | None:
     first = slices[0]
     if not isinstance(first, dict):
         return None
-    return {
+    next_slice = {
         "id": first["id"],
         "title": first["title"],
         "priority": first["priority"],
@@ -414,6 +403,11 @@ def _next_slice(plan: dict[str, Any]) -> dict[str, Any] | None:
         "actions": list(first["actions"]),
         "verification_gates": list(first["verification_gates"]),
     }
+    if first.get("implementation_allowed") is False:
+        next_slice["implementation_allowed"] = False
+    if isinstance(first.get("score"), int):
+        next_slice["score"] = first["score"]
+    return next_slice
 
 
 def _slice_verification_gates(slice_item: dict[str, Any] | None) -> list[str]:

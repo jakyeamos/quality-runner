@@ -8,6 +8,12 @@ from quality_runner.code_quality_paths import _string_or_none
 from quality_runner.schema_constants import RESOLUTION_LEDGER_SCHEMA
 
 ACCEPTED_STATUSES = {"accepted-intentional", "accepted-false-positive", "blocked-with-prerequisite"}
+RESOLUTION_STATUSES = {
+    "unresolved",
+    "fixed",
+    "superseded-by-current-scan",
+    *ACCEPTED_STATUSES,
+}
 
 
 def build_resolution_ledger(
@@ -65,8 +71,8 @@ def build_resolution_ledger(
         entries.append(
             {
                 **previous,
-                "status": "fixed",
-                "reason": "Finding absent from current scan.",
+                "status": "superseded-by-current-scan",
+                "reason": "Finding absent from current scan; QR did not execute remediation.",
             }
         )
 
@@ -76,9 +82,7 @@ def build_resolution_ledger(
         "run_id": run_id,
         "summary": {
             "total_entries": len(entries),
-            "by_status": _counts(
-                entries, "status", ["unresolved", "fixed", *sorted(ACCEPTED_STATUSES)]
-            ),
+            "by_status": _counts(entries, "status", sorted(RESOLUTION_STATUSES)),
         },
         "entries": entries,
     }

@@ -175,15 +175,37 @@ def test_run_payload_adds_structural_findings_and_groups_remediation_slices(
     )
     assert explicit_any_audit["score"] == 18
     assert "API hardening and type safety" in explicit_any_audit["summary"]
-    explicit_any_slices = [
+    cluster_slices = [
         slice_item
         for slice_item in remediation_plan["slices"]
-        if slice_item["id"] == "remediate-structural-harden-explicit-any"
+        if slice_item["id"] == "remediate-structural-src-app-page-tsx"
     ]
-    assert len(explicit_any_slices) == 1
-    assert len(explicit_any_slices[0]["findings"]) == 1
-    assert "2 findings" in explicit_any_slices[0]["actions"][0]
-    assert handoff["next_slice"]["id"] == "remediate-structural-harden-explicit-any"
+    assert len(cluster_slices) == 1
+    cluster_slice = cluster_slices[0]
+    assert cluster_slice["title"] == "Remediate structural cluster in src/app/page.tsx"
+    assert cluster_slice["implementation_allowed"] is False
+    assert {finding["rule_id"] for finding in cluster_slice["findings"]} >= {
+        "explicit-any",
+        "nested-card-markup",
+    }
+    current_file_findings = [
+        finding for finding in code_scan["findings"] if finding["file"] == "src/app/page.tsx"
+    ]
+    assert len(cluster_slice["findings"]) == len(current_file_findings)
+    assert cluster_slice["actions"] == [
+        (
+            f"Review {len(current_file_findings)} current structural findings in "
+            "src/app/page.tsx as one advisory cluster."
+        ),
+        "Make one coherent external remediation batch only if the rows share a behavior-preserving change.",
+        "Rerun quality-runner and confirm the listed fingerprints clear or are dispositioned with evidence.",
+    ]
+    assert cluster_slice["verification_gates"] == [
+        "Run focused verification for src/app/page.tsx: Run the relevant JavaScript formatter, typecheck, and tests for the touched package.",
+        "Rerun quality-runner and compare code-quality-scan.json plus resolution-ledger.json for this cluster.",
+    ]
+    assert handoff["next_slice"]["id"] == "remediate-structural-src-app-page-tsx"
+    assert handoff["next_slice"]["implementation_allowed"] is False
     assert handoff["next_slice"]["id"] == remediation_plan["slices"][0]["id"]
     runner_checks = {item["id"]: item for item in handoff["runner_provided_checks"]}
     assert runner_checks["harden"]["finding_count"] >= 1
@@ -192,7 +214,7 @@ def test_run_payload_adds_structural_findings_and_groups_remediation_slices(
     )
 
 
-def test_resolution_ledger_marks_missing_prior_findings_fixed_and_preserves_acceptance(
+def test_resolution_ledger_marks_missing_prior_findings_superseded_and_preserves_acceptance(
     tmp_path: Path,
 ) -> None:
     from quality_runner.workflow import run_payload
@@ -240,14 +262,22 @@ def test_resolution_ledger_marks_missing_prior_findings_fixed_and_preserves_acce
     assert accepted_row["reason"] == "Fixture intentionally keeps one type escape hatch."
 
     source.write_text("const first: unknown = {};\n", encoding="utf-8")
-    fixed_payload = run_payload(repo_root=tmp_path, run_id="ledger-fixed", profile="default")
-    fixed_ledger = json.loads(
-        Path(fixed_payload["artifact_paths"]["resolution_ledger_json"]).read_text()
+    superseded_payload = run_payload(
+        repo_root=tmp_path, run_id="ledger-superseded", profile="default"
     )
-    fixed_row = next(
-        row for row in fixed_ledger["entries"] if row["fingerprint"] == explicit_any["fingerprint"]
+    superseded_ledger = json.loads(
+        Path(superseded_payload["artifact_paths"]["resolution_ledger_json"]).read_text()
     )
-    assert fixed_row["status"] == "fixed"
+    superseded_row = next(
+        row
+        for row in superseded_ledger["entries"]
+        if row["fingerprint"] == explicit_any["fingerprint"]
+    )
+    assert superseded_row["status"] == "superseded-by-current-scan"
+    assert (
+        superseded_row["reason"]
+        == "Finding absent from current scan; QR did not execute remediation."
+    )
 
 
 def test_workflow_ingests_local_ci_status_and_attaches_check_evidence(tmp_path: Path) -> None:

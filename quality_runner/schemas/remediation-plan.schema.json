@@ -41,6 +41,8 @@
         "id": { "type": "string", "minLength": 1 },
         "title": { "type": "string", "minLength": 1 },
         "priority": { "enum": ["high", "medium", "low"] },
+        "implementation_allowed": { "const": false },
+        "score": { "type": "integer" },
         "findings": { "type": "array", "items": { "type": "object" } },
         "actions": { "type": "array", "items": { "type": "string" } },
         "verification_gates": { "type": "array", "items": { "type": "string" } }

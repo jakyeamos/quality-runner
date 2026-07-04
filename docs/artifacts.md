@@ -46,9 +46,12 @@ Artifacts are written under:
   score for grouped structural findings.
 - `remediation-plan.json`: adoption stage, stopping criteria, and ordered
   remediation slices with priority, actions, findings, and verification gates.
+  Structural scan slices are advisory clusters by file so an external agent can
+  choose one coherent batch without Quality Runner executing remediation.
 - `resolution-ledger.json`: current finding lifecycle state by stable
   fingerprint, preserving accepted dispositions and marking disappeared
-  findings fixed on later runs.
+  findings as superseded by the current scan unless an external actor records a
+  more specific disposition.
 - `resolution-ledger.md`: human-readable resolution ledger summary.
 - `agent-handoff.json`: machine-readable next-slice handoff using schema
   `quality-runner-agent-handoff-v0.2`, including adoption
