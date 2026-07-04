@@ -35,4 +35,3 @@
 ## Verification Gates
 
 - Rerun `quality-runner refresh . --run-id-prefix <next-run> --handoff-output /tmp/qr-handoff.md --json`.
-
