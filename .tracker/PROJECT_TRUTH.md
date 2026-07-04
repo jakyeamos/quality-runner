@@ -31,3 +31,6 @@ Current package-mining state:
   packaged plugin manifests.
 - Release docs target `v0.3.1` and include post-install checks for the
   compatibility imports, CLI, MCP, and release smoke before archiving old repos.
+- `quality-runner rollout` is the first-class multi-repo controller workflow
+  for safe sequential refreshes, repo-list parsing, per-repo controller reports,
+  validation artifacts, and rollout ledgers for all-projects stress passes.
