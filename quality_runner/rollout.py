@@ -12,6 +12,7 @@ from quality_runner.controller_reports import (
     build_controller_report_from_summary,
     validate_controller_report,
 )
+from quality_runner.fleet_documents import write_fleet_documents
 from quality_runner.workflow import refresh_payload
 
 ROLLOUT_RESULT_SCHEMA = "quality-runner-rollout-result-v0.1"
@@ -72,12 +73,14 @@ def rollout_payload(
             )
         )
 
+    fleet_documents = write_fleet_documents(output_dir=resolved_output_dir, results=results)
     ledger = {
         "schema": ROLLOUT_LEDGER_SCHEMA,
         "status": _rollout_status(results),
         "run_id_prefix": resolved_run_id_prefix,
         "output_dir": str(resolved_output_dir),
         "repo_count": len(entries),
+        "fleet_documents": fleet_documents,
         "results": results,
     }
     ledger_path = resolved_output_dir / "rollout-ledger.json"
@@ -89,6 +92,7 @@ def rollout_payload(
         "run_id_prefix": resolved_run_id_prefix,
         "output_dir": str(resolved_output_dir),
         "ledger_path": str(ledger_path),
+        "fleet_documents": fleet_documents,
         "repo_count": len(entries),
         "accepted_reports": sum(1 for result in results if result.get("report_status") == "accepted"),
         "rejected_reports": sum(1 for result in results if result.get("report_status") == "rejected"),
@@ -120,7 +124,8 @@ def _run_rollout_entry(
     refresh_callback: RefreshCallback,
 ) -> dict[str, Any]:
     repo_root = Path(entry["repo_path"]).expanduser().resolve()
-    repo_slug = _repo_slug(entry.get("name") or repo_root.name, fallback=f"repo-{index}")
+    repo_name = entry.get("name") or repo_root.name
+    repo_slug = _repo_slug(repo_name, fallback=f"repo-{index}")
     repo_run_id_prefix = entry.get("run_id_prefix") or f"{run_id_prefix}-{repo_slug}"
     report_path = output_dir / f"{index:03d}-{repo_slug}-controller-report.json"
     validation_path = output_dir / f"{index:03d}-{repo_slug}-controller-report-validation.json"
@@ -129,6 +134,8 @@ def _run_rollout_entry(
         error = f"repo root does not exist or is not a directory: {repo_root}"
         result = {
             "status": "invalid-repo",
+            "repo_name": repo_name,
+            "repo_slug": repo_slug,
             "repo_path": str(repo_root),
             "run_id_prefix": repo_run_id_prefix,
             "error": error,
@@ -183,6 +190,8 @@ def _run_rollout_entry(
         _write_json(validation_path, validation)
         return {
             "status": str(refresh.get("status") or summary.get("status") or "unknown"),
+            "repo_name": repo_name,
+            "repo_slug": repo_slug,
             "repo_path": str(repo_root),
             "branch_name": branch_name,
             "run_id_prefix": repo_run_id_prefix,
@@ -226,6 +235,8 @@ def _run_rollout_entry(
         _write_json(validation_path, validation)
         return {
             "status": "error",
+            "repo_name": repo_name,
+            "repo_slug": repo_slug,
             "repo_path": str(repo_root),
             "branch_name": branch_name,
             "run_id_prefix": repo_run_id_prefix,

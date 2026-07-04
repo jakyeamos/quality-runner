@@ -36,10 +36,18 @@ Current package-mining state:
   compatibility imports, CLI, MCP, and release smoke before archiving old repos.
 - `quality-runner rollout` is the first-class multi-repo controller workflow
   for safe sequential refreshes, repo-list parsing, per-repo controller reports,
-  validation artifacts, and rollout ledgers for all-projects stress passes.
+  validation artifacts, rollout ledgers, per-repo planning summaries, and
+  fleet remediation phase drafts for all-projects stress passes.
 
 Current verification:
 
+- 2026-07-04: `quality-runner rollout` now writes fleet planning documents by
+  default: `per-repo-summaries/INDEX.md`, one per-repo summary document per
+  rollout entry, and `fleet-remediation-phases.md`. Verified with focused
+  rollout tests, focused ruff on rollout/document files, `uv run basedpyright`,
+  and full `uv run pytest -q`. Full `uv run ruff check .` is currently blocked
+  by a pre-existing dirty scan-exclusion import-order issue outside this
+  rollout-document change.
 - 2026-07-04: Branch-scan warnings now compare commit identity, so a checked
   out `dev` branch aligned to `main` does not emit
   `checked_out_branch_not_main_or_most_advanced`. Verified with the focused

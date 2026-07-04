@@ -70,6 +70,14 @@ def _rollout_summary(payload: dict[str, Any], status: object) -> str:
     rejected = payload.get("rejected_reports")
     if isinstance(accepted, int) and isinstance(rejected, int):
         lines.append(f"controller reports: {accepted} accepted, {rejected} rejected")
+    fleet_documents = payload.get("fleet_documents")
+    if isinstance(fleet_documents, dict):
+        index_md = fleet_documents.get("index_md")
+        phase_md = fleet_documents.get("phase_md")
+        if isinstance(index_md, str):
+            lines.append(f"repo docs: {index_md}")
+        if isinstance(phase_md, str):
+            lines.append(f"phase draft: {phase_md}")
     return "\n".join(lines)
 
 
