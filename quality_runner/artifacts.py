@@ -26,7 +26,7 @@ def prepare_artifact_dir(repo_root: Path, run_id: str) -> Path:
     return run_dir
 
 
-def write_json(path: Path, payload: dict[str, Any]) -> Path:
+def write_json(path: Path, payload: Any) -> Path:
     _prepare_artifact_file(path)
     path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     return path

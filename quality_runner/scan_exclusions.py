@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Iterator
+from collections.abc import Iterator, Sequence
 from fnmatch import fnmatchcase
 from pathlib import Path
 from typing import Any
@@ -117,7 +117,7 @@ def _is_plain_segment_pattern(pattern: str) -> bool:
     return "/" not in pattern and not any(char in pattern for char in "*?[]")
 
 
-def _unique(values: list[object]) -> list[str]:
+def _unique(values: Sequence[object]) -> list[str]:
     unique: list[str] = []
     seen: set[str] = set()
     for value in values:

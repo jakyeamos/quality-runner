@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 
 from quality_runner.schema_constants import CONTROLLER_REPORT_VALIDATION_SCHEMA
 
@@ -68,7 +68,7 @@ def _non_empty_string(value: object) -> bool:
 def _only_ignored_generated_artifacts(git_status: str, ignored: object) -> bool:
     if not _string_list(ignored):
         return False
-    ignored_paths = [item.rstrip("/") for item in ignored]
+    ignored_paths = [item.rstrip("/") for item in cast(list[str], ignored)]
     lines = [line for line in git_status.splitlines() if line.strip()]
     if not lines:
         return True

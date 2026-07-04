@@ -119,7 +119,7 @@ def timeout_refresh_phase(
 
 
 @contextmanager
-def workflow_deadline(*, seconds: int, reason: str) -> Iterator[None]:
+def workflow_deadline(*, seconds: int | float, reason: str) -> Iterator[None]:
     if seconds <= 0:
         yield
         return

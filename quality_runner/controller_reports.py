@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 
 from quality_runner.controller_report_builder import build_controller_report_from_summary
 from quality_runner.controller_report_defaults import (
@@ -176,7 +176,7 @@ def _baseline_path(*, repo_path: str, baseline_run_id: str | None) -> str | None
 
 def _normalized_files_changed(value: object) -> list[str]:
     if _string_list(value):
-        return list(value)
+        return list(cast(list[str], value))
     if not isinstance(value, dict):
         return []
     for key in (
@@ -187,7 +187,7 @@ def _normalized_files_changed(value: object) -> list[str]:
     ):
         nested = value.get(key)
         if _string_list(nested):
-            return list(nested)
+            return list(cast(list[str], nested))
     return []
 
 
@@ -295,7 +295,7 @@ def _normalized_git_status_short(report: dict[str, Any]) -> str:
 def _normalized_ignored_generated_artifacts(report: dict[str, Any]) -> list[str]:
     ignored = report.get("ignored_generated_artifacts")
     if _string_list(ignored):
-        return list(ignored)
+        return list(cast(list[str], ignored))
     git_status = _normalized_git_status_short(report)
     return _default_ignored_generated_artifacts(git_status)
 

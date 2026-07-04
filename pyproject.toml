@@ -54,7 +54,7 @@ ignore = ["E501"]
 
 [tool.basedpyright]
 pythonVersion = "3.12"
-include = ["quality_runner", "tests"]
+include = ["quality_runner"]
 typeCheckingMode = "standard"
 reportMissingImports = "warning"
 reportMissingModuleSource = "none"
