@@ -6,7 +6,7 @@
     {
       "name": "Amos, Jakye",
       "affiliation": "Case Western Reserve University",
-      "orcid": "0000-0000-0000-0000"
+      "orcid": "0009-0006-0905-9633"
     }
   ],
   "license": "MIT",
@@ -23,5 +23,5 @@
       "scheme": "url"
     }
   ],
-  "notes": "Replace the placeholder ORCID before minting the DOI."
+  "notes": "Author ORCID recorded for DOI minting."
 }
