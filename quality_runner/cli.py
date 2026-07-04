@@ -18,6 +18,7 @@ from quality_runner.cli_controller_reports import (
 )
 from quality_runner.cli_human_summary import human_summary
 from quality_runner.cli_refresh import refresh_command_payload
+from quality_runner.cli_rollout import add_rollout_command, rollout_command_payload
 from quality_runner.cli_status import (
     export_handoff_payload,
     status_payload,
@@ -145,6 +146,8 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         help="Write the generated remediation handoff markdown to this path",
     )
+
+    add_rollout_command(subparsers)
 
     init_parser = subparsers.add_parser("init", help="Write a starter .quality-runner.toml")
     init_parser.add_argument("repo_path", help="Target repository path")
@@ -344,6 +347,8 @@ def _payload_for_args(args: argparse.Namespace) -> dict[str, Any]:
     if args.command == "refresh":
         repo_root = _validated_repo_path(args.repo_path)
         return refresh_command_payload(args, repo_root)
+    if args.command == "rollout":
+        return rollout_command_payload(args)
     raise ValueError(f"unsupported command: {args.command}")
 
 

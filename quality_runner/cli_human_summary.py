@@ -33,6 +33,8 @@ def human_summary(payload: dict[str, Any]) -> str:
         return f"status: {status}\nrun id: {payload.get('run_id')}"
     if payload.get("schema") == "quality-runner-refresh-result-v0.1":
         return _refresh_summary(payload, status)
+    if payload.get("schema") == "quality-runner-rollout-result-v0.1":
+        return _rollout_summary(payload, status)
     return _default_summary(payload, status)
 
 
@@ -53,6 +55,21 @@ def _refresh_summary(payload: dict[str, Any], status: object) -> str:
         output_path = handoff_export.get("output_path")
         if isinstance(output_path, str):
             lines.append(f"handoff: {output_path}")
+    return "\n".join(lines)
+
+
+def _rollout_summary(payload: dict[str, Any], status: object) -> str:
+    lines = [f"status: {status}"]
+    ledger_path = payload.get("ledger_path")
+    if isinstance(ledger_path, str):
+        lines.append(f"ledger: {ledger_path}")
+    repo_count = payload.get("repo_count")
+    if isinstance(repo_count, int):
+        lines.append(f"repos: {repo_count}")
+    accepted = payload.get("accepted_reports")
+    rejected = payload.get("rejected_reports")
+    if isinstance(accepted, int) and isinstance(rejected, int):
+        lines.append(f"controller reports: {accepted} accepted, {rejected} rejected")
     return "\n".join(lines)
 
 

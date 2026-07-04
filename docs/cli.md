@@ -200,6 +200,45 @@ refresh still writes a final `agent-handoff.json`/`.md` with a
 progress diagnostics with the last traversal directory, recent paths, visited
 path count, and skipped path count.
 
+## `quality-runner rollout`
+
+Runs safe single-repo refreshes across a repo list and captures controller
+artifacts for each repo. Rollout is sequential by design: each repo gets its own
+`quality-runner refresh` run id prefix, controller report, validation result,
+and ledger row before the next repo starts.
+
+```bash
+quality-runner rollout repos.txt \
+  --run-id-prefix all-projects-20260704 \
+  --output-dir /private/tmp/qr-all-projects-20260704 \
+  --timeout-seconds 90 \
+  --verify-timeout-seconds 180 \
+  --total-timeout-seconds 600 \
+  --workflow-timeout-reason "all-projects stress verify deadline" \
+  --total-timeout-reason "all-projects stress total deadline" \
+  --json
+```
+
+Repo list formats:
+
+- text: `/path/to/repo [baseline-run-id] [name]`
+- CSV-style text: `/path/to/repo,baseline-run-id,name`
+- JSON: `["/path/to/repo", {"repo_path": "/path", "baseline_run_id": "..."}]`
+- repeated CLI entries: `--repo /path/one --repo /path/two`
+
+By default, rollout preserves the read-only refresh policy and does not pass
+`--allow-mutating-gates`. Each repo still writes its normal `.quality-runner/`
+run artifacts, while the controller output directory receives:
+
+- `rollout-ledger.json`
+- `<index>-<repo>-controller-report.json`
+- `<index>-<repo>-controller-report-validation.json`
+
+Use `--allow-mutating-gates` only when the controller explicitly accepts source
+mutation risk for the whole repo list. Invalid repo paths and refresh exceptions
+are recorded as rejected or blocked controller artifacts, and the rollout
+continues to the remaining repos.
+
 ## `quality-runner release-smoke`
 
 Runs the pre-release CLI smoke path against a generated tiny repository. This is

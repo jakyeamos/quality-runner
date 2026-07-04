@@ -318,6 +318,65 @@ Refresh worker rules:
   `missing-capabilities`, or `needs-triage`.
 - Treat broad repo debt as a valid triage outcome, not as a failed refresh.
 
+## First-Class Multi-Repo Rollout Workflow
+
+The manual controller process above is now captured by `quality-runner rollout`.
+Use it for broad refresh or stress passes when the goal is current evidence,
+controller-report artifacts, and validated ledger rows rather than remediation.
+
+Prepare a repo list as text, CSV-style text, or JSON:
+
+```text
+/Users/jakyeamos/projects/tenure refresh3-20260703-tenure-verify tenure
+/Users/jakyeamos/projects/BidCamp refresh3-20260703-BidCamp-verify BidCamp
+/Users/jakyeamos/projects/AIOS refresh3-20260703-AIOS-verify AIOS
+```
+
+Run the all-projects stress pass from the Quality Runner checkout:
+
+```bash
+/Users/jakyeamos/projects/quality-runner/.venv/bin/quality-runner rollout \
+  /private/tmp/qr-all-projects-repos.txt \
+  --run-id-prefix all-projects-20260704 \
+  --output-dir /private/tmp/qr-all-projects-20260704 \
+  --timeout-seconds 90 \
+  --verify-timeout-seconds 180 \
+  --total-timeout-seconds 600 \
+  --workflow-timeout-reason "all-projects stress verify deadline" \
+  --total-timeout-reason "all-projects stress total deadline" \
+  --json
+```
+
+Default safety posture:
+
+- Repos run sequentially; a repo is ledged before the next repo starts.
+- Each repo uses `quality-runner refresh`, which runs inspect, run,
+  read-only verify-gates, summary generation, and controller-report creation.
+- Mutating gates are skipped unless the controller passes
+  `--allow-mutating-gates`.
+- The command does not edit, stage, commit, or push target repo files.
+- Generated target-repo evidence remains under
+  `.quality-runner/runs/<prefix>-verify/`.
+
+Controller artifacts:
+
+- `<output-dir>/rollout-ledger.json`
+- `<output-dir>/<index>-<repo>-controller-report.json`
+- `<output-dir>/<index>-<repo>-controller-report-validation.json`
+
+Interpretation for stress passes:
+
+- `completed` means every controller report validated, not that every repo is
+  clean.
+- `completed-with-rejected-reports` means at least one report needs controller
+  inspection before advancing the wave.
+- `completed-with-errors` means at least one repo path was invalid or refresh
+  raised before terminal evidence; the command still writes a blocked or
+  rejected artifact for that repo and continues.
+- Clean refreshes become `ready-for-review` unless a task-created commit and
+  push are recorded. Stress passes normally produce `blocked` or
+  `ready-for-review`, not `complete`.
+
 | Refresh wave | Repo | Repo path | Baseline run | Thread status | Thread id | Final QR status | Validate-report | Notes |
 |---:|---|---|---|---|---|---|---|---|
 | 1 | `tenure` | `/Users/jakyeamos/projects/tenure` | `wave1-restart-20260702-tenure-targeted` | blocked | `019f2646-6119-7de3-b58e-810b1c5f8d25` | `blocked`; `refresh-20260703-tenure-verify` | accepted | Classification `mixed-blocker`. Findings unchanged at 31 grouped, 0 missing capabilities. `lint`, `typecheck`, `dead_code`, and `runtime_smoke` passed; `formatter` and `build` timed out; `tests` was `environment-restricted` from localhost/server-port failures. Product issue: QR `formatter` gate mutated tracked files during a read-only refresh; worker restored QR-created formatter changes while preserving pre-existing `.aios/audit/*` dirtiness. |

@@ -288,6 +288,23 @@ def test_cli_refresh_help_names_statuses_action_groups_and_timeout_reasons() -> 
     assert "--total-timeout-reason" in result.stdout
 
 
+def test_cli_rollout_help_names_repo_list_outputs_and_safety_flags() -> None:
+    result = subprocess.run(
+        [sys.executable, "-m", "quality_runner", "rollout", "--help"],
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+    assert "Repo list formats" in result.stdout
+    assert "rollout-ledger.json" in result.stdout
+    assert "controller-report JSON" in result.stdout
+    assert "--repo" in result.stdout
+    assert "--allow-mutating-gates" in result.stdout
+    assert "--total-timeout-reason" in result.stdout
+
+
 def test_cli_inspect_can_checkout_most_advanced_branch(tmp_path: Path) -> None:
     write_js_fixture(tmp_path)
     _git(tmp_path, "init", "-b", "main")
