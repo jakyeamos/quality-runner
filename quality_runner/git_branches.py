@@ -14,8 +14,11 @@ def prepare_scan_branch(
         return []
 
     current_branch = _string_or_none(state.get("current_branch"))
+    current_head = _string_or_none(state.get("current_head"))
     main_branch = _string_or_none(state.get("main_branch"))
+    main_branch_head = _string_or_none(state.get("main_branch_head"))
     most_advanced_branch = _string_or_none(state.get("most_advanced_branch"))
+    most_advanced_branch_head = _string_or_none(state.get("most_advanced_branch_head"))
     dirty = state.get("dirty") is True
 
     if checkout_most_advanced_branch:
@@ -27,7 +30,9 @@ def prepare_scan_branch(
                     "path": ".",
                 }
             ]
-        if current_branch == most_advanced_branch:
+        if current_branch == most_advanced_branch or _same_commit(
+            current_head, most_advanced_branch_head
+        ):
             return []
         if dirty:
             raise ValueError(
@@ -36,10 +41,14 @@ def prepare_scan_branch(
         _switch_branch(root, most_advanced_branch)
         return []
 
+    matches_main = current_branch == main_branch or _same_commit(current_head, main_branch_head)
+    matches_most_advanced = current_branch == most_advanced_branch or _same_commit(
+        current_head, most_advanced_branch_head
+    )
     if (
         current_branch is not None
-        and current_branch != main_branch
-        and current_branch != most_advanced_branch
+        and not matches_main
+        and not matches_most_advanced
     ):
         target = most_advanced_branch or "unknown"
         return [
@@ -65,11 +74,16 @@ def _branch_state(repo_root: Path) -> dict[str, Any]:
     if current_branch == "HEAD":
         current_branch = None
     status = _git_output(repo_root, "status", "--porcelain")
+    main_branch = "main" if "main" in branches else None
+    most_advanced_branch = _most_advanced_branch(repo_root, branches)
     return {
         "is_repo": True,
         "current_branch": current_branch,
-        "main_branch": "main" if "main" in branches else None,
-        "most_advanced_branch": _most_advanced_branch(repo_root, branches),
+        "current_head": _git_output(repo_root, "rev-parse", "HEAD"),
+        "main_branch": main_branch,
+        "main_branch_head": _branch_head(repo_root, main_branch),
+        "most_advanced_branch": most_advanced_branch,
+        "most_advanced_branch_head": _branch_head(repo_root, most_advanced_branch),
         "dirty": None if status is None else bool(status),
     }
 
@@ -113,6 +127,16 @@ def _switch_branch(repo_root: Path, branch: str) -> None:
     if result.returncode != 0:
         detail = result.stderr.strip() or result.stdout.strip() or "unknown git switch failure"
         raise ValueError(f"could not switch to local most-advanced branch '{branch}': {detail}")
+
+
+def _branch_head(repo_root: Path, branch: str | None) -> str | None:
+    if branch is None:
+        return None
+    return _git_output(repo_root, "rev-parse", branch)
+
+
+def _same_commit(left: str | None, right: str | None) -> bool:
+    return left is not None and right is not None and left == right
 
 
 def _int_git_output(repo_root: Path, *args: str) -> int | None:

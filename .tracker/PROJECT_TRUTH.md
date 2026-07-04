@@ -40,5 +40,10 @@ Current package-mining state:
 
 Current verification:
 
+- 2026-07-04: Branch-scan warnings now compare commit identity, so a checked
+  out `dev` branch aligned to `main` does not emit
+  `checked_out_branch_not_main_or_most_advanced`. Verified with the focused
+  branch workflow tests, a full `uv run pytest -q`, and a real QR run against
+  `agent-eval-contract` that returned no warnings.
 - 2026-07-04: `uv run ruff check .`, `uv run basedpyright`, and
   `uv run pytest` passed after the README install documentation update.
