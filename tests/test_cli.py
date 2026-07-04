@@ -627,9 +627,7 @@ def test_cli_refresh_can_export_handoff_in_same_command(tmp_path: Path) -> None:
     assert payload["handoff_export"]["run_id"] == "cli-refresh-handoff-verify"
     assert payload["handoff_export"]["source_path"] == str(canonical_handoff)
     assert payload["handoff_export"]["output_path"] == str(output_path)
-    assert output_path.read_text(encoding="utf-8") == canonical_handoff.read_text(
-        encoding="utf-8"
-    )
+    assert output_path.read_text(encoding="utf-8") == canonical_handoff.read_text(encoding="utf-8")
     assert output_path.read_text(encoding="utf-8").startswith("# Quality Runner Agent Handoff\n")
 
 

@@ -57,9 +57,7 @@ def test_verify_gates_read_only_mode_skips_pre_cr_workspace_command(tmp_path: Pa
         run_id="read-only-pre-cr",
         read_only_gates=True,
     )
-    verification = json.loads(
-        Path(payload["artifact_paths"]["gate_verification_json"]).read_text()
-    )
+    verification = json.loads(Path(payload["artifact_paths"]["gate_verification_json"]).read_text())
     plan = json.loads(Path(payload["artifact_paths"]["gate_execution_plan_json"]).read_text())
 
     assert payload["status"] == "blocked"

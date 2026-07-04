@@ -10,61 +10,18 @@ from quality_runner.controller_report_defaults import (
     normalized_controller_command_environment,
     normalized_controller_status_recommendation,
 )
-from quality_runner.schema_constants import CONTROLLER_REPORT_VALIDATION_SCHEMA
+from quality_runner.controller_report_validation import (
+    _string_list,
+    validate_controller_report,
+)
 
 CONTROLLER_REPORT_LINT_SCHEMA = "quality-runner-controller-report-lint-v0.1"
 CONTROLLER_REPORT_SCHEMA = "quality-runner-controller-report-v0.1"
-TERMINAL_STATUSES = {"ready-for-review", "blocked", "complete"}
-__all__ = ["build_controller_report_from_summary", "lint_controller_report", "validate_controller_report"]
-
-
-def validate_controller_report(report: dict[str, Any]) -> dict[str, Any]:
-    errors: list[str] = []
-    status = report.get("status")
-    if status not in TERMINAL_STATUSES:
-        errors.append("report status must be ready-for-review, blocked, or complete")
-
-    for field in ("repo_path", "branch_name", "baseline_artifact_path"):
-        if not _non_empty_string(report.get(field)):
-            errors.append(f"{field} must be a non-empty string")
-
-    if not isinstance(report.get("final_qr"), dict):
-        errors.append("final_qr must be an object")
-    if not isinstance(report.get("files_changed"), list):
-        errors.append("files_changed must be a list")
-    if not isinstance(report.get("verification"), list):
-        errors.append("verification must be a list")
-    if not isinstance(report.get("blockers"), list):
-        errors.append("blockers must be a list")
-    ignored_generated_artifacts = report.get("ignored_generated_artifacts")
-    if ignored_generated_artifacts is not None and not _string_list(ignored_generated_artifacts):
-        errors.append("ignored_generated_artifacts must be a list of non-empty strings")
-
-    git_status = report.get("git_status_short")
-    if not isinstance(git_status, str):
-        errors.append("git_status_short must be a string")
-    elif (
-        status in {"complete", "ready-for-review"}
-        and git_status.strip()
-        and not _only_ignored_generated_artifacts(git_status, ignored_generated_artifacts)
-    ):
-        errors.append("completed reports must have a clean git_status_short field")
-
-    if status == "complete":
-        if not _non_empty_string(report.get("commit_hash")):
-            errors.append("completed reports must include a commit_hash")
-        if report.get("push_status") != "pushed":
-            errors.append('completed reports must have push_status "pushed"')
-    elif status == "blocked":
-        blockers = report.get("blockers")
-        if isinstance(blockers, list) and not blockers:
-            errors.append("blocked reports must include at least one blocker")
-
-    return {
-        "schema": CONTROLLER_REPORT_VALIDATION_SCHEMA,
-        "status": "rejected" if errors else "accepted",
-        "errors": errors,
-    }
+__all__ = [
+    "build_controller_report_from_summary",
+    "lint_controller_report",
+    "validate_controller_report",
+]
 
 
 def normalize_controller_report(report: dict[str, Any]) -> dict[str, Any]:
@@ -128,30 +85,6 @@ def lint_controller_report(report: dict[str, Any], *, strict: bool = False) -> d
         "errors": errors,
         "normalized_report": normalized,
     }
-
-
-def _non_empty_string(value: object) -> bool:
-    return isinstance(value, str) and bool(value)
-
-
-def _string_list(value: object) -> bool:
-    return isinstance(value, list) and all(isinstance(item, str) and item for item in value)
-
-
-def _only_ignored_generated_artifacts(git_status: str, ignored: object) -> bool:
-    if not _string_list(ignored):
-        return False
-    ignored_paths = [item.rstrip("/") for item in ignored]
-    lines = [line for line in git_status.splitlines() if line.strip()]
-    if not lines:
-        return True
-    return all(_line_is_ignored(line, ignored_paths) for line in lines)
-
-
-def _line_is_ignored(line: str, ignored_paths: list[str]) -> bool:
-    path = line[3:].strip() if len(line) > 3 else line.strip()
-    normalized = path.rstrip("/")
-    return any(normalized == ignored or normalized.startswith(f"{ignored}/") for ignored in ignored_paths)
 
 
 def _normalized_final_qr(report: dict[str, Any]) -> dict[str, Any]:
@@ -246,7 +179,12 @@ def _normalized_files_changed(value: object) -> list[str]:
         return list(value)
     if not isinstance(value, dict):
         return []
-    for key in ("tracked", "tracked_repo_files", "by_this_task", "tracked_repo_files_modified_after_run"):
+    for key in (
+        "tracked",
+        "tracked_repo_files",
+        "by_this_task",
+        "tracked_repo_files_modified_after_run",
+    ):
         nested = value.get(key)
         if _string_list(nested):
             return list(nested)
@@ -262,13 +200,20 @@ def _normalized_verification(report: dict[str, Any]) -> list[dict[str, str]]:
                 "result": str(item.get("result")),
             }
             for item in verification
-            if isinstance(item, dict) and item.get("command") is not None and item.get("result") is not None
+            if isinstance(item, dict)
+            and item.get("command") is not None
+            and item.get("result") is not None
         ]
         if normalized:
             return normalized
     argv = _nested(report, "command", "argv")
     if isinstance(argv, list) and argv:
-        return [{"command": " ".join(str(part) for part in argv), "result": str(_nested(report, "command", "exit_code"))}]
+        return [
+            {
+                "command": " ".join(str(part) for part in argv),
+                "result": str(_nested(report, "command", "exit_code")),
+            }
+        ]
     command = _nested(report, "run", "command")
     if isinstance(command, str) and command:
         return [{"command": command, "result": str(_nested(report, "run", "exit_code"))}]
@@ -287,15 +232,18 @@ def _normalized_commit_hash(report: dict[str, Any]) -> str | None:
 
 
 def _normalized_target_head(report: dict[str, Any]) -> str | None:
-    return _first_string(
-        report.get("target_head"),
-        _nested(report, "repo_state", "post_head"),
-        _nested(report, "repo_state", "target_head"),
-        _nested(report, "target", "target_head"),
-        _nested(report, "target", "head_sha"),
-        _nested(report, "target", "target_commit"),
-        _nested(report, "run", "target_commit"),
-    ) or None
+    return (
+        _first_string(
+            report.get("target_head"),
+            _nested(report, "repo_state", "post_head"),
+            _nested(report, "repo_state", "target_head"),
+            _nested(report, "target", "target_head"),
+            _nested(report, "target", "head_sha"),
+            _nested(report, "target", "target_commit"),
+            _nested(report, "run", "target_commit"),
+        )
+        or None
+    )
 
 
 def _normalized_commit_created_by_task(report: dict[str, Any]) -> bool:
@@ -335,7 +283,10 @@ def _normalized_git_status_short(report: dict[str, Any]) -> str:
     ):
         if isinstance(value, str):
             return value
-    for value in (_nested(report, "target", "final_git_status"), _nested(report, "target", "post_status")):
+    for value in (
+        _nested(report, "target", "final_git_status"),
+        _nested(report, "target", "post_status"),
+    ):
         if isinstance(value, list):
             return "\n".join(str(item) for item in value if _looks_like_git_status_line(item))
     return ""
@@ -407,7 +358,9 @@ def _normalized_blockers(value: object) -> list[str]:
         if isinstance(item, str) and item:
             blockers.append(item)
         elif isinstance(item, dict):
-            detail = _first_string(item.get("detail"), item.get("summary"), item.get("id"), item.get("class"))
+            detail = _first_string(
+                item.get("detail"), item.get("summary"), item.get("id"), item.get("class")
+            )
             if detail:
                 blockers.append(detail)
     return blockers
@@ -417,7 +370,10 @@ def _strict_errors(*, raw: dict[str, Any], normalized: dict[str, Any]) -> list[s
     errors: list[str] = []
     if raw.get("status") == "complete" and not final_qr_clean(normalized.get("final_qr", {})):
         errors.append("complete reports must have final_qr status clean/passed")
-    if normalized.get("status") == "complete" and normalized.get("commit_created_by_task") is not True:
+    if (
+        normalized.get("status") == "complete"
+        and normalized.get("commit_created_by_task") is not True
+    ):
         errors.append("complete reports must set commit_created_by_task true")
     if _head_changed_without_note(normalized):
         errors.append("reports with target HEAD changes must include an explicit concurrency note")
@@ -429,7 +385,9 @@ def _head_changed_without_note(report: dict[str, Any]) -> bool:
     if isinstance(observed, dict):
         if observed.get("observed") is not True:
             return False
-        return not _first_string(observed.get("note"), observed.get("detail"), observed.get("reason"))
+        return not _first_string(
+            observed.get("note"), observed.get("detail"), observed.get("reason")
+        )
     repo_state = report.get("repo_state")
     if not isinstance(repo_state, dict):
         return False
@@ -441,7 +399,11 @@ def _head_changed_without_note(report: dict[str, Any]) -> bool:
 
 
 def _looks_like_git_status_line(value: object) -> bool:
-    return isinstance(value, str) and len(value) >= 3 and value[:2].strip() in {"M", "A", "D", "R", "C", "U", "??"}
+    return (
+        isinstance(value, str)
+        and len(value) >= 3
+        and value[:2].strip() in {"M", "A", "D", "R", "C", "U", "??"}
+    )
 
 
 def _nested(payload: dict[str, Any], *keys: str) -> object:

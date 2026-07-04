@@ -112,9 +112,7 @@ def _missing_capabilities(capability_map: dict[str, Any]) -> list[str]:
     if not isinstance(missing, list):
         return []
     return [
-        item["id"]
-        for item in missing
-        if isinstance(item, dict) and isinstance(item.get("id"), str)
+        item["id"] for item in missing if isinstance(item, dict) and isinstance(item.get("id"), str)
     ]
 
 
@@ -203,7 +201,10 @@ def _blocker_classes(
             _append_unique(classes, "environment-or-runner")
         elif gate_failure_type == "dependency-setup-blocker":
             _append_unique(classes, "dependency-setup")
-        elif gate_failure_type == "read-only-mutation" or gate.get("skip_type") == "mutating-gate-not-run":
+        elif (
+            gate_failure_type == "read-only-mutation"
+            or gate.get("skip_type") == "mutating-gate-not-run"
+        ):
             _append_unique(classes, "read-only-policy")
         elif gate.get("status") == "failed":
             _append_unique(classes, "command-failure")

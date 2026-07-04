@@ -37,8 +37,10 @@ def test_cli_release_smoke_runs_refresh_and_exports_handoff(tmp_path: Path) -> N
     assert checks["refresh_handoff"]["status"] == "passed"
     assert checks["export_handoff"]["status"] == "passed"
     assert checks["schema_compatibility"]["status"] == "passed"
-    assert Path(payload["handoff_output"]).read_text(encoding="utf-8").startswith(
-        "# Quality Runner Agent Handoff\n"
+    assert (
+        Path(payload["handoff_output"])
+        .read_text(encoding="utf-8")
+        .startswith("# Quality Runner Agent Handoff\n")
     )
 
 

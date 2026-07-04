@@ -111,9 +111,7 @@ def _string_int_dict(value: object) -> dict[str, int]:
     if not isinstance(value, dict):
         return {}
     return {
-        key: item
-        for key, item in value.items()
-        if isinstance(key, str) and isinstance(item, int)
+        key: item for key, item in value.items() if isinstance(key, str) and isinstance(item, int)
     }
 
 

@@ -79,9 +79,10 @@ def verify_discovered_gates(
         gates.append(gate)
         if capability_id in LEAF_GATE_IDS and gate.get("status") == "passed":
             passed_leaf_ids.add(capability_id)
-        if gate.get("failure_type") == "dependency-setup-blocker" and gate.get(
-            "status"
-        ) == "failed":
+        if (
+            gate.get("failure_type") == "dependency-setup-blocker"
+            and gate.get("status") == "failed"
+        ):
             dependency_setup_blockers[
                 dependency_setup_context(repo_root=repo_root, capability=capability)
             ] = gate
@@ -210,11 +211,7 @@ def _verify_gate(
             "source": source,
         }
     risk = mutating_risk(capability_id=capability_id, capability=capability)
-    if (
-        read_only_gates
-        and not allow_mutating_gates
-        and risk in {"mutating", "unknown"}
-    ):
+    if read_only_gates and not allow_mutating_gates and risk in {"mutating", "unknown"}:
         return {
             "id": capability_id,
             "status": "skipped",
@@ -249,14 +246,18 @@ def _verify_gate(
             gate_failure_type = "read-only-mutation"
         environment_restricted = gate_failure_type == "environment-restricted"
         dependency_setup = gate_failure_type == "dependency-setup-blocker"
-        diagnostics = gate_diagnostics(
-            command=command,
-            cwd=gate_cwd(repo_root=repo_root, capability=capability),
-            stdout=stdout,
-            stderr=stderr,
-            timed_out=True,
-            dependency_setup=dependency_setup,
-        ) | _timeout_output_diagnostics(stdout=stdout, stderr=stderr) | _read_only_mutation_diagnostics(mutation)
+        diagnostics = (
+            gate_diagnostics(
+                command=command,
+                cwd=gate_cwd(repo_root=repo_root, capability=capability),
+                stdout=stdout,
+                stderr=stderr,
+                timed_out=True,
+                dependency_setup=dependency_setup,
+            )
+            | _timeout_output_diagnostics(stdout=stdout, stderr=stderr)
+            | _read_only_mutation_diagnostics(mutation)
+        )
         return {
             "id": capability_id,
             "status": "failed",

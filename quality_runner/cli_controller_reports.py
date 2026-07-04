@@ -69,7 +69,9 @@ def add_controller_report_summary_arguments(parser: argparse.ArgumentParser) -> 
         default="not-pushed",
         help='Push status for --controller-report, for example "pushed" or "not-pushed"',
     )
-    parser.add_argument("--report-output", default=None, help="Write controller report JSON to this path")
+    parser.add_argument(
+        "--report-output", default=None, help="Write controller report JSON to this path"
+    )
     parser.add_argument(
         "--lint-report",
         action="store_true",
@@ -93,7 +95,9 @@ def add_controller_report_command(
         "normalize", help="Normalize a worker report into the strict controller schema"
     )
     normalize_parser.add_argument("report_json", help="Worker report JSON path")
-    normalize_parser.add_argument("--output", default=None, help="Write normalized report JSON to this path")
+    normalize_parser.add_argument(
+        "--output", default=None, help="Write normalized report JSON to this path"
+    )
     normalize_parser.add_argument("--json", action="store_true", help="Emit JSON output")
     lint_parser = controller_subparsers.add_parser(
         "lint", help="Lint a worker report after normalization"

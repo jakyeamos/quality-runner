@@ -58,9 +58,7 @@ def test_verify_gates_runs_package_scripts_through_detected_package_manager(
     )
 
     payload = verify_gates_payload(repo_root=tmp_path, run_id="package-manager-gates")
-    verification = json.loads(
-        Path(payload["artifact_paths"]["gate_verification_json"]).read_text()
-    )
+    verification = json.loads(Path(payload["artifact_paths"]["gate_verification_json"]).read_text())
 
     assert payload["status"] == "passed"
     assert verification["gates"][0]["command"] == "pnpm run lint"
@@ -97,9 +95,7 @@ def test_verify_gates_read_only_mode_skips_mutating_formatter(
         run_id="read-only-mutating",
         read_only_gates=True,
     )
-    verification = json.loads(
-        Path(payload["artifact_paths"]["gate_verification_json"]).read_text()
-    )
+    verification = json.loads(Path(payload["artifact_paths"]["gate_verification_json"]).read_text())
     plan = json.loads(Path(payload["artifact_paths"]["gate_execution_plan_json"]).read_text())
 
     assert payload["status"] == "blocked"
@@ -126,9 +122,9 @@ def test_verify_gates_classifies_dependency_setup_blockers(
                     "lint": f"{sys.executable} -c 'import sys; sys.exit(0)'",
                     "test": (
                         f"{sys.executable} -c "
-                        "\"import sys; "
+                        '"import sys; '
                         "print('ERR_PNPM_ABORTED_REMOVE_MODULES_DIR_NO_TTY', file=sys.stderr); "
-                        "sys.exit(1)\""
+                        'sys.exit(1)"'
                     ),
                     "build": f"{sys.executable} -c 'import sys; sys.exit(0)'",
                 },
@@ -143,9 +139,7 @@ def test_verify_gates_classifies_dependency_setup_blockers(
     )
 
     payload = verify_gates_payload(repo_root=tmp_path, run_id="dependency-setup")
-    verification = json.loads(
-        Path(payload["artifact_paths"]["gate_verification_json"]).read_text()
-    )
+    verification = json.loads(Path(payload["artifact_paths"]["gate_verification_json"]).read_text())
 
     assert payload["status"] == "blocked"
     assert verification["gates"][0]["id"] == "lint"
@@ -171,10 +165,10 @@ def test_verify_gates_classifies_pnpm_ignored_builds_as_dependency_setup(
                 "scripts": {
                     "lint": (
                         f"{sys.executable} -c "
-                        "\"import sys; "
+                        '"import sys; '
                         "print('[ERR_PNPM_IGNORED_BUILDS] Ignored build scripts: sharp'); "
                         "print('Run \\'pnpm approve-builds\\' to pick which dependencies should be allowed'); "
-                        "sys.exit(1)\""
+                        'sys.exit(1)"'
                     ),
                     "test": f"{sys.executable} -c 'import sys; sys.exit(0)'",
                 },
@@ -189,9 +183,7 @@ def test_verify_gates_classifies_pnpm_ignored_builds_as_dependency_setup(
     )
 
     payload = verify_gates_payload(repo_root=tmp_path, run_id="pnpm-ignored-builds")
-    verification = json.loads(
-        Path(payload["artifact_paths"]["gate_verification_json"]).read_text()
-    )
+    verification = json.loads(Path(payload["artifact_paths"]["gate_verification_json"]).read_text())
     handoff = json.loads(Path(payload["artifact_paths"]["agent_handoff_json"]).read_text())
     handoff_markdown = Path(payload["artifact_paths"]["agent_handoff_md"]).read_text()
 
@@ -237,9 +229,7 @@ def test_verify_gates_uses_per_gate_timeout_config_and_skips_covered_aggregate(
     )
 
     payload = verify_gates_payload(repo_root=tmp_path, run_id="aggregate-skip")
-    verification = json.loads(
-        Path(payload["artifact_paths"]["gate_verification_json"]).read_text()
-    )
+    verification = json.loads(Path(payload["artifact_paths"]["gate_verification_json"]).read_text())
 
     assert payload["status"] == "passed"
     assert verification["gate_timeouts"] == {"lint": 9}

@@ -394,7 +394,9 @@ def _gate_blocker_action_groups(
             continue
         blocker_class = group.get("class")
         group_blockers = [
-            gate for gate in blockers if isinstance(blocker_class, str) and gate.get("blocker_class") == blocker_class
+            gate
+            for gate in blockers
+            if isinstance(blocker_class, str) and gate.get("blocker_class") == blocker_class
         ]
         if not group_blockers:
             continue
@@ -464,11 +466,7 @@ def _display_group_action(*, action: object, gate_ids: object) -> str:
 
 
 def _gate_ids(blockers: list[dict[str, Any]]) -> list[str]:
-    return [
-        str(gate["id"])
-        for gate in blockers
-        if isinstance(gate.get("id"), str) and gate["id"]
-    ]
+    return [str(gate["id"]) for gate in blockers if isinstance(gate.get("id"), str) and gate["id"]]
 
 
 def _string_or_none(value: object) -> str | None:

@@ -12,7 +12,9 @@ def controller_command_environment(repo_path: str) -> dict[str, str]:
     }
 
 
-def normalized_controller_command_environment(report: dict[str, Any], *, repo_path: str) -> dict[str, str]:
+def normalized_controller_command_environment(
+    report: dict[str, Any], *, repo_path: str
+) -> dict[str, str]:
     environment = report.get("controller_command_environment")
     if isinstance(environment, dict):
         return {
@@ -196,7 +198,9 @@ def final_qr_clean(final_qr: object) -> bool:
     if not isinstance(final_qr, dict):
         return False
     status = str(final_qr.get("status") or "")
-    classification = str(final_qr.get("classification") or final_qr.get("recommended_classification") or "")
+    classification = str(
+        final_qr.get("classification") or final_qr.get("recommended_classification") or ""
+    )
     return status in {"clean", "passed"} or classification == "clean"
 
 
@@ -208,7 +212,11 @@ def first_string(*values: object) -> str:
 
 
 def string_values(value: object) -> list[str]:
-    return [item for item in value if isinstance(item, str) and item] if isinstance(value, list) else []
+    return (
+        [item for item in value if isinstance(item, str) and item]
+        if isinstance(value, list)
+        else []
+    )
 
 
 def gate_descriptions(

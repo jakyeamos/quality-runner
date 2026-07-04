@@ -58,9 +58,7 @@ def test_verify_gates_read_only_mode_restores_tracked_mutations(tmp_path: Path) 
         run_id="read-only-tracked-mutation",
         read_only_gates=True,
     )
-    verification = json.loads(
-        Path(payload["artifact_paths"]["gate_verification_json"]).read_text()
-    )
+    verification = json.loads(Path(payload["artifact_paths"]["gate_verification_json"]).read_text())
     handoff = json.loads(Path(payload["artifact_paths"]["agent_handoff_json"]).read_text())
     handoff_markdown = Path(payload["artifact_paths"]["agent_handoff_md"]).read_text()
 

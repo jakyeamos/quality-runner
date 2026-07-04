@@ -107,7 +107,9 @@ def test_controller_report_strict_lint_rejects_false_complete() -> None:
             "classification": "missing-capabilities",
         },
         "files_changed": [],
-        "verification": [{"command": "quality-runner summarize-run .", "result": "passed-with-findings"}],
+        "verification": [
+            {"command": "quality-runner summarize-run .", "result": "passed-with-findings"}
+        ],
         "commit_hash": None,
         "push_status": "not-pushed",
         "git_status_short": "",
@@ -141,7 +143,10 @@ def test_controller_report_strict_lint_rejects_head_change_without_note() -> Non
     result = lint_controller_report(report, strict=True)
 
     assert result["status"] == "rejected"
-    assert "reports with target HEAD changes must include an explicit concurrency note" in result["errors"]
+    assert (
+        "reports with target HEAD changes must include an explicit concurrency note"
+        in result["errors"]
+    )
 
 
 def test_controller_report_strict_lint_rejects_complete_without_task_commit() -> None:
@@ -334,7 +339,9 @@ def test_controller_report_lint_accepts_legacy_and_timeout_diagnostic_shapes() -
             "failure_type": "workflow-timeout",
         },
         "files_changed": [],
-        "verification": [{"command": "quality-runner summarize-run /repos/example", "result": "blocked"}],
+        "verification": [
+            {"command": "quality-runner summarize-run /repos/example", "result": "blocked"}
+        ],
         "commit_hash": None,
         "target_head": "abc123",
         "commit_created_by_task": False,
@@ -366,7 +373,10 @@ def test_controller_report_lint_accepts_legacy_and_timeout_diagnostic_shapes() -
     timeout_result = lint_controller_report(timeout_report, strict=True)
 
     assert timeout_result["status"] == "accepted"
-    assert "Suggested scan exclusion: data/cache/**." in timeout_result["normalized_report"]["blockers"]
+    assert (
+        "Suggested scan exclusion: data/cache/**."
+        in timeout_result["normalized_report"]["blockers"]
+    )
 
 
 def test_controller_report_strict_lint_allows_head_change_with_note() -> None:

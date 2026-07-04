@@ -95,7 +95,9 @@ def build_parser() -> argparse.ArgumentParser:
         required=True,
         help="Prefix used to create <prefix>-inspect, <prefix>-run, and <prefix>-verify runs",
     )
-    refresh_parser.add_argument("--baseline-run-id", default=None, help="Baseline run id for deltas")
+    refresh_parser.add_argument(
+        "--baseline-run-id", default=None, help="Baseline run id for deltas"
+    )
     refresh_parser.add_argument(
         "--timeout-seconds",
         type=int,
@@ -165,7 +167,9 @@ def build_parser() -> argparse.ArgumentParser:
     )
     summary_parser.add_argument("repo_path", help="Target repository path")
     summary_parser.add_argument("--run-id", required=True, help="Run id to summarize")
-    summary_parser.add_argument("--baseline-run-id", default=None, help="Baseline run id for deltas")
+    summary_parser.add_argument(
+        "--baseline-run-id", default=None, help="Baseline run id for deltas"
+    )
     add_controller_report_summary_arguments(summary_parser)
     summary_parser.add_argument("--json", action="store_true", help="Emit JSON output")
 
@@ -230,7 +234,10 @@ def main(argv: list[str] | None = None) -> int:
         print(json.dumps(payload, indent=2, sort_keys=True))
     else:
         print(human_summary(payload))
-    if parsed.command in {"validate-report", "controller-report"} and payload.get("status") == "rejected":
+    if (
+        parsed.command in {"validate-report", "controller-report"}
+        and payload.get("status") == "rejected"
+    ):
         return 1
     if parsed.command == "release-smoke" and payload.get("status") != "passed":
         return 1

@@ -119,7 +119,8 @@ def _record_check(
 def _schema_compatibility_passed() -> bool:
     return (
         lint_controller_report(_legacy_controller_report(), strict=True)["status"] == "accepted"
-        and lint_controller_report(_timeout_controller_report(), strict=True)["status"] == "accepted"
+        and lint_controller_report(_timeout_controller_report(), strict=True)["status"]
+        == "accepted"
     )
 
 

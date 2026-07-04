@@ -706,9 +706,10 @@ def test_artifact_schema_additions_remain_optional_and_agent_handoff_versioned()
         "ci_status",
         "verification_state",
     }.issubset(capability_properties)
-    assert "local-executed" in capability_matrix["$defs"]["verificationState"]["properties"][
-        "execution"
-    ]["enum"]
+    assert (
+        "local-executed"
+        in capability_matrix["$defs"]["verificationState"]["properties"]["execution"]["enum"]
+    )
     assert remediation_plan["properties"]["schema"]["const"] == (
         "quality-runner-remediation-plan-v0.1"
     )
@@ -727,9 +728,7 @@ def test_artifact_schema_additions_remain_optional_and_agent_handoff_versioned()
     action_group = agent_handoff["$defs"]["actionGroup"]
     assert action_group["required"] == ["class", "gate_ids", "actions"]
     assert (
-        agent_handoff["$defs"]["remediationSlice"]["properties"]["action_groups"]["items"][
-            "$ref"
-        ]
+        agent_handoff["$defs"]["remediationSlice"]["properties"]["action_groups"]["items"]["$ref"]
         == "#/$defs/actionGroup"
     )
     assert "adoption_stage" not in agent_handoff["required"]

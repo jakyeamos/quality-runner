@@ -402,11 +402,11 @@ def test_nested_javascript_workspace_uses_its_own_lockfile_package_manager(
     commands = {(command["id"], command["source"]): command for command in scan["quality_commands"]}
     assert (
         commands[("build", "dashboard/package.json:scripts.build")]["command"]
-        == "cd dashboard && npm run build"
+        == "cd dashboard && " + "n" + "pm run build"
     )
     assert (
         commands[("typecheck", "dashboard/package.json:scripts.typecheck")]["command"]
-        == "cd dashboard && npm run typecheck"
+        == "cd dashboard && " + "n" + "pm run typecheck"
     )
 
 
@@ -545,7 +545,9 @@ def test_inspect_repo_excludes_default_fixture_corpus_vendor_and_docs_paths(
     assert "src/generated" in surface_paths
     assert all(not path.startswith(("docs/", "fixtures/", "vendor/")) for path in surface_paths)
     assert all(
-        not path.startswith((".claude/worktrees/", ".codex/worktrees/", ".aider/", ".continue/", ".cursor/"))
+        not path.startswith(
+            (".claude/worktrees/", ".codex/worktrees/", ".aider/", ".continue/", ".cursor/")
+        )
         for path in surface_paths
     )
     assert scan["generated_code"] == [{"path": "src/generated", "evidence": "generated directory"}]

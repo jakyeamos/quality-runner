@@ -23,9 +23,7 @@ def config_with_include_overrides(
     return merged
 
 
-def combined_warnings(
-    scan: dict[str, Any], capability_map: dict[str, Any]
-) -> list[dict[str, Any]]:
+def combined_warnings(scan: dict[str, Any], capability_map: dict[str, Any]) -> list[dict[str, Any]]:
     warnings: list[dict[str, Any]] = []
     seen: set[tuple[str, str, str]] = set()
     for source in (scan.get("warnings"), capability_map.get("warnings")):

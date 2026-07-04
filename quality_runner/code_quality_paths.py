@@ -183,20 +183,25 @@ def _mask_regex_literals(line: str) -> str:
     while index < len(line):
         char = line[index]
         next_char = line[index + 1] if index + 1 < len(line) else ""
-        if char == "/" and next_char not in {"/", "*"} and previous_significant in {
-            "",
-            "(",
-            "=",
-            ":",
-            ",",
-            "[",
-            "{",
-            "!",
-            "&",
-            "|",
-            "?",
-            "return",
-        }:
+        if (
+            char == "/"
+            and next_char not in {"/", "*"}
+            and previous_significant
+            in {
+                "",
+                "(",
+                "=",
+                ":",
+                ",",
+                "[",
+                "{",
+                "!",
+                "&",
+                "|",
+                "?",
+                "return",
+            }
+        ):
             end = _regex_literal_end(line, index + 1)
             if end is not None:
                 masked.append("/" + ("x" * (end - index - 1)))

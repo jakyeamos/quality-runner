@@ -132,9 +132,7 @@ def test_verify_gates_payload_executes_discovered_gates_and_marks_capabilities(
     )
 
     payload = verify_gates_payload(repo_root=tmp_path, run_id="verify-gates-run", profile="default")
-    verification = json.loads(
-        Path(payload["artifact_paths"]["gate_verification_json"]).read_text()
-    )
+    verification = json.loads(Path(payload["artifact_paths"]["gate_verification_json"]).read_text())
     capability_map = json.loads(
         Path(payload["artifact_paths"]["capability_matrix_json"]).read_text()
     )
@@ -209,9 +207,9 @@ def test_verify_gates_classifies_next_font_fetch_as_environment_restricted(
                 "scripts": {
                     "build": (
                         f"{sys.executable} -c "
-                        "\"import sys; "
+                        '"import sys; '
                         "print('next/font failed to fetch fonts.googleapis.com', file=sys.stderr); "
-                        "sys.exit(1)\""
+                        'sys.exit(1)"'
                     )
                 }
             }
@@ -224,9 +222,7 @@ def test_verify_gates_classifies_next_font_fetch_as_environment_restricted(
     )
 
     payload = verify_gates_payload(repo_root=tmp_path, run_id="next-font-fetch")
-    verification = json.loads(
-        Path(payload["artifact_paths"]["gate_verification_json"]).read_text()
-    )
+    verification = json.loads(Path(payload["artifact_paths"]["gate_verification_json"]).read_text())
 
     assert payload["status"] == "blocked"
     assert verification["gates"][0]["failure_type"] == "environment-restricted"
@@ -450,7 +446,9 @@ def test_verify_gate_kills_process_group_when_workflow_timeout_interrupts(
     def fake_popen(*_: object, **kwargs: object) -> FakeProcess:
         assert kwargs["start_new_session"] is True
         assert kwargs["env"]["UV_CACHE_DIR"] == str(tmp_path / ".quality-runner" / "cache" / "uv")
-        assert kwargs["env"]["XDG_CACHE_HOME"] == str(tmp_path / ".quality-runner" / "cache" / "xdg")
+        assert kwargs["env"]["XDG_CACHE_HOME"] == str(
+            tmp_path / ".quality-runner" / "cache" / "xdg"
+        )
         return FakeProcess()
 
     monkeypatch.setattr(process_runner.subprocess, "Popen", fake_popen)
@@ -484,8 +482,7 @@ def test_verify_gate_captures_partial_output_after_timeout(tmp_path: Path) -> No
     from quality_runner.gate_verification import verify_discovered_gates
 
     command = (
-        f"{sys.executable} -c "
-        "\"import time; print('partial stdout', flush=True); time.sleep(5)\""
+        f"{sys.executable} -c \"import time; print('partial stdout', flush=True); time.sleep(5)\""
     )
 
     verification = verify_discovered_gates(
@@ -525,9 +522,7 @@ def test_verify_gates_skips_ci_only_pseudo_gates(tmp_path: Path) -> None:
     )
 
     payload = verify_gates_payload(repo_root=tmp_path, run_id="ci-only-gates")
-    verification = json.loads(
-        Path(payload["artifact_paths"]["gate_verification_json"]).read_text()
-    )
+    verification = json.loads(Path(payload["artifact_paths"]["gate_verification_json"]).read_text())
 
     assert payload["status"] == "skipped-nonlocal"
     assert verification["gates"] == [
@@ -557,9 +552,7 @@ def test_verify_gates_does_not_block_on_file_evidence_capabilities(tmp_path: Pat
     )
 
     payload = verify_gates_payload(repo_root=tmp_path, run_id="file-evidence")
-    verification = json.loads(
-        Path(payload["artifact_paths"]["gate_verification_json"]).read_text()
-    )
+    verification = json.loads(Path(payload["artifact_paths"]["gate_verification_json"]).read_text())
 
     assert payload["status"] == "passed"
     assert [(gate["id"], gate["status"]) for gate in verification["gates"]] == [
@@ -567,7 +560,9 @@ def test_verify_gates_does_not_block_on_file_evidence_capabilities(tmp_path: Pat
         ("truth_file", "skipped"),
     ]
     assert verification["gates"][1]["capability_kind"] == "evidence_file"
-    assert verification["gates"][1]["reason"] == "capability is file evidence, not an executable gate"
+    assert (
+        verification["gates"][1]["reason"] == "capability is file evidence, not an executable gate"
+    )
 
 
 def test_verify_gates_classifies_environment_restricted_failures(tmp_path: Path) -> None:
@@ -592,9 +587,7 @@ def test_verify_gates_classifies_environment_restricted_failures(tmp_path: Path)
     )
 
     payload = verify_gates_payload(repo_root=tmp_path, run_id="environment-restricted")
-    verification = json.loads(
-        Path(payload["artifact_paths"]["gate_verification_json"]).read_text()
-    )
+    verification = json.loads(Path(payload["artifact_paths"]["gate_verification_json"]).read_text())
 
     assert payload["status"] == "blocked"
     assert verification["status"] == "blocked"
@@ -614,10 +607,10 @@ def test_verify_gates_classifies_test_server_timeout_as_environment_restricted(
                 "scripts": {
                     "test": (
                         f"{sys.executable} -c "
-                        "\"import sys; "
+                        '"import sys; '
                         "print('Error: Test timed out in 15000ms', file=sys.stderr); "
                         "print('Error: Server is not running.', file=sys.stderr); "
-                        "sys.exit(1)\""
+                        'sys.exit(1)"'
                     )
                 }
             }
@@ -630,16 +623,15 @@ def test_verify_gates_classifies_test_server_timeout_as_environment_restricted(
     )
 
     payload = verify_gates_payload(repo_root=tmp_path, run_id="test-server-timeout")
-    verification = json.loads(
-        Path(payload["artifact_paths"]["gate_verification_json"]).read_text()
-    )
+    verification = json.loads(Path(payload["artifact_paths"]["gate_verification_json"]).read_text())
 
     assert payload["status"] == "blocked"
     assert verification["status"] == "blocked"
     assert verification["gates"][0]["failure_type"] == "environment-restricted"
-    assert "rerun the exact command directly from the repo root" in verification["gates"][0][
-        "recommended_action"
-    ]
+    assert (
+        "rerun the exact command directly from the repo root"
+        in verification["gates"][0]["recommended_action"]
+    )
 
 
 def test_verify_gates_keeps_plain_test_failures_as_command_failures(tmp_path: Path) -> None:
@@ -652,7 +644,7 @@ def test_verify_gates_keeps_plain_test_failures_as_command_failures(tmp_path: Pa
                     "test": (
                         f"{sys.executable} -c "
                         "\"import sys; print('AssertionError: expected true', file=sys.stderr); "
-                        "sys.exit(1)\""
+                        'sys.exit(1)"'
                     )
                 }
             }
@@ -665,9 +657,7 @@ def test_verify_gates_keeps_plain_test_failures_as_command_failures(tmp_path: Pa
     )
 
     payload = verify_gates_payload(repo_root=tmp_path, run_id="plain-test-failure")
-    verification = json.loads(
-        Path(payload["artifact_paths"]["gate_verification_json"]).read_text()
-    )
+    verification = json.loads(Path(payload["artifact_paths"]["gate_verification_json"]).read_text())
 
     assert payload["status"] == "failed"
     assert verification["status"] == "failed"

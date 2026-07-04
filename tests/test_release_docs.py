@@ -38,7 +38,10 @@ def test_release_docs_describe_current_release_plan_and_release_history() -> Non
     assert "Trusted Publisher" in release_docs
     assert "before tagging" in release_docs
     assert "quality-runner release-smoke --json" in release_docs
-    assert "quality-runner refresh /path/to/repo --run-id-prefix refresh-001 --handoff-output handoff.md --json" in cli_docs
+    assert (
+        "quality-runner refresh /path/to/repo --run-id-prefix refresh-001 --handoff-output handoff.md --json"
+        in cli_docs
+    )
 
 
 def test_release_docs_include_example_handoffs() -> None:

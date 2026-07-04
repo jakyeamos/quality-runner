@@ -69,7 +69,9 @@ def build_controller_report_from_summary(
         "branch_name": branch_name,
         "status": resolved_status,
         "controller_status_recommendation": recommendation,
-        "baseline_artifact_path": _baseline_path(repo_path=repo_path, baseline_run_id=baseline_run_id)
+        "baseline_artifact_path": _baseline_path(
+            repo_path=repo_path, baseline_run_id=baseline_run_id
+        )
         or str(summary.get("path") or ""),
         "final_qr": {key: value for key, value in final_qr.items() if value is not None},
         "files_changed": files_changed or [],

@@ -82,7 +82,9 @@ def run_refresh_payload(
         current.phase_started = time.monotonic()
         current.timeout_seconds = total_timeout_seconds or resolved_verify_timeout
         current.timeout_reason = resolved_total_reason or resolved_verify_reason
-        current.timeout_scope = "total-refresh" if total_timeout_seconds is not None else "verify-phase"
+        current.timeout_scope = (
+            "total-refresh" if total_timeout_seconds is not None else "verify-phase"
+        )
         remaining = remaining_total_seconds()
         try:
             if remaining is None:

@@ -215,9 +215,10 @@ def _available_capabilities(capability_map: dict[str, Any]) -> list[dict[str, An
 
 def _gate_cost_key(capability: dict[str, Any]) -> tuple[int, str]:
     capability_id = str(capability.get("id") or "")
-    if _capability_kind(capability) == "evidence_file" or capability.get(
-        "local_execution"
-    ) == "ci-only":
+    if (
+        _capability_kind(capability) == "evidence_file"
+        or capability.get("local_execution") == "ci-only"
+    ):
         cost = 95
     else:
         cost = {

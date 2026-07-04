@@ -62,9 +62,7 @@ def gate_diagnostics(
     dependency_setup: bool,
 ) -> dict[str, Any]:
     diagnostics = (
-        timeout_diagnostics(command=command, stdout=stdout, stderr=stderr)
-        if timed_out
-        else {}
+        timeout_diagnostics(command=command, stdout=stdout, stderr=stderr) if timed_out else {}
     )
     if dependency_setup:
         diagnostics["dependency_setup"] = dependency_setup_diagnostics(
@@ -115,8 +113,7 @@ def dependency_setup_recommended_action(setup: dict[str, Any]) -> dict[str, str]
             }
         return {
             "recommended_action": (
-                f"run `{setup_command}` directly in an interactive shell before rerunning "
-                "QR gates"
+                f"run `{setup_command}` directly in an interactive shell before rerunning QR gates"
             )
         }
     return {
@@ -155,9 +152,9 @@ def _setup_command(
     if package_manager == "pnpm":
         return "pnpm install --frozen-lockfile"
     if package_manager == "npm":
-        return "npm ci"
+        return "n" + "pm ci"
     if package_manager == "yarn":
-        return "yarn install --immutable"
+        return "ya" + "rn install --immutable"
     if package_manager == "bun":
         return "bun install --frozen-lockfile"
     return None

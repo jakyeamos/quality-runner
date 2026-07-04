@@ -122,8 +122,7 @@ def validate_agent_handoff(handoff: dict[str, Any]) -> ValidationResult:
         if next_slice is not None:
             errors.append("agent handoff next_slice must be null for clean status")
     elif (
-        status
-        in {"planned", "gates-discovered", "gates-executed", "gates-blocked", "gates-failed"}
+        status in {"planned", "gates-discovered", "gates-executed", "gates-blocked", "gates-failed"}
         and next_slice is not None
     ):
         if not _slice_item(next_slice):
