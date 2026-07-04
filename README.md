@@ -28,13 +28,15 @@ self-audit improvements, and release-readiness proof.
 
 ## Install
 
-From PyPI after the package has been published:
+From PyPI:
 
 ```bash
 uv tool install quality-runner
 ```
 
-Until then, install from the public repository:
+Package page: [quality-runner on PyPI](https://pypi.org/project/quality-runner/).
+
+To install directly from the public repository instead:
 
 ```bash
 uv tool install git+https://github.com/jakyeamos/quality-runner.git
