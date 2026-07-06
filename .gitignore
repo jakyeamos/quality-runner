@@ -6,3 +6,7 @@ __pycache__/
 .pre-cr/
 *.egg-info/
 uv.lock
+
+# Generated / cache / audit output
+.turbo/
+.firecrawl/
