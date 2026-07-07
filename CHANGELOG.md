@@ -2,6 +2,23 @@
 
 All notable changes to Quality Runner are documented here.
 
+## 0.4.0 - 2026-07-07
+
+- Added multi-repo `rollout` workflow with fleet planning documents, per-repo
+  summaries, rollout ledgers, and controller-report validation.
+- Added DOI-ready research metadata (`CITATION.cff`, `.zenodo.json`, ORCID) and
+  release notes for software-methods archiving.
+- Added workflow intent semantics, gate controller runs, gate-response ledger
+  bridging, worktree-isolated gate verification, and fix-proposal artifacts.
+- Added security scan surfaces with capability discovery, candidate heuristics,
+  agent-review gates, and security ledger merging into remediation planning.
+- Added quality-skills ingest/review, unwired-work detection, remediation wiring
+  slices, slice-spec enrichment, and controller-report batch-scope linting.
+- Pruned artifact-heavy scan surfaces, excluded uv cache paths, and suppressed
+  equivalent-branch warnings when commit identity matches.
+- Extracted structural-scan and similarity parser modules to keep large scanner
+  files under the default large-file threshold.
+
 ## 0.3.1 - 2026-07-04
 
 - Added compatibility imports, console scripts, MCP tools, and packaged plugin

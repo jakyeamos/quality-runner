@@ -1,6 +1,6 @@
 [project]
 name = "quality-runner"
-version = "0.3.1"
+version = "0.4.0"
 description = "Standalone audit-and-plan quality orchestrator with CLI and MCP surfaces."
 requires-python = ">=3.12"
 readme = "README.md"

@@ -10,9 +10,11 @@ Quality Runner now also has DOI-ready software-methods metadata and release
 docs: `CITATION.cff`, `.zenodo.json`, `RESEARCH_READY.md`, and
 `docs/release-notes/v0.3.1-doi.md`.
 
-Version `0.3.1` is the compatibility release candidate for replacing direct
-`quality-evidence-contract` and `repo-quality-certifier` consumers with the
-single Quality Runner package.
+Version `0.4.0` is the next public release after the compatibility `0.3.1`
+package. It adds rollout, intent/gate controller semantics, security scanning,
+quality-skills workflows, and unwired-work remediation while keeping
+compatibility surfaces for prior `quality-evidence-contract` and
+`repo-quality-certifier` consumers.
 
 The package also carries compatibility surfaces for earlier extracted quality
 packages when those APIs are still imported by active tools:
@@ -36,7 +38,7 @@ Current package-mining state:
 - `quality-runner release-smoke` now verifies compatibility imports,
   repo-quality-certifier artifact generation, certifier MCP tool metadata, and
   packaged plugin manifests.
-- Release docs target `v0.3.1` and include post-install checks for the
+- Release docs target `v0.4.0` and include post-install checks for the
   compatibility imports, CLI, MCP, and release smoke before archiving old repos.
 - `quality-runner rollout` is the first-class multi-repo controller workflow
   for safe sequential refreshes, repo-list parsing, per-repo controller reports,
@@ -48,6 +50,12 @@ Current package-mining state:
 
 Current verification:
 
+- 2026-07-07: Prepared `0.4.0` release after extracting structural-scan and
+  similarity parser modules, fixing controller-report batch-scope assembly, and
+  clearing full-repo `uv run ruff check .` and `uv run basedpyright`. Verified
+  with full `uv run pytest -q` (362 passed), `uv run ruff format --check .`,
+  `uv run --with vulture vulture . --min-confidence 70`, and
+  `quality-runner release-smoke --json`.
 - 2026-07-07: Added `integrate` unwired-work detection, dead-code output
   reinterpretation, and decision-based remediation slices that ask authors to
   wire, finish, descope, or accept WIP. Verified with focused unwired-work
@@ -57,11 +65,7 @@ Current verification:
   tests/test_workflow.py::test_run_payload_adds_structural_findings_and_groups_remediation_slices
   tests/test_code_quality.py::test_quality_runner_source_files_stay_under_default_large_file_threshold`),
   full `uv run pytest -q`, touched-file `uv run ruff check ...`, and
-  `uv run --with vulture vulture . --min-confidence 70`. Full
-  `uv run ruff check .` remains blocked by unrelated lint debt in
-  `quality_runner/gate_execution_policy.py`, `quality_runner/security/*`, and
-  `tests/test_fix_proposals.py`; `uv run basedpyright` remains blocked by an
-  unrelated `quality_runner/mcp.py` redeclaration.
+  `uv run --with vulture vulture . --min-confidence 70`.
 - 2026-07-04: Documented the AIOS launch shortcut in the rollout controller
   notes. Verified with `uv run pytest -q tests/test_rollout.py
   tests/test_release_docs.py` and `uv run ruff check docs/qr-rollout-20260702.md`
