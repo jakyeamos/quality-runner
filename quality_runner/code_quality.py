@@ -34,6 +34,15 @@ from quality_runner.code_quality_paths import (
 )
 from quality_runner.code_quality_ponytail import ponytail_findings
 from quality_runner.code_quality_rules import _scan_file
+from quality_runner.code_quality_similarity import (
+    DEFAULT_SIMILARITY_ENABLED,
+    DEFAULT_SIMILARITY_INCLUDE_TESTS,
+    DEFAULT_SIMILARITY_MAX_PAIRS,
+    DEFAULT_SIMILARITY_MIN_LINES,
+    DEFAULT_SIMILARITY_THRESHOLD,
+    DEFAULT_SIMILARITY_TIMEOUT_SECONDS,
+    semantic_similarity_scan,
+)
 from quality_runner.code_quality_skills import skill_findings
 from quality_runner.code_quality_unwired import unwired_findings
 from quality_runner.scan_exclusions import (
@@ -116,6 +125,8 @@ def create_code_quality_scan(
         )
         extracted_functions.extend(_extract_functions(relative_path, lines))
 
+    semantic_similarity_clusters = 0
+    semantic_similarity_tools: dict[str, str] = {}
     if "deduplicate" not in disabled_groups:
         duplicate_clusters = _duplicate_clusters(extracted_functions)
         for cluster in duplicate_clusters:
@@ -137,6 +148,19 @@ def create_code_quality_scan(
                     remediation_bucket="duplicate consolidation and helper extraction",
                 )
             )
+        similarity_result = semantic_similarity_scan(
+            root,
+            policy=policy,
+            disabled_groups=disabled_groups,
+        )
+        duplicate_clusters.extend(similarity_result["clusters"])
+        findings.extend(similarity_result["findings"])
+        semantic_similarity_clusters = len(similarity_result["clusters"])
+        semantic_similarity_tools = {
+            str(entry["tool"]): str(entry["status"])
+            for entry in similarity_result["scanner_status"]
+            if isinstance(entry, dict) and isinstance(entry.get("tool"), str)
+        }
     else:
         duplicate_clusters = []
 
@@ -176,6 +200,8 @@ def create_code_quality_scan(
                 sorted_findings, "severity", ["warning", "observation"]
             ),
             "duplicate_clusters": len(duplicate_clusters),
+            "semantic_similarity_clusters": semantic_similarity_clusters,
+            "semantic_similarity_tools": semantic_similarity_tools,
             "scan_budget": _scan_budget_summary(
                 scanned_files=len(accountability),
                 max_text_files=policy["max_text_files"],
@@ -198,6 +224,12 @@ def _structural_policy(config: dict[str, Any]) -> dict[str, Any]:
     large_file_lines = policy.get("large_file_lines")
     fat_router_lines = policy.get("fat_router_lines")
     max_text_files = policy.get("max_text_files")
+    similarity_enabled = policy.get("similarity_enabled")
+    similarity_threshold = policy.get("similarity_threshold")
+    similarity_min_lines = policy.get("similarity_min_lines")
+    similarity_max_pairs = policy.get("similarity_max_pairs")
+    similarity_timeout_seconds = policy.get("similarity_timeout_seconds")
+    similarity_include_tests = policy.get("similarity_include_tests")
     return {
         "disabled_rule_groups": [item for item in disabled if isinstance(item, str)]
         if isinstance(disabled, list)
@@ -212,6 +244,25 @@ def _structural_policy(config: dict[str, Any]) -> dict[str, Any]:
         "max_text_files": max_text_files
         if isinstance(max_text_files, int) and max_text_files > 0
         else DEFAULT_MAX_TEXT_FILES,
+        "similarity_enabled": similarity_enabled
+        if isinstance(similarity_enabled, bool)
+        else DEFAULT_SIMILARITY_ENABLED,
+        "similarity_threshold": similarity_threshold
+        if isinstance(similarity_threshold, (int, float))
+        and 0 <= float(similarity_threshold) <= 1
+        else DEFAULT_SIMILARITY_THRESHOLD,
+        "similarity_min_lines": similarity_min_lines
+        if isinstance(similarity_min_lines, int) and similarity_min_lines > 0
+        else DEFAULT_SIMILARITY_MIN_LINES,
+        "similarity_max_pairs": similarity_max_pairs
+        if isinstance(similarity_max_pairs, int) and similarity_max_pairs > 0
+        else DEFAULT_SIMILARITY_MAX_PAIRS,
+        "similarity_timeout_seconds": similarity_timeout_seconds
+        if isinstance(similarity_timeout_seconds, int) and similarity_timeout_seconds > 0
+        else DEFAULT_SIMILARITY_TIMEOUT_SECONDS,
+        "similarity_include_tests": similarity_include_tests
+        if isinstance(similarity_include_tests, bool)
+        else DEFAULT_SIMILARITY_INCLUDE_TESTS,
     }
 
 

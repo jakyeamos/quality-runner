@@ -2,6 +2,12 @@ from __future__ import annotations
 
 from typing import Any, cast
 
+from quality_runner.controller_report_batch_scope import (
+    batch_scope_strict_errors,
+    evaluate_batch_scope,
+    load_batch_scope_file,
+    normalize_batch_scope,
+)
 from quality_runner.controller_report_builder import build_controller_report_from_summary
 from quality_runner.controller_report_defaults import (
     dirty_state_groups,
@@ -34,7 +40,7 @@ def normalize_controller_report(report: dict[str, Any]) -> dict[str, Any]:
         _nested(report, "target", "repo"),
         _nested(report, "run", "target_repo"),
     )
-    return {
+    normalized = {
         "schema": CONTROLLER_REPORT_SCHEMA,
         "repo_path": repo_path,
         "branch_name": _first_string(
@@ -71,6 +77,16 @@ def normalize_controller_report(report: dict[str, Any]) -> dict[str, Any]:
         "repo_state": _normalized_repo_state(report),
         "blockers": blockers or inferred_blockers(final_qr),
     }
+    batch_scope = normalize_batch_scope(report.get("batch_scope"))
+    if batch_scope:
+        normalized["batch_scope"] = batch_scope
+        evaluation = evaluate_batch_scope(
+            batch_scope=batch_scope,
+            files_changed=normalized["files_changed"],
+        )
+        normalized["unrelated_files_changed"] = evaluation["unrelated_files_changed"]
+        normalized["scope_violation"] = evaluation["scope_violation"]
+    return normalized
 
 
 def lint_controller_report(report: dict[str, Any], *, strict: bool = False) -> dict[str, Any]:
@@ -377,6 +393,14 @@ def _strict_errors(*, raw: dict[str, Any], normalized: dict[str, Any]) -> list[s
         errors.append("complete reports must set commit_created_by_task true")
     if _head_changed_without_note(normalized):
         errors.append("reports with target HEAD changes must include an explicit concurrency note")
+    batch_scope = normalized.get("batch_scope")
+    if isinstance(batch_scope, dict) and batch_scope:
+        errors.extend(
+            batch_scope_strict_errors(
+                batch_scope=batch_scope,
+                files_changed=normalized.get("files_changed", []),
+            )
+        )
     return errors
 
 

@@ -8,6 +8,11 @@ from uuid import uuid4
 
 from quality_runner.artifacts import artifact_dir, write_json
 from quality_runner.intent import resolve_workflow_intent
+from quality_runner.gate_resolution_bridge import (
+    apply_record_disposition,
+    enrich_record_disposition_response,
+    find_active_gate_run_id,
+)
 from quality_runner.run_summary import build_run_summary
 from quality_runner.schema_constants import GATE_RESPONSE_SCHEMA, GATE_RUN_SCHEMA
 
@@ -55,6 +60,12 @@ def create_gate_run(
     handoff_path = run_dir / "agent-handoff.json"
     if not handoff_path.exists():
         raise FileNotFoundError(f"agent handoff does not exist for run: {resolved_run_id}")
+
+    active_gate_run_id = find_active_gate_run_id(repo_root=repo_root, run_id=resolved_run_id)
+    if active_gate_run_id is not None and active_gate_run_id != resolved_gate_run_id:
+        raise ValueError(
+            f"an active gate run already exists for run {resolved_run_id}: {active_gate_run_id}"
+        )
 
     handoff = _load_json(handoff_path)
     summary = build_run_summary(
@@ -132,6 +143,8 @@ def record_gate_response(
     actor: str = "user",
     finding_ids: list[str] | None = None,
     notes: str | None = None,
+    disposition: str | None = None,
+    owner: str | None = None,
 ) -> dict[str, Any]:
     if action not in GATE_RESPONSE_ACTIONS:
         raise ValueError(f"unsupported gate response action: {action}")
@@ -152,7 +165,25 @@ def record_gate_response(
         "finding_ids": finding_ids or [],
         "notes": notes,
     }
+    if action == "record-disposition":
+        run_id = gate_run.get("run_id")
+        if not isinstance(run_id, str) or not run_id:
+            raise ValueError("gate run is missing run_id for record-disposition")
+        response = enrich_record_disposition_response(
+            repo_root=repo_root,
+            run_id=run_id,
+            response=response,
+            disposition=disposition or "accepted-intentional",
+            owner=owner or actor,
+        )
     responses_path = _append_gate_response(repo_root=repo_root, gate_run_id=gate_run_id, response=response)
+    if action == "record-disposition" and isinstance(gate_run.get("run_id"), str):
+        apply_record_disposition(
+            repo_root=repo_root,
+            run_id=gate_run["run_id"],
+            gate_run_id=gate_run_id,
+            response=response,
+        )
 
     updated_status = _status_after_response(current_status=current_status, action=action)
     gate_run["status"] = updated_status
@@ -290,6 +321,9 @@ def _artifact_paths(*, repo_root: Path, run_dir: Path, gate_dir: Path) -> dict[s
     intent_path = run_dir / "intent.json"
     if intent_path.exists():
         paths["intent_json"] = relative(intent_path)
+    resolution_ledger = run_dir / "resolution-ledger.json"
+    if resolution_ledger.exists():
+        paths["resolution_ledger_json"] = relative(resolution_ledger)
     return paths
 
 

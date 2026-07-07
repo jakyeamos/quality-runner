@@ -12,6 +12,7 @@ from quality_runner.cli_controller_reports import (
 )
 from quality_runner.cli_fix_proposals import add_fix_proposal_command
 from quality_runner.cli_gate import add_gate_commands
+from quality_runner.cli_handoff import add_handoff_commands
 from quality_runner.cli_human_summary import human_summary
 from quality_runner.cli_payload import payload_for_args
 from quality_runner.cli_rollout import add_rollout_command
@@ -176,6 +177,8 @@ def build_parser() -> argparse.ArgumentParser:
 
     add_fix_proposal_command(subparsers)
 
+    add_handoff_commands(subparsers)
+
     doctor_parser = subparsers.add_parser("doctor", help="Check Quality Runner readiness")
     doctor_parser.add_argument("--json", action="store_true", help="Emit JSON output")
 
@@ -224,7 +227,8 @@ def main(argv: list[str] | None = None) -> int:
     else:
         print(human_summary(payload))
     if (
-        parsed.command in {"validate-report", "controller-report", "validate-skill-review"}
+        parsed.command
+        in {"validate-report", "controller-report", "validate-skill-review", "validate-handoff", "validate-slice-spec", "review-worker"}
         and payload.get("status") == "rejected"
     ):
         return 1

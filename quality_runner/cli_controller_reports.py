@@ -70,6 +70,11 @@ def add_controller_report_summary_arguments(parser: argparse.ArgumentParser) -> 
         help='Push status for --controller-report, for example "pushed" or "not-pushed"',
     )
     parser.add_argument(
+        "--batch-scope-file",
+        default=None,
+        help="Batch scope JSON for controller report scope linting",
+    )
+    parser.add_argument(
         "--report-output", default=None, help="Write controller report JSON to this path"
     )
     parser.add_argument(
@@ -135,9 +140,12 @@ def controller_report_from_summary_payload(
         pre_head=args.pre_head,
         pre_git_status_short=args.pre_git_status_short,
         concurrency_note=args.concurrency_note,
+        batch_scope=_batch_scope_from_args(args),
         report_path=str(output_path) if output_path else None,
         generation_command=_summary_generation_command(args=args, repo_root=repo_root),
     )
+    if args.batch_scope_file:
+        payload = normalize_controller_report(payload)
     self_checks: list[dict[str, Any]] = []
     if output_path:
         _write_json(output_path, payload)
@@ -256,3 +264,11 @@ def _validate_command(output_path: Path | None) -> str:
 
 def _write_json(path: Path, payload: dict[str, Any]) -> None:
     path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+
+def _batch_scope_from_args(args: argparse.Namespace) -> dict[str, Any] | None:
+    if not args.batch_scope_file:
+        return None
+    from quality_runner.controller_report_batch_scope import load_batch_scope_file
+
+    return load_batch_scope_file(Path(args.batch_scope_file))

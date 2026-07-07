@@ -49,4 +49,10 @@ checks, which Quality Runner performs itself during the scan.
 
 The tool does not install dependencies or create repo scripts automatically.
 Review `agent-handoff.md` for suggested commands to add, or document an accepted
-exception in `.quality-runner.toml` when a gate is intentionally absent.
+exception in `.quality-runner.toml` when a gate is intentionally absent. For
+worker dispatch, validate the handoff and slice spec before editing:
+
+```bash
+quality-runner validate-handoff .quality-runner/runs/<run-id>/agent-handoff.json --json
+quality-runner validate-slice-spec .quality-runner/runs/<run-id>/slice-specs/<slice-id>.md --json
+```

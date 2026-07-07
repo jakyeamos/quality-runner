@@ -18,13 +18,58 @@ quality-runner refresh /path/to/repo \
 Then read:
 
 - `/tmp/qr-handoff.md`
+- `.quality-runner/runs/<run-id>/slice-specs/<next-slice-id>.md` for the
+  cold-executor plan on the queued slice (scope, STOP conditions, drift check,
+  evidence excerpts)
 - `.quality-runner/runs/<run-id>/quality-audit.json`
 - `.quality-runner/runs/<run-id>/remediation-plan.json`
 - `.quality-runner/runs/<run-id>/gate-verification.json`, when present
 - `.quality-runner/runs/<run-id>/code-quality-scan.json`, when structural
   findings drive the work
+- intent docs listed in the handoff (`PRODUCT.md`, `DESIGN.md`, ADRs, etc.)
 
 Do not edit source before reading the handoff and the relevant artifacts.
+
+For a single slice, prefer the matching `slice-specs/*.md` file as the
+execution contract. Use `remediation-plan.json` for ordering across slices and
+`agent-handoff.md` for controller routing. Convert to GSD-style phase plans only
+when the remediation spans multiple slices or needs repo-local planning history.
+
+## QR Slice Spec Contract
+
+When `slice-specs/<slice-id>.md` exists for the queued slice, treat it as the
+primary execution spec. It mirrors improve-style cold-executor plans and should
+already contain:
+
+- why the slice matters
+- current-state evidence excerpts
+- in-scope and out-of-scope boundaries
+- ordered steps with per-step verification
+- done criteria
+- STOP conditions (stop and report instead of editing when triggered)
+- `planned_at` git state and a drift-check command when the repo is a git
+  checkout
+
+Before editing in-scope files, run the slice drift check when `planned_at` is
+present. If the excerpt no longer matches the code, stop and refresh QR or
+record an accepted disposition rather than guessing.
+
+Validate artifacts before dispatch or after regeneration:
+
+```bash
+quality-runner validate-handoff .quality-runner/runs/<run-id>/agent-handoff.json --json
+quality-runner validate-slice-spec .quality-runner/runs/<run-id>/slice-specs/<slice-id>.md --json
+```
+
+After a worker finishes, controllers can audit the result read-only:
+
+```bash
+quality-runner review-worker /path/to/repo \
+  --baseline-run-id <before> \
+  --final-run-id <after> \
+  --worker-report worker-report.json \
+  --json
+```
 
 ## Required Agent Protocol
 
@@ -68,16 +113,19 @@ One or two sentences describing the bounded outcome.
 - In scope:
 - Out of scope:
 - Expected files/modules touched:
+- QR slice spec path (when present):
+- Drift check command (when present):
 
 ## Batches
 
 | Batch | Cluster | Evidence source | Expected edits | Verification | Stop condition | Status |
 |---|---|---|---|---|---|---|
-| 1 |  |  |  |  |  | pending |
+| 1 |  | slice-spec or QR scan |  |  | QR STOP conditions | pending |
 
 ## Execution Rules
 
 - Work one coherent cluster at a time.
+- Prefer the slice spec's scope and STOP conditions when present.
 - Prefer current scanner or gate evidence over stale line numbers.
 - Preserve pre-existing dirty work.
 - Do not commit `.quality-runner/` artifacts unless already tracked.

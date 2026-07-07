@@ -369,6 +369,8 @@ def _accepted_dispositions(
         reason = item.get("reason")
         owner = item.get("owner")
         expires = item.get("expires")
+        source_run_id = item.get("source_run_id")
+        review_evidence = item.get("review_evidence")
         if (
             isinstance(fingerprint, str)
             and fingerprint
@@ -379,6 +381,14 @@ def _accepted_dispositions(
             and isinstance(owner, str)
             and owner
             and (expires is None or isinstance(expires, str))
+            and (source_run_id is None or isinstance(source_run_id, str))
+            and (
+                review_evidence is None
+                or (
+                    isinstance(review_evidence, list)
+                    and all(isinstance(entry, str) and entry for entry in review_evidence)
+                )
+            )
         ):
             accepted.append(
                 {
@@ -387,6 +397,16 @@ def _accepted_dispositions(
                     "reason": reason,
                     "owner": owner,
                     **({"expires": expires} if isinstance(expires, str) and expires else {}),
+                    **(
+                        {"source_run_id": source_run_id}
+                        if isinstance(source_run_id, str) and source_run_id
+                        else {}
+                    ),
+                    **(
+                        {"review_evidence": review_evidence}
+                        if isinstance(review_evidence, list) and review_evidence
+                        else {}
+                    ),
                 }
             )
         else:
@@ -440,6 +460,36 @@ def _structural_scan(value: object, warnings: list[dict[str, str]]) -> dict[str,
         "quality_runner.structural_scan.max_text_files",
         warnings,
     )
+    similarity_enabled = _bool_value(
+        value.get("similarity_enabled"),
+        "quality_runner.structural_scan.similarity_enabled",
+        warnings,
+    )
+    similarity_threshold = _unit_interval(
+        value.get("similarity_threshold"),
+        "quality_runner.structural_scan.similarity_threshold",
+        warnings,
+    )
+    similarity_min_lines = _positive_int(
+        value.get("similarity_min_lines"),
+        "quality_runner.structural_scan.similarity_min_lines",
+        warnings,
+    )
+    similarity_max_pairs = _positive_int(
+        value.get("similarity_max_pairs"),
+        "quality_runner.structural_scan.similarity_max_pairs",
+        warnings,
+    )
+    similarity_timeout_seconds = _positive_int(
+        value.get("similarity_timeout_seconds"),
+        "quality_runner.structural_scan.similarity_timeout_seconds",
+        warnings,
+    )
+    similarity_include_tests = _bool_value(
+        value.get("similarity_include_tests"),
+        "quality_runner.structural_scan.similarity_include_tests",
+        warnings,
+    )
     result: dict[str, Any] = {"disabled_rule_groups": disabled}
     if include_ignored_paths:
         result["include_ignored_paths"] = include_ignored_paths
@@ -449,6 +499,18 @@ def _structural_scan(value: object, warnings: list[dict[str, str]]) -> dict[str,
         result["fat_router_lines"] = fat_router_lines
     if max_text_files is not None:
         result["max_text_files"] = max_text_files
+    if similarity_enabled is not None:
+        result["similarity_enabled"] = similarity_enabled
+    if similarity_threshold is not None:
+        result["similarity_threshold"] = similarity_threshold
+    if similarity_min_lines is not None:
+        result["similarity_min_lines"] = similarity_min_lines
+    if similarity_max_pairs is not None:
+        result["similarity_max_pairs"] = similarity_max_pairs
+    if similarity_timeout_seconds is not None:
+        result["similarity_timeout_seconds"] = similarity_timeout_seconds
+    if similarity_include_tests is not None:
+        result["similarity_include_tests"] = similarity_include_tests
     return result
 
 
@@ -459,6 +521,26 @@ def _positive_int(value: object, field: str, warnings: list[dict[str, str]]) -> 
         return value
     warnings.append(
         _warning("invalid_quality_runner_config_field", f"{field} must be a positive integer")
+    )
+    return None
+
+
+def _bool_value(value: object, field: str, warnings: list[dict[str, str]]) -> bool | None:
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        return value
+    warnings.append(_warning("invalid_quality_runner_config_field", f"{field} must be a boolean"))
+    return None
+
+
+def _unit_interval(value: object, field: str, warnings: list[dict[str, str]]) -> float | None:
+    if value is None:
+        return None
+    if isinstance(value, (int, float)) and 0 <= float(value) <= 1:
+        return float(value)
+    warnings.append(
+        _warning("invalid_quality_runner_config_field", f"{field} must be a number between 0 and 1")
     )
     return None
 

@@ -35,6 +35,10 @@ def build_run_manifest(
     return manifest
 
 
+def git_state_for_repo(repo_root: Path) -> dict[str, Any]:
+    return _git_state(repo_root)
+
+
 def _git_state(repo_root: Path) -> dict[str, Any]:
     root = repo_root.expanduser().resolve()
     if not (root / ".git").exists():

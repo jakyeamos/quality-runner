@@ -14,14 +14,19 @@ Artifacts are written under:
 `quality-runner inspect` writes:
 
 - `repo-scan.json`: repository facts such as package scripts, lockfiles, agent
-  instruction files, language-aware quality commands, mature repo surfaces,
-  nested workspaces, active scan exclusions, ecosystems, generated-code markers,
-  local CI checks, Pre-CR config, project truth file presence, and branch
-  selection warnings when the checked-out branch is neither `main` nor the local
-  most-advanced branch.
+  instruction files, discovered intent docs (`PRODUCT.md`, `DESIGN.md`,
+  `CONTEXT.md`, `docs/adr/*.md`), language-aware quality commands, mature repo
+  surfaces, nested workspaces, active scan exclusions, ecosystems,
+  generated-code markers, local CI checks, Pre-CR config, project truth file
+  presence, and branch selection warnings when the checked-out branch is neither
+  `main` nor the local most-advanced branch.
 - `code-quality-scan.json`: deterministic structural/code-quality findings,
   line accountability, duplicate clusters, skipped generated/vendor paths, and
-  non-blocking remediation buckets. Opt-in architecture-contract findings use
+  non-blocking remediation buckets. When locally installed `similarity-ts`,
+  `similarity-py`, or `similarity-rs` binaries are available, QR also records
+  semantic similarity clusters (`SIM-###`) alongside regex-based duplicate
+  clusters (`DUP-###`). QR never installs these tools; missing binaries are
+  recorded as non-blocking skipped scanner status. Opt-in architecture-contract findings use
   category `architecture` when configured in `.quality-runner.toml`. Opt-in
   Quality Skill findings use category `skill:<skill-id>` when configured.
   Partially built or unwired work uses category `integrate`; see
@@ -30,6 +35,8 @@ Artifacts are written under:
   `packageManager`, lockfiles, and non-blocking warnings such as mixed lockfiles.
 - `standards.json`: compiled standards packet for the selected profile,
   including saved custom profile settings when a repo-defined profile is used.
+  `sources` includes profile/config paths, agent instruction files, truth file,
+  and discovered intent docs as `intent:<type>` entries.
 - `capability-matrix.json`: available and missing repo-owned quality gates.
   Available command-backed capabilities include the command, source, detected
   language, optional owner/severity policy, required-by provenance, and local CI
@@ -58,7 +65,11 @@ When present, QR writes:
   `run-summary.json` when those artifacts are produced.
 
 The Markdown handoff renders intent under an `## Intent` section so human agents
-see the same goal context as controllers reading JSON.
+see the same goal context as controllers reading JSON. When `repo-scan.json`
+includes `intent_docs`, the handoff also lists relevant repo intent documents
+under `## Relevant Repo Intent Docs` so workers read ADRs and product/design
+context before editing. QR surfaces these paths only; it does not semantically
+interpret long-form intent documents.
 
 `--intent-file` must point at JSON inside the target repository. The file must
 include a non-empty `goal` string; other intent fields are optional lists or
@@ -92,7 +103,9 @@ and writes:
 `gate-responses.jsonl` is append-only. Each line uses schema
 `quality-runner-gate-response-v0.1` with `action` in
 `approve|fix|skip|route-next-slice|record-disposition|abort`, optional
-`finding_ids`, and provenance (`actor`, `at`, `notes`).
+`finding_ids`, and provenance (`actor`, `at`, `notes`). `record-disposition`
+also records `disposition`, `owner`, resolved `fingerprints`, and updates the
+source run's `resolution-ledger.json` `finding_dispositions` when present.
 
 ## Fix Proposal Artifacts
 
@@ -119,11 +132,21 @@ an external agent or human applies changes and reruns Quality Runner.
 
 - `quality-audit.json`: evidence-backed findings with severity, optional owner,
   category, evidence, recommended fix, verification, optional aggregate
-  score for grouped structural findings, and deterministic `actionability`
-  routing (`fix-now`, `triage`, `accept-risk`, `defer`, `informational`) with
-  `actionability_rationale`.
+  score for grouped structural findings, optional finding-quality metadata
+  (`impact`, `effort`, `fix_risk`, `confidence`, `why_now`, `leverage`), and
+  deterministic `actionability` routing (`fix-now`, `triage`, `accept-risk`,
+  `defer`, `informational`) with `actionability_rationale`.
 - `remediation-plan.json`: adoption stage, stopping criteria, and ordered
   remediation slices with priority, actions, findings, and verification gates.
+  Each slice may also include executor-facing metadata:
+  - `impact`, `effort`, `fix_risk`, `confidence`, `why_now`
+  - `leverage` with deterministic `rank` used for ordering after severity
+  - `planned_at` (`head`, `branch`, `dirty`) captured from run-manifest git state
+  - `drift_check` with a `git diff --stat <sha>..HEAD -- <paths>` command over
+    in-scope paths
+  - `scope` with `in_scope` and `out_of_scope` boundaries
+  - `stop_conditions` for when workers should stop and report instead of editing
+  - per-finding `evidence_excerpt` with line context for structural rows
   Structural scan slices are advisory clusters by file so an external agent can
   choose one coherent batch without Quality Runner executing remediation.
   `integrate` findings produce decision slices that ask whether to wire, finish,
@@ -131,11 +154,33 @@ an external agent or human applies changes and reruns Quality Runner.
 - `resolution-ledger.json`: current finding lifecycle state by stable
   fingerprint, preserving accepted dispositions and marking disappeared
   findings as superseded by the current scan unless an external actor records a
-  more specific disposition.
+  more specific disposition. Optional `finding_dispositions` records audit
+  finding ids accepted through `gate-respond record-disposition` and links
+  back to gate-run history.
 - `resolution-ledger.md`: human-readable resolution ledger summary.
+- `security-scan.json`: opt-in security capability discovery, candidate
+  findings, and agent-review gate metadata when
+  `[quality_runner.security]` is configured.
+- `slice-specs/`: per-slice Markdown cold-executor plans derived from QR
+  evidence. One file per remediation slice:
+  `slice-specs/<slice-id>.md`. Each spec is self-contained and includes:
+  - why this matters
+  - current state with evidence excerpts
+  - commands needed and per-step verification
+  - in-scope and out-of-scope boundaries
+  - ordered steps and done criteria
+  - STOP conditions
+  - planned-at git state and drift-check command when available
+  - leverage summary and relevant repo intent docs
+  - maintenance notes reminding workers that QR does not apply fixes
+  Use `quality-runner export-slice-specs` to regenerate specs for an existing
+  run. Use `quality-runner validate-slice-spec` to lint a generated file. See
+  [`docs/examples/slice-spec-structural-harden.md`](examples/slice-spec-structural-harden.md)
+  for a representative structural slice spec.
 - `agent-handoff.json`: machine-readable next-slice handoff using schema
   `quality-runner-agent-handoff-v0.2`, including adoption
-  stage, stopping criteria, optional embedded `intent`, `lifecycle_status`
+  stage, stopping criteria, optional embedded `intent`, optional `intent_docs`,
+  `lifecycle_status`
   (`audit-clean`, `gates-clean`, `merge-ready`, `blocked`, `failed`,
   `workflow-timeout`, `needs-triage`), missing repo-owned gates with suggested
   commands, gate verification status/classification for verified runs, gate
@@ -174,6 +219,7 @@ file/evidence capabilities without blocking, and writes:
   failure type, recommended environment action, and status.
 - `quality-audit.json`
 - `remediation-plan.json`
+- `slice-specs/`
 - `agent-handoff.json`
 - `agent-handoff.md`
 - `run-manifest.json`
@@ -229,6 +275,32 @@ controllers structured blocker-class routing and deduplicates repeated setup
 commands across gates that share the same dependency setup blocker. The
 Markdown handoff renders these groups under the next slice's `Action Groups`
 section so human workers see the same grouping without inspecting JSON.
+
+## Handoff Quality Lint
+
+`quality-runner validate-handoff` checks schema validity plus executor-readiness
+rules that JSON Schema alone does not capture:
+
+- every slice has at least one machine-checkable verification command
+- every slice has STOP conditions
+- every slice has `planned_at` git state when the target repo is a git checkout
+- structural slices anchor to file/line/fingerprint evidence
+- handoff keeps `implementation_allowed=false`
+
+`quality-runner validate-slice-spec` applies the same content bar to generated
+Markdown under `slice-specs/`.
+
+## Worker Review Artifacts
+
+`quality-runner review-worker` does not write repo artifacts. It returns JSON
+schema `quality-runner-review-worker-result-v0.1` comparing:
+
+- baseline vs final `code-quality-scan.json` fingerprint deltas
+- final handoff status and lifecycle classification
+- worker report validity and scope compliance warnings
+
+Use it after a worker claims completion and before a controller merges or
+advances the next slice.
 
 ## Safety Guarantees
 

@@ -98,6 +98,8 @@ Quality Runner writes artifacts under the target repo:
   remediation-plan.json
   resolution-ledger.json
   resolution-ledger.md
+  slice-specs/
+    remediate-<slice-id>.md
   agent-handoff.json
   agent-handoff.md
 ```
@@ -105,13 +107,14 @@ Quality Runner writes artifacts under the target repo:
 The normal workflow is:
 
 1. Read `agent-handoff.md`.
-2. Review `quality-audit.json` for evidence-backed findings.
-3. Review `code-quality-scan.json` for structural warnings and line evidence.
-4. Review `remediation-plan.json` for ordered actions and verification gates.
-5. Have the coding agent convert the QR handoff into GSD-style phases, plans,
+2. Read the queued slice spec under `slice-specs/` when one exists.
+3. Review `quality-audit.json` for evidence-backed findings.
+4. Review `code-quality-scan.json` for structural warnings and line evidence.
+5. Review `remediation-plan.json` for ordered actions and verification gates.
+6. For multi-slice work, convert the QR handoff into GSD-style phases, plans,
    ledgers, and batch summaries before editing.
-6. Execute one coherent batch at a time.
-7. Rerun Quality Runner to confirm findings clear and update the resolution ledger.
+7. Execute one coherent batch at a time.
+8. Rerun Quality Runner to confirm findings clear and update the resolution ledger.
 
 See [Agent Usage](docs/agent-usage.md) for the copy-paste phase and batch
 templates agents should follow.
@@ -128,8 +131,12 @@ quality-runner verify-gates /path/to/repo --json
 quality-runner refresh /path/to/repo --run-id-prefix refresh-001 --handoff-output handoff.md --json
 quality-runner release-smoke --json
 quality-runner validate-report worker-report.json --json
+quality-runner validate-handoff handoff.json --json
+quality-runner validate-slice-spec slice-spec.md --json
+quality-runner review-worker /path/to/repo --baseline-run-id before --final-run-id after --worker-report worker-report.json --json
 quality-runner controller-report lint worker-report.json --strict --json
 quality-runner export-handoff /path/to/repo
+quality-runner export-slice-specs /path/to/repo --run-id run-001 --json
 quality-runner-mcp
 repo-quality-certifier plan --repo-root /path/to/repo --json
 repo-quality-certifier-mcp
@@ -151,8 +158,11 @@ failed. Blocked or failed handoffs include `blocker_groups` and
 `next_slice.action_groups` for structured routing. Use `--handoff-output` when
 you want the scan and the human remediation plan from one command; use
 `export-handoff` later to regenerate or copy a handoff from an existing run.
-For large remediations, agents should use QR output as evidence for a
-GSD-style phase plan rather than editing directly from the handoff.
+`export-slice-specs` regenerates per-slice cold-executor plans under
+`slice-specs/`. For large remediations, agents should use QR output as evidence
+for a GSD-style phase plan rather than editing directly from the handoff. For a
+single queued slice, start from the matching `slice-specs/<slice-id>.md` when
+present.
 
 Before release, run `quality-runner release-smoke --json` to verify the public
 CLI happy path, installed handoff export behavior, report compatibility checks,
@@ -182,6 +192,14 @@ See [MCP Integration](docs/mcp.md) for JSON-RPC examples and tool payloads.
 Quality Runner writes versioned JSON and Markdown artifacts. See
 [Artifact Contract](docs/artifacts.md) for the current v1 artifact set and
 field-level guarantees.
+
+Semantic code similarity is a structural quality signal, not an automatic
+refactor. When `similarity-ts`, `similarity-py`, or `similarity-rs` are already
+installed locally, QR runs them read-only and normalizes high-confidence matches
+into `code-quality-scan.json` deduplicate findings and `SIM-###` clusters. QR
+does not install these tools. Disable or tune similarity under
+`[quality_runner.structural_scan]` (for example `similarity_enabled = false` or
+`disabled_rule_groups = ["deduplicate"]`).
 
 ## DOI-Ready Research Release
 

@@ -5,6 +5,7 @@ from typing import Any
 from quality_runner.adoption import adoption_stage_markdown
 from quality_runner.handoff_gate_summary import action_group_markdown, gate_verification_markdown
 from quality_runner.intent import intent_markdown_lines
+from quality_runner.intent_docs import intent_docs_markdown_lines
 from quality_runner.security.handoff import security_review_markdown
 
 
@@ -22,6 +23,7 @@ def render_handoff_markdown(handoff: dict[str, Any]) -> str:
         lines.extend([f"- Lifecycle status: {lifecycle_status}", ""])
 
     lines.extend(intent_markdown_lines(handoff.get("intent")))
+    lines.extend(intent_docs_markdown_lines(handoff.get("intent_docs")))
     lines.extend(
         [
             *(gate_verification_markdown(handoff.get("gate_verification"))),

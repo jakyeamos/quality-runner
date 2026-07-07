@@ -12,6 +12,7 @@ from quality_runner.discovery_inputs import (
     _workspace_manifests,
 )
 from quality_runner.discovery_quality import _quality_commands
+from quality_runner.intent_docs import discover_intent_docs
 from quality_runner.scan_exclusions import resolve_scan_exclusions
 from quality_runner.schema_constants import REPO_SCAN_SCHEMA
 from quality_runner.surfaces import detect_surfaces
@@ -44,6 +45,7 @@ def inspect_repo(
         root,
         [".pre-cr.json", ".pre-cr.yaml", ".pre-cr.yml", "pre-cr.config.json"],
     )
+    intent_docs = discover_intent_docs(root)
 
     return {
         "schema": REPO_SCAN_SCHEMA,
@@ -68,6 +70,7 @@ def inspect_repo(
             scan_exclusions=scan_exclusions,
         ),
         "generated_code": generated_code,
+        "intent_docs": intent_docs,
         "agent_instruction_files": agent_instruction_files,
         "pre_cr_config": pre_cr_config,
         "truth_file": _first_existing(root, [".tracker/PROJECT_TRUTH.md"]),

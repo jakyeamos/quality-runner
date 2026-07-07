@@ -120,7 +120,9 @@ quality-runner gate-respond /path/to/repo \
 `gate-respond` records controller decisions in `gate-responses.jsonl`. `approve`
 and `abort` close the gate run; `fix`, `skip`, `route-next-slice`, and
 `record-disposition` append history while leaving the run driveable until a
-terminal action is recorded.
+terminal action is recorded. For `record-disposition`, pass `--finding-id`,
+`--disposition`, `--owner`, and `--notes`; QR updates the source run's
+`resolution-ledger.json` `finding_dispositions` without editing source files.
 
 ### Disposable worktree verification
 
@@ -193,6 +195,7 @@ Writes:
 - `remediation-plan.json`
 - `resolution-ledger.json`
 - `resolution-ledger.md`
+- `slice-specs/` (per-slice cold-executor Markdown specs)
 - `agent-handoff.json`
 - `agent-handoff.md`
 
@@ -230,6 +233,7 @@ Writes:
 - `gate-verification.json`
 - `quality-audit.json`
 - `remediation-plan.json`
+- `slice-specs/` (per-slice cold-executor Markdown specs)
 - `agent-handoff.json`
 - `agent-handoff.md`
 - `run-manifest.json`
@@ -337,7 +341,9 @@ quality-runner release-smoke --work-dir /tmp/quality-runner-release-smoke --json
 The JSON result uses `quality-runner-release-smoke-result-v0.1` and includes
 per-check statuses plus the generated handoff path. The handoff examples in
 [`docs/examples`](examples/) show representative clean, blocked, and timeout
-outputs for manual release review.
+outputs for manual release review. See
+[`slice-spec-structural-harden.md`](examples/slice-spec-structural-harden.md)
+for a cold-executor slice spec example.
 
 ## `quality-runner validate-report`
 
@@ -398,7 +404,10 @@ self-checks expected by controller waves and records their results under
 `commit_created_by_task`, `repo_state`, and expected lint/validate commands in
 `verification`. Pass `--pre-head`, `--pre-git-status-short`, and
 `--concurrency-note` when a worker captured pre-run repo state or observed the
-target HEAD moving during a run.
+target HEAD moving during a run. Pass `--batch-scope-file` with a JSON object
+containing `finding_ids`, `cluster_id`, `intent_ref`, and `allowed_files` so
+strict lint can reject controller reports whose `files_changed` drift outside
+the declared batch scope.
 
 ## `quality-runner export-handoff`
 
@@ -410,6 +419,88 @@ another scan.
 quality-runner export-handoff /path/to/repo
 quality-runner export-handoff /path/to/repo --run-id baseline-001 --output handoff.md --json
 ```
+
+## `quality-runner export-slice-specs`
+
+Writes or regenerates improve-style cold-executor slice specs for an existing
+run. Specs are also written automatically by `run` and `verify-gates`; use this
+command when you need to refresh Markdown after copying artifacts or when an
+older run predates slice-spec generation.
+
+```bash
+quality-runner export-slice-specs /path/to/repo --run-id baseline-001 --json
+```
+
+Writes one Markdown file per remediation slice under
+`.quality-runner/runs/<run-id>/slice-specs/<slice-id>.md`. JSON output uses
+schema `quality-runner-export-slice-specs-result-v0.1` and lists
+`slice_spec_paths` plus `slice_spec_dir`.
+
+## `quality-runner validate-handoff`
+
+Validates an `agent-handoff.json` against schema rules and executor-readiness
+checks. Use this before dispatching a worker or after regenerating handoff
+artifacts.
+
+```bash
+quality-runner validate-handoff /path/to/repo/.quality-runner/runs/run-001/agent-handoff.json --json
+quality-runner validate-handoff handoff.json \
+  --remediation-plan remediation-plan.json \
+  --json
+```
+
+Schema validation uses the same rules as workflow writes. Quality validation
+additionally checks that:
+
+- `implementation_allowed` remains `false`
+- every remediation slice has machine-checkable verification
+- every slice has STOP conditions and `planned_at` git state when git metadata
+  is available
+- structural slices anchor to file/line/fingerprint evidence
+
+Returns `quality-runner-validate-handoff-result-v0.1` with `status`:
+`passed` or `rejected`.
+
+## `quality-runner validate-slice-spec`
+
+Validates a generated slice-spec Markdown file for required sections and basic
+content safety.
+
+```bash
+quality-runner validate-slice-spec \
+  /path/to/repo/.quality-runner/runs/run-001/slice-specs/remediate-missing-typecheck.md \
+  --json
+```
+
+Required sections include why this matters, current state, in/out scope, ordered
+steps, per-step verification, done criteria, and STOP conditions. The linter
+rejects secret-looking literals copied into Markdown.
+
+Returns `quality-runner-validate-slice-spec-result-v0.1`.
+
+## `quality-runner review-worker`
+
+Read-only post-worker verification. Compares a controller/worker completion
+report against a baseline QR run and a final QR run without editing source.
+
+```bash
+quality-runner review-worker /path/to/repo \
+  --baseline-run-id qr-before \
+  --final-run-id qr-after \
+  --worker-report worker-report.json \
+  --json
+```
+
+Checks include:
+
+- worker report schema validity (`validate-report` rules)
+- final `agent-handoff.json` schema and handoff quality lint
+- fingerprint delta between baseline and final `code-quality-scan.json`
+- changed files vs declared worker scope (warning when they diverge)
+
+Returns `quality-runner-review-worker-result-v0.1` with `status`: `passed` or
+`rejected`. QR does not apply fixes or rerun gates inside this command; it only
+audits artifacts the worker already produced.
 
 ## `repo-quality-certifier` Compatibility
 
@@ -428,7 +519,8 @@ contract used by existing callers.
 ## Exit Behavior
 
 - `0`: command completed successfully.
-- `1`: validation or filesystem error.
+- `1`: validation or filesystem error (`validate-handoff`, `validate-slice-spec`,
+  and `review-worker` also exit `1` when `status` is `rejected`).
 - `2`: argument parsing error.
 
 Errors are printed to stderr without Python tracebacks.

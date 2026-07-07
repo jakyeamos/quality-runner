@@ -12,6 +12,16 @@ from test_support.quality_runner_fixtures import (
 )
 
 
+def _capability_finding_enrichment() -> dict[str, str]:
+    return {
+        "impact": "Missing gates block merge readiness and hide regressions.",
+        "effort": "M",
+        "fix_risk": "LOW",
+        "confidence": "High",
+        "why_now": "Blocker-class finding should be handled before broader cleanup.",
+    }
+
+
 def _git_commit(repo_root: Path) -> str:
     subprocess.run(["git", "init"], cwd=repo_root, check=True, capture_output=True, text=True)
     (repo_root / "tracked.txt").write_text("tracked\n", encoding="utf-8")
@@ -63,10 +73,12 @@ def test_run_payload_writes_audit_plan_and_handoff(tmp_path: Path) -> None:
         "run_manifest_json",
         "quality_audit_json",
         "remediation_plan_json",
+        "slice_specs_dir",
         "resolution_ledger_json",
         "resolution_ledger_md",
         "agent_handoff_json",
         "agent_handoff_md",
+        "slice_specs_dir",
     }
     assert Path(artifact_paths["standards_json"]).name == "standards.json"
     assert (
@@ -606,32 +618,22 @@ def test_run_payload_handoff_contains_next_slice_and_verification_gates(tmp_path
     handoff = json.loads(Path(payload["artifact_paths"]["agent_handoff_json"]).read_text())
 
     assert validate_agent_handoff(handoff) == {"passed": True, "errors": []}
-    assert handoff["next_slice"] == {
-        "id": "remediate-missing-formatter",
-        "title": "Remediate missing-formatter",
-        "priority": "high",
-        "findings": [
-            {
-                "id": "missing-formatter",
-                "severity": "blocker",
-                "category": "capability",
-                "summary": "Required quality capability is missing: formatter.",
-                "actionability": "needs-maintainer-policy",
-                "actionability_rationale": (
-                    "Missing repo-owned quality gates require maintainer policy or adoption work."
-                ),
-            }
-        ],
-        "actions": [
-            "Apply recommended fix: Add a formatter command such as pnpm format.",
-            "Rerun quality-runner and confirm missing-formatter no longer appears.",
-        ],
-        "verification_gates": [
-            "Add the formatter capability and rerun quality-runner.",
-            "Confirm audit finding missing-formatter is absent from the regenerated report.",
-        ],
-        "score": 900,
-    }
+    next_slice = handoff["next_slice"]
+    assert next_slice["id"] == "remediate-missing-formatter"
+    assert next_slice["title"] == "Remediate missing-formatter"
+    assert next_slice["priority"] == "high"
+    assert next_slice["findings"][0]["id"] == "missing-formatter"
+    assert next_slice["stop_conditions"]
+    assert next_slice["scope"]["in_scope"]
+    assert next_slice["actions"] == [
+        "Apply recommended fix: Add a formatter command such as pnpm format.",
+        "Rerun quality-runner and confirm missing-formatter no longer appears.",
+    ]
+    assert next_slice["verification_gates"] == [
+        "Add the formatter capability and rerun quality-runner.",
+        "Confirm audit finding missing-formatter is absent from the regenerated report.",
+    ]
+    assert next_slice["score"] == 900
     assert handoff["verification_gates"] == [
         "Add the formatter capability and rerun quality-runner.",
         "Confirm audit finding missing-formatter is absent from the regenerated report.",
@@ -764,18 +766,15 @@ def test_generated_remediation_plan_orders_findings_and_exposes_actions(tmp_path
         "Add the dead_code capability and rerun quality-runner.",
         "Confirm audit finding missing-dead-code is absent from the regenerated report.",
     ]
-    assert first_slice["findings"] == [
-        {
-            "id": "missing-dead-code",
-            "severity": "blocker",
-            "category": "capability",
-            "summary": "Required quality capability is missing: dead_code.",
-            "actionability": "needs-maintainer-policy",
-            "actionability_rationale": (
-                "Missing repo-owned quality gates require maintainer policy or adoption work."
-            ),
-        }
-    ]
+    finding = first_slice["findings"][0]
+    assert finding["id"] == "missing-dead-code"
+    assert finding["severity"] == "blocker"
+    assert finding["category"] == "capability"
+    assert finding["actionability"] == "needs-maintainer-policy"
+    assert finding["impact"]
+    assert finding["effort"] == "M"
+    assert first_slice["stop_conditions"]
+    assert first_slice["leverage"]["rank"] >= 0
 
 
 def test_generated_audit_report_validates(tmp_path: Path) -> None:

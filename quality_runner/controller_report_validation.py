@@ -50,6 +50,10 @@ def validate_controller_report(report: dict[str, Any]) -> dict[str, Any]:
         if isinstance(blockers, list) and not blockers:
             errors.append("blocked reports must include at least one blocker")
 
+    batch_scope = report.get("batch_scope")
+    if isinstance(batch_scope, dict) and batch_scope and report.get("scope_violation") is True:
+        errors.append("controller report scope_violation must be false when batch_scope is set")
+
     return {
         "schema": CONTROLLER_REPORT_VALIDATION_SCHEMA,
         "status": "rejected" if errors else "accepted",

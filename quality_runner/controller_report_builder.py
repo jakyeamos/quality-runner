@@ -31,6 +31,7 @@ def build_controller_report_from_summary(
     pre_head: str | None = None,
     pre_git_status_short: str | None = None,
     concurrency_note: str | None = None,
+    batch_scope: dict[str, Any] | None = None,
     report_path: str | None = None,
     generation_command: str | None = None,
 ) -> dict[str, Any]:
@@ -95,6 +96,9 @@ def build_controller_report_from_summary(
         "repo_state": resolved_repo_state,
         "blockers": normalized_blockers if resolved_status == "blocked" else blockers or [],
     }
+    if batch_scope:
+        payload["batch_scope"] = batch_scope
+    return payload
 
 
 def _controller_report_verification(

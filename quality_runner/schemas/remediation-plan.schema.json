@@ -44,6 +44,20 @@
         "implementation_allowed": { "const": false },
         "disposition_required": { "type": "boolean" },
         "score": { "type": "integer" },
+        "impact": { "type": "string", "minLength": 1 },
+        "effort": { "enum": ["S", "M", "L"] },
+        "fix_risk": { "enum": ["LOW", "MED", "HIGH"] },
+        "confidence": { "enum": ["Low", "Medium", "High", "low", "medium", "high"] },
+        "why_now": { "type": "string", "minLength": 1 },
+        "leverage": { "type": "object" },
+        "planned_at": { "type": "object" },
+        "drift_check": { "type": "object" },
+        "scope": { "type": "object" },
+        "stop_conditions": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "source_run_id": { "type": "string", "minLength": 1 },
         "findings": { "type": "array", "items": { "type": "object" } },
         "actions": { "type": "array", "items": { "type": "string" } },
         "action_groups": {
@@ -52,7 +66,7 @@
         },
         "verification_gates": { "type": "array", "items": { "type": "string" } }
       },
-      "additionalProperties": false
+      "additionalProperties": true
     },
     "actionGroup": {
       "type": "object",

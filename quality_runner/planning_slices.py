@@ -30,10 +30,14 @@ def slice_for_finding(finding: dict[str, Any]) -> dict[str, Any]:
     score = finding.get("score")
     if isinstance(score, int):
         slice_item["score"] = score
+    for field in ("impact", "effort", "fix_risk", "confidence", "why_now", "leverage"):
+        value = finding.get(field)
+        if value is not None:
+            slice_item[field] = value
     return slice_item
 
 
-def slice_sort_key(slice_item: dict[str, Any]) -> tuple[int, int, int, str]:
+def slice_sort_key(slice_item: dict[str, Any]) -> tuple[int, int, float, int, str]:
     findings = slice_item.get("findings")
     category = None
     if isinstance(findings, list) and findings and isinstance(findings[0], dict):
@@ -42,7 +46,19 @@ def slice_sort_key(slice_item: dict[str, Any]) -> tuple[int, int, int, str]:
     priority = str(slice_item.get("priority") or "")
     score = slice_item.get("score")
     ranking_score = score if isinstance(score, int) else 0
-    return security_rank, PRIORITY_ORDER.get(priority, 99), -ranking_score, str(slice_item.get("id") or "")
+    leverage_rank = 0.0
+    leverage = slice_item.get("leverage")
+    if isinstance(leverage, dict):
+        rank = leverage.get("rank")
+        if isinstance(rank, (int, float)):
+            leverage_rank = float(rank)
+    return (
+        security_rank,
+        PRIORITY_ORDER.get(priority, 99),
+        -leverage_rank,
+        -ranking_score,
+        str(slice_item.get("id") or ""),
+    )
 
 
 def priority_for_finding(finding: dict[str, Any]) -> str:

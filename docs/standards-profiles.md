@@ -34,6 +34,10 @@ missing-dead-code = "warning"
 disabled_rule_groups = ["ui_structural"]
 large_file_lines = 900
 fat_router_lines = 400
+similarity_enabled = true
+similarity_threshold = 0.9
+similarity_min_lines = 10
+similarity_max_pairs = 20
 
 [[quality_runner.gates]]
 id = "lint"
@@ -56,7 +60,14 @@ status = "accepted-intentional"
 reason = "The large test file is one cohesive math invariant suite."
 owner = "qa"
 expires = "2026-12-31"
+source_run_id = "qr-20260707-run"
+review_evidence = ["code-quality-scan.json:CQ-0012"]
 ```
+
+Optional `source_run_id` and `review_evidence` tie accepted dispositions back
+to the QR run and artifact rows that justified the decision. These fields feed
+`resolution-ledger.json` and help workers distinguish intentional tradeoffs from
+stale findings.
 
 Repos can also save named custom profiles and select them as the default:
 

@@ -17,7 +17,7 @@ from quality_runner.gate_verification import (
 )
 from quality_runner.git_branches import prepare_scan_branch
 from quality_runner.intent import attach_intent_artifacts, intent_for_run
-from quality_runner.manifest import build_run_manifest
+from quality_runner.manifest import build_run_manifest, git_state_for_repo
 from quality_runner.package_preflight import build_package_manager_preflight
 from quality_runner.planning import (
     build_agent_handoff,
@@ -37,6 +37,7 @@ from quality_runner.workflow_internal import (
     require_valid,
     verify_payload_status,
 )
+from quality_runner.slice_specs import write_slice_specs
 from quality_runner.workflow_skills import (
     append_warnings,
     create_code_quality_scan_with_skills,
@@ -159,6 +160,8 @@ def verify_gates_payload(
         audit_report=audit_report,
         capability_map=verified_capability_map,
         code_quality_scan=code_quality_scan,
+        repo_root=repo_root,
+        git_state=git_state_for_repo(repo_root),
     )
     require_valid("remediation plan", validate_remediation_plan(remediation_plan))
 
@@ -200,6 +203,14 @@ def verify_gates_payload(
     artifact_paths["remediation_plan_json"] = str(
         write_json(run_dir / "remediation-plan.json", remediation_plan)
     )
+    slice_spec_paths = write_slice_specs(
+        run_dir,
+        remediation_plan.get("slices", []),
+        run_id=resolved_run_id,
+        intent_docs=scan.get("intent_docs") if isinstance(scan.get("intent_docs"), list) else None,
+    )
+    if slice_spec_paths:
+        artifact_paths["slice_specs_dir"] = str(run_dir / "slice-specs")
     artifact_paths["agent_handoff_json"] = str(write_json(run_dir / "agent-handoff.json", handoff))
     artifact_paths["agent_handoff_md"] = str(
         write_text(run_dir / "agent-handoff.md", render_handoff_markdown(handoff))

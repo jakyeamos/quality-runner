@@ -11,6 +11,10 @@
     "entries": {
       "type": "array",
       "items": { "$ref": "#/$defs/entry" }
+    },
+    "finding_dispositions": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/findingDisposition" }
     }
   },
   "$defs": {
@@ -62,6 +66,24 @@
         "reason": { "type": "string" },
         "owner": { "type": ["string", "null"] },
         "expires": { "type": ["string", "null"] }
+      },
+      "additionalProperties": true
+    },
+    "findingDisposition": {
+      "type": "object",
+      "required": ["finding_id", "status", "owner"],
+      "properties": {
+        "finding_id": { "type": "string", "minLength": 1 },
+        "status": { "type": "string", "minLength": 1 },
+        "reason": { "type": "string" },
+        "owner": { "type": "string", "minLength": 1 },
+        "source": { "type": "string" },
+        "gate_run_id": { "type": "string" },
+        "at": { "type": ["string", "null"] },
+        "fingerprints": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        }
       },
       "additionalProperties": true
     }

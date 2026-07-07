@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any
 
 from quality_runner.adoption import (
@@ -27,6 +28,7 @@ from quality_runner.remediation_wiring import wiring_decision_slices
 from quality_runner.runner_checks import runner_provided_checks
 from quality_runner.schema_constants import AGENT_HANDOFF_SCHEMA, REMEDIATION_PLAN_SCHEMA
 from quality_runner.security.handoff import security_review_handoff
+from quality_runner.slice_enrichment import enrich_remediation_slices
 
 PRIORITY_ORDER = {"high": 0, "medium": 1, "low": 2}
 
@@ -36,6 +38,8 @@ def build_remediation_plan(
     audit_report: dict[str, Any],
     capability_map: dict[str, Any],
     code_quality_scan: dict[str, Any] | None = None,
+    repo_root: Path | None = None,
+    git_state: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     all_findings = sorted(_findings(audit_report), key=finding_sort_key)
     remediation_findings = [
@@ -73,6 +77,15 @@ def build_remediation_plan(
         [slice_for_finding(finding) for finding in security_review_findings],
         key=slice_sort_key,
     )
+    run_id = _string_or_none(audit_report.get("run_id"))
+    slices = enrich_remediation_slices(
+        slices,
+        repo_root=repo_root,
+        git_state=git_state,
+        code_quality_scan=code_quality_scan,
+        run_id=run_id,
+    )
+    slices = sorted(slices, key=slice_sort_key)
     adoption_stage = build_adoption_stage(
         findings=remediation_findings,
         missing_gates=_missing_repo_owned_gates(capability_map),
@@ -151,6 +164,7 @@ def build_agent_handoff(
     gate_verification: dict[str, Any] | None = None,
     security_scan: dict[str, Any] | None = None,
     intent: dict[str, Any] | None = None,
+    intent_docs: list[dict[str, str]] | None = None,
     lifecycle_status: str | None = None,
     repo_scan: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
@@ -192,6 +206,7 @@ def build_agent_handoff(
         **_optional_value("gate_verification", gate_summary),
         **_optional_value("security_review", security_review_handoff(security_scan, capability_map)),
         **_optional_value("intent", intent),
+        **_optional_value("intent_docs", intent_docs or _intent_docs_from_scan(repo_scan)),
         **_optional_value("lifecycle_status", resolved_lifecycle),
         "next_slice": next_slice,
         "verification_gates": _slice_verification_gates(next_slice),
@@ -361,6 +376,20 @@ def _copy_next_slice(first: dict[str, Any]) -> dict[str, Any] | None:
         next_slice["action_groups"] = list(first["action_groups"])
     if isinstance(first.get("score"), int):
         next_slice["score"] = first["score"]
+    for field in (
+        "impact",
+        "effort",
+        "fix_risk",
+        "confidence",
+        "why_now",
+        "leverage",
+        "planned_at",
+        "drift_check",
+        "scope",
+        "stop_conditions",
+    ):
+        if field in first:
+            next_slice[field] = first[field]
     return next_slice
 
 
@@ -447,3 +476,20 @@ def _default_score(severity: str) -> int:
 
 def _string_or_none(value: object) -> str | None:
     return value if isinstance(value, str) else None
+
+
+def _intent_docs_from_scan(repo_scan: dict[str, Any] | None) -> list[dict[str, str]] | None:
+    if not isinstance(repo_scan, dict):
+        return None
+    intent_docs = repo_scan.get("intent_docs")
+    if not isinstance(intent_docs, list):
+        return None
+    normalized: list[dict[str, str]] = []
+    for doc in intent_docs:
+        if not isinstance(doc, dict):
+            continue
+        doc_type = doc.get("type")
+        path = doc.get("path")
+        if isinstance(doc_type, str) and isinstance(path, str) and doc_type and path:
+            normalized.append({"type": doc_type, "path": path})
+    return normalized or None

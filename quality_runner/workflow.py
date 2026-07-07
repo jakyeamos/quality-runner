@@ -16,7 +16,7 @@ from quality_runner.findings import (
 )
 from quality_runner.git_branches import prepare_scan_branch
 from quality_runner.intent import attach_intent_artifacts, intent_for_run
-from quality_runner.manifest import build_run_manifest
+from quality_runner.manifest import build_run_manifest, git_state_for_repo
 from quality_runner.package_preflight import build_package_manager_preflight
 from quality_runner.planning import (
     build_agent_handoff,
@@ -25,6 +25,7 @@ from quality_runner.planning import (
 )
 from quality_runner.refresh_workflow import run_refresh_payload
 from quality_runner.run_summary import build_run_summary
+from quality_runner.gate_resolution_bridge import merge_gate_finding_dispositions
 from quality_runner.security.ledger import merge_security_ledger_entries
 from quality_runner.security.scan import create_security_scan, merge_security_into_capability_map
 from quality_runner.workflow_helpers import (
@@ -37,6 +38,7 @@ from quality_runner.workflow_skills import (
     create_code_quality_scan_with_skills,
     write_skill_review_artifacts,
 )
+from quality_runner.slice_specs import write_slice_specs
 from quality_runner.workflow_verify import verify_gates_payload
 
 
@@ -174,6 +176,11 @@ def run_payload(
         repo_root=repo_root,
         run_id=resolved_run_id,
     )
+    resolution_ledger = merge_gate_finding_dispositions(
+        resolution_ledger,
+        repo_root=repo_root,
+        run_id=resolved_run_id,
+    )
 
     audit_report = build_audit_report(
         scan=scan,
@@ -188,6 +195,8 @@ def run_payload(
         audit_report=audit_report,
         capability_map=capability_map,
         code_quality_scan=code_quality_scan,
+        repo_root=repo_root,
+        git_state=git_state_for_repo(repo_root),
     )
     require_valid("remediation plan", validate_remediation_plan(remediation_plan))
     status = "clean" if not remediation_plan["slices"] else "planned"
@@ -264,6 +273,14 @@ def run_payload(
     artifact_paths["remediation_plan_json"] = str(
         write_json(run_dir / "remediation-plan.json", remediation_plan)
     )
+    slice_spec_paths = write_slice_specs(
+        run_dir,
+        remediation_plan.get("slices", []),
+        run_id=resolved_run_id,
+        intent_docs=scan.get("intent_docs") if isinstance(scan.get("intent_docs"), list) else None,
+    )
+    if slice_spec_paths:
+        artifact_paths["slice_specs_dir"] = str(run_dir / "slice-specs")
     artifact_paths["resolution_ledger_json"] = str(
         write_json(run_dir / "resolution-ledger.json", resolution_ledger)
     )

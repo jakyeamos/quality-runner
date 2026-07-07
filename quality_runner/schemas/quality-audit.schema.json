@@ -44,9 +44,15 @@
             "needs-triage"
           ]
         },
-        "actionability_rationale": { "type": "string", "minLength": 1 }
+        "actionability_rationale": { "type": "string", "minLength": 1 },
+        "impact": { "type": "string", "minLength": 1 },
+        "effort": { "enum": ["S", "M", "L"] },
+        "fix_risk": { "enum": ["LOW", "MED", "HIGH"] },
+        "confidence": { "enum": ["Low", "Medium", "High", "low", "medium", "high"] },
+        "why_now": { "type": "string", "minLength": 1 },
+        "leverage": { "type": "object" }
       },
-      "additionalProperties": false
+      "additionalProperties": true
     },
     "warnings": {
       "type": "array",

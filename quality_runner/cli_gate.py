@@ -75,6 +75,23 @@ def add_gate_commands(subparsers: argparse._SubParsersAction[argparse.ArgumentPa
     )
     gate_respond_parser.add_argument("--notes", default=None, help="Optional response notes")
     gate_respond_parser.add_argument(
+        "--disposition",
+        default=None,
+        choices=sorted(
+            {
+                "accepted-intentional",
+                "accepted-false-positive",
+                "blocked-with-prerequisite",
+            }
+        ),
+        help="Disposition status for record-disposition",
+    )
+    gate_respond_parser.add_argument(
+        "--owner",
+        default=None,
+        help="Owner recorded for record-disposition (defaults to --actor)",
+    )
+    gate_respond_parser.add_argument(
         "--actor",
         default="user",
         help="Actor recorded on the response (default: user)",
@@ -105,6 +122,8 @@ def gate_respond_command_payload(args: argparse.Namespace, *, repo_root: Path) -
         actor=args.actor,
         finding_ids=args.finding_ids,
         notes=args.notes,
+        disposition=args.disposition,
+        owner=args.owner,
     )
 
 

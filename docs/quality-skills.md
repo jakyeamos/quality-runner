@@ -83,8 +83,8 @@ verification = "Rerun quality-runner and confirm this skill finding clears."
 ```
 
 Skill findings use category `skill:<skill-id>` and flow through
-`code-quality-scan.json`, `quality-audit.json`, `remediation-plan.json`, and
-`agent-handoff.md` like other structural findings.
+`code-quality-scan.json`, `quality-audit.json`, `remediation-plan.json`,
+`slice-specs/`, and `agent-handoff.md` like other structural findings.
 
 ## Agent-assisted reviews
 

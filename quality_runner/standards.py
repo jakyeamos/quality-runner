@@ -52,6 +52,16 @@ def _sources(scan: dict[str, Any], profile: str, config: dict[str, Any]) -> list
     if isinstance(truth_file, str) and truth_file:
         sources.append({"type": "truth_file", "path": truth_file})
 
+    intent_docs = scan.get("intent_docs")
+    if isinstance(intent_docs, list):
+        for doc in intent_docs:
+            if not isinstance(doc, dict):
+                continue
+            doc_type = doc.get("type")
+            path = doc.get("path")
+            if isinstance(doc_type, str) and isinstance(path, str) and doc_type and path:
+                sources.append({"type": f"intent:{doc_type}", "path": path})
+
     return sources
 
 

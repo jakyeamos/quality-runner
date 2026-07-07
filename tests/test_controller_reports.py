@@ -501,3 +501,54 @@ def test_controller_report_validation_accepts_ignored_generated_artifacts_for_co
         "status": "accepted",
         "errors": [],
     }
+
+
+def test_controller_report_strict_lint_rejects_out_of_scope_files() -> None:
+    from quality_runner.controller_reports import lint_controller_report
+
+    report = {
+        "schema": "quality-runner-controller-report-v0.1",
+        "repo_path": "/repos/example",
+        "branch_name": "qr/scope",
+        "status": "ready-for-review",
+        "baseline_artifact_path": "/repos/example/.quality-runner/runs/baseline",
+        "final_qr": {"run_id": "final", "status": "planned"},
+        "files_changed": ["package.json", "src/unrelated.ts"],
+        "verification": [{"command": "quality-runner run .", "result": "planned"}],
+        "git_status_short": "",
+        "blockers": [],
+        "batch_scope": {
+            "finding_ids": ["missing-formatter"],
+            "allowed_files": ["package.json"],
+        },
+    }
+
+    result = lint_controller_report(report, strict=True)
+
+    assert result["status"] == "rejected"
+    assert any("outside batch_scope.allowed_files" in error for error in result["errors"])
+    assert result["normalized_report"]["scope_violation"] is True
+    assert result["normalized_report"]["unrelated_files_changed"] == ["src/unrelated.ts"]
+
+
+def test_controller_report_validate_rejects_scope_violation_flag() -> None:
+    from quality_runner.controller_reports import validate_controller_report
+
+    report = {
+        "repo_path": "/repos/example",
+        "branch_name": "qr/scope",
+        "status": "blocked",
+        "baseline_artifact_path": "/repos/example/.quality-runner/runs/baseline",
+        "final_qr": {"run_id": "final", "status": "blocked"},
+        "files_changed": ["package.json"],
+        "verification": [{"command": "quality-runner run .", "result": "blocked"}],
+        "git_status_short": "",
+        "blockers": ["scope drift"],
+        "batch_scope": {"allowed_files": ["package.json"]},
+        "scope_violation": True,
+    }
+
+    result = validate_controller_report(report)
+
+    assert result["status"] == "rejected"
+    assert "scope_violation must be false" in result["errors"][0]

@@ -44,6 +44,10 @@
     "verification_gates": { "type": "array", "items": { "type": "string" } },
     "security_review": { "type": "object" },
     "intent": { "$ref": "#/$defs/intentPacket" },
+    "intent_docs": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/intentDoc" }
+    },
     "lifecycle_status": {
       "enum": [
         "audit-clean",
@@ -245,6 +249,15 @@
         "source": { "type": "string", "minLength": 1 },
         "supplied_by": { "type": "string", "minLength": 1 },
         "captured_at": { "type": "string", "format": "date-time" }
+      },
+      "additionalProperties": false
+    },
+    "intentDoc": {
+      "type": "object",
+      "required": ["type", "path"],
+      "properties": {
+        "type": { "type": "string", "minLength": 1 },
+        "path": { "type": "string", "minLength": 1 }
       },
       "additionalProperties": false
     }

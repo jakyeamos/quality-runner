@@ -4,6 +4,7 @@ from typing import Any
 
 from quality_runner.actionability import enrich_audit_findings
 from quality_runner.code_quality_findings import CATEGORY_ORDER
+from quality_runner.finding_quality import compute_finding_quality, compute_leverage
 from quality_runner.findings import AUDIT_REPORT_SCHEMA
 from quality_runner.security.audit import security_audit_findings
 
@@ -212,6 +213,15 @@ def _code_quality_findings(code_quality_scan: dict[str, Any] | None) -> list[dic
         count = len(group)
         score = _structural_score(group)
         integrate = category == "integrate"
+        quality = compute_finding_quality(
+            {
+                "id": f"structural-{category}-{rule_id}",
+                "severity": _structural_severity(group),
+                "category": f"structural:{category}",
+                "score": score,
+            },
+            raw_findings=group,
+        )
         audit_findings.append(
             {
                 "id": f"structural-{category}-{rule_id}",
@@ -240,6 +250,8 @@ def _code_quality_findings(code_quality_scan: dict[str, Any] | None) -> list[dic
                 or ["Rerun quality-runner and confirm the structural finding clears."],
                 "owner": None,
                 "score": score,
+                **quality,
+                "leverage": compute_leverage(quality),
             }
         )
     return audit_findings

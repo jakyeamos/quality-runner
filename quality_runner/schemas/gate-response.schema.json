@@ -25,7 +25,24 @@
       "items": { "type": "string", "minLength": 1 },
       "default": []
     },
-    "notes": { "type": ["string", "null"] }
+    "notes": { "type": ["string", "null"] },
+    "disposition": {
+      "type": ["string", "null"],
+      "enum": [
+        "accepted-intentional",
+        "accepted-false-positive",
+        "blocked-with-prerequisite"
+      ]
+    },
+    "owner": { "type": ["string", "null"] },
+    "fingerprints": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "finding_references": {
+      "type": "array",
+      "items": { "type": "object" }
+    }
   },
   "additionalProperties": false
 }
