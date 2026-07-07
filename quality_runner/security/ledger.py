@@ -40,7 +40,9 @@ def merge_security_ledger_entries(
     }
 
     entries = list(ledger.get("entries", []))
-    current_fingerprints = {entry.get("fingerprint") for entry in entries if entry.get("fingerprint")}
+    current_fingerprints = {
+        entry.get("fingerprint") for entry in entries if entry.get("fingerprint")
+    }
 
     for candidate in candidates:
         if not isinstance(candidate, dict):
@@ -100,7 +102,9 @@ def merge_security_ledger_entries(
             }
         )
 
-    entries.sort(key=lambda item: (str(item.get("status")), str(item.get("file")), str(item.get("line"))))
+    entries.sort(
+        key=lambda item: (str(item.get("status")), str(item.get("file")), str(item.get("line")))
+    )
     summary = ledger.get("summary")
     if not isinstance(summary, dict):
         summary = {}
@@ -111,7 +115,9 @@ def merge_security_ledger_entries(
             **summary,
             "total_entries": len(entries),
             "by_status": by_status,
-            "security_entries": sum(1 for entry in entries if entry.get("ledger_kind") == "security"),
+            "security_entries": sum(
+                1 for entry in entries if entry.get("ledger_kind") == "security"
+            ),
         },
         "entries": entries,
     }

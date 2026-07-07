@@ -99,7 +99,10 @@ def _has_machine_checkable_verification(value: object) -> bool:
         if not isinstance(item, str) or not item:
             continue
         lowered = item.lower()
-        if any(token in lowered for token in ("rerun quality-runner", "pytest", "ruff", "pnpm", "git diff")):
+        if any(
+            token in lowered
+            for token in ("rerun quality-runner", "pytest", "ruff", "pnpm", "git diff")
+        ):
             return True
         if "`" in item or " run " in f" {lowered} ":
             return True
@@ -138,7 +141,11 @@ def _contains_secret_literal(content: str) -> bool:
 
 
 def _non_empty_string_list(value: object) -> bool:
-    return isinstance(value, list) and bool(value) and all(isinstance(item, str) and item for item in value)
+    return (
+        isinstance(value, list)
+        and bool(value)
+        and all(isinstance(item, str) and item for item in value)
+    )
 
 
 def _load_json(path: str) -> dict[str, Any] | None:

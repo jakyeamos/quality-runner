@@ -235,9 +235,7 @@ def test_packaged_console_script_invokes_cli(tmp_path: Path) -> None:
     assert certifier_payload["schema"] == "repo-quality-certifier-plan-result-v0.1"
     assert Path(certifier_payload["artifact_paths"]["gate_matrix_json"]).exists()
     mcp_payload = json.loads(mcp_result.stdout)
-    assert {
-        tool["name"] for tool in mcp_payload["result"]["tools"]
-    } == {
+    assert {tool["name"] for tool in mcp_payload["result"]["tools"]} == {
         "repo_quality_certifier_plan",
         "repo_quality_certifier_doc_quality",
     }

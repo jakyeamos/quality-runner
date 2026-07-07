@@ -11,6 +11,7 @@ from quality_runner.security.capability_catalog import (
 )
 from quality_runner.security.config import security_settings
 
+
 def detect_security_capabilities(
     *,
     scan: dict[str, Any],
@@ -107,7 +108,9 @@ def detect_security_capabilities(
     for capability_id in required:
         if capability_id in discovered_ids or capability_id in AGENT_REVIEW_CAPABILITY_IDS:
             continue
-        if capability_id in SECURITY_COMMAND_CAPABILITIES and not _has_missing(missing, capability_id):
+        if capability_id in SECURITY_COMMAND_CAPABILITIES and not _has_missing(
+            missing, capability_id
+        ):
             missing.append(
                 _missing_security_command(
                     capability_id=capability_id,
@@ -158,27 +161,33 @@ def _record_evidence_gaps(
     required_by: str,
 ) -> None:
     has_manifest = _has_dependency_manifest(scan)
-    if has_manifest and "security_dependency_audit" not in discovered_ids:
-        if not _has_missing(missing, "security_dependency_audit"):
-            missing.append(
-                _missing_evidence_capability(
-                    capability_id="security_dependency_audit",
-                    reason="dependency manifest present but no vulnerability audit gate detected",
-                    language=language,
-                    required_by=required_by,
-                )
+    if (
+        has_manifest
+        and "security_dependency_audit" not in discovered_ids
+        and not _has_missing(missing, "security_dependency_audit")
+    ):
+        missing.append(
+            _missing_evidence_capability(
+                capability_id="security_dependency_audit",
+                reason="dependency manifest present but no vulnerability audit gate detected",
+                language=language,
+                required_by=required_by,
             )
+        )
 
-    if _has_client_framework(scan) and "security_secrets_scan" not in discovered_ids:
-        if not _has_missing(missing, "security_secrets_scan"):
-            missing.append(
-                _missing_evidence_capability(
-                    capability_id="security_secrets_scan",
-                    reason="client framework present but no secrets scan gate detected",
-                    language=language,
-                    required_by=required_by,
-                )
+    if (
+        _has_client_framework(scan)
+        and "security_secrets_scan" not in discovered_ids
+        and not _has_missing(missing, "security_secrets_scan")
+    ):
+        missing.append(
+            _missing_evidence_capability(
+                capability_id="security_secrets_scan",
+                reason="client framework present but no secrets scan gate detected",
+                language=language,
+                required_by=required_by,
             )
+        )
 
 
 def _missing_evidence_capability(
@@ -248,7 +257,9 @@ def _available_security_command(
     return {
         "id": capability_id,
         "type": "command",
-        "capability_kind": "ci_only" if command.get("local_execution") == "ci-only" else "local_command",
+        "capability_kind": "ci_only"
+        if command.get("local_execution") == "ci-only"
+        else "local_command",
         "status": "available",
         "source": command["source"],
         "command": command["command"],
@@ -263,7 +274,9 @@ def _available_security_command(
     }
 
 
-def _matching_security_ci_status(scan: dict[str, Any], capability_id: str) -> dict[str, str | None] | None:
+def _matching_security_ci_status(
+    scan: dict[str, Any], capability_id: str
+) -> dict[str, str | None] | None:
     terms = SECURITY_COMMAND_CAPABILITIES.get(capability_id, ())
     checks = scan.get("ci_checks")
     if not isinstance(checks, list):
@@ -295,9 +308,10 @@ def _matching_script(
         command_lower = command.lower()
         for alias in aliases:
             alias_normalized = alias.lower().replace("_", "-")
-            if alias_normalized in normalized_name or alias_normalized in command_lower:
-                if _command_matches_capability(capability_id, command_lower):
-                    return script_name, command
+            if (
+                alias_normalized in normalized_name or alias_normalized in command_lower
+            ) and _command_matches_capability(capability_id, command_lower):
+                return script_name, command
     return None
 
 

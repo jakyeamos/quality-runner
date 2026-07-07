@@ -7,7 +7,9 @@ from typing import Any
 from quality_runner.fix_proposals import FIX_PROPOSE_RESULT_SCHEMA, propose_fix
 
 
-def add_fix_proposal_command(subparsers: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
+def add_fix_proposal_command(
+    subparsers: argparse._SubParsersAction[argparse.ArgumentParser],
+) -> None:
     parser = subparsers.add_parser(
         "propose-fix",
         help="Write structured fix proposals for a remediation finding group without applying changes",

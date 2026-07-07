@@ -38,7 +38,8 @@ def security_settings(config: dict[str, Any]) -> dict[str, Any]:
         "enabled": enabled is not False,
         "require_security_baseline": require_baseline is not False,
         "agent_review_gates": agent_review is not False,
-        "required_capabilities": _string_list(required) or list(DEFAULT_REQUIRED_SECURITY_CAPABILITIES),
+        "required_capabilities": _string_list(required)
+        or list(DEFAULT_REQUIRED_SECURITY_CAPABILITIES),
         "disabled_rule_groups": _string_list(disabled_groups),
         "minimum_agent_review": minimum_agent_review,
         "configured": True,

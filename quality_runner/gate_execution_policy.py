@@ -75,7 +75,7 @@ def build_gate_execution_plan(
                 "capability_kind": _capability_kind(capability),
                 "package_manager": package_manager_for_command(command_text),
                 "mutating_risk": risk,
-                "local_execution_status":                 local_execution_status(
+                "local_execution_status": local_execution_status(
                     capability=capability,
                     command=command_text,
                     mutating_risk=risk,
@@ -229,9 +229,7 @@ def _is_executable_capability(capability: dict[str, Any]) -> bool:
     kind = capability.get("capability_kind")
     if kind in {"agent_review", "evidence"}:
         return False
-    if capability.get("type") == "agent_review":
-        return False
-    return True
+    return capability.get("type") != "agent_review"
 
 
 def _gate_cost_key(capability: dict[str, Any]) -> tuple[int, str]:

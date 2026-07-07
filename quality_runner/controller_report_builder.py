@@ -64,7 +64,7 @@ def build_controller_report_from_summary(
         post_git_status_short=git_status_short,
         concurrency_note=concurrency_note,
     )
-    return {
+    payload: dict[str, Any] = {
         "schema": CONTROLLER_REPORT_SCHEMA,
         "repo_path": repo_path,
         "branch_name": branch_name,

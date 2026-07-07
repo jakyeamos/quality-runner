@@ -5,7 +5,6 @@ from typing import Any, cast
 from quality_runner.controller_report_batch_scope import (
     batch_scope_strict_errors,
     evaluate_batch_scope,
-    load_batch_scope_file,
     normalize_batch_scope,
 )
 from quality_runner.controller_report_builder import build_controller_report_from_summary

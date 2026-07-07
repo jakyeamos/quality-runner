@@ -228,7 +228,14 @@ def main(argv: list[str] | None = None) -> int:
         print(human_summary(payload))
     if (
         parsed.command
-        in {"validate-report", "controller-report", "validate-skill-review", "validate-handoff", "validate-slice-spec", "review-worker"}
+        in {
+            "validate-report",
+            "controller-report",
+            "validate-skill-review",
+            "validate-handoff",
+            "validate-slice-spec",
+            "review-worker",
+        }
         and payload.get("status") == "rejected"
     ):
         return 1

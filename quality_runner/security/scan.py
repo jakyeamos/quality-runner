@@ -114,9 +114,10 @@ def detect_security_surfaces(repo_root: Path, *, scan: dict[str, Any]) -> dict[s
         if not path.is_file():
             continue
         relative = path.relative_to(repo_root).as_posix()
-        if any(part.startswith(".") for part in path.parts):
-            if ".quality-runner" in path.parts or ".git" in path.parts:
-                continue
+        if any(part.startswith(".") for part in path.parts) and (
+            ".quality-runner" in path.parts or ".git" in path.parts
+        ):
+            continue
         if any(marker in relative for marker in API_ROUTE_MARKERS):
             surfaces["api_routes"] = True
         if any(marker in relative.lower() for marker in WEBHOOK_MARKERS):

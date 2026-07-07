@@ -41,7 +41,9 @@ Duplicates in src/foo.py:
 """
 
 
-def test_missing_similarity_tools_do_not_fail_scan(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_missing_similarity_tools_do_not_fail_scan(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     from quality_runner.code_quality import create_code_quality_scan
 
     (tmp_path / "src").mkdir()
@@ -130,7 +132,9 @@ Similarity: 95.00%, Score: 20.0 points
     assert result["findings"] == []
 
 
-def test_test_files_included_when_configured(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_test_files_included_when_configured(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     from quality_runner.code_quality_similarity import semantic_similarity_scan
 
     (tmp_path / "src").mkdir()
@@ -244,7 +248,9 @@ def test_regex_duplicate_detector_still_works_without_external_tool(
 
     result = create_code_quality_scan(tmp_path, scan={"run_id": "scan-001"}, config={})
 
-    dup_clusters = [cluster for cluster in result["duplicate_clusters"] if cluster["id"].startswith("DUP-")]
+    dup_clusters = [
+        cluster for cluster in result["duplicate_clusters"] if cluster["id"].startswith("DUP-")
+    ]
     assert dup_clusters
     assert any(finding["rule_id"] == "near-duplicate-function" for finding in result["findings"])
 
@@ -301,7 +307,9 @@ def test_python_output_style_parses_pair(tmp_path: Path, monkeypatch: pytest.Mon
     assert result["findings"][0]["rule_id"] == "semantic-similarity-pair"
 
 
-def test_similarity_disabled_skips_scanners(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_similarity_disabled_skips_scanners(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     from quality_runner.code_quality_similarity import semantic_similarity_scan
 
     (tmp_path / "src").mkdir()

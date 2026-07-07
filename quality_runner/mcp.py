@@ -284,11 +284,10 @@ def call_tool(name: str, arguments: dict[str, Any] | None = None) -> dict[str, A
         run_id = _required_string_arg(args, "run_id")
         finding_group = _required_string_arg(args, "finding_group")
         finding_ids = args.get("finding_ids")
-        normalized_finding_ids: list[str] | None
         if finding_ids is None:
-            normalized_finding_ids = None
+            propose_fix_finding_ids: list[str] | None = None
         elif isinstance(finding_ids, list):
-            normalized_finding_ids = [
+            propose_fix_finding_ids = [
                 item for item in finding_ids if isinstance(item, str) and item
             ]
         else:
@@ -299,7 +298,7 @@ def call_tool(name: str, arguments: dict[str, Any] | None = None) -> dict[str, A
                 run_id=run_id,
                 finding_group=finding_group,
                 proposal_id=_string_arg(args, "proposal_id"),
-                finding_ids=normalized_finding_ids,
+                finding_ids=propose_fix_finding_ids,
                 actor=_string_arg(args, "actor") or "agent",
             )
         )

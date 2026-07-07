@@ -58,7 +58,9 @@ def test_code_quality_scan_detects_unwired_work_signals(tmp_path: Path) -> None:
         "handler-without-registration",
     } <= rules
     assert result["summary"]["findings_by_category"]["integrate"] >= 4
-    assert all(finding["remediation_bucket"] == "Integration and wiring decisions" for finding in integrate)
+    assert all(
+        finding["remediation_bucket"] == "Integration and wiring decisions" for finding in integrate
+    )
 
 
 def test_code_quality_scan_can_disable_integrate_group(tmp_path: Path) -> None:

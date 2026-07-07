@@ -21,8 +21,12 @@ def write_fleet_documents(*, output_dir: Path, results: list[dict[str, Any]]) ->
 
     index_path = per_repo_dir / "INDEX.md"
     phase_path = output_dir / "fleet-remediation-phases.md"
-    index_path.write_text(_render_index(repo_docs=repo_docs, phase_path=phase_path), encoding="utf-8")
-    phase_path.write_text(_render_phase_draft(repo_docs=repo_docs, index_path=index_path), encoding="utf-8")
+    index_path.write_text(
+        _render_index(repo_docs=repo_docs, phase_path=phase_path), encoding="utf-8"
+    )
+    phase_path.write_text(
+        _render_phase_draft(repo_docs=repo_docs, index_path=index_path), encoding="utf-8"
+    )
     return {
         "per_repo_dir": str(per_repo_dir),
         "index_md": str(index_path),
@@ -179,7 +183,10 @@ def _phase_for(context: dict[str, Any]) -> str:
     categories = context["findings_by_category"]
     structural_count = sum(int(value) for key, value in categories.items() if key != "capability")
     finding_count = int(context["finding_count"])
-    if context.get("status") in {"error", "invalid-repo"} or context.get("report_status") == "rejected":
+    if (
+        context.get("status") in {"error", "invalid-repo"}
+        or context.get("report_status") == "rejected"
+    ):
         return "Phase 0 - Control Plane And Branch Hygiene"
     if name.startswith("bbdse"):
         return "Phase 4 - BBDSE Cluster"
@@ -305,7 +312,9 @@ def _missing_capabilities(capability: dict[str, Any], result: dict[str, Any]) ->
     missing = capability.get("missing")
     if isinstance(missing, list):
         return [
-            item["id"] for item in missing if isinstance(item, dict) and isinstance(item.get("id"), str)
+            item["id"]
+            for item in missing
+            if isinstance(item, dict) and isinstance(item.get("id"), str)
         ]
     return _string_items(result.get("missing_capabilities"))
 

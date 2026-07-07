@@ -100,11 +100,7 @@ def build_remediation_plan(
         "adoption_stage": adoption_stage,
         "stopping_criteria": stopping_criteria(adoption_stage),
         "slices": slices,
-        **(
-            {"security_review_slices": security_review_slices}
-            if security_review_slices
-            else {}
-        ),
+        **({"security_review_slices": security_review_slices} if security_review_slices else {}),
         "warnings": _warnings(capability_map),
     }
 
@@ -179,8 +175,10 @@ def build_agent_handoff(
         capability_map=capability_map,
         missing_repo_owned_gates=missing_gates,
     )
-    next_slice = gate_blocker_slice(gate_summary) or _author_decision_slice(remediation_plan) or _next_slice(
-        remediation_plan
+    next_slice = (
+        gate_blocker_slice(gate_summary)
+        or _author_decision_slice(remediation_plan)
+        or _next_slice(remediation_plan)
     )
     adoption_stage = handoff_adoption_stage(remediation_plan)
     resolved_lifecycle = lifecycle_status or compute_lifecycle_status(
@@ -204,7 +202,9 @@ def build_agent_handoff(
         "adoption_stage": adoption_stage,
         "stopping_criteria": stopping_criteria(adoption_stage),
         **_optional_value("gate_verification", gate_summary),
-        **_optional_value("security_review", security_review_handoff(security_scan, capability_map)),
+        **_optional_value(
+            "security_review", security_review_handoff(security_scan, capability_map)
+        ),
         **_optional_value("intent", intent),
         **_optional_value("intent_docs", intent_docs or _intent_docs_from_scan(repo_scan)),
         **_optional_value("lifecycle_status", resolved_lifecycle),

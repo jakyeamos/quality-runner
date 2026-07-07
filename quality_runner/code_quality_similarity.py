@@ -2,14 +2,15 @@ from __future__ import annotations
 
 import hashlib
 import os
-import re
 import shutil
 import subprocess
 from pathlib import Path
 from typing import Any
 
+from quality_runner.code_quality_duplicates import _duplicate_clusters
 from quality_runner.code_quality_findings import _finding
-from quality_runner.code_quality_paths import _is_generated_file, _is_test_file
+from quality_runner.code_quality_paths import _verification_for_path
+from quality_runner.code_quality_similarity_parse import parse_similarity_output
 
 DEFAULT_SIMILARITY_ENABLED = True
 DEFAULT_SIMILARITY_THRESHOLD = 0.87
@@ -36,25 +37,86 @@ EXCLUDED_PATH_PARTS = {
     "vendor",
 }
 
-_PAIR_HEADER_RE = re.compile(
-    r"Similarity:\s*([\d.]+)%.*?(?:Score:\s*([\d.]+)\s*points)?",
-    re.IGNORECASE,
-)
-_CLUSTER_HEADER_RE = re.compile(
-    r"Cluster\s+\d+:\s+\d+\s+functions.*?avg similarity\s+([\d.]+)%.*?"
-    r"(?:best score\s+([\d.]+))?",
-    re.IGNORECASE,
-)
-_CANDIDATE_RE = re.compile(
-    r"^\s*(?P<file>[^\s:]+):(?P<line>\d+)(?:-(?P<end_line>\d+))?\s+(?P<name>\S+)?\s*$"
-)
-_PYTHON_PAIR_RE = re.compile(
-    r"^\s*(?P<file1>[^:]+):(?P<line1>\d+)\s*\|\s*L(?P<start1>\d+)-(?P<end1>\d+)\s+"
-    r"function\s+(?P<name1>\S+)\s*<->\s*"
-    r"(?P<file2>[^:]+):(?P<line2>\d+)\s*\|\s*L(?P<start2>\d+)-(?P<end2>\d+)\s+"
-    r"function\s+(?P<name2>\S+)\s*$"
-)
-_PYTHON_SIMILARITY_RE = re.compile(r"Similarity:\s*([\d.]+)%", re.IGNORECASE)
+
+def similarity_policy_defaults(policy: dict[str, Any]) -> dict[str, Any]:
+    similarity_enabled = policy.get("similarity_enabled")
+    similarity_threshold = policy.get("similarity_threshold")
+    similarity_min_lines = policy.get("similarity_min_lines")
+    similarity_max_pairs = policy.get("similarity_max_pairs")
+    similarity_timeout_seconds = policy.get("similarity_timeout_seconds")
+    similarity_include_tests = policy.get("similarity_include_tests")
+    return {
+        "similarity_enabled": similarity_enabled
+        if isinstance(similarity_enabled, bool)
+        else DEFAULT_SIMILARITY_ENABLED,
+        "similarity_threshold": similarity_threshold
+        if isinstance(similarity_threshold, (int, float)) and 0 <= float(similarity_threshold) <= 1
+        else DEFAULT_SIMILARITY_THRESHOLD,
+        "similarity_min_lines": similarity_min_lines
+        if isinstance(similarity_min_lines, int) and similarity_min_lines > 0
+        else DEFAULT_SIMILARITY_MIN_LINES,
+        "similarity_max_pairs": similarity_max_pairs
+        if isinstance(similarity_max_pairs, int) and similarity_max_pairs > 0
+        else DEFAULT_SIMILARITY_MAX_PAIRS,
+        "similarity_timeout_seconds": similarity_timeout_seconds
+        if isinstance(similarity_timeout_seconds, int) and similarity_timeout_seconds > 0
+        else DEFAULT_SIMILARITY_TIMEOUT_SECONDS,
+        "similarity_include_tests": similarity_include_tests
+        if isinstance(similarity_include_tests, bool)
+        else DEFAULT_SIMILARITY_INCLUDE_TESTS,
+    }
+
+
+def collect_deduplicate_scan(
+    repo_root: Path,
+    *,
+    extracted_functions: list[dict[str, Any]],
+    policy: dict[str, Any],
+    disabled_groups: set[str],
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]], int, dict[str, str]]:
+    if "deduplicate" in disabled_groups:
+        return [], [], 0, {}
+
+    duplicate_clusters = _duplicate_clusters(extracted_functions)
+    findings: list[dict[str, Any]] = []
+    for cluster in duplicate_clusters:
+        first = cluster["candidates"][0]
+        findings.append(
+            _finding(
+                category="deduplicate",
+                severity="warning",
+                confidence="medium",
+                file=first["file"],
+                line=first["line"],
+                rule_id="near-duplicate-function",
+                evidence=f"{cluster['id']} spans {len(cluster['candidates'])} functions.",
+                expected_improvement=(
+                    "Extract a shared helper only when the call sites share domain semantics."
+                ),
+                risk="Near-duplicate logic can drift across fixes.",
+                verification=_verification_for_path(first["file"]),
+                remediation_bucket="duplicate consolidation and helper extraction",
+            )
+        )
+
+    similarity_result = semantic_similarity_scan(
+        repo_root,
+        policy=policy,
+        disabled_groups=disabled_groups,
+    )
+    duplicate_clusters.extend(similarity_result["clusters"])
+    findings.extend(similarity_result["findings"])
+    semantic_similarity_tools = {
+        str(entry["tool"]): str(entry["status"])
+        for entry in similarity_result["scanner_status"]
+        if isinstance(entry, dict) and isinstance(entry.get("tool"), str)
+    }
+    return (
+        duplicate_clusters,
+        findings,
+        len(similarity_result["clusters"]),
+        semantic_similarity_tools,
+    )
 
 
 def semantic_similarity_scan(
@@ -130,7 +192,7 @@ def semantic_similarity_scan(
         if status != "executed":
             continue
 
-        parsed = _parse_output(
+        parsed = parse_similarity_output(
             completed.stdout,
             source=tool,
             threshold=threshold,
@@ -221,242 +283,6 @@ def _build_command(
     return command
 
 
-def _parse_output(
-    stdout: str,
-    *,
-    source: str,
-    threshold: float,
-    include_tests: bool,
-) -> list[dict[str, Any]]:
-    clusters: list[dict[str, Any]] = []
-    current_header: dict[str, Any] | None = None
-    current_candidates: list[dict[str, Any]] = []
-    pending_python_pair: list[dict[str, Any]] | None = None
-
-    for raw_line in stdout.splitlines():
-        line = raw_line.rstrip()
-        if not line.strip():
-            continue
-
-        python_pair = _PYTHON_PAIR_RE.match(line)
-        if python_pair is not None:
-            pending_python_pair = _python_pair_candidates(python_pair.groupdict())
-            continue
-
-        if _PYTHON_SIMILARITY_RE.search(line) and pending_python_pair is not None:
-            similarity = float(_PYTHON_SIMILARITY_RE.search(line).group(1))  # type: ignore[union-attr]
-            cluster = _build_cluster(
-                candidates=pending_python_pair,
-                source=source,
-                threshold=threshold,
-                similarity=similarity,
-                score=None,
-                kind="pair",
-            )
-            if _cluster_allowed(cluster, include_tests=include_tests):
-                clusters.append(cluster)
-            pending_python_pair = None
-            current_candidates = []
-            current_header = None
-            continue
-
-        pair_header = _PAIR_HEADER_RE.search(line)
-        if pair_header is not None:
-            if current_candidates:
-                cluster = _finalize_cluster(
-                    candidates=current_candidates,
-                    header=current_header,
-                    source=source,
-                    threshold=threshold,
-                )
-                if cluster is not None and _cluster_allowed(cluster, include_tests=include_tests):
-                    clusters.append(cluster)
-            current_header = {
-                "similarity": float(pair_header.group(1)),
-                "score": float(pair_header.group(2)) if pair_header.group(2) else None,
-                "kind": "pair",
-            }
-            current_candidates = []
-            continue
-
-        cluster_header = _CLUSTER_HEADER_RE.search(line)
-        if cluster_header is not None:
-            if current_candidates:
-                cluster = _finalize_cluster(
-                    candidates=current_candidates,
-                    header=current_header,
-                    source=source,
-                    threshold=threshold,
-                )
-                if cluster is not None and _cluster_allowed(cluster, include_tests=include_tests):
-                    clusters.append(cluster)
-            current_header = {
-                "similarity": float(cluster_header.group(1)),
-                "score": float(cluster_header.group(2)) if cluster_header.group(2) else None,
-                "kind": "function",
-            }
-            current_candidates = []
-            continue
-
-        candidate_match = _CANDIDATE_RE.match(line)
-        if candidate_match is not None:
-            current_candidates.append(_candidate_from_match(candidate_match))
-            if (
-                current_header is not None
-                and current_header.get("kind") == "pair"
-                and len(current_candidates) >= 2
-            ):
-                cluster = _finalize_cluster(
-                    candidates=current_candidates[:2],
-                    header=current_header,
-                    source=source,
-                    threshold=threshold,
-                )
-                if cluster is not None and _cluster_allowed(cluster, include_tests=include_tests):
-                    clusters.append(cluster)
-                current_candidates = []
-                current_header = None
-            continue
-
-        if line.strip().startswith("Duplicates in "):
-            if current_candidates:
-                cluster = _finalize_cluster(
-                    candidates=current_candidates,
-                    header=current_header,
-                    source=source,
-                    threshold=threshold,
-                )
-                if cluster is not None and _cluster_allowed(cluster, include_tests=include_tests):
-                    clusters.append(cluster)
-            current_candidates = []
-            current_header = None
-
-    if current_candidates:
-        cluster = _finalize_cluster(
-            candidates=current_candidates,
-            header=current_header,
-            source=source,
-            threshold=threshold,
-        )
-        if cluster is not None and _cluster_allowed(cluster, include_tests=include_tests):
-            clusters.append(cluster)
-
-    return clusters
-
-
-def _candidate_from_match(match: re.Match[str]) -> dict[str, Any]:
-    line = int(match.group("line"))
-    end_line = int(match.group("end_line")) if match.group("end_line") else line
-    line_count = max(end_line - line + 1, 1)
-    candidate = {
-        "file": _normalize_path(match.group("file")),
-        "line": line,
-        "end_line": end_line,
-        "line_count": line_count,
-    }
-    name = match.group("name")
-    if name:
-        candidate["name"] = name
-    return candidate
-
-
-def _python_pair_candidates(groups: dict[str, str]) -> list[dict[str, Any]]:
-    return [
-        {
-            "file": _normalize_path(groups["file1"]),
-            "line": int(groups["line1"]),
-            "end_line": int(groups["end1"]),
-            "line_count": int(groups["end1"]) - int(groups["start1"]) + 1,
-            "name": groups["name1"],
-        },
-        {
-            "file": _normalize_path(groups["file2"]),
-            "line": int(groups["line2"]),
-            "end_line": int(groups["end2"]),
-            "line_count": int(groups["end2"]) - int(groups["start2"]) + 1,
-            "name": groups["name2"],
-        },
-    ]
-
-
-def _finalize_cluster(
-    *,
-    candidates: list[dict[str, Any]],
-    header: dict[str, Any] | None,
-    source: str,
-    threshold: float,
-) -> dict[str, Any] | None:
-    if len(candidates) < 2:
-        return None
-    similarity = float(header["similarity"]) if header and "similarity" in header else 0.0
-    score = header.get("score") if header else None
-    kind = str(header.get("kind", "function")) if header else "function"
-    return _build_cluster(
-        candidates=candidates,
-        source=source,
-        threshold=threshold,
-        similarity=similarity,
-        score=score,
-        kind=kind,
-    )
-
-
-def _build_cluster(
-    *,
-    candidates: list[dict[str, Any]],
-    source: str,
-    threshold: float,
-    similarity: float,
-    score: float | None,
-    kind: str,
-) -> dict[str, Any]:
-    filtered = [candidate for candidate in candidates if not _should_skip_path(str(candidate["file"]))]
-    if len(filtered) < 2:
-        return {
-            "id": "",
-            "source": source,
-            "kind": kind,
-            "reason": "ast-semantic-similarity",
-            "similarity": similarity,
-            "score": score,
-            "threshold": threshold,
-            "candidates": filtered,
-            "suggested_disposition": "review-for-shared-abstraction",
-        }
-    return {
-        "id": "",
-        "source": source,
-        "kind": kind,
-        "reason": "ast-semantic-similarity",
-        "similarity": similarity,
-        "score": score,
-        "threshold": threshold,
-        "candidates": sorted(filtered, key=lambda item: (str(item["file"]), int(item["line"]))),
-        "suggested_disposition": "review-for-shared-abstraction",
-    }
-
-
-def _cluster_allowed(cluster: dict[str, Any], *, include_tests: bool) -> bool:
-    candidates = cluster.get("candidates")
-    if not isinstance(candidates, list) or len(candidates) < 2:
-        return False
-    for candidate in candidates:
-        file_path = str(candidate.get("file", ""))
-        if _should_skip_path(file_path):
-            return False
-        if not include_tests and _is_test_file(file_path):
-            return False
-    return True
-
-
-def _should_skip_path(relative_path: str) -> bool:
-    normalized = relative_path.strip("/")
-    if not normalized or _is_generated_file(normalized):
-        return True
-    parts = Path(normalized).parts
-    return any(part in EXCLUDED_PATH_PARTS for part in parts)
-
-
 def _cluster_finding(cluster: dict[str, Any], *, source: str) -> dict[str, Any]:
     candidates = cluster["candidates"]
     first = candidates[0]
@@ -464,9 +290,7 @@ def _cluster_finding(cluster: dict[str, Any], *, source: str) -> dict[str, Any]:
     similarity_pct = similarity if similarity > 1 else similarity * 100
     avg_lines = sum(int(item.get("line_count", 1)) for item in candidates) / len(candidates)
     rule_id = RULE_ID_PAIR if str(cluster.get("kind")) == "pair" else RULE_ID_CLUSTER
-    pair_summary = " <-> ".join(
-        _candidate_label(item) for item in candidates[:2]
-    )
+    pair_summary = " <-> ".join(_candidate_label(item) for item in candidates[:2])
     if len(candidates) > 2:
         pair_summary = f"{pair_summary} (+{len(candidates) - 2} more)"
     score_text = ""
@@ -522,17 +346,13 @@ def _stable_similarity_fingerprint(
     similarity_pct: float,
 ) -> str:
     parts = []
-    for candidate in sorted(candidates, key=lambda item: (str(item.get("file", "")), str(item.get("name", "")))):
-        parts.append(
-            f"{candidate.get('file', '')}:{candidate.get('name', '')}"
-        )
+    for candidate in sorted(
+        candidates, key=lambda item: (str(item.get("file", "")), str(item.get("name", "")))
+    ):
+        parts.append(f"{candidate.get('file', '')}:{candidate.get('name', '')}")
     normalized = " ".join(parts)
     payload = f"{rule_id}:{normalized}:{round(similarity_pct, 2)}"
     return hashlib.sha256(payload.encode()).hexdigest()[:16]
-
-
-def _normalize_path(path: str) -> str:
-    return path.strip().lstrip("./")
 
 
 def _status_entry(

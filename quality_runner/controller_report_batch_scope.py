@@ -1,9 +1,8 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from typing import Any, cast
-
-import json
 
 
 def load_batch_scope_file(path: Path) -> dict[str, Any]:
@@ -70,7 +69,11 @@ def batch_scope_strict_errors(
             + ", ".join(unrelated)
         )
     finding_ids = batch_scope.get("finding_ids")
-    if _string_list(finding_ids) and files_changed and not _string_list(batch_scope.get("allowed_files")):
+    if (
+        _string_list(finding_ids)
+        and files_changed
+        and not _string_list(batch_scope.get("allowed_files"))
+    ):
         errors.append(
             "batch_scope provides finding_ids without allowed_files; "
             "strict lint cannot attest file scope"
@@ -79,10 +82,7 @@ def batch_scope_strict_errors(
 
 
 def _path_allowed(path: str, allowed_paths: set[str]) -> bool:
-    for allowed in allowed_paths:
-        if path == allowed or path.startswith(f"{allowed}/"):
-            return True
-    return False
+    return any(path == allowed or path.startswith(f"{allowed}/") for allowed in allowed_paths)
 
 
 def _string_list(value: object) -> bool:

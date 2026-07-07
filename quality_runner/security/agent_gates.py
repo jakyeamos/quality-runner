@@ -82,7 +82,12 @@ AGENT_REVIEW_GATE_DEFINITIONS: dict[str, dict[str, Any]] = {
     "security_secret_exposure_review": {
         "scope": {
             "paths": ["**/*"],
-            "categories": ["secrets-exposure", "secret-in-fallback", "secret-in-log", "secret-env-var"],
+            "categories": [
+                "secrets-exposure",
+                "secret-in-fallback",
+                "secret-in-log",
+                "secret-env-var",
+            ],
         },
         "review_instructions": [
             "Review hardcoded secrets, fallback values, and sensitive logs.",
@@ -192,7 +197,10 @@ def _active_triggers(
         triggers.add("dangerous_sinks")
     if any("redirect" in str(category) for category in categories):
         triggers.add("redirects")
-    if any(str(category).startswith("secret") or category == "secrets-exposure" for category in categories):
+    if any(
+        str(category).startswith("secret") or category == "secrets-exposure"
+        for category in categories
+    ):
         triggers.add("secrets")
     if "expensive-api-abuse" in categories:
         triggers.add("expensive_api")

@@ -26,9 +26,7 @@ def security_review_handoff(
         "security_candidates": candidates if isinstance(candidates, list) else [],
         "agent_review_gates": agent_gates if isinstance(agent_gates, list) else [],
         "capability_matrix_security_summary": (
-            capability_map.get("security_summary")
-            if isinstance(capability_map, dict)
-            else None
+            capability_map.get("security_summary") if isinstance(capability_map, dict) else None
         ),
     }
 

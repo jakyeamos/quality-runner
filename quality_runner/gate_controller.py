@@ -7,12 +7,12 @@ from typing import Any
 from uuid import uuid4
 
 from quality_runner.artifacts import artifact_dir, write_json
-from quality_runner.intent import resolve_workflow_intent
 from quality_runner.gate_resolution_bridge import (
     apply_record_disposition,
     enrich_record_disposition_response,
     find_active_gate_run_id,
 )
+from quality_runner.intent import resolve_workflow_intent
 from quality_runner.run_summary import build_run_summary
 from quality_runner.schema_constants import GATE_RESPONSE_SCHEMA, GATE_RUN_SCHEMA
 
@@ -176,7 +176,9 @@ def record_gate_response(
             disposition=disposition or "accepted-intentional",
             owner=owner or actor,
         )
-    responses_path = _append_gate_response(repo_root=repo_root, gate_run_id=gate_run_id, response=response)
+    responses_path = _append_gate_response(
+        repo_root=repo_root, gate_run_id=gate_run_id, response=response
+    )
     if action == "record-disposition" and isinstance(gate_run.get("run_id"), str):
         apply_record_disposition(
             repo_root=repo_root,

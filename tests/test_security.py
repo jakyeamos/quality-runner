@@ -113,7 +113,9 @@ def test_run_payload_writes_security_scan_json(tmp_path: Path) -> None:
     payload = run_payload(repo_root=tmp_path, run_id="sec-run-001", profile="default")
     artifact_paths = payload["artifact_paths"]
     assert "security_scan_json" in artifact_paths
-    security_scan = json.loads(Path(artifact_paths["security_scan_json"]).read_text(encoding="utf-8"))
+    security_scan = json.loads(
+        Path(artifact_paths["security_scan_json"]).read_text(encoding="utf-8")
+    )
     assert security_scan["schema"] == "quality-runner-security-scan-v0.1"
 
 
@@ -133,7 +135,9 @@ def test_security_findings_in_quality_audit(tmp_path: Path) -> None:
     api_dir.mkdir(parents=True)
     (api_dir / "index.ts").write_text("export default function handler() {}\n", encoding="utf-8")
     payload = run_payload(repo_root=tmp_path, run_id="sec-audit-001", profile="default")
-    audit = json.loads(Path(payload["artifact_paths"]["quality_audit_json"]).read_text(encoding="utf-8"))
+    audit = json.loads(
+        Path(payload["artifact_paths"]["quality_audit_json"]).read_text(encoding="utf-8")
+    )
     categories = {finding["category"] for finding in audit["findings"]}
     assert any(category.startswith("security:") for category in categories)
 
@@ -142,7 +146,9 @@ def test_security_review_in_handoff_markdown(tmp_path: Path) -> None:
     write_js_fixture(tmp_path)
     api_dir = tmp_path / "app" / "api" / "health"
     api_dir.mkdir(parents=True)
-    (api_dir / "route.ts").write_text("export async function GET() { return Response.json({}); }\n", encoding="utf-8")
+    (api_dir / "route.ts").write_text(
+        "export async function GET() { return Response.json({}); }\n", encoding="utf-8"
+    )
     payload = run_payload(repo_root=tmp_path, run_id="sec-handoff-001", profile="default")
     handoff_md = Path(payload["artifact_paths"]["agent_handoff_md"]).read_text(encoding="utf-8")
     assert "## Security Review Gates" in handoff_md
@@ -155,7 +161,9 @@ def test_security_review_in_handoff_json(tmp_path: Path) -> None:
     api_dir.mkdir(parents=True)
     (api_dir / "api.ts").write_text("export const routes = [];\n", encoding="utf-8")
     payload = run_payload(repo_root=tmp_path, run_id="sec-handoff-json", profile="default")
-    handoff = json.loads(Path(payload["artifact_paths"]["agent_handoff_json"]).read_text(encoding="utf-8"))
+    handoff = json.loads(
+        Path(payload["artifact_paths"]["agent_handoff_json"]).read_text(encoding="utf-8")
+    )
     security_review = handoff.get("security_review")
     assert isinstance(security_review, dict)
     assert "agent_review_gates" in security_review
@@ -165,9 +173,13 @@ def test_remediation_plan_prioritizes_security(tmp_path: Path) -> None:
     write_js_fixture(tmp_path)
     src = tmp_path / "src"
     src.mkdir()
-    (src / "bad.js").write_text('const token = "example-placeholder-not-a-real-token";\n', encoding="utf-8")
+    (src / "bad.js").write_text(
+        'const token = "example-placeholder-not-a-real-token";\n', encoding="utf-8"
+    )
     payload = run_payload(repo_root=tmp_path, run_id="sec-plan-001", profile="default")
-    plan = json.loads(Path(payload["artifact_paths"]["remediation_plan_json"]).read_text(encoding="utf-8"))
+    plan = json.loads(
+        Path(payload["artifact_paths"]["remediation_plan_json"]).read_text(encoding="utf-8")
+    )
     slices = plan["slices"]
     assert slices
     first_categories = {finding["category"] for finding in slices[0]["findings"]}
@@ -199,8 +211,12 @@ def test_resolution_ledger_includes_security_entries(tmp_path: Path) -> None:
     src.mkdir()
     (src / "bad.js").write_text("eval(input)\n", encoding="utf-8")
     payload = run_payload(repo_root=tmp_path, run_id="sec-ledger-001", profile="default")
-    ledger = json.loads(Path(payload["artifact_paths"]["resolution_ledger_json"]).read_text(encoding="utf-8"))
-    security_entries = [entry for entry in ledger["entries"] if entry.get("ledger_kind") == "security"]
+    ledger = json.loads(
+        Path(payload["artifact_paths"]["resolution_ledger_json"]).read_text(encoding="utf-8")
+    )
+    security_entries = [
+        entry for entry in ledger["entries"] if entry.get("ledger_kind") == "security"
+    ]
     assert security_entries
     assert security_entries[0]["status"] in {"unreviewed", "review-required"}
 
@@ -251,7 +267,9 @@ def test_inspect_payload_writes_security_scan_without_source_edits(tmp_path: Pat
 def test_capability_matrix_includes_security_summary(tmp_path: Path) -> None:
     write_js_fixture(tmp_path)
     payload = inspect_payload(repo_root=tmp_path, run_id="sec-cap-001", profile="default")
-    matrix = json.loads(Path(payload["artifact_paths"]["capability_matrix_json"]).read_text(encoding="utf-8"))
+    matrix = json.loads(
+        Path(payload["artifact_paths"]["capability_matrix_json"]).read_text(encoding="utf-8")
+    )
     assert "security_summary" in matrix
 
 
@@ -262,7 +280,12 @@ def test_merge_security_into_capability_map_adds_agent_review(tmp_path: Path) ->
     (api_dir / "route.ts").write_text("export async function GET() {}\n", encoding="utf-8")
     security_scan = _run_scan(tmp_path)
     merged = merge_security_into_capability_map(
-        {"schema": "quality-runner-capability-map-v0.1", "available": [], "missing": [], "warnings": []},
+        {
+            "schema": "quality-runner-capability-map-v0.1",
+            "available": [],
+            "missing": [],
+            "warnings": [],
+        },
         security_scan,
     )
     kinds = {item.get("capability_kind") for item in merged["available"]}

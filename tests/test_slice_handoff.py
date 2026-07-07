@@ -146,8 +146,6 @@ def test_example_slice_spec_passes_lint() -> None:
 
     from quality_runner.handoff_lint import validate_slice_spec_content
 
-    example = (
-        Path(__file__).resolve().parents[1] / "docs/examples/slice-spec-structural-harden.md"
-    )
+    example = Path(__file__).resolve().parents[1] / "docs/examples/slice-spec-structural-harden.md"
     result = validate_slice_spec_content(example.read_text(encoding="utf-8"))
     assert result["passed"] is True, result["errors"]

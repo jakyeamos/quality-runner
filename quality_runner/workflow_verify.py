@@ -25,6 +25,7 @@ from quality_runner.planning import (
     render_handoff_markdown,
 )
 from quality_runner.security.scan import create_security_scan, merge_security_into_capability_map
+from quality_runner.slice_specs import write_slice_specs
 from quality_runner.unwired_from_dead_code import merge_dead_code_unwired_findings
 from quality_runner.workflow_helpers import (
     combined_warnings,
@@ -37,7 +38,6 @@ from quality_runner.workflow_internal import (
     require_valid,
     verify_payload_status,
 )
-from quality_runner.slice_specs import write_slice_specs
 from quality_runner.workflow_skills import (
     append_warnings,
     create_code_quality_scan_with_skills,

@@ -7,6 +7,7 @@ from typing import Any
 
 from quality_runner.artifacts import write_json
 from quality_runner.code_quality_ledger import ACCEPTED_STATUSES
+
 GATE_RUN_SCHEMA = "quality-runner-gate-run-v0.1"
 TERMINAL_GATE_RUN_STATUSES = {"completed", "aborted"}
 
@@ -53,7 +54,9 @@ def enrich_record_disposition_response(
     if not isinstance(finding_ids, list) or not finding_ids:
         raise ValueError("record-disposition requires at least one --finding-id")
 
-    references = resolve_finding_references(repo_root=repo_root, run_id=run_id, finding_ids=finding_ids)
+    references = resolve_finding_references(
+        repo_root=repo_root, run_id=run_id, finding_ids=finding_ids
+    )
     missing = sorted(set(finding_ids) - {item["finding_id"] for item in references})
     if missing:
         raise ValueError(f"finding ids not present in run audit: {', '.join(missing)}")

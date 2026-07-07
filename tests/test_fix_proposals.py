@@ -5,10 +5,9 @@ from pathlib import Path
 
 import pytest
 
-from test_support.quality_runner_fixtures import write_complete_js_fixture
-
 from quality_runner.fix_proposals import propose_fix
 from quality_runner.workflow import run_payload
+from test_support.quality_runner_fixtures import write_complete_js_fixture
 
 
 def test_propose_fix_writes_structural_group_proposals(tmp_path: Path) -> None:

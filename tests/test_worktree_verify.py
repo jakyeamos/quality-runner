@@ -10,7 +10,9 @@ import pytest
 from quality_runner.worktree_verify import gate_worktree_session
 
 
-def _init_git_repo(repo: Path, *, filename: str = "tracked.txt", contents: str = "original\n") -> None:
+def _init_git_repo(
+    repo: Path, *, filename: str = "tracked.txt", contents: str = "original\n"
+) -> None:
     tracked = repo / filename
     tracked.write_text(contents, encoding="utf-8")
     subprocess.run(["git", "init"], cwd=repo, check=True, capture_output=True, text=True)
@@ -52,7 +54,9 @@ def _mutating_gate_toml(command: str) -> str:
     )
 
 
-def test_disposable_worktree_runs_mutating_gate_without_touching_dirty_source(tmp_path: Path) -> None:
+def test_disposable_worktree_runs_mutating_gate_without_touching_dirty_source(
+    tmp_path: Path,
+) -> None:
     from quality_runner.workflow import verify_gates_payload
 
     _init_git_repo(tmp_path)

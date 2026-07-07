@@ -71,7 +71,11 @@ def _source_file(item: dict[str, Any]) -> dict[str, Any] | None:
         and isinstance(text, str)
         and isinstance(lines, list)
     ):
-        return {"path": path, "text": text, "lines": [line for line in lines if isinstance(line, str)]}
+        return {
+            "path": path,
+            "text": text,
+            "lines": [line for line in lines if isinstance(line, str)],
+        }
     return None
 
 
@@ -106,17 +110,19 @@ def _stub_findings(item: dict[str, Any]) -> list[dict[str, Any]]:
     return findings
 
 
-def _todo_scaffold_findings(item: dict[str, Any], entrypoint_globs: list[str]) -> list[dict[str, Any]]:
+def _todo_scaffold_findings(
+    item: dict[str, Any], entrypoint_globs: list[str]
+) -> list[dict[str, Any]]:
     path = item["path"]
     lines = item["lines"]
     todo_lines = [
-        (index, line)
-        for index, line in enumerate(lines, start=1)
-        if _has_todo_comment(line)
+        (index, line) for index, line in enumerate(lines, start=1) if _has_todo_comment(line)
     ]
     if len(todo_lines) < 3:
         return []
-    if not (_path_matches_any(path, entrypoint_globs) or _path_or_text_suggests_wip(path, item["text"])):
+    if not (
+        _path_matches_any(path, entrypoint_globs) or _path_or_text_suggests_wip(path, item["text"])
+    ):
         return []
     first_line, first_evidence = todo_lines[0]
     return [

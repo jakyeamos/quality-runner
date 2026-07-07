@@ -42,7 +42,10 @@ def actionability_for_finding(finding: dict[str, Any]) -> tuple[str, str]:
             "Missing repo-owned quality gates require maintainer policy or adoption work.",
         )
     if category == "input-warning":
-        return ("informational", "Input warning affects evidence quality but not source code directly.")
+        return (
+            "informational",
+            "Input warning affects evidence quality but not source code directly.",
+        )
     if category == "standard":
         return (
             "needs-maintainer-policy",
@@ -79,15 +82,24 @@ def actionability_for_finding(finding: dict[str, Any]) -> tuple[str, str]:
         if severity == "observation":
             return ("informational", "Structural observation is advisory and non-blocking.")
         if severity == "warning":
-            return ("mechanical-fix", "Structural warning is usually addressable with a focused refactor.")
+            return (
+                "mechanical-fix",
+                "Structural warning is usually addressable with a focused refactor.",
+            )
         return (
             "needs-author-decision",
             "High-signal structural debt may require scoped redesign or accepted disposition.",
         )
     if "dependency" in summary.lower() or "install" in summary.lower():
-        return ("dependency-setup", "Finding points at dependency or environment setup before code edits.")
+        return (
+            "dependency-setup",
+            "Finding points at dependency or environment setup before code edits.",
+        )
     if "read-only" in summary.lower():
         return ("read-only-policy", "Finding is blocked by read-only gate policy or mutation risk.")
     if "environment" in summary.lower() or "sandbox" in summary.lower():
         return ("environment-blocker", "Finding is blocked by local environment restrictions.")
-    return ("needs-triage", "Finding needs controller triage when category-specific routing is unavailable.")
+    return (
+        "needs-triage",
+        "Finding needs controller triage when category-specific routing is unavailable.",
+    )

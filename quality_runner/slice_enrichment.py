@@ -123,7 +123,9 @@ def _scope_paths(slice_item: dict[str, Any]) -> list[str]:
         {
             str(finding["file"])
             for finding in findings
-            if isinstance(finding, dict) and isinstance(finding.get("file"), str) and finding["file"]
+            if isinstance(finding, dict)
+            and isinstance(finding.get("file"), str)
+            and finding["file"]
         }
     )
     return paths

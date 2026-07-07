@@ -14,8 +14,7 @@ def wiring_decision_slices(code_quality_scan: dict[str, Any] | None) -> list[dic
         groups.setdefault(str(finding["file"]), []).append(finding)
 
     return [
-        _slice_for_wiring_group(file=path, findings=group)
-        for path, group in sorted(groups.items())
+        _slice_for_wiring_group(file=path, findings=group) for path, group in sorted(groups.items())
     ]
 
 
@@ -83,11 +82,7 @@ def _slice_for_wiring_group(*, file: str, findings: list[dict[str, Any]]) -> dic
     )
     finding_ids = [str(finding["id"]) for finding in sorted_findings]
     verification = sorted(
-        {
-            str(finding["verification"])
-            for finding in sorted_findings
-            if finding.get("verification")
-        }
+        {str(finding["verification"]) for finding in sorted_findings if finding.get("verification")}
     )
     score = sum(int(finding.get("score") or 0) for finding in sorted_findings)
     return {

@@ -18,7 +18,7 @@ def add_rollout_command(
             "Repo list formats:\n"
             "  text: /path/to/repo [baseline-run-id] [name]\n"
             "  csv:  /path/to/repo,baseline-run-id,name\n"
-            "  json: [\"/path/to/repo\", {\"repo_path\": \"/path\", \"baseline_run_id\": \"...\"}]\n\n"
+            '  json: ["/path/to/repo", {"repo_path": "/path", "baseline_run_id": "..."}]\n\n'
             "Rollout runs repos sequentially, uses read-only refresh gates by default, and writes\n"
             "rollout-ledger.json plus one controller-report JSON per repo under --output-dir."
         ),

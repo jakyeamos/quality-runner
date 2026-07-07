@@ -57,7 +57,9 @@ def test_create_gate_run_requires_handoff(tmp_path: Path) -> None:
 def test_gate_status_and_respond_append_history(tmp_path: Path) -> None:
     _minimal_repo(tmp_path)
     run_payload(repo_root=tmp_path, run_id="respond-source")
-    created = create_gate_run(repo_root=tmp_path, run_id="respond-source", gate_run_id="gate-respond-001")
+    created = create_gate_run(
+        repo_root=tmp_path, run_id="respond-source", gate_run_id="gate-respond-001"
+    )
     gate_run_id = created["gate_run"]["gate_run_id"]
 
     status = gate_status_payload(repo_root=tmp_path, gate_run_id=gate_run_id)
@@ -124,7 +126,9 @@ def test_record_disposition_updates_resolution_ledger(tmp_path: Path) -> None:
         owner="maintainer",
     )
 
-    ledger_path = tmp_path / ".quality-runner" / "runs" / "disposition-source" / "resolution-ledger.json"
+    ledger_path = (
+        tmp_path / ".quality-runner" / "runs" / "disposition-source" / "resolution-ledger.json"
+    )
     ledger = json.loads(ledger_path.read_text(encoding="utf-8"))
     dispositions = ledger.get("finding_dispositions")
     assert isinstance(dispositions, list)

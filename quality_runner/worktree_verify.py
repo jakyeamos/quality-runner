@@ -141,7 +141,9 @@ def _remove_worktree_if_registered(repo_root: Path, worktree_path: Path) -> None
         return
     normalized = worktree_path.resolve().as_posix()
     for block in listed.split("\n\n"):
-        worktree_line = next((line for line in block.splitlines() if line.startswith("worktree ")), "")
+        worktree_line = next(
+            (line for line in block.splitlines() if line.startswith("worktree ")), ""
+        )
         if not worktree_line:
             continue
         registered = Path(worktree_line.removeprefix("worktree ")).resolve().as_posix()

@@ -14,6 +14,7 @@ from quality_runner.findings import (
     validate_audit_report,
     validate_remediation_plan,
 )
+from quality_runner.gate_resolution_bridge import merge_gate_finding_dispositions
 from quality_runner.git_branches import prepare_scan_branch
 from quality_runner.intent import attach_intent_artifacts, intent_for_run
 from quality_runner.manifest import build_run_manifest, git_state_for_repo
@@ -25,9 +26,9 @@ from quality_runner.planning import (
 )
 from quality_runner.refresh_workflow import run_refresh_payload
 from quality_runner.run_summary import build_run_summary
-from quality_runner.gate_resolution_bridge import merge_gate_finding_dispositions
 from quality_runner.security.ledger import merge_security_ledger_entries
 from quality_runner.security.scan import create_security_scan, merge_security_into_capability_map
+from quality_runner.slice_specs import write_slice_specs
 from quality_runner.workflow_helpers import (
     combined_warnings,
     config_with_include_overrides,
@@ -38,7 +39,6 @@ from quality_runner.workflow_skills import (
     create_code_quality_scan_with_skills,
     write_skill_review_artifacts,
 )
-from quality_runner.slice_specs import write_slice_specs
 from quality_runner.workflow_verify import verify_gates_payload
 
 
@@ -345,4 +345,3 @@ def refresh_payload(
         verify_callback=verify_gates_payload,
         summary_callback=build_run_summary,
     )
-

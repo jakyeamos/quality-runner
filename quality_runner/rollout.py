@@ -94,8 +94,12 @@ def rollout_payload(
         "ledger_path": str(ledger_path),
         "fleet_documents": fleet_documents,
         "repo_count": len(entries),
-        "accepted_reports": sum(1 for result in results if result.get("report_status") == "accepted"),
-        "rejected_reports": sum(1 for result in results if result.get("report_status") == "rejected"),
+        "accepted_reports": sum(
+            1 for result in results if result.get("report_status") == "accepted"
+        ),
+        "rejected_reports": sum(
+            1 for result in results if result.get("report_status") == "rejected"
+        ),
         "failed_repos": [
             result["repo_path"]
             for result in results

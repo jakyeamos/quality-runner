@@ -70,7 +70,9 @@ def review_worker_payload(
     if isinstance(changed_files, list) and expected_files:
         unexpected = sorted(set(changed_files) - set(expected_files))
         if unexpected:
-            warnings.append(f"worker changed files outside declared scope: {', '.join(unexpected[:5])}")
+            warnings.append(
+                f"worker changed files outside declared scope: {', '.join(unexpected[:5])}"
+            )
 
     final_summary = _optional_json(final_dir / "run-summary.json")
     status = final_handoff.get("status")

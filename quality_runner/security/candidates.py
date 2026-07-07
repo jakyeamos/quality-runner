@@ -34,7 +34,12 @@ DANGEROUS_SINK_PATTERNS: tuple[tuple[str, str, str, str], ...] = (
     ("dangerous-sink", r"\bexec\s*\(", "high", "exec() executes arbitrary code."),
     ("dangerous-sink", r"(?:child_process\.)?spawn\s*\(", "high", "Process spawn sink."),
     ("dangerous-sink", r"os\.system\s*\(", "high", "Shell command execution sink."),
-    ("dangerous-sink", r"subprocess\.(?:call|run|Popen)\s*\(", "high", "Subprocess execution sink."),
+    (
+        "dangerous-sink",
+        r"subprocess\.(?:call|run|Popen)\s*\(",
+        "high",
+        "Subprocess execution sink.",
+    ),
     ("dangerous-sink", r"dangerouslySetInnerHTML", "high", "Unsafe HTML injection sink."),
     ("dangerous-sink", r"pickle\.loads?\s*\(", "high", "Unsafe deserialization sink."),
     ("dangerous-sink", r"yaml\.load\s*\(", "medium", "YAML load without safe loader."),
@@ -143,22 +148,26 @@ def scan_security_candidates(
                             )
                         )
 
-        if WEBHOOK_PATTERN.search(relative_path) or any(
-            WEBHOOK_PATTERN.search(line) for line in lines[:200]
+        if (
+            (
+                WEBHOOK_PATTERN.search(relative_path)
+                or any(WEBHOOK_PATTERN.search(line) for line in lines[:200])
+            )
+            and "webhook" not in disabled
+            and not _has_signature_verification(lines)
         ):
-            if "webhook" not in disabled and not _has_signature_verification(lines):
-                candidates.append(
-                    _candidate(
-                        category="webhook-handler",
-                        severity="medium",
-                        confidence="medium",
-                        file=relative_path,
-                        line=1,
-                        evidence=f"Webhook handler in {relative_path} without obvious signature verification.",
-                        description="Webhook route may lack signature verification.",
-                        requires_agent_review=True,
-                    )
+            candidates.append(
+                _candidate(
+                    category="webhook-handler",
+                    severity="medium",
+                    confidence="medium",
+                    file=relative_path,
+                    line=1,
+                    evidence=f"Webhook handler in {relative_path} without obvious signature verification.",
+                    description="Webhook route may lack signature verification.",
+                    requires_agent_review=True,
                 )
+            )
 
     _CANDIDATE_ID = 0
     return _dedupe_candidates(candidates)

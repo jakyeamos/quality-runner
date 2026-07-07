@@ -45,11 +45,7 @@ def prepare_scan_branch(
     matches_most_advanced = current_branch == most_advanced_branch or _same_commit(
         current_head, most_advanced_branch_head
     )
-    if (
-        current_branch is not None
-        and not matches_main
-        and not matches_most_advanced
-    ):
+    if current_branch is not None and not matches_main and not matches_most_advanced:
         target = most_advanced_branch or "unknown"
         return [
             {

@@ -22,7 +22,11 @@ def compute_lifecycle_status(
     repo_scan: dict[str, Any] | None = None,
 ) -> str:
     failure_type = _string_or_none(gate_verification.get("failure_type"))
-    if failure_type == "workflow-timeout" or summary_status == "blocked" and failure_type == "workflow-timeout":
+    if (
+        failure_type == "workflow-timeout"
+        or summary_status == "blocked"
+        and failure_type == "workflow-timeout"
+    ):
         return "workflow-timeout"
 
     gate_status = _string_or_none(gate_verification.get("status"))
@@ -38,7 +42,8 @@ def compute_lifecycle_status(
         return "merge-ready"
 
     if handoff_status == "gates-clean" or (
-        gate_status in {"passed", "passed-with-findings"} and summary_status in {"passed", "passed-with-findings"}
+        gate_status in {"passed", "passed-with-findings"}
+        and summary_status in {"passed", "passed-with-findings"}
     ):
         return "gates-clean"
 
