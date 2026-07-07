@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://quality-runner.dev/schemas/gate-response.schema.json",
+  "title": "Quality Runner Gate Response",
+  "type": "object",
+  "required": ["schema", "gate_run_id", "at", "actor", "action"],
+  "properties": {
+    "schema": { "const": "quality-runner-gate-response-v0.1" },
+    "gate_run_id": { "type": "string", "minLength": 1 },
+    "run_id": { "type": ["string", "null"] },
+    "at": { "type": "string", "minLength": 1 },
+    "actor": { "type": "string", "minLength": 1 },
+    "action": {
+      "enum": [
+        "approve",
+        "fix",
+        "skip",
+        "route-next-slice",
+        "record-disposition",
+        "abort"
+      ]
+    },
+    "finding_ids": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "default": []
+    },
+    "notes": { "type": ["string", "null"] }
+  },
+  "additionalProperties": false
+}

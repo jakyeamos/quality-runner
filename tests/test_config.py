@@ -200,6 +200,68 @@ def test_load_repo_config_reads_structural_scan_policy_and_accepted_dispositions
     ]
 
 
+def test_load_repo_config_reads_integrate_policy(tmp_path) -> None:
+    from quality_runner.config import load_repo_config
+
+    (tmp_path / ".quality-runner.toml").write_text(
+        "\n".join(
+            [
+                "[quality_runner.integrate]",
+                "enabled = false",
+                'registration_globs = ["src/cli.py"]',
+                'entrypoint_globs = ["src/main.py"]',
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    config = load_repo_config(tmp_path)
+
+    assert config["integrate"] == {
+        "enabled": False,
+        "registration_globs": ["src/cli.py"],
+        "entrypoint_globs": ["src/main.py"],
+    }
+
+
+def test_load_repo_config_reads_architecture_contract(tmp_path) -> None:
+    from quality_runner.config import load_repo_config
+
+    (tmp_path / ".quality-runner.toml").write_text(
+        "\n".join(
+            [
+                "[quality_runner.architecture]",
+                "enabled = true",
+                "",
+                "[[quality_runner.architecture.import_boundaries]]",
+                'id = "ui-no-server-imports"',
+                'sources = ["apps/web/**"]',
+                'disallowed_imports = ["server/**"]',
+                'allowed_imports = ["packages/domain/types/**"]',
+                'severity = "warning"',
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    config = load_repo_config(tmp_path)
+
+    assert config["architecture"] == {
+        "enabled": True,
+        "import_boundaries": [
+            {
+                "id": "ui-no-server-imports",
+                "sources": ["apps/web/**"],
+                "disallowed_imports": ["server/**"],
+                "allowed_imports": ["packages/domain/types/**"],
+                "severity": "warning",
+            }
+        ],
+    }
+
+
 def test_load_repo_config_reports_missing_invalid_and_malformed_values(tmp_path) -> None:
     from quality_runner.config import load_repo_config
 
@@ -662,6 +724,10 @@ def test_packaged_schema_files_are_parseable() -> None:
         "run-manifest.schema.json",
         "run-result.schema.json",
         "run-summary.schema.json",
+        "intent.schema.json",
+        "gate-run.schema.json",
+        "gate-response.schema.json",
+        "fix-proposals.schema.json",
     }
 
     loaded = {}
@@ -726,7 +792,11 @@ def test_artifact_schema_additions_remain_optional_and_agent_handoff_versioned()
         {"$ref": "#/$defs/remediationSlice"},
     ]
     action_group = agent_handoff["$defs"]["actionGroup"]
-    assert action_group["required"] == ["class", "gate_ids", "actions"]
+    assert action_group["required"] == ["class", "actions"]
+    assert action_group["anyOf"] == [{"required": ["gate_ids"]}, {"required": ["finding_ids"]}]
+    assert remediation_plan["$defs"]["slice"]["properties"]["action_groups"]["items"]["$ref"] == (
+        "#/$defs/actionGroup"
+    )
     assert (
         agent_handoff["$defs"]["remediationSlice"]["properties"]["action_groups"]["items"]["$ref"]
         == "#/$defs/actionGroup"

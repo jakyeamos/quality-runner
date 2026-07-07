@@ -6,8 +6,15 @@ from typing import Any
 from quality_runner.code_quality_findings import CATEGORY_ORDER
 
 
-def structural_cluster_slices(code_quality_scan: dict[str, Any] | None) -> list[dict[str, Any]]:
-    code_findings = _code_quality_findings(code_quality_scan)
+def structural_cluster_slices(
+    code_quality_scan: dict[str, Any] | None,
+    *,
+    excluded_categories: set[str] | None = None,
+) -> list[dict[str, Any]]:
+    code_findings = _code_quality_findings(
+        code_quality_scan,
+        excluded_categories=excluded_categories or set(),
+    )
     if not code_findings:
         return []
 
@@ -21,7 +28,11 @@ def structural_cluster_slices(code_quality_scan: dict[str, Any] | None) -> list[
     ]
 
 
-def _code_quality_findings(code_quality_scan: dict[str, Any] | None) -> list[dict[str, Any]]:
+def _code_quality_findings(
+    code_quality_scan: dict[str, Any] | None,
+    *,
+    excluded_categories: set[str],
+) -> list[dict[str, Any]]:
     if not isinstance(code_quality_scan, dict):
         return []
     findings = code_quality_scan.get("findings")
@@ -46,6 +57,7 @@ def _code_quality_findings(code_quality_scan: dict[str, Any] | None) -> list[dic
             and finding_id
             and isinstance(category, str)
             and category
+            and category not in excluded_categories
             and isinstance(severity, str)
             and severity
             and isinstance(file, str)

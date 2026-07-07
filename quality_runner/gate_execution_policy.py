@@ -56,6 +56,7 @@ def build_gate_execution_plan(
     gate_timeouts: dict[str, int] | None = None,
     read_only_gates: bool = False,
     allow_mutating_gates: bool = False,
+    mutations_isolated: bool = False,
 ) -> list[dict[str, Any]]:
     resolved_gate_timeouts = valid_gate_timeouts(gate_timeouts)
     plan: list[dict[str, Any]] = []
@@ -74,12 +75,13 @@ def build_gate_execution_plan(
                 "capability_kind": _capability_kind(capability),
                 "package_manager": package_manager_for_command(command_text),
                 "mutating_risk": risk,
-                "local_execution_status": local_execution_status(
+                "local_execution_status":                 local_execution_status(
                     capability=capability,
                     command=command_text,
                     mutating_risk=risk,
                     read_only_gates=read_only_gates,
                     allow_mutating_gates=allow_mutating_gates,
+                    mutations_isolated=mutations_isolated,
                 ),
                 "timeout_seconds": resolved_gate_timeouts.get(capability_id, timeout_seconds),
             }
@@ -131,6 +133,7 @@ def local_execution_status(
     mutating_risk: str,
     read_only_gates: bool,
     allow_mutating_gates: bool,
+    mutations_isolated: bool = False,
 ) -> str:
     if capability.get("local_execution") == "ci-only":
         return "ci-only-skipped"
@@ -138,7 +141,12 @@ def local_execution_status(
         return "evidence-only-skipped"
     if command is None:
         return "no-command-skipped"
-    if read_only_gates and not allow_mutating_gates and mutating_risk in {"mutating", "unknown"}:
+    if (
+        read_only_gates
+        and not allow_mutating_gates
+        and not mutations_isolated
+        and mutating_risk in {"mutating", "unknown"}
+    ):
         return "mutating-skipped"
     return "will-execute"
 
@@ -210,7 +218,20 @@ def _available_capabilities(capability_map: dict[str, Any]) -> list[dict[str, An
     available = capability_map.get("available")
     if not isinstance(available, list):
         return []
-    return [capability for capability in available if isinstance(capability, dict)]
+    return [
+        capability
+        for capability in available
+        if isinstance(capability, dict) and _is_executable_capability(capability)
+    ]
+
+
+def _is_executable_capability(capability: dict[str, Any]) -> bool:
+    kind = capability.get("capability_kind")
+    if kind in {"agent_review", "evidence"}:
+        return False
+    if capability.get("type") == "agent_review":
+        return False
+    return True
 
 
 def _gate_cost_key(capability: dict[str, Any]) -> tuple[int, str]:
@@ -237,7 +258,7 @@ def _gate_cost_key(capability: dict[str, Any]) -> tuple[int, str]:
 
 def _capability_kind(capability: dict[str, Any]) -> str:
     kind = capability.get("capability_kind")
-    if kind in {"local_command", "ci_only", "evidence_file"}:
+    if kind in {"local_command", "ci_only", "evidence_file", "agent_review", "evidence"}:
         return str(kind)
     if capability.get("local_execution") == "ci-only":
         return "ci_only"

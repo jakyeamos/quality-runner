@@ -1,0 +1,86 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://quality-runner.dev/schemas/fix-proposals.schema.json",
+  "title": "Quality Runner Fix Proposals",
+  "type": "object",
+  "required": [
+    "schema",
+    "run_id",
+    "proposal_id",
+    "finding_group",
+    "implementation_allowed",
+    "applied",
+    "proposals",
+    "checksum",
+    "created_at"
+  ],
+  "properties": {
+    "schema": { "const": "quality-runner-fix-proposals-v0.1" },
+    "run_id": { "type": "string", "minLength": 1 },
+    "proposal_id": { "type": "string", "minLength": 1 },
+    "finding_group": { "type": "string", "minLength": 1 },
+    "implementation_allowed": { "const": false },
+    "applied": { "const": false },
+    "actor": { "type": "string", "minLength": 1 },
+    "slice_title": { "type": ["string", "null"] },
+    "artifact_paths": {
+      "type": "object",
+      "additionalProperties": { "type": "string" }
+    },
+    "proposals": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/proposal" }
+    },
+    "skipped_findings": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/skippedFinding" }
+    },
+    "checksum": { "type": "string", "minLength": 1 },
+    "created_at": { "type": "string", "minLength": 1 }
+  },
+  "$defs": {
+    "proposal": {
+      "type": "object",
+      "required": [
+        "proposal_ref",
+        "finding_id",
+        "kind",
+        "summary",
+        "applied",
+        "proposable"
+      ],
+      "properties": {
+        "proposal_ref": { "type": "string", "minLength": 1 },
+        "finding_id": { "type": "string", "minLength": 1 },
+        "fingerprint": { "type": ["string", "null"] },
+        "actionability": { "type": ["string", "null"] },
+        "kind": { "enum": ["instruction", "command", "unified-diff"] },
+        "summary": { "type": "string", "minLength": 1 },
+        "recommended_fix": { "type": ["string", "null"] },
+        "steps": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "command": { "type": ["string", "null"] },
+        "unified_diff": { "type": ["string", "null"] },
+        "verification": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "applied": { "const": false },
+        "proposable": { "type": "boolean" },
+        "checksum": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": false
+    },
+    "skippedFinding": {
+      "type": "object",
+      "required": ["finding_id", "reason"],
+      "properties": {
+        "finding_id": { "type": "string", "minLength": 1 },
+        "reason": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": false
+    }
+  }
+}

@@ -41,7 +41,20 @@
         { "$ref": "#/$defs/remediationSlice" }
       ]
     },
-    "verification_gates": { "type": "array", "items": { "type": "string" } }
+    "verification_gates": { "type": "array", "items": { "type": "string" } },
+    "security_review": { "type": "object" },
+    "intent": { "$ref": "#/$defs/intentPacket" },
+    "lifecycle_status": {
+      "enum": [
+        "audit-clean",
+        "gates-clean",
+        "merge-ready",
+        "blocked",
+        "failed",
+        "workflow-timeout",
+        "needs-triage"
+      ]
+    }
   },
   "$defs": {
     "adoptionStage": {
@@ -85,6 +98,7 @@
         "id": { "type": "string", "minLength": 1 },
         "title": { "type": "string", "minLength": 1 },
         "priority": { "enum": ["high", "medium", "low"] },
+        "disposition_required": { "type": "boolean" },
         "findings": {
           "type": "array",
           "items": { "$ref": "#/$defs/remediationFinding" },
@@ -114,16 +128,23 @@
         "id": { "type": "string", "minLength": 1 },
         "severity": { "enum": ["critical", "blocker", "warning", "observation"] },
         "category": { "type": "string", "minLength": 1 },
-        "summary": { "type": "string", "minLength": 1 }
+        "summary": { "type": "string", "minLength": 1 },
+        "actionability": { "type": "string", "minLength": 1 },
+        "actionability_rationale": { "type": "string", "minLength": 1 }
       },
       "additionalProperties": true
     },
     "actionGroup": {
       "type": "object",
-      "required": ["class", "gate_ids", "actions"],
+      "required": ["class", "actions"],
       "properties": {
         "class": { "type": "string", "minLength": 1 },
         "gate_ids": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "minItems": 1
+        },
+        "finding_ids": {
           "type": "array",
           "items": { "type": "string", "minLength": 1 },
           "minItems": 1
@@ -134,6 +155,7 @@
           "minItems": 1
         }
       },
+      "anyOf": [{ "required": ["gate_ids"] }, { "required": ["finding_ids"] }],
       "additionalProperties": false
     },
     "gateVerificationSummary": {
@@ -202,6 +224,27 @@
         "code": { "type": "string", "minLength": 1 },
         "message": { "type": "string", "minLength": 1 },
         "path": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": false
+    },
+    "intentPacket": {
+      "type": "object",
+      "required": ["schema", "run_id", "goal", "source", "supplied_by", "captured_at"],
+      "properties": {
+        "schema": { "const": "quality-runner-intent-v0.1" },
+        "run_id": { "type": "string", "minLength": 1 },
+        "goal": { "type": "string", "minLength": 1 },
+        "constraints": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "non_goals": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "tradeoffs": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "risk_areas": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "verification_expectations": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "source": { "type": "string", "minLength": 1 },
+        "supplied_by": { "type": "string", "minLength": 1 },
+        "captured_at": { "type": "string", "format": "date-time" }
       },
       "additionalProperties": false
     }

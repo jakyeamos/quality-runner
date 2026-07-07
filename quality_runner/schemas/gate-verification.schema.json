@@ -28,6 +28,17 @@
       "type": "array",
       "items": { "$ref": "#/$defs/executionPlanItem" }
     },
+    "verification_context": {
+      "type": "object",
+      "properties": {
+        "worktree_mode": { "enum": ["in-place", "disposable"] },
+        "base_head": { "type": "string", "minLength": 1 },
+        "execution_root": { "type": "string", "minLength": 1 },
+        "mutations_isolated": { "type": "boolean" },
+        "dirty_source_worktree": { "type": "boolean" }
+      },
+      "additionalProperties": false
+    },
     "gates": {
       "type": "array",
       "items": { "$ref": "#/$defs/gate" }

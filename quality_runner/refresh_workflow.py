@@ -33,6 +33,9 @@ def run_refresh_payload(
     total_timeout_reason: str | None,
     checkout_most_advanced_branch: bool,
     allow_mutating_gates: bool,
+    worktree_mode: str = "in-place",
+    allow_dirty_worktree_verify: bool = False,
+    intent: dict[str, Any] | None,
     inspect_callback: PayloadCallback,
     run_callback: PayloadCallback,
     verify_callback: PayloadCallback,
@@ -116,6 +119,7 @@ def run_refresh_payload(
                 profile=profile,
                 ci_status_json=ci_status_json,
                 checkout_most_advanced_branch=checkout_most_advanced_branch,
+                intent=intent,
             ),
         )
         run_result = run_total_bounded_phase(
@@ -127,6 +131,7 @@ def run_refresh_payload(
                 profile=profile,
                 ci_status_json=ci_status_json,
                 checkout_most_advanced_branch=checkout_most_advanced_branch,
+                intent=intent,
             ),
         )
         verify_result = _run_verify_phase(
@@ -137,6 +142,8 @@ def run_refresh_payload(
             timeout_seconds=timeout_seconds,
             checkout_most_advanced_branch=checkout_most_advanced_branch,
             allow_mutating_gates=allow_mutating_gates,
+            worktree_mode=worktree_mode,
+            allow_dirty_worktree_verify=allow_dirty_worktree_verify,
             resolved_verify_timeout=resolved_verify_timeout,
             resolved_verify_reason=resolved_verify_reason,
             resolved_total_reason=resolved_total_reason,
@@ -145,6 +152,7 @@ def run_refresh_payload(
             phase_timings=phase_timings,
             current=current,
             verify_callback=verify_callback,
+            intent=intent,
         )
         summary = summary_callback(
             repo_root=repo_root,
@@ -232,6 +240,8 @@ def _run_verify_phase(
     timeout_seconds: int,
     checkout_most_advanced_branch: bool,
     allow_mutating_gates: bool,
+    worktree_mode: str,
+    allow_dirty_worktree_verify: bool,
     resolved_verify_timeout: int,
     resolved_verify_reason: str,
     resolved_total_reason: str | None,
@@ -240,6 +250,7 @@ def _run_verify_phase(
     phase_timings: dict[str, dict[str, Any]],
     current: _RefreshTimeoutState,
     verify_callback: PayloadCallback,
+    intent: dict[str, Any] | None,
 ) -> dict[str, Any]:
     current.phase = "verify-gates"
     current.phase_key = "verify"
@@ -266,6 +277,9 @@ def _run_verify_phase(
             checkout_most_advanced_branch=checkout_most_advanced_branch,
             read_only_gates=True,
             allow_mutating_gates=allow_mutating_gates,
+            worktree_mode=worktree_mode,
+            allow_dirty_worktree_verify=allow_dirty_worktree_verify,
+            intent=intent,
         )
     phase_timings["verify"] = phase_timing(
         started=current.phase_started,

@@ -8,7 +8,14 @@ from typing import Any
 
 from quality_runner import __version__
 from quality_runner.artifacts import artifact_dir
-from quality_runner.cli import DOCTOR_RESULT_SCHEMA
+from quality_runner.cli_payload import DOCTOR_RESULT_SCHEMA
+from quality_runner.fix_proposals import propose_fix
+from quality_runner.gate_controller import (
+    create_gate_run,
+    gate_status_payload,
+    record_gate_response,
+)
+from quality_runner.intent import resolve_workflow_intent
 from quality_runner.standards import DEFAULT_PROFILE
 from quality_runner.workflow import generated_run_id, inspect_payload, run_payload
 
@@ -36,6 +43,8 @@ def list_tools() -> list[dict[str, Any]]:
             "run_id": {"type": "string"},
             "standards": {"type": "string"},
             "ci_status_json": {"type": "string"},
+            "intent": {"type": "string"},
+            "intent_file": {"type": "string"},
         },
         "required": ["repo_root"],
         "additionalProperties": False,
@@ -47,6 +56,70 @@ def list_tools() -> list[dict[str, Any]]:
             "run_id": {"type": "string"},
         },
         "required": ["repo_root", "run_id"],
+        "additionalProperties": False,
+    }
+    gate_schema = {
+        "type": "object",
+        "properties": {
+            "repo_root": {"type": "string"},
+            "run_id": {"type": "string"},
+            "gate_run_id": {"type": "string"},
+            "intent": {"type": "string"},
+            "intent_file": {"type": "string"},
+            "actor": {"type": "string"},
+        },
+        "required": ["repo_root", "run_id"],
+        "additionalProperties": False,
+    }
+    gate_status_schema = {
+        "type": "object",
+        "properties": {
+            "repo_root": {"type": "string"},
+            "gate_run_id": {"type": "string"},
+        },
+        "required": ["repo_root", "gate_run_id"],
+        "additionalProperties": False,
+    }
+    gate_respond_schema = {
+        "type": "object",
+        "properties": {
+            "repo_root": {"type": "string"},
+            "gate_run_id": {"type": "string"},
+            "action": {
+                "type": "string",
+                "enum": [
+                    "approve",
+                    "fix",
+                    "skip",
+                    "route-next-slice",
+                    "record-disposition",
+                    "abort",
+                ],
+            },
+            "finding_ids": {
+                "type": "array",
+                "items": {"type": "string"},
+            },
+            "notes": {"type": "string"},
+            "actor": {"type": "string"},
+        },
+        "required": ["repo_root", "gate_run_id", "action"],
+        "additionalProperties": False,
+    }
+    propose_fix_schema = {
+        "type": "object",
+        "properties": {
+            "repo_root": {"type": "string"},
+            "run_id": {"type": "string"},
+            "finding_group": {"type": "string"},
+            "proposal_id": {"type": "string"},
+            "finding_ids": {
+                "type": "array",
+                "items": {"type": "string"},
+            },
+            "actor": {"type": "string"},
+        },
+        "required": ["repo_root", "run_id", "finding_group"],
         "additionalProperties": False,
     }
     return [
@@ -80,6 +153,26 @@ def list_tools() -> list[dict[str, Any]]:
             "description": "Return an existing agent handoff for a repository run.",
             "inputSchema": handoff_schema,
         },
+        {
+            "name": "quality_runner_gate",
+            "description": "Create a driveable gate run from an existing Quality Runner run.",
+            "inputSchema": gate_schema,
+        },
+        {
+            "name": "quality_runner_gate_status",
+            "description": "Read an in-flight gate run and response history.",
+            "inputSchema": gate_status_schema,
+        },
+        {
+            "name": "quality_runner_gate_respond",
+            "description": "Record a controller decision for an in-flight gate run.",
+            "inputSchema": gate_respond_schema,
+        },
+        {
+            "name": "quality_runner_propose_fix",
+            "description": "Write structured fix proposals for a remediation finding group.",
+            "inputSchema": propose_fix_schema,
+        },
     ]
 
 
@@ -93,12 +186,21 @@ def call_tool(name: str, arguments: dict[str, Any] | None = None) -> dict[str, A
         run_id = _string_arg(args, "run_id") or generated_run_id()
         profile = _string_arg(args, "standards") or DEFAULT_PROFILE
         ci_status_json = _path_arg(args, "ci_status_json")
+        intent = resolve_workflow_intent(
+            repo_root=repo_root,
+            run_id=run_id,
+            goal=_string_arg(args, "intent"),
+            intent_file=_path_arg(args, "intent_file"),
+            source="mcp",
+            supplied_by="agent",
+        )
         return _tool_result(
             inspect_payload(
                 repo_root=repo_root,
                 run_id=run_id,
                 profile=profile,
                 ci_status_json=ci_status_json,
+                intent=intent,
             )
         )
 
@@ -107,12 +209,21 @@ def call_tool(name: str, arguments: dict[str, Any] | None = None) -> dict[str, A
         run_id = _string_arg(args, "run_id") or generated_run_id()
         profile = _string_arg(args, "standards") or DEFAULT_PROFILE
         ci_status_json = _path_arg(args, "ci_status_json")
+        intent = resolve_workflow_intent(
+            repo_root=repo_root,
+            run_id=run_id,
+            goal=_string_arg(args, "intent"),
+            intent_file=_path_arg(args, "intent_file"),
+            source="mcp",
+            supplied_by="agent",
+        )
         return _tool_result(
             run_payload(
                 repo_root=repo_root,
                 run_id=run_id,
                 profile=profile,
                 ci_status_json=ci_status_json,
+                intent=intent,
             )
         )
 
@@ -124,6 +235,74 @@ def call_tool(name: str, arguments: dict[str, Any] | None = None) -> dict[str, A
         repo_root = _validated_repo_root(args)
         run_id = _required_string_arg(args, "run_id")
         return _tool_result(_export_handoff_payload(repo_root, run_id))
+
+    if name == "quality_runner_gate":
+        repo_root = _validated_repo_root(args)
+        run_id = _required_string_arg(args, "run_id")
+        return _tool_result(
+            create_gate_run(
+                repo_root=repo_root,
+                run_id=run_id,
+                gate_run_id=_string_arg(args, "gate_run_id"),
+                goal=_string_arg(args, "intent"),
+                intent_file=_path_arg(args, "intent_file"),
+                actor=_string_arg(args, "actor") or "agent",
+            )
+        )
+
+    if name == "quality_runner_gate_status":
+        repo_root = _validated_repo_root(args)
+        gate_run_id = _required_string_arg(args, "gate_run_id")
+        return _tool_result(gate_status_payload(repo_root=repo_root, gate_run_id=gate_run_id))
+
+    if name == "quality_runner_gate_respond":
+        repo_root = _validated_repo_root(args)
+        gate_run_id = _required_string_arg(args, "gate_run_id")
+        action = _required_string_arg(args, "action")
+        finding_ids = args.get("finding_ids")
+        if finding_ids is None:
+            normalized_finding_ids: list[str] | None = None
+        elif isinstance(finding_ids, list):
+            normalized_finding_ids = [
+                item for item in finding_ids if isinstance(item, str) and item
+            ]
+        else:
+            raise JsonRpcError(JSONRPC_INVALID_PARAMS, "finding_ids must be an array of strings")
+        return _tool_result(
+            record_gate_response(
+                repo_root=repo_root,
+                gate_run_id=gate_run_id,
+                action=action,
+                actor=_string_arg(args, "actor") or "agent",
+                finding_ids=normalized_finding_ids,
+                notes=_string_arg(args, "notes"),
+            )
+        )
+
+    if name == "quality_runner_propose_fix":
+        repo_root = _validated_repo_root(args)
+        run_id = _required_string_arg(args, "run_id")
+        finding_group = _required_string_arg(args, "finding_group")
+        finding_ids = args.get("finding_ids")
+        normalized_finding_ids: list[str] | None
+        if finding_ids is None:
+            normalized_finding_ids = None
+        elif isinstance(finding_ids, list):
+            normalized_finding_ids = [
+                item for item in finding_ids if isinstance(item, str) and item
+            ]
+        else:
+            raise JsonRpcError(JSONRPC_INVALID_PARAMS, "finding_ids must be an array of strings")
+        return _tool_result(
+            propose_fix(
+                repo_root=repo_root,
+                run_id=run_id,
+                finding_group=finding_group,
+                proposal_id=_string_arg(args, "proposal_id"),
+                finding_ids=normalized_finding_ids,
+                actor=_string_arg(args, "actor") or "agent",
+            )
+        )
 
     raise JsonRpcError(JSONRPC_INVALID_PARAMS, f"Unknown Quality Runner MCP tool: {name}")
 

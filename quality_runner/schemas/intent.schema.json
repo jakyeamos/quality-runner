@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://quality-runner.dev/schemas/intent.schema.json",
+  "title": "Quality Runner Intent Packet",
+  "type": "object",
+  "required": ["schema", "run_id", "goal", "source", "supplied_by", "captured_at"],
+  "properties": {
+    "schema": { "const": "quality-runner-intent-v0.1" },
+    "run_id": { "type": "string", "minLength": 1 },
+    "goal": { "type": "string", "minLength": 1 },
+    "constraints": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "non_goals": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "tradeoffs": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "risk_areas": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "verification_expectations": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "source": { "type": "string", "minLength": 1 },
+    "supplied_by": { "type": "string", "minLength": 1 },
+    "captured_at": { "type": "string", "format": "date-time" }
+  },
+  "additionalProperties": false
+}

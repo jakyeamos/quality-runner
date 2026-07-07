@@ -10,9 +10,16 @@ from quality_runner.schema_constants import RUN_MANIFEST_SCHEMA
 
 
 # fmt: off
-def build_run_manifest(*, repo_root: Path, run_id: str, mode: str, artifact_paths: dict[str, str]) -> dict[str, Any]:
+def build_run_manifest(
+    *,
+    repo_root: Path,
+    run_id: str,
+    mode: str,
+    artifact_paths: dict[str, str],
+    intent: dict[str, Any] | None = None,
+) -> dict[str, Any]:
 # fmt: on
-    return {
+    manifest: dict[str, Any] = {
         "schema": RUN_MANIFEST_SCHEMA,
         "run_id": run_id,
         "mode": mode,
@@ -23,6 +30,9 @@ def build_run_manifest(*, repo_root: Path, run_id: str, mode: str, artifact_path
         "git": _git_state(repo_root),
         "artifact_paths": artifact_paths,
     }
+    if intent is not None:
+        manifest["intent"] = intent
+    return manifest
 
 
 def _git_state(repo_root: Path) -> dict[str, Any]:

@@ -15,9 +15,11 @@ def action_group_markdown(value: object) -> list[str]:
         blocker_class = group.get("class")
         gate_ids = group.get("gate_ids")
         actions = group.get("actions")
-        if not isinstance(blocker_class, str) or not isinstance(gate_ids, list):
+        finding_ids = group.get("finding_ids")
+        if not isinstance(blocker_class, str):
             continue
-        ids = [gate_id for gate_id in gate_ids if isinstance(gate_id, str) and gate_id]
+        ids_source = gate_ids if isinstance(gate_ids, list) else finding_ids
+        ids = [gate_id for gate_id in ids_source if isinstance(gate_id, str) and gate_id] if isinstance(ids_source, list) else []
         if not ids:
             continue
         lines.append(f"- {blocker_class}: {', '.join(ids)}")

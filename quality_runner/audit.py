@@ -2,8 +2,10 @@ from __future__ import annotations
 
 from typing import Any
 
+from quality_runner.actionability import enrich_audit_findings
 from quality_runner.code_quality_findings import CATEGORY_ORDER
 from quality_runner.findings import AUDIT_REPORT_SCHEMA
+from quality_runner.security.audit import security_audit_findings
 
 
 def build_audit_report(
@@ -12,10 +14,14 @@ def build_audit_report(
     standards_packet: dict[str, Any],
     capability_map: dict[str, Any],
     code_quality_scan: dict[str, Any] | None = None,
+    security_scan: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
+    config = standards_packet.get("config")
+    security_config = config.get("security") if isinstance(config, dict) else None
     findings = [
         *_missing_capability_findings(capability_map, standards_packet),
         *_standards_requirement_findings(standards_packet, scan),
+        *security_audit_findings(security_scan, security_config),
         *_code_quality_findings(code_quality_scan),
         *_warning_findings(capability_map),
     ]
@@ -27,7 +33,7 @@ def build_audit_report(
         "profile": _string_or_none(standards_packet.get("profile")),
         "status": "findings" if findings else "clean",
         "implementation_allowed": False,
-        "findings": findings,
+        "findings": enrich_audit_findings(findings),
         "warnings": _warnings(capability_map),
     }
 
@@ -88,6 +94,8 @@ def _missing_capability_findings(
         language = capability.get("language")
         required_owner = capability.get("owner")
         if not isinstance(capability_id, str) or not capability_id:
+            continue
+        if capability_id.startswith("security_"):
             continue
         reason_text = reason if isinstance(reason, str) and reason else "capability is absent"
         type_text = (
@@ -203,17 +211,25 @@ def _code_quality_findings(code_quality_scan: dict[str, Any] | None) -> list[dic
         expected = _string_or_default(representative.get("expected_improvement"), "Review finding.")
         count = len(group)
         score = _structural_score(group)
+        integrate = category == "integrate"
         audit_findings.append(
             {
                 "id": f"structural-{category}-{rule_id}",
                 "severity": _structural_severity(group),
                 "category": f"structural:{category}",
-                "summary": (
-                    f"{count} {rule_id} structural finding{'s' if count != 1 else ''} "
-                    f"in {_string_or_default(representative.get('remediation_bucket'), 'structural quality')}."
+                "summary": _structural_summary(
+                    count=count,
+                    rule_id=rule_id,
+                    representative=representative,
+                    integrate=integrate,
                 ),
                 "evidence": _structural_evidence(group),
-                "recommended_fix": f"{count} findings, aggregate score {score}: {expected}",
+                "recommended_fix": _structural_recommended_fix(
+                    count=count,
+                    score=score,
+                    expected=expected,
+                    integrate=integrate,
+                ),
                 "verification": sorted(
                     {
                         item
@@ -227,6 +243,39 @@ def _code_quality_findings(code_quality_scan: dict[str, Any] | None) -> list[dic
             }
         )
     return audit_findings
+
+
+def _structural_summary(
+    *,
+    count: int,
+    rule_id: str,
+    representative: dict[str, Any],
+    integrate: bool,
+) -> str:
+    if integrate:
+        return (
+            f"{count} {rule_id} partial or unwired work finding"
+            f"{'s' if count != 1 else ''} require author disposition."
+        )
+    return (
+        f"{count} {rule_id} structural finding{'s' if count != 1 else ''} "
+        f"in {_string_or_default(representative.get('remediation_bucket'), 'structural quality')}."
+    )
+
+
+def _structural_recommended_fix(
+    *,
+    count: int,
+    score: int,
+    expected: str,
+    integrate: bool,
+) -> str:
+    if integrate:
+        return (
+            f"{count} findings, aggregate score {score}: choose whether to wire, finish, "
+            f"descope, or accept the work as WIP. {expected}"
+        )
+    return f"{count} findings, aggregate score {score}: {expected}"
 
 
 def _structural_group_sort_key(
@@ -328,6 +377,9 @@ def _recommended_fix(capability_id: str, language: str) -> str:
         "pre_pr": "Add a pre-PR check command or document the equivalent release gate.",
         "pre_cr": "Add a Pre-CR script or configuration.",
         "truth_file": "Create and maintain .tracker/PROJECT_TRUTH.md.",
+        "security_secrets_scan": "Add a secrets scan gate such as gitleaks detect --source .",
+        "security_dependency_audit": "Add a dependency audit gate such as pnpm audit --audit-level high.",
+        "security_static_analysis": "Add a static security analysis gate such as semgrep --config auto.",
     }
     fixes = python_fixes if language == "python" else javascript_fixes
     return fixes.get(capability_id, f"Provide the missing {capability_id} capability.")

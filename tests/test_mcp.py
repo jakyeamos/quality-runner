@@ -17,6 +17,10 @@ def test_mcp_lists_quality_runner_tools() -> None:
         "quality_runner_run",
         "quality_runner_status",
         "quality_runner_export_handoff",
+        "quality_runner_gate",
+        "quality_runner_gate_status",
+        "quality_runner_gate_respond",
+        "quality_runner_propose_fix",
     }
 
 
@@ -118,7 +122,7 @@ def test_mcp_initialize_and_tools_list_jsonrpc() -> None:
     assert initialize["result"]["serverInfo"] == {"name": "quality-runner", "version": __version__}
     assert initialize["result"]["capabilities"] == {"tools": {"listChanged": False}}
     assert tools is not None
-    assert len(tools["result"]["tools"]) == 5
+    assert len(tools["result"]["tools"]) == 9
 
 
 def test_mcp_notifications_do_not_return_response() -> None:
@@ -288,6 +292,53 @@ def test_mcp_export_handoff_rejects_symlinked_artifact_directories(tmp_path: Pat
         assert response["error"]["message"] == "artifact path component must not be a symlink"
 
 
+def test_mcp_gate_creates_driveable_run(tmp_path: Path) -> None:
+    write_js_fixture(tmp_path)
+    call_tool("quality_runner_run", {"repo_root": str(tmp_path), "run_id": "gate-source"})
+
+    result = call_tool(
+        "quality_runner_gate",
+        {
+            "repo_root": str(tmp_path),
+            "run_id": "gate-source",
+            "gate_run_id": "mcp-gate-001",
+            "intent": "Exercise gate controller over MCP",
+        },
+    )
+
+    structured = result["structuredContent"]
+    assert structured["schema"] == "quality-runner-gate-run-result-v0.1"
+    assert structured["gate_run"]["gate_run_id"] == "mcp-gate-001"
+    assert structured["implementation_allowed"] is False
+
+
+def test_mcp_propose_fix_writes_proposal_artifact(tmp_path: Path) -> None:
+    from test_support.quality_runner_fixtures import write_complete_js_fixture
+
+    write_complete_js_fixture(tmp_path)
+    source = tmp_path / "src" / "app" / "page.tsx"
+    source.parent.mkdir(parents=True, exist_ok=True)
+    source.write_text("const value: any = 1;\n", encoding="utf-8")
+    call_tool("quality_runner_run", {"repo_root": str(tmp_path), "run_id": "mcp-propose-run"})
+    handoff = json.loads(
+        (tmp_path / ".quality-runner/runs/mcp-propose-run/agent-handoff.json").read_text()
+    )
+
+    result = call_tool(
+        "quality_runner_propose_fix",
+        {
+            "repo_root": str(tmp_path),
+            "run_id": "mcp-propose-run",
+            "finding_group": handoff["next_slice"]["id"],
+        },
+    )
+
+    structured = result["structuredContent"]
+    assert structured["schema"] == "quality-runner-fix-propose-result-v0.1"
+    assert structured["implementation_allowed"] is False
+    assert structured["fix_proposals"]["applied"] is False
+
+
 def test_mcp_main_preserves_version_behavior(capsys) -> None:
     exit_code = main(["--version"])
 
@@ -304,4 +355,4 @@ def test_mcp_main_stdio_loop_writes_jsonrpc_response(monkeypatch, capsys) -> Non
     assert exit_code == 0
     response = json.loads(capsys.readouterr().out)
     assert response["id"] == 1
-    assert len(response["result"]["tools"]) == 5
+    assert len(response["result"]["tools"]) == 9

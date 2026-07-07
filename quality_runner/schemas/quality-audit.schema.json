@@ -30,7 +30,21 @@
         "evidence": { "type": "array", "items": { "type": "string" } },
         "recommended_fix": { "type": "string", "minLength": 1 },
         "verification": { "type": "array", "items": { "type": "string" } },
-        "score": { "type": "integer", "minimum": 0 }
+        "score": { "type": "integer", "minimum": 0 },
+        "actionability": {
+          "enum": [
+            "mechanical-fix",
+            "needs-author-decision",
+            "needs-maintainer-policy",
+            "dependency-setup",
+            "environment-blocker",
+            "read-only-policy",
+            "informational",
+            "accepted-disposition",
+            "needs-triage"
+          ]
+        },
+        "actionability_rationale": { "type": "string", "minLength": 1 }
       },
       "additionalProperties": false
     },

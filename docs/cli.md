@@ -76,6 +76,86 @@ scan_exclusions = ["samples", "generated-reports/**"]
 These augment the default exclusions for fixtures, corpora, docs, vendored
 trees, and tool output directories.
 
+Unwired-work checks can also be configured. They run as structural category
+`integrate` and produce decision-based remediation slices; see
+[Unwired Work Detection](unwired-work.md).
+
+## Shared Workflow Flags
+
+`inspect`, `run`, `verify-gates`, and `refresh` share these arguments:
+
+- `--intent`: short author goal for the run (what the user set out to accomplish)
+- `--intent-file`: path to intent JSON inside the target repo (must include `goal`)
+- `--ci-status-json`: local CI status export for capability evidence
+- `--profile`: standards profile override
+- `--run-id`: stable run id (refresh uses `--run-id-prefix` instead)
+- `--interactive`: prompt before excluding expensive default-ignored scan paths
+- `--checkout-most-advanced-branch`: switch to the local most-advanced branch first
+- `--skill-review-report`: merge a validated agent skill review report into findings
+- `--json`: emit machine-readable CLI output
+
+Intent is optional. When supplied, QR writes `intent.json` and embeds the packet
+on `run-manifest.json`, `agent-handoff.json`, and `run-summary.json`.
+
+## QR Gate Controller
+
+`gate`, `gate-status`, and `gate-respond` implement a driveable controller loop
+on top of existing run artifacts. They do not re-run `refresh` and they do not
+mutate source files.
+
+```bash
+quality-runner gate /path/to/repo --run-id refresh-001-verify --json
+quality-runner gate-status /path/to/repo --gate-run-id gate-20260707-001 --json
+quality-runner gate-respond /path/to/repo \
+  --gate-run-id gate-20260707-001 \
+  --action route-next-slice \
+  --finding-id gate-pnpm-install \
+  --notes "Run pnpm install before re-verify." \
+  --json
+```
+
+`gate` requires an existing run with `agent-handoff.json`. Use `--intent` or
+`--intent-file` when the source run has no intent artifact.
+
+`gate-respond` records controller decisions in `gate-responses.jsonl`. `approve`
+and `abort` close the gate run; `fix`, `skip`, `route-next-slice`, and
+`record-disposition` append history while leaving the run driveable until a
+terminal action is recorded.
+
+### Disposable worktree verification
+
+`verify-gates` and `refresh` accept:
+
+- `--worktree-mode in-place` (default): execute gates in the target repository
+- `--worktree-mode disposable`: execute gates in a detached git worktree at
+  `HEAD`, write artifacts to the original repo, and discard the worktree
+- `--allow-dirty-worktree-verify`: permit disposable verification when the
+  source worktree has local edits
+
+```bash
+quality-runner verify-gates /path/to/repo \
+  --run-id verify-disposable \
+  --worktree-mode disposable \
+  --allow-dirty-worktree-verify \
+  --json
+```
+
+## `quality-runner propose-fix`
+
+Writes structured fix proposals for a remediation finding group without
+applying source changes.
+
+```bash
+quality-runner propose-fix /path/to/repo \
+  --run-id refresh-001-verify \
+  --finding-group remediate-structural-src-app-page-tsx \
+  --json
+```
+
+`--finding-group` must match a remediation slice id or the current handoff
+`next_slice` id. Use repeated `--finding-id` to limit proposals to specific
+findings inside the group.
+
 ## `quality-runner status`
 
 Reports the normalized repo config and latest run metadata.
@@ -295,9 +375,9 @@ changes must include an explicit concurrency note.
 
 ## `quality-runner summarize-run`
 
-Prints a controller-friendly run summary with final status, gate table, missing
-capabilities, finding counts, a recommended classification, and an optional
-baseline delta.
+Prints a controller-friendly run summary with final status, `lifecycle_status`,
+handoff `status`, gate table, missing capabilities, finding counts, a recommended
+classification, optional embedded `intent`, and an optional baseline delta.
 
 ```bash
 quality-runner summarize-run /path/to/repo --run-id final-001 --json

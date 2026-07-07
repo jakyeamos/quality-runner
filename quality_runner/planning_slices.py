@@ -1,0 +1,82 @@
+from __future__ import annotations
+
+from typing import Any
+
+PRIORITY_ORDER = {"high": 0, "medium": 1, "low": 2}
+
+
+def slice_for_finding(finding: dict[str, Any]) -> dict[str, Any]:
+    finding_id = finding["id"]
+    recommended_fix = finding["recommended_fix"]
+    slice_item = {
+        "id": f"remediate-{finding_id}",
+        "title": f"Remediate {finding_id}",
+        "priority": priority_for_finding(finding),
+        "findings": [
+            {
+                "id": finding_id,
+                "severity": finding["severity"],
+                "category": finding["category"],
+                "summary": finding["summary"],
+                **_optional_actionability(finding),
+            }
+        ],
+        "actions": [
+            f"Apply recommended fix: {recommended_fix}",
+            f"Rerun quality-runner and confirm {finding_id} no longer appears.",
+        ],
+        "verification_gates": list(finding["verification"]),
+    }
+    score = finding.get("score")
+    if isinstance(score, int):
+        slice_item["score"] = score
+    return slice_item
+
+
+def slice_sort_key(slice_item: dict[str, Any]) -> tuple[int, int, int, str]:
+    findings = slice_item.get("findings")
+    category = None
+    if isinstance(findings, list) and findings and isinstance(findings[0], dict):
+        category = findings[0].get("category")
+    security_rank = 0 if isinstance(category, str) and category.startswith("security:") else 1
+    priority = str(slice_item.get("priority") or "")
+    score = slice_item.get("score")
+    ranking_score = score if isinstance(score, int) else 0
+    return security_rank, PRIORITY_ORDER.get(priority, 99), -ranking_score, str(slice_item.get("id") or "")
+
+
+def priority_for_finding(finding: dict[str, Any]) -> str:
+    category = finding.get("category")
+    severity = finding["severity"]
+    if isinstance(category, str) and category.startswith("security:"):
+        if severity in {"critical", "blocker"}:
+            return "high"
+        if category.startswith("security:agent-review"):
+            return "medium"
+        if severity == "warning":
+            return "medium"
+    if severity == "blocker":
+        return "high"
+    if severity == "warning":
+        return "medium"
+    return "low"
+
+
+def finding_sort_key(finding: dict[str, Any]) -> tuple[int, int, int, str]:
+    category = finding.get("category")
+    security_rank = 0 if isinstance(category, str) and category.startswith("security:") else 1
+    priority = priority_for_finding(finding)
+    score = finding.get("score")
+    ranking_score = score if isinstance(score, int) else 0
+    return security_rank, PRIORITY_ORDER.get(priority, 99), -ranking_score, finding["id"]
+
+
+def _optional_actionability(finding: dict[str, Any]) -> dict[str, str]:
+    actionability = finding.get("actionability")
+    rationale = finding.get("actionability_rationale")
+    if not isinstance(actionability, str) or not actionability:
+        return {}
+    payload: dict[str, str] = {"actionability": actionability}
+    if isinstance(rationale, str) and rationale:
+        payload["actionability_rationale"] = rationale
+    return payload

@@ -21,7 +21,11 @@ Artifacts are written under:
   most-advanced branch.
 - `code-quality-scan.json`: deterministic structural/code-quality findings,
   line accountability, duplicate clusters, skipped generated/vendor paths, and
-  non-blocking remediation buckets.
+  non-blocking remediation buckets. Opt-in architecture-contract findings use
+  category `architecture` when configured in `.quality-runner.toml`. Opt-in
+  Quality Skill findings use category `skill:<skill-id>` when configured.
+  Partially built or unwired work uses category `integrate`; see
+  [Unwired Work Detection](unwired-work.md).
 - `package-manager-preflight.json`: detected package-manager state, declared
   `packageManager`, lockfiles, and non-blocking warnings such as mixed lockfiles.
 - `standards.json`: compiled standards packet for the selected profile,
@@ -35,19 +39,95 @@ Artifacts are written under:
   include `capability_kind` so local commands, CI-only gates, and file/evidence
   capabilities can be handled independently.
 - `run-manifest.json`: run metadata, Quality Runner version, artifact paths, and
-  git HEAD/branch/dirty state when the target is a git repo.
+  git HEAD/branch/dirty state when the target is a git repo. When author intent
+  is supplied, the manifest also embeds the resolved `intent` packet.
+
+## Author Intent
+
+`inspect`, `run`, `verify-gates`, and `refresh` accept optional author intent
+through `--intent` or `--intent-file`. Intent captures what the user set out to
+accomplish, not a description of the diff.
+
+When present, QR writes:
+
+- `intent.json`: schema `quality-runner-intent-v0.1` with `goal`, optional
+  `constraints`, `non_goals`, `tradeoffs`, `risk_areas`, and
+  `verification_expectations`, plus provenance fields (`source`, `supplied_by`,
+  `captured_at`).
+- embedded `intent` on `run-manifest.json`, `agent-handoff.json`, and
+  `run-summary.json` when those artifacts are produced.
+
+The Markdown handoff renders intent under an `## Intent` section so human agents
+see the same goal context as controllers reading JSON.
+
+`--intent-file` must point at JSON inside the target repository. The file must
+include a non-empty `goal` string; other intent fields are optional lists or
+strings.
+
+## Gate Controller Artifacts
+
+QR Gate is an optional controller protocol layered on top of existing run
+artifacts. It stays source-read-only: `gate-respond` appends decision history
+only and never edits repository source files.
+
+`quality-runner gate` reads an existing run (typically a verify or refresh run)
+and writes:
+
+```text
+<repo>/.quality-runner/gate-runs/<gate-run-id>/
+  gate-run.json
+  gate-responses.jsonl
+  intent.json            # only when --intent/--intent-file is supplied and the source run has no intent
+```
+
+`gate-run.json` uses schema `quality-runner-gate-run-v0.1` and records:
+
+- linked `run_id`
+- `status`: `awaiting-response`, `ready-to-proceed`, `completed`, or `aborted`
+- `phase`: `post-run` or `post-verify`
+- `lifecycle_status` and optional `awaiting` routing (`blocker-routing`,
+  `finding-triage`, `author-decision`, `workflow-timeout`)
+- artifact paths back to the source run handoff, audit, and gate verification
+
+`gate-responses.jsonl` is append-only. Each line uses schema
+`quality-runner-gate-response-v0.1` with `action` in
+`approve|fix|skip|route-next-slice|record-disposition|abort`, optional
+`finding_ids`, and provenance (`actor`, `at`, `notes`).
+
+## Fix Proposal Artifacts
+
+`quality-runner propose-fix` writes `fix-proposals.json` for a remediation
+finding group without editing repository source files. The artifact uses schema
+`quality-runner-fix-proposals-v0.1` and always records `implementation_allowed:
+false` and `applied: false`.
+
+Each proposal links to a finding id (and optional fingerprint) from the selected
+remediation slice or handoff `next_slice`. Proposal kinds are:
+
+- `instruction` — recommended fix plus verification steps for mechanical findings
+- `command` — explicit setup or gate command for blocker-class findings
+- `unified-diff` — reserved for future unified diff payloads; QR core does not
+  apply patches
+
+Every proposal and the parent artifact include deterministic `checksum`
+fields so external executors can detect tampering. QR never applies proposals;
+an external agent or human applies changes and reruns Quality Runner.
 
 ## Run Artifacts
 
 `quality-runner run` writes all inspect artifacts plus:
 
 - `quality-audit.json`: evidence-backed findings with severity, optional owner,
-  category, evidence, recommended fix, verification, and optional aggregate
-  score for grouped structural findings.
+  category, evidence, recommended fix, verification, optional aggregate
+  score for grouped structural findings, and deterministic `actionability`
+  routing (`fix-now`, `triage`, `accept-risk`, `defer`, `informational`) with
+  `actionability_rationale`.
 - `remediation-plan.json`: adoption stage, stopping criteria, and ordered
   remediation slices with priority, actions, findings, and verification gates.
   Structural scan slices are advisory clusters by file so an external agent can
   choose one coherent batch without Quality Runner executing remediation.
+  `integrate` findings produce decision slices that ask whether to wire, finish,
+  descope, or accept WIP rather than defaulting to cleanup.
 - `resolution-ledger.json`: current finding lifecycle state by stable
   fingerprint, preserving accepted dispositions and marking disappeared
   findings as superseded by the current scan unless an external actor records a
@@ -55,10 +135,15 @@ Artifacts are written under:
 - `resolution-ledger.md`: human-readable resolution ledger summary.
 - `agent-handoff.json`: machine-readable next-slice handoff using schema
   `quality-runner-agent-handoff-v0.2`, including adoption
-  stage, stopping criteria, missing repo-owned gates with suggested commands,
-  gate verification status/classification for verified runs, gate blockers with
-  setup guidance, primary blocker class, grouped blocker routing, and
-  runner-provided structural checks that produced findings.
+  stage, stopping criteria, optional embedded `intent`, `lifecycle_status`
+  (`audit-clean`, `gates-clean`, `merge-ready`, `blocked`, `failed`,
+  `workflow-timeout`, `needs-triage`), missing repo-owned gates with suggested
+  commands, gate verification status/classification for verified runs, gate
+  blockers with setup guidance, primary blocker class, grouped blocker routing,
+  and runner-provided structural checks that produced findings.
+  `merge-ready` means local gates passed and every ingested CI check reports
+  `conclusion: success`; it is separate from handoff `status` values such as
+  `gates-clean`.
 - `agent-handoff.md`: human-readable handoff for a coding agent. The Markdown
   intentionally separates missing repo-owned gates such as `pnpm test` or
   `pnpm typecheck` from Quality Runner's built-in structural checks so readers
@@ -98,6 +183,19 @@ executed local command. If a safe-looking command mutates tracked files, QR
 restores the pre-gate tracked diff, marks the gate with
 `failure_type=read-only-mutation`, and classifies the run as a
 `read-only-gate-blocker`.
+
+`verify-gates` and `refresh` accept `--worktree-mode in-place|disposable`.
+Disposable mode creates a detached git worktree at the current `HEAD` under
+`.quality-runner/worktrees/<run-id>/`, executes gates inside that isolated copy,
+writes QR artifacts to the original repository, and removes the worktree when
+verification completes. Gate results record `verification_context` on
+`gate-verification.json` with `worktree_mode`, `base_head`, `execution_root`,
+`mutations_isolated`, and optional `dirty_source_worktree`.
+
+Disposable mode refuses a dirty source worktree unless
+`--allow-dirty-worktree-verify` is set. In disposable mode, mutating gates may
+run inside the isolated worktree even when `read_only_gates` is active, because
+the user's working tree is not mutated.
 
 This command is intentionally separate from `inspect` and `run` so capability
 discovery, command execution, and command pass/fail are distinguishable. For

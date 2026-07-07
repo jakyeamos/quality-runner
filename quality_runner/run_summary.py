@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 from typing import Any
 
+from quality_runner.lifecycle_status import compute_lifecycle_status
 from quality_runner.timeout_diagnostics import concise_timeout_diagnostics
 
 RUN_SUMMARY_SCHEMA = "quality-runner-run-summary-v0.1"
@@ -41,6 +42,8 @@ def _run_summary(*, repo_root: Path, run_id: str) -> dict[str, Any]:
     audit = _load_optional_json(run_dir / "quality-audit.json")
     capability_map = _load_optional_json(run_dir / "capability-matrix.json")
     gate_verification = _load_optional_json(run_dir / "gate-verification.json")
+    repo_scan = _load_optional_json(run_dir / "repo-scan.json")
+    handoff = _load_optional_json(run_dir / "agent-handoff.json")
     gate_results = _gate_results(gate_verification)
     missing_capabilities = _missing_capabilities(capability_map)
     finding_counts = _finding_counts(audit)
@@ -52,6 +55,16 @@ def _run_summary(*, repo_root: Path, run_id: str) -> dict[str, Any]:
         missing_capabilities=missing_capabilities,
         finding_counts=finding_counts,
     )
+    handoff_status = _string_or_none(handoff.get("status"))
+    lifecycle_status = handoff.get("lifecycle_status")
+    if not isinstance(lifecycle_status, str) or not lifecycle_status:
+        lifecycle_status = compute_lifecycle_status(
+            summary_status=status,
+            handoff_status=handoff_status,
+            gate_verification=gate_verification,
+            audit=audit,
+            repo_scan=repo_scan,
+        )
     return {
         "run_id": run_id,
         "path": str(run_dir),
@@ -65,6 +78,8 @@ def _run_summary(*, repo_root: Path, run_id: str) -> dict[str, Any]:
             finding_counts=finding_counts,
             blocker_classes=blocker_classes,
         ),
+        "lifecycle_status": lifecycle_status,
+        **_optional_field("handoff_status", handoff_status),
         "blocker_classes": blocker_classes,
         "gate_results": gate_results,
         "missing_capabilities": missing_capabilities,

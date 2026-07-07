@@ -1,0 +1,258 @@
+# Quality Skills
+
+Quality Skills let you attach standards you personally value to a codebase. Quality
+Runner evaluates whether the repository lives up to those standards and includes
+failures as normal findings in the audit and remediation plan.
+
+Skills are **opt-in**, **local-first**, and **non-executable**. Quality Runner
+does not call a model, run arbitrary skill code, or perform remediation.
+
+## Why Quality Skills exist
+
+Generic structural scans answer whether a repo satisfies broad code-quality
+expectations. Quality Skills answer a different question:
+
+> Does this repository reflect the standards this user or team intentionally values?
+
+Examples include UI polish, accessibility, API design, architecture boundaries,
+validation quality, test quality, product copy hygiene, and performance budgets.
+
+## Local design
+
+Skills are stored as local TOML packs:
+
+```text
+.quality-runner/skills/<skill-id>.toml
+```
+
+Enable them in `.quality-runner.toml`:
+
+```toml
+[quality_runner.skills]
+enabled = true
+active = ["ui-polish", "architecture-boundaries"]
+
+[[quality_runner.skills.local]]
+id = "ui-polish"
+path = ".quality-runner/skills/ui-polish.toml"
+applies_to = ["apps/web/**", "packages/ui/**"]
+
+[[quality_runner.skills.local]]
+id = "architecture-boundaries"
+path = ".quality-runner/skills/architecture-boundaries.toml"
+applies_to = ["**/*.ts", "**/*.tsx"]
+```
+
+Behavior:
+
+- If `[quality_runner.skills]` is absent, no skills run.
+- If `enabled = false`, no skills run.
+- If `active` is present, only listed skill ids run.
+- If `active` is absent, all configured local skills may run.
+- Skill paths must stay inside the repo. Path traversal is rejected.
+- Missing or malformed skill files are skipped safely and surfaced as warnings.
+
+## Deterministic rules
+
+v1 supports three deterministic rule types:
+
+1. `disallowed_pattern` — emit a finding when a line matches a configured regex.
+2. `trigger_without_required` — emit a finding when a file has a trigger pattern
+   but none of the required patterns.
+3. `import_boundary` — emit a finding when a source file imports a disallowed target.
+
+Example skill pack:
+
+```toml
+id = "ui-polish"
+name = "UI Polish Standards"
+version = "0.1.0"
+description = "Checks for interaction clarity, loading states, empty states, accessibility, and product polish."
+
+[[deterministic_rules]]
+id = "ui-clickable-div"
+type = "disallowed_pattern"
+category = "accessibility"
+severity = "warning"
+paths = ["**/*.tsx", "**/*.jsx"]
+disallowed_patterns = ["<div[^>]+onClick="]
+message = "Clickable divs should usually be semantic buttons or links."
+risk = "Non-semantic interactive elements hurt keyboard and assistive technology users."
+expected = "Use button/link semantics or provide keyboard and ARIA support."
+verification = "Rerun quality-runner and confirm this skill finding clears."
+```
+
+Skill findings use category `skill:<skill-id>` and flow through
+`code-quality-scan.json`, `quality-audit.json`, `remediation-plan.json`, and
+`agent-handoff.md` like other structural findings.
+
+## Agent-assisted reviews
+
+Some standards require judgment. Skills can define `agent_reviews` rubrics. Quality
+Runner compiles them into review packet artifacts:
+
+```text
+.quality-runner/runs/<run-id>/skill-review-packet.json
+.quality-runner/runs/<run-id>/skill-review-packet.md
+```
+
+Quality Runner does **not** call a model. A supervising agent reads the packet,
+inspects the repo, and produces a review report.
+
+### Review report schema
+
+```json
+{
+  "schema": "quality-runner-skill-review-report-v0.1",
+  "run_id": "example-run",
+  "reviewer": {
+    "type": "agent",
+    "name": "coding-agent"
+  },
+  "findings": [
+    {
+      "skill_id": "ui-polish",
+      "review_id": "ui-polish-review",
+      "rule_id": "ui-polish-review/missing-empty-state",
+      "severity": "observation",
+      "confidence": "medium",
+      "file": "apps/web/src/search/results.tsx",
+      "line": 42,
+      "summary": "Collection UI renders results without an empty state.",
+      "evidence": "{items.map((item) => <ResultCard item={item} />)}",
+      "risk": "Users may see a blank or confusing screen when no results are available.",
+      "expected_improvement": "Add an empty state for zero-result or unavailable-data cases.",
+      "verification": "Rerun Quality Runner and confirm this skill finding clears or is dispositioned."
+    }
+  ]
+}
+```
+
+Quality Runner validates agent-produced findings before merging them. Findings
+without file, line, or evidence are rejected or ignored.
+
+Merge a validated report during a run:
+
+```bash
+quality-runner run /path/to/repo \
+  --run-id skill-audit-001-reviewed \
+  --skill-review-report /tmp/skill-review-report.json \
+  --json
+```
+
+Validate a report without running a full audit:
+
+```bash
+quality-runner validate-skill-review /tmp/skill-review-report.json \
+  --repo-path /path/to/repo \
+  --json
+```
+
+## Skill ingest
+
+Users may have standards in natural language, markdown, or another agent skill
+format. Quality Runner does not creatively interpret those inputs. Instead:
+
+```text
+Raw skill / user preference / markdown guide
+        ↓
+Agent-facing skill ingest prompt (docs/skill-ingest-agent.md)
+        ↓
+Agent converts it into QR skill TOML
+        ↓
+QR validates and registers the skill
+        ↓
+QR uses the skill in deterministic scans and/or review packets
+```
+
+Dry run:
+
+```bash
+quality-runner skill ingest /tmp/ui-polish.toml \
+  --repo-path /path/to/repo \
+  --id ui-polish \
+  --json
+```
+
+Register and activate:
+
+```bash
+quality-runner skill ingest /tmp/ui-polish.toml \
+  --repo-path /path/to/repo \
+  --id ui-polish \
+  --activate \
+  --write \
+  --json
+```
+
+Skill ingest may write QR-owned files only:
+
+- `.quality-runner/skills/<skill-id>.toml`
+- `.quality-runner.toml`
+
+It must not edit application source files.
+
+## Safety boundary
+
+Quality Runner may:
+
+- inspect repositories,
+- run deterministic local scans,
+- compile standards and skills,
+- generate review packets for an agent,
+- ingest validated agent-review reports,
+- emit evidence-backed findings,
+- write QR-owned artifacts,
+- produce remediation plans and handoffs.
+
+Quality Runner must not:
+
+- edit target source files,
+- execute remediation,
+- install target dependencies,
+- create commits,
+- call remote services directly for review,
+- run arbitrary skill code,
+- apply fixes.
+
+```text
+Agent review is allowed.
+Agent execution/remediation through QR is not allowed.
+```
+
+## End-to-end workflow
+
+```bash
+# 1. User gives an agent a raw skill they like.
+
+# 2. Agent uses docs/skill-ingest-agent.md to convert it into /tmp/ui-polish.toml
+
+# 3. Validate the candidate skill
+quality-runner skill ingest /tmp/ui-polish.toml \
+  --repo-path . \
+  --id ui-polish \
+  --json
+
+# 4. Register and activate after approval
+quality-runner skill ingest /tmp/ui-polish.toml \
+  --repo-path . \
+  --id ui-polish \
+  --activate \
+  --write \
+  --json
+
+# 5. Run with deterministic skill findings
+quality-runner run . --run-id skill-audit-001 --json
+
+# 6. QR emits skill-review-packet.* when agent reviews are configured
+
+# 7. Agent produces /tmp/skill-review-report.json
+
+# 8. Validate and merge the review
+quality-runner run . \
+  --run-id skill-audit-001-reviewed \
+  --skill-review-report /tmp/skill-review-report.json \
+  --json
+```
+
+See also [Skill Ingest Agent Prompt](skill-ingest-agent.md).

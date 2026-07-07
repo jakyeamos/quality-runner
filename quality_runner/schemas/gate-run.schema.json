@@ -1,0 +1,69 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://quality-runner.dev/schemas/gate-run.schema.json",
+  "title": "Quality Runner Gate Run",
+  "type": "object",
+  "required": [
+    "schema",
+    "run_id",
+    "gate_run_id",
+    "status",
+    "phase",
+    "lifecycle_status",
+    "artifact_paths",
+    "implementation_allowed"
+  ],
+  "properties": {
+    "schema": { "const": "quality-runner-gate-run-v0.1" },
+    "run_id": { "type": "string", "minLength": 1 },
+    "gate_run_id": { "type": "string", "minLength": 1 },
+    "status": {
+      "enum": ["awaiting-response", "ready-to-proceed", "completed", "aborted"]
+    },
+    "phase": { "enum": ["post-run", "post-verify"] },
+    "awaiting": {
+      "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/awaiting" }]
+    },
+    "lifecycle_status": {
+      "enum": [
+        "audit-clean",
+        "gates-clean",
+        "merge-ready",
+        "blocked",
+        "failed",
+        "workflow-timeout",
+        "needs-triage"
+      ]
+    },
+    "handoff_status": { "type": ["string", "null"] },
+    "artifact_paths": {
+      "type": "object",
+      "additionalProperties": { "type": "string" }
+    },
+    "intent_ref": { "type": ["string", "null"] },
+    "implementation_allowed": { "const": false },
+    "created_at": { "type": "string", "minLength": 1 },
+    "updated_at": { "type": "string", "minLength": 1 },
+    "last_response_at": { "type": ["string", "null"] }
+  },
+  "$defs": {
+    "awaiting": {
+      "type": "object",
+      "required": ["kind", "since"],
+      "properties": {
+        "kind": {
+          "enum": [
+            "blocker-routing",
+            "finding-triage",
+            "author-decision",
+            "workflow-timeout",
+            "none"
+          ]
+        },
+        "primary_blocker_class": { "type": ["string", "null"] },
+        "since": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": false
+    }
+  }
+}

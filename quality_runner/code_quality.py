@@ -6,6 +6,7 @@ import os
 from pathlib import Path
 from typing import Any
 
+from quality_runner.code_quality_architecture import architecture_findings
 from quality_runner.code_quality_duplicates import _duplicate_clusters, _extract_functions
 from quality_runner.code_quality_findings import (
     CATEGORY_ORDER,
@@ -33,6 +34,8 @@ from quality_runner.code_quality_paths import (
 )
 from quality_runner.code_quality_ponytail import ponytail_findings
 from quality_runner.code_quality_rules import _scan_file
+from quality_runner.code_quality_skills import skill_findings
+from quality_runner.code_quality_unwired import unwired_findings
 from quality_runner.scan_exclusions import (
     gitignore_scan_exclusions,
     matches_scan_exclusion,
@@ -66,6 +69,7 @@ def create_code_quality_scan(
     *,
     scan: dict[str, Any],
     config: dict[str, Any],
+    skill_review_report: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     root = repo_root.expanduser().resolve()
     policy = _structural_policy(config)
@@ -141,6 +145,19 @@ def create_code_quality_scan(
 
     if "speed" not in disabled_groups:
         findings.extend(_bundle_budget_findings(root))
+
+    if "integrate" not in disabled_groups:
+        findings.extend(unwired_findings(scanned_files, config))
+
+    findings.extend(architecture_findings(scanned_files, config))
+    findings.extend(
+        skill_findings(
+            repo_root=root,
+            scanned_files=scanned_files,
+            config=config,
+            skill_review_report=skill_review_report,
+        )
+    )
 
     sorted_findings = sorted(findings, key=_finding_sort_key)
     for index, finding in enumerate(sorted_findings, start=1):

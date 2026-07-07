@@ -86,6 +86,11 @@ Structural scan findings are default-on and non-blocking. Repos can disable
 rule groups, tune large-file/router thresholds, or preserve accepted dispositions
 by stable finding fingerprint.
 
+Opt-in architecture contracts add repo-specific import-boundary and
+pattern-boundary rules under `[quality_runner.architecture]`. See
+[Architecture Contracts](architecture-contracts.md) for configuration examples and
+rollout guidance.
+
 Unknown profiles fail closed unless they are defined under
 `quality_runner.profiles`.
 

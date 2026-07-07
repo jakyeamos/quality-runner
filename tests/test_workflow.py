@@ -56,6 +56,7 @@ def test_run_payload_writes_audit_plan_and_handoff(tmp_path: Path) -> None:
     assert set(artifact_paths) == {
         "repo_scan_json",
         "code_quality_scan_json",
+        "security_scan_json",
         "package_manager_preflight_json",
         "standards_json",
         "capability_matrix_json",
@@ -615,6 +616,10 @@ def test_run_payload_handoff_contains_next_slice_and_verification_gates(tmp_path
                 "severity": "blocker",
                 "category": "capability",
                 "summary": "Required quality capability is missing: formatter.",
+                "actionability": "needs-maintainer-policy",
+                "actionability_rationale": (
+                    "Missing repo-owned quality gates require maintainer policy or adoption work."
+                ),
             }
         ],
         "actions": [
@@ -625,6 +630,7 @@ def test_run_payload_handoff_contains_next_slice_and_verification_gates(tmp_path
             "Add the formatter capability and rerun quality-runner.",
             "Confirm audit finding missing-formatter is absent from the regenerated report.",
         ],
+        "score": 900,
     }
     assert handoff["verification_gates"] == [
         "Add the formatter capability and rerun quality-runner.",
@@ -764,6 +770,10 @@ def test_generated_remediation_plan_orders_findings_and_exposes_actions(tmp_path
             "severity": "blocker",
             "category": "capability",
             "summary": "Required quality capability is missing: dead_code.",
+            "actionability": "needs-maintainer-policy",
+            "actionability_rationale": (
+                "Missing repo-owned quality gates require maintainer policy or adoption work."
+            ),
         }
     ]
 

@@ -31,6 +31,9 @@ def suggested_gate_command(capability_id: str, language: object) -> str:
         "pre_pr": "pnpm pre-pr",
         "pre_cr": "pnpm pre-cr",
         "truth_file": "maintain .tracker/PROJECT_TRUTH.md",
+        "security_secrets_scan": "gitleaks detect --source .",
+        "security_dependency_audit": "pnpm audit --audit-level high",
+        "security_static_analysis": "semgrep --config auto",
     }
     commands = python_commands if language == "python" else javascript_commands
     return commands.get(capability_id, f"add a {capability_id} gate")

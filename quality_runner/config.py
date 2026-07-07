@@ -4,6 +4,11 @@ import tomllib
 from pathlib import Path
 from typing import Any
 
+from quality_runner.architecture_config_parse import parse_architecture_section
+from quality_runner.integrate_config_parse import parse_integrate_section
+from quality_runner.security.config_parse import parse_security_section
+from quality_runner.skills_config_parse import parse_skills_section
+
 CONFIG_FILE_NAME = ".quality-runner.toml"
 CONFIG_SCHEMA = "quality-runner-config-v0.1"
 PROFILE_EXTENDS_DEFAULT = "default"
@@ -62,7 +67,11 @@ def load_repo_config(repo_root: Path) -> dict[str, Any]:
         section.get("severity_overrides"), "quality_runner.severity_overrides", warnings
     )
     structural_scan = _structural_scan(section.get("structural_scan"), warnings)
-    return _config(
+    integrate = parse_integrate_section(section.get("integrate"), warnings)
+    architecture = parse_architecture_section(section.get("architecture"), warnings)
+    security = parse_security_section(section.get("security"), warnings)
+    skills = parse_skills_section(section.get("skills"), warnings)
+    payload = _config(
         path=CONFIG_FILE_NAME,
         default_profile=default_profile,
         profiles=profiles,
@@ -78,6 +87,15 @@ def load_repo_config(repo_root: Path) -> dict[str, Any]:
         structural_scan=structural_scan,
         warnings=warnings,
     )
+    if integrate:
+        payload["integrate"] = integrate
+    if architecture:
+        payload["architecture"] = architecture
+    if security:
+        payload["security"] = security
+    if skills:
+        payload["skills"] = skills
+    return payload
 
 
 # fmt: off

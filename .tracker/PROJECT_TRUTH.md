@@ -1,6 +1,6 @@
 # Quality Runner Project Truth
 
-Last updated: 2026-07-04
+Last updated: 2026-07-07
 
 Quality Runner is the public, installable quality orchestration package. It owns
 the CLI/MCP workflow for repo inspection, gate evidence, audit generation,
@@ -48,6 +48,20 @@ Current package-mining state:
 
 Current verification:
 
+- 2026-07-07: Added `integrate` unwired-work detection, dead-code output
+  reinterpretation, and decision-based remediation slices that ask authors to
+  wire, finish, descope, or accept WIP. Verified with focused unwired-work
+  tests (`uv run pytest -q tests/test_code_quality_unwired.py
+  tests/test_unwired_from_dead_code.py tests/test_remediation_wiring.py
+  tests/test_config.py tests/test_phase1_semantics.py
+  tests/test_workflow.py::test_run_payload_adds_structural_findings_and_groups_remediation_slices
+  tests/test_code_quality.py::test_quality_runner_source_files_stay_under_default_large_file_threshold`),
+  full `uv run pytest -q`, touched-file `uv run ruff check ...`, and
+  `uv run --with vulture vulture . --min-confidence 70`. Full
+  `uv run ruff check .` remains blocked by unrelated lint debt in
+  `quality_runner/gate_execution_policy.py`, `quality_runner/security/*`, and
+  `tests/test_fix_proposals.py`; `uv run basedpyright` remains blocked by an
+  unrelated `quality_runner/mcp.py` redeclaration.
 - 2026-07-04: Documented the AIOS launch shortcut in the rollout controller
   notes. Verified with `uv run pytest -q tests/test_rollout.py
   tests/test_release_docs.py` and `uv run ruff check docs/qr-rollout-20260702.md`

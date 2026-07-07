@@ -12,6 +12,8 @@ CATEGORY_ORDER = [
     "speed",
     "improve-tests",
     "ui_structural",
+    "architecture",
+    "integrate",
 ]
 CONFIDENCE_WEIGHT = {"high": 3, "medium": 2, "low": 1}
 SEVERITY_WEIGHT = {"warning": 3, "observation": 1}
@@ -55,10 +57,18 @@ def _fingerprint(rule_id: str, file: str, evidence: str) -> str:
     return hashlib.sha256(f"{rule_id}:{file}:{normalized}".encode()).hexdigest()[:16]
 
 
+def _category_rank(category: str) -> int:
+    if category in CATEGORY_ORDER:
+        return CATEGORY_ORDER.index(category)
+    if category.startswith("skill:"):
+        return len(CATEGORY_ORDER)
+    return len(CATEGORY_ORDER) + 1
+
+
 def _finding_sort_key(finding: dict[str, Any]) -> tuple[int, int, str, int, str]:
     return (
         -int(finding["score"]),
-        CATEGORY_ORDER.index(str(finding["category"])),
+        _category_rank(str(finding["category"])),
         str(finding["file"]),
         int(finding["line"]),
         str(finding["rule_id"]),

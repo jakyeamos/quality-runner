@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://quality-runner.dev/schemas/security-scan.schema.json",
+  "title": "Quality Runner Security Scan",
+  "type": "object",
+  "required": [
+    "schema",
+    "run_id",
+    "repo_root",
+    "summary",
+    "taxonomy",
+    "candidates",
+    "agent_review_gates",
+    "missing_capabilities",
+    "available_capabilities"
+  ],
+  "properties": {
+    "schema": { "const": "quality-runner-security-scan-v0.1" },
+    "run_id": { "type": ["string", "null"] },
+    "repo_root": { "type": "string", "minLength": 1 },
+    "summary": { "type": "object" },
+    "taxonomy": { "type": "object" },
+    "candidates": { "type": "array" },
+    "agent_review_gates": { "type": "array" },
+    "missing_capabilities": { "type": "array" },
+    "available_capabilities": { "type": "array" },
+    "surfaces": { "type": "object" },
+    "settings": { "type": "object" }
+  },
+  "additionalProperties": true
+}

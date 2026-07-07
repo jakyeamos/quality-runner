@@ -40,7 +40,15 @@
             "superseded-by-current-scan",
             "accepted-intentional",
             "accepted-false-positive",
-            "blocked-with-prerequisite"
+            "blocked-with-prerequisite",
+            "unreviewed",
+            "review-required",
+            "true-positive",
+            "false-positive",
+            "accepted-risk",
+            "stale",
+            "superseded",
+            "blocked"
           ]
         },
         "category": { "type": "string", "minLength": 1 },

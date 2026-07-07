@@ -40,38 +40,44 @@ def verify_discovered_gates(
     gate_timeouts: dict[str, int] | None = None,
     read_only_gates: bool = False,
     allow_mutating_gates: bool = False,
+    execution_root: Path | None = None,
+    mutations_isolated: bool = False,
+    verification_context: dict[str, Any] | None = None,
     on_partial_result: Any | None = None,
 ) -> dict[str, Any]:
     gates: list[dict[str, Any]] = []
     passed_leaf_ids: set[str] = set()
     dependency_setup_blockers: dict[tuple[str, str], dict[str, Any]] = {}
     resolved_gate_timeouts = valid_gate_timeouts(gate_timeouts)
+    execution_repo = execution_root or repo_root
     execution_plan = build_gate_execution_plan(
-        repo_root=repo_root,
+        repo_root=execution_repo,
         capability_map=capability_map,
         timeout_seconds=timeout_seconds,
         gate_timeouts=resolved_gate_timeouts,
         read_only_gates=read_only_gates,
         allow_mutating_gates=allow_mutating_gates,
+        mutations_isolated=mutations_isolated,
     )
     for capability in ordered_capabilities(capability_map):
         capability_id = str(capability.get("id") or "unknown")
         timeout = resolved_gate_timeouts.get(capability_id, timeout_seconds)
         blocked_by_setup = dependency_setup_blockers.get(
-            dependency_setup_context(repo_root=repo_root, capability=capability)
+            dependency_setup_context(repo_root=execution_repo, capability=capability)
         )
         if blocked_by_setup is None:
             gate = _verify_gate(
-                repo_root=repo_root,
+                repo_root=execution_repo,
                 capability=capability,
                 timeout_seconds=timeout,
                 covered_by=_covered_by(capability, passed_leaf_ids),
                 read_only_gates=read_only_gates,
                 allow_mutating_gates=allow_mutating_gates,
+                mutations_isolated=mutations_isolated,
             )
         else:
             gate = dependency_setup_skipped_gate(
-                repo_root=repo_root,
+                repo_root=execution_repo,
                 capability=capability,
                 timeout_seconds=timeout,
                 blocked_by=blocked_by_setup,
@@ -84,7 +90,7 @@ def verify_discovered_gates(
             and gate.get("status") == "failed"
         ):
             dependency_setup_blockers[
-                dependency_setup_context(repo_root=repo_root, capability=capability)
+                dependency_setup_context(repo_root=execution_repo, capability=capability)
             ] = gate
         if on_partial_result is not None:
             on_partial_result(
@@ -96,6 +102,7 @@ def verify_discovered_gates(
                     read_only_gates=read_only_gates,
                     allow_mutating_gates=allow_mutating_gates,
                     execution_plan=execution_plan,
+                    verification_context=verification_context,
                 )
             )
     return _verification_payload(
@@ -106,6 +113,7 @@ def verify_discovered_gates(
         read_only_gates=read_only_gates,
         allow_mutating_gates=allow_mutating_gates,
         execution_plan=execution_plan,
+        verification_context=verification_context,
     )
 
 
@@ -118,6 +126,7 @@ def _verification_payload(
     read_only_gates: bool,
     allow_mutating_gates: bool,
     execution_plan: list[dict[str, Any]],
+    verification_context: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     return {
         "schema": GATE_VERIFICATION_SCHEMA,
@@ -130,6 +139,7 @@ def _verification_payload(
         "environment": _environment(),
         "execution_plan": execution_plan,
         "gates": gates,
+        **_optional_field("verification_context", verification_context),
     }
 
 
@@ -172,6 +182,7 @@ def _verify_gate(
     covered_by: list[str],
     read_only_gates: bool,
     allow_mutating_gates: bool,
+    mutations_isolated: bool = False,
 ) -> dict[str, Any]:
     command = capability.get("command")
     capability_id = str(capability.get("id") or "unknown")
@@ -183,6 +194,14 @@ def _verify_gate(
             "status": "skipped",
             "capability_kind": "ci_only",
             "reason": "capability is CI-only and has no local executor",
+            "source": source,
+        }
+    if capability_kind in {"agent_review", "evidence"}:
+        return {
+            "id": capability_id,
+            "status": "skipped",
+            "capability_kind": capability_kind,
+            "reason": "capability is a review obligation or evidence signal, not an executable gate",
             "source": source,
         }
     if capability_kind == "evidence_file":
@@ -211,7 +230,12 @@ def _verify_gate(
             "source": source,
         }
     risk = mutating_risk(capability_id=capability_id, capability=capability)
-    if read_only_gates and not allow_mutating_gates and risk in {"mutating", "unknown"}:
+    if (
+        read_only_gates
+        and not allow_mutating_gates
+        and not mutations_isolated
+        and risk in {"mutating", "unknown"}
+    ):
         return {
             "id": capability_id,
             "status": "skipped",
@@ -227,7 +251,9 @@ def _verify_gate(
 
     started = time.monotonic()
     readonly_snapshot = (
-        tracked_snapshot(repo_root) if read_only_gates and not allow_mutating_gates else None
+        tracked_snapshot(repo_root)
+        if read_only_gates and not allow_mutating_gates and not mutations_isolated
+        else None
     )
     try:
         result = run_shell_command(
@@ -382,7 +408,7 @@ def _string_or_none(value: object) -> str | None:
 
 def _capability_kind(capability: dict[str, Any]) -> str:
     kind = capability.get("capability_kind")
-    if kind in {"local_command", "ci_only", "evidence_file"}:
+    if kind in {"local_command", "ci_only", "evidence_file", "agent_review", "evidence"}:
         return str(kind)
     if capability.get("local_execution") == "ci-only":
         return "ci_only"

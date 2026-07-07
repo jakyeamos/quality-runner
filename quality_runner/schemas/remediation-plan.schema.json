@@ -42,11 +42,40 @@
         "title": { "type": "string", "minLength": 1 },
         "priority": { "enum": ["high", "medium", "low"] },
         "implementation_allowed": { "const": false },
+        "disposition_required": { "type": "boolean" },
         "score": { "type": "integer" },
         "findings": { "type": "array", "items": { "type": "object" } },
         "actions": { "type": "array", "items": { "type": "string" } },
+        "action_groups": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/actionGroup" }
+        },
         "verification_gates": { "type": "array", "items": { "type": "string" } }
       },
+      "additionalProperties": false
+    },
+    "actionGroup": {
+      "type": "object",
+      "required": ["class", "actions"],
+      "properties": {
+        "class": { "type": "string", "minLength": 1 },
+        "gate_ids": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "minItems": 1
+        },
+        "finding_ids": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "minItems": 1
+        },
+        "actions": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "minItems": 1
+        }
+      },
+      "anyOf": [{ "required": ["gate_ids"] }, { "required": ["finding_ids"] }],
       "additionalProperties": false
     },
     "warnings": {

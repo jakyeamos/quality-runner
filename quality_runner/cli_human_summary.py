@@ -3,6 +3,8 @@ from __future__ import annotations
 from typing import Any
 
 from quality_runner import __version__
+from quality_runner.cli_fix_proposals import FIX_PROPOSAL_RESULT_SCHEMAS
+from quality_runner.cli_gate import GATE_RESULT_SCHEMAS
 from quality_runner.cli_status import EXPORT_HANDOFF_RESULT_SCHEMA, STATUS_RESULT_SCHEMA
 from quality_runner.release_smoke import RELEASE_SMOKE_SCHEMA
 from quality_runner.run_summary import RUN_SUMMARY_SCHEMA
@@ -30,7 +32,35 @@ def human_summary(payload: dict[str, Any]) -> str:
             return f"handoff: {output_path}"
         return f"handoff: {payload.get('source_path')}"
     if payload.get("schema") == RUN_SUMMARY_SCHEMA:
-        return f"status: {status}\nrun id: {payload.get('run_id')}"
+        lifecycle = payload.get("lifecycle_status")
+        lines = [f"status: {status}", f"run id: {payload.get('run_id')}"]
+        if isinstance(lifecycle, str) and lifecycle:
+            lines.append(f"lifecycle: {lifecycle}")
+        return "\n".join(lines)
+    if payload.get("schema") in GATE_RESULT_SCHEMAS:
+        gate_run = payload.get("gate_run")
+        gate_run_id = gate_run.get("gate_run_id") if isinstance(gate_run, dict) else None
+        lifecycle = gate_run.get("lifecycle_status") if isinstance(gate_run, dict) else None
+        lines = [f"status: {status}"]
+        if isinstance(gate_run_id, str):
+            lines.append(f"gate run: {gate_run_id}")
+        if isinstance(lifecycle, str):
+            lines.append(f"lifecycle: {lifecycle}")
+        awaiting = gate_run.get("awaiting") if isinstance(gate_run, dict) else None
+        if isinstance(awaiting, dict):
+            kind = awaiting.get("kind")
+            if isinstance(kind, str):
+                lines.append(f"awaiting: {kind}")
+        return "\n".join(lines)
+    if payload.get("schema") in FIX_PROPOSAL_RESULT_SCHEMAS:
+        lines = [f"status: {status}", f"finding group: {payload.get('finding_group')}"]
+        proposal_count = payload.get("proposal_count")
+        if isinstance(proposal_count, int):
+            lines.append(f"proposals: {proposal_count}")
+        proposal_id = payload.get("proposal_id")
+        if isinstance(proposal_id, str):
+            lines.append(f"proposal id: {proposal_id}")
+        return "\n".join(lines)
     if payload.get("schema") == "quality-runner-refresh-result-v0.1":
         return _refresh_summary(payload, status)
     if payload.get("schema") == "quality-runner-rollout-result-v0.1":

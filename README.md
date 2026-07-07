@@ -218,7 +218,9 @@ quality-runner run /path/to/repo --profile team --json
 ```
 
 See [Standards Profiles](docs/standards-profiles.md) for the full profile and
-repo-policy reference.
+repo-policy reference. For opt-in layer-boundary rules, see
+[Architecture Contracts](docs/architecture-contracts.md). For opt-in user-defined
+standards packs, see [Quality Skills](docs/quality-skills.md).
 
 ## Scan Exclusions
 

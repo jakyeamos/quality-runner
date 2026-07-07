@@ -8,7 +8,6 @@ from quality_runner.adoption import (
     handoff_adoption_stage,
     stopping_criteria,
 )
-from quality_runner.findings import AGENT_HANDOFF_SCHEMA, REMEDIATION_PLAN_SCHEMA
 from quality_runner.handoff_gate_suggestions import (
     gate_severity,
     suggested_gate_command,
@@ -18,11 +17,16 @@ from quality_runner.handoff_gate_summary import (
     build_gate_verification_summary,
     gate_blocker_slice,
     gate_handoff_status,
-    gate_verification_markdown,
 )
+from quality_runner.handoff_markdown import render_handoff_markdown as render_handoff_markdown
 from quality_runner.handoff_status import handoff_status
+from quality_runner.lifecycle_status import compute_lifecycle_status
+from quality_runner.planning_slices import finding_sort_key, slice_for_finding, slice_sort_key
 from quality_runner.remediation_clusters import structural_cluster_slices
+from quality_runner.remediation_wiring import wiring_decision_slices
 from quality_runner.runner_checks import runner_provided_checks
+from quality_runner.schema_constants import AGENT_HANDOFF_SCHEMA, REMEDIATION_PLAN_SCHEMA
+from quality_runner.security.handoff import security_review_handoff
 
 PRIORITY_ORDER = {"high": 0, "medium": 1, "low": 2}
 
@@ -33,21 +37,44 @@ def build_remediation_plan(
     capability_map: dict[str, Any],
     code_quality_scan: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    findings = sorted(_findings(audit_report), key=_finding_sort_key)
-    structural_slices = structural_cluster_slices(code_quality_scan)
+    all_findings = sorted(_findings(audit_report), key=finding_sort_key)
+    remediation_findings = [
+        finding
+        for finding in all_findings
+        if not str(finding.get("category", "")).startswith("security:agent-review")
+    ]
+    security_review_findings = [
+        finding
+        for finding in all_findings
+        if str(finding.get("category", "")).startswith("security:agent-review")
+    ]
+    wiring_slices = wiring_decision_slices(code_quality_scan)
+    structural_slices = structural_cluster_slices(
+        code_quality_scan,
+        excluded_categories={"integrate"} if wiring_slices else set(),
+    )
     slices = sorted(
         [
             *[
-                _slice_for_finding(finding)
-                for finding in findings
-                if structural_slices == [] or not finding["category"].startswith("structural:")
+                slice_for_finding(finding)
+                for finding in remediation_findings
+                if _include_finding_slice(
+                    finding,
+                    structural_slices=structural_slices,
+                    wiring_slices=wiring_slices,
+                )
             ],
             *structural_slices,
+            *wiring_slices,
         ],
-        key=_slice_sort_key,
+        key=slice_sort_key,
+    )
+    security_review_slices = sorted(
+        [slice_for_finding(finding) for finding in security_review_findings],
+        key=slice_sort_key,
     )
     adoption_stage = build_adoption_stage(
-        findings=findings,
+        findings=remediation_findings,
         missing_gates=_missing_repo_owned_gates(capability_map),
         warnings=_warnings(capability_map),
     )
@@ -60,6 +87,11 @@ def build_remediation_plan(
         "adoption_stage": adoption_stage,
         "stopping_criteria": stopping_criteria(adoption_stage),
         "slices": slices,
+        **(
+            {"security_review_slices": security_review_slices}
+            if security_review_slices
+            else {}
+        ),
         "warnings": _warnings(capability_map),
     }
 
@@ -98,6 +130,7 @@ def render_plan_markdown(plan: dict[str, Any]) -> str:
                     *_finding_markdown_items(slice_item.get("findings")),
                     "- Actions:",
                     *_markdown_items(slice_item.get("actions")),
+                    *action_group_markdown(slice_item.get("action_groups")),
                     "- Verification:",
                     *_markdown_items(slice_item.get("verification_gates")),
                     "",
@@ -116,6 +149,10 @@ def build_agent_handoff(
     artifact_paths: dict[str, str],
     capability_map: dict[str, Any] | None = None,
     gate_verification: dict[str, Any] | None = None,
+    security_scan: dict[str, Any] | None = None,
+    intent: dict[str, Any] | None = None,
+    lifecycle_status: str | None = None,
+    repo_scan: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     missing_gates = _missing_repo_owned_gates(capability_map)
     gate_summary = build_gate_verification_summary(
@@ -128,8 +165,17 @@ def build_agent_handoff(
         capability_map=capability_map,
         missing_repo_owned_gates=missing_gates,
     )
-    next_slice = gate_blocker_slice(gate_summary) or _next_slice(remediation_plan)
+    next_slice = gate_blocker_slice(gate_summary) or _author_decision_slice(remediation_plan) or _next_slice(
+        remediation_plan
+    )
     adoption_stage = handoff_adoption_stage(remediation_plan)
+    resolved_lifecycle = lifecycle_status or compute_lifecycle_status(
+        summary_status=str(gate_summary.get("status") if gate_summary else status),
+        handoff_status=status,
+        gate_verification=gate_verification or {},
+        audit=audit_report,
+        repo_scan=repo_scan,
+    )
     return {
         "schema": AGENT_HANDOFF_SCHEMA,
         "run_id": _string_or_none(audit_report.get("run_id")),
@@ -144,150 +190,30 @@ def build_agent_handoff(
         "adoption_stage": adoption_stage,
         "stopping_criteria": stopping_criteria(adoption_stage),
         **_optional_value("gate_verification", gate_summary),
+        **_optional_value("security_review", security_review_handoff(security_scan, capability_map)),
+        **_optional_value("intent", intent),
+        **_optional_value("lifecycle_status", resolved_lifecycle),
         "next_slice": next_slice,
         "verification_gates": _slice_verification_gates(next_slice),
     }
 
 
-def render_handoff_markdown(handoff: dict[str, Any]) -> str:
-    lines = [
-        "# Quality Runner Agent Handoff",
-        "",
-        f"- Schema: {handoff.get('schema')}",
-        f"- Status: {handoff.get('status')}",
-        f"- Implementation allowed: {str(handoff.get('implementation_allowed')).lower()}",
-        "",
-        *(gate_verification_markdown(handoff.get("gate_verification"))),
-        "",
-        "## Artifacts",
-        "",
-    ]
-
-    artifact_paths = handoff.get("artifact_paths")
-    if isinstance(artifact_paths, dict):
-        for name in sorted(artifact_paths):
-            value = artifact_paths[name]
-            if isinstance(value, str):
-                lines.append(f"- {name}: {value}")
-    lines.extend(["", "## Warnings", ""])
-
-    warnings = handoff.get("warnings")
-    if isinstance(warnings, list) and warnings:
-        for warning in warnings:
-            if not isinstance(warning, dict):
-                continue
-            code = warning.get("code")
-            message = warning.get("message")
-            path = warning.get("path")
-            if isinstance(code, str) and isinstance(message, str) and isinstance(path, str):
-                lines.append(f"- {code} ({path}): {message}")
-    else:
-        lines.append("No warnings.")
-
-    lines.extend(["", "## Missing Repo-Owned Gates", ""])
-
-    missing_gates = handoff.get("missing_repo_owned_gates")
-    if isinstance(missing_gates, list) and missing_gates:
-        for gate in missing_gates:
-            if not isinstance(gate, dict):
-                continue
-            gate_id = gate.get("id")
-            severity = gate.get("severity")
-            suggestion = gate.get("suggested_command")
-            reason = gate.get("reason")
-            if isinstance(gate_id, str) and isinstance(suggestion, str):
-                lines.append(f"- {gate_id} ({severity}): add `{suggestion}`.")
-                if isinstance(reason, str) and reason:
-                    lines.append(f"  - Why: {reason}")
-    else:
-        lines.append("No missing repo-owned gates.")
-
-    lines.extend(["", "## Runner-Provided Checks", ""])
-
-    runner_checks = handoff.get("runner_provided_checks")
-    if isinstance(runner_checks, list) and runner_checks:
-        for check in runner_checks:
-            if not isinstance(check, dict):
-                continue
-            check_id = check.get("id")
-            finding_count = check.get("finding_count")
-            description = check.get("description")
-            if isinstance(check_id, str) and isinstance(finding_count, int):
-                line = f"- {check_id}: {finding_count} finding"
-                line += "" if finding_count == 1 else "s"
-                if isinstance(description, str) and description:
-                    line += f" ({description})"
-                lines.append(line + ".")
-    else:
-        lines.append("No runner-provided structural checks produced findings.")
-
-    lines.extend(["", "## Adoption Stage", ""])
-    lines.extend(adoption_stage_markdown(handoff.get("adoption_stage")))
-
-    lines.extend(["", "## Stopping Criteria", ""])
-    lines.extend(_markdown_items(handoff.get("stopping_criteria")))
-
-    lines.extend(["", "## Next Slice", ""])
-
-    next_slice = handoff.get("next_slice")
-    if isinstance(next_slice, dict):
-        lines.extend(
-            [
-                f"- ID: {next_slice.get('id')}",
-                f"- Title: {next_slice.get('title')}",
-                f"- Priority: {next_slice.get('priority')}",
-                "- Findings:",
-                *_finding_markdown_items(next_slice.get("findings")),
-                "- Actions:",
-                *_markdown_items(next_slice.get("actions")),
-                *action_group_markdown(next_slice.get("action_groups")),
-            ]
-        )
-    else:
-        lines.append("No remediation slice is queued.")
-
-    lines.extend(["", "## Verification Gates", ""])
-    lines.extend(_markdown_items(handoff.get("verification_gates")))
-
-    lines.extend(["", "## Remediation Slices", ""])
-
-    slice_ids = handoff.get("slice_ids")
-    if isinstance(slice_ids, list) and slice_ids:
-        lines.extend(_markdown_items(slice_ids))
-    else:
-        lines.append("No remediation slices are required.")
-
-    return "\n".join(lines).rstrip() + "\n"
-
-
 def _slice_for_finding(finding: dict[str, Any]) -> dict[str, Any]:
-    finding_id = finding["id"]
-    recommended_fix = finding["recommended_fix"]
-    return {
-        "id": f"remediate-{finding_id}",
-        "title": f"Remediate {finding_id}",
-        "priority": _priority_for_finding(finding),
-        "findings": [
-            {
-                "id": finding_id,
-                "severity": finding["severity"],
-                "category": finding["category"],
-                "summary": finding["summary"],
-            }
-        ],
-        "actions": [
-            f"Apply recommended fix: {recommended_fix}",
-            f"Rerun quality-runner and confirm {finding_id} no longer appears.",
-        ],
-        "verification_gates": list(finding["verification"]),
-    }
+    return slice_for_finding(finding)
 
 
-def _slice_sort_key(slice_item: dict[str, Any]) -> tuple[int, int, str]:
-    priority = str(slice_item.get("priority") or "")
-    score = slice_item.get("score")
-    ranking_score = score if isinstance(score, int) else 0
-    return PRIORITY_ORDER.get(priority, 99), -ranking_score, str(slice_item.get("id") or "")
+def _include_finding_slice(
+    finding: dict[str, Any],
+    *,
+    structural_slices: list[dict[str, Any]],
+    wiring_slices: list[dict[str, Any]],
+) -> bool:
+    category = str(finding.get("category") or "")
+    if not category.startswith("structural:"):
+        return True
+    if category == "structural:integrate" and wiring_slices:
+        return False
+    return structural_slices == []
 
 
 def _missing_repo_owned_gates(capability_map: dict[str, Any] | None) -> list[dict[str, str]]:
@@ -306,6 +232,8 @@ def _missing_repo_owned_gates(capability_map: dict[str, Any] | None) -> list[dic
         language = capability.get("language")
         required_by = capability.get("required_by")
         if not isinstance(capability_id, str) or not capability_id:
+            continue
+        if capability_id.startswith("security_"):
             continue
         gates.append(
             {
@@ -370,6 +298,7 @@ def _findings(audit_report: dict[str, Any]) -> list[dict[str, Any]]:
                     "recommended_fix": recommended_fix,
                     "verification": verification,
                     "score": score if isinstance(score, int) else _default_score(severity),
+                    **_optional_actionability(finding),
                 }
             )
     return normalized
@@ -395,19 +324,54 @@ def _next_slice(plan: dict[str, Any]) -> dict[str, Any] | None:
     first = slices[0]
     if not isinstance(first, dict):
         return None
-    next_slice = {
-        "id": first["id"],
-        "title": first["title"],
-        "priority": first["priority"],
-        "findings": list(first["findings"]),
-        "actions": list(first["actions"]),
-        "verification_gates": list(first["verification_gates"]),
-    }
+    return _copy_next_slice(first)
+
+
+def _author_decision_slice(plan: dict[str, Any]) -> dict[str, Any] | None:
+    slices = plan.get("slices")
+    if not isinstance(slices, list):
+        return None
+    for slice_item in slices:
+        if not isinstance(slice_item, dict):
+            continue
+        if slice_item.get("disposition_required") is True or _slice_needs_author_decision(
+            slice_item
+        ):
+            return _copy_next_slice(slice_item)
+    return None
+
+
+def _copy_next_slice(first: dict[str, Any]) -> dict[str, Any] | None:
+    try:
+        next_slice = {
+            "id": first["id"],
+            "title": first["title"],
+            "priority": first["priority"],
+            "findings": list(first["findings"]),
+            "actions": list(first["actions"]),
+            "verification_gates": list(first["verification_gates"]),
+        }
+    except (KeyError, TypeError):
+        return None
     if first.get("implementation_allowed") is False:
         next_slice["implementation_allowed"] = False
+    if first.get("disposition_required") is True:
+        next_slice["disposition_required"] = True
+    if isinstance(first.get("action_groups"), list):
+        next_slice["action_groups"] = list(first["action_groups"])
     if isinstance(first.get("score"), int):
         next_slice["score"] = first["score"]
     return next_slice
+
+
+def _slice_needs_author_decision(slice_item: dict[str, Any]) -> bool:
+    findings = slice_item.get("findings")
+    if not isinstance(findings, list):
+        return False
+    return any(
+        isinstance(finding, dict) and finding.get("actionability") == "needs-author-decision"
+        for finding in findings
+    )
 
 
 def _slice_verification_gates(slice_item: dict[str, Any] | None) -> list[str]:
@@ -456,26 +420,25 @@ def _finding_markdown_items(value: object) -> list[str]:
         finding_id = finding.get("id")
         summary = finding.get("summary")
         if isinstance(finding_id, str) and finding_id and isinstance(summary, str) and summary:
-            items.append(f"- {finding_id}: {summary}")
+            line = f"- {finding_id}: {summary}"
+            actionability = finding.get("actionability")
+            if isinstance(actionability, str) and actionability:
+                line += f" [{actionability}]"
+            items.append(line)
     if not items:
         return ["- unavailable"]
     return items
 
 
-def _finding_sort_key(finding: dict[str, Any]) -> tuple[int, int, str]:
-    priority = _priority_for_finding(finding)
-    score = finding.get("score")
-    ranking_score = score if isinstance(score, int) else 0
-    return PRIORITY_ORDER.get(priority, 99), -ranking_score, finding["id"]
-
-
-def _priority_for_finding(finding: dict[str, Any]) -> str:
-    severity = finding["severity"]
-    if severity == "blocker":
-        return "high"
-    if severity == "warning":
-        return "medium"
-    return "low"
+def _optional_actionability(finding: dict[str, Any]) -> dict[str, str]:
+    actionability = finding.get("actionability")
+    rationale = finding.get("actionability_rationale")
+    if not isinstance(actionability, str) or not actionability:
+        return {}
+    payload: dict[str, str] = {"actionability": actionability}
+    if isinstance(rationale, str) and rationale:
+        payload["actionability_rationale"] = rationale
+    return payload
 
 
 def _default_score(severity: str) -> int:

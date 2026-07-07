@@ -5,10 +5,17 @@ from pathlib import Path
 from typing import Any
 
 from quality_runner.cli_status import export_handoff_payload
+from quality_runner.intent import resolve_workflow_intent
 from quality_runner.workflow import refresh_payload
 
 
 def refresh_command_payload(args: argparse.Namespace, repo_root: Path) -> dict[str, Any]:
+    workflow_intent = resolve_workflow_intent(
+        repo_root=repo_root,
+        run_id=f"{args.run_id_prefix}-verify",
+        goal=args.intent,
+        intent_file=Path(args.intent_file).expanduser().resolve() if args.intent_file else None,
+    )
     payload = refresh_payload(
         repo_root=repo_root,
         run_id_prefix=args.run_id_prefix,
@@ -23,6 +30,9 @@ def refresh_command_payload(args: argparse.Namespace, repo_root: Path) -> dict[s
         total_timeout_reason=args.total_timeout_reason,
         checkout_most_advanced_branch=args.checkout_most_advanced_branch,
         allow_mutating_gates=args.allow_mutating_gates,
+        worktree_mode=args.worktree_mode,
+        allow_dirty_worktree_verify=args.allow_dirty_worktree_verify,
+        intent=workflow_intent,
     )
     if args.handoff_output:
         payload["handoff_export"] = export_handoff_payload(

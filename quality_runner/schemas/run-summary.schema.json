@@ -38,6 +38,24 @@
     "finding_counts": { "type": "object" },
     "audit_status": { "type": ["string", "null"] },
     "gate_verification_status": { "type": ["string", "null"] },
+    "lifecycle_status": {
+      "enum": [
+        "audit-clean",
+        "gates-clean",
+        "merge-ready",
+        "blocked",
+        "failed",
+        "workflow-timeout",
+        "needs-triage"
+      ]
+    },
+    "handoff_status": { "type": ["string", "null"] },
+    "blocker_classes": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "failure_type": { "type": ["string", "null"] },
+    "timeout_diagnostics": { "type": ["object", "null"] },
     "delta": { "type": ["object", "null"] }
   },
   "additionalProperties": false

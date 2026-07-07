@@ -20,7 +20,8 @@
       "items": { "$ref": "#/$defs/acceptedException" },
       "default": []
     },
-    "warnings": { "$ref": "#/$defs/warnings" }
+    "warnings": { "$ref": "#/$defs/warnings" },
+    "security_summary": { "type": "object" }
   },
   "$defs": {
     "capability": {
@@ -29,7 +30,8 @@
       "properties": {
         "id": { "type": "string", "minLength": 1 },
         "type": { "type": "string", "minLength": 1 },
-        "capability_kind": { "enum": ["local_command", "ci_only", "evidence_file"] },
+        "capability_kind": { "enum": ["local_command", "ci_only", "evidence_file", "evidence", "agent_review"] },
+        "status": { "type": "string" },
         "source": { "type": "string", "minLength": 1 },
         "command": { "type": "string", "minLength": 1 },
         "language": { "type": "string", "minLength": 1 },
@@ -40,9 +42,13 @@
         "severity": { "type": "string", "minLength": 1 },
         "local_execution": { "enum": ["ci-only"] },
         "ci_status": { "$ref": "#/$defs/ciStatus" },
-        "verification_state": { "$ref": "#/$defs/verificationState" }
+        "verification_state": { "$ref": "#/$defs/verificationState" },
+        "recommended_commands": { "type": "array", "items": { "type": "string" } },
+        "scope": { "type": "object" },
+        "review_instructions": { "type": "array", "items": { "type": "string" } },
+        "completion_criteria": { "type": "array", "items": { "type": "string" } }
       },
-      "additionalProperties": false
+      "additionalProperties": true
     },
     "missingCapability": {
       "type": "object",
@@ -86,11 +92,11 @@
       "properties": {
         "discovery": {
           "type": "string",
-          "enum": ["command-discovered", "script-discovered", "file-discovered"]
+          "enum": ["command-discovered", "script-discovered", "file-discovered", "available", "missing", "review-required"]
         },
         "execution": {
           "type": "string",
-          "enum": ["not-run", "ci-executed", "local-executed"]
+          "enum": ["not-run", "ci-executed", "local-executed", "not-applicable", "agent-required"]
         },
         "result": {
           "type": "string",

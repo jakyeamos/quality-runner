@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from quality_runner.actionability import ACTIONABILITY_VALUES
+from quality_runner.lifecycle_status import LIFECYCLE_STATUSES
 from quality_runner.schema_constants import (
     AGENT_HANDOFF_SCHEMA,
     AUDIT_REPORT_SCHEMA,
@@ -43,6 +45,11 @@ def validate_audit_report(report: dict[str, Any]) -> ValidationResult:
         severity = finding.get("severity")
         if isinstance(severity, str) and severity and severity not in ALLOWED_SEVERITIES:
             errors.append(f"finding {finding_id} severity is not in the allowed vocabulary")
+        actionability = finding.get("actionability")
+        if actionability is not None and (
+            not isinstance(actionability, str) or actionability not in ACTIONABILITY_VALUES
+        ):
+            errors.append(f"finding {finding_id} actionability is not in the allowed vocabulary")
         evidence = finding.get("evidence")
         if not _non_empty_string_list(evidence):
             errors.append(f"finding {finding_id} has no evidence")
@@ -79,6 +86,10 @@ def validate_remediation_plan(plan: dict[str, Any]) -> ValidationResult:
             errors.append(f"slice {slice_id} has no actions")
         if not _non_empty_string_list(slice_item.get("verification_gates")):
             errors.append(f"slice {slice_id} has no verification gates")
+        if slice_item.get("action_groups") is not None and not _optional_action_group_list(
+            slice_item.get("action_groups")
+        ):
+            errors.append(f"slice {slice_id} action_groups must be a list of action groups")
     return {"passed": not errors, "errors": errors}
 
 
@@ -116,6 +127,16 @@ def validate_agent_handoff(handoff: dict[str, Any]) -> ValidationResult:
     gate_verification = handoff.get("gate_verification")
     if gate_verification is not None and not _gate_verification_summary(gate_verification):
         errors.append("agent handoff gate_verification must be a gate verification summary object")
+
+    lifecycle_status = handoff.get("lifecycle_status")
+    if lifecycle_status is not None and (
+        not isinstance(lifecycle_status, str) or lifecycle_status not in LIFECYCLE_STATUSES
+    ):
+        errors.append("agent handoff lifecycle_status is not in the allowed vocabulary")
+
+    intent = handoff.get("intent")
+    if intent is not None and not isinstance(intent, dict):
+        errors.append("agent handoff intent must be an object when present")
 
     next_slice = handoff.get("next_slice")
     if status in {"clean", "gates-clean"}:
@@ -207,7 +228,10 @@ def _action_group(value: object) -> bool:
         return False
     return (
         _non_empty_string(value.get("class"))
-        and _non_empty_string_list(value.get("gate_ids"))
+        and (
+            _non_empty_string_list(value.get("gate_ids"))
+            or _non_empty_string_list(value.get("finding_ids"))
+        )
         and _non_empty_string_list(value.get("actions"))
     )
 
