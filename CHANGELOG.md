@@ -2,6 +2,14 @@
 
 All notable changes to Quality Runner are documented here.
 
+## 0.5.0 - 2026-07-09
+
+- Added fresh-review reports, review state, and review-delta loop controls.
+- Added CLI and MCP surfaces for producing review evidence and remediation
+  handoffs without modifying source files.
+- Added packet-isolation coverage and kept MCP review wiring within the size
+  budget.
+
 ## 0.4.0 - 2026-07-07
 
 - Added multi-repo `rollout` workflow with fleet planning documents, per-repo
