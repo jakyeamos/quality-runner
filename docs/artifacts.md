@@ -302,6 +302,23 @@ schema `quality-runner-review-worker-result-v0.1` comparing:
 Use it after a worker claims completion and before a controller merges or
 advances the next slice.
 
+## Task Review Delta Artifacts
+
+When `refresh` receives `--review-cycle-id` and `--review-iteration` together
+with task intent, the final verify run additionally writes:
+
+- `review-delta.json`: canonical `quality-runner-review-delta-v0.1` payload with
+  cycle identity, task hash, changed paths, new/persisted/resolved findings,
+  out-of-scope findings, verification state, and the continue/stop decision.
+- `review-delta.md`: concise implementation change document rendered from the
+  JSON payload.
+
+The delta references the run's existing audit, remediation plan, handoff, and
+resolution ledger. It never includes prior agent reasoning or review prose.
+The verify run manifest records the cycle id, iteration, baseline run id, and
+delta paths. These artifacts are intended for an external implementation agent
+to consume between iterations; Quality Runner does not apply their fixes.
+
 ## Safety Guarantees
 
 Quality Runner rejects:

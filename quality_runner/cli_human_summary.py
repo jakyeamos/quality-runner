@@ -85,6 +85,13 @@ def _refresh_summary(payload: dict[str, Any], status: object) -> str:
         output_path = handoff_export.get("output_path")
         if isinstance(output_path, str):
             lines.append(f"handoff: {output_path}")
+    delta = payload.get("review_delta")
+    if isinstance(delta, dict):
+        lines.append(f"review cycle: {delta.get('cycle_id')} iteration {delta.get('iteration')}")
+        lines.append(f"review recommendation: {'stop' if delta.get('clean') else 'continue'}")
+        delta_paths = payload.get("review_delta_paths")
+        if isinstance(delta_paths, dict) and isinstance(delta_paths.get("review_delta_md"), str):
+            lines.append(f"review delta: {delta_paths['review_delta_md']}")
     return "\n".join(lines)
 
 

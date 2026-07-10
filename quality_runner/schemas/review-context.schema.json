@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://quality-runner.dev/schemas/review-context.schema.json",
+  "title": "Quality Runner Fresh Review Context",
+  "type": "object",
+  "required": ["schema", "run_id", "repo_root", "mode", "scope", "breadth", "exclusions", "evidence", "omitted_evidence", "freshness", "input_hashes"],
+  "properties": {
+    "schema": { "const": "quality-runner-review-context-v0.1" },
+    "run_id": { "type": "string", "minLength": 1 },
+    "repo_root": { "type": "string", "minLength": 1 },
+    "mode": { "enum": ["task", "blind", "combined"] },
+    "scope": { "enum": ["task", "project"] },
+    "breadth": { "enum": ["focused", "related", "full"] },
+    "task": { "type": "string", "minLength": 1 },
+    "repository_state": { "type": "object" },
+    "changed_files": { "type": "array", "items": { "type": "string" } },
+    "exclusions": { "type": "array", "items": { "type": "string" } },
+    "evidence": { "type": "array", "items": { "$ref": "#/$defs/evidence" } },
+    "omitted_evidence": { "type": "array", "items": { "type": "string" } },
+    "known_issues": { "type": "array", "items": { "type": "string" } },
+    "previous_summary": { "type": "string", "minLength": 1 },
+    "freshness": { "$ref": "#/$defs/freshness" },
+    "input_hashes": { "type": "object", "additionalProperties": { "type": "string", "minLength": 1 } },
+    "packets": { "type": "array", "items": { "$ref": "#" } }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "evidence": {
+      "type": "object",
+      "required": ["path", "kind", "available", "note"],
+      "properties": {
+        "path": { "type": "string", "minLength": 1 },
+        "kind": { "type": "string", "minLength": 1 },
+        "available": { "type": "boolean" },
+        "note": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "freshness": {
+      "type": "object",
+      "required": ["new_invocation_required", "prior_review_context_included", "previous_agent_summary_included", "hidden_reasoning_included", "active_cycle"],
+      "properties": {
+        "new_invocation_required": { "const": true },
+        "prior_review_context_included": { "const": false },
+        "previous_agent_summary_included": { "type": "boolean" },
+        "hidden_reasoning_included": { "const": false },
+        "active_cycle": { "type": "boolean" }
+      },
+      "additionalProperties": false
+    }
+  }
+}

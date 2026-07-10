@@ -728,6 +728,9 @@ def test_packaged_schema_files_are_parseable() -> None:
         "gate-run.schema.json",
         "gate-response.schema.json",
         "fix-proposals.schema.json",
+        "review-context.schema.json",
+        "review-manifest.schema.json",
+        "review-delta.schema.json",
     }
 
     loaded = {}

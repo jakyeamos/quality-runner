@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from typing import Any
 
@@ -25,6 +26,7 @@ from quality_runner.planning import (
     render_handoff_markdown,
 )
 from quality_runner.refresh_workflow import run_refresh_payload
+from quality_runner.review_delta import build_review_delta, persist_review_delta
 from quality_runner.run_summary import build_run_summary
 from quality_runner.security.ledger import merge_security_ledger_entries
 from quality_runner.security.scan import create_security_scan, merge_security_into_capability_map
@@ -322,8 +324,19 @@ def refresh_payload(
     worktree_mode: str = "in-place",
     allow_dirty_worktree_verify: bool = False,
     intent: dict[str, Any] | None = None,
+    review_cycle_id: str | None = None,
+    review_iteration: int | None = None,
 ) -> dict[str, Any]:
-    return run_refresh_payload(
+    review_enabled = review_cycle_id is not None or review_iteration is not None
+    if review_enabled:
+        if review_cycle_id is None or review_iteration is None:
+            raise ValueError("--review-cycle-id and --review-iteration must be provided together")
+        if intent is None or not isinstance(intent.get("goal"), str) or not intent["goal"].strip():
+            raise ValueError("task intent is required for a review delta")
+        assert review_cycle_id is not None
+        assert review_iteration is not None
+        assert intent is not None
+    payload = run_refresh_payload(
         repo_root=repo_root,
         run_id_prefix=run_id_prefix,
         baseline_run_id=baseline_run_id,
@@ -345,3 +358,51 @@ def refresh_payload(
         verify_callback=verify_gates_payload,
         summary_callback=build_run_summary,
     )
+    if not review_enabled:
+        return payload
+    if review_cycle_id is None or review_iteration is None or intent is None:
+        raise AssertionError("review metadata was unexpectedly cleared")
+    verify_run_id = f"{run_id_prefix}-verify"
+    delta = build_review_delta(
+        repo_root=repo_root,
+        run_id=verify_run_id,
+        cycle_id=review_cycle_id,
+        iteration=review_iteration,
+        intent=intent,
+        baseline_run_id=baseline_run_id,
+    )
+    delta_paths = persist_review_delta(repo_root=repo_root, run_id=verify_run_id, payload=delta)
+    _attach_review_metadata(
+        repo_root=repo_root,
+        run_id=verify_run_id,
+        cycle_id=review_cycle_id,
+        iteration=review_iteration,
+        baseline_run_id=baseline_run_id,
+        delta_paths=delta_paths,
+    )
+    payload["review_delta"] = delta
+    payload["review_delta_paths"] = delta_paths
+    return payload
+
+
+def _attach_review_metadata(
+    *,
+    repo_root: Path,
+    run_id: str,
+    cycle_id: str,
+    iteration: int,
+    baseline_run_id: str | None,
+    delta_paths: dict[str, str],
+) -> None:
+    run_dir = repo_root / ".quality-runner" / "runs" / run_id
+    manifest_path = run_dir / "run-manifest.json"
+    if not manifest_path.exists():
+        return
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["review_cycle"] = {
+        "cycle_id": cycle_id,
+        "iteration": iteration,
+        "baseline_run_id": baseline_run_id,
+        "artifact_paths": delta_paths,
+    }
+    write_json(manifest_path, manifest)

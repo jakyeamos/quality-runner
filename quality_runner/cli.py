@@ -80,6 +80,17 @@ def build_parser() -> argparse.ArgumentParser:
         "--baseline-run-id", default=None, help="Baseline run id for deltas"
     )
     refresh_parser.add_argument(
+        "--review-cycle-id",
+        default=None,
+        help="Stable task implement-review cycle id; enables review-delta artifacts",
+    )
+    refresh_parser.add_argument(
+        "--review-iteration",
+        type=int,
+        default=None,
+        help="1-based iteration number within --review-cycle-id",
+    )
+    refresh_parser.add_argument(
         "--timeout-seconds",
         type=int,
         default=120,

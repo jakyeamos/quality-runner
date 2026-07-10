@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://quality-runner.dev/schemas/review-manifest.schema.json",
+  "title": "Quality Runner Fresh Review Manifest",
+  "type": "object",
+  "required": ["schema", "run_id", "mode", "scope", "breadth", "exclusions", "evidence_references", "freshness", "input_hashes", "artifact_paths"],
+  "properties": {
+    "schema": { "const": "quality-runner-review-manifest-v0.1" },
+    "run_id": { "type": "string", "minLength": 1 },
+    "mode": { "enum": ["task", "blind", "combined"] },
+    "scope": { "enum": ["task", "project"] },
+    "breadth": { "enum": ["focused", "related", "full"] },
+    "exclusions": { "type": "array", "items": { "type": "string" } },
+    "evidence_references": { "type": "array", "items": { "$ref": "review-context.schema.json#/$defs/evidence" } },
+    "freshness": { "$ref": "review-context.schema.json#/$defs/freshness" },
+    "input_hashes": { "type": "object", "additionalProperties": { "type": "string", "minLength": 1 } },
+    "artifact_paths": { "type": "object", "additionalProperties": { "type": "string" } }
+  },
+  "additionalProperties": false
+}

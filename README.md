@@ -129,6 +129,9 @@ quality-runner inspect /path/to/repo --json
 quality-runner run /path/to/repo --json
 quality-runner verify-gates /path/to/repo --json
 quality-runner refresh /path/to/repo --run-id-prefix refresh-001 --handoff-output handoff.md --json
+quality-runner refresh /path/to/repo --run-id-prefix task-001-pass-1 \
+  --intent "Implement the requested task" --review-cycle-id task-001 \
+  --review-iteration 1 --json
 quality-runner release-smoke --json
 quality-runner validate-report worker-report.json --json
 quality-runner validate-handoff handoff.json --json
@@ -163,6 +166,14 @@ you want the scan and the human remediation plan from one command; use
 for a GSD-style phase plan rather than editing directly from the handoff. For a
 single queued slice, start from the matching `slice-specs/<slice-id>.md` when
 present.
+
+For an agent-driven implement-review loop, pass the task through the existing
+`--intent` or `--intent-file` input and add `--review-cycle-id` plus a
+1-based `--review-iteration`. Quality Runner writes `review-delta.json` and
+`review-delta.md` after each refresh. The agent applies task-scoped fixes and
+calls `refresh` again with the previous verify run as `--baseline-run-id` until
+the delta recommends `stop`. Quality Runner remains read-only; unrelated
+findings are retained as `out_of_scope` without blocking the task.
 
 Before release, run `quality-runner release-smoke --json` to verify the public
 CLI happy path, installed handoff export behavior, report compatibility checks,

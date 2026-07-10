@@ -502,6 +502,27 @@ Returns `quality-runner-review-worker-result-v0.1` with `status`: `passed` or
 `rejected`. QR does not apply fixes or rerun gates inside this command; it only
 audits artifacts the worker already produced.
 
+## Task-scoped implement-review deltas
+
+An implementation agent can opt into a repeated review loop by supplying the
+existing task intent plus a stable cycle id and iteration to `refresh`:
+
+```bash
+quality-runner refresh /path/to/repo \
+  --run-id-prefix task-002-pass-1 \
+  --intent "Implement the requested task" \
+  --review-cycle-id task-002 \
+  --review-iteration 1 \
+  --json
+```
+
+The final verify run writes `review-delta.json` and `review-delta.md`. The
+agent applies the listed task-scoped fixes, then calls `refresh` again with
+`--baseline-run-id task-002-pass-1-verify` and the next iteration. A delta
+recommends `stop` only when the task scope has no findings and verification is
+not blocked. Unrelated findings remain visible as `out_of_scope` and do not
+block the task. Quality Runner remains read-only and never applies the fixes.
+
 ## `repo-quality-certifier` Compatibility
 
 The compatibility command preserves the prior Repo Quality Certifier verbs while

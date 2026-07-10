@@ -1,0 +1,79 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://quality-runner.dev/schemas/review-delta.schema.json",
+  "title": "Quality Runner Task Review Delta",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "cycle_id", "iteration", "run_id", "baseline_run_id", "task", "scope", "findings", "verification", "evidence_limitations", "clean", "continue", "stop_reason", "source_artifacts"],
+  "properties": {
+    "schema": { "const": "quality-runner-review-delta-v0.1" },
+    "cycle_id": { "type": "string", "minLength": 1 },
+    "iteration": { "type": "integer", "minimum": 1 },
+    "run_id": { "type": "string", "minLength": 1 },
+    "baseline_run_id": { "type": ["string", "null"] },
+    "task": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["intent_hash", "goal"],
+      "properties": {
+        "intent_hash": { "type": "string", "minLength": 1 },
+        "goal": { "type": "string", "minLength": 1 }
+      }
+    },
+    "scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["changed_paths", "scope_available", "scope_basis"],
+      "properties": {
+        "changed_paths": { "type": "array", "items": { "type": "string" } },
+        "scope_available": { "type": "boolean" },
+        "scope_basis": { "const": "baseline-and-working-tree-diff" }
+      }
+    },
+    "findings": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["new", "persisted", "resolved", "out_of_scope"],
+      "properties": {
+        "new": { "$ref": "#/$defs/findingList" },
+        "persisted": { "$ref": "#/$defs/findingList" },
+        "resolved": { "$ref": "#/$defs/findingList" },
+        "out_of_scope": { "$ref": "#/$defs/findingList" }
+      }
+    },
+    "verification": { "$ref": "#/$defs/verification" },
+    "evidence_limitations": { "type": "array", "items": { "type": "string" } },
+    "clean": { "type": "boolean" },
+    "continue": { "type": "boolean" },
+    "stop_reason": { "type": "string", "minLength": 1 },
+    "source_artifacts": { "type": "object", "additionalProperties": { "type": "string" } }
+  },
+  "$defs": {
+    "finding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["fingerprint", "summary"],
+      "properties": {
+        "fingerprint": { "type": "string", "minLength": 1 },
+        "id": { "type": ["string", "null"] },
+        "rule_id": { "type": ["string", "null"] },
+        "file": { "type": ["string", "null"] },
+        "severity": { "type": ["string", "null"] },
+        "category": { "type": ["string", "null"] },
+        "summary": { "type": "string", "minLength": 1 }
+      }
+    },
+    "findingList": { "type": "array", "items": { "$ref": "#/$defs/finding" } },
+    "verification": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "blocked", "failure_type", "blockers"],
+      "properties": {
+        "status": { "type": "string", "minLength": 1 },
+        "blocked": { "type": "boolean" },
+        "failure_type": { "type": ["string", "null"] },
+        "blockers": { "type": "array" }
+      }
+    }
+  }
+}

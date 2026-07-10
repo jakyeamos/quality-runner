@@ -33,6 +33,8 @@ def refresh_command_payload(args: argparse.Namespace, repo_root: Path) -> dict[s
         worktree_mode=args.worktree_mode,
         allow_dirty_worktree_verify=args.allow_dirty_worktree_verify,
         intent=workflow_intent,
+        review_cycle_id=args.review_cycle_id,
+        review_iteration=args.review_iteration,
     )
     if args.handoff_output:
         payload["handoff_export"] = export_handoff_payload(
