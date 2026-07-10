@@ -24,19 +24,19 @@ Plans:
 
 Plans:
 **Wave 1**
-- [ ] 02-01-PLAN.md - Define review contracts and fresh task/blind/combined context packets
+- [x] 02-01-PLAN.md - Define review contracts and fresh task/blind/combined context packets
 
 **Wave 2** *(blocked on Wave 1 completion)*
-- [ ] 02-02-PLAN.md - Normalize reports and persist Markdown/JSON/fix-prompt artifacts
+- [x] 02-02-PLAN.md - Normalize reports and persist Markdown/JSON/fix-prompt artifacts
 
 **Wave 3** *(blocked on Wave 2 completion)*
-- [ ] 02-03-PLAN.md - Add file/BYO adapter boundary and review CLI command
+- [x] 02-03-PLAN.md - Add file/BYO adapter boundary and review CLI command
 
 **Wave 4** *(blocked on Wave 3 completion)*
-- [ ] 02-04-PLAN.md - Add known issues, resolution state, and implement-review loop
+- [x] 02-04-PLAN.md - Add known issues, resolution state, and implement-review loop
 
 **Wave 5** *(blocked on Wave 4 completion)*
-- [ ] 02-05-PLAN.md - Expose MCP review tool and document the workflow
+- [x] 02-05-PLAN.md - Expose MCP review tool and document the workflow
 
 ---
 *Last updated: 2026-07-04 after QR remediation GSD bootstrap*

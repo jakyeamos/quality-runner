@@ -11,12 +11,12 @@
 
 ### Fresh Review
 
-- [ ] **FR-FRESH-CONTEXT**: Every task, blind, or combined review starts from a newly constructed context packet without inherited implementation-agent reasoning or active-cycle review reports.
-- [ ] **FR-REVIEW-MODES**: Users can run task-aware adversarial, fully blind, and combined reviews with task/project scope, focused/related/full breadth, exclusions, and evidence limitations represented in the result.
-- [ ] **FR-REPORTS**: Each review produces a saved human-readable and machine-readable report with ranked severity, classification, confidence, evidence, uncertainty, suggested fixes, and separate fixing-agent prompts.
-- [ ] **FR-STATE**: The workflow stores known issues and tracks finding resolution locally while deferring cross-report matching until the end of an implement-review cycle.
-- [ ] **FR-BYO-AGENT**: The workflow can hand a fresh packet to a user-selected agent or file-based adapter and reports unavailable capabilities without fabricating review results.
-- [ ] **FR-SAFETY**: The reviewer remains local-first and read-only, never editing source files, installing dependencies, committing, or executing remediation.
+- [x] **FR-FRESH-CONTEXT**: Every task, blind, or combined review starts from a newly constructed context packet without inherited implementation-agent reasoning or active-cycle review reports.
+- [x] **FR-REVIEW-MODES**: Users can run task-aware adversarial, fully blind, and combined reviews with task/project scope, focused/related/full breadth, exclusions, and evidence limitations represented in the result.
+- [x] **FR-REPORTS**: Each review produces a saved human-readable and machine-readable report with ranked severity, classification, confidence, evidence, uncertainty, suggested fixes, and separate fixing-agent prompts.
+- [x] **FR-STATE**: The workflow stores known issues and tracks finding resolution locally while deferring cross-report matching until the end of an implement-review cycle.
+- [x] **FR-BYO-AGENT**: The workflow can hand a fresh packet to a user-selected agent or file-based adapter and reports unavailable capabilities without fabricating review results.
+- [x] **FR-SAFETY**: The reviewer remains local-first and read-only, never editing source files, installing dependencies, committing, or executing remediation.
 
 ## v2 Requirements
 
@@ -36,12 +36,12 @@
 | Requirement | Phase | Status |
 |-------------|-------|--------|
 | QR-QUALITY-RUNNER | Phase 1 | Pending |
-| FR-FRESH-CONTEXT | Phase 2 | Pending |
-| FR-REVIEW-MODES | Phase 2 | Pending |
-| FR-REPORTS | Phase 2 | Pending |
-| FR-STATE | Phase 2 | Pending |
-| FR-BYO-AGENT | Phase 2 | Pending |
-| FR-SAFETY | Phase 2 | Pending |
+| FR-FRESH-CONTEXT | Phase 2 | Complete |
+| FR-REVIEW-MODES | Phase 2 | Complete |
+| FR-REPORTS | Phase 2 | Complete |
+| FR-STATE | Phase 2 | Complete |
+| FR-BYO-AGENT | Phase 2 | Complete |
+| FR-SAFETY | Phase 2 | Complete |
 
 **Coverage:**
 - v1 requirements: 7 total
