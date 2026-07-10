@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://quality-runner.dev/schemas/review-state.schema.json",
+  "title": "Quality Runner Review State",
+  "type": "object",
+  "required": ["schema", "cycle_id", "active", "entries"],
+  "properties": {
+    "schema": {"const": "quality-runner-review-state-v0.1"},
+    "cycle_id": {"type": "string", "minLength": 1},
+    "active": {"type": "boolean"},
+    "entries": {"type": "array", "items": {"type": "object"}}
+  },
+  "additionalProperties": true
+}

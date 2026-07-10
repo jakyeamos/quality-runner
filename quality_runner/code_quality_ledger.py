@@ -6,6 +6,7 @@ from typing import Any
 from quality_runner.code_quality_findings import _counts
 from quality_runner.code_quality_paths import _string_or_none
 from quality_runner.schema_constants import RESOLUTION_LEDGER_SCHEMA
+from quality_runner.review_state import finalize_cycle_state
 
 ACCEPTED_STATUSES = {"accepted-intentional", "accepted-false-positive", "blocked-with-prerequisite"}
 RESOLUTION_STATUSES = {
@@ -117,6 +118,17 @@ def render_resolution_ledger_markdown(ledger: dict[str, Any]) -> str:
     else:
         lines.append("No resolution entries.")
     return "\n".join(lines).rstrip() + "\n"
+
+
+def build_review_cycle_ledger(
+    *, cycle_id: str, findings: list[dict[str, Any]], prior_findings: list[dict[str, Any]] | None = None
+) -> dict[str, object]:
+    """Build review-only resolution state without changing audit ledger semantics."""
+    return finalize_cycle_state(
+        cycle_id=cycle_id,
+        findings=findings,
+        prior_findings=prior_findings or [],
+    )
 
 
 def _current_findings(code_quality_scan: dict[str, Any]) -> dict[str, dict[str, Any]]:
