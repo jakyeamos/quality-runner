@@ -1,0 +1,72 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://quality-runner.dev/schemas/review-report.schema.json",
+  "title": "Quality Runner Fresh Review Report",
+  "type": "object",
+  "required": ["schema", "run_id", "mode", "scope", "breadth", "adapter_status", "task_provenance", "summary", "severity_counts", "evidence_used", "evidence_unavailable", "exclusions", "sections", "findings"],
+  "properties": {
+    "schema": { "const": "quality-runner-review-report-v0.1" },
+    "run_id": { "type": "string", "minLength": 1 },
+    "mode": { "enum": ["task", "blind", "combined"] },
+    "scope": { "enum": ["task", "project"] },
+    "breadth": { "enum": ["focused", "related", "full"] },
+    "adapter_status": { "enum": ["review-complete", "review-not-run", "malformed-output", "permission-denied"] },
+    "task_provenance": { "type": ["string", "null"] },
+    "summary": { "type": "string", "minLength": 1 },
+    "severity_counts": {
+      "type": "object",
+      "required": ["critical", "high", "medium", "low"],
+      "properties": {
+        "critical": { "type": "integer", "minimum": 0 },
+        "high": { "type": "integer", "minimum": 0 },
+        "medium": { "type": "integer", "minimum": 0 },
+        "low": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": false
+    },
+    "evidence_used": { "type": "array", "items": { "type": "string" } },
+    "evidence_unavailable": { "type": "array", "items": { "type": "string" } },
+    "exclusions": { "type": "array", "items": { "type": "string" } },
+    "sections": {
+      "type": "object",
+      "required": ["missed_requirements", "confirmed_issues", "suspected_issues", "not_enough_evidence", "project_consistency_risks", "regression_risks", "known_accepted_issues", "suggested_fixes", "agent_handoff_prompts", "remaining_uncertainty"],
+      "properties": {
+        "missed_requirements": { "type": "array" },
+        "confirmed_issues": { "type": "array" },
+        "suspected_issues": { "type": "array" },
+        "not_enough_evidence": { "type": "array" },
+        "project_consistency_risks": { "type": "array" },
+        "regression_risks": { "type": "array" },
+        "known_accepted_issues": { "type": "array" },
+        "suggested_fixes": { "type": "array" },
+        "agent_handoff_prompts": { "type": "array" },
+        "remaining_uncertainty": { "type": "array" }
+      },
+      "additionalProperties": false
+    },
+    "findings": { "type": "array", "items": { "$ref": "#/$defs/finding" } }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "finding": {
+      "type": "object",
+      "required": ["id", "fingerprint", "severity", "classification", "confidence", "summary", "why_it_matters", "location", "evidence", "recommended_fix", "agent_prompt", "human_confirmation_required", "status"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "fingerprint": { "type": "string", "minLength": 1 },
+        "severity": { "enum": ["critical", "high", "medium", "low"] },
+        "classification": { "enum": ["confirmed", "suspected", "not-enough-evidence", "known-accepted"] },
+        "confidence": { "enum": ["high", "medium", "low"] },
+        "summary": { "type": "string", "minLength": 1 },
+        "why_it_matters": { "type": "string", "minLength": 1 },
+        "location": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "evidence": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "recommended_fix": { "type": "string", "minLength": 1 },
+        "agent_prompt": { "type": "string", "minLength": 1 },
+        "human_confirmation_required": { "type": "boolean" },
+        "status": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": false
+    }
+  }
+}
