@@ -3,16 +3,57 @@ from __future__ import annotations
 import argparse
 import subprocess
 from pathlib import Path
-from typing import cast
+from typing import Any, cast
 
 from quality_runner.artifacts import artifact_dir
 from quality_runner.review_adapters import adapter_from_path
 from quality_runner.review_artifacts import persist_review_artifacts
 from quality_runner.review_context import build_review_context, normalize_review_options
-from quality_runner.review_types import EvidenceReference, ReviewOptions
+from quality_runner.review_types import EvidenceReference
 from quality_runner.workflow_internal import generated_run_id
 
 REVIEW_RESULT_SCHEMA = "quality-runner-review-result-v0.1"
+
+
+def review_mcp_tool() -> dict[str, object]:
+    return {
+        "name": "quality_runner_review",
+        "description": "Run a fresh local read-only review and write canonical artifacts.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "repo_root": {"type": "string"}, "run_id": {"type": "string"},
+                "mode": {"enum": ["task", "blind", "combined"]}, "scope": {"enum": ["task", "project"]},
+                "breadth": {"enum": ["focused", "related", "full"]}, "task": {"type": "string"},
+                "task_file": {"type": "string"}, "previous_summary": {"type": "string"},
+                "exclude": {"type": "array", "items": {"type": "string"}}, "evidence": {"type": "array", "items": {"type": "string"}},
+                "detail": {"enum": ["standard", "concise", "expanded"]}, "save": {"type": "boolean"},
+                "known_issues": {"type": "array", "items": {"type": "string"}}, "loop": {"type": "boolean"},
+                "loop_stop": {"type": "boolean"}, "finding_id": {"type": "array", "items": {"type": "string"}},
+                "all_critical_high": {"type": "boolean"}, "adapter_output": {"type": "string"},
+            },
+            "required": ["repo_root"], "additionalProperties": False,
+        },
+    }
+
+
+def review_mcp_payload(arguments: dict[str, Any], repo_root: Path) -> dict[str, object]:
+    def strings(key: str) -> list[str]:
+        value = arguments.get(key, [])
+        if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
+            raise ValueError(f"{key} must be an array of strings")
+        return value
+
+    args = argparse.Namespace(
+        command="review", repo_path=str(repo_root), run_id=arguments.get("run_id"),
+        mode=arguments.get("mode", "task"), scope=arguments.get("scope", "project"), breadth=arguments.get("breadth"),
+        task=arguments.get("task"), task_file=arguments.get("task_file"), reuse_task=False,
+        previous_summary=arguments.get("previous_summary"), exclude=strings("exclude"), evidence=strings("evidence"),
+        detail=arguments.get("detail", "standard"), save=arguments.get("save", True) is not False,
+        known_issues=strings("known_issues"), loop=bool(arguments.get("loop", False)), loop_stop=bool(arguments.get("loop_stop", False)),
+        finding_id=strings("finding_id"), all_critical_high=bool(arguments.get("all_critical_high", False)), adapter_output=arguments.get("adapter_output"),
+    )
+    return review_command_payload(args, repo_root)
 
 
 def add_review_command(subparsers: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
