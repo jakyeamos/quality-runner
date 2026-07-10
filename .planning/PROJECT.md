@@ -19,6 +19,7 @@ Keep quality-runner healthy by resolving Quality Runner findings with behavior-p
 - [ ] Resolve QR findings from run qr-fleet-continue-20260704-quality-runner using cluster-oriented remediation.
 - [ ] Verify remediation with focused repo checks and post-remediation QR comparison.
 - [ ] Keep QR advisory-only; source changes happen through GSD execution and git commits.
+- [ ] Implement Fresh Review from [docs/fresh-review-prd.md](../docs/fresh-review-prd.md).
 
 ### Out of Scope
 
@@ -45,6 +46,7 @@ Keep quality-runner healthy by resolving Quality Runner findings with behavior-p
 |----------|-----------|---------|
 | Use QR per-repo summaries as PRDs | They contain the current finding clusters, artifacts, and verification suggestions. | Pending execution |
 | Keep Quality Runner advisory-only | The user explicitly does not want execution pulled into QR. | Good |
+| Fresh Review is a read-only QR extension | The reviewer packages fresh task/blind contexts, writes local reports, and hands selected findings to a separate fixing agent. | PRD complete; implementation pending |
 
 ---
 *Last updated: 2026-07-04 after QR remediation GSD bootstrap*
