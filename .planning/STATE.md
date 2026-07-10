@@ -1,63 +1,59 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.0
-milestone_name: milestone
-status: executing
-last_updated: "2026-07-10T00:55:07.273Z"
+milestone: v1.1
+milestone_name: GPT-5.6 modernization
+status: planning
+last_updated: "2026-07-10T00:00:00.000Z"
 progress:
-  total_phases: 2
-  completed_phases: 1
-  total_plans: 6
-  completed_plans: 6
-  percent: 100
+  total_phases: 8
+  completed_phases: 0
+  total_plans: 8
+  completed_plans: 0
+  percent: 0
 ---
 
 # Planning State
 
 ## Project Reference
 
-See: `.planning/PROJECT.md` (updated 2026-07-04)
+See `.planning/PROJECT.md` for the established product boundary and
+`docs/modernization/` for the modernization target and implementation plan.
 
-**Core value:** Keep quality-runner healthy by resolving Quality Runner findings with behavior-preserving, evidence-backed remediation.
-**Current focus:** Phase 02 — Fresh Review; release 0.5.0
+**Core value:** Give developers and agents trustworthy local evidence before
+they authorize repository changes.
 
-## Milestone
+**Current focus:** Review and approve M0 — restore public release and safety
+boundaries before introducing the typed v2 core.
 
-**Name:** QR Remediation Baseline
-**Status:** Phase 02 complete
-**Started:** 2026-07-04
+## Current Position
+
+- Branch: `codex/gpt56-modernization`
+- Baseline: `main` at 0.5.0 / commit `0a3def1`
+- Audit and planning: complete
+- Implementation: not started
 
 ## Active Phase
 
-- **Phase:** 02
-- **Slug:** `fresh-review`
-- **Status:** Complete
-- **Plan:** 05-05 of 5
+- **Phase:** M0
+- **Slug:** restore-trust-at-the-boundary
+- **Status:** Planned
+- **Completion gate:** version-parity, safe-artifact, and execution-policy
+  regression suites pass from a built wheel.
 
-## Release Snapshot
+## Key Decisions
 
-- Version: 0.5.0
-- Verification: release-smoke passed
-- Release commit: ae950c1
+- Use a parallel typed core with adapters, not a clean rewrite.
+- Retain public artifact and compatibility contracts through a versioned
+  transition.
+- Make command execution explicit and isolated by default.
+- Improve the CLI/MCP experience before considering a browser or TUI surface.
 
-## Completed Scope
+## Next Step
 
-- GSD project bootstrap initialized from QR documentation.
+Implement M0 as specified in `docs/modernization/EXEC_PLAN.md` after plan
+approval.
 
-## Workflow Notes
+## Recent Progress
 
-- Quality Runner remains advisory-only.
-- Execute QR remediation through repo-local GSD plans, verification, git commits, and pushes.
-
-## Accumulated Context
-
-### Roadmap Evolution
-
-- 2026-07-04: Phase 1 planned: QR remediation: quality-runner from QR run qr-fleet-continue-20260704-quality-runner.
-- 2026-07-04: Initialized GSD planning from QR summary /Users/jakyeamos/.local/state/quality-runner/fleet/per-repo-summaries-20260704/quality-runner.md.
-
-## Next Command
-
-```bash
-/gsd-progress
-```
+- 2026-07-10: Modernization audit and execution plan recorded in commit
+  `a40a811`; no application code changed.

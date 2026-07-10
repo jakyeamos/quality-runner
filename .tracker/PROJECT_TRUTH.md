@@ -1,102 +1,53 @@
 # Quality Runner Project Truth
 
-Last updated: 2026-07-07
+Last updated: 2026-07-10
 
-Quality Runner is the public, installable quality orchestration package. It owns
-the CLI/MCP workflow for repo inspection, gate evidence, audit generation,
-remediation planning, handoff export, and controller report validation.
+## Current State
 
-Quality Runner now also has DOI-ready software-methods metadata and release
-docs: `CITATION.cff`, `.zenodo.json`, `RESEARCH_READY.md`, and
-`docs/release-notes/v0.3.1-doi.md`.
+Quality Runner is a public, local-first quality orchestration package. It
+inspects repositories, records evidence, plans remediation, and hands execution
+to separately authorized humans or agents. It does not own autonomous source
+changes or remote review execution.
 
-Version `0.4.0` is the next public release after the compatibility `0.3.1`
-package. It adds rollout, intent/gate controller semantics, security scanning,
-quality-skills workflows, and unwired-work remediation while keeping
-compatibility surfaces for prior `quality-evidence-contract` and
-`repo-quality-certifier` consumers.
+`main` is the 0.5.0 release baseline. The protected
+`codex/gpt56-modernization` branch contains the approved-for-review
+modernization audit and plan; no application implementation has started there.
 
-The package also carries compatibility surfaces for earlier extracted quality
-packages when those APIs are still imported by active tools:
+## Current Position
 
-- `quality_evidence_contract` remains available for shared evidence and finding
-  schema normalization.
-- `repo_quality_certifier`, `repo-quality-certifier`, and
-  `repo-quality-certifier-mcp` remain available as compatibility surfaces for
-  older gate-certification callers.
+- Target: a typed v2 core behind CLI, MCP, and compatibility adapters.
+- First implementation slice: M0 — restore release, artifact-boundary, and
+  verification-policy trust.
+- Canonical planning documents: `docs/modernization/`.
+- Public compatibility: retain `quality_evidence_contract` and
+  `repo_quality_certifier` during a published transition window.
 
-New public positioning and new integrations should lead with `quality-runner`.
+## Core Contract
 
-The README install section now points directly to the live PyPI package page and
-keeps the repository install path as the alternate source-checkout route.
+- Local-first operation with no silent remote transfer.
+- Auditing/planning stays separate from source mutation.
+- JSON artifacts remain canonical; Markdown remains the human decision surface.
+- Scan-only and code-executing verification are explicit, separately reported
+  modes.
 
-Current package-mining state:
+## Baseline Quality
 
-- The `quality-runner` wheel includes `quality_evidence_contract`,
-  `repo_quality_certifier`, both repo-quality-certifier console scripts, and
-  the certifier plugin manifest/skill package data.
-- `quality-runner release-smoke` now verifies compatibility imports,
-  repo-quality-certifier artifact generation, certifier MCP tool metadata, and
-  packaged plugin manifests.
-- Release docs target `v0.4.0` and include post-install checks for the
-  compatibility imports, CLI, MCP, and release smoke before archiving old repos.
-- `quality-runner rollout` is the first-class multi-repo controller workflow
-  for safe sequential refreshes, repo-list parsing, per-repo controller reports,
-  validation artifacts, rollout ledgers, per-repo planning summaries, and
-  fleet remediation phase drafts for all-projects stress passes.
-- AIOS now exposes `aios quality rollout` as a thin launch-and-capture adapter
-  over this workflow; Quality Runner still owns the controller protocol and
-  artifact contract.
+- Package build and Vulture pass at the release baseline.
+- The full test suite exposes one release-version contract failure.
+- Lint, format, and type checks expose pre-existing Fresh Review and import-order
+  debt.
+- Release smoke currently passes without testing package/runtime/plugin version
+  parity; M0 closes that gap.
 
-Current verification:
+## Risks
 
-- 2026-07-07: Prepared `0.4.0` release after extracting structural-scan and
-  similarity parser modules, fixing controller-report batch-scope assembly, and
-  clearing full-repo `uv run ruff check .` and `uv run basedpyright`. Verified
-  with full `uv run pytest -q` (362 passed), `uv run ruff format --check .`,
-  `uv run --with vulture vulture . --min-confidence 70`, and
-  `quality-runner release-smoke --json`.
-- 2026-07-07: Added `integrate` unwired-work detection, dead-code output
-  reinterpretation, and decision-based remediation slices that ask authors to
-  wire, finish, descope, or accept WIP. Verified with focused unwired-work
-  tests (`uv run pytest -q tests/test_code_quality_unwired.py
-  tests/test_unwired_from_dead_code.py tests/test_remediation_wiring.py
-  tests/test_config.py tests/test_phase1_semantics.py
-  tests/test_workflow.py::test_run_payload_adds_structural_findings_and_groups_remediation_slices
-  tests/test_code_quality.py::test_quality_runner_source_files_stay_under_default_large_file_threshold`),
-  full `uv run pytest -q`, touched-file `uv run ruff check ...`, and
-  `uv run --with vulture vulture . --min-confidence 70`.
-- 2026-07-04: Documented the AIOS launch shortcut in the rollout controller
-  notes. Verified with `uv run pytest -q tests/test_rollout.py
-  tests/test_release_docs.py` and `uv run ruff check docs/qr-rollout-20260702.md`
-  (Ruff reported no Python files under the Markdown path and exited cleanly).
-- 2026-07-04: Added DOI-ready software-methods metadata and release notes.
-  Verified the passing DOI path with `uv run ruff check quality_runner tests`,
-  `uv run pytest -q`, and `uv run quality-runner release-smoke --json`.
-  DOI minting is still blocked by existing format drift in five files and
-  existing basedpyright debt in tests.
-- 2026-07-04: QR now excludes generated artifact surfaces from both recursive
-  discovery and structural source scanning: build/test outputs, local caches,
-  top-level artifact output dirs, lockfiles/build metadata, and
-  `generated-*` source artifacts. Verified with regression tests, full
-  `uv run ruff check .`, `uv run basedpyright`, full `uv run pytest -q`, and a
-  non-mutating BBDSE `BBDS-Analytics-Product-Suite` smoke where discovery took
-  0.544s and code-quality scanning took 6.437s.
-- 2026-07-04: `quality-runner rollout` now writes fleet planning documents by
-  default: `per-repo-summaries/INDEX.md`, one per-repo summary document per
-  rollout entry, and `fleet-remediation-phases.md`. Verified with focused
-  rollout tests, focused ruff on rollout/document files, `uv run basedpyright`,
-  and full `uv run pytest -q`. Full `uv run ruff check .` is currently blocked
-  by a pre-existing dirty scan-exclusion import-order issue outside this
-  rollout-document change.
-- 2026-07-04: Branch-scan warnings now compare commit identity, so a checked
-  out `dev` branch aligned to `main` does not emit
-  `checked_out_branch_not_main_or_most_advanced`. Verified with the focused
-  branch workflow tests, a full `uv run pytest -q`, and a real QR run against
-  `agent-eval-contract` that returned no warnings.
-- 2026-07-04: `uv run ruff check .`, `uv run basedpyright`, and
-  `uv run pytest` passed after the README install documentation update.
+- Artifact path traversal and symlink safety are inconsistent across public
+  entry points.
+- Untrusted repository gate commands can currently execute under a misleading
+  read-only label.
+- Public release metadata is internally inconsistent.
 
-## QR Remediation Planning
+## Recent Progress
 
-- 2026-07-04: Added GSD Phase 1 for QR remediation from qr-fleet-continue-20260704-quality-runner; 1 plan(s) created from quality-runner.md. Execution has not started.
+- 2026-07-10: Added the modernization audit, target, execution plan, and live
+  progress record on `codex/gpt56-modernization` (commit `a40a811`).
