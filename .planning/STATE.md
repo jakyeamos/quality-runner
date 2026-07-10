@@ -19,7 +19,7 @@ progress:
 See: `.planning/PROJECT.md` (updated 2026-07-04)
 
 **Core value:** Keep quality-runner healthy by resolving Quality Runner findings with behavior-preserving, evidence-backed remediation.
-**Current focus:** Phase 02 — Fresh Review
+**Current focus:** Phase 02 — Fresh Review; release 0.5.0
 
 ## Milestone
 
@@ -33,6 +33,12 @@ See: `.planning/PROJECT.md` (updated 2026-07-04)
 - **Slug:** `fresh-review`
 - **Status:** Complete
 - **Plan:** 05-05 of 5
+
+## Release Snapshot
+
+- Version: 0.5.0
+- Verification: release-smoke passed
+- Release commit: ae950c1
 
 ## Completed Scope
 
