@@ -16,6 +16,7 @@ from quality_runner.cli_handoff import add_handoff_commands
 from quality_runner.cli_human_summary import human_summary
 from quality_runner.cli_payload import payload_for_args
 from quality_runner.cli_rollout import add_rollout_command
+from quality_runner.cli_review import add_review_command
 from quality_runner.cli_skills import add_skill_commands
 from quality_runner.cli_workflow_args import add_workflow_arguments, add_worktree_verify_arguments
 from quality_runner.standards import DEFAULT_PROFILE
@@ -140,6 +141,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
 
     add_rollout_command(subparsers)
+    add_review_command(subparsers)
 
     init_parser = subparsers.add_parser("init", help="Write a starter .quality-runner.toml")
     init_parser.add_argument("repo_path", help="Target repository path")

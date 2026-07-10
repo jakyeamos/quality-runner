@@ -20,6 +20,19 @@ def human_summary(payload: dict[str, Any]) -> str:
         return f"Quality Runner {version}: {status}"
     if payload.get("schema") == INIT_RESULT_SCHEMA:
         return f"config: {payload.get('config_path')}"
+    if payload.get("schema") == "quality-runner-review-result-v0.1":
+        lines = [
+            f"status: {status}",
+            f"summary: {payload.get('summary')}",
+            f"mode: {payload.get('mode')} scope: {payload.get('scope')} breadth: {payload.get('breadth')}",
+            f"adapter: {payload.get('adapter_status')}",
+            f"severity counts: {payload.get('severity_counts')}",
+            f"evidence limitations: {payload.get('evidence_unavailable')}",
+        ]
+        saved_path = payload.get("saved_path")
+        if isinstance(saved_path, str):
+            lines.append(f"saved: {saved_path}")
+        return "\n".join(lines)
     if payload.get("schema") == RELEASE_SMOKE_SCHEMA:
         return _release_smoke_summary(payload, status)
     if payload.get("schema") == STATUS_RESULT_SCHEMA:

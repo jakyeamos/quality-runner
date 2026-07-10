@@ -22,6 +22,7 @@ from quality_runner.cli_gate import (
 from quality_runner.cli_handoff import handoff_command_payload
 from quality_runner.cli_refresh import refresh_command_payload
 from quality_runner.cli_rollout import rollout_command_payload
+from quality_runner.cli_review import review_command_payload
 from quality_runner.cli_skills import skill_command_payload
 from quality_runner.cli_status import export_handoff_payload, status_payload
 from quality_runner.code_quality import preview_ignored_paths
@@ -129,6 +130,8 @@ def payload_for_args(args: argparse.Namespace) -> dict[str, Any]:
         return refresh_command_payload(args, _validated_repo_path(args.repo_path))
     if args.command == "rollout":
         return rollout_command_payload(args)
+    if args.command == "review":
+        return review_command_payload(args, _validated_repo_path(args.repo_path))
     if args.command == "gate":
         return gate_command_payload(args, repo_root=_validated_repo_path(args.repo_path))
     if args.command == "gate-status":
