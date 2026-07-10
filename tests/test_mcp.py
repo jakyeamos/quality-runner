@@ -21,6 +21,7 @@ def test_mcp_lists_quality_runner_tools() -> None:
         "quality_runner_gate_status",
         "quality_runner_gate_respond",
         "quality_runner_propose_fix",
+        "quality_runner_review",
     }
 
 
@@ -32,6 +33,20 @@ def test_mcp_doctor_reports_ready_without_implementation_permission() -> None:
     assert structured["schema"] == "quality-runner-doctor-result-v0.1"
     assert structured["status"] == "ready"
     assert structured["implementation_allowed"] is False
+
+
+def test_mcp_review_blind_mode_is_packet_only(tmp_path: Path) -> None:
+    result = call_tool("quality_runner_review", {"repo_root": str(tmp_path), "mode": "blind", "run_id": "mcp-review"})
+    assert result["isError"] is False
+    structured = result["structuredContent"]
+    assert structured["status"] == "review-not-run"
+    assert structured["breadth"] == "related"
+
+
+def test_mcp_review_missing_task_is_invalid_params(tmp_path: Path) -> None:
+    response = handle_jsonrpc_message({"jsonrpc": "2.0", "id": 4, "method": "tools/call", "params": {"name": "quality_runner_review", "arguments": {"repo_root": str(tmp_path)}}})
+    assert response is not None
+    assert response["error"]["code"] == -32602
 
 
 def test_mcp_run_returns_structured_content(tmp_path: Path) -> None:
@@ -122,7 +137,7 @@ def test_mcp_initialize_and_tools_list_jsonrpc() -> None:
     assert initialize["result"]["serverInfo"] == {"name": "quality-runner", "version": __version__}
     assert initialize["result"]["capabilities"] == {"tools": {"listChanged": False}}
     assert tools is not None
-    assert len(tools["result"]["tools"]) == 9
+    assert len(tools["result"]["tools"]) == 10
 
 
 def test_mcp_notifications_do_not_return_response() -> None:
@@ -355,4 +370,4 @@ def test_mcp_main_stdio_loop_writes_jsonrpc_response(monkeypatch, capsys) -> Non
     assert exit_code == 0
     response = json.loads(capsys.readouterr().out)
     assert response["id"] == 1
-    assert len(response["result"]["tools"]) == 9
+    assert len(response["result"]["tools"]) == 10

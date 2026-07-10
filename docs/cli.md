@@ -545,3 +545,27 @@ contract used by existing callers.
 - `2`: argument parsing error.
 
 Errors are printed to stderr without Python tracebacks.
+## `quality-runner review`
+
+Runs a fresh local review packet without modifying source files:
+
+```bash
+quality-runner review /path/to/repo --task "Implement the requested change" --json
+quality-runner review /path/to/repo --mode blind --breadth full --no-save
+```
+
+The command defaults to `--mode task`, `--scope project`, and project breadth
+`--breadth related`. It supports `--mode task|blind|combined`,
+`--scope task|project`, `--breadth focused|related|full`, `--task`,
+`--task-file`, `--reuse-task`, `--previous-summary`, repeated `--exclude` and
+`--evidence`, `--detail`, `--save/--no-save`, `--known-issues`, `--loop`,
+`--loop-stop`, `--finding-id`, `--all-critical-high`, and the local
+`--adapter-output` JSON path. Task and combined modes require task input;
+Quality Runner suggests blind mode when it is absent.
+
+Human and JSON output expose mode, scope, breadth, adapter status, severity
+counts, evidence limitations, and saved artifact paths. The no-issue message is
+qualified: no major issues from available evidence does not prove end-to-end
+correctness. Quality Runner remains local and read-only; a missing adapter is
+`review-not-run`, not a completed review. Saved output includes
+`review-agent-packet.md` and `review-fix-prompts.md` for separate agents.

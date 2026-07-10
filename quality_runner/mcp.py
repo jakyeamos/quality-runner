@@ -9,6 +9,7 @@ from typing import Any
 from quality_runner import __version__
 from quality_runner.artifacts import artifact_dir
 from quality_runner.cli_payload import DOCTOR_RESULT_SCHEMA
+from quality_runner.cli_review import review_command_payload
 from quality_runner.fix_proposals import propose_fix
 from quality_runner.gate_controller import (
     create_gate_run,
@@ -122,6 +123,21 @@ def list_tools() -> list[dict[str, Any]]:
         "required": ["repo_root", "run_id", "finding_group"],
         "additionalProperties": False,
     }
+    review_schema = {
+        "type": "object",
+        "properties": {
+            "repo_root": {"type": "string"}, "run_id": {"type": "string"},
+            "mode": {"enum": ["task", "blind", "combined"]},
+            "scope": {"enum": ["task", "project"]}, "breadth": {"enum": ["focused", "related", "full"]},
+            "task": {"type": "string"}, "task_file": {"type": "string"}, "previous_summary": {"type": "string"},
+            "exclude": {"type": "array", "items": {"type": "string"}}, "evidence": {"type": "array", "items": {"type": "string"}},
+            "detail": {"enum": ["standard", "concise", "expanded"]}, "save": {"type": "boolean"},
+            "known_issues": {"type": "array", "items": {"type": "string"}}, "loop": {"type": "boolean"},
+            "loop_stop": {"type": "boolean"}, "finding_id": {"type": "array", "items": {"type": "string"}},
+            "all_critical_high": {"type": "boolean"}, "adapter_output": {"type": "string"},
+        },
+        "required": ["repo_root"], "additionalProperties": False,
+    }
     return [
         {
             "name": "quality_runner_doctor",
@@ -173,6 +189,7 @@ def list_tools() -> list[dict[str, Any]]:
             "description": "Write structured fix proposals for a remediation finding group.",
             "inputSchema": propose_fix_schema,
         },
+        {"name": "quality_runner_review", "description": "Run a fresh local read-only review and write canonical artifacts.", "inputSchema": review_schema},
     ]
 
 
@@ -180,6 +197,21 @@ def call_tool(name: str, arguments: dict[str, Any] | None = None) -> dict[str, A
     args = arguments or {}
     if name == "quality_runner_doctor":
         return _tool_result(_doctor_payload())
+
+    if name == "quality_runner_review":
+        repo_root = _validated_repo_root(args)
+        review_args = argparse.Namespace(
+            command="review", repo_path=str(repo_root), run_id=_string_arg(args, "run_id"),
+            mode=_string_arg(args, "mode") or "task", scope=_string_arg(args, "scope") or "project",
+            breadth=_string_arg(args, "breadth"), task=_string_arg(args, "task"), task_file=_string_arg(args, "task_file"),
+            reuse_task=False, previous_summary=_string_arg(args, "previous_summary"),
+            exclude=_string_list_arg(args, "exclude"), evidence=_string_list_arg(args, "evidence"),
+            detail=_string_arg(args, "detail") or "standard", save=args.get("save", True) is not False,
+            known_issues=_string_list_arg(args, "known_issues"), loop=bool(args.get("loop", False)),
+            loop_stop=bool(args.get("loop_stop", False)), finding_id=_string_list_arg(args, "finding_id"),
+            all_critical_high=bool(args.get("all_critical_high", False)), adapter_output=_string_arg(args, "adapter_output"),
+        )
+        return _tool_result(review_command_payload(review_args, repo_root))
 
     if name == "quality_runner_inspect_repo":
         repo_root = _validated_repo_root(args)
@@ -456,6 +488,13 @@ def _required_string_arg(arguments: dict[str, Any], key: str) -> str:
     value = _string_arg(arguments, key)
     if value is None:
         raise JsonRpcError(JSONRPC_INVALID_PARAMS, f"{key} is required")
+    return value
+
+
+def _string_list_arg(arguments: dict[str, Any], key: str) -> list[str]:
+    value = arguments.get(key, [])
+    if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
+        raise JsonRpcError(JSONRPC_INVALID_PARAMS, f"{key} must be an array of strings")
     return value
 
 

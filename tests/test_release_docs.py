@@ -23,6 +23,8 @@ def test_release_docs_describe_current_release_plan_and_release_history() -> Non
     assert "code-quality-scan.json" in cli_docs
     assert "resolution-ledger.json" in cli_docs
     assert "resolution-ledger.md" in cli_docs
+    assert "quality-runner review" in cli_docs
+    assert "review-agent-packet.md" in cli_docs
 
     assert "## 0.2.1 - 2026-07-02" in changelog
     assert "repo-owned quality gates" in changelog

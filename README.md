@@ -69,6 +69,17 @@ packages it supersedes publicly:
 
 ## Quickstart
 
+Start a fresh, local-only review with a task-aware packet:
+
+```bash
+quality-runner review /path/to/repo --task "Implement the requested change" --json
+```
+
+Fresh Review is read-only and does not call remote services or apply fixes. Use
+`--mode blind` when no task should be supplied. A missing adapter returns an
+honest `review-not-run` packet-only result; fixing-agent prompts are separate
+artifacts and are not remediation commands.
+
 Run a full repo refresh and write the remediation handoff in the same command:
 
 ```bash

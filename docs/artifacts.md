@@ -392,3 +392,23 @@ scan_exclusions = ["samples", "generated-reports/**"]
 ```
 
 The active list is written to `repo-scan.json` as `scan_exclusions`.
+## Fresh Review artifacts
+
+`quality-runner review` writes these files under
+`.quality-runner/runs/<run-id>/` when saving is enabled:
+
+- `review-manifest.json`: mode, scope, breadth, freshness, evidence, and paths.
+- `review-context.json`: the newly constructed task, blind, or combined packet.
+- `review-report.json`: canonical findings, classifications, counts, caveats,
+  and adapter status.
+- `review-report.md`: human-readable report.
+- `review-agent-packet.md`: bounded packet for a separate reviewing agent.
+- `review-fix-prompts.md`: selected finding prompts for a separate fixing agent.
+
+Review packets never include hidden reasoning. Active implement-review loops do
+not compare prior review documents; comparison and resolution classification
+occur only during final cycle summarization. Known issues are stored locally in
+`.quality-runner/known-issues.json`, remain visible as known-accepted findings,
+and can trigger explicit re-verification after major changes. No adapter yields
+a packet-only `review-not-run` result. All review artifacts and state are local;
+Quality Runner does not edit source files or call remote services.
