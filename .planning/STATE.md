@@ -6,10 +6,10 @@ status: active
 last_updated: "2026-07-12T00:00:00.000Z"
 progress:
   total_phases: 8
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 8
-  completed_plans: 1
-  percent: 12
+  completed_plans: 2
+  percent: 25
 ---
 
 # Planning State
@@ -22,8 +22,8 @@ See `.planning/PROJECT.md` for the established product boundary and
 **Core value:** Give developers and agents trustworthy local evidence before
 they authorize repository changes.
 
-**Current focus:** Plan M1 — establish the typed v2 contracts and eliminate the
-Fresh Review type debt.
+**Current focus:** Plan M2 — migrate the read-only audit vertical slice through
+the typed application boundary.
 
 ## Current Position
 
@@ -31,15 +31,16 @@ Fresh Review type debt.
 - Baseline: `main` at 0.5.0 / commit `0a3def1`
 - Audit and planning: complete
 - M0 — restore trust at the boundary: complete in `f36dcf4`
-- Implementation: M1 next
+- M1 — establish typed review contracts: complete in `cb12746`
+- Implementation: M2 next
 
 ## Active Phase
 
-- **Phase:** M1
-- **Slug:** establish-typed-v2-contracts
+- **Phase:** M2
+- **Slug:** migrate-read-only-audit-vertical-slice
 - **Status:** Planned
-- **Completion gate:** typed v2 ownership and adapter seams are explicit, with
-  the Fresh Review type errors removed.
+- **Completion gate:** one typed audit use case preserves inspect/run artifacts,
+  finding IDs, CLI/MCP projections, exclusions, and resource budgets.
 
 ## Key Decisions
 
@@ -50,13 +51,18 @@ Fresh Review type debt.
 - Improve the CLI/MCP experience before considering a browser or TUI surface.
 - Clear hook-inherited Git environment before traced pytest runs so fixture
   repositories cannot alter the active worktree.
+- Keep strict core contracts behind v1 packet/options/state projections until
+  the published compatibility cutover.
 
 ## Next Step
 
-Plan and implement M1 as specified in `docs/modernization/EXEC_PLAN.md`.
+Plan and implement M2 as specified in `docs/modernization/EXEC_PLAN.md`.
 
 ## Recent Progress
 
+- 2026-07-12: M1 completed in `cb12746`; typed core/application contracts,
+  v1 golden projections, serializer validation, and public compatibility types
+  are verified by 436 tests, Basedpyright, build, and release smoke.
 - 2026-07-12: M0 completed in `f36dcf4`; release metadata, artifact safety,
   explicit gate execution consent, Fresh Review truthfulness, and hook test
   isolation are verified.
