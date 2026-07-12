@@ -5,16 +5,16 @@ Last updated: 2026-07-12
 ## Current State
 
 The quality-skills audit contract is hardened on feature branch
-`quality-skills-hardening` at commit `ed16bb2`. The first source-backed user pack,
-`ui-foundations`, now covers visual anti-pattern signals, loading and empty-state
-signals, and four high-recall agent-review rubrics for hierarchy, interaction
-states, accessibility, and visual restraint.
+`quality-skills-hardening` at commit `8055088`. The source-backed user packs
+`ui-foundations` and `test-strategy` now cover visual anti-patterns, UI states,
+behavior coverage, regression value, test reliability, and quality-gate evidence
+through deterministic observations and high-recall agent reviews.
 
 ## Next Step
 
-Select and convert the next candidate pack, then exercise the starter packs
-against representative source-only repositories before registering them in a
-personal multi-repo configuration.
+Select and convert the security/privacy candidate pack, then exercise the
+starter packs against representative source-only repositories before registering
+them in a personal multi-repo configuration.
 
 ## Blockers
 
@@ -75,6 +75,11 @@ Current verification:
   `ed16bb2`. Focused quality-skill tests passed (`24 passed`), pack ingest,
   touched-file Ruff, format, and agent-review report merging passed. Full suite
   reached `402 passed, 1 failed` on the existing packaging-entrypoint mismatch.
+
+- 2026-07-12: Added and committed the `test-strategy` starter pack as
+  `8055088`. Focused quality-skill tests passed (`25 passed`), pack ingest,
+  touched-file Ruff, format, and agent-review report merging passed. Full suite
+  reached `403 passed, 1 failed` on the existing packaging-entrypoint mismatch.
 
 - 2026-07-12: Quality-skills hardening committed as `ccfc12e`. Focused skill and
   workflow tests passed (`25 passed`); full suite reached `401 passed, 1 failed`
