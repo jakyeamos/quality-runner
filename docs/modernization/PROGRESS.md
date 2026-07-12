@@ -2,7 +2,7 @@
 
 ## Current state
 
-M0 through M2 are implemented on the protected branch
+M0 through M3 are implemented on the protected branch
 `codex/gpt56-modernization`, based on `main` commit `0a3def1`. The branch
 remains isolated until review and merge.
 
@@ -48,6 +48,22 @@ result schemas or artifact names:
   security scan, including `app/api`, `pages/api`, `src/routes`, `routes/api`,
   Go, Kotlin, and extensionless route paths.
 
+M3 migrates gate verification without changing the public `verify-gates` result
+schema or v1 artifact names:
+
+- a typed verification request and execution policy now drive one application
+  service, while `workflow_verify.verify_gates_payload` remains the thin CLI and
+  refresh compatibility facade;
+- M3 reuses M2 audit analysis, executes gates before planning, and renders the
+  original plan-before-execution, partial-verification, intent, handoff, and
+  manifest projections through a dedicated v1 artifact renderer;
+- executable gates still require a disposable worktree, now receive only an
+  explicit runtime environment allowlist, and clean up failed worktree creation
+  and interrupted sessions without leaking tracked or untracked source files;
+- timeout gate records are represented by the published schema, with regression
+  coverage for environment secrecy, symlink refusal, cleanup, interruption, and
+  the legacy intent artifact-path snapshot.
+
 ## Decisions in force
 
 - Use a parallel typed core with controlled adapters, not a clean rewrite.
@@ -62,12 +78,11 @@ result schemas or artifact names:
 
 ## Quality status
 
-- The full `pytest` suite passes; Basedpyright reports zero errors.
+- The full `pytest` suite passes (454 tests); Basedpyright reports zero errors.
 - Ruff lint/format, Vulture, a fresh package build, and
   `quality-runner release-smoke --json` pass.
 
 ## Next milestone
 
-M3 migrates gate verification as its own explicit policy-controlled application
-service. The existing verification execution path remains intentionally
-unchanged until then.
+M4 ships the journey-led CLI and MCP outcome model, retaining the now-migrated
+verification facade as a compatibility projection.
