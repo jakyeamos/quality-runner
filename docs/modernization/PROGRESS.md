@@ -2,7 +2,7 @@
 
 ## Current state
 
-M0 through M3 are implemented on the protected branch
+M0 through M4 are implemented on the protected branch
 `codex/gpt56-modernization`, based on `main` commit `0a3def1`. The branch
 remains isolated until review and merge.
 
@@ -64,6 +64,24 @@ schema or v1 artifact names:
   coverage for environment secrecy, symlink refusal, cleanup, interruption, and
   the legacy intent artifact-path snapshot.
 
+M4 adds a versioned journey-outcome layer without changing legacy CLI/MCP
+projections:
+
+- `quality-runner-outcome-v0.2` presents audit, review, verify, and bounded run
+  history with explicit state, assessment, confidence, writes, safety, and one
+  safest next action;
+- `audit`, `verify`, and `runs` are outcome-first CLI journeys, while
+  `review --outcome` is an explicit opt-in that preserves default v1 review
+  behavior;
+- four additive MCP tools expose the same contract as structured content while
+  leaving legacy tools and schemas unchanged;
+- safety claims are derived from observed branch/execution evidence, malformed
+  verification artifacts fail closed, and unavailable history is limited
+  evidence rather than a clean no-history result;
+- legacy workflow access is isolated behind explicit compatibility adapters, and
+  v2 schema, projection, CLI, MCP, history, and adversarial regression tests
+  hold the cross-journey contract.
+
 ## Decisions in force
 
 - Use a parallel typed core with controlled adapters, not a clean rewrite.
@@ -78,11 +96,12 @@ schema or v1 artifact names:
 
 ## Quality status
 
-- The full `pytest` suite passes (454 tests); Basedpyright reports zero errors.
+- The full `pytest` suite passes (496 tests); Basedpyright reports zero errors.
 - Ruff lint/format, Vulture, a fresh package build, and
   `quality-runner release-smoke --json` pass.
 
 ## Next milestone
 
-M4 ships the journey-led CLI and MCP outcome model, retaining the now-migrated
-verification facade as a compatibility projection.
+M5 makes Fresh Review operationally honest from packet creation through adapter
+response validation and fixing handoff, retaining packet-only review as a clear
+distinct capability.

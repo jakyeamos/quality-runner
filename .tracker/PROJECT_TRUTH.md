@@ -13,14 +13,16 @@ changes or remote review execution.
 `codex/gpt56-modernization` branch contains M0 trust-boundary work in
 `f36dcf4`, M1 typed Fresh Review contracts in `cb12746`, M2 typed read-only
 audit orchestration in `3f23204`, and M3 typed verification orchestration in
-`8705cc1`, producing an unreleased 0.5.1 candidate. No tag or package
+`8705cc1`. M4 in `75d8ac4` adds the additive v2 journey-outcome contract,
+outcome-first CLI/MCP surfaces, bounded run history, and precise safety
+projections. The branch is an unreleased 0.5.1 candidate; no tag or package
 publication has occurred.
 
 ## Current Position
 
 - Target: a typed v2 core behind CLI, MCP, and compatibility adapters.
-- Next implementation slice: M4 — ship the journey-led CLI and MCP outcome
-  model over the migrated core flows.
+- Next implementation slice: M5 — make Fresh Review operationally honest from
+  packet creation through validated response and fixing handoff.
 - Canonical planning documents: `docs/modernization/`.
 - Public compatibility: retain `quality_evidence_contract` and
   `repo_quality_certifier` during a published transition window.
@@ -35,17 +37,17 @@ publication has occurred.
 
 ## Baseline Quality
 
-- The full 454-test pytest suite, Ruff lint/format, Basedpyright, Vulture,
+- The full 496-test pytest suite, Ruff lint/format, Basedpyright, Vulture,
   package build, and release smoke pass.
-- Basedpyright reports zero errors; Fresh Review now uses strict core contracts
-  behind v1 JSON and Python compatibility projections.
+- Basedpyright reports zero errors; audit, review, verify, and run history now
+  have a versioned v2 outcome contract behind preserved v1 projections.
 - Release smoke now checks package/runtime/plugin parity and the release
   workflow enforces tag, wheel, manifest, and citation contracts.
 
 ## Risks
 
-- M4 must make outcome, safety, and next-action states clearer without changing
-  legacy CLI/MCP payload contracts.
+- M5 must make adapter-backed Fresh Review operationally honest without leaking
+  prior context or changing legacy CLI/MCP payload contracts.
 - Existing large-file warnings remain in `repo_quality_certifier/core.py` and
   `tests/test_cli.py`.
 - User-authored gate commands remain arbitrary code; M0 requires explicit
@@ -55,6 +57,9 @@ publication has occurred.
 
 ## Recent Progress
 
+- 2026-07-12: Completed M4 on `codex/gpt56-modernization` (`75d8ac4`): v2
+  outcome contract, outcome-first CLI/MCP journeys, bounded history, and
+  safety claims tied to observed evidence; 496 tests and release checks pass.
 - 2026-07-12: Completed M3 on `codex/gpt56-modernization` (`8705cc1`): typed
   verification service and v1 artifact renderer, minimal inherited environment,
   disposable-worktree recovery, timeout schema alignment, and 454 passing tests.

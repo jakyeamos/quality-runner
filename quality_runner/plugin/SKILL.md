@@ -7,26 +7,27 @@ description: Run standalone audit-and-plan quality orchestration for a repositor
 
 Use this skill when the user asks to audit a repository against quality standards, run Quality Runner, inspect available quality gates, or produce a remediation plan.
 
-Quality Runner v1 is audit-and-plan by default. It writes `.quality-runner/`
-artifacts and does not modify target source files. Discovered gates are evidence
-only unless a user explicitly authorizes `--execute-gates --worktree-mode
-disposable`; that runs arbitrary local commands in a disposable checkout, not a
-sandbox.
+Quality Runner's preferred journeys are outcome-first. They write local
+`.quality-runner/` evidence as needed but do not modify target source files.
+Discovered gates remain evidence-only unless a user explicitly authorizes
+`--execute-gates --worktree-mode disposable`; that runs local commands in a
+disposable checkout, not a sandbox.
 
 Preferred MCP tools:
 
-- `quality_runner_inspect_repo` to inspect repo shape and quality capabilities.
-- `quality_runner_run` to write the full audit, remediation plan, and agent handoff.
-- `quality_runner_status` to list existing runs.
-- `quality_runner_export_handoff` to read an existing `agent-handoff.md`.
+- `quality_runner_audit_outcome` to inspect or plan with a clear remediation outcome.
+- `quality_runner_review_outcome` to distinguish a completed review from a packet awaiting evidence.
+- `quality_runner_verify_outcome` to record or explicitly authorize disposable verification.
+- `quality_runner_runs_outcome` to read persisted run history without writing a summary.
+
+Use the legacy MCP tools only when an existing client requires their v1 payloads.
 
 CLI fallback:
 
 ```bash
-quality-runner refresh /path/to/repo \
-  --run-id-prefix qr-<date-or-task> \
-  --handoff-output /path/to/repo/.quality-runner/exports/qr-handoff.md \
-  --json
+quality-runner audit /path/to/repo --run-id qr-<date-or-task> --json
+quality-runner verify /path/to/repo --run-id qr-<date-or-task>-verify --json
+quality-runner runs /path/to/repo --json
 ```
 
 Agent workflow:

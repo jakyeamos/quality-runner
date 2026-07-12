@@ -69,42 +69,43 @@ packages it supersedes publicly:
 
 ## Quickstart
 
-Start a fresh, local-only review with a task-aware packet:
+Start with the outcome-first journeys. Each result names the state, the strength
+of the evidence, what was written, the safety mode, and one next action.
 
 ```bash
-quality-runner review /path/to/repo --task "Implement the requested change" --json
+quality-runner audit /path/to/repo --run-id baseline-001 --json
+quality-runner review /path/to/repo --mode blind --outcome --json
+quality-runner verify /path/to/repo --run-id baseline-001-verify --json
+quality-runner runs /path/to/repo --json
 ```
 
-Fresh Review is read-only and does not call remote services or apply fixes. Use
-`--mode blind` when no task should be supplied. A missing adapter returns a
-`packet-ready` outcome with a next action, not a no-findings conclusion.
+`audit` creates evidence and a remediation plan without editing source files.
+`review --outcome` makes a prepared packet visibly `awaiting-evidence`, rather
+than treating the absence of an independent review as clean. `verify` records
+discovered gates by default; `runs` reads history without adding a summary file.
+The v2 outcome JSON is additive: existing commands retain their v1 projections.
 
-Run a full repo refresh and write the remediation handoff in the same command:
+To authorize discovered commands after reviewing their evidence, use a disposable
+checkout explicitly:
+
+```bash
+quality-runner verify /path/to/repo \
+  --execute-gates --worktree-mode disposable --json
+```
+
+Disposable execution protects the ordinary source checkout from normal gate
+mutations; it is not a sandbox for arbitrary commands. See the
+[CLI Reference](docs/cli.md) for the full execution and dirty-worktree contract.
+
+Legacy `inspect`, `run`, `verify-gates`, `status`, and orchestration commands
+remain available for compatibility. Use `refresh` when a controller needs its
+established combined v1 workflow and handoff export:
 
 ```bash
 quality-runner refresh /path/to/repo \
   --run-id-prefix baseline-001 \
   --handoff-output /path/to/repo/.quality-runner/exports/baseline-001-handoff.md \
   --json
-```
-
-By default, refresh records discovered commands as evidence but does not run
-them. To authorize those commands after reviewing the plan, opt into a
-disposable checkout:
-
-```bash
-quality-runner verify-gates /path/to/repo \
-  --execute-gates --worktree-mode disposable --json
-```
-
-This protects the ordinary source checkout from normal gate mutations; it is
-not a sandbox for arbitrary commands. See the [CLI Reference](docs/cli.md) for
-the execution and dirty-worktree contract.
-
-For an audit-only pass without gate verification, use `run`:
-
-```bash
-quality-runner run /path/to/repo --run-id baseline-001 --json
 ```
 
 Quality Runner writes artifacts under the target repo:
@@ -143,6 +144,19 @@ See [Agent Usage](docs/agent-usage.md) for the copy-paste phase and batch
 templates agents should follow.
 
 ## Commands
+
+For new work, begin with the four outcome-first commands:
+
+```bash
+quality-runner audit /path/to/repo --json
+quality-runner review /path/to/repo --outcome --json
+quality-runner verify /path/to/repo --json
+quality-runner runs /path/to/repo --json
+```
+
+Their JSON payload uses `quality-runner-outcome-v0.2`; the detailed definitions
+and safety behavior live in the [CLI Reference](docs/cli.md). The established
+commands below remain callable with their v1 payloads.
 
 ```bash
 quality-runner doctor
@@ -206,13 +220,16 @@ compatibility surfaces in one command.
 
 ## MCP
 
-The MCP server exposes:
+New MCP integrations should use the additive outcome tools:
 
-- `quality_runner_doctor`
-- `quality_runner_inspect_repo`
-- `quality_runner_run`
-- `quality_runner_status`
-- `quality_runner_export_handoff`
+- `quality_runner_audit_outcome`
+- `quality_runner_review_outcome`
+- `quality_runner_verify_outcome`
+- `quality_runner_runs_outcome`
+
+They retain the standard MCP wrapper while exposing the v2 outcome as
+`structuredContent`. The established v1 MCP tools remain available for existing
+clients; use `tools/list` as the authoritative current tool/schema registry.
 
 For compatibility with prior Repo Quality Certifier consumers, the
 `repo-quality-certifier-mcp` command remains packaged and exposes:

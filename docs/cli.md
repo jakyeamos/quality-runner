@@ -11,6 +11,53 @@ Certifier callers:
 - `repo-quality-certifier`
 - `repo-quality-certifier-mcp`
 
+## Outcome-first journeys
+
+New users and integrations should start with `audit`, `review`, `verify`, and
+`runs`. `audit`, `verify`, and `runs` render a compact outcome card by default;
+`review` opts into the same projection with `--outcome`. Their v2 JSON uses
+`quality-runner-outcome-v0.2` and leads with state, assessment, evidence
+confidence, writes, safety, and the safest next action.
+
+```bash
+quality-runner audit /path/to/repo --json
+quality-runner review /path/to/repo --mode blind --outcome --json
+quality-runner verify /path/to/repo --json
+quality-runner runs /path/to/repo --json
+```
+
+The v2 outcome is additive. `inspect`, `run`, `verify-gates`, and the default
+`review` projection keep their established v1 schemas and exit behavior. A
+blocked verification or packet-ready review is a truthful outcome, not a parser
+failure; callers should read its `next_action` before deciding whether to run
+commands or request a reviewer.
+
+### `quality-runner audit`
+
+`audit` is the preferred audit-and-plan entrypoint. It writes the same local
+evidence family as the compatibility `run` path, then projects it into the v2
+outcome. Use `--inspect-only` to create inspection evidence without preparing a
+remediation plan. Neither mode edits source files. If
+`--checkout-most-advanced-branch` is requested, the outcome explicitly reports
+that the source worktree branch may have changed.
+
+### `quality-runner verify`
+
+`verify` is the preferred verification entrypoint. It records gate evidence by
+default and reports that state as evidence-only. Running discovered commands
+requires both `--execute-gates` and `--worktree-mode disposable`; the outcome
+labels successful execution as disposable only when the saved verification
+record proves it. A disposable checkout protects the source worktree from
+ordinary mutations, but it is not a host sandbox.
+
+### `quality-runner runs`
+
+`runs` is a bounded read-only history view. It never writes `run-summary.json`.
+Use `--run-id` for one run or `--limit` to constrain recent history. Its outcome
+includes the bounded run IDs and statuses it read, plus truncation and unreadable
+run signals. Missing or unreadable selected runs become limited evidence rather
+than a clean result.
+
 ## `quality-runner doctor`
 
 Checks local install readiness.
@@ -82,7 +129,8 @@ Unwired-work checks can also be configured. They run as structural category
 
 ## Shared Workflow Flags
 
-`inspect`, `run`, `verify-gates`, and `refresh` share these arguments:
+`audit`, `inspect`, `run`, `verify`, `verify-gates`, and `refresh` share these
+arguments where they apply:
 
 - `--intent`: short author goal for the run (what the user set out to accomplish)
 - `--intent-file`: path to intent JSON inside the target repo (must include `goal`)
@@ -231,6 +279,11 @@ gates stay skipped unless `--allow-mutating-gates` is also explicit.
 
 Possible verification statuses include `passed`, `passed-with-findings`,
 `failed`, `blocked`, and `skipped-nonlocal`.
+
+`verify` uses these same gate semantics but projects the result into an additive
+outcome. It remains evidence-only until explicit disposable execution is
+authorized, so a blocked outcome should be acted on through its displayed next
+command rather than interpreted as a passed gate.
 
 Writes:
 
@@ -568,6 +621,7 @@ Runs a fresh local review packet without modifying source files:
 ```bash
 quality-runner review /path/to/repo --task "Implement the requested change" --json
 quality-runner review /path/to/repo --mode blind --breadth full --no-save
+quality-runner review /path/to/repo --mode blind --outcome --json
 ```
 
 The command defaults to `--mode task`, `--scope project`, and project breadth
@@ -585,3 +639,7 @@ no findings uses the qualified no-issue message. A missing adapter instead
 returns `review-not-run` with `outcome: packet-ready` and `next_action`; it is
 not a completed review and does not produce finding-specific fix prompts.
 Saved output includes `review-agent-packet.md` for the next reviewer.
+
+Pass `--outcome` to opt into the v2 journey projection. In that projection,
+packet-only review is `awaiting-evidence` with `assessment: packet-ready`; it is
+never shown as clean. Omitting `--outcome` preserves the v1 review payload.
