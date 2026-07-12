@@ -17,6 +17,7 @@ def build_run_manifest(
     mode: str,
     artifact_paths: dict[str, str],
     intent: dict[str, Any] | None = None,
+    quality_skills: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
 # fmt: on
     manifest: dict[str, Any] = {
@@ -32,6 +33,8 @@ def build_run_manifest(
     }
     if intent is not None:
         manifest["intent"] = intent
+    if quality_skills:
+        manifest["quality_skills"] = quality_skills
     return manifest
 
 

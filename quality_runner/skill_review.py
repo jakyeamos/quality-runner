@@ -32,6 +32,12 @@ def build_skill_review_packet(
         "included_files": included_files,
         "output_schema": SKILL_REVIEW_REPORT_SCHEMA,
         "instructions": _packet_instructions(),
+        "review_policy": {
+            "recall_preference": "high",
+            "allow_low_confidence": True,
+            "require_file_line_evidence": True,
+            "do_not_invent_evidence": True,
+        },
         "safety": {
             "do_not_edit_source": True,
             "do_not_execute_remediation": True,
@@ -53,6 +59,12 @@ def render_skill_review_packet_markdown(packet: dict[str, Any]) -> str:
         "- Do not edit source files.",
         "- Do not execute remediation.",
         "- Produce evidence-backed findings only.",
+        "",
+        "## Review policy",
+        "",
+        "- Prefer high recall and report plausible evidence-backed issues.",
+        "- Use low confidence when certainty is limited.",
+        "- Never invent file or line evidence.",
         "",
         "## Reviews",
         "",
@@ -154,6 +166,12 @@ def review_report_findings(
         return []
 
     skill_names = {str(skill["id"]): str(skill["name"]) for skill in skills}
+    review_categories = {
+        (str(skill["id"]), str(review["id"])): str(review.get("category", ""))
+        for skill in skills
+        for review in skill.get("agent_reviews", [])
+        if isinstance(review, dict) and isinstance(review.get("id"), str)
+    }
     findings: list[dict[str, Any]] = []
     for item in accepted:
         skill_id = str(item["skill_id"])
@@ -161,21 +179,23 @@ def review_report_findings(
         severity = str(item["severity"])
         confidence = str(item["confidence"])
         file = str(item["file"])
-        findings.append(
-            _finding(
-                category=f"skill:{skill_id}",
-                severity=severity,
-                confidence=confidence,
-                file=file,
-                line=int(item["line"]),
-                rule_id=str(item["rule_id"]),
-                evidence=str(item["evidence"]),
-                expected_improvement=str(item["expected_improvement"]),
-                risk=str(item["risk"]),
-                verification=str(item["verification"]),
-                remediation_bucket=f"Skill: {skill_name}",
-            )
+        finding = _finding(
+            category=f"skill:{skill_id}",
+            severity=severity,
+            confidence=confidence,
+            file=file,
+            line=int(item["line"]),
+            rule_id=str(item["rule_id"]),
+            evidence=str(item["evidence"]),
+            expected_improvement=str(item["expected_improvement"]),
+            risk=str(item["risk"]),
+            verification=str(item["verification"]),
+            remediation_bucket=f"Skill: {skill_name}",
+            rule_category=review_categories.get((skill_id, str(item["review_id"])), ""),
         )
+        finding["skill_id"] = skill_id
+        finding["review_id"] = str(item["review_id"])
+        findings.append(finding)
     return findings
 
 
@@ -341,7 +361,8 @@ def _validation_result(
 
 def _packet_instructions() -> str:
     return (
-        "Review the listed files against each rubric. Only create findings when there is "
-        "concrete file/line evidence. Do not edit source files or execute remediation. "
-        "Return JSON using the required output schema."
+        "Review the listed files against each rubric. Prefer high recall: report every "
+        "plausible issue that has concrete file/line evidence, using observation severity "
+        "and low confidence when appropriate. Do not invent evidence, edit source files, "
+        "or execute remediation. Return JSON using the required output schema."
     )

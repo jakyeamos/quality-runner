@@ -37,7 +37,7 @@ from quality_runner.code_quality_similarity import (
     collect_deduplicate_scan,
     similarity_policy_defaults,
 )
-from quality_runner.code_quality_skills import skill_findings
+from quality_runner.code_quality_skills import scan_quality_skills
 from quality_runner.code_quality_unwired import unwired_findings
 from quality_runner.scan_exclusions import (
     gitignore_scan_exclusions,
@@ -144,14 +144,13 @@ def create_code_quality_scan(
         findings.extend(unwired_findings(scanned_files, config))
 
     findings.extend(architecture_findings(scanned_files, config))
-    findings.extend(
-        skill_findings(
-            repo_root=root,
-            scanned_files=scanned_files,
-            config=config,
-            skill_review_report=skill_review_report,
-        )
+    skill_scan_findings, skill_coverage, quality_skills = scan_quality_skills(
+        repo_root=root,
+        scanned_files=scanned_files,
+        config=config,
+        skill_review_report=skill_review_report,
     )
+    findings.extend(skill_scan_findings)
 
     sorted_findings = sorted(findings, key=_finding_sort_key)
     for index, finding in enumerate(sorted_findings, start=1):
@@ -183,6 +182,8 @@ def create_code_quality_scan(
         "findings": sorted_findings,
         "duplicate_clusters": duplicate_clusters,
         "skipped_files": sorted(skipped_files, key=lambda item: item["path"]),
+        "quality_skills": quality_skills,
+        "skill_coverage": skill_coverage,
     }
 
 

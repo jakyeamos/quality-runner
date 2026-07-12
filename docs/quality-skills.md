@@ -74,6 +74,7 @@ id = "ui-clickable-div"
 type = "disallowed_pattern"
 category = "accessibility"
 severity = "warning"
+confidence = "medium"
 paths = ["**/*.tsx", "**/*.jsx"]
 disallowed_patterns = ["<div[^>]+onClick="]
 message = "Clickable divs should usually be semantic buttons or links."
@@ -85,6 +86,12 @@ verification = "Rerun quality-runner and confirm this skill finding clears."
 Skill findings use category `skill:<skill-id>` and flow through
 `code-quality-scan.json`, `quality-audit.json`, `remediation-plan.json`,
 `slice-specs/`, and `agent-handoff.md` like other structural findings.
+The raw finding also preserves `rule_message` and `rule_category`. The scan
+records `skill_coverage` with scoped files, matched files, finding counts, and
+skip reasons. Deterministic rules default to `confidence = "medium"`; use
+`low`, `medium`, or `high` explicitly when the rule is heuristic or exact.
+Malformed rule entries remain inactive but are surfaced as configuration
+warnings during ingest and scanning instead of disappearing silently.
 
 ## Agent-assisted reviews
 
@@ -130,6 +137,8 @@ inspects the repo, and produces a review report.
 
 Quality Runner validates agent-produced findings before merging them. Findings
 without file, line, or evidence are rejected or ignored.
+The review packet prefers high recall: agents may report plausible findings with
+`observation` severity and `low` confidence when concrete source evidence exists.
 
 Merge a validated report during a run:
 
@@ -189,6 +198,10 @@ Skill ingest may write QR-owned files only:
 
 - `.quality-runner/skills/<skill-id>.toml`
 - `.quality-runner.toml`
+
+Each run records active skill identity (`id`, `version`, and content hash) in
+`code-quality-scan.json` and `run-manifest.json` so later audits can be compared
+against the exact skill definitions that produced them.
 
 It must not edit application source files.
 

@@ -41,6 +41,7 @@ from quality_runner.workflow_internal import (
 from quality_runner.workflow_skills import (
     append_warnings,
     create_code_quality_scan_with_skills,
+    quality_skill_identities,
     write_skill_review_artifacts,
 )
 from quality_runner.worktree_verify import gate_worktree_session
@@ -227,6 +228,7 @@ def verify_gates_payload(
         mode="verify-gates",
         artifact_paths=artifact_paths,
         intent=run_intent,
+        quality_skills=quality_skill_identities(code_quality_scan),
     )
     artifact_paths["run_manifest_json"] = str(
         write_json(run_dir / "run-manifest.json", run_manifest)

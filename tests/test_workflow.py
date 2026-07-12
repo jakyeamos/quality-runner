@@ -519,6 +519,74 @@ def test_run_manifest_handles_git_command_failures(tmp_path: Path, monkeypatch) 
     }
 
 
+def test_run_manifest_records_quality_skill_identity(tmp_path: Path) -> None:
+    import quality_runner.manifest as manifest
+
+    payload = manifest.build_run_manifest(
+        repo_root=tmp_path,
+        run_id="skill-manifest",
+        mode="run",
+        artifact_paths={},
+        quality_skills=[
+            {
+                "id": "ui-polish",
+                "name": "UI Polish Standards",
+                "version": "0.1.0",
+                "content_sha256": "a" * 64,
+            }
+        ],
+    )
+
+    assert payload["quality_skills"][0]["content_sha256"] == "a" * 64
+
+
+def test_run_payload_persists_active_quality_skills_in_manifest(tmp_path: Path) -> None:
+    from quality_runner.workflow import run_payload
+
+    skill_path = tmp_path / ".quality-runner/skills/ui-polish.toml"
+    skill_path.parent.mkdir(parents=True)
+    skill_path.write_text(
+        """
+id = "ui-polish"
+name = "UI Polish Standards"
+version = "0.1.0"
+
+[[deterministic_rules]]
+id = "ui-clickable-div"
+type = "disallowed_pattern"
+category = "accessibility"
+severity = "observation"
+confidence = "low"
+paths = ["src/**/*.tsx"]
+disallowed_patterns = ["<div[^>]+onClick="]
+message = "Clickable divs should use semantic controls."
+risk = "Keyboard users may not be able to operate the control."
+expected = "Use a semantic button or link."
+""".strip(),
+        encoding="utf-8",
+    )
+    (tmp_path / ".quality-runner.toml").write_text(
+        """
+[quality_runner.skills]
+enabled = true
+active = ["ui-polish"]
+
+[[quality_runner.skills.local]]
+id = "ui-polish"
+path = ".quality-runner/skills/ui-polish.toml"
+""".strip(),
+        encoding="utf-8",
+    )
+    source_path = tmp_path / "src/page.tsx"
+    source_path.parent.mkdir()
+    source_path.write_text("<div onClick={onOpen}>Open</div>\n", encoding="utf-8")
+
+    payload = run_payload(repo_root=tmp_path, run_id="skill-manifest-run", profile="default")
+
+    manifest = json.loads(Path(payload["artifact_paths"]["run_manifest_json"]).read_text())
+    assert manifest["quality_skills"][0]["id"] == "ui-polish"
+
+
 def test_run_payload_rejects_unsafe_run_ids(tmp_path: Path) -> None:
     from quality_runner.workflow import run_payload
 

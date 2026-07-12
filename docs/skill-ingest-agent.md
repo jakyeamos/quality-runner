@@ -27,6 +27,11 @@ Use **agent_reviews** for standards that require judgment, such as:
 - copy clarity,
 - visual hierarchy.
 
+Prefer high recall for agent reviews. Report plausible issues when there is
+concrete file/line evidence, using `observation` severity and `low` confidence
+when certainty is limited. Never invent evidence or omit a real concern only
+because it is not certain.
+
 ## Required fields
 
 Every skill pack must include:
@@ -44,6 +49,7 @@ Every deterministic rule must include:
 - `type` (`disallowed_pattern`, `trigger_without_required`, or `import_boundary`)
 - `category`
 - `severity` (`warning` or `observation`)
+- optional `confidence` (`low`, `medium`, or `high`); default is `medium`
 - `paths`
 - `message`
 - `risk`
@@ -130,7 +136,8 @@ focus = [
 rubric = """
 Review UI-facing components and pages for product polish.
 
-Only create findings when there is concrete file/line evidence.
+Report every plausible issue with concrete file/line evidence. Use low confidence
+when appropriate; do not omit a concern only because it is uncertain.
 Do not suggest broad rewrites.
 Prefer small remediation slices.
 Flag missing loading, empty, or error states when the code clearly renders async or collection-driven UI.
@@ -139,7 +146,7 @@ Flag missing loading, empty, or error states when the code clearly renders async
 
 ## Constraints
 
-- Keep v1 conservative and low-noise.
+- Prefer high recall while keeping every finding evidence-backed.
 - Never include arbitrary executable code.
 - Never include instructions to modify files.
 - Never include remote calls.

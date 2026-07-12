@@ -39,6 +39,7 @@ from quality_runner.workflow_internal import generated_run_id, inspect_repo_bund
 from quality_runner.workflow_skills import (
     append_warnings,
     create_code_quality_scan_with_skills,
+    quality_skill_identities,
     write_skill_review_artifacts,
 )
 from quality_runner.workflow_verify import verify_gates_payload
@@ -116,6 +117,7 @@ def inspect_payload(
         mode="inspect",
         artifact_paths=artifact_paths,
         intent=run_intent,
+        quality_skills=quality_skill_identities(code_quality_scan),
     )
     artifact_paths["run_manifest_json"] = str(
         write_json(run_dir / "run-manifest.json", inspect_manifest)
@@ -265,6 +267,7 @@ def run_payload(
         mode="run",
         artifact_paths=artifact_paths,
         intent=run_intent,
+        quality_skills=quality_skill_identities(code_quality_scan),
     )
     artifact_paths["run_manifest_json"] = str(
         write_json(run_dir / "run-manifest.json", run_manifest)

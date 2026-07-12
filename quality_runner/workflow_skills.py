@@ -105,3 +105,23 @@ def load_skill_review_report_json(path: Path) -> dict[str, Any]:
     if not isinstance(payload, dict):
         raise ValueError("skill review report must be a JSON object")
     return payload
+
+
+def quality_skill_identities(code_quality_scan: dict[str, Any]) -> list[dict[str, Any]]:
+    skills = code_quality_scan.get("quality_skills")
+    if not isinstance(skills, list):
+        return []
+    return [
+        item
+        for item in skills
+        if isinstance(item, dict)
+        and all(
+            isinstance(item.get(field), str) and item.get(field)
+            for field in (
+                "id",
+                "name",
+                "version",
+                "content_sha256",
+            )
+        )
+    ]

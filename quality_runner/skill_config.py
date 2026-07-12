@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+import hashlib
 import re
 import tomllib
 from pathlib import Path
 from typing import Any
 
 SKILL_ID_RE = re.compile(r"^[a-z0-9][a-z0-9-]*$")
+SKILL_CONFIDENCE_VALUES = frozenset({"high", "medium", "low"})
+SKILL_SEVERITY_VALUES = frozenset({"warning", "observation"})
 
 FORBIDDEN_SKILL_FIELDS = frozenset(
     {
@@ -68,6 +71,15 @@ def load_active_skills(
         if skill_pack is None:
             continue
 
+        validation_warnings = skill_pack.get("validation_warnings")
+        if isinstance(validation_warnings, list):
+            warnings.extend(
+                warning
+                for warning in validation_warnings
+                if isinstance(warning, dict)
+                and all(isinstance(warning.get(key), str) for key in ("code", "message", "path"))
+            )
+
         applies_to = entry.get("applies_to")
         if isinstance(applies_to, list):
             patterns = [item for item in applies_to if isinstance(item, str) and item]
@@ -111,7 +123,8 @@ def _load_skill_pack(
     path: Path, configured_id: str
 ) -> tuple[dict[str, Any] | None, dict[str, str] | None]:
     try:
-        payload = tomllib.loads(path.read_text(encoding="utf-8"))
+        content = path.read_text(encoding="utf-8")
+        payload = tomllib.loads(content)
     except (OSError, tomllib.TOMLDecodeError) as error:
         return None, _skill_warning(configured_id, f"skill file could not be parsed: {error}")
 
@@ -137,10 +150,12 @@ def _load_skill_pack(
     if not isinstance(name, str) or not name:
         return None, _skill_warning(configured_id, "skill file must include a non-empty name")
 
-    deterministic_rules = _parse_deterministic_rules(
+    deterministic_rules, deterministic_warnings = _parse_deterministic_rules(
         payload.get("deterministic_rules"), configured_id
     )
-    agent_reviews = _parse_agent_reviews(payload.get("agent_reviews"), configured_id)
+    agent_reviews, review_warnings = _parse_agent_reviews(
+        payload.get("agent_reviews"), configured_id
+    )
 
     return {
         "id": configured_id,
@@ -150,18 +165,28 @@ def _load_skill_pack(
         if isinstance(payload.get("description"), str)
         else "",
         "path": path,
+        "content_sha256": hashlib.sha256(content.encode("utf-8")).hexdigest(),
         "deterministic_rules": deterministic_rules,
         "agent_reviews": agent_reviews,
+        "validation_warnings": [*deterministic_warnings, *review_warnings],
     }, None
 
 
-def _parse_deterministic_rules(value: object, skill_id: str) -> list[dict[str, Any]]:
+def _parse_deterministic_rules(
+    value: object, skill_id: str
+) -> tuple[list[dict[str, Any]], list[dict[str, str]]]:
     if not isinstance(value, list):
-        return []
+        if value is not None:
+            return [], [_skill_warning(skill_id, "deterministic_rules must be a list")]
+        return [], []
 
     rules: list[dict[str, Any]] = []
-    for item in value:
+    warnings: list[dict[str, str]] = []
+    for index, item in enumerate(value):
         if not isinstance(item, dict):
+            warnings.append(
+                _skill_warning(skill_id, f"deterministic_rules[{index}] must be a table")
+            )
             continue
         rule_id = item.get("id")
         rule_type = item.get("type")
@@ -182,6 +207,12 @@ def _parse_deterministic_rules(value: object, skill_id: str) -> list[dict[str, A
             or not isinstance(expected, str)
             or not expected
         ):
+            warnings.append(
+                _skill_warning(
+                    skill_id,
+                    f"deterministic_rules[{index}] is missing required fields",
+                )
+            )
             continue
 
         rule: dict[str, Any] = {
@@ -199,14 +230,39 @@ def _parse_deterministic_rules(value: object, skill_id: str) -> list[dict[str, A
         if isinstance(category, str) and category:
             rule["category"] = category
         severity = item.get("severity")
-        if severity in {"warning", "observation"}:
+        if severity is not None and severity not in SKILL_SEVERITY_VALUES:
+            warnings.append(
+                _skill_warning(
+                    skill_id,
+                    f"deterministic_rules[{index}] {rule_id} has invalid severity",
+                )
+            )
+            continue
+        if severity in SKILL_SEVERITY_VALUES:
             rule["severity"] = severity
+        confidence = item.get("confidence")
+        if confidence is not None and confidence not in SKILL_CONFIDENCE_VALUES:
+            warnings.append(
+                _skill_warning(
+                    skill_id,
+                    f"deterministic_rules[{index}] {rule_id} has invalid confidence",
+                )
+            )
+            continue
+        rule["confidence"] = confidence if confidence in SKILL_CONFIDENCE_VALUES else "medium"
 
         if rule_type == "disallowed_pattern":
             patterns = _string_list(item.get("disallowed_patterns"))
             if patterns:
                 rule["disallowed_patterns"] = patterns
                 rules.append(rule)
+            else:
+                warnings.append(
+                    _skill_warning(
+                        skill_id,
+                        f"deterministic_rules[{index}] {rule_id} has no disallowed_patterns",
+                    )
+                )
         elif rule_type == "trigger_without_required":
             triggers = _string_list(item.get("trigger_patterns"))
             required = _string_list(item.get("required_patterns"))
@@ -214,22 +270,49 @@ def _parse_deterministic_rules(value: object, skill_id: str) -> list[dict[str, A
                 rule["trigger_patterns"] = triggers
                 rule["required_patterns"] = required
                 rules.append(rule)
+            else:
+                warnings.append(
+                    _skill_warning(
+                        skill_id,
+                        f"deterministic_rules[{index}] {rule_id} requires trigger_patterns and required_patterns",
+                    )
+                )
         elif rule_type == "import_boundary":
             disallowed = _string_list(item.get("disallowed_imports"))
             if disallowed:
                 rule["disallowed_imports"] = disallowed
                 rule["allowed_imports"] = _string_list(item.get("allowed_imports"))
                 rules.append(rule)
-    return rules
+            else:
+                warnings.append(
+                    _skill_warning(
+                        skill_id,
+                        f"deterministic_rules[{index}] {rule_id} has no disallowed_imports",
+                    )
+                )
+        else:
+            warnings.append(
+                _skill_warning(
+                    skill_id,
+                    f"deterministic_rules[{index}] {rule_id} has unsupported type {rule_type}",
+                )
+            )
+    return rules, warnings
 
 
-def _parse_agent_reviews(value: object, skill_id: str) -> list[dict[str, Any]]:
+def _parse_agent_reviews(
+    value: object, skill_id: str
+) -> tuple[list[dict[str, Any]], list[dict[str, str]]]:
     if not isinstance(value, list):
-        return []
+        if value is not None:
+            return [], [_skill_warning(skill_id, "agent_reviews must be a list")]
+        return [], []
 
     reviews: list[dict[str, Any]] = []
-    for item in value:
+    warnings: list[dict[str, str]] = []
+    for index, item in enumerate(value):
         if not isinstance(item, dict):
+            warnings.append(_skill_warning(skill_id, f"agent_reviews[{index}] must be a table"))
             continue
         review_id = item.get("id")
         paths = _string_list(item.get("paths"))
@@ -241,6 +324,9 @@ def _parse_agent_reviews(value: object, skill_id: str) -> list[dict[str, Any]]:
             or not isinstance(rubric, str)
             or not rubric
         ):
+            warnings.append(
+                _skill_warning(skill_id, f"agent_reviews[{index}] is missing required fields")
+            )
             continue
         review: dict[str, Any] = {
             "id": review_id,
@@ -251,13 +337,21 @@ def _parse_agent_reviews(value: object, skill_id: str) -> list[dict[str, Any]]:
         if isinstance(category, str) and category:
             review["category"] = category
         severity = item.get("severity")
-        if severity in {"warning", "observation"}:
+        if severity is not None and severity not in SKILL_SEVERITY_VALUES:
+            warnings.append(
+                _skill_warning(
+                    skill_id,
+                    f"agent_reviews[{index}] {review_id} has invalid severity",
+                )
+            )
+            continue
+        if severity in SKILL_SEVERITY_VALUES:
             review["severity"] = severity
         focus = _string_list(item.get("focus"))
         if focus:
             review["focus"] = focus
         reviews.append(review)
-    return reviews
+    return reviews, warnings
 
 
 def _string_list(value: object) -> list[str]:

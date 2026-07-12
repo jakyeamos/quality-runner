@@ -32,9 +32,11 @@ def _finding(
     risk: str,
     verification: str,
     remediation_bucket: str,
+    rule_message: str | None = None,
+    rule_category: str | None = None,
 ) -> dict[str, Any]:
     fingerprint = _fingerprint(rule_id, file, evidence)
-    return {
+    finding: dict[str, Any] = {
         "id": "",
         "fingerprint": fingerprint,
         "category": category,
@@ -50,6 +52,11 @@ def _finding(
         "verification": verification,
         "remediation_bucket": remediation_bucket,
     }
+    if isinstance(rule_message, str) and rule_message:
+        finding["rule_message"] = rule_message
+    if isinstance(rule_category, str) and rule_category:
+        finding["rule_category"] = rule_category
+    return finding
 
 
 def _fingerprint(rule_id: str, file: str, evidence: str) -> str:

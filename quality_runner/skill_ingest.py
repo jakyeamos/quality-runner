@@ -114,6 +114,14 @@ def validate_skill_pack(
             errors=["candidate skill pack failed validation"],
         )
 
+    validation_warnings = skill_pack.get("validation_warnings")
+    if isinstance(validation_warnings, list):
+        warnings.extend(
+            str(item["message"])
+            for item in validation_warnings
+            if isinstance(item, dict) and isinstance(item.get("message"), str)
+        )
+
     return _result(
         status="validated",
         write=False,

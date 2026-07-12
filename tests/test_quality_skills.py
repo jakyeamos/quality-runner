@@ -144,6 +144,88 @@ def test_quality_skill_disallowed_pattern_detects_line(tmp_path: Path) -> None:
     assert "button/link" in finding["expected_improvement"]
 
 
+def test_quality_skill_surfaces_rule_metadata_confidence_and_coverage(tmp_path: Path) -> None:
+    from quality_runner.code_quality import create_code_quality_scan
+
+    skill_content = _clickable_div_skill_toml().replace(
+        'severity = "warning"', 'severity = "observation"\nconfidence = "low"'
+    )
+    skill_path = _install_skill(tmp_path, "ui-polish", skill_content)
+    _write(tmp_path / "apps/web/page.tsx", "<div onClick={onOpen}>Open</div>\n")
+    config = _skills_enabled_config(
+        active=["ui-polish"],
+        local=[{"id": "ui-polish", "path": skill_path, "applies_to": ["apps/web/**"]}],
+    )
+
+    result = create_code_quality_scan(tmp_path, scan={"run_id": "scan-001"}, config=config)
+
+    finding = next(
+        finding
+        for finding in result["findings"]
+        if finding["rule_id"] == "ui-polish/ui-clickable-div"
+    )
+    assert finding["confidence"] == "low"
+    assert finding["rule_category"] == "accessibility"
+    assert finding["rule_message"] == "Clickable divs should usually be semantic buttons or links."
+    coverage = result["skill_coverage"][0]
+    assert coverage["status"] == "matched"
+    assert coverage["scoped_files"] == 1
+    assert coverage["matched_files"] == 1
+    assert coverage["finding_count"] == 1
+    assert coverage["confidence"] == "low"
+    assert result["quality_skills"][0]["version"] == "0.1.0"
+    assert len(result["quality_skills"][0]["content_sha256"]) == 64
+
+
+def test_quality_skill_coverage_reports_invalid_pattern_skip(tmp_path: Path) -> None:
+    from quality_runner.code_quality import create_code_quality_scan
+
+    skill_content = _clickable_div_skill_toml().replace(
+        'disallowed_patterns = ["<div[^>]+onClick="]', 'disallowed_patterns = ["["]'
+    )
+    skill_path = _install_skill(tmp_path, "ui-polish", skill_content)
+    _write(tmp_path / "apps/web/page.tsx", "<div onClick={onOpen}>Open</div>\n")
+    config = _skills_enabled_config(
+        active=["ui-polish"],
+        local=[{"id": "ui-polish", "path": skill_path}],
+    )
+
+    result = create_code_quality_scan(tmp_path, scan={"run_id": "scan-001"}, config=config)
+
+    coverage = result["skill_coverage"][0]
+    assert coverage["status"] == "skipped"
+    assert coverage["skipped_reason"] == "all configured disallowed_patterns are invalid regexes"
+    assert coverage["finding_count"] == 0
+
+
+def test_quality_skill_ingest_surfaces_skipped_rule_warning(tmp_path: Path) -> None:
+    from quality_runner.skill_ingest import ingest_skill_pack
+
+    candidate = tmp_path / "candidate.toml"
+    candidate.write_text(
+        """
+id = "ui-polish"
+name = "UI Polish Standards"
+
+[[deterministic_rules]]
+id = "missing-message"
+type = "disallowed_pattern"
+paths = ["**/*.tsx"]
+""".strip(),
+        encoding="utf-8",
+    )
+
+    result = ingest_skill_pack(
+        candidate,
+        skill_id="ui-polish",
+        repo_root=tmp_path,
+        write=False,
+    )
+
+    assert result["status"] == "validated"
+    assert any("deterministic_rules[0]" in warning for warning in result["warnings"])
+
+
 def test_quality_skill_trigger_without_required_detects_missing_empty_state(
     tmp_path: Path,
 ) -> None:
@@ -311,6 +393,12 @@ def test_skill_review_packet_contains_active_review_rubrics(tmp_path: Path) -> N
     assert reviews[0]["skill_id"] == "ui-polish"
     assert reviews[0]["review_id"] == "ui-polish-review"
     assert "product polish" in reviews[0]["rubric"]
+    assert packet["review_policy"] == {
+        "recall_preference": "high",
+        "allow_low_confidence": True,
+        "require_file_line_evidence": True,
+        "do_not_invent_evidence": True,
+    }
 
 
 def test_skill_review_report_validation_rejects_missing_evidence(tmp_path: Path) -> None:
@@ -424,6 +512,40 @@ def test_skill_review_report_findings_merge_into_code_quality_scan(tmp_path: Pat
     ]
     assert len(matches) == 1
     assert matches[0]["category"] == "skill:ui-polish"
+
+
+def test_quality_skill_metadata_surfaces_in_audit_report(tmp_path: Path) -> None:
+    from quality_runner.audit import build_audit_report, render_audit_markdown
+    from quality_runner.code_quality import create_code_quality_scan
+
+    skill_path = _install_skill(tmp_path, "ui-polish", _clickable_div_skill_toml())
+    _write(tmp_path / "apps/web/page.tsx", "<div onClick={onOpen}>Open</div>\n")
+    config = _skills_enabled_config(
+        active=["ui-polish"],
+        local=[{"id": "ui-polish", "path": skill_path}],
+    )
+    code_quality_scan = create_code_quality_scan(
+        tmp_path,
+        scan={"run_id": "scan-001"},
+        config=config,
+    )
+
+    report = build_audit_report(
+        scan={"run_id": "scan-001", "repo_root": str(tmp_path)},
+        standards_packet={"profile": "default"},
+        capability_map={"missing": [], "warnings": []},
+        code_quality_scan=code_quality_scan,
+    )
+
+    finding = next(
+        finding
+        for finding in report["findings"]
+        if finding.get("rule_message")
+        == "Clickable divs should usually be semantic buttons or links."
+    )
+    assert finding["rule_category"] == "accessibility"
+    assert "Clickable divs should usually be semantic buttons or links." in finding["summary"]
+    assert "Rule category: accessibility" in render_audit_markdown(report)
 
 
 def test_skill_review_report_rejects_inactive_skill(tmp_path: Path) -> None:

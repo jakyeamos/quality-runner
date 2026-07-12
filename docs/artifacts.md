@@ -28,7 +28,9 @@ Artifacts are written under:
   clusters (`DUP-###`). QR never installs these tools; missing binaries are
   recorded as non-blocking skipped scanner status. Opt-in architecture-contract findings use
   category `architecture` when configured in `.quality-runner.toml`. Opt-in
-  Quality Skill findings use category `skill:<skill-id>` when configured.
+  Quality Skill findings use category `skill:<skill-id>` when configured. The
+  scan also records active `quality_skills` identities and per-rule
+  `skill_coverage` with scoped/matched file counts and skip reasons.
   Partially built or unwired work uses category `integrate`; see
   [Unwired Work Detection](unwired-work.md).
 - `package-manager-preflight.json`: detected package-manager state, declared
