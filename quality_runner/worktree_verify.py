@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import subprocess
 from collections.abc import Iterator
-from contextlib import contextmanager
+from contextlib import contextmanager, suppress
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -96,7 +96,11 @@ def _open_disposable_worktree(
     if worktree_path.exists():
         _remove_worktree_path(worktree_path)
 
-    _git(root, "worktree", "add", "--detach", str(worktree_path), base_head)
+    try:
+        _git(root, "worktree", "add", "--detach", str(worktree_path), base_head)
+    except subprocess.CalledProcessError:
+        _clean_failed_worktree_add(repo_root=root, worktree_path=worktree_path)
+        raise
     relative_execution_root = worktree_path.relative_to(root).as_posix()
     return WorktreeSession(
         mode="disposable",
@@ -114,11 +118,18 @@ def _open_disposable_worktree(
 
 
 def _close_disposable_worktree(*, repo_root: Path, worktree_path: Path) -> None:
-    if not worktree_path.exists():
-        return
     _remove_worktree_if_registered(repo_root, worktree_path)
     if worktree_path.exists():
         _remove_worktree_path(worktree_path)
+    _git_optional(repo_root, "worktree", "prune")
+
+
+def _clean_failed_worktree_add(*, repo_root: Path, worktree_path: Path) -> None:
+    with suppress(OSError, ValueError, subprocess.SubprocessError):
+        _remove_worktree_if_registered(repo_root, worktree_path)
+    with suppress(OSError, ValueError):
+        if worktree_path.exists():
+            _remove_worktree_path(worktree_path)
     _git_optional(repo_root, "worktree", "prune")
 
 

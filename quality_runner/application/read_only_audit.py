@@ -11,6 +11,7 @@ from quality_runner.core.audit_contracts import (
     AuditAnalysis,
     AuditArtifactPaths,
     AuditPayload,
+    AuditPlan,
     AuditRequest,
     PlannedAudit,
 )
@@ -112,6 +113,26 @@ def plan_read_only_audit(
         repo_root=repo_root,
         run_id=analysis.request.run_id,
     )
+    plan = build_audit_plan(analysis, artifact_paths=artifact_paths)
+    return PlannedAudit(
+        analysis=plan.analysis,
+        audit_report=plan.audit_report,
+        remediation_plan=plan.remediation_plan,
+        handoff=plan.handoff,
+        status=plan.status,
+        resolution_ledger=_audit_payload(resolution_ledger),
+    )
+
+
+def build_audit_plan(
+    analysis: AuditAnalysis,
+    *,
+    artifact_paths: AuditArtifactPaths,
+    gate_verification: AuditPayload | None = None,
+) -> AuditPlan:
+    repo_root = analysis.request.repo_root.expanduser().resolve()
+    code_quality_scan = _legacy_payload(analysis.code_quality_scan)
+    security_scan = _legacy_payload(analysis.security_scan)
     audit_report = build_audit_report(
         scan=_legacy_payload(analysis.scan),
         standards_packet=_legacy_payload(analysis.standards_packet),
@@ -133,6 +154,7 @@ def plan_read_only_audit(
         remediation_plan=remediation_plan,
         artifact_paths=artifact_paths,
         capability_map=_legacy_payload(analysis.capability_map),
+        gate_verification=_legacy_optional_payload(gate_verification),
         security_scan=security_scan,
         intent=intent_for_run(
             _legacy_optional_payload(analysis.request.intent),
@@ -144,9 +166,8 @@ def plan_read_only_audit(
     status: Literal["clean", "planned"] = (
         "clean" if not remediation_plan.get("slices") else "planned"
     )
-    return PlannedAudit(
+    return AuditPlan(
         analysis=analysis,
-        resolution_ledger=_audit_payload(resolution_ledger),
         audit_report=_audit_payload(audit_report),
         remediation_plan=_audit_payload(remediation_plan),
         handoff=_audit_payload(handoff),

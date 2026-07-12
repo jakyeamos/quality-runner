@@ -185,6 +185,70 @@ def test_gate_worktree_session_cleans_up_on_failure(tmp_path: Path) -> None:
     assert not worktree_path.exists()
 
 
+def test_disposable_worktree_cleans_prepared_path_and_registration_when_add_fails(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from quality_runner import worktree_verify
+
+    worktree_path = tmp_path / ".quality-runner" / "worktrees" / "add-failure"
+    registration_created = False
+    removed_registration = False
+    pruned = False
+
+    def fake_git(_repo_root: Path, *args: str) -> str:
+        nonlocal registration_created, removed_registration
+        if args[:2] == ("worktree", "add"):
+            registration_created = True
+            raise subprocess.CalledProcessError(1, ["git", *args])
+        if args == ("worktree", "remove", "--force", str(worktree_path)):
+            removed_registration = True
+        return ""
+
+    def fake_git_optional(_repo_root: Path, *args: str) -> str | None:
+        nonlocal pruned
+        if args == ("worktree", "list", "--porcelain"):
+            return f"worktree {worktree_path}\nHEAD deadbeef\n" if registration_created else ""
+        if args == ("worktree", "prune"):
+            pruned = True
+        return ""
+
+    monkeypatch.setattr(worktree_verify, "_is_git_worktree", lambda _root: True)
+    monkeypatch.setattr(worktree_verify, "_is_dirty_worktree", lambda _root: False)
+    monkeypatch.setattr(worktree_verify, "_git_head", lambda _root: "deadbeef")
+    monkeypatch.setattr(worktree_verify, "_git", fake_git)
+    monkeypatch.setattr(worktree_verify, "_git_optional", fake_git_optional)
+
+    with pytest.raises(subprocess.CalledProcessError):
+        with gate_worktree_session(
+            repo_root=tmp_path,
+            run_id="add-failure",
+            worktree_mode="disposable",
+        ):
+            raise AssertionError("failed worktree creation must not yield a session")
+
+    assert removed_registration
+    assert pruned
+    assert not worktree_path.exists()
+
+
+def test_disposable_worktree_refuses_symlinked_worktree_ancestor(tmp_path: Path) -> None:
+    _init_git_repo(tmp_path)
+    external = tmp_path / "external"
+    external.mkdir()
+    (tmp_path / ".quality-runner").symlink_to(external, target_is_directory=True)
+
+    with pytest.raises(ValueError, match="worktree path component must not be a symlink"):
+        with gate_worktree_session(
+            repo_root=tmp_path,
+            run_id="symlinked-ancestor",
+            worktree_mode="disposable",
+            allow_dirty_worktree_verify=True,
+        ):
+            raise AssertionError("symlinked worktree path must not yield a session")
+
+    assert not (external / "worktrees").exists()
+
+
 def test_in_place_verification_context_is_recorded(tmp_path: Path) -> None:
     from quality_runner.workflow import verify_gates_payload
 

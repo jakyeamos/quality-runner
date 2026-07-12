@@ -57,10 +57,14 @@ class AuditAnalysis:
 
 
 @dataclass(frozen=True)
-class PlannedAudit:
+class AuditPlan:
     analysis: AuditAnalysis
-    resolution_ledger: AuditPayload
     audit_report: AuditPayload
     remediation_plan: AuditPayload
     handoff: AuditPayload
     status: Literal["clean", "planned"]
+
+
+@dataclass(frozen=True)
+class PlannedAudit(AuditPlan):
+    resolution_ledger: AuditPayload

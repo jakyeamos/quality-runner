@@ -2,6 +2,7 @@ from quality_runner.core.audit_contracts import (
     AuditAnalysis,
     AuditArtifactPaths,
     AuditPayload,
+    AuditPlan,
     AuditRequest,
     AuditWarning,
     PlannedAudit,
@@ -28,12 +29,21 @@ from quality_runner.core.review_contracts import (
     ReviewScope,
     TaskReviewPacket,
 )
+from quality_runner.core.verification_contracts import (
+    GateExecutionPlan,
+    GateExecutionPolicy,
+    GateVerificationPayload,
+    VerificationRequest,
+    VerificationResult,
+    WorktreeMode,
+)
 
 __all__ = [
     "AdapterResult",
     "AdapterStatus",
     "AuditAnalysis",
     "AuditArtifactPaths",
+    "AuditPlan",
     "AuditPayload",
     "AuditRequest",
     "AuditWarning",
@@ -56,4 +66,10 @@ __all__ = [
     "TaskReviewPacket",
     "ScannedTextFile",
     "TextScanScope",
+    "GateExecutionPlan",
+    "GateExecutionPolicy",
+    "GateVerificationPayload",
+    "VerificationRequest",
+    "VerificationResult",
+    "WorktreeMode",
 ]

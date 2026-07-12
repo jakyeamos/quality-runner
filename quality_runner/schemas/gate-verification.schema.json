@@ -65,6 +65,7 @@
         "stderr": { "type": "string" },
         "stdout_tail": { "type": "string" },
         "stderr_tail": { "type": "string" },
+        "phase": { "type": "string", "minLength": 1 },
         "reason": { "type": "string", "minLength": 1 },
         "blocked_by": { "type": "string", "minLength": 1 },
         "failure_type": {
@@ -73,7 +74,8 @@
             "timeout",
             "environment-restricted",
             "dependency-setup-blocker",
-            "read-only-mutation"
+            "read-only-mutation",
+            "workflow-timeout"
           ]
         },
         "skip_type": {
@@ -85,6 +87,7 @@
         },
         "recommended_action": { "type": "string", "minLength": 1 },
         "diagnostics": { "type": "object" },
+        "timeout_diagnostics": { "type": "object" },
         "covered_by": {
           "type": "array",
           "items": { "type": "string", "minLength": 1 }

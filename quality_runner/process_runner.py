@@ -6,6 +6,15 @@ import subprocess
 from pathlib import Path
 from typing import Any
 
+LOCAL_COMMAND_ENV_ALLOWLIST = (
+    "PATH",
+    "HOME",
+    "TMPDIR",
+    "LANG",
+    "LC_ALL",
+    "LC_CTYPE",
+)
+
 
 def run_shell_command(command: str, *, cwd: Path, timeout: int) -> dict[str, object]:
     process = subprocess.Popen(
@@ -73,7 +82,11 @@ def _text_value(value: object) -> str:
 
 
 def local_command_env(cwd: Path) -> dict[str, str]:
-    env = dict(os.environ)
+    env = {
+        key: value
+        for key in LOCAL_COMMAND_ENV_ALLOWLIST
+        if (value := os.environ.get(key)) is not None
+    }
     cache_root = cwd / ".quality-runner" / "cache"
     env["UV_CACHE_DIR"] = str(cache_root / "uv")
     env["XDG_CACHE_HOME"] = str(cache_root / "xdg")
