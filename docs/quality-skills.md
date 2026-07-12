@@ -140,6 +140,20 @@ without file, line, or evidence are rejected or ignored.
 The review packet prefers high recall: agents may report plausible findings with
 `observation` severity and `low` confidence when concrete source evidence exists.
 
+### Starter pack: UI Foundations
+
+The [UI Foundations starter pack](examples/ui-foundations.toml) consolidates the
+source-auditable parts of the UI skill corpus into one pack. It keeps exact or
+high-signal patterns deterministic, including decorative gradient treatments and
+likely missing loading or empty states. It sends hierarchy, interaction
+completeness, accessibility, and visual restraint to agent review because those
+standards need context.
+
+The pack is intentionally high-recall. Its low-confidence observations are
+review prompts, not automatic proof that a design choice is wrong. Copy it into
+`.quality-runner/skills/`, add it to `[quality_runner.skills.local]`, and scope it
+to the repository's UI source paths before activating it.
+
 Merge a validated report during a run:
 
 ```bash

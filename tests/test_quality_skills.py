@@ -102,6 +102,12 @@ Only create findings with concrete file/line evidence.
 '''.strip()
 
 
+def _ui_foundations_skill_toml() -> str:
+    return (Path(__file__).parents[1] / "docs/examples/ui-foundations.toml").read_text(
+        encoding="utf-8"
+    )
+
+
 def _install_skill(tmp_path: Path, skill_id: str, content: str) -> str:
     relative = f".quality-runner/skills/{skill_id}.toml"
     _write(tmp_path / relative, content)
@@ -142,6 +148,100 @@ def test_quality_skill_disallowed_pattern_detects_line(tmp_path: Path) -> None:
     assert "onClick" in finding["evidence"]
     assert "assistive technology" in finding["risk"]
     assert "button/link" in finding["expected_improvement"]
+
+
+def test_ui_foundations_pack_reports_source_findings_and_review_scopes(tmp_path: Path) -> None:
+    from quality_runner.code_quality import create_code_quality_scan
+    from quality_runner.skill_config import load_active_skills
+    from quality_runner.skill_review import build_skill_review_packet
+
+    skill_path = _install_skill(tmp_path, "ui-foundations", _ui_foundations_skill_toml())
+    component = (
+        "export function Results({ items }) {\n"
+        "  const response = fetch('/api/results');\n"
+        "  return items.map((item) => <div key={item.id}>{item.name}</div>);\n"
+        "}\n"
+    )
+    styles = (
+        ".hero { background-clip: text; border-radius: 40px; "
+        "background: repeating-linear-gradient(90deg, #fff, #fff 1px, #eee 1px, #eee 2px); }\n"
+    )
+    _write(tmp_path / "src/components/Results.tsx", component)
+    _write(tmp_path / "src/components/Results.css", styles)
+    config = _skills_enabled_config(
+        active=["ui-foundations"],
+        local=[
+            {
+                "id": "ui-foundations",
+                "path": skill_path,
+                "applies_to": ["src/**"],
+            }
+        ],
+    )
+
+    result = create_code_quality_scan(tmp_path, scan={"run_id": "ui-foundations"}, config=config)
+    rule_ids = {str(finding["rule_id"]) for finding in result["findings"]}
+    assert "ui-foundations/gradient-text" in rule_ids
+    assert "ui-foundations/decorative-gradient-stripes" in rule_ids
+    assert "ui-foundations/oversized-corner-radius" in rule_ids
+    assert "ui-foundations/collection-empty-state" in rule_ids
+    assert "ui-foundations/async-loading-state" in rule_ids
+    assert result["quality_skills"][0]["id"] == "ui-foundations"
+    deterministic_coverage = [
+        item for item in result["skill_coverage"] if item["rule_type"] != "agent_review"
+    ]
+    assert all(item["status"] in {"matched", "evaluated"} for item in deterministic_coverage)
+
+    reviewed = create_code_quality_scan(
+        tmp_path,
+        scan={"run_id": "ui-foundations-reviewed"},
+        config=config,
+        skill_review_report={
+            "schema": SKILL_REVIEW_REPORT_SCHEMA,
+            "run_id": "ui-foundations-reviewed",
+            "findings": [
+                {
+                    "skill_id": "ui-foundations",
+                    "review_id": "visual-hierarchy",
+                    "rule_id": "visual-hierarchy/competing-actions",
+                    "severity": "observation",
+                    "confidence": "low",
+                    "file": "src/components/Results.tsx",
+                    "line": 2,
+                    "summary": "The collection render does not make a primary action hierarchy evident.",
+                    "evidence": "return items.map((item) => <div key={item.id}>{item.name}</div>);",
+                    "risk": "Users may not know which action or destination is most important.",
+                    "expected_improvement": "Make the intended primary action explicit near the collection output.",
+                    "verification": "Rerun quality-runner and review the resulting UI state.",
+                }
+            ],
+        },
+    )
+    assert any(
+        finding["rule_id"] == "visual-hierarchy/competing-actions"
+        for finding in reviewed["findings"]
+    )
+
+    skills, warnings = load_active_skills(tmp_path, config)
+    assert warnings == []
+    packet = build_skill_review_packet(
+        run_id="ui-foundations",
+        repo_root=tmp_path,
+        scanned_files=[
+            {"path": "src/components/Results.tsx", "lines": component.splitlines()},
+            {"path": "src/components/Results.css", "lines": styles.splitlines()},
+        ],
+        skills=skills,
+    )
+    assert packet is not None
+    assert len(packet["reviews"]) == 4
+    assert {review["review_id"] for review in packet["reviews"]} == {
+        "visual-hierarchy",
+        "states-and-interactions",
+        "accessibility-foundations",
+        "visual-restraint-and-system-fit",
+    }
+    assert len(packet["included_files"]) == 2
 
 
 def test_quality_skill_surfaces_rule_metadata_confidence_and_coverage(tmp_path: Path) -> None:
