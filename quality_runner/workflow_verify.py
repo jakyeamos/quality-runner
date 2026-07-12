@@ -6,6 +6,7 @@ from typing import Any
 from quality_runner.artifacts import prepare_artifact_dir, write_json, write_text
 from quality_runner.audit import build_audit_report
 from quality_runner.findings import (
+    require_valid,
     validate_agent_handoff,
     validate_audit_report,
     validate_remediation_plan,
@@ -35,7 +36,6 @@ from quality_runner.workflow_helpers import (
 from quality_runner.workflow_internal import (
     generated_run_id,
     inspect_repo_bundle,
-    require_valid,
     verify_payload_status,
 )
 from quality_runner.workflow_skills import (

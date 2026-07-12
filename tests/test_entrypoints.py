@@ -149,10 +149,15 @@ def test_packaged_console_script_invokes_cli(tmp_path: Path) -> None:
     assert "repo-quality-certifier-mcp = repo_quality_certifier.mcp:main" in entry_points
     assert "quality_runner/plugin/manifest.json" in wheel_names
     assert "quality_runner/plugin/SKILL.md" in wheel_names
+    assert "quality_runner/core/audit_contracts.py" in wheel_names
     assert "quality_runner/core/review_contracts.py" in wheel_names
+    assert "quality_runner/application/audit_v1_artifacts.py" in wheel_names
+    assert "quality_runner/application/read_only_audit.py" in wheel_names
     assert "quality_runner/application/review_v1_reports.py" in wheel_names
     assert "quality_runner/application/review_v1_serializers.py" in wheel_names
     assert "quality_runner/review_types.py" in wheel_names
+    assert "quality_runner/scan_scope.py" in wheel_names
+    assert "quality_runner/security_surface_paths.py" in wheel_names
     assert "repo_quality_certifier/plugin/manifest.json" in wheel_names
     assert "repo_quality_certifier/plugin/SKILL.md" in wheel_names
     assert not any(name.startswith("test_support/") for name in wheel_names)

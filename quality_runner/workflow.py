@@ -2,51 +2,26 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
+from quality_runner.application.audit_v1_artifacts import (
+    plan_and_write_run_v1_artifacts,
+    write_inspect_v1_artifacts,
+)
+from quality_runner.application.read_only_audit import analyze_read_only_audit
 from quality_runner.artifacts import (
     existing_artifact_dir,
     prepare_artifact_dir,
     safe_child_file,
     write_json,
-    write_text,
 )
-from quality_runner.audit import build_audit_report
-from quality_runner.code_quality import (
-    build_resolution_ledger,
-    render_resolution_ledger_markdown,
-)
-from quality_runner.findings import (
-    validate_agent_handoff,
-    validate_audit_report,
-    validate_remediation_plan,
-)
-from quality_runner.gate_resolution_bridge import merge_gate_finding_dispositions
+from quality_runner.core.audit_contracts import AuditPayload, AuditRequest, AuditWarning
 from quality_runner.git_branches import prepare_scan_branch
-from quality_runner.intent import attach_intent_artifacts, intent_for_run
-from quality_runner.manifest import build_run_manifest, git_state_for_repo
-from quality_runner.package_preflight import build_package_manager_preflight
-from quality_runner.planning import (
-    build_agent_handoff,
-    build_remediation_plan,
-    render_handoff_markdown,
-)
 from quality_runner.refresh_workflow import run_refresh_payload
 from quality_runner.review_delta import build_review_delta, persist_review_delta
 from quality_runner.run_summary import build_run_summary
-from quality_runner.security.ledger import merge_security_ledger_entries
-from quality_runner.security.scan import create_security_scan, merge_security_into_capability_map
-from quality_runner.slice_specs import write_slice_specs
-from quality_runner.workflow_helpers import (
-    combined_warnings,
-    config_with_include_overrides,
-)
-from quality_runner.workflow_internal import generated_run_id, inspect_repo_bundle, require_valid
-from quality_runner.workflow_skills import (
-    append_warnings,
-    create_code_quality_scan_with_skills,
-    write_skill_review_artifacts,
-)
+from quality_runner.workflow_helpers import combined_warnings
+from quality_runner.workflow_internal import generated_run_id
 from quality_runner.workflow_verify import verify_gates_payload
 
 
@@ -65,67 +40,19 @@ def inspect_payload(
         repo_root, checkout_most_advanced_branch=checkout_most_advanced_branch
     )
     run_dir = prepare_artifact_dir(repo_root, resolved_run_id)
-    scan, standards_packet, capability_map, config = inspect_repo_bundle(
-        repo_root, resolved_run_id, profile, ci_status_json, branch_warnings
-    )
-    config = config_with_include_overrides(config, include_ignored_paths)
-    security_scan = create_security_scan(
-        repo_root,
-        scan=scan,
-        config=config,
-        standards_packet=standards_packet,
-    )
-    capability_map = merge_security_into_capability_map(capability_map, security_scan)
-    code_quality_scan, skill_warnings = create_code_quality_scan_with_skills(
-        repo_root,
-        scan=scan,
-        config=config,
-        skill_review_report=skill_review_report,
-    )
-    scan = append_warnings(scan, skill_warnings)
-    package_manager_preflight = build_package_manager_preflight(repo_root, scan)
-
-    artifact_paths = {
-        "repo_scan_json": str(write_json(run_dir / "repo-scan.json", scan)),
-        "code_quality_scan_json": str(
-            write_json(run_dir / "code-quality-scan.json", code_quality_scan)
-        ),
-        "security_scan_json": str(write_json(run_dir / "security-scan.json", security_scan)),
-        "package_manager_preflight_json": str(
-            write_json(run_dir / "package-manager-preflight.json", package_manager_preflight)
-        ),
-        "standards_json": str(write_json(run_dir / "standards.json", standards_packet)),
-        "capability_matrix_json": str(
-            write_json(run_dir / "capability-matrix.json", capability_map)
-        ),
-        "run_manifest_json": str(run_dir / "run-manifest.json"),
-    }
-    artifact_paths.update(
-        write_skill_review_artifacts(
-            run_dir=run_dir,
-            run_id=resolved_run_id,
+    analysis = analyze_read_only_audit(
+        _audit_request(
             repo_root=repo_root,
-            config=config,
-            code_quality_scan=code_quality_scan,
+            run_id=resolved_run_id,
+            profile=profile,
+            ci_status_json=ci_status_json,
+            include_ignored_paths=include_ignored_paths,
+            branch_warnings=branch_warnings,
             skill_review_report=skill_review_report,
+            intent=intent,
         )
     )
-    run_intent = intent_for_run(intent, resolved_run_id)
-    artifact_paths = attach_intent_artifacts(
-        run_dir=run_dir,
-        intent=run_intent,
-        artifact_paths=artifact_paths,
-    )
-    inspect_manifest = build_run_manifest(
-        repo_root=repo_root,
-        run_id=resolved_run_id,
-        mode="inspect",
-        artifact_paths=artifact_paths,
-        intent=run_intent,
-    )
-    artifact_paths["run_manifest_json"] = str(
-        write_json(run_dir / "run-manifest.json", inspect_manifest)
-    )
+    artifact_paths = write_inspect_v1_artifacts(analysis, run_dir=run_dir)
 
     return {
         "schema": "quality-runner-inspect-result-v0.1",
@@ -133,7 +60,9 @@ def inspect_payload(
         "implementation_allowed": False,
         "run_id": resolved_run_id,
         "artifact_paths": artifact_paths,
-        "warnings": combined_warnings(scan, capability_map),
+        "warnings": combined_warnings(
+            _legacy_payload(analysis.scan), _legacy_payload(analysis.capability_map)
+        ),
     }
 
 
@@ -152,165 +81,69 @@ def run_payload(
         repo_root, checkout_most_advanced_branch=checkout_most_advanced_branch
     )
     run_dir = prepare_artifact_dir(repo_root, resolved_run_id)
-    scan, standards_packet, capability_map, config = inspect_repo_bundle(
-        repo_root, resolved_run_id, profile, ci_status_json, branch_warnings
-    )
-    config = config_with_include_overrides(config, include_ignored_paths)
-    security_scan = create_security_scan(
-        repo_root,
-        scan=scan,
-        config=config,
-        standards_packet=standards_packet,
-    )
-    capability_map = merge_security_into_capability_map(capability_map, security_scan)
-    code_quality_scan, skill_warnings = create_code_quality_scan_with_skills(
-        repo_root,
-        scan=scan,
-        config=config,
-        skill_review_report=skill_review_report,
-    )
-    scan = append_warnings(scan, skill_warnings)
-    package_manager_preflight = build_package_manager_preflight(repo_root, scan)
-    resolution_ledger = build_resolution_ledger(
-        repo_root=repo_root,
-        run_id=resolved_run_id,
-        code_quality_scan=code_quality_scan,
-        config=config,
-    )
-    resolution_ledger = merge_security_ledger_entries(
-        resolution_ledger,
-        security_scan=security_scan,
-        config=config,
-        repo_root=repo_root,
-        run_id=resolved_run_id,
-    )
-    resolution_ledger = merge_gate_finding_dispositions(
-        resolution_ledger,
-        repo_root=repo_root,
-        run_id=resolved_run_id,
-    )
-
-    audit_report = build_audit_report(
-        scan=scan,
-        standards_packet=standards_packet,
-        capability_map=capability_map,
-        code_quality_scan=code_quality_scan,
-        security_scan=security_scan,
-    )
-    require_valid("audit report", validate_audit_report(audit_report))
-
-    remediation_plan = build_remediation_plan(
-        audit_report=audit_report,
-        capability_map=capability_map,
-        code_quality_scan=code_quality_scan,
-        repo_root=repo_root,
-        git_state=git_state_for_repo(repo_root),
-    )
-    require_valid("remediation plan", validate_remediation_plan(remediation_plan))
-    status = "clean" if not remediation_plan["slices"] else "planned"
-
-    artifact_paths = {
-        "repo_scan_json": str(run_dir / "repo-scan.json"),
-        "code_quality_scan_json": str(run_dir / "code-quality-scan.json"),
-        "package_manager_preflight_json": str(run_dir / "package-manager-preflight.json"),
-        "standards_json": str(run_dir / "standards.json"),
-        "capability_matrix_json": str(run_dir / "capability-matrix.json"),
-        "security_scan_json": str(run_dir / "security-scan.json"),
-        "run_manifest_json": str(run_dir / "run-manifest.json"),
-        "quality_audit_json": str(run_dir / "quality-audit.json"),
-        "remediation_plan_json": str(run_dir / "remediation-plan.json"),
-        "resolution_ledger_json": str(run_dir / "resolution-ledger.json"),
-        "resolution_ledger_md": str(run_dir / "resolution-ledger.md"),
-        "agent_handoff_json": str(run_dir / "agent-handoff.json"),
-        "agent_handoff_md": str(run_dir / "agent-handoff.md"),
-    }
-    artifact_paths.update(
-        write_skill_review_artifacts(
-            run_dir=run_dir,
-            run_id=resolved_run_id,
+    analysis = analyze_read_only_audit(
+        _audit_request(
             repo_root=repo_root,
-            config=config,
-            code_quality_scan=code_quality_scan,
+            run_id=resolved_run_id,
+            profile=profile,
+            ci_status_json=ci_status_json,
+            include_ignored_paths=include_ignored_paths,
+            branch_warnings=branch_warnings,
             skill_review_report=skill_review_report,
+            intent=intent,
         )
     )
-    handoff = build_agent_handoff(
-        audit_report=audit_report,
-        remediation_plan=remediation_plan,
-        artifact_paths=artifact_paths,
-        capability_map=capability_map,
-        security_scan=security_scan,
-        intent=intent_for_run(intent, resolved_run_id),
-        repo_scan=scan,
-    )
-    require_valid("agent handoff", validate_agent_handoff(handoff))
-
-    artifact_paths["repo_scan_json"] = str(write_json(run_dir / "repo-scan.json", scan))
-    artifact_paths["code_quality_scan_json"] = str(
-        write_json(run_dir / "code-quality-scan.json", code_quality_scan)
-    )
-    artifact_paths["security_scan_json"] = str(
-        write_json(run_dir / "security-scan.json", security_scan)
-    )
-    artifact_paths["package_manager_preflight_json"] = str(
-        write_json(run_dir / "package-manager-preflight.json", package_manager_preflight)
-    )
-    artifact_paths["standards_json"] = str(write_json(run_dir / "standards.json", standards_packet))
-    artifact_paths["capability_matrix_json"] = str(
-        write_json(run_dir / "capability-matrix.json", capability_map)
-    )
-    run_intent = intent_for_run(intent, resolved_run_id)
-    artifact_paths = attach_intent_artifacts(
-        run_dir=run_dir,
-        intent=run_intent,
-        artifact_paths=artifact_paths,
-    )
-    run_manifest = build_run_manifest(
-        repo_root=repo_root,
-        run_id=resolved_run_id,
-        mode="run",
-        artifact_paths=artifact_paths,
-        intent=run_intent,
-    )
-    artifact_paths["run_manifest_json"] = str(
-        write_json(run_dir / "run-manifest.json", run_manifest)
-    )
-    artifact_paths["quality_audit_json"] = str(
-        write_json(run_dir / "quality-audit.json", audit_report)
-    )
-    artifact_paths["remediation_plan_json"] = str(
-        write_json(run_dir / "remediation-plan.json", remediation_plan)
-    )
-    slice_spec_paths = write_slice_specs(
-        run_dir,
-        remediation_plan.get("slices", []),
-        run_id=resolved_run_id,
-        intent_docs=scan.get("intent_docs") if isinstance(scan.get("intent_docs"), list) else None,
-    )
-    if slice_spec_paths:
-        artifact_paths["slice_specs_dir"] = str(run_dir / "slice-specs")
-    artifact_paths["resolution_ledger_json"] = str(
-        write_json(run_dir / "resolution-ledger.json", resolution_ledger)
-    )
-    artifact_paths["resolution_ledger_md"] = str(
-        write_text(
-            run_dir / "resolution-ledger.md",
-            render_resolution_ledger_markdown(resolution_ledger),
-        )
-    )
-    artifact_paths["agent_handoff_json"] = str(write_json(run_dir / "agent-handoff.json", handoff))
-    artifact_paths["agent_handoff_md"] = str(
-        write_text(run_dir / "agent-handoff.md", render_handoff_markdown(handoff))
-    )
+    planned, artifact_paths = plan_and_write_run_v1_artifacts(analysis, run_dir=run_dir)
 
     return {
         "schema": "quality-runner-run-result-v0.1",
-        "status": status,
+        "status": planned.status,
         "implementation_allowed": False,
         "run_id": resolved_run_id,
         "artifact_paths": artifact_paths,
-        "warnings": combined_warnings(scan, capability_map),
+        "warnings": combined_warnings(
+            _legacy_payload(analysis.scan), _legacy_payload(analysis.capability_map)
+        ),
     }
+
+
+def _audit_request(
+    *,
+    repo_root: Path,
+    run_id: str,
+    profile: str | None,
+    ci_status_json: Path | None,
+    include_ignored_paths: list[str] | None,
+    branch_warnings: list[dict[str, str]],
+    skill_review_report: dict[str, Any] | None,
+    intent: dict[str, Any] | None,
+) -> AuditRequest:
+    return AuditRequest(
+        repo_root=repo_root,
+        run_id=run_id,
+        profile=profile,
+        ci_status_json=ci_status_json,
+        include_ignored_paths=tuple(include_ignored_paths or []),
+        branch_warnings=tuple(_audit_warning(warning) for warning in branch_warnings),
+        skill_review_report=_audit_optional_payload(skill_review_report),
+        intent=_audit_optional_payload(intent),
+    )
+
+
+def _audit_warning(warning: dict[str, str]) -> AuditWarning:
+    return {
+        "code": warning["code"],
+        "message": warning["message"],
+        "path": warning["path"],
+    }
+
+
+def _audit_optional_payload(payload: dict[str, Any] | None) -> AuditPayload | None:
+    return cast(AuditPayload | None, payload)
+
+
+def _legacy_payload(payload: AuditPayload) -> dict[str, Any]:
+    return cast(dict[str, Any], payload)
 
 
 def refresh_payload(

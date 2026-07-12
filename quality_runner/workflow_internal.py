@@ -42,17 +42,6 @@ def inspect_repo_bundle(
     return scan, standards_packet, capability_map, config
 
 
-def require_valid(name: str, result: dict[str, Any]) -> None:
-    if result.get("passed") is True:
-        return
-    errors = result.get("errors")
-    if isinstance(errors, list) and errors:
-        message = "; ".join(str(error) for error in errors)
-    else:
-        message = "unknown validation error"
-    raise ValueError(f"invalid {name}: {message}")
-
-
 def string_or_default(value: object, default: str) -> str:
     return value if isinstance(value, str) and value else default
 

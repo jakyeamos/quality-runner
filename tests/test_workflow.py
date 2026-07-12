@@ -682,6 +682,7 @@ def test_run_payload_rejects_invalid_handoff_before_writing_artifacts(
     tmp_path: Path,
     monkeypatch,
 ) -> None:
+    import quality_runner.application.read_only_audit as read_only_audit
     import quality_runner.workflow as workflow
 
     write_js_fixture(tmp_path)
@@ -693,7 +694,7 @@ def test_run_payload_rejects_invalid_handoff_before_writing_artifacts(
             "implementation_allowed": False,
         }
 
-    monkeypatch.setattr(workflow, "build_agent_handoff", invalid_handoff)
+    monkeypatch.setattr(read_only_audit, "build_agent_handoff", invalid_handoff)
 
     try:
         workflow.run_payload(repo_root=tmp_path, run_id="invalid-handoff-run", profile="default")

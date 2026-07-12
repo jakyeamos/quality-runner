@@ -1,3 +1,13 @@
+from quality_runner.core.audit_contracts import (
+    AuditAnalysis,
+    AuditArtifactPaths,
+    AuditPayload,
+    AuditRequest,
+    AuditWarning,
+    PlannedAudit,
+    ScannedTextFile,
+    TextScanScope,
+)
 from quality_runner.core.review_contracts import (
     AdapterResult,
     AdapterStatus,
@@ -22,6 +32,11 @@ from quality_runner.core.review_contracts import (
 __all__ = [
     "AdapterResult",
     "AdapterStatus",
+    "AuditAnalysis",
+    "AuditArtifactPaths",
+    "AuditPayload",
+    "AuditRequest",
+    "AuditWarning",
     "BlindReviewPacket",
     "CombinedReviewPacket",
     "EvidenceReference",
@@ -29,6 +44,7 @@ __all__ = [
     "KnownIssue",
     "KnownIssueDraft",
     "NormalizedReviewOptions",
+    "PlannedAudit",
     "ReviewBreadth",
     "ReviewFinding",
     "ReviewManifest",
@@ -38,4 +54,6 @@ __all__ = [
     "ReviewReport",
     "ReviewScope",
     "TaskReviewPacket",
+    "ScannedTextFile",
+    "TextScanScope",
 ]
