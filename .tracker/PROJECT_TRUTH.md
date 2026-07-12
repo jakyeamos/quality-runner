@@ -11,14 +11,15 @@ changes or remote review execution.
 
 `main` is the 0.5.0 release baseline. The protected
 `codex/gpt56-modernization` branch contains M0 trust-boundary work in
-`f36dcf4` and M1 typed Fresh Review contracts in `cb12746`, producing an
-unreleased 0.5.1 candidate. No tag or package publication has occurred.
+`f36dcf4`, M1 typed Fresh Review contracts in `cb12746`, and M2 typed
+read-only audit orchestration in `3f23204`, producing an unreleased 0.5.1
+candidate. No tag or package publication has occurred.
 
 ## Current Position
 
 - Target: a typed v2 core behind CLI, MCP, and compatibility adapters.
-- Next implementation slice: M2 — migrate the read-only audit vertical slice
-  through the typed application boundary.
+- Next implementation slice: M3 — migrate verification through its own
+  policy-controlled application boundary.
 - Canonical planning documents: `docs/modernization/`.
 - Public compatibility: retain `quality_evidence_contract` and
   `repo_quality_certifier` during a published transition window.
@@ -33,8 +34,8 @@ unreleased 0.5.1 candidate. No tag or package publication has occurred.
 
 ## Baseline Quality
 
-- `uv run --offline pytest -q` passes: 436 tests.
-- Ruff, formatting, Vulture, package build, and release smoke pass.
+- The full pytest suite, Ruff lint/format, Basedpyright, Vulture, package build,
+  and release smoke pass.
 - Basedpyright reports zero errors; Fresh Review now uses strict core contracts
   behind v1 JSON and Python compatibility projections.
 - Release smoke now checks package/runtime/plugin parity and the release
@@ -42,8 +43,8 @@ unreleased 0.5.1 candidate. No tag or package publication has occurred.
 
 ## Risks
 
-- M2 must preserve every inspect/run artifact and finding contract while moving
-  the read-only audit journey through one typed use case.
+- M3 must preserve verification evidence, explicit execution consent, and
+  worktree safety while moving gate execution through one typed use case.
 - Existing large-file warnings remain in `repo_quality_certifier/core.py` and
   `tests/test_cli.py`.
 - User-authored gate commands remain arbitrary code; M0 requires explicit
@@ -53,6 +54,9 @@ unreleased 0.5.1 candidate. No tag or package publication has occurred.
 
 ## Recent Progress
 
+- 2026-07-12: Completed M2 on `codex/gpt56-modernization` (`3f23204`): typed
+  audit contracts and use case, v1 artifact rendering, shared bounded scan
+  scopes, preserved CLI/MCP projections, and route-surface regressions covered.
 - 2026-07-12: Completed M1 on `codex/gpt56-modernization` (`cb12746`): strict
   review core/application contracts, fixed v1 baseline fixtures, closed-schema
   readers, and public typed compatibility adapters.

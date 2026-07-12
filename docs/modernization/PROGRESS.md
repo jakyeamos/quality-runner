@@ -2,7 +2,7 @@
 
 ## Current state
 
-M0 and M1 are implemented on the protected branch
+M0 through M2 are implemented on the protected branch
 `codex/gpt56-modernization`, based on `main` commit `0a3def1`. The branch
 remains isolated until review and merge.
 
@@ -31,6 +31,23 @@ projections:
 - CLI and MCP review paths build strict internal values before persisting the
   identical v1 JSON artifacts.
 
+M2 migrates the read-only audit vertical slice without changing the inspect/run
+result schemas or artifact names:
+
+- typed audit request, analysis, planning, and scoped-file contracts now sit
+  behind one application use case; `workflow.inspect_payload` and `run_payload`
+  are thin compatibility adapters;
+- a v1 artifact renderer preserves the existing write order, including the
+  intentionally different handoff, manifest, and final-result artifact-path
+  snapshots;
+- code-quality and security candidate analysis consume the same exclusion-aware
+  bounded text scope, while a separately capped surface walk retains API,
+  webhook, and dependency-manifest detection without polluting code-quality
+  artifacts;
+- the canonical API/webhook route predicate is shared by the collector and
+  security scan, including `app/api`, `pages/api`, `src/routes`, `routes/api`,
+  Go, Kotlin, and extensionless route paths.
+
 ## Decisions in force
 
 - Use a parallel typed core with controlled adapters, not a clean rewrite.
@@ -45,12 +62,12 @@ projections:
 
 ## Quality status
 
-- `pytest` passes 436 tests; Basedpyright reports zero errors.
+- The full `pytest` suite passes; Basedpyright reports zero errors.
 - Ruff lint/format, Vulture, a fresh package build, and
   `quality-runner release-smoke --json` pass.
 
 ## Next milestone
 
-M2 migrates the read-only audit vertical slice through one typed application
-use case while preserving inspect/run artifacts, finding IDs, CLI/MCP output,
-and handoff expectations.
+M3 migrates gate verification as its own explicit policy-controlled application
+service. The existing verification execution path remains intentionally
+unchanged until then.
