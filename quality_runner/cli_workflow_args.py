@@ -38,7 +38,7 @@ def add_worktree_verify_arguments(parser: argparse.ArgumentParser) -> None:
         "--worktree-mode",
         choices=["in-place", "disposable"],
         default="in-place",
-        help="Run gate commands in-place or inside a disposable git worktree at HEAD",
+        help="Use disposable with --execute-gates; in-place is retained for non-executing plans",
     )
     parser.add_argument(
         "--allow-dirty-worktree-verify",

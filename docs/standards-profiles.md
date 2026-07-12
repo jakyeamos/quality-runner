@@ -47,6 +47,7 @@ source = "local policy"
 owner = "platform"
 required = true
 severity = "blocker"
+mutating_risk = "unknown"
 
 [[quality_runner.accepted_exceptions]]
 capability = "dead_code"

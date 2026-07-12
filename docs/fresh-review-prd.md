@@ -136,12 +136,16 @@ review occurred.
 
 ## 6. Review report
 
-Each run writes both human-readable Markdown and agent-friendly JSON. The top
-line must use this shape:
+Each completed review writes both human-readable Markdown and agent-friendly
+JSON. A `review-complete` report with findings uses this top line:
 
 ```text
 Review complete: X critical, Y high, Z medium issues found.
 ```
+
+A `review-not-run` result begins `Review packet ready:` and tells the user to
+send the packet to a reviewer. Other incomplete adapter states begin `Review
+did not complete`; neither outcome may imply a finding conclusion.
 
 The report records mode, scope, breadth, reviewer adapter, repository state,
 task provenance (or explicit blind omission), exclusions, evidence used,
@@ -337,4 +341,3 @@ decisions:
   work, with at least one meaningful missed issue found in repeated usage.
 - Use the deterministic major-change rule in section 8 for known-issue
   re-verification.
-

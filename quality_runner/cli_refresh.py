@@ -29,6 +29,7 @@ def refresh_command_payload(args: argparse.Namespace, repo_root: Path) -> dict[s
         total_timeout_seconds=args.total_timeout_seconds,
         total_timeout_reason=args.total_timeout_reason,
         checkout_most_advanced_branch=args.checkout_most_advanced_branch,
+        execute_discovered_gates=getattr(args, "execute_gates", False),
         allow_mutating_gates=args.allow_mutating_gates,
         worktree_mode=args.worktree_mode,
         allow_dirty_worktree_verify=args.allow_dirty_worktree_verify,
@@ -40,6 +41,6 @@ def refresh_command_payload(args: argparse.Namespace, repo_root: Path) -> dict[s
         payload["handoff_export"] = export_handoff_payload(
             repo_root=repo_root,
             run_id=f"{args.run_id_prefix}-verify",
-            output_path=Path(args.handoff_output).expanduser().resolve(),
+            output_path=Path(args.handoff_output).expanduser(),
         )
     return payload

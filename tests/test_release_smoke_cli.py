@@ -38,6 +38,15 @@ def test_cli_release_smoke_runs_refresh_and_exports_handoff(tmp_path: Path) -> N
     assert checks["export_handoff"]["status"] == "passed"
     assert checks["schema_compatibility"]["status"] == "passed"
     assert checks["compatibility_surfaces"]["status"] == "passed"
+
+
+def test_release_smoke_default_temp_directory_is_usable() -> None:
+    from quality_runner.release_smoke import release_smoke_payload
+
+    payload = release_smoke_payload(work_dir=None, help_text="release-smoke")
+
+    assert payload["status"] == "passed"
+    assert Path(payload["work_dir"]).is_dir()
     assert (
         Path(payload["handoff_output"])
         .read_text(encoding="utf-8")

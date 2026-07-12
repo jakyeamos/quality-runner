@@ -11,13 +11,18 @@ Run QR before editing:
 ```bash
 quality-runner refresh /path/to/repo \
   --run-id-prefix qr-<date-or-task> \
-  --handoff-output /tmp/qr-handoff.md \
+  --handoff-output /path/to/repo/.quality-runner/exports/qr-handoff.md \
   --json
 ```
 
+This default refresh records gate evidence; it is not executable-gate proof.
+Only use `--execute-gates --worktree-mode disposable` after explicit user
+authorization, and treat it as arbitrary local-code execution in a disposable
+checkout rather than a sandbox.
+
 Then read:
 
-- `/tmp/qr-handoff.md`
+- `/path/to/repo/.quality-runner/exports/qr-handoff.md`
 - `.quality-runner/runs/<run-id>/slice-specs/<next-slice-id>.md` for the
   cold-executor plan on the queued slice (scope, STOP conditions, drift check,
   evidence excerpts)

@@ -22,17 +22,27 @@ def review_mcp_tool() -> dict[str, object]:
         "inputSchema": {
             "type": "object",
             "properties": {
-                "repo_root": {"type": "string"}, "run_id": {"type": "string"},
-                "mode": {"enum": ["task", "blind", "combined"]}, "scope": {"enum": ["task", "project"]},
-                "breadth": {"enum": ["focused", "related", "full"]}, "task": {"type": "string"},
-                "task_file": {"type": "string"}, "previous_summary": {"type": "string"},
-                "exclude": {"type": "array", "items": {"type": "string"}}, "evidence": {"type": "array", "items": {"type": "string"}},
-                "detail": {"enum": ["standard", "concise", "expanded"]}, "save": {"type": "boolean"},
-                "known_issues": {"type": "array", "items": {"type": "string"}}, "loop": {"type": "boolean"},
-                "loop_stop": {"type": "boolean"}, "finding_id": {"type": "array", "items": {"type": "string"}},
-                "all_critical_high": {"type": "boolean"}, "adapter_output": {"type": "string"},
+                "repo_root": {"type": "string"},
+                "run_id": {"type": "string"},
+                "mode": {"enum": ["task", "blind", "combined"]},
+                "scope": {"enum": ["task", "project"]},
+                "breadth": {"enum": ["focused", "related", "full"]},
+                "task": {"type": "string"},
+                "task_file": {"type": "string"},
+                "previous_summary": {"type": "string"},
+                "exclude": {"type": "array", "items": {"type": "string"}},
+                "evidence": {"type": "array", "items": {"type": "string"}},
+                "detail": {"enum": ["standard", "concise", "expanded"]},
+                "save": {"type": "boolean"},
+                "known_issues": {"type": "array", "items": {"type": "string"}},
+                "loop": {"type": "boolean"},
+                "loop_stop": {"type": "boolean"},
+                "finding_id": {"type": "array", "items": {"type": "string"}},
+                "all_critical_high": {"type": "boolean"},
+                "adapter_output": {"type": "string"},
             },
-            "required": ["repo_root"], "additionalProperties": False,
+            "required": ["repo_root"],
+            "additionalProperties": False,
         },
     }
 
@@ -45,13 +55,26 @@ def review_mcp_payload(arguments: dict[str, Any], repo_root: Path) -> dict[str, 
         return value
 
     args = argparse.Namespace(
-        command="review", repo_path=str(repo_root), run_id=arguments.get("run_id"),
-        mode=arguments.get("mode", "task"), scope=arguments.get("scope", "project"), breadth=arguments.get("breadth"),
-        task=arguments.get("task"), task_file=arguments.get("task_file"), reuse_task=False,
-        previous_summary=arguments.get("previous_summary"), exclude=strings("exclude"), evidence=strings("evidence"),
-        detail=arguments.get("detail", "standard"), save=arguments.get("save", True) is not False,
-        known_issues=strings("known_issues"), loop=bool(arguments.get("loop", False)), loop_stop=bool(arguments.get("loop_stop", False)),
-        finding_id=strings("finding_id"), all_critical_high=bool(arguments.get("all_critical_high", False)), adapter_output=arguments.get("adapter_output"),
+        command="review",
+        repo_path=str(repo_root),
+        run_id=arguments.get("run_id"),
+        mode=arguments.get("mode", "task"),
+        scope=arguments.get("scope", "project"),
+        breadth=arguments.get("breadth"),
+        task=arguments.get("task"),
+        task_file=arguments.get("task_file"),
+        reuse_task=False,
+        previous_summary=arguments.get("previous_summary"),
+        exclude=strings("exclude"),
+        evidence=strings("evidence"),
+        detail=arguments.get("detail", "standard"),
+        save=arguments.get("save", True) is not False,
+        known_issues=strings("known_issues"),
+        loop=bool(arguments.get("loop", False)),
+        loop_stop=bool(arguments.get("loop_stop", False)),
+        finding_id=strings("finding_id"),
+        all_critical_high=bool(arguments.get("all_critical_high", False)),
+        adapter_output=arguments.get("adapter_output"),
     )
     return review_command_payload(args, repo_root)
 
@@ -65,7 +88,9 @@ def add_review_command(subparsers: argparse._SubParsersAction[argparse.ArgumentP
     parser.add_argument("--breadth", choices=["focused", "related", "full"], default=None)
     parser.add_argument("--task", default=None, help="Task or acceptance criteria under review")
     parser.add_argument("--task-file", default=None, help="Read task text from a local file")
-    parser.add_argument("--reuse-task", action="store_true", help="Reuse --previous-summary as task context")
+    parser.add_argument(
+        "--reuse-task", action="store_true", help="Reuse --previous-summary as task context"
+    )
     parser.add_argument("--previous-summary", default=None)
     parser.add_argument("--exclude", action="append", default=[])
     parser.add_argument("--evidence", action="append", default=[])
@@ -76,7 +101,11 @@ def add_review_command(subparsers: argparse._SubParsersAction[argparse.ArgumentP
     parser.add_argument("--loop", action="store_true")
     parser.add_argument("--finding-id", action="append", default=[])
     parser.add_argument("--all-critical-high", action="store_true")
-    parser.add_argument("--adapter-output", default=None, help="Local adapter result JSON inside the run artifact directory")
+    parser.add_argument(
+        "--adapter-output",
+        default=None,
+        help="Local adapter result JSON inside the run artifact directory",
+    )
     parser.add_argument("--json", action="store_true", help="Emit JSON output")
 
 
@@ -86,7 +115,9 @@ def review_command_payload(args: argparse.Namespace, repo_root: Path) -> dict[st
     if args.reuse_task and not task:
         task = args.previous_summary
     if args.mode in {"task", "combined"} and not task:
-        raise ValueError("task mode requires --task or --task-file; use --mode blind for a fresh blind review")
+        raise ValueError(
+            "task mode requires --task or --task-file; use --mode blind for a fresh blind review"
+        )
     evidence, omitted = _evidence(repo_root, args.evidence)
     options = normalize_review_options(
         mode=args.mode,
@@ -111,8 +142,15 @@ def review_command_payload(args: argparse.Namespace, repo_root: Path) -> dict[st
     run_dir = artifact_dir(repo_root, run_id)
     adapter = adapter_from_path(Path(args.adapter_output) if args.adapter_output else None)
     result = adapter.review(context, run_dir)
-    report = result["report"] or _empty_report(context, result["status"], result["evidence_unavailable"])
-    manifest = _manifest(context, artifact_paths=_expected_artifact_paths(repo_root, run_id) if args.save else {})
+    report = result["report"] or _empty_report(
+        context,
+        result["status"],
+        result["evidence_unavailable"],
+        result["message"],
+    )
+    manifest = _manifest(
+        context, artifact_paths=_expected_artifact_paths(repo_root, run_id) if args.save else {}
+    )
     artifact_paths = persist_review_artifacts(
         repo_root=repo_root,
         run_id=run_id,
@@ -122,6 +160,7 @@ def review_command_payload(args: argparse.Namespace, repo_root: Path) -> dict[st
         save=args.save,
     )
     severity_counts = report.get("severity_counts", {})
+    next_action = result["message"]
     return {
         "schema": REVIEW_RESULT_SCHEMA,
         "status": result["status"],
@@ -130,11 +169,15 @@ def review_command_payload(args: argparse.Namespace, repo_root: Path) -> dict[st
         "scope": context["scope"],
         "breadth": context["breadth"],
         "adapter_status": result["status"],
+        "outcome": "packet-ready" if result["status"] == "review-not-run" else result["status"],
         "summary": report["summary"],
         "severity_counts": severity_counts,
-        "evidence_unavailable": sorted(set(_strings(report.get("evidence_unavailable")) + result["evidence_unavailable"])),
+        "evidence_unavailable": sorted(
+            set(_strings(report.get("evidence_unavailable")) + result["evidence_unavailable"])
+        ),
         "artifact_paths": artifact_paths,
         "saved_path": artifact_paths.get("review_report_json"),
+        **({"next_action": next_action} if isinstance(next_action, str) and next_action else {}),
         "report": report,
     }
 
@@ -150,14 +193,25 @@ def _evidence(repo_root: Path, paths: list[str]) -> tuple[list[EvidenceReference
     omitted: list[str] = []
     root = repo_root.resolve()
     for raw in paths:
-        path = (root / raw).resolve() if not Path(raw).is_absolute() else Path(raw).expanduser().resolve()
+        path = (
+            (root / raw).resolve()
+            if not Path(raw).is_absolute()
+            else Path(raw).expanduser().resolve()
+        )
         try:
             path.relative_to(root)
         except ValueError:
             omitted.append(f"outside repository: {raw}")
             continue
         available = path.is_file()
-        references.append({"path": str(path.relative_to(root)), "kind": "file", "available": available, "note": "" if available else "missing"})
+        references.append(
+            {
+                "path": str(path.relative_to(root)),
+                "kind": "file",
+                "available": available,
+                "note": "" if available else "missing",
+            }
+        )
         if not available:
             omitted.append(str(path.relative_to(root)))
     return references, omitted
@@ -165,7 +219,12 @@ def _evidence(repo_root: Path, paths: list[str]) -> tuple[list[EvidenceReference
 
 def _changed_files(repo_root: Path) -> list[str]:
     try:
-        result = subprocess.run(["git", "-C", str(repo_root), "status", "--short"], capture_output=True, text=True, check=False)
+        result = subprocess.run(
+            ["git", "-C", str(repo_root), "status", "--short"],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
     except OSError:
         return []
     return [line[3:] for line in result.stdout.splitlines() if len(line) > 3]
@@ -198,16 +257,32 @@ def _expected_artifact_paths(repo_root: Path, run_id: str) -> dict[str, str]:
     }
 
 
-def _empty_report(context: dict[str, object], status: str, unavailable: list[str]) -> dict[str, object]:
+def _empty_report(
+    context: dict[str, object],
+    status: str,
+    unavailable: list[str],
+    next_action: str | None,
+) -> dict[str, object]:
     from quality_runner.review_report import build_review_report
 
     mode = cast(str, context["mode"])
-    return build_review_report(
-        run_id=str(context["run_id"]), mode=mode, scope=str(context["scope"]), breadth=str(context["breadth"]),
-        findings=[], evidence_used=[], evidence_unavailable=unavailable + _strings(context.get("omitted_evidence")),
-        exclusions=_strings(context.get("exclusions")), adapter_status=status,
-        task_provenance=str(context.get("input_hashes", {}).get("task")) if mode != "blind" else None,
+    report = build_review_report(
+        run_id=str(context["run_id"]),
+        mode=mode,
+        scope=str(context["scope"]),
+        breadth=str(context["breadth"]),
+        findings=[],
+        evidence_used=[],
+        evidence_unavailable=unavailable + _strings(context.get("omitted_evidence")),
+        exclusions=_strings(context.get("exclusions")),
+        adapter_status=status,
+        task_provenance=str(context.get("input_hashes", {}).get("task"))
+        if mode != "blind"
+        else None,
     )
+    if next_action:
+        report["next_action"] = next_action
+    return report
 
 
 def _strings(value: object) -> list[str]:

@@ -149,3 +149,67 @@ def test_write_text_creates_parent_returns_path_and_writes_exact_content(tmp_pat
     assert path == target
     assert path.exists()
     assert path.read_text(encoding="utf-8") == "line 1\nline 2"
+
+
+def test_artifact_namespace_helpers_reject_symlink_components(tmp_path: Path) -> None:
+    from quality_runner.artifacts import existing_artifact_dir, prepare_artifact_dir
+
+    external = tmp_path / "external"
+    external.mkdir()
+    cases = ((".quality-runner",), (".quality-runner", "runs"), (".quality-runner", "runs", "run"))
+    for index, parts in enumerate(cases):
+        repo = tmp_path / f"repo-{index}"
+        repo.mkdir()
+        if parts == (".quality-runner",):
+            (repo / ".quality-runner").symlink_to(external, target_is_directory=True)
+        elif parts == (".quality-runner", "runs"):
+            (repo / ".quality-runner").mkdir()
+            (repo / ".quality-runner" / "runs").symlink_to(external, target_is_directory=True)
+        else:
+            runs = repo / ".quality-runner" / "runs"
+            runs.mkdir(parents=True)
+            (runs / "run").symlink_to(external, target_is_directory=True)
+        for helper in (prepare_artifact_dir, existing_artifact_dir):
+            try:
+                helper(repo, "run")
+            except ValueError as error:
+                assert str(error) == "artifact path component must not be a symlink"
+            else:
+                raise AssertionError(f"{helper.__name__} accepted a symlinked namespace")
+
+
+def test_artifact_text_file_rejects_symlink_leaf(tmp_path: Path) -> None:
+    from quality_runner.artifacts import artifact_text_file, prepare_artifact_dir
+
+    run_dir = prepare_artifact_dir(tmp_path, "run")
+    external = tmp_path / "external.md"
+    external.write_text("secret\n", encoding="utf-8")
+    (run_dir / "agent-handoff.md").symlink_to(external)
+
+    try:
+        artifact_text_file(tmp_path, "run", "agent-handoff.md")
+    except ValueError as error:
+        assert str(error) == "artifact file must not be a symlink"
+    else:
+        raise AssertionError("artifact_text_file accepted a symlink leaf")
+
+    assert external.read_text(encoding="utf-8") == "secret\n"
+
+
+def test_write_text_rejects_nested_symlink_ancestor_without_external_write(tmp_path: Path) -> None:
+    from quality_runner.artifacts import write_text
+
+    external = tmp_path / "external"
+    (external / "nested").mkdir(parents=True)
+    linked_parent = tmp_path / "linked"
+    linked_parent.symlink_to(external, target_is_directory=True)
+    target = linked_parent / "nested" / "handoff.md"
+
+    try:
+        write_text(target, "should not escape\n")
+    except ValueError as error:
+        assert str(error) == "artifact path component must not be a symlink"
+    else:
+        raise AssertionError("write_text followed a symlinked ancestor")
+
+    assert not (external / "nested" / "handoff.md").exists()

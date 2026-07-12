@@ -2,12 +2,34 @@ from __future__ import annotations
 
 import json
 import signal
+import subprocess
 import sys
 from pathlib import Path
 
 import pytest
 
 from test_support.quality_runner_fixtures import write_complete_js_fixture
+
+
+def _commit_fixture(repo_root: Path) -> None:
+    subprocess.run(["git", "init"], cwd=repo_root, check=True, capture_output=True, text=True)
+    subprocess.run(["git", "add", "."], cwd=repo_root, check=True, capture_output=True, text=True)
+    subprocess.run(
+        [
+            "git",
+            "-c",
+            "user.email=quality-runner@example.com",
+            "-c",
+            "user.name=Quality Runner",
+            "commit",
+            "-m",
+            "Fixture",
+        ],
+        cwd=repo_root,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
 
 
 def test_run_payload_records_package_manager_mismatch_in_audit_and_plan(
@@ -131,7 +153,14 @@ def test_verify_gates_payload_executes_discovered_gates_and_marks_capabilities(
         encoding="utf-8",
     )
 
-    payload = verify_gates_payload(repo_root=tmp_path, run_id="verify-gates-run", profile="default")
+    _commit_fixture(tmp_path)
+    payload = verify_gates_payload(
+        repo_root=tmp_path,
+        run_id="verify-gates-run",
+        profile="default",
+        execute_discovered_gates=True,
+        worktree_mode="disposable",
+    )
     verification = json.loads(Path(payload["artifact_paths"]["gate_verification_json"]).read_text())
     capability_map = json.loads(
         Path(payload["artifact_paths"]["capability_matrix_json"]).read_text()
@@ -221,7 +250,13 @@ def test_verify_gates_classifies_next_font_fetch_as_environment_restricted(
         encoding="utf-8",
     )
 
-    payload = verify_gates_payload(repo_root=tmp_path, run_id="next-font-fetch")
+    _commit_fixture(tmp_path)
+    payload = verify_gates_payload(
+        repo_root=tmp_path,
+        run_id="next-font-fetch",
+        execute_discovered_gates=True,
+        worktree_mode="disposable",
+    )
     verification = json.loads(Path(payload["artifact_paths"]["gate_verification_json"]).read_text())
 
     assert payload["status"] == "blocked"
@@ -434,6 +469,7 @@ def test_verify_gate_kills_process_group_when_workflow_timeout_interrupts(
     from quality_runner import gate_verification, process_runner
 
     killed_groups: list[tuple[int, int]] = []
+    execution_root = tmp_path / "isolated"
 
     class FakeProcess:
         pid = 12345
@@ -445,9 +481,11 @@ def test_verify_gate_kills_process_group_when_workflow_timeout_interrupts(
 
     def fake_popen(*_: object, **kwargs: object) -> FakeProcess:
         assert kwargs["start_new_session"] is True
-        assert kwargs["env"]["UV_CACHE_DIR"] == str(tmp_path / ".quality-runner" / "cache" / "uv")
+        assert kwargs["env"]["UV_CACHE_DIR"] == str(
+            execution_root / ".quality-runner" / "cache" / "uv"
+        )
         assert kwargs["env"]["XDG_CACHE_HOME"] == str(
-            tmp_path / ".quality-runner" / "cache" / "xdg"
+            execution_root / ".quality-runner" / "cache" / "xdg"
         )
         return FakeProcess()
 
@@ -473,6 +511,9 @@ def test_verify_gate_kills_process_group_when_workflow_timeout_interrupts(
                 ]
             },
             run_id="workflow-interrupt",
+            execute_discovered_gates=True,
+            execution_root=execution_root,
+            mutations_isolated=True,
         )
 
     assert killed_groups == [(12346, signal.SIGTERM)]
@@ -485,6 +526,8 @@ def test_verify_gate_captures_partial_output_after_timeout(tmp_path: Path) -> No
         f"{sys.executable} -c \"import time; print('partial stdout', flush=True); time.sleep(5)\""
     )
 
+    execution_root = tmp_path / "isolated"
+    execution_root.mkdir()
     verification = verify_discovered_gates(
         repo_root=tmp_path,
         capability_map={
@@ -498,6 +541,9 @@ def test_verify_gate_captures_partial_output_after_timeout(tmp_path: Path) -> No
             ]
         },
         timeout_seconds=1,
+        execute_discovered_gates=True,
+        execution_root=execution_root,
+        mutations_isolated=True,
     )
 
     gate = verification["gates"][0]
@@ -551,7 +597,13 @@ def test_verify_gates_does_not_block_on_file_evidence_capabilities(tmp_path: Pat
         encoding="utf-8",
     )
 
-    payload = verify_gates_payload(repo_root=tmp_path, run_id="file-evidence")
+    _commit_fixture(tmp_path)
+    payload = verify_gates_payload(
+        repo_root=tmp_path,
+        run_id="file-evidence",
+        execute_discovered_gates=True,
+        worktree_mode="disposable",
+    )
     verification = json.loads(Path(payload["artifact_paths"]["gate_verification_json"]).read_text())
 
     assert payload["status"] == "passed"
@@ -586,7 +638,13 @@ def test_verify_gates_classifies_environment_restricted_failures(tmp_path: Path)
         encoding="utf-8",
     )
 
-    payload = verify_gates_payload(repo_root=tmp_path, run_id="environment-restricted")
+    _commit_fixture(tmp_path)
+    payload = verify_gates_payload(
+        repo_root=tmp_path,
+        run_id="environment-restricted",
+        execute_discovered_gates=True,
+        worktree_mode="disposable",
+    )
     verification = json.loads(Path(payload["artifact_paths"]["gate_verification_json"]).read_text())
 
     assert payload["status"] == "blocked"
@@ -622,7 +680,13 @@ def test_verify_gates_classifies_test_server_timeout_as_environment_restricted(
         encoding="utf-8",
     )
 
-    payload = verify_gates_payload(repo_root=tmp_path, run_id="test-server-timeout")
+    _commit_fixture(tmp_path)
+    payload = verify_gates_payload(
+        repo_root=tmp_path,
+        run_id="test-server-timeout",
+        execute_discovered_gates=True,
+        worktree_mode="disposable",
+    )
     verification = json.loads(Path(payload["artifact_paths"]["gate_verification_json"]).read_text())
 
     assert payload["status"] == "blocked"
@@ -656,7 +720,13 @@ def test_verify_gates_keeps_plain_test_failures_as_command_failures(tmp_path: Pa
         encoding="utf-8",
     )
 
-    payload = verify_gates_payload(repo_root=tmp_path, run_id="plain-test-failure")
+    _commit_fixture(tmp_path)
+    payload = verify_gates_payload(
+        repo_root=tmp_path,
+        run_id="plain-test-failure",
+        execute_discovered_gates=True,
+        worktree_mode="disposable",
+    )
     verification = json.loads(Path(payload["artifact_paths"]["gate_verification_json"]).read_text())
 
     assert payload["status"] == "failed"
@@ -691,10 +761,15 @@ def test_verify_gates_runs_cheap_gates_before_expensive_gates(tmp_path: Path) ->
         ]
     }
 
+    execution_root = tmp_path / "isolated"
+    execution_root.mkdir()
     verification = verify_discovered_gates(
         repo_root=tmp_path,
         capability_map=capability_map,
         run_id="ordered-gates",
+        execute_discovered_gates=True,
+        execution_root=execution_root,
+        mutations_isolated=True,
     )
 
     assert [gate["id"] for gate in verification["gates"]] == [

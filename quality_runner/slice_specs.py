@@ -3,7 +3,14 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from quality_runner.artifacts import write_text
+from quality_runner.artifacts import (
+    artifact_text_file,
+    existing_artifact_dir,
+    prepare_directory,
+    safe_child_file,
+    validate_path_segment,
+    write_text,
+)
 from quality_runner.intent_docs import intent_docs_markdown_lines
 
 
@@ -79,8 +86,9 @@ def write_slice_specs(
     run_id: str | None,
     intent_docs: list[dict[str, str]] | None = None,
 ) -> dict[str, str]:
-    specs_dir = run_dir / "slice-specs"
-    specs_dir.mkdir(parents=True, exist_ok=True)
+    if run_dir.is_symlink() or not run_dir.is_dir():
+        raise ValueError("slice spec run directory must be a regular directory")
+    specs_dir = prepare_directory(run_dir, "slice-specs")
     paths: dict[str, str] = {}
     for slice_item in slices:
         if not isinstance(slice_item, dict):
@@ -88,8 +96,9 @@ def write_slice_specs(
         slice_id = slice_item.get("id")
         if not isinstance(slice_id, str) or not slice_id:
             continue
+        validate_path_segment(slice_id, label="slice_id")
         filename = f"{slice_id}.md"
-        target = specs_dir / filename
+        target = safe_child_file(specs_dir, filename)
         content = render_slice_spec_markdown(
             slice_item,
             run_id=run_id,
@@ -104,17 +113,18 @@ def export_slice_specs_payload(
     repo_root: Path,
     run_id: str,
 ) -> dict[str, Any]:
-    run_dir = repo_root / ".quality-runner" / "runs" / run_id
-    plan_path = run_dir / "remediation-plan.json"
-    if not plan_path.exists():
-        raise FileNotFoundError(f"remediation plan not found for run: {run_id}")
+    run_dir = existing_artifact_dir(repo_root, run_id)
+    try:
+        plan_path = artifact_text_file(repo_root, run_id, "remediation-plan.json")
+    except FileNotFoundError as error:
+        raise FileNotFoundError(f"remediation plan not found for run: {run_id}") from error
     import json
 
     plan = json.loads(plan_path.read_text(encoding="utf-8"))
     slices = plan.get("slices")
     if not isinstance(slices, list):
         raise ValueError("remediation plan slices must be a list")
-    scan_path = run_dir / "repo-scan.json"
+    scan_path = safe_child_file(run_dir, "repo-scan.json")
     intent_docs = None
     if scan_path.exists():
         scan = json.loads(scan_path.read_text(encoding="utf-8"))

@@ -6,6 +6,7 @@ import subprocess
 from pathlib import Path
 from typing import Any
 
+from quality_runner.artifacts import write_json
 from quality_runner.controller_reports import (
     build_controller_report_from_summary,
     lint_controller_report,
@@ -122,7 +123,7 @@ def controller_report_from_summary_payload(
     repo_root: Path,
     summary: dict[str, Any],
 ) -> dict[str, Any]:
-    output_path = Path(args.report_output).expanduser().resolve() if args.report_output else None
+    output_path = Path(args.report_output).expanduser() if args.report_output else None
     target_head = args.target_head or _git_head(repo_root)
     payload = build_controller_report_from_summary(
         repo_path=str(repo_root),
@@ -181,11 +182,8 @@ def controller_report_command_payload(args: argparse.Namespace) -> dict[str, Any
     if args.controller_report_command == "normalize":
         normalized = normalize_controller_report(report)
         if args.output:
-            output_path = Path(args.output).expanduser().resolve()
-            output_path.write_text(
-                json.dumps(normalized, indent=2, sort_keys=True) + "\n",
-                encoding="utf-8",
-            )
+            output_path = Path(args.output).expanduser()
+            write_json(output_path, normalized)
         return normalized
     if args.controller_report_command == "lint":
         return lint_controller_report(report, strict=args.strict)
@@ -248,7 +246,7 @@ def _summary_generation_command(*, args: argparse.Namespace, repo_root: Path) ->
         parts.extend(["--baseline-run-id", str(args.baseline_run_id)])
     parts.extend(["--controller-report", "--json"])
     if args.report_output:
-        parts.extend(["--report-output", str(Path(args.report_output).expanduser().resolve())])
+        parts.extend(["--report-output", str(Path(args.report_output).expanduser())])
     return " ".join(parts)
 
 
@@ -263,7 +261,7 @@ def _validate_command(output_path: Path | None) -> str:
 
 
 def _write_json(path: Path, payload: dict[str, Any]) -> None:
-    path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    write_json(path, payload)
 
 
 def _batch_scope_from_args(args: argparse.Namespace) -> dict[str, Any] | None:

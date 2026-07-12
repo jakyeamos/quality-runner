@@ -5,7 +5,9 @@ from typing import Literal, TypedDict
 ReviewMode = Literal["task", "blind", "combined"]
 ReviewScope = Literal["task", "project"]
 ReviewBreadth = Literal["focused", "related", "full"]
-AdapterStatus = Literal["review-complete", "review-not-run", "malformed-output", "permission-denied"]
+AdapterStatus = Literal[
+    "review-complete", "review-not-run", "malformed-output", "permission-denied"
+]
 
 
 class EvidenceReference(TypedDict):

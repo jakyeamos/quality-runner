@@ -6,6 +6,7 @@ import shutil
 import subprocess
 import sys
 import zipfile
+from email.parser import BytesParser
 from pathlib import Path
 
 from quality_runner import __version__
@@ -134,9 +135,14 @@ def test_packaged_console_script_invokes_cli(tmp_path: Path) -> None:
 
     with zipfile.ZipFile(wheel_path) as wheel:
         wheel_names = wheel.namelist()
-        entry_points = wheel.read(
-            f"quality_runner-{__version__}.dist-info/entry_points.txt"
-        ).decode()
+        metadata_path = next(name for name in wheel_names if name.endswith(".dist-info/METADATA"))
+        metadata = BytesParser().parsebytes(wheel.read(metadata_path))
+        dist_info_dir = metadata_path.removesuffix("/METADATA")
+        entry_points = wheel.read(f"{dist_info_dir}/entry_points.txt").decode()
+        plugin_manifest = json.loads(wheel.read("quality_runner/plugin/manifest.json"))
+    assert metadata["Name"] == "quality-runner"
+    assert metadata["Version"] == __version__
+    assert plugin_manifest["version"] == __version__
     assert "quality-runner = quality_runner.cli:main" in entry_points
     assert "quality-runner-mcp = quality_runner.mcp:main" in entry_points
     assert "repo-quality-certifier = repo_quality_certifier.cli:main" in entry_points
@@ -160,6 +166,16 @@ def test_packaged_console_script_invokes_cli(tmp_path: Path) -> None:
     quality_runner = venv_dir / "bin" / "quality-runner"
     version_result = subprocess.run(
         [str(quality_runner), "--version"],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    metadata_version_result = subprocess.run(
+        [
+            str(venv_python),
+            "-c",
+            "from importlib.metadata import version; print(version('quality-runner'))",
+        ],
         check=True,
         capture_output=True,
         text=True,
@@ -224,6 +240,8 @@ def test_packaged_console_script_invokes_cli(tmp_path: Path) -> None:
     doctor_payload = json.loads(doctor_result.stdout)
     assert doctor_payload["schema"] == "quality-runner-doctor-result-v0.1"
     assert doctor_payload["status"] == "ready"
+    assert doctor_payload["version"] == __version__
+    assert metadata_version_result.stdout.strip() == __version__
     smoke_payload = json.loads(smoke_result.stdout)
     assert smoke_payload["schema"] == "quality-runner-release-smoke-result-v0.1"
     assert smoke_payload["status"] == "passed"

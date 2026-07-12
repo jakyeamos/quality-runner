@@ -71,6 +71,24 @@ def test_no_issue_report_includes_end_to_end_caveat() -> None:
     assert report["sections"]["missed_requirements"] == []
 
 
+def test_non_complete_review_rejects_findings() -> None:
+    from quality_runner.review_report import build_review_report
+
+    with pytest.raises(ValueError, match="review-complete"):
+        build_review_report(
+            run_id="review-incomplete",
+            mode="blind",
+            scope="project",
+            breadth="related",
+            findings=[_finding()],
+            evidence_used=[],
+            evidence_unavailable=["adapter unavailable"],
+            exclusions=[],
+            adapter_status="review-not-run",
+            task_provenance=None,
+        )
+
+
 def test_report_rejects_invalid_confidence_and_missing_finding_fields() -> None:
     from quality_runner.review_report import build_review_report
 

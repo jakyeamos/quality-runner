@@ -25,8 +25,14 @@ def test_review_schemas_use_stable_schema_names_and_closed_top_level_objects() -
 def test_review_contracts_restrict_modes_scopes_and_breadths() -> None:
     from quality_runner.review_context import normalize_review_options
 
-    assert normalize_review_options(mode="task", scope="task", breadth=None, task="Fix it")["mode"] == "task"
-    assert normalize_review_options(mode="blind", scope="project", breadth=None, task=None)["breadth"] == "related"
+    assert (
+        normalize_review_options(mode="task", scope="task", breadth=None, task="Fix it")["mode"]
+        == "task"
+    )
+    assert (
+        normalize_review_options(mode="blind", scope="project", breadth=None, task=None)["breadth"]
+        == "related"
+    )
 
     with pytest.raises(ValueError, match="mode"):
         normalize_review_options(mode="unknown", scope="task", breadth=None, task="Fix it")
@@ -53,7 +59,9 @@ def test_manifest_schema_requires_freshness_and_input_hashes() -> None:
     assert "hidden_reasoning" not in manifest["properties"]
 
 
-def test_task_packet_allowlist_includes_task_and_excludes_prior_review_documents(tmp_path: Path) -> None:
+def test_task_packet_allowlist_includes_task_and_excludes_prior_review_documents(
+    tmp_path: Path,
+) -> None:
     from quality_runner.review_context import build_review_packet, normalize_review_options
 
     options = normalize_review_options(

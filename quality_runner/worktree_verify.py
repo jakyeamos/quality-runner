@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from quality_runner.artifacts import _validate_run_id
+from quality_runner.artifacts import validate_run_id
 from quality_runner.read_only_git import _is_git_worktree
 
 WORKTREE_MODES = frozenset({"in-place", "disposable"})
@@ -90,7 +90,7 @@ def _open_disposable_worktree(
     if base_head is None:
         raise ValueError("disposable worktree mode requires a readable git HEAD")
 
-    _validate_run_id(run_id)
+    validate_run_id(run_id)
     worktree_path = _prepare_worktree_dir(root, run_id)
     _remove_worktree_if_registered(root, worktree_path)
     if worktree_path.exists():
@@ -166,7 +166,12 @@ def _is_dirty_worktree(repo_root: Path) -> bool:
     if not _is_git_worktree(repo_root):
         return False
     status = _git_optional(repo_root, "status", "--porcelain")
-    return bool(status and status.strip())
+    if not status:
+        return False
+    return any(
+        line and not (line.startswith("?? ") and line[3:].strip() == ".quality-runner/")
+        for line in status.splitlines()
+    )
 
 
 def _git_head(repo_root: Path) -> str | None:

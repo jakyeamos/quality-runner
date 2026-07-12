@@ -74,9 +74,9 @@ deleted in the same milestone or scheduled in the published deprecation plan.
 - **Systems:** execution policy, subprocess runner, Git worktree handling,
   verification artifacts, CLI/MCP adapters.
 - **Depends on:** M0 and M2.
-- **Preserve:** known-safe gate support, evidence output, and user-requested
-  in-place behavior where it is explicitly allowed.
-- **Change intentionally:** isolated verification is the default executable
+- **Preserve:** known-safe gate support, evidence output, and explicit
+  disposable-checkout execution.
+- **Change intentionally:** disposable verification is the only executable
   mode; read-only rollback is no longer presented as a complete sandbox.
 - **Verify:** hostile config, environment minimization, timeout, untracked-write,
   worktree cleanup, and recovery-after-interruption fixtures.
@@ -171,8 +171,8 @@ deleted in the same milestone or scheduled in the published deprecation plan.
 
 ## Product defaults recorded for implementation
 
-- Unknown discovered commands require explicit execution consent and run in an
-  isolated worktree by default.
+- Unknown discovered commands require explicit execution consent and run in a
+  disposable checkout. The checkout is not an arbitrary-command sandbox.
 - Legacy public surfaces receive two minor releases of compatibility support
   after a v2 default ships, unless a security fix requires earlier restriction.
 - No browser dashboard or optional TUI is built before the CLI/MCP journeys are

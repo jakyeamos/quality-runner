@@ -39,7 +39,9 @@ class FileReviewAdapter:
     def review(self, packet: ReviewPacket, output_dir: Path) -> AdapterResult:
         approved_root = output_dir.expanduser().resolve()
         if not _within(self.result_path, approved_root):
-            return _permission_result("Adapter output must remain inside the review artifact directory.")
+            return _permission_result(
+                "Adapter output must remain inside the review artifact directory."
+            )
         try:
             size = self.result_path.stat().st_size
             if size > MAX_OUTPUT_BYTES:
@@ -73,7 +75,12 @@ class FileReviewAdapter:
             )
         except (KeyError, TypeError, ValueError) as error:
             return _malformed_result(f"Adapter output failed review validation: {error}")
-        return {"status": "review-complete", "report": report, "evidence_unavailable": [], "message": None}
+        return {
+            "status": "review-complete",
+            "report": report,
+            "evidence_unavailable": [],
+            "message": None,
+        }
 
 
 def adapter_from_path(result_path: Path | None) -> ReviewAdapter:
@@ -95,8 +102,18 @@ def _strings(value: object) -> list[str]:
 
 
 def _malformed_result(message: str) -> AdapterResult:
-    return {"status": "malformed-output", "report": None, "evidence_unavailable": [message], "message": message}
+    return {
+        "status": "malformed-output",
+        "report": None,
+        "evidence_unavailable": [message],
+        "message": message,
+    }
 
 
 def _permission_result(message: str) -> AdapterResult:
-    return {"status": "permission-denied", "report": None, "evidence_unavailable": [message], "message": message}
+    return {
+        "status": "permission-denied",
+        "report": None,
+        "evidence_unavailable": [message],
+        "message": message,
+    }

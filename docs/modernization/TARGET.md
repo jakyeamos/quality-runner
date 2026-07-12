@@ -73,9 +73,10 @@ symlink safety before reading or writing.
 
 Verification is an effectful service, not part of scanning. Unknown discovered
 commands are non-executable by default. An explicit verification request runs
-in an isolated worktree with a minimal inherited environment; any less-isolated
-mode is a deliberate, loudly reported choice. No core flow sends repository
-content to a remote service.
+in a disposable checkout with a minimal inherited environment. That checkout
+protects the source worktree from normal mutations; it is not a sandbox for
+arbitrary local commands. No core flow sends repository content to a remote
+service.
 
 ## Public contracts and migration
 

@@ -2,6 +2,16 @@
 
 All notable changes to Quality Runner are documented here.
 
+## 0.5.1 - Unreleased
+
+- Hardened artifact path resolution and made discovered-command execution an
+  explicit, disposable-checkout action.
+- Made package metadata derive from one runtime source and added parity checks
+  for built distributions, public runtime surfaces, the plugin manifest, and
+  citation metadata.
+- Made packet-only Fresh Review outcomes explicit instead of resembling a
+  no-findings review.
+
 ## 0.5.0 - 2026-07-09
 
 - Added fresh-review reports, review state, and review-delta loop controls.

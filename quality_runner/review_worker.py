@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 from typing import Any
 
+from quality_runner.artifacts import artifact_text_file, existing_artifact_dir, safe_child_file
 from quality_runner.controller_reports import validate_controller_report
 from quality_runner.findings import validate_agent_handoff
 from quality_runner.handoff_lint import validate_handoff_quality
@@ -18,13 +19,14 @@ def review_worker_payload(
     final_run_id: str,
     worker_report_path: Path,
 ) -> dict[str, Any]:
-    root = repo_root.expanduser().resolve()
-    baseline_dir = root / ".quality-runner" / "runs" / baseline_run_id
-    final_dir = root / ".quality-runner" / "runs" / final_run_id
-    if not baseline_dir.is_dir():
-        raise FileNotFoundError(f"baseline run not found: {baseline_run_id}")
-    if not final_dir.is_dir():
-        raise FileNotFoundError(f"final run not found: {final_run_id}")
+    try:
+        baseline_dir = existing_artifact_dir(repo_root, baseline_run_id)
+    except FileNotFoundError as error:
+        raise FileNotFoundError(f"baseline run not found: {baseline_run_id}") from error
+    try:
+        final_dir = existing_artifact_dir(repo_root, final_run_id)
+    except FileNotFoundError as error:
+        raise FileNotFoundError(f"final run not found: {final_run_id}") from error
     worker_report = _load_json(worker_report_path, "worker report")
 
     errors: list[str] = []
@@ -38,7 +40,10 @@ def review_worker_payload(
             if isinstance(item, str)
         )
 
-    final_handoff = _load_json(final_dir / "agent-handoff.json", "final agent handoff")
+    final_handoff = _load_json(
+        artifact_text_file(repo_root, final_run_id, "agent-handoff.json"),
+        "final agent handoff",
+    )
     handoff_validation = validate_agent_handoff(final_handoff)
     if not handoff_validation.get("passed"):
         errors.extend(
@@ -48,7 +53,10 @@ def review_worker_payload(
         )
     quality_validation = validate_handoff_quality(
         final_handoff,
-        remediation_plan=_load_json(final_dir / "remediation-plan.json", "final remediation plan"),
+        remediation_plan=_load_json(
+            artifact_text_file(repo_root, final_run_id, "remediation-plan.json"),
+            "final remediation plan",
+        ),
     )
     if not quality_validation.get("passed"):
         errors.extend(
@@ -57,8 +65,8 @@ def review_worker_payload(
             if isinstance(item, str)
         )
 
-    baseline_scan = _optional_json(baseline_dir / "code-quality-scan.json")
-    final_scan = _optional_json(final_dir / "code-quality-scan.json")
+    baseline_scan = _optional_artifact_json(baseline_dir, "code-quality-scan.json")
+    final_scan = _optional_artifact_json(final_dir, "code-quality-scan.json")
     fingerprint_delta = _fingerprint_delta(baseline_scan, final_scan)
     if fingerprint_delta["unresolved"]:
         warnings.append(
@@ -74,7 +82,7 @@ def review_worker_payload(
                 f"worker changed files outside declared scope: {', '.join(unexpected[:5])}"
             )
 
-    final_summary = _optional_json(final_dir / "run-summary.json")
+    final_summary = _optional_artifact_json(final_dir, "run-summary.json")
     status = final_handoff.get("status")
     return {
         "schema": REVIEW_WORKER_RESULT_SCHEMA,
@@ -145,6 +153,10 @@ def _optional_json(path: Path) -> dict[str, Any] | None:
         return None
     payload = json.loads(path.read_text(encoding="utf-8"))
     return payload if isinstance(payload, dict) else None
+
+
+def _optional_artifact_json(run_dir: Path, filename: str) -> dict[str, Any] | None:
+    return _optional_json(safe_child_file(run_dir, filename))
 
 
 def _nested(payload: dict[str, Any] | None, *keys: str) -> Any:

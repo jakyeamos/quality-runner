@@ -13,6 +13,7 @@
       "type": "object",
       "additionalProperties": { "type": "integer", "minimum": 1 }
     },
+    "execute_discovered_gates": { "type": "boolean" },
     "read_only_gates": { "type": "boolean" },
     "allow_mutating_gates": { "type": "boolean" },
     "failure_type": { "enum": ["workflow-timeout"] },
@@ -35,7 +36,8 @@
         "base_head": { "type": "string", "minLength": 1 },
         "execution_root": { "type": "string", "minLength": 1 },
         "mutations_isolated": { "type": "boolean" },
-        "dirty_source_worktree": { "type": "boolean" }
+        "dirty_source_worktree": { "type": "boolean" },
+        "execution_authorized": { "type": "boolean" }
       },
       "additionalProperties": false
     },
@@ -74,7 +76,13 @@
             "read-only-mutation"
           ]
         },
-        "skip_type": { "enum": ["mutating-gate-not-run", "dependency-setup-blocked"] },
+        "skip_type": {
+          "enum": [
+            "mutating-gate-not-run",
+            "dependency-setup-blocked",
+            "execution-consent-required"
+          ]
+        },
         "recommended_action": { "type": "string", "minLength": 1 },
         "diagnostics": { "type": "object" },
         "covered_by": {
@@ -105,6 +113,7 @@
         "local_execution_status": {
           "enum": [
             "will-execute",
+            "consent-required",
             "mutating-skipped",
             "ci-only-skipped",
             "evidence-only-skipped",

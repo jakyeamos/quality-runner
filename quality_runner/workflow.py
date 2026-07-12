@@ -4,7 +4,13 @@ import json
 from pathlib import Path
 from typing import Any
 
-from quality_runner.artifacts import prepare_artifact_dir, write_json, write_text
+from quality_runner.artifacts import (
+    existing_artifact_dir,
+    prepare_artifact_dir,
+    safe_child_file,
+    write_json,
+    write_text,
+)
 from quality_runner.audit import build_audit_report
 from quality_runner.code_quality import (
     build_resolution_ledger,
@@ -320,6 +326,7 @@ def refresh_payload(
     total_timeout_seconds: int | None = None,
     total_timeout_reason: str | None = None,
     checkout_most_advanced_branch: bool = False,
+    execute_discovered_gates: bool = False,
     allow_mutating_gates: bool = False,
     worktree_mode: str = "in-place",
     allow_dirty_worktree_verify: bool = False,
@@ -349,6 +356,7 @@ def refresh_payload(
         total_timeout_seconds=total_timeout_seconds,
         total_timeout_reason=total_timeout_reason,
         checkout_most_advanced_branch=checkout_most_advanced_branch,
+        execute_discovered_gates=execute_discovered_gates,
         allow_mutating_gates=allow_mutating_gates,
         worktree_mode=worktree_mode,
         allow_dirty_worktree_verify=allow_dirty_worktree_verify,
@@ -394,8 +402,8 @@ def _attach_review_metadata(
     baseline_run_id: str | None,
     delta_paths: dict[str, str],
 ) -> None:
-    run_dir = repo_root / ".quality-runner" / "runs" / run_id
-    manifest_path = run_dir / "run-manifest.json"
+    run_dir = existing_artifact_dir(repo_root, run_id)
+    manifest_path = safe_child_file(run_dir, "run-manifest.json")
     if not manifest_path.exists():
         return
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))

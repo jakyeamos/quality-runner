@@ -169,8 +169,12 @@ def test_refresh_payload_persists_delta_and_manifest_metadata(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     _write_run(tmp_path, "task-001-pass-1-verify", [])
-    manifest_path = tmp_path / ".quality-runner" / "runs" / "task-001-pass-1-verify" / "run-manifest.json"
-    manifest_path.write_text(json.dumps({"schema": "quality-runner-run-manifest-v0.1"}), encoding="utf-8")
+    manifest_path = (
+        tmp_path / ".quality-runner" / "runs" / "task-001-pass-1-verify" / "run-manifest.json"
+    )
+    manifest_path.write_text(
+        json.dumps({"schema": "quality-runner-run-manifest-v0.1"}), encoding="utf-8"
+    )
 
     def fake_refresh(**_: object) -> dict[str, object]:
         return {

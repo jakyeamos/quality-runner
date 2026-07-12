@@ -38,15 +38,32 @@ def load_known_issues(repo_root: Path) -> list[KnownIssue]:
     return [_validate_issue(item) for item in issues]
 
 
-def accept_known_issue(repo_root: Path, *, fingerprint: str, summary: str, reason: str, owner: str) -> KnownIssue:
-    return _upsert(repo_root, {"fingerprint": fingerprint, "summary": summary, "status": "accepted", "reason": reason, "owner": owner})
+def accept_known_issue(
+    repo_root: Path, *, fingerprint: str, summary: str, reason: str, owner: str
+) -> KnownIssue:
+    return _upsert(
+        repo_root,
+        {
+            "fingerprint": fingerprint,
+            "summary": summary,
+            "status": "accepted",
+            "reason": reason,
+            "owner": owner,
+        },
+    )
 
 
 def edit_known_issue(repo_root: Path, issue_id: str, **changes: str) -> KnownIssue:
     issues = load_known_issues(repo_root)
     for issue in issues:
         if issue.get("id") == issue_id:
-            issue.update({key: value for key, value in changes.items() if key in {"summary", "reason", "owner", "status"}})
+            issue.update(
+                {
+                    key: value
+                    for key, value in changes.items()
+                    if key in {"summary", "reason", "owner", "status"}
+                }
+            )
             issue["updated_at"] = _now()
             _save(repo_root, issues)
             return issue
@@ -58,13 +75,21 @@ def remove_known_issue(repo_root: Path, issue_id: str) -> None:
     _save(repo_root, issues)
 
 
-def known_issue_findings(repo_root: Path, findings: Sequence[Mapping[str, object]]) -> list[dict[str, object]]:
-    accepted = {issue.get("fingerprint"): issue for issue in load_known_issues(repo_root) if issue.get("status") == "accepted"}
+def known_issue_findings(
+    repo_root: Path, findings: Sequence[Mapping[str, object]]
+) -> list[dict[str, object]]:
+    accepted = {
+        issue.get("fingerprint"): issue
+        for issue in load_known_issues(repo_root)
+        if issue.get("status") == "accepted"
+    }
     result: list[dict[str, object]] = []
     for finding in findings:
         fingerprint = finding.get("fingerprint")
         if isinstance(fingerprint, str) and fingerprint in accepted:
-            result.append({**finding, "classification": "known-accepted", "status": "known-accepted"})
+            result.append(
+                {**finding, "classification": "known-accepted", "status": "known-accepted"}
+            )
     return result
 
 
@@ -103,12 +128,19 @@ def finalize_cycle_state(
     for fingerprint, old in prior.items():
         if isinstance(fingerprint, str) and fingerprint not in current:
             entries.append({"fingerprint": fingerprint, "status": "resolved", "finding": dict(old)})
-    return {"schema": REVIEW_STATE_SCHEMA, "cycle_id": cycle_id, "active": False, "entries": entries}
+    return {
+        "schema": REVIEW_STATE_SCHEMA,
+        "cycle_id": cycle_id,
+        "active": False,
+        "entries": entries,
+    }
 
 
 def _upsert(repo_root: Path, issue: KnownIssue) -> KnownIssue:
     issues = load_known_issues(repo_root)
-    existing = next((item for item in issues if item.get("fingerprint") == issue["fingerprint"]), None)
+    existing = next(
+        (item for item in issues if item.get("fingerprint") == issue["fingerprint"]), None
+    )
     if existing is None:
         issue = {"id": f"issue-{len(issues) + 1}", **issue}
         issues.append(issue)
@@ -125,17 +157,28 @@ def _save(repo_root: Path, issues: Sequence[KnownIssue]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     if path.is_symlink():
         raise ValueError("known issues file must not be a symlink")
-    path.write_text(json.dumps({"schema": KNOWN_ISSUES_SCHEMA, "issues": list(issues)}, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    path.write_text(
+        json.dumps(
+            {"schema": KNOWN_ISSUES_SCHEMA, "issues": list(issues)}, indent=2, sort_keys=True
+        )
+        + "\n",
+        encoding="utf-8",
+    )
 
 
 def _validate_issue(value: object) -> KnownIssue:
-    if not isinstance(value, Mapping) or not all(isinstance(value.get(key), str) and value.get(key) for key in ("id", "fingerprint", "summary", "status")):
+    if not isinstance(value, Mapping) or not all(
+        isinstance(value.get(key), str) and value.get(key)
+        for key in ("id", "fingerprint", "summary", "status")
+    ):
         raise ValueError("known issue requires id, fingerprint, summary, and status")
     return dict(value)
 
 
 def _matches_path(path: str, patterns: Sequence[str]) -> bool:
-    return any(path == pattern or path.startswith(pattern.rstrip("/") + "/") for pattern in patterns)
+    return any(
+        path == pattern or path.startswith(pattern.rstrip("/") + "/") for pattern in patterns
+    )
 
 
 def _now() -> str:

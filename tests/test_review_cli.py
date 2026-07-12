@@ -91,6 +91,11 @@ def test_review_cli_reports_packet_only_json(tmp_path: Path) -> None:
     )
     payload = json.loads(result.stdout)
     assert payload["status"] == "review-not-run"
+    assert payload["outcome"] == "packet-ready"
+    assert payload["summary"].startswith("Review packet ready:")
+    assert "next_action" in payload
     assert payload["mode"] == "blind"
     assert payload["breadth"] == "related"
     assert "review_report_json" in payload["artifact_paths"]
+    assert payload["report"]["summary"].startswith("Review packet ready:")
+    assert payload["report"]["findings"] == []

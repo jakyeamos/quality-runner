@@ -5,6 +5,7 @@ from importlib.resources import files
 from pathlib import Path
 from typing import Any
 
+from quality_runner.artifacts import prepare_safe_directory
 from quality_runner.cli_status import export_handoff_payload
 from quality_runner.controller_reports import lint_controller_report
 from quality_runner.workflow import refresh_payload
@@ -13,8 +14,11 @@ RELEASE_SMOKE_SCHEMA = "quality-runner-release-smoke-result-v0.1"
 
 
 def release_smoke_payload(*, work_dir: Path | None, help_text: str) -> dict[str, Any]:
-    root = work_dir.expanduser().resolve() if work_dir is not None else Path(tempfile.mkdtemp())
-    root.mkdir(parents=True, exist_ok=True)
+    root = (
+        prepare_safe_directory(work_dir)
+        if work_dir is not None
+        else Path(tempfile.mkdtemp()).resolve()
+    )
     repo_root = root / "sample-repo"
     _write_sample_repo(repo_root)
 

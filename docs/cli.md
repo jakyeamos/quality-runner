@@ -126,17 +126,20 @@ terminal action is recorded. For `record-disposition`, pass `--finding-id`,
 
 ### Disposable worktree verification
 
-`verify-gates` and `refresh` accept:
+Discovered commands are evidence-only by default. To run them, callers must
+supply both `--execute-gates` and `--worktree-mode disposable`. An execution
+request with `in-place` mode is rejected. Disposable mode verifies `HEAD` in a
+separate checkout and removes that checkout afterward; it protects the ordinary
+source worktree from normal gate mutations, but it is not a host sandbox for an
+arbitrary authorized command.
 
-- `--worktree-mode in-place` (default): execute gates in the target repository
-- `--worktree-mode disposable`: execute gates in a detached git worktree at
-  `HEAD`, write artifacts to the original repo, and discard the worktree
-- `--allow-dirty-worktree-verify`: permit disposable verification when the
-  source worktree has local edits
+`--allow-dirty-worktree-verify` permits a disposable verification against
+`HEAD` while retaining local source edits. It does not verify those edits.
 
 ```bash
 quality-runner verify-gates /path/to/repo \
   --run-id verify-disposable \
+  --execute-gates \
   --worktree-mode disposable \
   --allow-dirty-worktree-verify \
   --json
@@ -201,15 +204,17 @@ Writes:
 
 ## `quality-runner verify-gates`
 
-Executes discovered command-backed repo gates and records local pass/fail
-evidence without applying remediation. JavaScript package scripts execute
-through the detected package manager, and CI-only gates without a local executor
-are reported as skipped. File/evidence capabilities such as a truth file are
-kept in the capability matrix but do not block executable gate verification.
+Records discovered command-backed gates and their execution plan without
+applying remediation. By default every executable gate is skipped with
+`execution-consent-required`; this is a blocked evidence state, not a command
+failure. CI-only and file/evidence capabilities remain non-executable evidence.
+When explicitly authorized in disposable mode, JavaScript package scripts run
+through the detected package manager.
 
 ```bash
 quality-runner verify-gates /path/to/repo --run-id verify-001 --json
 quality-runner verify-gates /path/to/repo --timeout-seconds 300 --json
+quality-runner verify-gates /path/to/repo --execute-gates --worktree-mode disposable --json
 ```
 
 Repos can override individual gate timeouts in `.quality-runner.toml`:
@@ -219,6 +224,10 @@ Repos can override individual gate timeouts in `.quality-runner.toml`:
 tests = 300
 pre_cr = 600
 ```
+
+Configured `[[quality_runner.gates]]` may set `mutating_risk` to `safe`,
+`unknown`, or `mutating`. Under `--read-only-gates`, `unknown` and `mutating`
+gates stay skipped unless `--allow-mutating-gates` is also explicit.
 
 Possible verification statuses include `passed`, `passed-with-findings`,
 `failed`, `blocked`, and `skipped-nonlocal`.
@@ -230,6 +239,7 @@ Writes:
 - `package-manager-preflight.json`
 - `standards.json`
 - `capability-matrix.json`
+- `gate-execution-plan.json`
 - `gate-verification.json`
 - `quality-audit.json`
 - `remediation-plan.json`
@@ -240,13 +250,15 @@ Writes:
 
 ## `quality-runner refresh`
 
-Runs `inspect`, `run`, read-only `verify-gates`, and `summarize-run` as one
-controller-friendly workflow.
+Runs `inspect`, `run`, `verify-gates`, and `summarize-run` as one
+controller-friendly workflow. Its default verification is evidence-only; use
+the same explicit disposable-execution pair when command proof is required.
 
 ```bash
 quality-runner refresh /path/to/repo --run-id-prefix refresh-001 --handoff-output handoff.md --json
 quality-runner refresh /path/to/repo --run-id-prefix refresh-001 --verify-timeout-seconds 300 --json
 quality-runner refresh /path/to/repo --run-id-prefix refresh-001 --total-timeout-seconds 900 --json
+quality-runner refresh /path/to/repo --run-id-prefix refresh-001 --execute-gates --worktree-mode disposable --json
 ```
 
 Use `--handoff-output` for the normal single-repo workflow where the scan and
@@ -273,7 +285,8 @@ When a timeout fires, `workflow-timeout.json`, the verify result, and
 
 Agent handoffs from refresh use `quality-runner-agent-handoff-v0.2` and route
 verified gate outcomes with `gates-clean`, `gates-blocked`, and `gates-failed`.
-Blocked and failed handoffs include `gate_verification.blocker_groups` and
+Default command-backed gates are classified as `execution-consent-required` and
+surface in `gates-blocked` until explicit execution is authorized. Blocked and failed handoffs include `gate_verification.blocker_groups` and
 `next_slice.action_groups` so controllers can distinguish dependency setup,
 environment restrictions, read-only policy blockers, and executable gate
 failures before launching the next worker.
@@ -310,16 +323,17 @@ Repo list formats:
 - JSON: `["/path/to/repo", {"repo_path": "/path", "baseline_run_id": "..."}]`
 - repeated CLI entries: `--repo /path/one --repo /path/two`
 
-By default, rollout preserves the read-only refresh policy and does not pass
-`--allow-mutating-gates`. Each repo still writes its normal `.quality-runner/`
+By default, rollout preserves evidence-only refresh verification. To execute
+gates across the list, pass `--execute-gates --worktree-mode disposable`; each
+repo still writes its normal `.quality-runner/`
 run artifacts, while the controller output directory receives:
 
 - `rollout-ledger.json`
 - `<index>-<repo>-controller-report.json`
 - `<index>-<repo>-controller-report-validation.json`
 
-Use `--allow-mutating-gates` only when the controller explicitly accepts source
-mutation risk for the whole repo list. Invalid repo paths and refresh exceptions
+`--allow-mutating-gates` is an advanced compatibility flag, not execution
+authorization. Invalid repo paths and refresh exceptions
 are recorded as rejected or blocked controller artifacts, and the rollout
 continues to the remaining repos.
 
@@ -535,7 +549,9 @@ repo-quality-certifier doc-quality --repo-root /path/to/repo --run-id certify-00
 
 The command writes gate-certification artifacts to
 `AIOS-backfill/gate-adoption/<run-id>` by default, matching the historical
-contract used by existing callers.
+contract used by existing callers. Run ids and generated output paths are
+validated; explicit output directories are never followed through symlinks, and
+the compatibility command does not edit Git ignore configuration.
 
 ## Exit Behavior
 
@@ -564,8 +580,8 @@ The command defaults to `--mode task`, `--scope project`, and project breadth
 Quality Runner suggests blind mode when it is absent.
 
 Human and JSON output expose mode, scope, breadth, adapter status, severity
-counts, evidence limitations, and saved artifact paths. The no-issue message is
-qualified: no major issues from available evidence does not prove end-to-end
-correctness. Quality Runner remains local and read-only; a missing adapter is
-`review-not-run`, not a completed review. Saved output includes
-`review-agent-packet.md` and `review-fix-prompts.md` for separate agents.
+counts, evidence limitations, and saved artifact paths. A completed review with
+no findings uses the qualified no-issue message. A missing adapter instead
+returns `review-not-run` with `outcome: packet-ready` and `next_action`; it is
+not a completed review and does not produce finding-specific fix prompts.
+Saved output includes `review-agent-packet.md` for the next reviewer.

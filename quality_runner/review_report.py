@@ -9,8 +9,10 @@ SEVERITIES = ("critical", "high", "medium", "low")
 CLASSIFICATIONS = ("confirmed", "suspected", "not-enough-evidence", "known-accepted")
 CONFIDENCES = ("high", "medium", "low")
 ADAPTER_STATUSES = ("review-complete", "review-not-run", "malformed-output", "permission-denied")
-NO_ISSUE_CAVEAT = (
-    "No major issues found from available evidence, but this does not prove the feature works end-to-end."
+NO_ISSUE_CAVEAT = "No major issues found from available evidence, but this does not prove the feature works end-to-end."
+PACKET_READY_SUMMARY = "Review packet ready: no review was run. Send the packet to a reviewer, then rerun with --adapter-output."
+INCOMPLETE_REVIEW_SUMMARY = (
+    "Review did not complete; no finding conclusion can be drawn from this result."
 )
 
 
@@ -54,13 +56,23 @@ def build_review_report(
     if mode in {"task", "combined"} and not task_provenance:
         raise ValueError("task provenance is required for task and combined reports")
     normalized = [_normalize_finding(finding) for finding in findings]
-    counts = {severity: sum(item["severity"] == severity for item in normalized) for severity in SEVERITIES}
+    if adapter_status != "review-complete" and normalized:
+        raise ValueError("findings require a review-complete adapter status")
+    counts = {
+        severity: sum(item["severity"] == severity for item in normalized)
+        for severity in SEVERITIES
+    }
     summary = (
         f"Review complete: {counts['critical']} critical, {counts['high']} high, "
         f"{counts['medium']} medium issues found."
     )
     if not normalized:
-        summary = NO_ISSUE_CAVEAT
+        if adapter_status == "review-complete":
+            summary = NO_ISSUE_CAVEAT
+        elif adapter_status == "review-not-run":
+            summary = PACKET_READY_SUMMARY
+        else:
+            summary = INCOMPLETE_REVIEW_SUMMARY
     sections = _sections(normalized, mode=mode)
     return {
         "schema": "quality-runner-review-report-v0.1",
@@ -160,7 +172,9 @@ def _sections(findings: Sequence[ReviewFinding], *, mode: str) -> dict[str, list
 
 
 def _string_list(value: object, field: str) -> list[str]:
-    if not isinstance(value, list) or not all(isinstance(item, str) and item.strip() for item in value):
+    if not isinstance(value, list) or not all(
+        isinstance(item, str) and item.strip() for item in value
+    ):
         raise ValueError(f"finding requires non-empty string list for {field}")
     return [item.strip() for item in value]
 

@@ -21,8 +21,8 @@ from quality_runner.cli_gate import (
 )
 from quality_runner.cli_handoff import handoff_command_payload
 from quality_runner.cli_refresh import refresh_command_payload
-from quality_runner.cli_rollout import rollout_command_payload
 from quality_runner.cli_review import review_command_payload
+from quality_runner.cli_rollout import rollout_command_payload
 from quality_runner.cli_skills import skill_command_payload
 from quality_runner.cli_status import export_handoff_payload, status_payload
 from quality_runner.code_quality import preview_ignored_paths
@@ -80,7 +80,7 @@ def payload_for_args(args: argparse.Namespace) -> dict[str, Any]:
         return export_handoff_payload(
             repo_root=_validated_repo_path(args.repo_path),
             run_id=args.run_id,
-            output_path=Path(args.output).expanduser().resolve() if args.output else None,
+            output_path=Path(args.output).expanduser() if args.output else None,
         )
     if args.command in {"validate-skill-review", "skill"}:
         return skill_command_payload(args, validated_repo_path=_validated_repo_path)
@@ -119,6 +119,7 @@ def payload_for_args(args: argparse.Namespace) -> dict[str, Any]:
             ci_status_json=Path(args.ci_status_json) if args.ci_status_json else None,
             timeout_seconds=args.timeout_seconds,
             checkout_most_advanced_branch=args.checkout_most_advanced_branch,
+            execute_discovered_gates=getattr(args, "execute_gates", False),
             read_only_gates=args.read_only_gates,
             allow_mutating_gates=args.allow_mutating_gates,
             worktree_mode=args.worktree_mode,

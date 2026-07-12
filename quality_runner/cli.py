@@ -15,8 +15,8 @@ from quality_runner.cli_gate import add_gate_commands
 from quality_runner.cli_handoff import add_handoff_commands
 from quality_runner.cli_human_summary import human_summary
 from quality_runner.cli_payload import payload_for_args
-from quality_runner.cli_rollout import add_rollout_command
 from quality_runner.cli_review import add_review_command
+from quality_runner.cli_rollout import add_rollout_command
 from quality_runner.cli_skills import add_skill_commands
 from quality_runner.cli_workflow_args import add_workflow_arguments, add_worktree_verify_arguments
 from quality_runner.standards import DEFAULT_PROFILE
@@ -36,7 +36,9 @@ def build_parser() -> argparse.ArgumentParser:
     inspect_parser = subparsers.add_parser("inspect", help="Inspect a repo without audit planning")
     add_workflow_arguments(inspect_parser)
 
-    verify_parser = subparsers.add_parser("verify-gates", help="Execute discovered repo gates")
+    verify_parser = subparsers.add_parser(
+        "verify-gates", help="Record discovered gates and optionally execute them"
+    )
     add_workflow_arguments(verify_parser)
     verify_parser.add_argument(
         "--timeout-seconds",
@@ -48,6 +50,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--read-only-gates",
         action="store_true",
         help="Skip gates that are known or likely to mutate source files",
+    )
+    verify_parser.add_argument(
+        "--execute-gates",
+        action="store_true",
+        help="Execute discovered repository commands in a disposable worktree",
     )
     verify_parser.add_argument(
         "--allow-mutating-gates",
@@ -64,7 +71,7 @@ def build_parser() -> argparse.ArgumentParser:
             "Use --handoff-output to write a remediation handoff in the same command.\n\n"
             "Refresh emits gate handoff statuses for controller routing:\n"
             "  gates-clean    all discovered local gates passed\n"
-            "  gates-blocked  environment, dependency setup, or read-only policy blocked evidence\n"
+            "  gates-blocked  execution consent, environment, dependency setup, or read-only policy blocked evidence\n"
             "  gates-failed   executable repo gates ran and failed\n\n"
             "Blocked and failed handoffs include gate_verification.blocker_groups and\n"
             "next_slice.action_groups. Use --total-timeout-reason to record why a\n"
@@ -132,6 +139,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--allow-mutating-gates",
         action="store_true",
         help="Allow known or suspected mutating gates to execute during refresh",
+    )
+    refresh_parser.add_argument(
+        "--execute-gates",
+        action="store_true",
+        help="Execute discovered repository commands in a disposable worktree during refresh",
     )
     add_worktree_verify_arguments(refresh_parser)
     refresh_parser.add_argument(

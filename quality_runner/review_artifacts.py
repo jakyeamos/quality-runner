@@ -65,6 +65,9 @@ def render_review_markdown(report: Mapping[str, object]) -> str:
     lines.extend(_metadata_section("Evidence used", report.get("evidence_used")))
     lines.extend(_metadata_section("Evidence unavailable", report.get("evidence_unavailable")))
     lines.extend(_metadata_section("Exclusions", report.get("exclusions")))
+    next_action = report.get("next_action")
+    if isinstance(next_action, str) and next_action:
+        lines.extend(["## Next action", "", next_action, ""])
     sections = report.get("sections")
     sections_map = sections if isinstance(sections, Mapping) else {}
     for key, title in SECTION_TITLES:
@@ -100,6 +103,12 @@ def render_fix_prompts(report: Mapping[str, object]) -> str:
     ]
     findings = report.get("findings")
     if not isinstance(findings, Sequence) or isinstance(findings, (str, bytes)) or not findings:
+        if report.get("adapter_status") != "review-complete":
+            lines.append("No fixing prompts were generated because a review did not complete.")
+            next_action = report.get("next_action")
+            if isinstance(next_action, str) and next_action:
+                lines.append(next_action)
+            return "\n".join(lines).rstrip() + "\n"
         lines.append("No finding-specific prompts were generated.")
         return "\n".join(lines).rstrip() + "\n"
     for finding in findings:

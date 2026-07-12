@@ -49,29 +49,52 @@ def _mutating_gate_toml(command: str) -> str:
             'owner = "qa"',
             "required = true",
             'severity = "blocker"',
+            'mutating_risk = "mutating"',
             "",
         ]
     )
 
 
-def test_disposable_worktree_runs_mutating_gate_without_touching_dirty_source(
+def _commit_path(repo: Path, path: str, message: str) -> None:
+    subprocess.run(["git", "add", path], cwd=repo, check=True)
+    subprocess.run(
+        [
+            "git",
+            "-c",
+            "user.email=quality-runner@example.com",
+            "-c",
+            "user.name=Quality Runner",
+            "commit",
+            "-m",
+            message,
+        ],
+        cwd=repo,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+
+def test_disposable_worktree_skips_mutating_gate_under_read_only_policy(
     tmp_path: Path,
 ) -> None:
     from quality_runner.workflow import verify_gates_payload
 
     _init_git_repo(tmp_path)
-    tracked = tmp_path / "tracked.txt"
-    tracked.write_text("dirty working copy\n", encoding="utf-8")
     command = (
         f"{sys.executable} -c "
         "\"from pathlib import Path; Path('tracked.txt').write_text('mutated\\\\n')\""
     )
     (tmp_path / ".quality-runner.toml").write_text(_mutating_gate_toml(command), encoding="utf-8")
+    _commit_path(tmp_path, ".quality-runner.toml", "Gate fixture")
+    tracked = tmp_path / "tracked.txt"
+    tracked.write_text("dirty working copy\n", encoding="utf-8")
 
     payload = verify_gates_payload(
         repo_root=tmp_path,
         run_id="disposable-mutating",
         read_only_gates=True,
+        execute_discovered_gates=True,
         worktree_mode="disposable",
         allow_dirty_worktree_verify=True,
     )
@@ -83,8 +106,33 @@ def test_disposable_worktree_runs_mutating_gate_without_touching_dirty_source(
     assert verification["verification_context"]["dirty_source_worktree"] is True
     assert not (tmp_path / ".quality-runner" / "worktrees" / "disposable-mutating").exists()
     gate = verification["gates"][0]
-    assert gate["status"] == "passed"
-    assert gate.get("skip_type") != "mutating-gate-not-run"
+    assert gate["status"] == "skipped"
+    assert gate["skip_type"] == "mutating-gate-not-run"
+
+
+def test_disposable_worktree_runs_mutating_gate_when_explicitly_allowed(tmp_path: Path) -> None:
+    from quality_runner.workflow import verify_gates_payload
+
+    _init_git_repo(tmp_path)
+    command = (
+        f"{sys.executable} -c "
+        "\"from pathlib import Path; Path('tracked.txt').write_text('mutated\\\\n')\""
+    )
+    (tmp_path / ".quality-runner.toml").write_text(_mutating_gate_toml(command), encoding="utf-8")
+    _commit_path(tmp_path, ".quality-runner.toml", "Gate fixture")
+
+    payload = verify_gates_payload(
+        repo_root=tmp_path,
+        run_id="disposable-allowed-mutating",
+        read_only_gates=True,
+        allow_mutating_gates=True,
+        execute_discovered_gates=True,
+        worktree_mode="disposable",
+    )
+    verification = json.loads(Path(payload["artifact_paths"]["gate_verification_json"]).read_text())
+
+    assert (tmp_path / "tracked.txt").read_text(encoding="utf-8") == "original\n"
+    assert verification["gates"][0]["status"] == "passed"
 
 
 def test_disposable_worktree_refuses_dirty_repo_without_override(tmp_path: Path) -> None:
@@ -101,6 +149,7 @@ def test_disposable_worktree_refuses_dirty_repo_without_override(tmp_path: Path)
         verify_gates_payload(
             repo_root=tmp_path,
             run_id="dirty-refused",
+            execute_discovered_gates=True,
             worktree_mode="disposable",
         )
 
@@ -114,6 +163,7 @@ def test_disposable_worktree_requires_git_repo(tmp_path: Path) -> None:
         verify_gates_payload(
             repo_root=tmp_path,
             run_id="not-git",
+            execute_discovered_gates=True,
             worktree_mode="disposable",
         )
 
@@ -153,3 +203,19 @@ def test_in_place_verification_context_is_recorded(tmp_path: Path) -> None:
 
     assert verification["verification_context"]["worktree_mode"] == "in-place"
     assert verification["verification_context"]["mutations_isolated"] is False
+    assert verification["gates"][0]["skip_type"] == "execution-consent-required"
+
+    with pytest.raises(ValueError, match="requires --worktree-mode disposable"):
+        verify_gates_payload(
+            repo_root=tmp_path,
+            run_id="in-place-execution-refused",
+            execute_discovered_gates=True,
+            worktree_mode="in-place",
+        )
+
+    with pytest.raises(ValueError, match="must be in-place or disposable"):
+        verify_gates_payload(
+            repo_root=tmp_path,
+            run_id="invalid-mode-refused",
+            worktree_mode="not-a-mode",
+        )

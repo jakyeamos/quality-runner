@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from typing import Any
 
@@ -149,3 +150,23 @@ def test_example_slice_spec_passes_lint() -> None:
     example = Path(__file__).resolve().parents[1] / "docs/examples/slice-spec-structural-harden.md"
     result = validate_slice_spec_content(example.read_text(encoding="utf-8"))
     assert result["passed"] is True, result["errors"]
+
+
+def test_export_slice_specs_rejects_path_traversal_in_plan_slice_id(tmp_path: Path) -> None:
+    from quality_runner.artifacts import prepare_artifact_dir
+    from quality_runner.slice_specs import export_slice_specs_payload
+
+    run_dir = prepare_artifact_dir(tmp_path, "slice-export")
+    (run_dir / "remediation-plan.json").write_text(
+        json.dumps({"slices": [{"id": "../escaped", "title": "Unsafe"}]}),
+        encoding="utf-8",
+    )
+
+    try:
+        export_slice_specs_payload(repo_root=tmp_path, run_id="slice-export")
+    except ValueError as error:
+        assert str(error) == "slice_id must be a non-empty single path segment"
+    else:
+        raise AssertionError("slice spec export accepted a traversal slice ID")
+
+    assert not (tmp_path / "escaped.md").exists()

@@ -7,6 +7,7 @@ import uuid
 from pathlib import Path
 from typing import Any
 
+from quality_runner.artifacts import validate_run_id
 from repo_quality_certifier.core import (
     build_gate_matrix,
     build_gate_rollout_plan,
@@ -39,6 +40,7 @@ def build_plan_payload(
     output_dir: Path | None = None,
 ) -> dict[str, Any]:
     repo_root = repo_root.expanduser().resolve()
+    validate_run_id(run_id)
     scan = scan_repo_gate_facts(repo_root, run_id=run_id)
     gate_matrix = build_gate_matrix(scan=scan, run_id=run_id)
     enrichment = build_tmcp_expert_enrichment(
@@ -58,9 +60,7 @@ def build_plan_payload(
         rubric_pack=rubric_pack,
     )
     artifact_dir = (
-        output_dir.expanduser().resolve()
-        if output_dir
-        else gate_adoption_output_dir(repo_root, run_id)
+        output_dir.expanduser() if output_dir else gate_adoption_output_dir(repo_root, run_id)
     )
     paths = write_gate_adoption_artifacts(
         output_dir=artifact_dir,

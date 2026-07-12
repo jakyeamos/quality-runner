@@ -43,6 +43,37 @@ jobs:
       - name: Build package
         run: uv build
 
+      - name: Verify tag, wheel, runtime, plugin, and citation versions
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          RELEASE_VERSION: ${{ github.ref_name }}
+        run: |
+          RELEASE_VERSION="${RELEASE_VERSION#v}"
+          python - "$RELEASE_VERSION" <<'PY'
+          import json
+          import sys
+          import zipfile
+          from email.parser import BytesParser
+          from pathlib import Path
+
+          expected = sys.argv[1]
+          wheel = next(Path("dist").glob("quality_runner-*.whl"))
+          with zipfile.ZipFile(wheel) as archive:
+              metadata_path = next(
+                  name for name in archive.namelist() if name.endswith(".dist-info/METADATA")
+              )
+              metadata = BytesParser().parsebytes(archive.read(metadata_path))
+              manifest = json.loads(archive.read("quality_runner/plugin/manifest.json"))
+          citation = Path("CITATION.cff").read_text(encoding="utf-8")
+          assert metadata["Version"] == expected, (metadata["Version"], expected)
+          assert manifest["version"] == expected, (manifest["version"], expected)
+          assert f'version: "{expected}"' in citation
+          PY
+          python -m venv .release-version-check
+          .release-version-check/bin/python -m pip install --no-deps dist/*.whl
+          test "$(.release-version-check/bin/quality-runner --version)" = "$RELEASE_VERSION"
+          test "$(.release-version-check/bin/quality-runner-mcp --version)" = "$RELEASE_VERSION"
+
       - name: Publish to PyPI
         if: startsWith(github.ref, 'refs/tags/')
         uses: pypa/gh-action-pypi-publish@release/v1

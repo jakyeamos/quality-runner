@@ -203,9 +203,11 @@ an external agent or human applies changes and reruns Quality Runner.
 
 ## Gate Verification Artifacts
 
-`quality-runner verify-gates` executes discovered command-backed capabilities,
-skips CI-only capabilities that have no local executor, skips non-executable
-file/evidence capabilities without blocking, and writes:
+`quality-runner verify-gates` records discovered command-backed capabilities,
+their execution plan, and their evidence state. By default it does not execute
+commands: executable gates carry `skip_type: execution-consent-required` and
+the run is blocked pending authorization. CI-only and file/evidence capabilities
+remain non-executable evidence.
 
 - `repo-scan.json`
 - `code-quality-scan.json`
@@ -214,6 +216,8 @@ file/evidence capabilities without blocking, and writes:
 - `capability-matrix.json`: updated so locally executed gates have
   `verification_state.execution = "local-executed"` and result `passed` or
   `failed`.
+- `gate-execution-plan.json`: the discovered command, working directory,
+  mutation risk, timeout, and whether execution needs consent.
 - `gate-verification.json`: per-gate command, source, exit code, duration,
   timeout, capability kind, bounded stdout/stderr tail fields, skipped reason,
   failure type, recommended environment action, and status.
@@ -224,24 +228,17 @@ file/evidence capabilities without blocking, and writes:
 - `agent-handoff.md`
 - `run-manifest.json`
 
-When `read_only_gates` is active, QR snapshots the tracked git diff before each
-executed local command. If a safe-looking command mutates tracked files, QR
-restores the pre-gate tracked diff, marks the gate with
-`failure_type=read-only-mutation`, and classifies the run as a
-`read-only-gate-blocker`.
-
-`verify-gates` and `refresh` accept `--worktree-mode in-place|disposable`.
-Disposable mode creates a detached git worktree at the current `HEAD` under
-`.quality-runner/worktrees/<run-id>/`, executes gates inside that isolated copy,
-writes QR artifacts to the original repository, and removes the worktree when
-verification completes. Gate results record `verification_context` on
+Execution requires both `--execute-gates` and `--worktree-mode disposable`.
+The disposable checkout is created at `HEAD`, QR writes artifacts to the
+original repository, and the checkout is removed after verification. It avoids
+ordinary source-worktree mutations but does not sandbox an explicitly
+authorized command. Gate results record `verification_context` on
 `gate-verification.json` with `worktree_mode`, `base_head`, `execution_root`,
 `mutations_isolated`, and optional `dirty_source_worktree`.
 
 Disposable mode refuses a dirty source worktree unless
-`--allow-dirty-worktree-verify` is set. In disposable mode, mutating gates may
-run inside the isolated worktree even when `read_only_gates` is active, because
-the user's working tree is not mutated.
+`--allow-dirty-worktree-verify` is set; that opt-in verifies `HEAD`, not the
+local edits. An in-place execution request is rejected.
 
 This command is intentionally separate from `inspect` and `run` so capability
 discovery, command execution, and command pass/fail are distinguishable. For
@@ -324,9 +321,14 @@ to consume between iterations; Quality Runner does not apply their fixes.
 Quality Runner rejects:
 
 - unsafe run ids
-- symlinked `.quality-runner`, `runs`, or run-directory components before writes
-- symlinked artifact leaf files before writes
-- symlinked handoff export paths before reads
+- symlinked artifact namespace components and leaf files before artifact reads
+  or writes, including status, export, summarization, review, and gate surfaces
+- symlinked ancestors or leaf files on explicit handoff and report outputs
+- unsafe compatibility-certifier run ids, rubric ids, or output directories
+
+Use a real, non-symlinked output path for explicit exports and rollout reports.
+For example, place an export below the target repo's `.quality-runner/` folder
+instead of using an operating-system path that resolves through a symlink.
 
 By default, Quality Runner v1 does not edit files outside its artifact
 directory. `inspect` and `run` can explicitly switch branches first with
@@ -410,5 +412,7 @@ not compare prior review documents; comparison and resolution classification
 occur only during final cycle summarization. Known issues are stored locally in
 `.quality-runner/known-issues.json`, remain visible as known-accepted findings,
 and can trigger explicit re-verification after major changes. No adapter yields
-a packet-only `review-not-run` result. All review artifacts and state are local;
-Quality Runner does not edit source files or call remote services.
+`review-not-run` with `outcome: packet-ready` and a next action, not a finding
+conclusion; its fix-prompts artifact records that no review completed. All review
+artifacts and state are local; Quality Runner does not edit source files or call
+remote services.

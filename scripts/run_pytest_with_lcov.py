@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import sys
 import trace
 from pathlib import Path
@@ -10,12 +11,31 @@ import pytest
 ROOT = Path(__file__).resolve().parents[1]
 OUTPUT = ROOT / ".pre-cr" / "coverage.lcov"
 PACKAGE_ROOT = ROOT / "quality_runner"
+GIT_LOCAL_ENV_VARS = (
+    "GIT_ALTERNATE_OBJECT_DIRECTORIES",
+    "GIT_CONFIG",
+    "GIT_CONFIG_PARAMETERS",
+    "GIT_CONFIG_COUNT",
+    "GIT_OBJECT_DIRECTORY",
+    "GIT_DIR",
+    "GIT_WORK_TREE",
+    "GIT_IMPLICIT_WORK_TREE",
+    "GIT_GRAFT_FILE",
+    "GIT_INDEX_FILE",
+    "GIT_NO_REPLACE_OBJECTS",
+    "GIT_REPLACE_REF_BASE",
+    "GIT_PREFIX",
+    "GIT_SHALLOW_FILE",
+    "GIT_COMMON_DIR",
+)
 
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 
 def main() -> int:
+    for name in GIT_LOCAL_ENV_VARS:
+        os.environ.pop(name, None)
     tracer = trace.Trace(count=True, trace=False, ignoredirs=[])
     exit_code = tracer.runfunc(pytest.main, ["-q"])
     write_lcov(tracer.results().counts)

@@ -36,15 +36,28 @@ def test_mcp_doctor_reports_ready_without_implementation_permission() -> None:
 
 
 def test_mcp_review_blind_mode_is_packet_only(tmp_path: Path) -> None:
-    result = call_tool("quality_runner_review", {"repo_root": str(tmp_path), "mode": "blind", "run_id": "mcp-review"})
+    result = call_tool(
+        "quality_runner_review",
+        {"repo_root": str(tmp_path), "mode": "blind", "run_id": "mcp-review"},
+    )
     assert result["isError"] is False
     structured = result["structuredContent"]
     assert structured["status"] == "review-not-run"
+    assert structured["outcome"] == "packet-ready"
+    assert structured["summary"].startswith("Review packet ready:")
+    assert "next_action" in structured
     assert structured["breadth"] == "related"
 
 
 def test_mcp_review_missing_task_is_invalid_params(tmp_path: Path) -> None:
-    response = handle_jsonrpc_message({"jsonrpc": "2.0", "id": 4, "method": "tools/call", "params": {"name": "quality_runner_review", "arguments": {"repo_root": str(tmp_path)}}})
+    response = handle_jsonrpc_message(
+        {
+            "jsonrpc": "2.0",
+            "id": 4,
+            "method": "tools/call",
+            "params": {"name": "quality_runner_review", "arguments": {"repo_root": str(tmp_path)}},
+        }
+    )
     assert response is not None
     assert response["error"]["code"] == -32602
 

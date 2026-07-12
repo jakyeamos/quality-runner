@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import shlex
 import subprocess
 import sys
 from pathlib import Path
@@ -245,6 +246,8 @@ def test_cli_verify_gates_json_executes_discovered_gates(tmp_path: Path) -> None
         '[quality_runner]\nrequired_capabilities = ["lint"]\n',
         encoding="utf-8",
     )
+    _git(tmp_path, "init")
+    _git_commit_all(tmp_path, "fixture")
 
     result = subprocess.run(
         [
@@ -255,6 +258,9 @@ def test_cli_verify_gates_json_executes_discovered_gates(tmp_path: Path) -> None
             str(tmp_path),
             "--run-id",
             "cli-verify-gates",
+            "--execute-gates",
+            "--worktree-mode",
+            "disposable",
             "--json",
         ],
         cwd=ROOT,
@@ -269,6 +275,85 @@ def test_cli_verify_gates_json_executes_discovered_gates(tmp_path: Path) -> None
     assert payload["schema"] == "quality-runner-verify-gates-result-v0.1"
     assert payload["status"] == "passed"
     assert verification["gates"][0]["status"] == "passed"
+
+
+def test_cli_verify_gates_requires_explicit_execution_consent(tmp_path: Path) -> None:
+    sentinel = tmp_path / "sentinel.txt"
+    program = f"from pathlib import Path; Path({str(sentinel)!r}).write_text('ran')"
+    (tmp_path / "package.json").write_text(
+        json.dumps({"scripts": {"lint": f"{sys.executable} -c {shlex.quote(program)}"}}),
+        encoding="utf-8",
+    )
+    (tmp_path / ".quality-runner.toml").write_text(
+        '[quality_runner]\nrequired_capabilities = ["lint"]\n',
+        encoding="utf-8",
+    )
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "quality_runner",
+            "verify-gates",
+            str(tmp_path),
+            "--run-id",
+            "cli-consent-required",
+            "--json",
+        ],
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+    payload = json.loads(result.stdout)
+    verification = json.loads(Path(payload["artifact_paths"]["gate_verification_json"]).read_text())
+
+    assert payload["status"] == "blocked"
+    assert verification["execute_discovered_gates"] is False
+    assert verification["gates"][0]["skip_type"] == "execution-consent-required"
+    assert not sentinel.exists()
+
+
+def test_cli_verify_gates_rejects_execution_in_the_source_worktree(tmp_path: Path) -> None:
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "quality_runner",
+            "verify-gates",
+            str(tmp_path),
+            "--execute-gates",
+            "--json",
+        ],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 1
+    assert "requires --worktree-mode disposable" in result.stderr
+
+
+def test_cli_rollout_rejects_execution_without_disposable_worktrees(tmp_path: Path) -> None:
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "quality_runner",
+            "rollout",
+            "--repo",
+            str(tmp_path),
+            "--execute-gates",
+            "--json",
+        ],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 1
+    assert "requires --worktree-mode disposable" in result.stderr
 
 
 def test_cli_refresh_help_names_statuses_action_groups_and_timeout_reasons() -> None:
@@ -459,6 +544,8 @@ def test_cli_status_reports_latest_verify_gate_failure(tmp_path: Path) -> None:
         '[quality_runner]\nrequired_capabilities = ["lint"]\n',
         encoding="utf-8",
     )
+    _git(tmp_path, "init")
+    _git_commit_all(tmp_path, "fixture")
     subprocess.run(
         [
             sys.executable,
@@ -468,6 +555,9 @@ def test_cli_status_reports_latest_verify_gate_failure(tmp_path: Path) -> None:
             str(tmp_path),
             "--run-id",
             "cli-status-verify",
+            "--execute-gates",
+            "--worktree-mode",
+            "disposable",
             "--json",
         ],
         cwd=ROOT,
@@ -607,7 +697,7 @@ def test_cli_refresh_runs_read_only_sequence_and_persists_summary(
     assert payload["runs"]["inspect"]["run_id"] == "cli-refresh-inspect"
     assert payload["runs"]["run"]["run_id"] == "cli-refresh-run"
     assert payload["runs"]["verify"]["run_id"] == "cli-refresh-verify"
-    assert payload["summary"]["recommended_classification"] == "read-only-gate-blocker"
+    assert payload["summary"]["recommended_classification"] == "execution-consent-required"
     persisted = tmp_path / ".quality-runner" / "runs" / "cli-refresh-verify" / "run-summary.json"
     assert json.loads(persisted.read_text(encoding="utf-8"))["run_id"] == "cli-refresh-verify"
 
@@ -690,6 +780,8 @@ def test_cli_refresh_workflow_timeout_records_reason(tmp_path: Path) -> None:
         '[quality_runner]\nrequired_capabilities = ["tests"]\n',
         encoding="utf-8",
     )
+    _git(tmp_path, "init")
+    _git_commit_all(tmp_path, "fixture")
 
     result = subprocess.run(
         [
@@ -706,6 +798,9 @@ def test_cli_refresh_workflow_timeout_records_reason(tmp_path: Path) -> None:
             "1",
             "--workflow-timeout-reason",
             "controller deadline exceeded during verify",
+            "--execute-gates",
+            "--worktree-mode",
+            "disposable",
             "--json",
         ],
         cwd=ROOT,

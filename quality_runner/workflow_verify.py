@@ -43,7 +43,7 @@ from quality_runner.workflow_skills import (
     create_code_quality_scan_with_skills,
     write_skill_review_artifacts,
 )
-from quality_runner.worktree_verify import gate_worktree_session
+from quality_runner.worktree_verify import gate_worktree_session, resolve_worktree_mode
 
 
 def verify_gates_payload(
@@ -53,6 +53,7 @@ def verify_gates_payload(
     ci_status_json: Path | None = None,
     timeout_seconds: int = 120,
     checkout_most_advanced_branch: bool = False,
+    execute_discovered_gates: bool = False,
     read_only_gates: bool = False,
     allow_mutating_gates: bool = False,
     worktree_mode: str = "in-place",
@@ -60,6 +61,11 @@ def verify_gates_payload(
     skill_review_report: dict[str, Any] | None = None,
     intent: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
+    resolved_worktree_mode = resolve_worktree_mode(worktree_mode)
+    if execute_discovered_gates and resolved_worktree_mode != "disposable":
+        raise ValueError(
+            "executing discovered gates requires --worktree-mode disposable to isolate the target repository"
+        )
     resolved_run_id = generated_run_id() if run_id is None else run_id
     branch_warnings = prepare_scan_branch(
         repo_root, checkout_most_advanced_branch=checkout_most_advanced_branch
@@ -113,17 +119,23 @@ def verify_gates_payload(
     def write_partial_gate_verification(verification: dict[str, Any]) -> None:
         write_json(run_dir / "gate-verification.json", verification)
 
+    effective_worktree_mode = resolved_worktree_mode if execute_discovered_gates else "in-place"
     with gate_worktree_session(
         repo_root=repo_root,
         run_id=resolved_run_id,
-        worktree_mode=worktree_mode,
+        worktree_mode=effective_worktree_mode,
         allow_dirty_worktree_verify=allow_dirty_worktree_verify,
     ) as worktree_session:
+        verification_context = {
+            **worktree_session.verification_context,
+            "execution_authorized": execute_discovered_gates,
+        }
         gate_execution_plan = build_gate_execution_plan(
             repo_root=worktree_session.execution_root,
             capability_map=capability_map,
             timeout_seconds=timeout_seconds,
             gate_timeouts=gate_timeouts(config),
+            execute_discovered_gates=execute_discovered_gates,
             read_only_gates=read_only_gates,
             allow_mutating_gates=allow_mutating_gates,
             mutations_isolated=worktree_session.mutations_isolated,
@@ -135,11 +147,12 @@ def verify_gates_payload(
             run_id=resolved_run_id,
             timeout_seconds=timeout_seconds,
             gate_timeouts=gate_timeouts(config),
+            execute_discovered_gates=execute_discovered_gates,
             read_only_gates=read_only_gates,
             allow_mutating_gates=allow_mutating_gates,
             execution_root=worktree_session.execution_root,
             mutations_isolated=worktree_session.mutations_isolated,
-            verification_context=worktree_session.verification_context,
+            verification_context=verification_context,
             on_partial_result=write_partial_gate_verification,
         )
     verified_capability_map = apply_gate_verification(capability_map, gate_verification)

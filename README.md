@@ -76,18 +76,30 @@ quality-runner review /path/to/repo --task "Implement the requested change" --js
 ```
 
 Fresh Review is read-only and does not call remote services or apply fixes. Use
-`--mode blind` when no task should be supplied. A missing adapter returns an
-honest `review-not-run` packet-only result; fixing-agent prompts are separate
-artifacts and are not remediation commands.
+`--mode blind` when no task should be supplied. A missing adapter returns a
+`packet-ready` outcome with a next action, not a no-findings conclusion.
 
 Run a full repo refresh and write the remediation handoff in the same command:
 
 ```bash
 quality-runner refresh /path/to/repo \
   --run-id-prefix baseline-001 \
-  --handoff-output /tmp/baseline-001-handoff.md \
+  --handoff-output /path/to/repo/.quality-runner/exports/baseline-001-handoff.md \
   --json
 ```
+
+By default, refresh records discovered commands as evidence but does not run
+them. To authorize those commands after reviewing the plan, opt into a
+disposable checkout:
+
+```bash
+quality-runner verify-gates /path/to/repo \
+  --execute-gates --worktree-mode disposable --json
+```
+
+This protects the ordinary source checkout from normal gate mutations; it is
+not a sandbox for arbitrary commands. See the [CLI Reference](docs/cli.md) for
+the execution and dirty-worktree contract.
 
 For an audit-only pass without gate verification, use `run`:
 
@@ -164,11 +176,12 @@ before scanning; the worktree must be clean.
 
 See [CLI Reference](docs/cli.md) for command details.
 
-`refresh` runs inspect, run, verify, and summarize in read-only mode. Its
-handoff statuses are intended for controllers: `gates-clean` means discovered
-local gates passed, `gates-blocked` means environment/dependency/read-only
-policy blocked evidence, and `gates-failed` means executable repo gates ran and
-failed. Blocked or failed handoffs include `blocker_groups` and
+`refresh` runs inspect, run, verify, and summarize. Its default verification is
+evidence-only: command-backed gates are reported as
+`execution-consent-required` until explicit disposable execution is authorized.
+`gates-clean` therefore means explicitly run local gates passed, while
+`gates-blocked` and `gates-failed` distinguish missing consent or environment
+constraints from executed command failures. Blocked or failed handoffs include `blocker_groups` and
 `next_slice.action_groups` for structured routing. Use `--handoff-output` when
 you want the scan and the human remediation plan from one command; use
 `export-handoff` later to regenerate or copy a handoff from an existing run.
@@ -276,8 +289,10 @@ scan_exclusions = ["samples", "generated-reports/**"]
 ## v1 Safety Boundary
 
 Quality Runner v1 may create or update files under `.quality-runner/runs/<run-id>/`
-in the target repository. It must not edit source files, install dependencies,
-create commits, call remote services, or execute remediation.
+in the target repository. It does not edit source files, install dependencies,
+create commits, call remote services, or execute remediation. Discovered gate
+commands are evidence-only unless the caller explicitly requests disposable
+execution.
 
 Every generated remediation slice includes verification guidance, but a separate
 coding agent must receive user approval before implementation.

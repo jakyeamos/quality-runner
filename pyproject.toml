@@ -1,6 +1,6 @@
 [project]
 name = "quality-runner"
-version = "0.5.0"
+dynamic = ["version"]
 description = "Standalone audit-and-plan quality orchestrator with CLI and MCP surfaces."
 requires-python = ">=3.12"
 readme = "README.md"
@@ -37,6 +37,9 @@ repo-quality-certifier-mcp = "repo_quality_certifier.mcp:main"
 [tool.setuptools.package-data]
 quality_runner = ["plugin/*.json", "plugin/*.md", "schemas/*.json"]
 repo_quality_certifier = ["plugin/*.json", "plugin/*.md"]
+
+[tool.setuptools.dynamic]
+version = {attr = "quality_runner._version.__version__"}
 
 [tool.setuptools.packages.find]
 include = ["quality_runner*", "quality_evidence_contract*", "repo_quality_certifier*"]

@@ -7,7 +7,11 @@ description: Run standalone audit-and-plan quality orchestration for a repositor
 
 Use this skill when the user asks to audit a repository against quality standards, run Quality Runner, inspect available quality gates, or produce a remediation plan.
 
-Quality Runner v1 is audit-and-plan only. It writes `.quality-runner/` artifacts and does not modify target source files.
+Quality Runner v1 is audit-and-plan by default. It writes `.quality-runner/`
+artifacts and does not modify target source files. Discovered gates are evidence
+only unless a user explicitly authorizes `--execute-gates --worktree-mode
+disposable`; that runs arbitrary local commands in a disposable checkout, not a
+sandbox.
 
 Preferred MCP tools:
 
@@ -21,14 +25,14 @@ CLI fallback:
 ```bash
 quality-runner refresh /path/to/repo \
   --run-id-prefix qr-<date-or-task> \
-  --handoff-output /tmp/qr-handoff.md \
+  --handoff-output /path/to/repo/.quality-runner/exports/qr-handoff.md \
   --json
 ```
 
 Agent workflow:
 
 1. Run QR before editing source.
-2. Read `/tmp/qr-handoff.md` and the referenced `.quality-runner/runs/<run-id>/` artifacts.
+2. Read `.quality-runner/exports/qr-handoff.md` and the referenced `.quality-runner/runs/<run-id>/` artifacts.
 3. Before editing, write or update GSD-style planning artifacts in the target repo.
    Use the repo's existing planning folder if present; otherwise use `.planning/`.
 4. The plan must include phases, batches, evidence, expected touched files,

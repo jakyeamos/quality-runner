@@ -54,6 +54,7 @@ def build_gate_execution_plan(
     capability_map: dict[str, Any],
     timeout_seconds: int,
     gate_timeouts: dict[str, int] | None = None,
+    execute_discovered_gates: bool = False,
     read_only_gates: bool = False,
     allow_mutating_gates: bool = False,
     mutations_isolated: bool = False,
@@ -79,6 +80,7 @@ def build_gate_execution_plan(
                     capability=capability,
                     command=command_text,
                     mutating_risk=risk,
+                    execute_discovered_gates=execute_discovered_gates,
                     read_only_gates=read_only_gates,
                     allow_mutating_gates=allow_mutating_gates,
                     mutations_isolated=mutations_isolated,
@@ -131,6 +133,7 @@ def local_execution_status(
     capability: dict[str, Any],
     command: str | None,
     mutating_risk: str,
+    execute_discovered_gates: bool,
     read_only_gates: bool,
     allow_mutating_gates: bool,
     mutations_isolated: bool = False,
@@ -141,12 +144,9 @@ def local_execution_status(
         return "evidence-only-skipped"
     if command is None:
         return "no-command-skipped"
-    if (
-        read_only_gates
-        and not allow_mutating_gates
-        and not mutations_isolated
-        and mutating_risk in {"mutating", "unknown"}
-    ):
+    if not execute_discovered_gates:
+        return "consent-required"
+    if read_only_gates and not allow_mutating_gates and mutating_risk in {"mutating", "unknown"}:
         return "mutating-skipped"
     return "will-execute"
 

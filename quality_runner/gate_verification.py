@@ -1,31 +1,21 @@
 from __future__ import annotations
 
-import subprocess
 import sys
-import time
 from pathlib import Path
 from typing import Any
 
 from quality_runner.dependency_setup import (
-    dependency_setup_action,
     dependency_setup_context,
     dependency_setup_skipped_gate,
-    gate_diagnostics,
 )
+from quality_runner.gate_execution import verify_gate
 from quality_runner.gate_execution_policy import (
     build_gate_execution_plan,
-    failure_type,
-    gate_cwd,
-    mutating_risk,
     ordered_capabilities,
-    recommended_action,
     valid_gate_timeouts,
 )
-from quality_runner.process_runner import run_shell_command
-from quality_runner.read_only_git import restore_if_changed, tracked_snapshot
 from quality_runner.schema_constants import GATE_VERIFICATION_SCHEMA
 
-MAX_OUTPUT_CHARS = 4000
 DEFAULT_TIMEOUT_SECONDS = 120
 AGGREGATE_GATE_IDS = {"pre_cr", "pre_pr"}
 LEAF_GATE_IDS = ("formatter", "lint", "typecheck", "tests", "build", "dead_code", "runtime_smoke")
@@ -38,6 +28,7 @@ def verify_discovered_gates(
     run_id: str | None = None,
     timeout_seconds: int = DEFAULT_TIMEOUT_SECONDS,
     gate_timeouts: dict[str, int] | None = None,
+    execute_discovered_gates: bool = False,
     read_only_gates: bool = False,
     allow_mutating_gates: bool = False,
     execution_root: Path | None = None,
@@ -45,6 +36,12 @@ def verify_discovered_gates(
     verification_context: dict[str, Any] | None = None,
     on_partial_result: Any | None = None,
 ) -> dict[str, Any]:
+    if execute_discovered_gates and (
+        not mutations_isolated
+        or execution_root is None
+        or execution_root.expanduser().resolve() == repo_root.expanduser().resolve()
+    ):
+        raise ValueError("executing discovered gates requires a separate disposable execution root")
     gates: list[dict[str, Any]] = []
     passed_leaf_ids: set[str] = set()
     dependency_setup_blockers: dict[tuple[str, str], dict[str, Any]] = {}
@@ -55,6 +52,7 @@ def verify_discovered_gates(
         capability_map=capability_map,
         timeout_seconds=timeout_seconds,
         gate_timeouts=resolved_gate_timeouts,
+        execute_discovered_gates=execute_discovered_gates,
         read_only_gates=read_only_gates,
         allow_mutating_gates=allow_mutating_gates,
         mutations_isolated=mutations_isolated,
@@ -66,11 +64,12 @@ def verify_discovered_gates(
             dependency_setup_context(repo_root=execution_repo, capability=capability)
         )
         if blocked_by_setup is None:
-            gate = _verify_gate(
+            gate = verify_gate(
                 repo_root=execution_repo,
                 capability=capability,
                 timeout_seconds=timeout,
                 covered_by=_covered_by(capability, passed_leaf_ids),
+                execute_discovered_gates=execute_discovered_gates,
                 read_only_gates=read_only_gates,
                 allow_mutating_gates=allow_mutating_gates,
                 mutations_isolated=mutations_isolated,
@@ -99,6 +98,7 @@ def verify_discovered_gates(
                     gates=gates,
                     timeout_seconds=timeout_seconds,
                     gate_timeouts=resolved_gate_timeouts,
+                    execute_discovered_gates=execute_discovered_gates,
                     read_only_gates=read_only_gates,
                     allow_mutating_gates=allow_mutating_gates,
                     execution_plan=execution_plan,
@@ -110,6 +110,7 @@ def verify_discovered_gates(
         gates=gates,
         timeout_seconds=timeout_seconds,
         gate_timeouts=resolved_gate_timeouts,
+        execute_discovered_gates=execute_discovered_gates,
         read_only_gates=read_only_gates,
         allow_mutating_gates=allow_mutating_gates,
         execution_plan=execution_plan,
@@ -117,35 +118,8 @@ def verify_discovered_gates(
     )
 
 
-def _verification_payload(
-    *,
-    run_id: str | None,
-    gates: list[dict[str, Any]],
-    timeout_seconds: int,
-    gate_timeouts: dict[str, int],
-    read_only_gates: bool,
-    allow_mutating_gates: bool,
-    execution_plan: list[dict[str, Any]],
-    verification_context: dict[str, Any] | None = None,
-) -> dict[str, Any]:
-    return {
-        "schema": GATE_VERIFICATION_SCHEMA,
-        **_optional_field("run_id", run_id),
-        "status": _status(gates),
-        "timeout_seconds": timeout_seconds,
-        "gate_timeouts": gate_timeouts,
-        "read_only_gates": read_only_gates,
-        "allow_mutating_gates": allow_mutating_gates,
-        "environment": _environment(),
-        "execution_plan": execution_plan,
-        "gates": gates,
-        **_optional_field("verification_context", verification_context),
-    }
-
-
 def apply_gate_verification(
-    capability_map: dict[str, Any],
-    verification: dict[str, Any],
+    capability_map: dict[str, Any], verification: dict[str, Any]
 ) -> dict[str, Any]:
     results = {
         gate["id"]: gate
@@ -174,191 +148,31 @@ def apply_gate_verification(
     return updated
 
 
-def _verify_gate(
+def _verification_payload(
     *,
-    repo_root: Path,
-    capability: dict[str, Any],
+    run_id: str | None,
+    gates: list[dict[str, Any]],
     timeout_seconds: int,
-    covered_by: list[str],
+    gate_timeouts: dict[str, int],
+    execute_discovered_gates: bool,
     read_only_gates: bool,
     allow_mutating_gates: bool,
-    mutations_isolated: bool = False,
+    execution_plan: list[dict[str, Any]],
+    verification_context: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    command = capability.get("command")
-    capability_id = str(capability.get("id") or "unknown")
-    capability_kind = _capability_kind(capability)
-    source = _string_or_none(capability.get("source"))
-    if capability.get("local_execution") == "ci-only":
-        return {
-            "id": capability_id,
-            "status": "skipped",
-            "capability_kind": "ci_only",
-            "reason": "capability is CI-only and has no local executor",
-            "source": source,
-        }
-    if capability_kind in {"agent_review", "evidence"}:
-        return {
-            "id": capability_id,
-            "status": "skipped",
-            "capability_kind": capability_kind,
-            "reason": "capability is a review obligation or evidence signal, not an executable gate",
-            "source": source,
-        }
-    if capability_kind == "evidence_file":
-        return {
-            "id": capability_id,
-            "status": "skipped",
-            "capability_kind": capability_kind,
-            "reason": "capability is file evidence, not an executable gate",
-            "source": source,
-        }
-    if covered_by:
-        return {
-            "id": capability_id,
-            "status": "skipped",
-            "capability_kind": capability_kind,
-            "reason": "aggregate gate covered by leaf gates",
-            "source": source,
-            "covered_by": covered_by,
-        }
-    if not isinstance(command, str) or not command:
-        return {
-            "id": capability_id,
-            "status": "skipped",
-            "capability_kind": capability_kind,
-            "reason": "capability has no executable command",
-            "source": source,
-        }
-    risk = mutating_risk(capability_id=capability_id, capability=capability)
-    if (
-        read_only_gates
-        and not allow_mutating_gates
-        and not mutations_isolated
-        and risk in {"mutating", "unknown"}
-    ):
-        return {
-            "id": capability_id,
-            "status": "skipped",
-            "capability_kind": capability_kind,
-            "command": command,
-            "source": source,
-            "cwd": str(gate_cwd(repo_root=repo_root, capability=capability)),
-            "mutating_risk": risk,
-            "skip_type": "mutating-gate-not-run",
-            "reason": "read-only gate policy skipped a possibly mutating command",
-            "recommended_action": "rerun with --allow-mutating-gates only when source changes are allowed",
-        }
-
-    started = time.monotonic()
-    readonly_snapshot = (
-        tracked_snapshot(repo_root)
-        if read_only_gates and not allow_mutating_gates and not mutations_isolated
-        else None
-    )
-    try:
-        result = run_shell_command(
-            command,
-            cwd=repo_root,
-            timeout=timeout_seconds,
-        )
-    except subprocess.TimeoutExpired as error:
-        stdout = _truncate(error.stdout)
-        stderr = _truncate(error.stderr)
-        gate_failure_type = failure_type(
-            command=command, stdout=stdout, stderr=stderr, timed_out=True
-        )
-        mutation = restore_if_changed(repo_root, readonly_snapshot)
-        if mutation is not None:
-            gate_failure_type = "read-only-mutation"
-        environment_restricted = gate_failure_type == "environment-restricted"
-        dependency_setup = gate_failure_type == "dependency-setup-blocker"
-        diagnostics = (
-            gate_diagnostics(
-                command=command,
-                cwd=gate_cwd(repo_root=repo_root, capability=capability),
-                stdout=stdout,
-                stderr=stderr,
-                timed_out=True,
-                dependency_setup=dependency_setup,
-            )
-            | _timeout_output_diagnostics(stdout=stdout, stderr=stderr)
-            | _read_only_mutation_diagnostics(mutation)
-        )
-        return {
-            "id": capability_id,
-            "status": "failed",
-            "capability_kind": capability_kind,
-            "command": command,
-            "source": source,
-            "exit_code": None,
-            "duration_seconds": round(time.monotonic() - started, 3),
-            "timeout_seconds": timeout_seconds,
-            "stdout": stdout,
-            "stderr": stderr,
-            "stdout_tail": stdout,
-            "stderr_tail": stderr,
-            "failure_type": gate_failure_type,
-            "reason": "gate timed out",
-            "diagnostics": diagnostics,
-            **recommended_action(
-                environment_restricted=environment_restricted,
-                dependency_setup=dependency_setup,
-            ),
-            **dependency_setup_action(diagnostics),
-            **_optional_field(
-                "recommended_action",
-                _read_only_mutation_action(mutation),
-            ),
-        }
-    stdout = _truncate(result["stdout"])
-    stderr = _truncate(result["stderr"])
-    gate_failure_type = failure_type(command=command, stdout=stdout, stderr=stderr, timed_out=False)
-    returncode = _int_result(result["returncode"])
-    mutation = restore_if_changed(repo_root, readonly_snapshot)
-    if mutation is not None:
-        gate_failure_type = "read-only-mutation"
-    failed = returncode != 0 or mutation is not None
-    environment_restricted = failed and gate_failure_type == "environment-restricted"
-    dependency_setup = failed and gate_failure_type == "dependency-setup-blocker"
-    diagnostics = (
-        gate_diagnostics(
-            command=command,
-            cwd=gate_cwd(repo_root=repo_root, capability=capability),
-            stdout=stdout,
-            stderr=stderr,
-            timed_out=False,
-            dependency_setup=dependency_setup,
-        )
-        | _read_only_mutation_diagnostics(mutation)
-        if dependency_setup or mutation is not None
-        else None
-    )
     return {
-        "id": capability_id,
-        "status": "failed" if failed else "passed",
-        "capability_kind": capability_kind,
-        "command": command,
-        "source": source,
-        "exit_code": returncode,
-        "duration_seconds": round(time.monotonic() - started, 3),
+        "schema": GATE_VERIFICATION_SCHEMA,
+        **_optional_field("run_id", run_id),
+        "status": _status(gates),
         "timeout_seconds": timeout_seconds,
-        "cwd": str(gate_cwd(repo_root=repo_root, capability=capability)),
-        "mutating_risk": risk,
-        "stdout": stdout,
-        "stderr": stderr,
-        "stdout_tail": stdout,
-        "stderr_tail": stderr,
-        **_optional_field("failure_type", gate_failure_type if failed else None),
-        **_optional_field("diagnostics", diagnostics),
-        **recommended_action(
-            environment_restricted=environment_restricted,
-            dependency_setup=dependency_setup,
-        ),
-        **dependency_setup_action(diagnostics),
-        **_optional_field(
-            "recommended_action",
-            _read_only_mutation_action(mutation),
-        ),
+        "gate_timeouts": gate_timeouts,
+        "execute_discovered_gates": execute_discovered_gates,
+        "read_only_gates": read_only_gates,
+        "allow_mutating_gates": allow_mutating_gates,
+        "environment": _environment(),
+        "execution_plan": execution_plan,
+        "gates": gates,
+        **_optional_field("verification_context", verification_context),
     }
 
 
@@ -373,7 +187,7 @@ def _status(gates: list[dict[str, Any]]) -> str:
     if any(
         gate.get("failure_type")
         in {"environment-restricted", "dependency-setup-blocker", "read-only-mutation"}
-        or gate.get("skip_type") == "mutating-gate-not-run"
+        or gate.get("skip_type") in {"mutating-gate-not-run", "execution-consent-required"}
         for gate in gates
     ):
         return "blocked"
@@ -393,28 +207,6 @@ def _discovery_for_capability(capability: dict[str, Any]) -> str:
     if capability_type == "file":
         return "file-discovered"
     return "command-discovered"
-
-
-def _truncate(value: object) -> str:
-    text = value if isinstance(value, str) else ""
-    if len(text) <= MAX_OUTPUT_CHARS:
-        return text
-    return text[:MAX_OUTPUT_CHARS] + "\n[truncated]\n"
-
-
-def _string_or_none(value: object) -> str | None:
-    return value if isinstance(value, str) and value else None
-
-
-def _capability_kind(capability: dict[str, Any]) -> str:
-    kind = capability.get("capability_kind")
-    if kind in {"local_command", "ci_only", "evidence_file", "agent_review", "evidence"}:
-        return str(kind)
-    if capability.get("local_execution") == "ci-only":
-        return "ci_only"
-    if capability.get("type") == "file":
-        return "evidence_file"
-    return "local_command"
 
 
 def _covered_by(capability: dict[str, Any], passed_leaf_ids: set[str]) -> list[str]:
@@ -455,30 +247,4 @@ def _environment() -> dict[str, str | bool | None]:
 
 
 def _optional_field(key: str, value: object) -> dict[str, Any]:
-    if value is None:
-        return {}
-    return {key: value}
-
-
-def _read_only_mutation_diagnostics(mutation: dict[str, Any] | None) -> dict[str, Any]:
-    if mutation is None:
-        return {}
-    return {"read_only_mutation": mutation}
-
-
-def _read_only_mutation_action(mutation: dict[str, Any] | None) -> str | None:
-    if mutation is None:
-        return None
-    if mutation.get("restored") is True:
-        return "gate mutated tracked files during read-only verification; QR restored the pre-gate tracked diff, rerun directly only when source changes are allowed"
-    return "gate mutated tracked files during read-only verification and QR could not fully restore them; inspect the tracked diff before continuing"
-
-
-def _timeout_output_diagnostics(*, stdout: str, stderr: str) -> dict[str, Any]:
-    if stdout or stderr:
-        return {"timeout_output_status": "captured-partial-output"}
-    return {"timeout_output_status": "timeout-with-no-output"}
-
-
-def _int_result(value: object) -> int:
-    return value if isinstance(value, int) else 1
+    return {} if value is None else {key: value}
