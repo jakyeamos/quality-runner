@@ -52,6 +52,29 @@ def test_file_adapter_validates_local_report(tmp_path: Path) -> None:
     assert report["severity_counts"] == {"critical": 0, "high": 1, "medium": 0, "low": 0}
 
 
+def test_combined_file_adapter_preserves_v1_task_provenance(tmp_path: Path) -> None:
+    from quality_runner.review_context import build_review_context, normalize_review_options
+
+    output = tmp_path / "combined-report.json"
+    output.write_text(json.dumps({"findings": [_finding()]}), encoding="utf-8")
+    packet = build_review_context(
+        repo_root=tmp_path,
+        run_id="combined-adapter-report",
+        options=normalize_review_options(
+            mode="combined",
+            scope="project",
+            breadth="related",
+            task="Review the integration boundary",
+        ),
+    )
+
+    result = FileReviewAdapter(output).review(packet, tmp_path)
+
+    assert result["status"] == "review-complete"
+    assert result["report"] is not None
+    assert result["report"]["task_provenance"] == "None"
+
+
 def test_file_adapter_rejects_path_escape(tmp_path: Path) -> None:
     output = tmp_path.parent / "outside.json"
     output.write_text("{}", encoding="utf-8")

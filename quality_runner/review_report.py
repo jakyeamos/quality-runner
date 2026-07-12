@@ -1,9 +1,22 @@
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
-from typing import TypedDict, cast
+from typing import cast
 
-from quality_runner.review_types import ReviewBreadth, ReviewMode, ReviewScope
+from quality_runner.application.review_v1_serializers import REVIEW_REPORT_SCHEMA
+from quality_runner.core.review_contracts import (
+    AdapterStatus,
+    ReviewBreadth,
+    ReviewClassification,
+    ReviewConfidence,
+    ReviewFinding,
+    ReviewMode,
+    ReviewReport,
+    ReviewScope,
+    ReviewSections,
+    ReviewSeverity,
+    SeverityCounts,
+)
 
 SEVERITIES = ("critical", "high", "medium", "low")
 CLASSIFICATIONS = ("confirmed", "suspected", "not-enough-evidence", "known-accepted")
@@ -14,22 +27,6 @@ PACKET_READY_SUMMARY = "Review packet ready: no review was run. Send the packet 
 INCOMPLETE_REVIEW_SUMMARY = (
     "Review did not complete; no finding conclusion can be drawn from this result."
 )
-
-
-class ReviewFinding(TypedDict):
-    id: str
-    fingerprint: str
-    severity: str
-    classification: str
-    confidence: str
-    summary: str
-    why_it_matters: str
-    location: list[str]
-    evidence: list[str]
-    recommended_fix: str
-    agent_prompt: str
-    human_confirmation_required: bool
-    status: str
 
 
 def build_review_report(
@@ -44,7 +41,7 @@ def build_review_report(
     exclusions: Sequence[str],
     adapter_status: str,
     task_provenance: str | None,
-) -> dict[str, object]:
+) -> ReviewReport:
     if mode not in {"task", "blind", "combined"}:
         raise ValueError(f"invalid review mode: {mode}")
     if scope not in {"task", "project"}:
@@ -53,41 +50,46 @@ def build_review_report(
         raise ValueError(f"invalid review breadth: {breadth}")
     if adapter_status not in ADAPTER_STATUSES:
         raise ValueError(f"invalid adapter status: {adapter_status}")
-    if mode in {"task", "combined"} and not task_provenance:
+    resolved_mode = cast(ReviewMode, mode)
+    resolved_scope = cast(ReviewScope, scope)
+    resolved_breadth = cast(ReviewBreadth, breadth)
+    resolved_status = cast(AdapterStatus, adapter_status)
+    if resolved_mode in {"task", "combined"} and not task_provenance:
         raise ValueError("task provenance is required for task and combined reports")
     normalized = [_normalize_finding(finding) for finding in findings]
-    if adapter_status != "review-complete" and normalized:
+    if resolved_status != "review-complete" and normalized:
         raise ValueError("findings require a review-complete adapter status")
-    counts = {
-        severity: sum(item["severity"] == severity for item in normalized)
-        for severity in SEVERITIES
+    counts: SeverityCounts = {
+        "critical": sum(item["severity"] == "critical" for item in normalized),
+        "high": sum(item["severity"] == "high" for item in normalized),
+        "medium": sum(item["severity"] == "medium" for item in normalized),
+        "low": sum(item["severity"] == "low" for item in normalized),
     }
     summary = (
         f"Review complete: {counts['critical']} critical, {counts['high']} high, "
         f"{counts['medium']} medium issues found."
     )
     if not normalized:
-        if adapter_status == "review-complete":
+        if resolved_status == "review-complete":
             summary = NO_ISSUE_CAVEAT
-        elif adapter_status == "review-not-run":
+        elif resolved_status == "review-not-run":
             summary = PACKET_READY_SUMMARY
         else:
             summary = INCOMPLETE_REVIEW_SUMMARY
-    sections = _sections(normalized, mode=mode)
     return {
-        "schema": "quality-runner-review-report-v0.1",
+        "schema": REVIEW_REPORT_SCHEMA,
         "run_id": run_id,
-        "mode": cast(ReviewMode, mode),
-        "scope": cast(ReviewScope, scope),
-        "breadth": cast(ReviewBreadth, breadth),
-        "adapter_status": adapter_status,
+        "mode": resolved_mode,
+        "scope": resolved_scope,
+        "breadth": resolved_breadth,
+        "adapter_status": resolved_status,
         "task_provenance": task_provenance,
         "summary": summary,
         "severity_counts": counts,
         "evidence_used": _clean_strings(evidence_used),
         "evidence_unavailable": _clean_strings(evidence_unavailable),
         "exclusions": _clean_strings(exclusions),
-        "sections": sections,
+        "sections": _sections(normalized, mode=resolved_mode),
         "findings": normalized,
     }
 
@@ -111,36 +113,37 @@ def _normalize_finding(finding: Mapping[str, object]) -> ReviewFinding:
         if not isinstance(value, str) or not value.strip():
             raise ValueError(f"finding requires {field}")
         values[field] = value.strip()
-    if values["severity"] not in SEVERITIES:
-        raise ValueError(f"invalid finding severity: {values['severity']}")
-    if values["classification"] not in CLASSIFICATIONS:
-        raise ValueError(f"invalid finding classification: {values['classification']}")
-    if values["confidence"] not in CONFIDENCES:
-        raise ValueError(f"invalid finding confidence: {values['confidence']}")
-    location = _string_list(finding.get("location"), "location")
-    evidence = _string_list(finding.get("evidence"), "evidence")
+    severity = values["severity"]
+    classification = values["classification"]
+    confidence = values["confidence"]
+    if severity not in SEVERITIES:
+        raise ValueError(f"invalid finding severity: {severity}")
+    if classification not in CLASSIFICATIONS:
+        raise ValueError(f"invalid finding classification: {classification}")
+    if confidence not in CONFIDENCES:
+        raise ValueError(f"invalid finding confidence: {confidence}")
     confirmation = finding.get("human_confirmation_required")
     if not isinstance(confirmation, bool):
         raise ValueError("finding requires human_confirmation_required")
-    return ReviewFinding(
-        id=values["id"],
-        fingerprint=values["fingerprint"],
-        severity=values["severity"],
-        classification=values["classification"],
-        confidence=values["confidence"],
-        summary=values["summary"],
-        why_it_matters=values["why_it_matters"],
-        recommended_fix=values["recommended_fix"],
-        agent_prompt=values["agent_prompt"],
-        status=values["status"],
-        location=location,
-        evidence=evidence,
-        human_confirmation_required=confirmation,
-    )
+    return {
+        "id": values["id"],
+        "fingerprint": values["fingerprint"],
+        "severity": cast(ReviewSeverity, severity),
+        "classification": cast(ReviewClassification, classification),
+        "confidence": cast(ReviewConfidence, confidence),
+        "summary": values["summary"],
+        "why_it_matters": values["why_it_matters"],
+        "recommended_fix": values["recommended_fix"],
+        "agent_prompt": values["agent_prompt"],
+        "status": values["status"],
+        "location": _string_list(finding.get("location"), "location"),
+        "evidence": _string_list(finding.get("evidence"), "evidence"),
+        "human_confirmation_required": confirmation,
+    }
 
 
-def _sections(findings: Sequence[ReviewFinding], *, mode: str) -> dict[str, list[object]]:
-    sections: dict[str, list[object]] = {
+def _sections(findings: Sequence[ReviewFinding], *, mode: ReviewMode) -> ReviewSections:
+    sections: ReviewSections = {
         "missed_requirements": [],
         "confirmed_issues": [],
         "suspected_issues": [],

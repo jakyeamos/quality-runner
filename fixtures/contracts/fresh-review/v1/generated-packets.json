@@ -1,0 +1,226 @@
+{
+  "blind": {
+    "breadth": "related",
+    "changed_files": [
+      "quality_runner/review_context.py",
+      "tests/test_review_context.py"
+    ],
+    "evidence": [],
+    "exclusions": [
+      "generated"
+    ],
+    "freshness": {
+      "active_cycle": false,
+      "hidden_reasoning_included": false,
+      "new_invocation_required": true,
+      "previous_agent_summary_included": false,
+      "prior_review_context_included": false
+    },
+    "input_hashes": {
+      "packet": "479e6e73bfa0a639834c7863e9db7e9467fa11ba9b3b2dcd011d8b6e5e22e9b8"
+    },
+    "known_issues": [
+      "known-001"
+    ],
+    "mode": "blind",
+    "omitted_evidence": [
+      "browser access"
+    ],
+    "repo_root": "/quality-runner-v1-projection",
+    "repository_state": {
+      "branch": "main",
+      "clean": true
+    },
+    "run_id": "baseline-blind",
+    "schema": "quality-runner-review-context-v0.1",
+    "scope": "project"
+  },
+  "combined": {
+    "breadth": "related",
+    "evidence": [],
+    "exclusions": [
+      "generated"
+    ],
+    "freshness": {
+      "active_cycle": false,
+      "hidden_reasoning_included": false,
+      "new_invocation_required": true,
+      "previous_agent_summary_included": false,
+      "prior_review_context_included": false
+    },
+    "input_hashes": {
+      "blind_packet": "68c3cda5a01e86cf72b84fbaf89df0e2b8f03d5d47ff33b517e47b25b5f826d9",
+      "task_packet": "96c6c239c43057068ea2f323fdfd332dca4bb4860f905842ec92068e23252e11"
+    },
+    "mode": "combined",
+    "omitted_evidence": [
+      "browser access"
+    ],
+    "packets": [
+      {
+        "breadth": "related",
+        "changed_files": [
+          "quality_runner/review_context.py",
+          "tests/test_review_context.py"
+        ],
+        "evidence": [],
+        "exclusions": [
+          "generated"
+        ],
+        "freshness": {
+          "active_cycle": false,
+          "hidden_reasoning_included": false,
+          "new_invocation_required": true,
+          "previous_agent_summary_included": true,
+          "prior_review_context_included": false
+        },
+        "input_hashes": {
+          "packet": "96c6c239c43057068ea2f323fdfd332dca4bb4860f905842ec92068e23252e11",
+          "task": "af707fe37a07a189c62c8352f6f98ad3feaf788cb98f229d064e90318896421f"
+        },
+        "known_issues": [
+          "known-001"
+        ],
+        "mode": "task",
+        "omitted_evidence": [
+          "browser access"
+        ],
+        "previous_summary": "Prior implementation notes",
+        "repo_root": "/quality-runner-v1-projection",
+        "repository_state": {
+          "branch": "main",
+          "clean": true
+        },
+        "run_id": "baseline-combined",
+        "schema": "quality-runner-review-context-v0.1",
+        "scope": "project",
+        "task": "Preserve the review projection"
+      },
+      {
+        "breadth": "related",
+        "changed_files": [
+          "quality_runner/review_context.py",
+          "tests/test_review_context.py"
+        ],
+        "evidence": [],
+        "exclusions": [
+          "generated"
+        ],
+        "freshness": {
+          "active_cycle": false,
+          "hidden_reasoning_included": false,
+          "new_invocation_required": true,
+          "previous_agent_summary_included": false,
+          "prior_review_context_included": false
+        },
+        "input_hashes": {
+          "packet": "68c3cda5a01e86cf72b84fbaf89df0e2b8f03d5d47ff33b517e47b25b5f826d9"
+        },
+        "known_issues": [
+          "known-001"
+        ],
+        "mode": "blind",
+        "omitted_evidence": [
+          "browser access"
+        ],
+        "repo_root": "/quality-runner-v1-projection",
+        "repository_state": {
+          "branch": "main",
+          "clean": true
+        },
+        "run_id": "baseline-combined",
+        "schema": "quality-runner-review-context-v0.1",
+        "scope": "project"
+      }
+    ],
+    "repo_root": "/quality-runner-v1-projection",
+    "run_id": "baseline-combined",
+    "schema": "quality-runner-review-context-v0.1",
+    "scope": "project"
+  },
+  "direct_combined": {
+    "breadth": "related",
+    "changed_files": [
+      "quality_runner/review_context.py",
+      "tests/test_review_context.py"
+    ],
+    "evidence": [],
+    "exclusions": [
+      "generated"
+    ],
+    "freshness": {
+      "active_cycle": false,
+      "hidden_reasoning_included": false,
+      "new_invocation_required": true,
+      "previous_agent_summary_included": true,
+      "prior_review_context_included": false
+    },
+    "input_hashes": {
+      "packet": "cec9c598d9345b29804aa70a4f6d13bc8c33885ae0b60bbb6b6dd3bb56c6ba6e",
+      "task": "af707fe37a07a189c62c8352f6f98ad3feaf788cb98f229d064e90318896421f"
+    },
+    "known_issues": [
+      "known-001"
+    ],
+    "mode": "combined",
+    "omitted_evidence": [
+      "browser access"
+    ],
+    "previous_summary": "Prior implementation notes",
+    "repo_root": "/quality-runner-v1-projection",
+    "repository_state": {
+      "branch": "main",
+      "clean": true
+    },
+    "run_id": "baseline-direct-combined",
+    "schema": "quality-runner-review-context-v0.1",
+    "scope": "project",
+    "task": "Preserve the review projection"
+  },
+  "task": {
+    "breadth": "focused",
+    "changed_files": [
+      "quality_runner/review_context.py",
+      "tests/test_review_context.py"
+    ],
+    "evidence": [
+      {
+        "available": true,
+        "kind": "file",
+        "note": "",
+        "path": "quality_runner/review_context.py"
+      }
+    ],
+    "exclusions": [
+      "generated"
+    ],
+    "freshness": {
+      "active_cycle": false,
+      "hidden_reasoning_included": false,
+      "new_invocation_required": true,
+      "previous_agent_summary_included": true,
+      "prior_review_context_included": false
+    },
+    "input_hashes": {
+      "packet": "9f074d1c8b4ea2c391c8a43d6fb20bc194ef1883d6e4854401d70c4babcbbc56",
+      "task": "af707fe37a07a189c62c8352f6f98ad3feaf788cb98f229d064e90318896421f"
+    },
+    "known_issues": [
+      "known-001"
+    ],
+    "mode": "task",
+    "omitted_evidence": [
+      "browser access"
+    ],
+    "previous_summary": "Prior implementation notes",
+    "repo_root": "/quality-runner-v1-projection",
+    "repository_state": {
+      "branch": "main",
+      "clean": true
+    },
+    "run_id": "baseline-task",
+    "schema": "quality-runner-review-context-v0.1",
+    "scope": "task",
+    "task": "Preserve the review projection"
+  }
+}

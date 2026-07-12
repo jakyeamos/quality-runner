@@ -2,8 +2,9 @@
 
 ## Current state
 
-M0 is implemented on the protected branch `codex/gpt56-modernization`, based
-on `main` commit `0a3def1`. The branch remains isolated until review and merge.
+M0 and M1 are implemented on the protected branch
+`codex/gpt56-modernization`, based on `main` commit `0a3def1`. The branch
+remains isolated until review and merge.
 
 M0 restores the public trust boundary without changing artifact schema ids:
 
@@ -16,6 +17,20 @@ M0 restores the public trust boundary without changing artifact schema ids:
 - Fresh Review reports `packet-ready` or incomplete outcomes truthfully instead
   of resembling a completed no-findings review.
 
+M1 establishes the typed migration seam without changing the v1 Fresh Review
+projections:
+
+- strict normalized packet, report, manifest, adapter, and known-issue records
+  now live in `quality_runner.core`; application serializers own the v1
+  projection boundary;
+- public `review_types` and `review_context` retain their permissive v1 typed
+  dictionary contracts, including direct combined packet callers;
+- task, blind, combined, and direct-combined packet projections have committed
+  M0 baseline fixtures, while v1 readers enforce their published closed-object
+  schema boundaries;
+- CLI and MCP review paths build strict internal values before persisting the
+  identical v1 JSON artifacts.
+
 ## Decisions in force
 
 - Use a parallel typed core with controlled adapters, not a clean rewrite.
@@ -25,16 +40,17 @@ M0 restores the public trust boundary without changing artifact schema ids:
   safer by default.
 - Keep `CITATION.cff` on the last published release until the tagged release
   commit updates it; the tag workflow verifies that parity explicitly.
+- Treat v1 payloads and Python typed dictionaries as compatibility projections;
+  strict core contracts must not leak into legacy entrypoint annotations.
 
-## Baseline quality
+## Quality status
 
-- Full tests, Ruff lint/format, Vulture, a fresh package build, and
+- `pytest` passes 436 tests; Basedpyright reports zero errors.
+- Ruff lint/format, Vulture, a fresh package build, and
   `quality-runner release-smoke --json` pass.
-- Basedpyright still reports 14 pre-existing errors concentrated in the Fresh
-  Review typed-dictionary boundary; M1 owns that typed-contract migration.
 
 ## Next milestone
 
-M1 establishes typed v2 contracts and the migration harness. It must preserve
-the hardened M0 behavior while eliminating the remaining Fresh Review type
-boundary debt.
+M2 migrates the read-only audit vertical slice through one typed application
+use case while preserving inspect/run artifacts, finding IDs, CLI/MCP output,
+and handoff expectations.

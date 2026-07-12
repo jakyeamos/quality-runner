@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 
 from quality_runner.review_state import (
@@ -15,6 +16,7 @@ def test_known_issue_accept_edit_remove_and_repeat(tmp_path: Path) -> None:
     issue = accept_known_issue(
         tmp_path, fingerprint="fp", summary="Known", reason="accepted", owner="me"
     )
+    assert "extensions" not in issue
     assert load_known_issues(tmp_path)[0]["id"] == issue["id"]
     edit_known_issue(tmp_path, issue["id"], summary="Updated")
     assert (
@@ -47,3 +49,33 @@ def test_cycle_finalization_classifies_resolved_and_accepted() -> None:
     )
     statuses = {entry["fingerprint"]: entry["status"] for entry in state["entries"]}
     assert statuses == {"open": "accepted", "gone": "resolved"}
+
+
+def test_known_issue_preserves_unknown_fields_when_edited(tmp_path: Path) -> None:
+    path = tmp_path / ".quality-runner" / "known-issues.json"
+    path.parent.mkdir()
+    path.write_text(
+        json.dumps(
+            {
+                "schema": "quality-runner-known-issues-v0.1",
+                "issues": [
+                    {
+                        "id": "issue-1",
+                        "fingerprint": "fp",
+                        "summary": "Known",
+                        "status": "accepted",
+                        "future_extension": {"source": "external-client"},
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    issue = load_known_issues(tmp_path)[0]
+    edit_known_issue(tmp_path, issue["id"], summary="Updated")
+    persisted = json.loads(path.read_text(encoding="utf-8"))
+
+    assert dict(issue)["future_extension"] == {"source": "external-client"}
+    assert "extensions" not in issue
+    assert persisted["issues"][0]["future_extension"] == {"source": "external-client"}

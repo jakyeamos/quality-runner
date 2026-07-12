@@ -149,6 +149,10 @@ def test_packaged_console_script_invokes_cli(tmp_path: Path) -> None:
     assert "repo-quality-certifier-mcp = repo_quality_certifier.mcp:main" in entry_points
     assert "quality_runner/plugin/manifest.json" in wheel_names
     assert "quality_runner/plugin/SKILL.md" in wheel_names
+    assert "quality_runner/core/review_contracts.py" in wheel_names
+    assert "quality_runner/application/review_v1_reports.py" in wheel_names
+    assert "quality_runner/application/review_v1_serializers.py" in wheel_names
+    assert "quality_runner/review_types.py" in wheel_names
     assert "repo_quality_certifier/plugin/manifest.json" in wheel_names
     assert "repo_quality_certifier/plugin/SKILL.md" in wheel_names
     assert not any(name.startswith("test_support/") for name in wheel_names)
@@ -204,7 +208,9 @@ def test_packaged_console_script_invokes_cli(tmp_path: Path) -> None:
             "-c",
             "from quality_evidence_contract import QUALITY_FINDING_SCHEMA; "
             "from repo_quality_certifier import GATE_MATRIX_SCHEMA; "
-            "print(QUALITY_FINDING_SCHEMA, GATE_MATRIX_SCHEMA)",
+            "from quality_runner.application.review_v1_serializers import REVIEW_CONTEXT_SCHEMA; "
+            "from quality_runner.review_types import ReviewPacket; "
+            "print(QUALITY_FINDING_SCHEMA, GATE_MATRIX_SCHEMA, REVIEW_CONTEXT_SCHEMA)",
         ],
         check=True,
         capture_output=True,
@@ -247,7 +253,7 @@ def test_packaged_console_script_invokes_cli(tmp_path: Path) -> None:
     assert smoke_payload["status"] == "passed"
     assert Path(smoke_payload["handoff_output"]).exists()
     assert compat_import_result.stdout.strip() == (
-        "quality-finding-v0.1 aios-repo-gate-matrix-v0.1"
+        "quality-finding-v0.1 aios-repo-gate-matrix-v0.1 quality-runner-review-context-v0.1"
     )
     certifier_payload = json.loads(certifier_result.stdout)
     assert certifier_payload["schema"] == "repo-quality-certifier-plan-result-v0.1"

@@ -3,27 +3,21 @@ from __future__ import annotations
 import json
 from collections.abc import Mapping
 from pathlib import Path
-from typing import Protocol, TypedDict
+from typing import Protocol
 
+from quality_runner.core.review_contracts import AdapterResult, ReviewPacket
 from quality_runner.review_report import build_review_report
-from quality_runner.review_types import ReviewPacket
 
 MAX_OUTPUT_BYTES = 2_000_000
-
-
-class AdapterResult(TypedDict):
-    status: str
-    report: dict[str, object] | None
-    evidence_unavailable: list[str]
-    message: str | None
+type ReviewPacketInput = ReviewPacket | Mapping[str, object]
 
 
 class ReviewAdapter(Protocol):
-    def review(self, packet: ReviewPacket, output_dir: Path) -> AdapterResult: ...
+    def review(self, packet: ReviewPacketInput, output_dir: Path) -> AdapterResult: ...
 
 
 class NoReviewAdapter:
-    def review(self, packet: ReviewPacket, output_dir: Path) -> AdapterResult:
+    def review(self, packet: ReviewPacketInput, output_dir: Path) -> AdapterResult:
         return {
             "status": "review-not-run",
             "report": None,
@@ -36,7 +30,7 @@ class FileReviewAdapter:
     def __init__(self, result_path: Path) -> None:
         self.result_path = result_path.expanduser().resolve()
 
-    def review(self, packet: ReviewPacket, output_dir: Path) -> AdapterResult:
+    def review(self, packet: ReviewPacketInput, output_dir: Path) -> AdapterResult:
         approved_root = output_dir.expanduser().resolve()
         if not _within(self.result_path, approved_root):
             return _permission_result(
@@ -59,19 +53,21 @@ class FileReviewAdapter:
         if not all(isinstance(item, Mapping) for item in findings):
             return _malformed_result("Adapter output findings must contain only JSON objects.")
         try:
+            mode = _packet_text(packet, "mode")
+            input_hashes = packet.get("input_hashes", {})
+            if not isinstance(input_hashes, Mapping):
+                raise TypeError("input_hashes must be an object")
             report = build_review_report(
-                run_id=str(packet["run_id"]),
-                mode=str(packet["mode"]),
-                scope=str(packet["scope"]),
-                breadth=str(packet["breadth"]),
+                run_id=_packet_text(packet, "run_id"),
+                mode=mode,
+                scope=_packet_text(packet, "scope"),
+                breadth=_packet_text(packet, "breadth"),
                 findings=list(findings),
                 evidence_used=_strings(raw.get("evidence_used")),
                 evidence_unavailable=_strings(raw.get("evidence_unavailable")),
                 exclusions=_strings(packet.get("exclusions")),
                 adapter_status="review-complete",
-                task_provenance=str(packet.get("input_hashes", {}).get("task"))
-                if packet.get("mode") != "blind"
-                else None,
+                task_provenance=str(input_hashes.get("task")) if mode != "blind" else None,
             )
         except (KeyError, TypeError, ValueError) as error:
             return _malformed_result(f"Adapter output failed review validation: {error}")
@@ -99,6 +95,12 @@ def _strings(value: object) -> list[str]:
     if not isinstance(value, list):
         return []
     return [item.strip() for item in value if isinstance(item, str) and item.strip()]
+
+
+def _packet_text(packet: Mapping[str, object], key: str) -> str:
+    if key not in packet:
+        raise KeyError(key)
+    return str(packet[key])
 
 
 def _malformed_result(message: str) -> AdapterResult:
