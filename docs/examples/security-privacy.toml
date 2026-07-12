@@ -1,0 +1,123 @@
+id = "security-privacy"
+name = "Security and Privacy Review"
+version = "0.1.0"
+description = "Redaction-safe source signals and high-recall review criteria for transport, authorization, privacy, input boundaries, and security evidence."
+
+[[deterministic_rules]]
+id = "disabled-tls-verification"
+type = "disallowed_pattern"
+category = "transport-security"
+severity = "observation"
+confidence = "medium"
+paths = ["**/*.py", "**/*.js", "**/*.jsx", "**/*.ts", "**/*.tsx", "**/*.go", "**/*.rs", "**/*.java", "**/*.yml", "**/*.yaml", "**/*.toml", "**/*.json"]
+disallowed_patterns = ['(?i)\bverify\s*=\s*false\b', '(?i)\brejectUnauthorized\s*:\s*false\b', '(?i)\bInsecureSkipVerify\s*:\s*true\b', '(?i)\bsslmode\s*=\s*disable\b']
+message = "TLS or certificate verification appears to be disabled and requires an explicit security review."
+risk = "Unverified transport can permit interception or accepting an unintended endpoint certificate."
+expected = "Keep verification enabled in production paths, or isolate and document a narrowly scoped local-test exception."
+verification = "Review the environment and call site, then rerun quality-runner after resolving or accepting the exception."
+
+[[deterministic_rules]]
+id = "wildcard-cors-origin"
+type = "disallowed_pattern"
+category = "cross-origin-policy"
+severity = "observation"
+confidence = "low"
+paths = ["**/*.py", "**/*.js", "**/*.jsx", "**/*.ts", "**/*.tsx", "**/*.go", "**/*.rs", "**/*.java", "**/*.yml", "**/*.yaml", "**/*.toml", "**/*.json"]
+disallowed_patterns = ['(?i)access-control-allow-origin\s*[:=]\s*(?:["]|\x27)\*(?:["]|\x27)', '(?i)(?:["]|\x27)?origin(?:["]|\x27)?\s*[:=]\s*(?:["]|\x27)\*(?:["]|\x27)']
+message = "A wildcard cross-origin origin should be reviewed against the route's data and credential policy."
+risk = "Broad cross-origin access can expose authenticated or sensitive responses to unintended callers."
+expected = "Use an explicit origin allowlist or document why this route is intentionally public and credential-free."
+verification = "Review the route, credential mode, and response data in context, then rerun quality-runner after resolving or accepting the exception."
+
+[[agent_reviews]]
+id = "secrets-and-redaction"
+category = "security-secrets"
+severity = "observation"
+paths = ["**/*.py", "**/*.js", "**/*.jsx", "**/*.ts", "**/*.tsx", "**/*.go", "**/*.rs", "**/*.java", "**/*.yml", "**/*.yaml", "**/*.toml", "**/*.json", "**/*.md"]
+focus = ["hardcoded secrets", "secret fallback values", "sensitive logs", "environment boundaries", "artifact redaction", "secret rotation evidence"]
+rubric = """
+Review source and security artifacts for secret handling and redaction safety.
+
+Report plausible hardcoded credentials, secret-like fallback values, sensitive
+values written to logs or error messages, secrets exposed through public
+environment prefixes, and artifacts that could retain secret material. Cite the
+exact file and line, but never reproduce a secret value in the finding or
+evidence; replace it with <redacted>. Prefer high recall and use low confidence
+when a value may be a placeholder or test fixture. Cross-check the existing
+security scanner findings when available instead of duplicating them blindly.
+Report whether confirmed exposure has rotation or revocation evidence.
+"""
+
+[[agent_reviews]]
+id = "auth-and-authorization"
+category = "security-auth"
+severity = "observation"
+paths = ["**/*.py", "**/*.js", "**/*.jsx", "**/*.ts", "**/*.tsx", "**/*.go", "**/*.rs", "**/*.java", "**/middleware.*", "**/auth/**", "**/routes/**", "**/api/**", "**/*.yml", "**/*.yaml", "**/*.md"]
+focus = ["authentication guards", "object-level authorization", "tenant isolation", "default deny", "session and token validation", "privilege boundaries"]
+rubric = """
+Review authentication and authorization boundaries using source evidence.
+
+Map protected entry points and report plausible gaps where login presence is
+checked without resource-level authorization, tenant or organization scoping is
+missing, default-deny behavior is absent, sessions or tokens are accepted
+without visible validation or expiry checks, or privileged actions are reachable
+through a weaker route. Cite the exact handler, middleware, query, or policy
+boundary. Prefer high recall and use low confidence when shared middleware or
+framework guards may exist elsewhere; search for and cite that evidence before
+calling a gap. Do not infer an auth bypass from a route name alone.
+"""
+
+[[agent_reviews]]
+id = "privacy-and-data-flow"
+category = "privacy"
+severity = "observation"
+paths = ["**/*.py", "**/*.js", "**/*.jsx", "**/*.ts", "**/*.tsx", "**/*.go", "**/*.rs", "**/*.java", "**/*.yml", "**/*.yaml", "**/*.toml", "**/*.json", "**/*.md"]
+focus = ["personal data", "data minimization", "logging and telemetry", "retention", "exports and deletion", "third-party sharing"]
+rubric = """
+Review source and documentation for privacy-sensitive data flows.
+
+Report plausible collection, storage, logging, telemetry, export, deletion, or
+third-party-sharing paths involving personal or sensitive data that lack an
+obvious minimization, purpose, retention, access, or redaction control. Cite the
+exact field, event, serializer, query, integration, or policy document. Prefer
+high recall and use low confidence when the data's sensitivity or user consent
+cannot be established from source alone. Do not declare legal noncompliance;
+describe the evidence gap and the privacy risk that needs confirmation.
+"""
+
+[[agent_reviews]]
+id = "input-and-boundary-security"
+category = "security-inputs"
+severity = "observation"
+paths = ["**/*.py", "**/*.js", "**/*.jsx", "**/*.ts", "**/*.tsx", "**/*.go", "**/*.rs", "**/*.java", "**/*.yml", "**/*.yaml", "**/*.toml", "**/*.json"]
+focus = ["untrusted input", "injection boundaries", "path traversal", "SSRF", "deserialization", "webhook verification", "redirect allowlists"]
+rubric = """
+Review untrusted-input boundaries and security-sensitive sinks.
+
+Report plausible paths from request, query, file, webhook, message, or external
+service input into commands, templates, queries, redirects, file paths,
+deserializers, outbound requests, or side effects without visible validation,
+allowlisting, signature verification, or safe APIs. Cite the source and sink
+lines and distinguish the existing security scan's candidate from the deeper
+context review. Prefer high recall and allow low-confidence observations when
+the validation happens in shared code that is not visible. Do not recommend
+exploit development or invasive testing.
+"""
+
+[[agent_reviews]]
+id = "security-evidence-and-gates"
+category = "security-verification"
+severity = "observation"
+paths = ["**/*.py", "**/*.js", "**/*.jsx", "**/*.ts", "**/*.tsx", "**/*.go", "**/*.rs", "**/*.java", "**/package.json", "**/pyproject.toml", "**/Cargo.toml", "**/*.yml", "**/*.yaml", "**/*.md"]
+focus = ["secret scanning", "dependency audits", "security CI gates", "threat model evidence", "vulnerability reporting", "local-only boundaries"]
+rubric = """
+Review repository security and privacy evidence gates.
+
+Report plausible gaps where secret scanning, dependency auditing, auth tests,
+security regression tests, threat-model evidence, vulnerability reporting, or
+local-only data boundaries are absent, ambiguous, or documented but not wired
+into the quality path. Cite the exact script, workflow, configuration, or
+documentation line. Prefer high recall and use low confidence when a tool may
+be configured outside the repository. Do not require a particular vendor or
+severity threshold without repository evidence supporting that requirement.
+"""

@@ -114,6 +114,12 @@ def _test_strategy_skill_toml() -> str:
     )
 
 
+def _security_privacy_skill_toml() -> str:
+    return (Path(__file__).parents[1] / "docs/examples/security-privacy.toml").read_text(
+        encoding="utf-8"
+    )
+
+
 def _install_skill(tmp_path: Path, skill_id: str, content: str) -> str:
     relative = f".quality-runner/skills/{skill_id}.toml"
     _write(tmp_path / relative, content)
@@ -333,6 +339,93 @@ def test_test_strategy_pack_reports_source_findings_and_review_scopes(tmp_path: 
         "quality-gates-and-evidence",
     }
     assert len(packet["included_files"]) == 2
+
+
+def test_security_privacy_pack_reports_safe_source_findings_and_review_scopes(
+    tmp_path: Path,
+) -> None:
+    from quality_runner.code_quality import create_code_quality_scan
+    from quality_runner.skill_config import load_active_skills
+    from quality_runner.skill_review import build_skill_review_packet
+
+    skill_path = _install_skill(tmp_path, "security-privacy", _security_privacy_skill_toml())
+    source = (
+        "def fetch_profile(url):\n"
+        "    response = requests.get(url, verify=False)\n"
+        "    cors = {'origin': '*'}\n"
+        "    return response.json(), cors\n"
+    )
+    _write(tmp_path / "src/api.py", source)
+    config = _skills_enabled_config(
+        active=["security-privacy"],
+        local=[
+            {
+                "id": "security-privacy",
+                "path": skill_path,
+                "applies_to": ["src/**"],
+            }
+        ],
+    )
+
+    result = create_code_quality_scan(tmp_path, scan={"run_id": "security-privacy"}, config=config)
+    rule_ids = {str(finding["rule_id"]) for finding in result["findings"]}
+    assert "security-privacy/disabled-tls-verification" in rule_ids
+    assert "security-privacy/wildcard-cors-origin" in rule_ids
+    assert result["quality_skills"][0]["id"] == "security-privacy"
+    assert all(
+        "requests.get" not in str(finding["evidence"]) or "verify=False" in str(finding["evidence"])
+        for finding in result["findings"]
+        if str(finding["rule_id"]).startswith("security-privacy/")
+    )
+
+    reviewed = create_code_quality_scan(
+        tmp_path,
+        scan={"run_id": "security-privacy-reviewed"},
+        config=config,
+        skill_review_report={
+            "schema": SKILL_REVIEW_REPORT_SCHEMA,
+            "run_id": "security-privacy-reviewed",
+            "findings": [
+                {
+                    "skill_id": "security-privacy",
+                    "review_id": "auth-and-authorization",
+                    "rule_id": "auth-and-authorization/missing-resource-guard",
+                    "severity": "observation",
+                    "confidence": "low",
+                    "file": "src/api.py",
+                    "line": 1,
+                    "summary": "The profile-fetching boundary has no visible resource authorization check.",
+                    "evidence": "def fetch_profile(url):",
+                    "risk": "A caller may reach a sensitive resource without an object-level authorization decision.",
+                    "expected_improvement": "Add or cite the authorization guard and resource-scope check before the external request.",
+                    "verification": "Rerun quality-runner and the security-focused test command after confirming the guard.",
+                }
+            ],
+        },
+    )
+    assert any(
+        finding["rule_id"] == "auth-and-authorization/missing-resource-guard"
+        for finding in reviewed["findings"]
+    )
+
+    skills, warnings = load_active_skills(tmp_path, config)
+    assert warnings == []
+    packet = build_skill_review_packet(
+        run_id="security-privacy",
+        repo_root=tmp_path,
+        scanned_files=[{"path": "src/api.py", "lines": source.splitlines()}],
+        skills=skills,
+    )
+    assert packet is not None
+    assert len(packet["reviews"]) == 5
+    assert {review["review_id"] for review in packet["reviews"]} == {
+        "secrets-and-redaction",
+        "auth-and-authorization",
+        "privacy-and-data-flow",
+        "input-and-boundary-security",
+        "security-evidence-and-gates",
+    }
+    assert len(packet["included_files"]) == 1
 
 
 def test_quality_skill_surfaces_rule_metadata_confidence_and_coverage(tmp_path: Path) -> None:

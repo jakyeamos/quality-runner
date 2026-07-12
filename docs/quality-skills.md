@@ -167,6 +167,19 @@ test frameworks use different assertion and marker conventions. The agent
 review must use repository evidence to distinguish a real coverage gap from an
 intentional integration test, snapshot, fixture, or exception.
 
+### Starter pack: Security and Privacy
+
+The [Security and Privacy starter pack](examples/security-privacy.toml) adds
+redaction-safe transport and cross-origin observations plus agent reviews for
+secrets, authorization, privacy-sensitive data flows, input boundaries, and
+security evidence gates.
+
+This pack complements Quality Runner's existing security candidate scanner. It
+does not reproduce secret values, attempt exploit development, or treat a
+source-only signal as a confirmed vulnerability. Agent findings must redact
+sensitive evidence and identify the evidence gap or boundary that requires
+confirmation.
+
 Merge a validated report during a run:
 
 ```bash
