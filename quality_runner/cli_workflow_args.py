@@ -45,3 +45,28 @@ def add_worktree_verify_arguments(parser: argparse.ArgumentParser) -> None:
         action="store_true",
         help="Allow disposable verification when the source worktree has local edits",
     )
+
+
+def add_verify_arguments(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
+        "--timeout-seconds",
+        type=int,
+        default=120,
+        help="Per-gate command timeout",
+    )
+    parser.add_argument(
+        "--read-only-gates",
+        action="store_true",
+        help="Skip gates that are known or likely to mutate source files",
+    )
+    parser.add_argument(
+        "--execute-gates",
+        action="store_true",
+        help="Execute discovered repository commands in a disposable worktree",
+    )
+    parser.add_argument(
+        "--allow-mutating-gates",
+        action="store_true",
+        help="Allow known or suspected mutating gates to execute",
+    )
+    add_worktree_verify_arguments(parser)

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, cast
+from typing import Any
 
 from quality_runner.application.gate_verification import run_gate_verification
 from quality_runner.core.audit_contracts import AuditPayload
@@ -21,8 +21,8 @@ def verify_gates_payload(
     allow_mutating_gates: bool = False,
     worktree_mode: str = "in-place",
     allow_dirty_worktree_verify: bool = False,
-    skill_review_report: dict[str, Any] | None = None,
-    intent: dict[str, Any] | None = None,
+    skill_review_report: AuditPayload | None = None,
+    intent: AuditPayload | None = None,
 ) -> dict[str, Any]:
     result = run_gate_verification(
         VerificationRequest(
@@ -39,8 +39,8 @@ def verify_gates_payload(
                 worktree_mode=worktree_mode,
                 allow_dirty_worktree_verify=allow_dirty_worktree_verify,
             ),
-            skill_review_report=_audit_optional_payload(skill_review_report),
-            intent=_audit_optional_payload(intent),
+            skill_review_report=skill_review_report,
+            intent=intent,
         )
     )
     return {
@@ -51,7 +51,3 @@ def verify_gates_payload(
         "artifact_paths": result.artifact_paths,
         "warnings": list(result.warnings),
     }
-
-
-def _audit_optional_payload(payload: dict[str, Any] | None) -> AuditPayload | None:
-    return cast(AuditPayload | None, payload)

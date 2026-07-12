@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
@@ -17,6 +18,7 @@ from quality_runner.gate_controller import (
     record_gate_response,
 )
 from quality_runner.intent import resolve_workflow_intent
+from quality_runner.mcp_journeys import is_journey_tool, journey_tool_payload, journey_tools
 from quality_runner.standards import DEFAULT_PROFILE
 from quality_runner.workflow import generated_run_id, inspect_payload, run_payload
 
@@ -175,6 +177,7 @@ def list_tools() -> list[dict[str, Any]]:
             "inputSchema": propose_fix_schema,
         },
         review_mcp_tool(),
+        *journey_tools(),
     ]
 
 
@@ -182,6 +185,10 @@ def call_tool(name: str, arguments: dict[str, Any] | None = None) -> dict[str, A
     args = arguments or {}
     if name == "quality_runner_doctor":
         return _tool_result(_doctor_payload())
+
+    if is_journey_tool(name):
+        repo_root = _validated_repo_root(args)
+        return _tool_result(journey_tool_payload(name, args, repo_root=repo_root))
 
     if name == "quality_runner_review":
         repo_root = _validated_repo_root(args)
@@ -422,7 +429,7 @@ def _export_handoff_payload(repo_root: Path, run_id: str) -> dict[str, Any]:
     }
 
 
-def _tool_result(payload: dict[str, Any]) -> dict[str, Any]:
+def _tool_result(payload: Mapping[str, object]) -> dict[str, Any]:
     text = json.dumps(payload, indent=2, sort_keys=True)
     return {
         "schema": MCP_RESULT_SCHEMA,

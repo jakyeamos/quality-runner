@@ -1,0 +1,169 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://quality-runner.dev/schemas/outcome.schema.json",
+  "title": "Quality Runner Journey Outcome",
+  "type": "object",
+  "required": [
+    "schema",
+    "journey",
+    "state",
+    "assessment",
+    "confidence",
+    "writes",
+    "safety",
+    "next_action",
+    "summary",
+    "source"
+  ],
+  "properties": {
+    "schema": { "const": "quality-runner-outcome-v0.2" },
+    "journey": { "enum": ["audit", "review", "verify", "runs"] },
+    "state": {
+      "enum": [
+        "complete",
+        "action-required",
+        "awaiting-evidence",
+        "blocked",
+        "failed",
+        "empty"
+      ]
+    },
+    "assessment": {
+      "enum": [
+        "clean",
+        "findings",
+        "inspection-only",
+        "packet-ready",
+        "review-complete",
+        "review-unavailable",
+        "gates-passed",
+        "gates-passed-with-findings",
+        "evidence-incomplete",
+        "gates-failed",
+        "history",
+        "no-history"
+      ]
+    },
+    "run_id": { "type": "string", "minLength": 1 },
+    "confidence": { "$ref": "#/$defs/confidence" },
+    "writes": { "$ref": "#/$defs/writes" },
+    "safety": { "$ref": "#/$defs/safety" },
+    "next_action": { "$ref": "#/$defs/next_action" },
+    "summary": { "type": "string", "minLength": 1 },
+    "source": { "$ref": "#/$defs/source" },
+    "history": { "$ref": "#/$defs/history" }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "confidence": {
+      "type": "object",
+      "required": ["level", "basis", "limitations"],
+      "properties": {
+        "level": { "enum": ["confirmed", "observed", "limited", "none"] },
+        "basis": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "limitations": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        }
+      },
+      "additionalProperties": false
+    },
+    "writes": {
+      "type": "object",
+      "required": ["source_worktree", "state", "artifact_paths"],
+      "properties": {
+        "source_worktree": { "enum": ["unchanged", "branch-switched"] },
+        "state": { "enum": ["none", "artifacts-written"] },
+        "artifact_paths": {
+          "type": "object",
+          "propertyNames": { "minLength": 1 },
+          "additionalProperties": { "type": "string", "minLength": 1 }
+        }
+      },
+      "additionalProperties": false
+    },
+    "safety": {
+      "type": "object",
+      "required": [
+        "mode",
+        "commands_executed",
+        "source_worktree_mutated",
+        "requires_explicit_authorization"
+      ],
+      "properties": {
+        "mode": {
+          "enum": [
+            "scan-only",
+            "evidence-only",
+            "disposable-execution",
+            "read-only-history"
+          ]
+        },
+        "commands_executed": { "type": "boolean" },
+        "source_worktree_mutated": { "type": "boolean" },
+        "requires_explicit_authorization": { "type": "boolean" },
+        "note": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": false
+    },
+    "next_action": {
+      "type": "object",
+      "required": ["kind", "summary", "requires_authorization"],
+      "properties": {
+        "kind": {
+          "enum": [
+            "read-handoff",
+            "provide-review-output",
+            "authorize-verification",
+            "inspect-gate-failure",
+            "inspect-run",
+            "start-audit",
+            "none"
+          ]
+        },
+        "summary": { "type": "string", "minLength": 1 },
+        "command": { "type": "string", "minLength": 1 },
+        "requires_authorization": { "type": "boolean" }
+      },
+      "additionalProperties": false
+    },
+    "source": {
+      "type": "object",
+      "required": ["legacy_schema", "legacy_status"],
+      "properties": {
+        "legacy_schema": { "type": "string", "minLength": 1 },
+        "legacy_status": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": false
+    },
+    "history": {
+      "type": "object",
+      "required": ["runs", "truncated", "unavailable_run_ids"],
+      "properties": {
+        "runs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["run_id", "status"],
+            "properties": {
+              "run_id": { "type": "string", "minLength": 1 },
+              "status": { "type": "string", "minLength": 1 },
+              "lifecycle_status": { "type": "string", "minLength": 1 }
+            },
+            "additionalProperties": false
+          }
+        },
+        "truncated": { "type": "boolean" },
+        "unavailable_run_ids": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "selected_run_id": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": false
+    }
+  }
+}

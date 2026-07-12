@@ -32,8 +32,8 @@ def inspect_payload(
     ci_status_json: Path | None = None,
     include_ignored_paths: list[str] | None = None,
     checkout_most_advanced_branch: bool = False,
-    skill_review_report: dict[str, Any] | None = None,
-    intent: dict[str, Any] | None = None,
+    skill_review_report: AuditPayload | None = None,
+    intent: AuditPayload | None = None,
 ) -> dict[str, Any]:
     resolved_run_id = generated_run_id() if run_id is None else run_id
     branch_warnings = prepare_scan_branch(
@@ -73,8 +73,8 @@ def run_payload(
     ci_status_json: Path | None = None,
     include_ignored_paths: list[str] | None = None,
     checkout_most_advanced_branch: bool = False,
-    skill_review_report: dict[str, Any] | None = None,
-    intent: dict[str, Any] | None = None,
+    skill_review_report: AuditPayload | None = None,
+    intent: AuditPayload | None = None,
 ) -> dict[str, Any]:
     resolved_run_id = generated_run_id() if run_id is None else run_id
     branch_warnings = prepare_scan_branch(
@@ -115,8 +115,8 @@ def _audit_request(
     ci_status_json: Path | None,
     include_ignored_paths: list[str] | None,
     branch_warnings: list[dict[str, str]],
-    skill_review_report: dict[str, Any] | None,
-    intent: dict[str, Any] | None,
+    skill_review_report: AuditPayload | None,
+    intent: AuditPayload | None,
 ) -> AuditRequest:
     return AuditRequest(
         repo_root=repo_root,
@@ -125,8 +125,8 @@ def _audit_request(
         ci_status_json=ci_status_json,
         include_ignored_paths=tuple(include_ignored_paths or []),
         branch_warnings=tuple(_audit_warning(warning) for warning in branch_warnings),
-        skill_review_report=_audit_optional_payload(skill_review_report),
-        intent=_audit_optional_payload(intent),
+        skill_review_report=skill_review_report,
+        intent=intent,
     )
 
 
@@ -136,10 +136,6 @@ def _audit_warning(warning: dict[str, str]) -> AuditWarning:
         "message": warning["message"],
         "path": warning["path"],
     }
-
-
-def _audit_optional_payload(payload: dict[str, Any] | None) -> AuditPayload | None:
-    return cast(AuditPayload | None, payload)
 
 
 def _legacy_payload(payload: AuditPayload) -> dict[str, Any]:

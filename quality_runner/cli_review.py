@@ -118,6 +118,11 @@ def add_review_command(subparsers: argparse._SubParsersAction[argparse.ArgumentP
         default=None,
         help="Local adapter result JSON inside the run artifact directory",
     )
+    parser.add_argument(
+        "--outcome",
+        action="store_true",
+        help="Render the additive v2 journey outcome instead of the legacy result projection",
+    )
     parser.add_argument("--json", action="store_true", help="Emit JSON output")
 
 

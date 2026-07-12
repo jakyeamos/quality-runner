@@ -22,6 +22,10 @@ def test_mcp_lists_quality_runner_tools() -> None:
         "quality_runner_gate_respond",
         "quality_runner_propose_fix",
         "quality_runner_review",
+        "quality_runner_audit_outcome",
+        "quality_runner_review_outcome",
+        "quality_runner_verify_outcome",
+        "quality_runner_runs_outcome",
     }
 
 
@@ -47,6 +51,104 @@ def test_mcp_review_blind_mode_is_packet_only(tmp_path: Path) -> None:
     assert structured["summary"].startswith("Review packet ready:")
     assert "next_action" in structured
     assert structured["breadth"] == "related"
+
+
+def test_mcp_audit_outcome_returns_additive_v2_projection(tmp_path: Path) -> None:
+    write_js_fixture(tmp_path)
+
+    result = call_tool(
+        "quality_runner_audit_outcome",
+        {"repo_root": str(tmp_path), "run_id": "mcp-outcome-audit"},
+    )
+
+    assert result["schema"] == "quality-runner-mcp-result-v0.1"
+    assert result["isError"] is False
+    structured = result["structuredContent"]
+    assert structured["schema"] == "quality-runner-outcome-v0.2"
+    assert structured["journey"] == "audit"
+    assert structured["state"] == "action-required"
+    assert structured["source"] == {
+        "legacy_schema": "quality-runner-run-result-v0.1",
+        "legacy_status": "planned",
+    }
+
+
+def test_mcp_review_outcome_keeps_packet_ready_truthful(tmp_path: Path) -> None:
+    result = call_tool(
+        "quality_runner_review_outcome",
+        {"repo_root": str(tmp_path), "mode": "blind", "run_id": "mcp-outcome-review"},
+    )
+
+    assert result["isError"] is False
+    structured = result["structuredContent"]
+    assert structured["schema"] == "quality-runner-outcome-v0.2"
+    assert structured["journey"] == "review"
+    assert structured["state"] == "awaiting-evidence"
+    assert structured["assessment"] == "packet-ready"
+    assert structured["confidence"]["level"] == "none"
+    assert structured["source"]["legacy_schema"] == "quality-runner-review-result-v0.1"
+
+
+def test_mcp_verify_outcome_defaults_to_evidence_only(tmp_path: Path) -> None:
+    write_js_fixture(tmp_path)
+
+    result = call_tool(
+        "quality_runner_verify_outcome",
+        {"repo_root": str(tmp_path), "run_id": "mcp-outcome-verify"},
+    )
+
+    assert result["isError"] is False
+    structured = result["structuredContent"]
+    assert structured["schema"] == "quality-runner-outcome-v0.2"
+    assert structured["journey"] == "verify"
+    assert structured["state"] == "blocked"
+    assert structured["safety"]["mode"] == "evidence-only"
+    assert structured["next_action"] == {
+        "kind": "authorize-verification",
+        "summary": "Authorize disposable execution to replace evidence-only gate records.",
+        "command": f"quality-runner verify {tmp_path} --run-id mcp-outcome-verify "
+        "--execute-gates --worktree-mode disposable",
+        "requires_authorization": True,
+    }
+
+
+def test_mcp_runs_outcome_reads_history_without_persisting_summaries(tmp_path: Path) -> None:
+    write_js_fixture(tmp_path)
+    audit = call_tool(
+        "quality_runner_audit_outcome",
+        {"repo_root": str(tmp_path), "run_id": "mcp-outcome-history"},
+    )
+    assert audit["isError"] is False
+
+    result = call_tool("quality_runner_runs_outcome", {"repo_root": str(tmp_path)})
+
+    assert result["isError"] is False
+    structured = result["structuredContent"]
+    assert structured["schema"] == "quality-runner-outcome-v0.2"
+    assert structured["journey"] == "runs"
+    assert structured["state"] == "complete"
+    assert structured["assessment"] == "history"
+    assert structured["writes"]["state"] == "none"
+    assert not (
+        tmp_path / ".quality-runner" / "runs" / "mcp-outcome-history" / "run-summary.json"
+    ).exists()
+
+
+def test_mcp_runs_outcome_rejects_an_unsafe_selected_run_id(tmp_path: Path) -> None:
+    response = handle_jsonrpc_message(
+        {
+            "jsonrpc": "2.0",
+            "id": 3,
+            "method": "tools/call",
+            "params": {
+                "name": "quality_runner_runs_outcome",
+                "arguments": {"repo_root": str(tmp_path), "run_id": "../escape"},
+            },
+        }
+    )
+
+    assert response is not None
+    assert response["error"]["code"] == -32602
 
 
 def test_mcp_review_missing_task_is_invalid_params(tmp_path: Path) -> None:
@@ -150,7 +252,7 @@ def test_mcp_initialize_and_tools_list_jsonrpc() -> None:
     assert initialize["result"]["serverInfo"] == {"name": "quality-runner", "version": __version__}
     assert initialize["result"]["capabilities"] == {"tools": {"listChanged": False}}
     assert tools is not None
-    assert len(tools["result"]["tools"]) == 10
+    assert len(tools["result"]["tools"]) == 14
 
 
 def test_mcp_notifications_do_not_return_response() -> None:
@@ -383,4 +485,4 @@ def test_mcp_main_stdio_loop_writes_jsonrpc_response(monkeypatch, capsys) -> Non
     assert exit_code == 0
     response = json.loads(capsys.readouterr().out)
     assert response["id"] == 1
-    assert len(response["result"]["tools"]) == 10
+    assert len(response["result"]["tools"]) == 14

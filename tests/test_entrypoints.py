@@ -70,7 +70,7 @@ def test_module_entrypoint_version_exits_successfully() -> None:
 
 def test_module_entrypoint_rejects_unknown_commands() -> None:
     result = subprocess.run(
-        [sys.executable, "-m", "quality_runner", "audit", "/tmp", "--json"],
+        [sys.executable, "-m", "quality_runner", "unknown-command", "/tmp", "--json"],
         cwd=ROOT,
         check=False,
         capture_output=True,
@@ -78,7 +78,7 @@ def test_module_entrypoint_rejects_unknown_commands() -> None:
     )
 
     assert result.returncode == 2
-    assert "invalid choice: 'audit'" in result.stderr
+    assert "invalid choice: 'unknown-command'" in result.stderr
 
 
 def test_scaffold_entrypoint_functions_import_and_return_success(monkeypatch) -> None:
@@ -88,7 +88,7 @@ def test_scaffold_entrypoint_functions_import_and_return_success(monkeypatch) ->
     from quality_runner.mcp import main as mcp_main
 
     assert cli_main(["--version"]) == 0
-    assert cli_main(["audit"]) == 2
+    assert cli_main(["unknown-command"]) == 2
     assert mcp_main(["--version"]) == 0
     monkeypatch.setattr("sys.stdin", iter([]))
     assert mcp_main([]) == 0
@@ -150,11 +150,17 @@ def test_packaged_console_script_invokes_cli(tmp_path: Path) -> None:
     assert "quality_runner/plugin/manifest.json" in wheel_names
     assert "quality_runner/plugin/SKILL.md" in wheel_names
     assert "quality_runner/core/audit_contracts.py" in wheel_names
+    assert "quality_runner/core/outcome_contracts.py" in wheel_names
     assert "quality_runner/core/review_contracts.py" in wheel_names
     assert "quality_runner/application/audit_v1_artifacts.py" in wheel_names
+    assert "quality_runner/application/outcome_projection.py" in wheel_names
+    assert "quality_runner/application/outcome_projection_support.py" in wheel_names
     assert "quality_runner/application/read_only_audit.py" in wheel_names
     assert "quality_runner/application/review_v1_reports.py" in wheel_names
     assert "quality_runner/application/review_v1_serializers.py" in wheel_names
+    assert "quality_runner/application/run_history.py" in wheel_names
+    assert "quality_runner/compatibility/journey_outcomes.py" in wheel_names
+    assert "quality_runner/mcp_journeys.py" in wheel_names
     assert "quality_runner/review_types.py" in wheel_names
     assert "quality_runner/scan_scope.py" in wheel_names
     assert "quality_runner/security_surface_paths.py" in wheel_names

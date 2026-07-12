@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+from typing import cast
 
 from quality_runner import __version__
 from quality_runner.cli_controller_reports import (
@@ -14,12 +15,45 @@ from quality_runner.cli_fix_proposals import add_fix_proposal_command
 from quality_runner.cli_gate import add_gate_commands
 from quality_runner.cli_handoff import add_handoff_commands
 from quality_runner.cli_human_summary import human_summary
+from quality_runner.cli_journeys import add_journey_commands
+from quality_runner.cli_outcome import OUTCOME_SCHEMA, render_outcome
 from quality_runner.cli_payload import payload_for_args
 from quality_runner.cli_review import add_review_command
 from quality_runner.cli_rollout import add_rollout_command
 from quality_runner.cli_skills import add_skill_commands
-from quality_runner.cli_workflow_args import add_workflow_arguments, add_worktree_verify_arguments
+from quality_runner.cli_workflow_args import (
+    add_verify_arguments,
+    add_workflow_arguments,
+    add_worktree_verify_arguments,
+)
+from quality_runner.core.outcome_contracts import JourneyOutcome
 from quality_runner.standards import DEFAULT_PROFILE
+
+ROOT_HELP = """usage: quality-runner <journey> [options]
+
+Quality Runner records local evidence and the safest next action for a repository.
+
+Start with a journey:
+  audit REPO            inspect a repository and prepare remediation evidence
+  review REPO           prepare or run a fresh, read-only review (--outcome for v2)
+  verify REPO           record gate evidence; execution requires explicit consent
+  runs REPO             read recent evidence without creating new artifacts
+
+Common setup:
+  init REPO             create a starter Quality Runner configuration
+  doctor                confirm local installation readiness
+
+Compatibility commands remain available:
+  inspect, run, verify-gates, status, summarize-run, export-handoff
+
+Advanced operations:
+  refresh, rollout, gate, controller-report, skill, proposal, validation,
+  release-smoke, and worker handoff tools
+
+Run 'quality-runner <command> --help' for options. Audit, verify, and runs emit
+a compact outcome card by default and v2 JSON with --json; review opts in with
+--outcome.
+"""
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -27,8 +61,11 @@ def build_parser() -> argparse.ArgumentParser:
         prog="quality-runner",
         description="Audit a repo and produce an evidence-backed remediation plan.",
     )
+    parser.format_help = lambda: ROOT_HELP
     parser.add_argument("--version", action="version", version=__version__)
     subparsers = parser.add_subparsers(dest="command")
+
+    add_journey_commands(subparsers)
 
     run_parser = subparsers.add_parser("run", help="Inspect a repo and write audit artifacts")
     add_workflow_arguments(run_parser)
@@ -40,28 +77,7 @@ def build_parser() -> argparse.ArgumentParser:
         "verify-gates", help="Record discovered gates and optionally execute them"
     )
     add_workflow_arguments(verify_parser)
-    verify_parser.add_argument(
-        "--timeout-seconds",
-        type=int,
-        default=120,
-        help="Per-gate command timeout",
-    )
-    verify_parser.add_argument(
-        "--read-only-gates",
-        action="store_true",
-        help="Skip gates that are known or likely to mutate source files",
-    )
-    verify_parser.add_argument(
-        "--execute-gates",
-        action="store_true",
-        help="Execute discovered repository commands in a disposable worktree",
-    )
-    verify_parser.add_argument(
-        "--allow-mutating-gates",
-        action="store_true",
-        help="Allow known or suspected mutating gates to execute",
-    )
-    add_worktree_verify_arguments(verify_parser)
+    add_verify_arguments(verify_parser)
 
     refresh_parser = subparsers.add_parser(
         "refresh",
@@ -249,6 +265,8 @@ def main(argv: list[str] | None = None) -> int:
             print(human_summary(payload))
     elif getattr(parsed, "json", False):
         print(json.dumps(payload, indent=2, sort_keys=True))
+    elif payload.get("schema") == OUTCOME_SCHEMA:
+        print(render_outcome(cast(JourneyOutcome, payload)))
     else:
         print(human_summary(payload))
     if (

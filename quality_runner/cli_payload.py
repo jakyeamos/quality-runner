@@ -5,9 +5,10 @@ import json
 import platform
 import sys
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from quality_runner import __version__
+from quality_runner.application.outcome_projection import LegacyPayload
 from quality_runner.cli_controller_reports import (
     controller_report_command_payload,
     controller_report_from_summary_payload,
@@ -26,6 +27,12 @@ from quality_runner.cli_rollout import rollout_command_payload
 from quality_runner.cli_skills import skill_command_payload
 from quality_runner.cli_status import export_handoff_payload, status_payload
 from quality_runner.code_quality import preview_ignored_paths
+from quality_runner.compatibility.journey_outcomes import (
+    audit_journey_outcome,
+    review_journey_outcome,
+    runs_journey_outcome,
+    verify_journey_outcome,
+)
 from quality_runner.config import CONFIG_FILE_NAME, load_repo_config
 from quality_runner.controller_reports import validate_controller_report
 from quality_runner.intent import workflow_intent_from_cli_args
@@ -60,6 +67,14 @@ def payload_for_args(args: argparse.Namespace) -> dict[str, Any]:
         )
     if args.command == "status":
         return status_payload(repo_root=_validated_repo_path(args.repo_path))
+    if args.command == "runs":
+        return _result_payload(
+            runs_journey_outcome(
+                repo_root=_validated_repo_path(args.repo_path),
+                run_id=args.run_id,
+                limit=args.limit,
+            )
+        )
     if args.command == "summarize-run":
         repo_root = _validated_repo_path(args.repo_path)
         summary = build_run_summary(
@@ -98,6 +113,23 @@ def payload_for_args(args: argparse.Namespace) -> dict[str, Any]:
             skill_review_report=_optional_skill_review_report(args),
             intent=workflow_intent_from_cli_args(args, repo_root=repo_root, run_id=args.run_id),
         )
+    if args.command == "audit":
+        repo_root = _validated_repo_path(args.repo_path)
+        return _result_payload(
+            audit_journey_outcome(
+                repo_root=repo_root,
+                run_id=args.run_id,
+                profile=args.profile,
+                ci_status_json=Path(args.ci_status_json) if args.ci_status_json else None,
+                include_ignored_paths=_interactive_include_ignored_paths(args, repo_root),
+                checkout_most_advanced_branch=args.checkout_most_advanced_branch,
+                skill_review_report=_legacy_payload(_optional_skill_review_report(args)),
+                intent=_legacy_payload(
+                    workflow_intent_from_cli_args(args, repo_root=repo_root, run_id=args.run_id)
+                ),
+                inspect_only=args.inspect_only,
+            )
+        )
     if args.command == "inspect":
         repo_root = _validated_repo_path(args.repo_path)
         return inspect_payload(
@@ -127,12 +159,39 @@ def payload_for_args(args: argparse.Namespace) -> dict[str, Any]:
             skill_review_report=_optional_skill_review_report(args),
             intent=workflow_intent_from_cli_args(args, repo_root=repo_root, run_id=args.run_id),
         )
+    if args.command == "verify":
+        repo_root = _validated_repo_path(args.repo_path)
+        return _result_payload(
+            verify_journey_outcome(
+                repo_root=repo_root,
+                run_id=args.run_id,
+                profile=args.profile,
+                ci_status_json=Path(args.ci_status_json) if args.ci_status_json else None,
+                timeout_seconds=args.timeout_seconds,
+                checkout_most_advanced_branch=args.checkout_most_advanced_branch,
+                execute_discovered_gates=args.execute_gates,
+                read_only_gates=args.read_only_gates,
+                allow_mutating_gates=args.allow_mutating_gates,
+                worktree_mode=args.worktree_mode,
+                allow_dirty_worktree_verify=args.allow_dirty_worktree_verify,
+                skill_review_report=_legacy_payload(_optional_skill_review_report(args)),
+                intent=_legacy_payload(
+                    workflow_intent_from_cli_args(args, repo_root=repo_root, run_id=args.run_id)
+                ),
+            )
+        )
     if args.command == "refresh":
         return refresh_command_payload(args, _validated_repo_path(args.repo_path))
     if args.command == "rollout":
         return rollout_command_payload(args)
     if args.command == "review":
-        return review_command_payload(args, _validated_repo_path(args.repo_path))
+        repo_root = _validated_repo_path(args.repo_path)
+        payload = review_command_payload(args, repo_root)
+        if getattr(args, "outcome", False):
+            return _result_payload(
+                review_journey_outcome(cast(LegacyPayload, payload), repo_root=repo_root)
+            )
+        return payload
     if args.command == "gate":
         return gate_command_payload(args, repo_root=_validated_repo_path(args.repo_path))
     if args.command == "gate-status":
@@ -198,6 +257,14 @@ def _optional_skill_review_report(args: argparse.Namespace) -> dict[str, Any] | 
     if not report_path:
         return None
     return load_skill_review_report_json(Path(report_path).expanduser().resolve())
+
+
+def _legacy_payload(payload: dict[str, Any] | None) -> LegacyPayload | None:
+    return cast(LegacyPayload | None, payload)
+
+
+def _result_payload(payload: object) -> dict[str, Any]:
+    return cast(dict[str, Any], payload)
 
 
 def _validated_repo_path(repo_path: str) -> Path:
