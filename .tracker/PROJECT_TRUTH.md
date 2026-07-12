@@ -1,6 +1,26 @@
 # Quality Runner Project Truth
 
-Last updated: 2026-07-07
+Last updated: 2026-07-12
+
+## Current State
+
+The quality-skills audit contract is hardened on feature branch
+`quality-skills-hardening` at commit `ccfc12e`. Deterministic rules now support
+explicit confidence, preserve rule metadata, surface malformed-rule warnings,
+and emit per-rule coverage. Agent-review packets now declare a high-recall
+policy, and run artifacts record active skill versions and content hashes.
+
+## Next Step
+
+Add the first user skill packs and exercise both deterministic findings and
+agent-review report merging against representative source-only repositories.
+
+## Blockers
+
+- Existing packaging entrypoint test fails because it looks for a `0.4.0`
+  wheel metadata path that the current build does not produce.
+- Full-repo Ruff/format and basedpyright retain pre-existing findings outside
+  this change; touched-file checks pass.
 
 Quality Runner is the public, installable quality orchestration package. It owns
 the CLI/MCP workflow for repo inspection, gate evidence, audit generation,
@@ -49,6 +69,12 @@ Current package-mining state:
   artifact contract.
 
 Current verification:
+
+- 2026-07-12: Quality-skills hardening committed as `ccfc12e`. Focused skill and
+  workflow tests passed (`25 passed`); full suite reached `401 passed, 1 failed`
+  on the existing packaging-entrypoint mismatch. Touched-file Ruff, format,
+  targeted basedpyright (`0 errors`), schema JSON parsing, vulture, and the
+  commit-hook Pre-CR check passed.
 
 - 2026-07-07: Prepared `0.4.0` release after extracting structural-scan and
   similarity parser modules, fixing controller-report batch-scope assembly, and
