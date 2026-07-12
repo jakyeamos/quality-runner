@@ -1,6 +1,6 @@
 # Quality Runner Project Truth
 
-Last updated: 2026-07-10
+Last updated: 2026-07-12
 
 ## Current State
 
@@ -10,14 +10,15 @@ to separately authorized humans or agents. It does not own autonomous source
 changes or remote review execution.
 
 `main` is the 0.5.0 release baseline. The protected
-`codex/gpt56-modernization` branch contains the approved-for-review
-modernization audit and plan; no application implementation has started there.
+`codex/gpt56-modernization` branch contains the completed M0 trust-boundary
+implementation in `f36dcf4`, producing an unreleased 0.5.1 candidate. No tag
+or package publication has occurred.
 
 ## Current Position
 
 - Target: a typed v2 core behind CLI, MCP, and compatibility adapters.
-- First implementation slice: M0 — restore release, artifact-boundary, and
-  verification-policy trust.
+- Next implementation slice: M1 — establish typed v2 contracts and remove the
+  Fresh Review type debt.
 - Canonical planning documents: `docs/modernization/`.
 - Public compatibility: retain `quality_evidence_contract` and
   `repo_quality_certifier` during a published transition window.
@@ -32,22 +33,25 @@ modernization audit and plan; no application implementation has started there.
 
 ## Baseline Quality
 
-- Package build and Vulture pass at the release baseline.
-- The full test suite exposes one release-version contract failure.
-- Lint, format, and type checks expose pre-existing Fresh Review and import-order
-  debt.
-- Release smoke currently passes without testing package/runtime/plugin version
-  parity; M0 closes that gap.
+- `uv run --offline pytest -q` passes: 410 tests.
+- Ruff, formatting, Vulture, package build, and release smoke pass.
+- basedpyright has 14 pre-existing Fresh Review TypedDict errors, explicitly
+  deferred to M1; M0 introduces none.
+- Release smoke now checks package/runtime/plugin parity and the release
+  workflow enforces tag, wheel, manifest, and citation contracts.
 
 ## Risks
 
-- Artifact path traversal and symlink safety are inconsistent across public
-  entry points.
-- Untrusted repository gate commands can currently execute under a misleading
-  read-only label.
-- Public release metadata is internally inconsistent.
+- M1 must resolve the 14 Fresh Review typed-contract errors.
+- Existing large-file warnings remain in `repo_quality_certifier/core.py` and
+  `tests/test_cli.py`.
+- User-authored gate commands remain arbitrary code; M0 requires explicit
+  consent and a disposable checkout but does not sandbox those commands.
 
 ## Recent Progress
 
+- 2026-07-12: Completed M0 on `codex/gpt56-modernization` (`f36dcf4`), including
+  safe artifact paths, explicit gate execution policy, release-contract checks,
+  truthful Fresh Review output, and hook-environment isolation.
 - 2026-07-10: Added the modernization audit, target, execution plan, and live
-  progress record on `codex/gpt56-modernization` (commit `a40a811`).
+  progress record (`a40a811`).
