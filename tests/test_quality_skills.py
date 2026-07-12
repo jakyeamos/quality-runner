@@ -108,6 +108,12 @@ def _ui_foundations_skill_toml() -> str:
     )
 
 
+def _test_strategy_skill_toml() -> str:
+    return (Path(__file__).parents[1] / "docs/examples/test-strategy.toml").read_text(
+        encoding="utf-8"
+    )
+
+
 def _install_skill(tmp_path: Path, skill_id: str, content: str) -> str:
     relative = f".quality-runner/skills/{skill_id}.toml"
     _write(tmp_path / relative, content)
@@ -240,6 +246,91 @@ def test_ui_foundations_pack_reports_source_findings_and_review_scopes(tmp_path:
         "states-and-interactions",
         "accessibility-foundations",
         "visual-restraint-and-system-fit",
+    }
+    assert len(packet["included_files"]) == 2
+
+
+def test_test_strategy_pack_reports_source_findings_and_review_scopes(tmp_path: Path) -> None:
+    from quality_runner.code_quality import create_code_quality_scan
+    from quality_runner.skill_config import load_active_skills
+    from quality_runner.skill_review import build_skill_review_packet
+
+    skill_path = _install_skill(tmp_path, "test-strategy", _test_strategy_skill_toml())
+    test_source = (
+        'describe("results", () => {\n'
+        '  test.skip("pending regression", () => {\n'
+        "    runScenario();\n"
+        "  });\n"
+        "});\n"
+    )
+    service_source = "export function loadResults() { return fetch('/api/results'); }\n"
+    _write(tmp_path / "tests/results.test.ts", test_source)
+    _write(tmp_path / "src/results.ts", service_source)
+    config = _skills_enabled_config(
+        active=["test-strategy"],
+        local=[
+            {
+                "id": "test-strategy",
+                "path": skill_path,
+                "applies_to": ["src/**", "tests/**"],
+            }
+        ],
+    )
+
+    result = create_code_quality_scan(tmp_path, scan={"run_id": "test-strategy"}, config=config)
+    rule_ids = {str(finding["rule_id"]) for finding in result["findings"]}
+    assert "test-strategy/skipped-or-focused-test" in rule_ids
+    assert "test-strategy/test-file-without-visible-assertion" in rule_ids
+    assert result["quality_skills"][0]["id"] == "test-strategy"
+
+    reviewed = create_code_quality_scan(
+        tmp_path,
+        scan={"run_id": "test-strategy-reviewed"},
+        config=config,
+        skill_review_report={
+            "schema": SKILL_REVIEW_REPORT_SCHEMA,
+            "run_id": "test-strategy-reviewed",
+            "findings": [
+                {
+                    "skill_id": "test-strategy",
+                    "review_id": "behavior-and-contract-coverage",
+                    "rule_id": "behavior-and-contract-coverage/missing-error-case",
+                    "severity": "observation",
+                    "confidence": "low",
+                    "file": "src/results.ts",
+                    "line": 1,
+                    "summary": "The data-loading contract has no visible test for a failed request.",
+                    "evidence": "export function loadResults() { return fetch('/api/results'); }",
+                    "risk": "A request failure could regress without a test protecting the error behavior.",
+                    "expected_improvement": "Add a regression test for the failed-request behavior and its user-visible outcome.",
+                    "verification": "Rerun quality-runner and the repository test command after adding the regression case.",
+                }
+            ],
+        },
+    )
+    assert any(
+        finding["rule_id"] == "behavior-and-contract-coverage/missing-error-case"
+        for finding in reviewed["findings"]
+    )
+
+    skills, warnings = load_active_skills(tmp_path, config)
+    assert warnings == []
+    packet = build_skill_review_packet(
+        run_id="test-strategy",
+        repo_root=tmp_path,
+        scanned_files=[
+            {"path": "tests/results.test.ts", "lines": test_source.splitlines()},
+            {"path": "src/results.ts", "lines": service_source.splitlines()},
+        ],
+        skills=skills,
+    )
+    assert packet is not None
+    assert len(packet["reviews"]) == 4
+    assert {review["review_id"] for review in packet["reviews"]} == {
+        "behavior-and-contract-coverage",
+        "regression-value",
+        "isolation-and-determinism",
+        "quality-gates-and-evidence",
     }
     assert len(packet["included_files"]) == 2
 

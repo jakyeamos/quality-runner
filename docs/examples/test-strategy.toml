@@ -1,0 +1,108 @@
+id = "test-strategy"
+name = "Test Strategy and Regression"
+version = "0.1.0"
+description = "Source-level signals and high-recall review criteria for behavior coverage, regression value, isolation, determinism, and quality gates."
+
+[[deterministic_rules]]
+id = "skipped-or-focused-test"
+type = "disallowed_pattern"
+category = "test-quality"
+severity = "observation"
+confidence = "low"
+paths = ["**/test_*.py", "**/*_test.py", "**/*.test.js", "**/*.test.jsx", "**/*.test.ts", "**/*.test.tsx", "**/*.spec.js", "**/*.spec.jsx", "**/*.spec.ts", "**/*.spec.tsx"]
+disallowed_patterns = ['\.(?:skip|only)\s*\(', '\b(?:xit|xdescribe)\s*\(', 'pytest\.mark\.skip', '@unittest\.skip', '(?i:\bxfail\b)']
+message = "Skipped, focused, or expected-failure tests should be reviewed before they are treated as durable coverage."
+risk = "The test suite may omit regression coverage or pass only because a focused or skipped path is not exercising the full suite."
+expected = "Resolve the test marker, document the intentional exception, or add a tracked follow-up with an owner and verification path."
+verification = "Review the test marker in context, then rerun the repository's complete test command after resolving or accepting the exception."
+
+[[deterministic_rules]]
+id = "test-file-without-visible-assertion"
+type = "trigger_without_required"
+category = "test-quality"
+severity = "observation"
+confidence = "low"
+paths = ["**/test_*.py", "**/*_test.py", "**/*.test.js", "**/*.test.jsx", "**/*.test.ts", "**/*.test.tsx", "**/*.spec.js", "**/*.spec.jsx", "**/*.spec.ts", "**/*.spec.tsx"]
+trigger_patterns = ['(?i:\b(?:test|it|describe)\s*\()', '\bdef\s+test_', '(?i:\b(?:pytest|jest|vitest|unittest)\b)']
+required_patterns = ['(?i:\b(?:assert|expect|snapshot|should|to[A-Za-z]+|assertThat)\b)']
+message = "A test file contains test-like declarations without a visible assertion or expectation."
+risk = "The test may execute setup without protecting behavior, a contract, or a regression."
+expected = "Add a behavior assertion, or document why the test intentionally verifies an effect such as a snapshot, event, or process exit."
+verification = "Review the test's purpose in context, then rerun the repository's complete test command after resolving or accepting the observation."
+
+[[agent_reviews]]
+id = "behavior-and-contract-coverage"
+category = "test-coverage"
+severity = "observation"
+paths = ["**/*.py", "**/*.js", "**/*.jsx", "**/*.ts", "**/*.tsx", "**/*.go", "**/*.rs", "**/*.java", "**/*_test.py", "**/*.test.js", "**/*.test.jsx", "**/*.test.ts", "**/*.test.tsx", "**/*.spec.js", "**/*.spec.jsx", "**/*.spec.ts", "**/*.spec.tsx"]
+focus = ["public contracts", "domain rules", "state transitions", "edge cases", "error paths", "regression coverage"]
+rubric = """
+Review source and tests for behavior and contract coverage.
+
+Map public functions, endpoints, commands, domain rules, state transitions, and
+important error paths to the tests that protect them. Report every plausible
+coverage gap with concrete file, line, and source evidence. Prefer high recall;
+use low confidence when the mapping is incomplete but the risk is credible.
+Prioritize user-visible behavior, public contracts, data boundaries, and
+confirmed regressions over line-count coverage. Do not require tests for
+trivial wiring without a meaningful behavior risk, and do not invent a missing
+contract that the source does not establish.
+"""
+
+[[agent_reviews]]
+id = "regression-value"
+category = "test-value"
+severity = "observation"
+paths = ["**/*_test.py", "**/*.test.js", "**/*.test.jsx", "**/*.test.ts", "**/*.test.tsx", "**/*.spec.js", "**/*.spec.jsx", "**/*.spec.ts", "**/*.spec.tsx", "**/test_*.py"]
+focus = ["behavior assertions", "regression protection", "implementation-detail coupling", "over-mocking", "redundant tests", "snapshot value"]
+rubric = """
+Review tests for whether they provide durable regression value.
+
+Report plausible tests that assert implementation details instead of observable
+behavior, rely on excessive mocks, duplicate another test without protecting a
+distinct contract, or use snapshots without a clear reviewable product or
+protocol surface. Also report missing regression assertions when a test name or
+fixture clearly identifies a bug or boundary case but the expected behavior is
+not asserted. Cite the exact test and evidence. Prefer high recall and allow
+low-confidence observations when the framework's intent is not fully visible.
+Do not label a mock or snapshot as low value without explaining the protected
+behavior that appears absent.
+"""
+
+[[agent_reviews]]
+id = "isolation-and-determinism"
+category = "test-reliability"
+severity = "observation"
+paths = ["**/*_test.py", "**/*.test.js", "**/*.test.jsx", "**/*.test.ts", "**/*.test.tsx", "**/*.spec.js", "**/*.spec.jsx", "**/*.spec.ts", "**/*.spec.tsx", "**/test_*.py"]
+focus = ["shared mutable state", "time and randomness", "network access", "cleanup", "order dependence", "retries"]
+rubric = """
+Review tests for isolation, determinism, and reliable cleanup.
+
+Report plausible sources of order dependence, shared mutable state, real
+network calls, uncontrolled time or randomness, leaked resources, missing
+cleanup, and retries that could hide failures. Cite the exact fixture, hook,
+mock, client, timer, or test ordering evidence. Prefer high recall and use low
+confidence when the execution environment is not fully visible. Distinguish
+intentional integration or end-to-end tests from accidental nondeterminism, and
+do not require unit-test isolation rules for tests explicitly designed to verify
+real external boundaries.
+"""
+
+[[agent_reviews]]
+id = "quality-gates-and-evidence"
+category = "verification"
+severity = "observation"
+paths = ["**/*.py", "**/*.js", "**/*.jsx", "**/*.ts", "**/*.tsx", "**/*.go", "**/*.rs", "**/*.java", "**/package.json", "**/pyproject.toml", "**/Makefile", "**/Taskfile.yml", "**/*.yml", "**/*.yaml", "**/*.md"]
+focus = ["test commands", "CI execution", "coverage evidence", "changed-surface verification", "failure reporting", "test documentation"]
+rubric = """
+Review repository quality-gate source for test strategy and evidence quality.
+
+Report plausible gaps where tests are not wired into the documented or CI
+quality path, required test commands are ambiguous, failures can be hidden,
+coverage or regression evidence is not produced for an important surface, or
+the repository documents a test promise that its scripts do not enforce. Cite
+the exact script, workflow, configuration, or documentation line. Prefer high
+recall and use low confidence when the repository's deployment environment is
+not available. Do not require a specific CI provider or coverage percentage
+without repository evidence supporting that requirement.
+"""

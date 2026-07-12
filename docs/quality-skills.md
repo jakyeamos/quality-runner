@@ -154,6 +154,19 @@ review prompts, not automatic proof that a design choice is wrong. Copy it into
 `.quality-runner/skills/`, add it to `[quality_runner.skills.local]`, and scope it
 to the repository's UI source paths before activating it.
 
+### Starter pack: Test Strategy and Regression
+
+The [Test Strategy and Regression starter pack](examples/test-strategy.toml)
+converts the test-strategy corpus into source-level signals for skipped or
+focused tests and test files without visible assertions. Its agent reviews cover
+behavior and contract coverage, regression value, isolation and determinism, and
+quality-gate evidence.
+
+The deterministic checks are intentionally low-confidence observations because
+test frameworks use different assertion and marker conventions. The agent
+review must use repository evidence to distinguish a real coverage gap from an
+intentional integration test, snapshot, fixture, or exception.
+
 Merge a validated report during a run:
 
 ```bash
