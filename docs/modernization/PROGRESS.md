@@ -2,11 +2,11 @@
 
 ## Current state
 
-M0 through M6 are implemented on the protected branch
+M0 through M7 are implemented on the protected branch
 `codex/gpt56-modernization`, based on `main` commit `0a3def1`. The branch
 remains isolated until review and merge.
 
-M7 is in progress. Its first confidentiality hardening slice (`113f143`)
+M7 is complete in `279cc8a`. Its first confidentiality hardening slice (`113f143`)
 redacts secret-like source literals before candidate fingerprints and any
 security-scan, audit, or handoff artifact persistence; a normal-run regression
 scans every generated artifact for the original marker.
@@ -45,6 +45,11 @@ Its release repair (`cd30948`) requires a tag-triggered publish to prove its
 commit is an ancestor of `main`; CI, release, and installed-wheel tests exercise
 default v2 and frozen v1 Review output. The canonical rollback and Homebrew
 guidance now disclose v0.5.0's historical display mismatch and template state.
+
+Its final hardening (`279cc8a`) redacts same-line and multiline source evidence
+through typed, concatenated, and template-literal forms before code-quality,
+excerpt, or security-candidate persistence. CI/release and installed-wheel
+tests now execute the MCP v2 Review outcome, not just tool discovery.
 
 M0 restores the public trust boundary without changing artifact schema ids:
 
@@ -166,11 +171,12 @@ changing installed surfaces:
 
 ## Quality status
 
-- The full `pytest` suite passes (520 tests); Basedpyright reports zero errors.
-- Ruff lint/format, Vulture, a fresh package build, and
+- The full `pytest` suite passes (533 tests); Basedpyright reports zero errors.
+- Ruff lint/format, Vulture, lock and workflow-YAML validation, a fresh package
+  build, default/v1 CLI review, MCP Review outcome, and
   `quality-runner release-smoke --json` pass.
 
 ## Next milestone
 
-M7 establishes repeatable built-distribution release evidence, explicit upgrade
-and rollback guidance, deprecation notices, and operational troubleshooting.
+M7 is complete. The next action is independent branch review and merge; tag
+only after the release commit is reachable from `main`.

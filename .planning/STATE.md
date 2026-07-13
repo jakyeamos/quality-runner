@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: GPT-5.6 modernization
-status: active
-last_updated: "2026-07-13T01:46:51Z"
+status: complete
+last_updated: "2026-07-13T03:53:09Z"
 progress:
   total_phases: 8
-  completed_phases: 7
+  completed_phases: 8
   total_plans: 8
-  completed_plans: 7
-  percent: 88
+  completed_plans: 8
+  percent: 100
 ---
 
 # Planning State
@@ -22,8 +22,7 @@ See `.planning/PROJECT.md` for the established product boundary and
 **Core value:** Give developers and agents trustworthy local evidence before
 they authorize repository changes.
 
-**Current focus:** M7 — release readiness, cutover guidance, and operational
-hardening.
+**Current focus:** M7 complete — independent branch review and merge readiness.
 
 ## Current Position
 
@@ -38,22 +37,18 @@ hardening.
 - M5 — make Fresh Review operationally honest: complete in `f5c8610`
 - M6 — isolate compatibility and retire duplicate foundations: complete in
   `0b5ac2e` and `56c94d4`
-- M7 — release hardening: in progress; its first confidentiality slice is
-  complete in `113f143` and reproducible distribution evidence is complete in
-  `66ce3ef`; Fresh Review v2 is now the default in `32e7b26`, with release and
-  rollback guidance in `633b96e`; `9fcea7d` restores the published positional
-  and Review v1 compatibility shapes; `4dee5af` extends source-evidence
-  redaction through code-quality and remediation artifacts, with its neutral
-  dependency boundary fixed in `27deaa4`; `cd30948` gates tag publication on
-  `main` ancestry and smoke-tests both installed Review projections
+- M7 — release hardening: complete in `279cc8a`; source-evidence redaction now
+  covers same-line, multiline, typed, concatenated, and template-literal values,
+  while CI/release smoke a built wheel's default v2, frozen v1, and MCP outcome
+  paths.
 
 ## Active Phase
 
 - **Phase:** M7
 - **Slug:** release-hardening
-- **Status:** In progress
-- **Completion gate:** release, cutover, and rollback evidence is reproducible
-  from a built distribution and published guidance reflects actual behavior.
+- **Status:** Complete
+- **Completion gate:** passed with 533 tests, locked static checks, a built
+  0.5.1 wheel, release smoke, default/v1 CLI review, and MCP outcome smoke.
 
 ## Key Decisions
 
@@ -75,12 +70,14 @@ hardening.
 
 ## Next Step
 
-Finish the security-evidence and release-pipeline review fixes, then run the
-full locked validation ladder, build and smoke the distribution, record M7
-completion, and push the branch.
+Run independent branch review and merge `codex/gpt56-modernization`; tag only
+after the release commit is reachable from `main`.
 
 ## Recent Progress
 
+- 2026-07-13: M7 completed in `279cc8a`: final redaction hardening covers
+  multiline typed, concatenated, and template literals across code-quality,
+  excerpts, and security candidates; built-wheel MCP execution is smoke-tested.
 - 2026-07-13: M7 release hardening in `cd30948`: release tags must be reachable
   from `main`; CI/release and wheel tests exercise default v2 and frozen v1
   Review behavior; operator docs now disclose the old 0.5.0 display mismatch.
@@ -117,5 +114,3 @@ completion, and push the branch.
 - 2026-07-12: M3 `8705cc1` completed; typed verification service, v1 artifacts, disposable cleanup, minimal environment, and full validation passed.
 - 2026-07-12: M2 `3f23204` completed; typed audit, v1 artifacts, shared scopes, and compatibility validation passed.
 - 2026-07-12: M1 `cb12746` completed; typed review contracts and v1 projections passed full validation.
-- 2026-07-12: M0 `f36dcf4` completed; trust-boundary hardening and release checks passed.
-- 2026-07-10: Modernization audit and execution plan recorded in `a40a811`.

@@ -23,7 +23,7 @@ handoffs, and truthful artifact/outcome reporting. The branch is an unreleased
 behind explicit workflow and outcome façades, with installed-wheel facade
 checks. M6 completes in `56c94d4`: packet construction and report normalization
 now have application owners, while root review façades retain their v1 type and
-direct-combined compatibility contracts. M7 is in progress: `113f143` redacts
+direct-combined compatibility contracts. M7 is complete: `113f143` redacts
 secret-like candidate literals before they are fingerprinted or persisted, and
 `66ce3ef` locks the development toolchain while testing doctor, v2 outcomes,
 and MCP discovery from the built wheel. `32e7b26` makes CLI Fresh Review v2
@@ -39,14 +39,16 @@ and remediation excerpts so source-secret markers do not persist in those paths;
 `27deaa4` moves the helper to a neutral module to preserve the import boundary.
 `cd30948` requires release tags to be ancestors of `main`, smoke-tests default
 v2 and frozen v1 Review behavior from installed wheels, and corrects the
-release, rollback, and Homebrew guidance.
+release, rollback, and Homebrew guidance. M7 completes in `279cc8a`: source
+evidence redaction now covers multiline typed, concatenated, and template
+literals across code-quality, remediation excerpts, and security candidates;
+CI/release and installed-wheel tests execute the MCP v2 Review outcome.
 
 ## Current Position
 
 - Target: a typed v2 core behind CLI, MCP, and compatibility adapters.
-- Next implementation slice: close final security-evidence and release-pipeline
-  findings, then run locked validation, built-wheel smoke, and adversarial
-  review for M7 completion.
+- Next implementation slice: M7 is complete; conduct independent branch review
+  and merge, then tag only after the release commit reaches `main`.
 - Canonical planning documents: `docs/modernization/`.
 - Public compatibility: retain `quality_evidence_contract` and
   `repo_quality_certifier` during a published transition window.
@@ -63,17 +65,15 @@ release, rollback, and Homebrew guidance.
 
 ## Baseline Quality
 
-- The full 520-test pytest suite, Ruff lint/format, Basedpyright, Vulture,
-  package build, and release smoke pass.
+- The full 533-test pytest suite, Ruff lint/format, Basedpyright, Vulture,
+  lock validation, YAML validation, package build, and release smoke pass.
 - Basedpyright reports zero errors; audit, review, verify, and run history now
   have a versioned v2 outcome contract behind preserved v1 projections.
 - Release smoke now checks package/runtime/plugin parity and the release
-  workflow enforces tag, wheel, manifest, and citation contracts.
+  workflow enforces tag, wheel, manifest, citation, and MCP outcome contracts.
 
 ## Risks
 
-- M7 must keep public v1 readers and rollback guidance accurate while any v2
-  default or deprecation policy is documented.
 - Generated evidence can contain target-repository output; it remains local and
   must be handled as potentially sensitive even after source-evidence redaction.
 - Existing large-file warnings remain in `repo_quality_certifier/core.py` and
@@ -85,6 +85,9 @@ release, rollback, and Homebrew guidance.
 
 ## Recent Progress
 
+- 2026-07-13: M7 completed in `279cc8a`: context-aware redaction covers
+  multiline source evidence and security candidates; built wheels smoke the MCP
+  Review outcome as well as default v2 and frozen v1 CLI output.
 - 2026-07-13: `cd30948` adds `main`-ancestry release gating, built-wheel Review
   projection checks, and accurate historical rollback/Homebrew documentation.
 - 2026-07-13: `4dee5af` closes the source-evidence redaction bypass across
@@ -121,8 +124,3 @@ release, rollback, and Homebrew guidance.
 - 2026-07-12: Completed M1 on `codex/gpt56-modernization` (`cb12746`): strict
   review core/application contracts, fixed v1 baseline fixtures, closed-schema
   readers, and public typed compatibility adapters.
-- 2026-07-12: Completed M0 on `codex/gpt56-modernization` (`f36dcf4`), including
-  safe artifact paths, explicit gate execution policy, release-contract checks,
-  truthful Fresh Review output, and hook-environment isolation.
-- 2026-07-10: Added the modernization audit, target, execution plan, and live
-  progress record (`a40a811`).
