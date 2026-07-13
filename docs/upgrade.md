@@ -2,10 +2,9 @@
 
 ## Release state
 
-This branch is an unreleased `0.5.1` candidate. `v0.5.0` is the current
-published compatibility baseline. The cutover policy below takes effect only
-when `v0.5.1` is published; it does not claim that the candidate is available
-from PyPI yet.
+This guide covers `0.5.1`. `v0.5.0` is the prior published compatibility
+baseline. The cutover policy applies when `0.5.1` is installed; until its PyPI
+artifact is available, install from source or wait for publication.
 
 ## Upgrade and rollback
 
@@ -16,7 +15,7 @@ uv tool upgrade quality-runner
 quality-runner doctor --json
 ```
 
-To select the published candidate version explicitly:
+To select the release version explicitly:
 
 ```bash
 uv tool upgrade 'quality-runner==0.5.1'

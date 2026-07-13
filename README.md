@@ -249,9 +249,15 @@ See [MCP Integration](docs/mcp.md) for JSON-RPC examples and tool payloads.
 
 Quality Runner writes versioned JSON and Markdown artifacts. See
 [Artifact Contract](docs/artifacts.md) for the current v1 artifact set and
-field-level guarantees. Treat generated target-repository evidence as
-potentially sensitive until it has been reviewed for local paths, gate output,
-and source-derived content.
+field-level guarantees.
+
+Recognized secret-like source values are redacted before security and
+code-quality findings are fingerprinted or serialized; source excerpts in
+remediation slices receive the same protection. This does not make artifacts
+secret-free, so treat generated target-repository evidence as potentially
+sensitive until it has been reviewed for local paths, gate output, and
+source-derived content. See the [Upgrade and Compatibility Guide](docs/upgrade.md)
+for the narrow re-triage rule for newly redacted complex or multiline evidence.
 
 Semantic code similarity is a structural quality signal, not an automatic
 refactor. When `similarity-ts`, `similarity-py`, or `similarity-rs` are already

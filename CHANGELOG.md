@@ -2,7 +2,7 @@
 
 All notable changes to Quality Runner are documented here.
 
-## 0.5.1 - Unreleased
+## 0.5.1 - 2026-07-13
 
 - Hardened artifact path resolution and made discovered-command execution an
   explicit, disposable-checkout action.
@@ -11,6 +11,10 @@ All notable changes to Quality Runner are documented here.
   citation metadata.
 - Made packet-only Fresh Review outcomes explicit instead of resembling a
   no-findings review.
+- Added outcome-first audit, review, verify, and run-history journeys while
+  retaining published v1 CLI, MCP, artifact, and compatibility projections.
+- Hardened source-evidence redaction across security, code-quality, and
+  remediation artifacts, including complex multiline and lexical edge cases.
 
 ## 0.5.0 - 2026-07-09
 
