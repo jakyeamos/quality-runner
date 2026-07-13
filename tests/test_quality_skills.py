@@ -120,6 +120,12 @@ def _security_privacy_skill_toml() -> str:
     )
 
 
+def _release_readiness_skill_toml() -> str:
+    return (Path(__file__).parents[1] / "docs/examples/release-readiness.toml").read_text(
+        encoding="utf-8"
+    )
+
+
 def _install_skill(tmp_path: Path, skill_id: str, content: str) -> str:
     relative = f".quality-runner/skills/{skill_id}.toml"
     _write(tmp_path / relative, content)
@@ -426,6 +432,87 @@ def test_security_privacy_pack_reports_safe_source_findings_and_review_scopes(
         "security-evidence-and-gates",
     }
     assert len(packet["included_files"]) == 1
+
+
+def test_release_readiness_pack_reports_release_signals_and_review_scopes(tmp_path: Path) -> None:
+    from quality_runner.code_quality import create_code_quality_scan
+    from quality_runner.skill_config import load_active_skills
+    from quality_runner.skill_review import build_skill_review_packet
+
+    skill_path = _install_skill(tmp_path, "release-readiness", _release_readiness_skill_toml())
+    release_workflow = (
+        "name: release\n"
+        "jobs:\n"
+        "  release:\n"
+        "    steps:\n"
+        "      - run: uv publish\n"
+        "      - continue-on-error: true\n"
+    )
+    source = "export function releaseArtifact() { return publishArtifact(); }\n"
+    _write(tmp_path / "config/release.yml", release_workflow)
+    _write(tmp_path / "src/release.ts", source)
+    config = _skills_enabled_config(
+        active=["release-readiness"],
+        local=[{"id": "release-readiness", "path": skill_path}],
+    )
+
+    result = create_code_quality_scan(tmp_path, scan={"run_id": "release-readiness"}, config=config)
+    rule_ids = {str(finding["rule_id"]) for finding in result["findings"]}
+    assert "release-readiness/verification-bypass" in rule_ids
+    assert "release-readiness/release-job-without-quality-command" in rule_ids
+    assert result["quality_skills"][0]["id"] == "release-readiness"
+
+    reviewed = create_code_quality_scan(
+        tmp_path,
+        scan={"run_id": "release-readiness-reviewed"},
+        config=config,
+        skill_review_report={
+            "schema": SKILL_REVIEW_REPORT_SCHEMA,
+            "run_id": "release-readiness-reviewed",
+            "findings": [
+                {
+                    "skill_id": "release-readiness",
+                    "review_id": "release-evidence",
+                    "rule_id": "release-evidence/missing-build-proof",
+                    "severity": "observation",
+                    "confidence": "low",
+                    "file": "config/release.yml",
+                    "line": 1,
+                    "summary": "The release workflow does not show build or test evidence before publication.",
+                    "evidence": "name: release",
+                    "risk": "The published artifact may not be verified by the repository's quality path.",
+                    "expected_improvement": "Add or cite the build and test gates that must pass before publication.",
+                    "verification": "Rerun quality-runner and the release verification workflow after adding the evidence.",
+                }
+            ],
+        },
+    )
+    assert any(
+        finding["rule_id"] == "release-evidence/missing-build-proof"
+        for finding in reviewed["findings"]
+    )
+
+    skills, warnings = load_active_skills(tmp_path, config)
+    assert warnings == []
+    packet = build_skill_review_packet(
+        run_id="release-readiness",
+        repo_root=tmp_path,
+        scanned_files=[
+            {"path": "config/release.yml", "lines": release_workflow.splitlines()},
+            {"path": "src/release.ts", "lines": source.splitlines()},
+        ],
+        skills=skills,
+    )
+    assert packet is not None
+    assert len(packet["reviews"]) == 5
+    assert {review["review_id"] for review in packet["reviews"]} == {
+        "release-evidence",
+        "ship-blockers-and-quality-ladder",
+        "compatibility-and-change-surface",
+        "rollback-and-operations",
+        "handoff-and-communication",
+    }
+    assert len(packet["included_files"]) == 2
 
 
 def test_quality_skill_surfaces_rule_metadata_confidence_and_coverage(tmp_path: Path) -> None:

@@ -180,6 +180,18 @@ source-only signal as a confirmed vulnerability. Agent findings must redact
 sensitive evidence and identify the evidence gap or boundary that requires
 confirmation.
 
+### Starter pack: Release Readiness
+
+The [Release Readiness starter pack](examples/release-readiness.toml) adds
+observations for verification bypasses and release workflows without visible
+quality commands. Its agent reviews cover ship evidence, blockers, compatibility
+risk, rollback and operations, and release handoff communication.
+
+The pack treats missing evidence as a finding, but does not assume that a
+configured command passed or that a repository-local workflow contains the full
+deployment environment. Those conclusions remain evidence-backed agent review
+questions.
+
 Merge a validated report during a run:
 
 ```bash
