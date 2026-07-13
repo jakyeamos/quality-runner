@@ -5,7 +5,7 @@ Last updated: 2026-07-12
 ## Current State
 
 The quality-skills audit contract is hardened on feature branch
-`quality-skills-hardening` at commit `156b2ec0`. The source-backed user packs
+`quality-skills-hardening` at commit `56b2ec0`. The source-backed user packs
 `ui-foundations`, `test-strategy`, `security-privacy`, `release-readiness`, and
 `pr-risk` now cover visual and UI-state risks, behavior coverage, regression
 value, test reliability, transport and cross-origin risks, authorization,
@@ -97,7 +97,7 @@ Current verification:
   packaging-entrypoint mismatch.
 
 - 2026-07-12: Added and committed the `pr-risk` starter pack as
-  `156b2ec0`. Focused quality-skill tests passed (`28 passed`), pack ingest,
+  `56b2ec0`. Focused quality-skill tests passed (`28 passed`), pack ingest,
   TOML parsing, touched-file Ruff, format, and agent-review report merging
   passed. Full suite reached `406 passed, 1 failed` on the existing
   packaging-entrypoint mismatch.
