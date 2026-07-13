@@ -40,8 +40,8 @@ def test_release_docs_describe_current_release_plan_and_release_history() -> Non
     assert "multi-repo `rollout` workflow" in changelog
     assert "gate controller runs" in changelog
     assert "security scan surfaces" in changelog
-    assert "v0.4.0" in release_docs
-    assert "Do not reuse `v0.1.0`, `v0.2.0`, `v0.3.0`, or `v0.3.1`" in release_docs
+    assert "v0.5.0" in release_docs
+    assert "Do not reuse `v0.1.0`, `v0.2.0`, `v0.3.0`, `v0.3.1`, or `v0.4.0`" in release_docs
     assert "Do not reuse `v0.1.0`" in release_docs
     assert "Trusted Publisher" in release_docs
     assert "before tagging" in release_docs
