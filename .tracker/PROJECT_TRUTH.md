@@ -45,15 +45,16 @@ literals across code-quality, remediation excerpts, and security candidates;
 CI/release and installed-wheel tests execute the MCP v2 Review outcome.
 Independent post-M7 review found four P2 release blockers. `bf6c9e7` closes
 the source-evidence redaction bypasses for typed, commented, and expression
-assignments; the branch remains unmerged while the remaining schema and
-operator-documentation repairs are completed and revalidated.
+assignments. `b4b5e6e` preserves the v0.1 gate schema, emits the consent-aware
+v0.2 artifact, and repairs the packaged skill and clean-install release path.
+The branch remains unmerged pending full validation and a focused follow-up
+review.
 
 ## Current Position
 
 - Target: a typed v2 core behind CLI, MCP, and compatibility adapters.
-- Next implementation slice: finish the remaining independent-review P2
-  repairs, repeat the release gate, then fast-forward merge only when no
-  P0/P1/P2 findings remain.
+- Next implementation slice: repeat the release gate and focused follow-up
+  review, then fast-forward merge only when no P0/P1/P2 findings remain.
 - Canonical planning documents: `docs/modernization/`.
 - Public compatibility: retain `quality_evidence_contract` and
   `repo_quality_certifier` during a published transition window.
@@ -72,8 +73,8 @@ operator-documentation repairs are completed and revalidated.
 
 - The M7 full 533-test pytest suite, Ruff lint/format, Basedpyright, Vulture,
   lock validation, YAML validation, package build, and release smoke passed.
-  The post-review source-redaction regression suite passes; full release
-  validation remains required after the remaining P2 repairs.
+  The post-review 87-test security, schema, compatibility, workflow, and
+  documentation suite passes; full release validation remains required.
 - Basedpyright reports zero errors; audit, review, verify, and run history now
   have a versioned v2 outcome contract behind preserved v1 projections.
 - Release smoke now checks package/runtime/plugin parity and the release
@@ -93,8 +94,8 @@ operator-documentation repairs are completed and revalidated.
 ## Recent Progress
 
 - 2026-07-13: Independent merge review found four P2s. `bf6c9e7` closes
-  typed/commented/expression source-evidence redaction gaps; versioned gate
-  schema and release-documentation repairs remain in progress.
+  typed/commented/expression source-evidence gaps; `b4b5e6e` preserves v0.1,
+  emits v0.2 consent-aware gates, and corrects skill/release instructions.
 - 2026-07-13: M7 completed in `279cc8a`: context-aware redaction covers
   multiline source evidence and security candidates; built wheels smoke the MCP
   Review outcome as well as default v2 and frozen v1 CLI output.
