@@ -5,7 +5,7 @@ Last updated: 2026-07-12
 ## Current State
 
 The quality-skills audit contract is hardened on feature branch
-`quality-skills-hardening` at commit `14724fcc`. The source-backed user packs
+`quality-skills-hardening` at commit `4724fcc`. The source-backed user packs
 `ui-foundations`, `test-strategy`, `security-privacy`, `release-readiness`,
 `pr-risk`, `data-integrity`, `developer-experience`, and
 `architecture-maintainability` now cover visual and UI-state risks, behavior
@@ -119,7 +119,7 @@ Current verification:
   packaging-entrypoint mismatch.
 
 - 2026-07-12: Added and committed the `architecture-maintainability` starter
-  pack as `14724fcc`. Focused quality-skill tests passed (`31 passed`), pack
+  pack as `4724fcc`. Focused quality-skill tests passed (`31 passed`), pack
   ingest, TOML parsing, touched-file Ruff, format, and agent-review report
   merging passed. Full suite reached `409 passed, 1 failed` on the existing
   packaging-entrypoint mismatch.
