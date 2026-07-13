@@ -32,7 +32,8 @@ dry-run-first retention pruning, and redaction-safe gate-run persistence. The
 repository config declares an executable `security_dependency_audit` gate that
 exports the locked dependency set and runs `pip-audit` without auditing the
 editable local project. Final dogfood reports that gate as passed through the
-Quality Runner executor.
+Quality Runner executor. The full test suite now passes with `419 passed`
+after aligning the runtime version and packaged metadata on `0.5.0`.
 
 ## Next Step
 
@@ -56,11 +57,12 @@ Quality Runner now also has DOI-ready software-methods metadata and release
 docs: `CITATION.cff`, `.zenodo.json`, `RESEARCH_READY.md`, and
 `docs/release-notes/v0.3.1-doi.md`.
 
-Version `0.4.0` is the next public release after the compatibility `0.3.1`
-package. It adds rollout, intent/gate controller semantics, security scanning,
-quality-skills workflows, and unwired-work remediation while keeping
-compatibility surfaces for prior `quality-evidence-contract` and
-`repo-quality-certifier` consumers.
+Version `0.5.0` is the current public release after `0.4.0`. It adds
+fresh-review reports, review state, and review-delta loop controls while
+keeping compatibility surfaces for prior `quality-evidence-contract` and
+`repo-quality-certifier` consumers. Version `0.4.0` added rollout,
+intent/gate-controller semantics, security scanning, quality-skills workflows,
+and unwired-work remediation.
 
 The package also carries compatibility surfaces for earlier extracted quality
 packages when those APIs are still imported by active tools:
@@ -84,7 +86,7 @@ Current package-mining state:
 - `quality-runner release-smoke` now verifies compatibility imports,
   repo-quality-certifier artifact generation, certifier MCP tool metadata, and
   packaged plugin manifests.
-- Release docs target `v0.4.0` and include post-install checks for the
+- Release docs target `v0.5.0` and include post-install checks for the
   compatibility imports, CLI, MCP, and release smoke before archiving old repos.
 - `quality-runner rollout` is the first-class multi-repo controller workflow
   for safe sequential refreshes, repo-list parsing, per-repo controller reports,
@@ -95,6 +97,11 @@ Current package-mining state:
   artifact contract.
 
 Current verification:
+
+- 2026-07-13: Aligned runtime, plugin, citation, and release-checklist
+  metadata on `0.5.0` in `6e93ee0`; focused packaging checks and the full suite
+  passed (`419 passed`). Touched-file Ruff/format and source-root Vulture pass;
+  repository-wide Ruff/format/basedpyright retain unrelated baseline findings.
 
 - 2026-07-12: Added and committed the `ui-foundations` starter pack as
   `ed16bb2`. Focused quality-skill tests passed (`24 passed`), pack ingest,
