@@ -41,6 +41,11 @@ artifact for the original marker. `27deaa4` keeps that pure helper at a neutral
 evidence boundary so code-quality imports cannot initialize the security package
 recursively.
 
+Its release repair (`cd30948`) requires a tag-triggered publish to prove its
+commit is an ancestor of `main`; CI, release, and installed-wheel tests exercise
+default v2 and frozen v1 Review output. The canonical rollback and Homebrew
+guidance now disclose v0.5.0's historical display mismatch and template state.
+
 M0 restores the public trust boundary without changing artifact schema ids:
 
 - package metadata now derives from `quality_runner/_version.py`; the plugin,

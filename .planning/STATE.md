@@ -44,7 +44,8 @@ hardening.
   rollback guidance in `633b96e`; `9fcea7d` restores the published positional
   and Review v1 compatibility shapes; `4dee5af` extends source-evidence
   redaction through code-quality and remediation artifacts, with its neutral
-  dependency boundary fixed in `27deaa4`
+  dependency boundary fixed in `27deaa4`; `cd30948` gates tag publication on
+  `main` ancestry and smoke-tests both installed Review projections
 
 ## Active Phase
 
@@ -80,6 +81,9 @@ completion, and push the branch.
 
 ## Recent Progress
 
+- 2026-07-13: M7 release hardening in `cd30948`: release tags must be reachable
+  from `main`; CI/release and wheel tests exercise default v2 and frozen v1
+  Review behavior; operator docs now disclose the old 0.5.0 display mismatch.
 - 2026-07-13: M7 source-evidence hardening in `4dee5af`: shared redaction now
   protects security candidates, code-quality findings, and remediation excerpts
   across inspect, run, and verify without altering arbitrary artifact writes;

@@ -37,6 +37,9 @@ public `ReviewFinding` type while retaining explicit v2 next-action guidance.
 `4dee5af` shares redaction across security candidates, code-quality findings,
 and remediation excerpts so source-secret markers do not persist in those paths;
 `27deaa4` moves the helper to a neutral module to preserve the import boundary.
+`cd30948` requires release tags to be ancestors of `main`, smoke-tests default
+v2 and frozen v1 Review behavior from installed wheels, and corrects the
+release, rollback, and Homebrew guidance.
 
 ## Current Position
 
@@ -82,6 +85,8 @@ and remediation excerpts so source-secret markers do not persist in those paths;
 
 ## Recent Progress
 
+- 2026-07-13: `cd30948` adds `main`-ancestry release gating, built-wheel Review
+  projection checks, and accurate historical rollback/Homebrew documentation.
 - 2026-07-13: `4dee5af` closes the source-evidence redaction bypass across
   code-quality, slice-enrichment, and security candidate artifacts; `27deaa4`
   resolves its package-cycle regression.
