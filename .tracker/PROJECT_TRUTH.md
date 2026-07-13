@@ -5,19 +5,19 @@ Last updated: 2026-07-12
 ## Current State
 
 The quality-skills audit contract is hardened on feature branch
-`quality-skills-hardening` at commit `c79de7e`. The source-backed user packs
-`ui-foundations`, `test-strategy`, `security-privacy`, and `release-readiness`
-now cover visual and UI-state risks, behavior coverage, regression value, test
-reliability, transport and cross-origin risks, authorization, privacy flows,
-input boundaries, security evidence, release verification, compatibility,
-rollback, and handoff through deterministic observations and high-recall agent
-reviews.
+`quality-skills-hardening` at commit `156b2ec0`. The source-backed user packs
+`ui-foundations`, `test-strategy`, `security-privacy`, `release-readiness`, and
+`pr-risk` now cover visual and UI-state risks, behavior coverage, regression
+value, test reliability, transport and cross-origin risks, authorization,
+privacy flows, input boundaries, security evidence, release verification,
+compatibility, rollback, changed-surface risk, merge integrity, and handoff
+through deterministic observations and high-recall agent reviews.
 
 ## Next Step
 
-Select and convert the PR-risk candidate pack, then exercise the starter packs
-against representative source-only repositories before registering them in a
-personal multi-repo configuration.
+Select and convert the data-integrity candidate pack, then exercise the starter
+packs against representative source-only repositories before registering them
+in a personal multi-repo configuration.
 
 ## Blockers
 
@@ -94,6 +94,12 @@ Current verification:
   `c79de7e`. Focused quality-skill tests passed (`27 passed`), pack ingest,
   TOML parsing, touched-file Ruff, format, and agent-review report merging
   passed. Full suite reached `405 passed, 1 failed` on the existing
+  packaging-entrypoint mismatch.
+
+- 2026-07-12: Added and committed the `pr-risk` starter pack as
+  `156b2ec0`. Focused quality-skill tests passed (`28 passed`), pack ingest,
+  TOML parsing, touched-file Ruff, format, and agent-review report merging
+  passed. Full suite reached `406 passed, 1 failed` on the existing
   packaging-entrypoint mismatch.
 
 - 2026-07-12: Quality-skills hardening committed as `ccfc12e`. Focused skill and
