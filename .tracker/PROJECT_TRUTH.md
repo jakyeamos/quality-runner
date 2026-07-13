@@ -5,18 +5,19 @@ Last updated: 2026-07-12
 ## Current State
 
 The quality-skills audit contract is hardened on feature branch
-`quality-skills-hardening` at commit `140e1f8`. The source-backed user packs
-`ui-foundations`, `test-strategy`, and `security-privacy` now cover visual
-anti-patterns, UI states, behavior coverage, regression value, test reliability,
-transport and cross-origin risks, authorization, privacy flows, input
-boundaries, and security evidence through deterministic observations and
-high-recall agent reviews.
+`quality-skills-hardening` at commit `c79de7e`. The source-backed user packs
+`ui-foundations`, `test-strategy`, `security-privacy`, and `release-readiness`
+now cover visual and UI-state risks, behavior coverage, regression value, test
+reliability, transport and cross-origin risks, authorization, privacy flows,
+input boundaries, security evidence, release verification, compatibility,
+rollback, and handoff through deterministic observations and high-recall agent
+reviews.
 
 ## Next Step
 
-Select and convert the release-readiness or PR-risk candidate pack, then exercise
-the starter packs against representative source-only repositories before
-registering them in a personal multi-repo configuration.
+Select and convert the PR-risk candidate pack, then exercise the starter packs
+against representative source-only repositories before registering them in a
+personal multi-repo configuration.
 
 ## Blockers
 
@@ -87,6 +88,12 @@ Current verification:
   `140e1f8`. Focused quality-skill tests passed (`26 passed`), pack ingest,
   TOML parsing, touched-file Ruff, format, and agent-review report merging
   passed. Full suite reached `404 passed, 1 failed` on the existing
+  packaging-entrypoint mismatch.
+
+- 2026-07-12: Added and committed the `release-readiness` starter pack as
+  `c79de7e`. Focused quality-skill tests passed (`27 passed`), pack ingest,
+  TOML parsing, touched-file Ruff, format, and agent-review report merging
+  passed. Full suite reached `405 passed, 1 failed` on the existing
   packaging-entrypoint mismatch.
 
 - 2026-07-12: Quality-skills hardening committed as `ccfc12e`. Focused skill and
