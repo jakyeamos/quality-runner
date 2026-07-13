@@ -238,6 +238,17 @@ reviewer to establish the repository's actual owners, consumers, constraints,
 and external compatibility requirements before recommending consolidation or a
 boundary change.
 
+### Starter pack: Performance Readiness
+
+The [Performance Readiness starter pack](examples/performance-readiness.toml)
+adds low-confidence observations for broad projections and recognizable
+blocking calls. Its agent reviews cover measurement, hot paths, scaling, I/O and
+concurrency, bundle/runtime behavior, and load verification.
+
+The pack does not declare code slow from static shape alone. Performance
+findings should identify the workload, runtime path, and missing measurement or
+verification evidence needed to confirm the risk.
+
 Merge a validated report during a run:
 
 ```bash

@@ -148,6 +148,12 @@ def _architecture_maintainability_skill_toml() -> str:
     ).read_text(encoding="utf-8")
 
 
+def _performance_readiness_skill_toml() -> str:
+    return (Path(__file__).parents[1] / "docs/examples/performance-readiness.toml").read_text(
+        encoding="utf-8"
+    )
+
+
 def _install_skill(tmp_path: Path, skill_id: str, content: str) -> str:
     relative = f".quality-runner/skills/{skill_id}.toml"
     _write(tmp_path / relative, content)
@@ -819,6 +825,85 @@ def test_architecture_maintainability_pack_reports_seams_and_review_scopes(
         "decision-and-tradeoffs",
         "complexity-and-maintainability",
         "compatibility-and-removal",
+    }
+    assert len(packet["included_files"]) == 1
+
+
+def test_performance_readiness_pack_reports_static_signals_and_review_scopes(
+    tmp_path: Path,
+) -> None:
+    from quality_runner.code_quality import create_code_quality_scan
+    from quality_runner.skill_config import load_active_skills
+    from quality_runner.skill_review import build_skill_review_packet
+
+    skill_path = _install_skill(
+        tmp_path, "performance-readiness", _performance_readiness_skill_toml()
+    )
+    source = (
+        "def load_users(cursor):\n"
+        "    time.sleep(1)\n"
+        "    return cursor.execute('SELECT * FROM users')\n"
+    )
+    _write(tmp_path / "src/query.py", source)
+    config = _skills_enabled_config(
+        active=["performance-readiness"],
+        local=[{"id": "performance-readiness", "path": skill_path}],
+    )
+
+    result = create_code_quality_scan(
+        tmp_path, scan={"run_id": "performance-readiness"}, config=config
+    )
+    rule_ids = {str(finding["rule_id"]) for finding in result["findings"]}
+    assert "performance-readiness/select-star" in rule_ids
+    assert "performance-readiness/blocking-call-in-source" in rule_ids
+    assert result["quality_skills"][0]["id"] == "performance-readiness"
+
+    reviewed = create_code_quality_scan(
+        tmp_path,
+        scan={"run_id": "performance-readiness-reviewed"},
+        config=config,
+        skill_review_report={
+            "schema": SKILL_REVIEW_REPORT_SCHEMA,
+            "run_id": "performance-readiness-reviewed",
+            "findings": [
+                {
+                    "skill_id": "performance-readiness",
+                    "review_id": "measurement-and-profiling",
+                    "rule_id": "measurement-and-profiling/missing-baseline",
+                    "severity": "observation",
+                    "confidence": "low",
+                    "file": "src/query.py",
+                    "line": 1,
+                    "summary": "The database access path has no visible baseline or profiling evidence.",
+                    "evidence": "def load_users(cursor):",
+                    "risk": "A query or blocking-call change could regress latency without a measured comparison.",
+                    "expected_improvement": "Add a representative benchmark or profiling check for the user-loading path.",
+                    "verification": "Rerun quality-runner and the performance verification command after adding the baseline.",
+                }
+            ],
+        },
+    )
+    assert any(
+        finding["rule_id"] == "measurement-and-profiling/missing-baseline"
+        for finding in reviewed["findings"]
+    )
+
+    skills, warnings = load_active_skills(tmp_path, config)
+    assert warnings == []
+    packet = build_skill_review_packet(
+        run_id="performance-readiness",
+        repo_root=tmp_path,
+        scanned_files=[{"path": "src/query.py", "lines": source.splitlines()}],
+        skills=skills,
+    )
+    assert packet is not None
+    assert len(packet["reviews"]) == 5
+    assert {review["review_id"] for review in packet["reviews"]} == {
+        "measurement-and-profiling",
+        "hot-path-and-scaling",
+        "io-and-concurrency",
+        "bundle-and-runtime",
+        "verification-and-load",
     }
     assert len(packet["included_files"]) == 1
 
