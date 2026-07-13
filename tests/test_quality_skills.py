@@ -219,6 +219,12 @@ def test_ui_foundations_pack_reports_source_findings_and_review_scopes(tmp_path:
         "background: repeating-linear-gradient(90deg, #fff, #fff 1px, #eee 1px, #eee 2px); }\n"
     )
     _write(tmp_path / "src/components/Results.tsx", component)
+    _write(
+        tmp_path / "src/components/Nav.tsx",
+        "export function Nav({ links }) {\n"
+        "  return PAGE_LINKS.map((link) => <a key={link.path}>{link.label}</a>);\n"
+        "}\n",
+    )
     _write(tmp_path / "src/components/Results.css", styles)
     config = _skills_enabled_config(
         active=["ui-foundations"],
@@ -238,6 +244,11 @@ def test_ui_foundations_pack_reports_source_findings_and_review_scopes(tmp_path:
     assert "ui-foundations/oversized-corner-radius" in rule_ids
     assert "ui-foundations/collection-empty-state" in rule_ids
     assert "ui-foundations/async-loading-state" in rule_ids
+    assert not any(
+        finding["file"] == "src/components/Nav.tsx"
+        and finding["rule_id"] == "ui-foundations/collection-empty-state"
+        for finding in result["findings"]
+    )
     assert result["quality_skills"][0]["id"] == "ui-foundations"
     deterministic_coverage = [
         item for item in result["skill_coverage"] if item["rule_type"] != "agent_review"
