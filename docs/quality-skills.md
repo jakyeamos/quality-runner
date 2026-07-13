@@ -226,6 +226,18 @@ not require one universal toolchain or document filename. Reviewers should use
 the repository's actual scripts, metadata, and maintained guides as the source
 of truth.
 
+### Starter pack: Architecture and Maintainability
+
+The [Architecture and Maintainability starter pack](examples/architecture-maintainability.toml)
+adds a low-confidence observation for compatibility seams without visible
+removal boundaries. Its agent reviews cover ownership and dependency direction,
+duplicated concepts, architecture tradeoffs, complexity, and migration seams.
+
+Architecture rules are intentionally repository-specific. The pack asks the
+reviewer to establish the repository's actual owners, consumers, constraints,
+and external compatibility requirements before recommending consolidation or a
+boundary change.
+
 Merge a validated report during a run:
 
 ```bash

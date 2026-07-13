@@ -142,6 +142,12 @@ def _developer_experience_skill_toml() -> str:
     )
 
 
+def _architecture_maintainability_skill_toml() -> str:
+    return (
+        Path(__file__).parents[1] / "docs/examples/architecture-maintainability.toml"
+    ).read_text(encoding="utf-8")
+
+
 def _install_skill(tmp_path: Path, skill_id: str, content: str) -> str:
     relative = f".quality-runner/skills/{skill_id}.toml"
     _write(tmp_path / relative, content)
@@ -737,6 +743,82 @@ def test_developer_experience_pack_reports_docs_signals_and_review_scopes(tmp_pa
         "contribution-and-ci",
         "repository-wayfinding",
         "maintainer-handoff",
+    }
+    assert len(packet["included_files"]) == 1
+
+
+def test_architecture_maintainability_pack_reports_seams_and_review_scopes(
+    tmp_path: Path,
+) -> None:
+    from quality_runner.code_quality import create_code_quality_scan
+    from quality_runner.skill_config import load_active_skills
+    from quality_runner.skill_review import build_skill_review_packet
+
+    skill_path = _install_skill(
+        tmp_path,
+        "architecture-maintainability",
+        _architecture_maintainability_skill_toml(),
+    )
+    source = "def legacy_adapter(value):\n    return value\n"
+    _write(tmp_path / "src/compat.py", source)
+    config = _skills_enabled_config(
+        active=["architecture-maintainability"],
+        local=[{"id": "architecture-maintainability", "path": skill_path}],
+    )
+
+    result = create_code_quality_scan(
+        tmp_path, scan={"run_id": "architecture-maintainability"}, config=config
+    )
+    rule_ids = {str(finding["rule_id"]) for finding in result["findings"]}
+    assert "architecture-maintainability/compatibility-seam-without-removal-boundary" in rule_ids
+    assert result["quality_skills"][0]["id"] == "architecture-maintainability"
+
+    reviewed = create_code_quality_scan(
+        tmp_path,
+        scan={"run_id": "architecture-maintainability-reviewed"},
+        config=config,
+        skill_review_report={
+            "schema": SKILL_REVIEW_REPORT_SCHEMA,
+            "run_id": "architecture-maintainability-reviewed",
+            "findings": [
+                {
+                    "skill_id": "architecture-maintainability",
+                    "review_id": "ownership-and-boundaries",
+                    "rule_id": "ownership-and-boundaries/duplicate-owner",
+                    "severity": "observation",
+                    "confidence": "low",
+                    "file": "src/compat.py",
+                    "line": 1,
+                    "summary": "The compatibility helper may duplicate an existing contract owner.",
+                    "evidence": "def legacy_adapter(value):",
+                    "risk": "A second owner can let the compatibility behavior drift from the canonical contract.",
+                    "expected_improvement": "Identify the canonical owner and either consume it directly or document the external boundary and removal condition.",
+                    "verification": "Rerun quality-runner and the consumer tests after confirming the ownership boundary.",
+                }
+            ],
+        },
+    )
+    assert any(
+        finding["rule_id"] == "ownership-and-boundaries/duplicate-owner"
+        for finding in reviewed["findings"]
+    )
+
+    skills, warnings = load_active_skills(tmp_path, config)
+    assert warnings == []
+    packet = build_skill_review_packet(
+        run_id="architecture-maintainability",
+        repo_root=tmp_path,
+        scanned_files=[{"path": "src/compat.py", "lines": source.splitlines()}],
+        skills=skills,
+    )
+    assert packet is not None
+    assert len(packet["reviews"]) == 5
+    assert {review["review_id"] for review in packet["reviews"]} == {
+        "ownership-and-boundaries",
+        "duplication-and-single-source",
+        "decision-and-tradeoffs",
+        "complexity-and-maintainability",
+        "compatibility-and-removal",
     }
     assert len(packet["included_files"]) == 1
 

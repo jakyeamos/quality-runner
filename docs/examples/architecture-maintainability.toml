@@ -1,0 +1,106 @@
+id = "architecture-maintainability"
+name = "Architecture and Maintainability"
+version = "0.1.0"
+description = "Source-level architecture signals and high-recall review criteria for ownership, boundaries, duplication, tradeoffs, complexity, and compatibility seams."
+
+[[deterministic_rules]]
+id = "compatibility-seam-without-removal-boundary"
+type = "trigger_without_required"
+category = "architecture-maintainability"
+severity = "observation"
+confidence = "low"
+paths = ["*.py", "**/*.py", "*.js", "**/*.js", "*.jsx", "**/*.jsx", "*.ts", "**/*.ts", "*.tsx", "**/*.tsx", "*.go", "**/*.go", "*.rs", "**/*.rs", "*.java", "**/*.java", "*.md", "**/*.md", "*.yml", "**/*.yml", "*.yaml", "**/*.yaml", "*.toml", "**/*.toml", "*.json", "**/*.json"]
+trigger_patterns = ['(?i)(?:adapter|compat(?:ibility)?|shim|legacy|deprecated)']
+required_patterns = ['(?i)\b(?:remove|removal|until|deprecat(?:e|ed|ion)|sunset|delete\s+by|issue\s*#)\b']
+message = "A compatibility or legacy seam has no visible removal, deprecation, or tracking boundary."
+risk = "A temporary bridge may become a permanent second owner that lets concepts and behavior drift."
+expected = "Name the owning contract, document the removal condition, and keep the compatibility path narrow until it can be deleted."
+verification = "Review the seam's consumers and rerun quality-runner after resolving or accepting the observation."
+
+[[agent_reviews]]
+id = "ownership-and-boundaries"
+category = "architecture-boundaries"
+severity = "observation"
+paths = ["*.py", "**/*.py", "*.js", "**/*.js", "*.jsx", "**/*.jsx", "*.ts", "**/*.ts", "*.tsx", "**/*.tsx", "*.go", "**/*.go", "*.rs", "**/*.rs", "*.java", "**/*.java", "*.sql", "**/*.sql", "*.yml", "**/*.yml", "*.yaml", "**/*.yaml", "*.toml", "**/*.toml", "*.md", "**/*.md"]
+focus = ["module ownership", "dependency direction", "public boundaries", "layering", "cross-module imports", "stable contracts"]
+rubric = """
+Review architecture boundaries and concept ownership.
+
+Identify the concepts that should have one natural owner and trace their current
+owners and consumers. Report plausible dependency-direction violations, leaking
+implementation details, unstable cross-layer imports, duplicated contracts, or
+boundaries that are only implied by naming. Cite the exact module, import,
+function, type, or configuration line. Prefer high recall and use low
+confidence when framework conventions or generated code may provide an unseen
+boundary. Do not impose a universal architecture without repository evidence.
+"""
+
+[[agent_reviews]]
+id = "duplication-and-single-source"
+category = "architecture-duplication"
+severity = "observation"
+paths = ["*.py", "**/*.py", "*.js", "**/*.js", "*.jsx", "**/*.jsx", "*.ts", "**/*.ts", "*.tsx", "**/*.tsx", "*.go", "**/*.go", "*.rs", "**/*.rs", "*.java", "**/*.java", "*.sql", "**/*.sql", "*.md", "**/*.md"]
+focus = ["duplicate concepts", "parallel abstractions", "copied structs", "local adapters", "derived values", "test oracles"]
+rubric = """
+Review the repository for duplicated concepts and diverging sources of truth.
+
+Report plausible cases where multiple modules reimplement the same rule,
+geometry, state machine, data contract, renderer phase, API shape, or test
+oracle; where an adapter duplicates a shared primitive; or where a check
+re-derives a value instead of consuming the owner's result. Cite the relevant
+definitions and consumers. Prefer high recall and use low confidence when
+similarity may reflect intentionally different domains. Explain the divergence
+risk before recommending consolidation.
+"""
+
+[[agent_reviews]]
+id = "decision-and-tradeoffs"
+category = "architecture-decisions"
+severity = "observation"
+paths = ["*.py", "**/*.py", "*.js", "**/*.js", "*.jsx", "**/*.jsx", "*.ts", "**/*.ts", "*.tsx", "**/*.tsx", "*.go", "**/*.go", "*.rs", "**/*.rs", "*.java", "**/*.java", "*.sql", "**/*.sql", "*.yml", "**/*.yml", "*.yaml", "**/*.yaml", "*.toml", "**/*.toml", "*.md", "**/*.md"]
+focus = ["constraints", "alternatives", "tradeoffs", "migration cost", "compatibility", "decision records"]
+rubric = """
+Review important architecture choices for evidence-backed tradeoffs.
+
+Report plausible decisions where constraints, alternatives, compatibility costs,
+migration consequences, or verification expectations are absent or contradicted
+by the implementation. Cite the exact decision document, configuration, public
+interface, or migration seam. Prefer high recall and use low confidence when
+the decision context lives outside the repository. Do not demand an ADR for
+every local implementation choice; focus on choices with durable system impact.
+"""
+
+[[agent_reviews]]
+id = "complexity-and-maintainability"
+category = "maintainability"
+severity = "observation"
+paths = ["*.py", "**/*.py", "*.js", "**/*.js", "*.jsx", "**/*.jsx", "*.ts", "**/*.ts", "*.tsx", "**/*.tsx", "*.go", "**/*.go", "*.rs", "**/*.rs", "*.java", "**/*.java", "*.sql", "**/*.sql", "*.yml", "**/*.yml", "*.yaml", "**/*.yaml", "*.toml", "**/*.toml", "*.md", "**/*.md"]
+focus = ["unnecessary indirection", "coupling", "complexity", "dead paths", "local reasoning", "future change cost"]
+rubric = """
+Review source for maintainability risks that make correct change difficult.
+
+Report plausible unnecessary layers, pass-through wrappers, hidden coupling,
+large mixed-responsibility modules, dead or obsolete paths, speculative
+abstractions, and changes that would require editing many unrelated owners.
+Cite the exact code and explain the local reasoning or future change cost.
+Prefer high recall and use low confidence when runtime composition or generated
+code is not visible. Do not reward abstraction for its own sake or propose a
+large rewrite without a smaller coherent slice.
+"""
+
+[[agent_reviews]]
+id = "compatibility-and-removal"
+category = "architecture-migration"
+severity = "observation"
+paths = ["*.py", "**/*.py", "*.js", "**/*.js", "*.jsx", "**/*.jsx", "*.ts", "**/*.ts", "*.tsx", "**/*.tsx", "*.go", "**/*.go", "*.rs", "**/*.rs", "*.java", "**/*.java", "*.sql", "**/*.sql", "*.yml", "**/*.yml", "*.yaml", "**/*.yaml", "*.toml", "**/*.toml", "*.md", "**/*.md"]
+focus = ["compatibility wrappers", "deprecation", "migration seams", "removal criteria", "consumer porting", "behavior preservation"]
+rubric = """
+Review compatibility layers and migration seams for a clean removal path.
+
+Report plausible wrappers, aliases, parallel APIs, legacy branches, or
+temporary adapters that lack a named removal condition, consumer inventory,
+behavior-preserving tests, or a bounded migration slice. Cite the seam and its
+consumers. Prefer high recall and use low confidence when versioning or external
+consumers are not visible. Accept a compatibility layer when it models a real
+external constraint, but require an explicit reason and removal boundary.
+"""
