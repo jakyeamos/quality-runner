@@ -23,13 +23,14 @@ handoffs, and truthful artifact/outcome reporting. The branch is an unreleased
 behind explicit workflow and outcome façades, with installed-wheel facade
 checks. M6 completes in `56c94d4`: packet construction and report normalization
 now have application owners, while root review façades retain their v1 type and
-direct-combined compatibility contracts. M7 release hardening is next.
+direct-combined compatibility contracts. M7 is in progress: `113f143` redacts
+secret-like candidate literals before they are fingerprinted or persisted.
 
 ## Current Position
 
 - Target: a typed v2 core behind CLI, MCP, and compatibility adapters.
-- Next implementation slice: M7 — make release, cutover, rollback, and
-  operational evidence reproducible from the built distribution.
+- Next implementation slice: make release, cutover, rollback, and operational
+  evidence reproducible from the built distribution.
 - Canonical planning documents: `docs/modernization/`.
 - Public compatibility: retain `quality_evidence_contract` and
   `repo_quality_certifier` during a published transition window.
@@ -55,6 +56,8 @@ direct-combined compatibility contracts. M7 release hardening is next.
 
 - M7 must keep public v1 readers and rollback guidance accurate while any v2
   default or deprecation policy is documented.
+- Generated evidence can contain target-repository output; it remains local and
+  must be handled as potentially sensitive even after candidate-literal redaction.
 - Existing large-file warnings remain in `repo_quality_certifier/core.py` and
   `tests/test_cli.py`.
 - User-authored gate commands remain arbitrary code; M0 requires explicit
@@ -64,6 +67,8 @@ direct-combined compatibility contracts. M7 release hardening is next.
 
 ## Recent Progress
 
+- 2026-07-13: Began M7 in `113f143`: security candidates redact secret-like
+  literals before fingerprints and persisted scan/audit/handoff evidence.
 - 2026-07-13: Completed M6 on `codex/gpt56-modernization` (`0b5ac2e`,
   `56c94d4`): application-owned workflow/outcome/packet/report paths, typed
   root façades, built-wheel compatibility, 520 passing tests, and clean reviews.

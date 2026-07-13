@@ -6,6 +6,11 @@ M0 through M6 are implemented on the protected branch
 `codex/gpt56-modernization`, based on `main` commit `0a3def1`. The branch
 remains isolated until review and merge.
 
+M7 is in progress. Its first confidentiality hardening slice (`113f143`)
+redacts secret-like source literals before candidate fingerprints and any
+security-scan, audit, or handoff artifact persistence; a normal-run regression
+scans every generated artifact for the original marker.
+
 M0 restores the public trust boundary without changing artifact schema ids:
 
 - package metadata now derives from `quality_runner/_version.py`; the plugin,

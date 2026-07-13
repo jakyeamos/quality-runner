@@ -38,7 +38,8 @@ hardening.
 - M5 — make Fresh Review operationally honest: complete in `f5c8610`
 - M6 — isolate compatibility and retire duplicate foundations: complete in
   `0b5ac2e` and `56c94d4`
-- Implementation: M7 next
+- M7 — release hardening: in progress; its first confidentiality slice is
+  complete in `113f143`
 
 ## Active Phase
 
@@ -68,11 +69,14 @@ hardening.
 
 ## Next Step
 
-Map the release, upgrade, deprecation, and operational documentation gaps
-against the built-wheel behavior, then implement the smallest complete M7 slice.
+Make built-distribution release evidence exercise the public CLI and MCP
+surfaces, then complete the v2 cutover, upgrade guidance, and operational docs.
 
 ## Recent Progress
 
+- 2026-07-13: M7 began in `113f143`: secret-like candidate literals are
+  redacted before fingerprinting or artifact persistence; the normal-run
+  regression scans all generated artifacts for the original marker.
 - 2026-07-13: M6 completed in `0b5ac2e` and `56c94d4`: application owns
   workflow, outcome, packet, and report execution; root façades preserve v1
   behavior; 520 tests, wheel, smoke, and three reviews passed.
