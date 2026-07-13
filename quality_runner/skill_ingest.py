@@ -4,14 +4,15 @@ import tomllib
 from pathlib import Path
 from typing import Any
 
-from quality_runner.config import CONFIG_FILE_NAME, load_repo_config
-from quality_runner.schema_constants import SKILL_INGEST_RESULT_SCHEMA
+from quality_runner.config import CONFIG_FILE_NAME
+from quality_runner.schema_constants import SKILL_APPEND_RESULT_SCHEMA, SKILL_INGEST_RESULT_SCHEMA
 from quality_runner.skill_config import (
     FORBIDDEN_SKILL_FIELDS,
     _load_skill_pack,
     _resolve_skill_path,
     sanitize_skill_id,
 )
+from quality_runner.skill_registration import _canonical_skill_toml, _update_repo_config
 
 SKILLS_DIR = ".quality-runner/skills"
 
@@ -195,157 +196,248 @@ def ingest_skill_pack(
     )
 
 
-def _canonical_skill_toml(raw: dict[str, Any], skill_id: str) -> str:
-    lines = [
-        f'id = "{skill_id}"',
-        f'name = "{_escape_toml_string(str(raw.get("name", skill_id)))}"',
-    ]
-    version = raw.get("version")
-    if isinstance(version, str) and version:
-        lines.append(f'version = "{_escape_toml_string(version)}"')
-    description = raw.get("description")
-    if isinstance(description, str) and description:
-        lines.append(f'description = "{_escape_toml_string(description)}"')
-    lines.append("")
-
-    deterministic_rules = raw.get("deterministic_rules")
-    if isinstance(deterministic_rules, list):
-        for rule in deterministic_rules:
-            if not isinstance(rule, dict):
-                continue
-            lines.append("[[deterministic_rules]]")
-            for key, value in rule.items():
-                lines.extend(_toml_field_lines(key, value))
-            lines.append("")
-
-    agent_reviews = raw.get("agent_reviews")
-    if isinstance(agent_reviews, list):
-        for review in agent_reviews:
-            if not isinstance(review, dict):
-                continue
-            lines.append("[[agent_reviews]]")
-            for key, value in review.items():
-                lines.extend(_toml_field_lines(key, value))
-            lines.append("")
-
-    return "\n".join(lines).rstrip() + "\n"
-
-
-def _toml_field_lines(key: str, value: object) -> list[str]:
-    if isinstance(value, str):
-        if "\n" in value:
-            return [f'{key} = """', value.rstrip(), '"""']
-        return [f'{key} = "{_escape_toml_string(value)}"']
-    if isinstance(value, list) and all(isinstance(item, str) for item in value):
-        quoted = ", ".join(f'"{_escape_toml_string(item)}"' for item in value)
-        return [f"{key} = [{quoted}]"]
-    return []
-
-
-def _escape_toml_string(value: str) -> str:
-    return value.replace("\\", "\\\\").replace('"', '\\"')
-
-
-def _update_repo_config(
-    repo_root: Path,
+def append_skill_to_target(
+    candidate_path: Path,
     *,
-    skill_id: str,
-    skill_path: str,
+    source_skill_id: str,
+    pack_id: str,
+    target_path: Path,
+    source_ref: str | None = None,
+    write: bool = False,
+) -> dict[str, Any]:
+    return _append_skill_to_target(
+        candidate_path,
+        source_skill_id=source_skill_id,
+        pack_id=pack_id,
+        target_path=target_path,
+        target_relative_path=None,
+        repo_root=None,
+        source_ref=source_ref,
+        activate=False,
+        write=write,
+    )
+
+
+def _append_skill_to_target(
+    candidate_path: Path,
+    *,
+    source_skill_id: str,
+    pack_id: str,
+    target_path: Path,
+    target_relative_path: str | None,
+    repo_root: Path | None,
+    source_ref: str | None,
     activate: bool,
-) -> None:
-    config_path = repo_root / CONFIG_FILE_NAME
-    existing = config_path.read_text(encoding="utf-8") if config_path.exists() else ""
-    config = load_repo_config(repo_root)
-    skills_section = config.get("skills")
-    if not isinstance(skills_section, dict):
-        skills_section = {"enabled": True}
+    write: bool,
+) -> dict[str, Any]:
+    normalized_source_id = sanitize_skill_id(source_skill_id)
+    normalized_pack_id = sanitize_skill_id(pack_id)
+    if normalized_source_id is None or normalized_pack_id is None:
+        return _append_result(
+            status="rejected",
+            write=False,
+            source_skill_id=source_skill_id,
+            pack_id=pack_id,
+            active=False,
+            warnings=[],
+            errors=["source skill id and pack id must be valid skill ids"],
+        )
 
-    local = skills_section.get("local")
-    if not isinstance(local, list):
-        local = []
+    validation = validate_skill_pack(
+        candidate_path,
+        skill_id=normalized_source_id,
+        repo_root=candidate_path.parent,
+    )
+    if validation.get("status") == "rejected":
+        return _append_result(
+            status="rejected",
+            write=False,
+            source_skill_id=normalized_source_id,
+            pack_id=normalized_pack_id,
+            active=False,
+            warnings=validation.get("warnings", []),
+            errors=validation.get("errors", []),
+        )
 
-    updated_local: list[dict[str, Any]] = []
-    found = False
-    for item in local:
-        if isinstance(item, dict) and item.get("id") == skill_id:
-            updated_local.append({"id": skill_id, "path": skill_path})
-            found = True
-        elif isinstance(item, dict):
-            updated_local.append(item)
-    if not found:
-        updated_local.append({"id": skill_id, "path": skill_path})
+    target_path = target_path.expanduser().resolve()
+    if not target_path.exists():
+        return _append_result(
+            status="rejected",
+            write=False,
+            source_skill_id=normalized_source_id,
+            pack_id=normalized_pack_id,
+            active=False,
+            warnings=validation.get("warnings", []),
+            errors=[f"target pack not found: {normalized_pack_id}"],
+        )
 
-    active = skills_section.get("active")
-    active_ids: list[str]
-    if isinstance(active, list):
-        active_ids = [item for item in active if isinstance(item, str) and item]
-    else:
-        active_ids = []
-    if activate and skill_id not in active_ids:
-        active_ids.append(skill_id)
+    target_pack, target_warning = _load_skill_pack(target_path, normalized_pack_id)
+    warnings = list(validation.get("warnings", []))
+    if target_warning is not None:
+        warnings.append(target_warning["message"])
+    if target_pack is None:
+        return _append_result(
+            status="rejected",
+            write=False,
+            source_skill_id=normalized_source_id,
+            pack_id=normalized_pack_id,
+            active=False,
+            warnings=warnings,
+            errors=["target pack failed validation"],
+        )
 
-    block = _render_skills_config_block(enabled=True, active=active_ids, local=updated_local)
-    if "[quality_runner.skills]" in existing:
-        existing = _replace_skills_block(existing, block)
-    else:
-        existing = existing.rstrip() + ("\n\n" if existing.strip() else "") + block + "\n"
-    config_path.write_text(existing, encoding="utf-8")
+    existing_sources = target_pack.get("sources")
+    if isinstance(existing_sources, list) and any(
+        isinstance(source, dict) and source.get("id") == normalized_source_id
+        for source in existing_sources
+    ):
+        return _append_result(
+            status="rejected",
+            write=False,
+            source_skill_id=normalized_source_id,
+            pack_id=normalized_pack_id,
+            active=False,
+            warnings=warnings,
+            errors=[f"source skill already appended to pack: {normalized_source_id}"],
+        )
+
+    candidate_path = candidate_path.expanduser().resolve()
+    candidate_pack, candidate_warning = _load_skill_pack(candidate_path, normalized_source_id)
+    if candidate_warning is not None:
+        warnings.append(candidate_warning["message"])
+    if candidate_pack is None:
+        return _append_result(
+            status="rejected",
+            write=False,
+            source_skill_id=normalized_source_id,
+            pack_id=normalized_pack_id,
+            active=False,
+            warnings=warnings,
+            errors=["candidate pack failed validation"],
+        )
+
+    merged_rules = list(target_pack.get("deterministic_rules", []))
+    appended_rules = _namespace_pack_items(
+        candidate_pack.get("deterministic_rules", []),
+        source_id=normalized_source_id,
+    )
+    existing_rule_ids = {
+        str(rule["id"])
+        for rule in merged_rules
+        if isinstance(rule, dict) and isinstance(rule.get("id"), str)
+    }
+    rule_collisions = sorted(
+        str(rule["id"])
+        for rule in appended_rules
+        if isinstance(rule, dict)
+        and isinstance(rule.get("id"), str)
+        and rule["id"] in existing_rule_ids
+    )
+    if rule_collisions:
+        return _append_result(
+            status="rejected",
+            write=False,
+            source_skill_id=normalized_source_id,
+            pack_id=normalized_pack_id,
+            active=False,
+            warnings=warnings,
+            errors=[f"namespaced rule ids already exist: {', '.join(rule_collisions)}"],
+        )
+    merged_rules.extend(appended_rules)
+    merged_reviews = list(target_pack.get("agent_reviews", []))
+    appended_reviews = _namespace_pack_items(
+        candidate_pack.get("agent_reviews", []), source_id=normalized_source_id
+    )
+    existing_review_ids = {
+        str(review["id"])
+        for review in merged_reviews
+        if isinstance(review, dict) and isinstance(review.get("id"), str)
+    }
+    review_collisions = sorted(
+        str(review["id"])
+        for review in appended_reviews
+        if isinstance(review, dict)
+        and isinstance(review.get("id"), str)
+        and review["id"] in existing_review_ids
+    )
+    if review_collisions:
+        return _append_result(
+            status="rejected",
+            write=False,
+            source_skill_id=normalized_source_id,
+            pack_id=normalized_pack_id,
+            active=False,
+            warnings=warnings,
+            errors=[f"namespaced review ids already exist: {', '.join(review_collisions)}"],
+        )
+    merged_reviews.extend(appended_reviews)
+    sources = [
+        source
+        for source in target_pack.get("sources", [])
+        if isinstance(source, dict) and isinstance(source.get("id"), str)
+    ]
+    source: dict[str, Any] = {"id": normalized_source_id}
+    if source_ref:
+        source["ref"] = source_ref
+    candidate_version = candidate_pack.get("version")
+    if isinstance(candidate_version, str) and candidate_version:
+        source["version"] = candidate_version
+    sources.append(source)
+    canonical_content = _canonical_skill_toml(
+        {
+            "name": target_pack["name"],
+            "version": target_pack.get("version"),
+            "description": target_pack.get("description"),
+            "sources": sources,
+            "deterministic_rules": merged_rules,
+            "agent_reviews": merged_reviews,
+        },
+        normalized_pack_id,
+    )
+
+    if not write:
+        return _append_result(
+            status="validated",
+            write=False,
+            source_skill_id=normalized_source_id,
+            pack_id=normalized_pack_id,
+            active=activate,
+            warnings=warnings,
+            errors=[],
+        )
+
+    target_path.write_text(canonical_content, encoding="utf-8")
+    if repo_root is not None and target_relative_path is not None:
+        _update_repo_config(
+            repo_root,
+            skill_id=normalized_pack_id,
+            skill_path=target_relative_path,
+            activate=activate,
+        )
+    return _append_result(
+        status="appended",
+        write=True,
+        source_skill_id=normalized_source_id,
+        pack_id=normalized_pack_id,
+        active=activate,
+        warnings=warnings,
+        errors=[],
+    )
 
 
-def _render_skills_config_block(
-    *,
-    enabled: bool,
-    active: list[str],
-    local: list[dict[str, Any]],
-) -> str:
-    lines = ["[quality_runner.skills]", f"enabled = {'true' if enabled else 'false'}"]
-    if active:
-        quoted = ", ".join(f'"{item}"' for item in sorted(active))
-        lines.append(f"active = [{quoted}]")
-    for item in local:
-        skill_id = item.get("id")
-        path = item.get("path")
-        if not isinstance(skill_id, str) or not isinstance(path, str):
+def _namespace_pack_items(value: object, *, source_id: str) -> list[dict[str, Any]]:
+    if not isinstance(value, list):
+        return []
+    namespaced: list[dict[str, Any]] = []
+    for item in value:
+        if not isinstance(item, dict):
             continue
-        lines.append("")
-        lines.append("[[quality_runner.skills.local]]")
-        lines.append(f'id = "{skill_id}"')
-        lines.append(f'path = "{path}"')
-        applies_to = item.get("applies_to")
-        if isinstance(applies_to, list) and applies_to:
-            quoted = ", ".join(f'"{value}"' for value in applies_to)
-            lines.append(f"applies_to = [{quoted}]")
-    return "\n".join(lines)
-
-
-def _replace_skills_block(existing: str, block: str) -> str:
-    lines = existing.splitlines()
-    result: list[str] = []
-    index = 0
-    while index < len(lines):
-        line = lines[index]
-        if line.strip() == "[quality_runner.skills]":
-            result.append(block.rstrip())
-            index += 1
-            while index < len(lines):
-                next_line = lines[index]
-                if next_line.startswith("[") and not next_line.startswith(
-                    "[[quality_runner.skills"
-                ):
-                    break
-                if next_line.startswith("[[quality_runner.skills"):
-                    index += 1
-                    while index < len(lines) and not (
-                        lines[index].startswith("[")
-                        and not lines[index].startswith("[[quality_runner.skills")
-                    ):
-                        index += 1
-                    continue
-                index += 1
-            continue
-        result.append(line)
-        index += 1
-    return "\n".join(result).rstrip() + "\n"
+        copied = dict(item)
+        item_id = copied.get("id")
+        if isinstance(item_id, str) and item_id:
+            copied["id"] = f"{source_id}/{item_id}"
+        namespaced.append(copied)
+    return namespaced
 
 
 def _result(
@@ -376,3 +468,31 @@ def _result(
     if canonical_content is not None:
         payload["canonical_content"] = canonical_content
     return payload
+
+
+def _append_result(
+    *,
+    status: str,
+    write: bool,
+    source_skill_id: str,
+    pack_id: str,
+    active: bool,
+    warnings: list[str] | list[dict[str, str]],
+    errors: list[str],
+) -> dict[str, Any]:
+    normalized_warnings = [
+        warning if isinstance(warning, str) else str(warning.get("message", warning))
+        for warning in warnings
+    ]
+    return {
+        "schema": SKILL_APPEND_RESULT_SCHEMA,
+        "status": status,
+        "write": write,
+        "source_skill_id": source_skill_id,
+        "pack_id": pack_id,
+        "skill_path": f"{SKILLS_DIR}/{pack_id}.toml",
+        "config_path": CONFIG_FILE_NAME,
+        "active": active,
+        "warnings": normalized_warnings,
+        "errors": errors,
+    }

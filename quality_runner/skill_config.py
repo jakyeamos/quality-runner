@@ -156,6 +156,7 @@ def _load_skill_pack(
     agent_reviews, review_warnings = _parse_agent_reviews(
         payload.get("agent_reviews"), configured_id
     )
+    sources, source_warnings = _parse_sources(payload.get("sources"), configured_id)
 
     return {
         "id": configured_id,
@@ -168,7 +169,8 @@ def _load_skill_pack(
         "content_sha256": hashlib.sha256(content.encode("utf-8")).hexdigest(),
         "deterministic_rules": deterministic_rules,
         "agent_reviews": agent_reviews,
-        "validation_warnings": [*deterministic_warnings, *review_warnings],
+        "sources": sources,
+        "validation_warnings": [*deterministic_warnings, *review_warnings, *source_warnings],
     }, None
 
 
@@ -352,6 +354,38 @@ def _parse_agent_reviews(
             review["focus"] = focus
         reviews.append(review)
     return reviews, warnings
+
+
+def _parse_sources(
+    value: object, skill_id: str
+) -> tuple[list[dict[str, Any]], list[dict[str, str]]]:
+    if not isinstance(value, list):
+        if value is not None:
+            return [], [_skill_warning(skill_id, "sources must be a list")]
+        return [], []
+
+    sources: list[dict[str, Any]] = []
+    warnings: list[dict[str, str]] = []
+    seen_ids: set[str] = set()
+    for index, item in enumerate(value):
+        if not isinstance(item, dict):
+            warnings.append(_skill_warning(skill_id, f"sources[{index}] must be a table"))
+            continue
+        source_id = item.get("id")
+        if not isinstance(source_id, str) or not source_id:
+            warnings.append(_skill_warning(skill_id, f"sources[{index}] must include an id"))
+            continue
+        if source_id in seen_ids:
+            warnings.append(_skill_warning(skill_id, f"sources[{index}] duplicates id {source_id}"))
+            continue
+        seen_ids.add(source_id)
+        source: dict[str, Any] = {"id": source_id}
+        for key in ("ref", "version"):
+            value_for_key = item.get(key)
+            if isinstance(value_for_key, str) and value_for_key:
+                source[key] = value_for_key
+        sources.append(source)
+    return sources, warnings
 
 
 def _string_list(value: object) -> list[str]:

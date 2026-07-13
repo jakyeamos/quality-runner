@@ -166,6 +166,37 @@ Reports the normalized repo config and latest run metadata.
 quality-runner status /path/to/repo --json
 ```
 
+## `quality-runner skill`
+
+Quality Skill management is split into candidate validation, pack assignment,
+and corpus distribution:
+
+```bash
+quality-runner skill ingest candidate.toml \
+  --repo-path /path/to/repo --id candidate --json
+
+quality-runner skill classify candidate.toml \
+  --corpus-path /path/to/personal-quality-corpus \
+  --id candidate --json
+
+quality-runner skill append candidate.toml \
+  --corpus-path /path/to/personal-quality-corpus --id candidate \
+  --pack-id ui-foundations --json
+
+quality-runner skill sync \
+  --corpus-path /path/to/personal-quality-corpus \
+  --repo-path /path/to/repo-a \
+  --repo-path /path/to/repo-b --json
+```
+
+`ingest`, `append`, and `sync` are dry-run commands unless `--write` is passed.
+`classify` returns ranked advisory recommendations. `append` namespaces the
+candidate's rule and review ids and records `[[sources]]` provenance. `sync`
+updates only QR-owned skill files and the skill configuration block; it keeps
+target-only packs and unrelated configuration. Use `--replace-active` with
+`sync` only when the corpus should replace, rather than extend, the target's
+active set.
+
 ## `quality-runner prune-artifacts`
 
 Previews or applies the configured artifact retention policy. The default is a

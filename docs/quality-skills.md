@@ -52,6 +52,103 @@ Behavior:
 - Skill paths must stay inside the repo. Path traversal is rejected.
 - Missing or malformed skill files are skipped safely and surfaced as warnings.
 
+## Personal corpus and pack assignment
+
+A personal corpus is a versioned directory of already-compiled TOML packs. It is
+the synchronization source for multiple repositories; raw `SKILL.md` files remain
+input to the ingest agent and are never copied into a repository as executable
+configuration.
+
+```text
+personal-quality-corpus/
+├── quality-runner-corpus.toml
+└── packs/
+    ├── ui-foundations.toml
+    └── security-privacy.toml
+```
+
+The manifest is explicit about pack identity, source location, classification
+hints, and which packs should be active after synchronization:
+
+```toml
+schema = "quality-runner-skill-corpus-v0.1"
+id = "personal"
+version = "0.1.0"
+active = ["ui-foundations"]
+
+[[packs]]
+id = "ui-foundations"
+path = "packs/ui-foundations.toml"
+focus = ["ui", "visual", "accessibility", "components"]
+```
+
+The normal workflow for a new skill is:
+
+```text
+raw SKILL.md → ingest candidate TOML → classify against existing packs
+             → user/agent selects pack → append or create pack → sync targets
+```
+
+Classification is advisory lexical evidence, not an automatic merge. Assign a
+candidate to an existing pack when it fits; create a new pack only when it has a
+meaningfully different domain or adoption boundary.
+
+```bash
+# Recommend existing packs.
+quality-runner skill classify /tmp/new-skill.toml \
+  --corpus-path ~/personal-quality-corpus \
+  --id new-skill \
+  --json
+
+# Preview an explicit append. Rule and review ids are namespaced and provenance
+# is recorded in [[sources]] so the contribution remains traceable.
+quality-runner skill append /tmp/new-skill.toml \
+  --corpus-path ~/personal-quality-corpus \
+  --id new-skill \
+  --pack-id ui-foundations \
+  --source-ref personal/.codex/skills/new-skill \
+  --json
+
+# Apply the append only after review.
+quality-runner skill append /tmp/new-skill.toml \
+  --corpus-path ~/personal-quality-corpus \
+  --id new-skill \
+  --pack-id ui-foundations \
+  --source-ref personal/.codex/skills/new-skill \
+  --write --json
+```
+
+If no existing pack is a fit, use the existing `skill ingest --write` flow to
+create a standalone pack, then copy that reviewed pack into the corpus and add
+its `[[packs]]` entry to the corpus manifest.
+
+Corpus synchronization is dry-run by default and additive: it registers or
+updates corpus packs, preserves target-only packs and non-skill configuration,
+and activates only the ids listed by the corpus while retaining existing active
+ids. It writes only `.quality-runner/skills/` and the skill section of
+`.quality-runner.toml`.
+
+```bash
+# Preview across multiple repositories.
+quality-runner skill sync \
+  --corpus-path ~/personal-quality-corpus \
+  --repo-path /path/to/project-a \
+  --repo-path /path/to/project-b \
+  --json
+
+# Apply after reviewing the plan.
+quality-runner skill sync \
+  --corpus-path ~/personal-quality-corpus \
+  --repo-path /path/to/project-a \
+  --repo-path /path/to/project-b \
+  --write --json
+```
+
+`--replace-active` is an explicit opt-in when a repository should adopt the
+corpus active set instead of retaining its existing active ids. Corpus paths and
+all target skill paths are containment-checked; traversal and malformed packs
+are rejected before a write begins.
+
 ## Deterministic rules
 
 v1 supports three deterministic rule types:
@@ -303,6 +400,10 @@ quality-runner skill ingest /tmp/ui-polish.toml \
   --id ui-polish \
   --json
 ```
+
+For a compiled personal corpus, prefer the classify/append/sync workflow above.
+`skill ingest` remains the compatibility path for registering one standalone
+pack into one repository.
 
 Register and activate:
 

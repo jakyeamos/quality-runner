@@ -5,6 +5,11 @@ You are converting a user-provided quality skill into a Quality Runner skill pac
 Output **only** a TOML skill pack. Do not edit repository source files. Do not
 include executable code, shell commands, or remediation instructions.
 
+The output is a candidate pack, not an automatic corpus assignment. After it is
+validated, Quality Runner can recommend an existing personal-corpus pack. The
+user or supervising agent should make the assignment decision; do not merge the
+candidate into another pack in this prompt.
+
 ## Your job
 
 1. Read the raw user-provided skill, guide, or preference document.
@@ -175,6 +180,27 @@ quality-runner skill ingest /tmp/ui-polish.toml \
   --write \
   --json
 ```
+
+For personal corpus workflows, classify the candidate first and then append it
+explicitly to the selected existing pack:
+
+```bash
+quality-runner skill classify /tmp/ui-polish.toml \
+  --corpus-path /path/to/personal-quality-corpus \
+  --id ui-polish \
+  --json
+
+quality-runner skill append /tmp/ui-polish.toml \
+  --corpus-path /path/to/personal-quality-corpus \
+  --id ui-polish \
+  --pack-id ui-foundations \
+  --source-ref personal/.codex/skills/ui-polish \
+  --write --json
+```
+
+Use `skill sync` to distribute the reviewed compiled corpus to multiple target
+repositories. Synchronization is dry-run by default and never reads raw
+Markdown skills as pack definitions.
 
 Quality Runner validates and registers. It does not creatively interpret the raw
 skill itself.
