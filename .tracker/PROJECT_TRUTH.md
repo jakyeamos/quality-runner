@@ -5,7 +5,7 @@ Last updated: 2026-07-12
 ## Current State
 
 The quality-skills audit contract is hardened on feature branch
-`quality-skills-hardening` at commit `69e30fc`. The source-backed user packs
+`quality-skills-hardening` at commit `72af5b5`. The source-backed user packs
 `ui-foundations`, `test-strategy`, `security-privacy`, `release-readiness`,
 `pr-risk`, `data-integrity`, `developer-experience`, and
 `architecture-maintainability` now cover visual and UI-state risks, behavior
@@ -22,6 +22,9 @@ triggers and agent-review coverage.
 The Architecture and Maintainability compatibility trigger now requires
 code-shaped seam declarations or compatibility terms paired with boundary
 language, avoiding generic documentation/configuration mentions.
+The core security scanner's secret-in-fallback candidate now requires a
+credential-shaped name or recognizable token marker, preserving the secret
+review gate while filtering ordinary UI, error, content-type, and demo defaults.
 
 ## Next Step
 
