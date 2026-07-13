@@ -279,6 +279,32 @@ def test_cli_and_mcp_packet_ready_projections_match_persisted_v1_artifacts(tmp_p
     assert review_report_to_v1(review_report_from_v1(mcp_report)) == mcp_report
 
 
+def test_default_cli_outcome_keeps_persisted_v1_review_artifacts_readable(tmp_path: Path) -> None:
+    command = [
+        sys.executable,
+        "-m",
+        "quality_runner",
+        "review",
+        str(tmp_path),
+        "--mode",
+        "blind",
+        "--run-id",
+        "outcome-artifact-contract",
+        "--json",
+    ]
+    result = subprocess.run(command, cwd=ROOT, check=True, capture_output=True, text=True)
+    outcome = json.loads(result.stdout)
+    paths = outcome["writes"]["artifact_paths"]
+    context = json.loads(Path(paths["review_context_json"]).read_text())
+    manifest = json.loads(Path(paths["review_manifest_json"]).read_text())
+    report = json.loads(Path(paths["review_report_json"]).read_text())
+
+    assert outcome["schema"] == "quality-runner-outcome-v0.2"
+    assert review_packet_to_v1(review_packet_from_v1(context)) == context
+    assert review_manifest_to_v1(review_manifest_from_v1(manifest)) == manifest
+    assert review_report_to_v1(review_report_from_v1(report)) == report
+
+
 @pytest.mark.parametrize("mode", ["task", "combined"])
 def test_task_and_combined_cli_mcp_projections_preserve_v1_contracts(
     tmp_path: Path, mode: str
