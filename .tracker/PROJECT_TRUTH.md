@@ -5,7 +5,7 @@ Last updated: 2026-07-13
 ## Current State
 
 The quality-skills audit contract is hardened on feature branch
-`quality-skill-corpus-workflow` at commit `28905ca`. Release metadata now agrees on
+`quality-skill-corpus-workflow` at commit `b879c63`. Release metadata now agrees on
 version `0.5.0` across the runtime package, wheel manifest, citation record,
 and release checklist. The source-backed user packs
 `ui-foundations`, `test-strategy`, `security-privacy`, `release-readiness`,
@@ -45,6 +45,11 @@ trees. Personal Quality Skill corpus management now has a versioned
 append-to-existing-pack with namespaced rule/review ids and `[[sources]]`
 provenance, and additive dry-run-first multi-repository synchronization. Raw
 Markdown skills remain ingest inputs; only validated compiled TOML packs sync.
+The mined anti-template workflow now has clean-room `ui-specificity` and
+`copy-specificity` starter packs, preserves `skill:<id>` categories through the
+audit/actionability boundary, rejects invalid regexes during skill ingest, and
+scans Astro, Vue, Svelte, SCSS, Sass, Less, and MDX surfaces. These packs remain
+opt-in observations with contextual review and rendered/copy verification.
 
 ## Next Step
 
@@ -58,10 +63,20 @@ the selected repositories. Runtime/browser-dependent skills remain deferred.
   this change; touched-file checks pass. Vulture passes the source roots; its
   broad `vulture .` form needs `.quality-runner` excluded after local uv gate
   runs generate ignored dependency-cache code.
+- The packaging console-script test remains environment-blocked: its offline
+  wheel build falls back to an online `uv` fetch and DNS is unavailable. The
+  remaining suite passes with that one test deselected.
 
 _(9 older entries trimmed)_
 
 Current verification:
+
+- 2026-07-13: Mined the anti-template workflow in `b879c63`. Added clean-room
+  UI and copy specificity packs, frontend extension coverage, strict regex
+  ingest rejection, and skill category preservation. Focused tests, touched-file
+  Ruff/format/BasedPyright, source-root Vulture, and TOML parsing passed; the
+  suite passed with `426 passed, 1 deselected` after the network-blocked package
+  test was excluded.
 
 - 2026-07-13: Added personal corpus classification, pack append/provenance, and
   additive multi-repo synchronization in `28905ca`. Full suite passes (`423
