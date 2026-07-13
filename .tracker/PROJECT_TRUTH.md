@@ -5,7 +5,7 @@ Last updated: 2026-07-12
 ## Current State
 
 The quality-skills audit contract is hardened on feature branch
-`quality-security-evidence` at commit `df9ddfb`. The source-backed user packs
+`quality-security-evidence` at commit `2f351ac`. The source-backed user packs
 `ui-foundations`, `test-strategy`, `security-privacy`, `release-readiness`,
 `pr-risk`, `data-integrity`, `developer-experience`, and
 `architecture-maintainability` now cover visual and UI-state risks, behavior
