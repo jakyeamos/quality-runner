@@ -5,22 +5,23 @@ Last updated: 2026-07-12
 ## Current State
 
 The quality-skills audit contract is hardened on feature branch
-`quality-skills-hardening` at commit `81efe8b`. The source-backed user packs
+`quality-skills-hardening` at commit `14724fcc`. The source-backed user packs
 `ui-foundations`, `test-strategy`, `security-privacy`, `release-readiness`,
-`pr-risk`, `data-integrity`, and `developer-experience` now cover visual and
-UI-state risks, behavior coverage, regression value, test reliability, transport
-and cross-origin risks, authorization, privacy flows, input boundaries, security
-evidence, release verification, compatibility, rollback, changed-surface risk,
-merge integrity, schema and migration safety, pipeline correctness, onboarding,
-wayfinding, contribution flow, and handoff through deterministic observations
-and high-recall agent reviews. SQL is now included in Quality Runner's text scan
-surface for migration audits.
+`pr-risk`, `data-integrity`, `developer-experience`, and
+`architecture-maintainability` now cover visual and UI-state risks, behavior
+coverage, regression value, test reliability, transport and cross-origin risks,
+authorization, privacy flows, input boundaries, security evidence, release
+verification, compatibility, rollback, changed-surface risk, merge integrity,
+schema and migration safety, pipeline correctness, onboarding, wayfinding,
+contribution flow, ownership, duplication, boundaries, and handoff through
+deterministic observations and high-recall agent reviews. SQL is now included in
+Quality Runner's text scan surface for migration audits.
 
 ## Next Step
 
-Select and convert the architecture/maintainability candidate pack, then
-exercise the starter packs against representative source-only repositories
-before registering them in a personal multi-repo configuration.
+Select and convert the performance-readiness candidate pack, then exercise the
+starter packs against representative source-only repositories before registering
+them in a personal multi-repo configuration.
 
 ## Blockers
 
@@ -115,6 +116,12 @@ Current verification:
   `81efe8b`. Focused quality-skill tests passed (`30 passed`), pack ingest,
   TOML parsing, touched-file Ruff, format, and agent-review report merging
   passed. Full suite reached `408 passed, 1 failed` on the existing
+  packaging-entrypoint mismatch.
+
+- 2026-07-12: Added and committed the `architecture-maintainability` starter
+  pack as `14724fcc`. Focused quality-skill tests passed (`31 passed`), pack
+  ingest, TOML parsing, touched-file Ruff, format, and agent-review report
+  merging passed. Full suite reached `409 passed, 1 failed` on the existing
   packaging-entrypoint mismatch.
 
 - 2026-07-12: Quality-skills hardening committed as `ccfc12e`. Focused skill and
