@@ -9,7 +9,8 @@ inspects repositories, records evidence, plans remediation, and hands execution
 to separately authorized humans or agents. It does not own autonomous source
 changes or remote review execution.
 
-`main` is the 0.5.0 release baseline. The protected
+`main` is the published 0.5.1 release at `a101bd4`, tagged `v0.5.1`, with a
+verified PyPI distribution and public GitHub Release. The protected
 `codex/gpt56-modernization` branch contains M0 trust-boundary work in
 `f36dcf4`, M1 typed Fresh Review contracts in `cb12746`, M2 typed read-only
 audit orchestration in `3f23204`, and M3 typed verification orchestration in
@@ -17,8 +18,8 @@ audit orchestration in `3f23204`, and M3 typed verification orchestration in
 outcome-first CLI/MCP surfaces, bounded run history, and precise safety
 projections. M5 in `f5c8610` completes the two-phase Fresh Review lifecycle:
 strict packet-bound local responses, isolated combined packets, auditable
-handoffs, and truthful artifact/outcome reporting. The branch is an unreleased
-0.5.1 candidate; no tag or package publication has occurred. M6 began in
+handoffs, and truthful artifact/outcome reporting. The modernization branch
+has been merged and published. M6 began in
 `0b5ac2e`: application-owned audit, verification, and journey services now sit
 behind explicit workflow and outcome façades, with installed-wheel facade
 checks. M6 completes in `56c94d4`: packet construction and report normalization
@@ -51,14 +52,14 @@ v0.2 artifact, and repairs the packaged skill and clean-install release path.
 for private fields, malformed syntax, computed logging, and tokenless values.
 `948107f` prepares the v0.5.1 citation, changelog, upgrade guidance, and public
 README. `c71b130` adds a pinned Python dependency audit and validates untrusted
-baseline Git revisions before review-delta comparisons. The branch is validated
-and ready for its reviewed PR merge, main-branch tag, and publication checks.
+baseline Git revisions before review-delta comparisons. Its reviewed merge,
+tag, release workflow, and published-artifact smoke checks have completed.
 
 ## Current Position
 
 - Target: a typed v2 core behind CLI, MCP, and compatibility adapters.
-- Next implementation slice: push the validated v0.5.1 branch, merge its
-  reviewed PR, then tag the resulting `main` commit and verify PyPI.
+- Next implementation slice: no active release work; start a new scoped
+  follow-up from `main` when product feedback or a new requirement arrives.
 - Canonical planning documents: `docs/modernization/`.
 - Public compatibility: retain `quality_evidence_contract` and
   `repo_quality_certifier` during a published transition window.
@@ -77,7 +78,8 @@ and ready for its reviewed PR merge, main-branch tag, and publication checks.
 
 - `c71b130` passes the full 556-test pytest suite, Ruff lint/format,
   Basedpyright, Vulture, lock validation, pip-audit, release smoke, build, and
-  installed-wheel smoke checks.
+  installed-wheel smoke checks. GitHub CI and the tag release workflow pass;
+  the published PyPI wheel passes an independent disposable-install smoke.
 - Basedpyright reports zero errors; audit, review, verify, and run history now
   have a versioned v2 outcome contract behind preserved v1 projections.
 - Release smoke now checks package/runtime/plugin parity and the release
@@ -96,6 +98,9 @@ and ready for its reviewed PR merge, main-branch tag, and publication checks.
 
 ## Recent Progress
 
+- 2026-07-13: v0.5.1 released: PR #2 merged at `a101bd4`, tag workflow and
+  six-job CI passed, PyPI publishes wheel/sdist, GitHub Release is public, and
+  a disposable PyPI install passes CLI, doctor, release-smoke, and MCP checks.
 - 2026-07-13: `c71b130` adds a pinned Python dependency audit, upgrades pytest
   to 9.0.3, and prevents untrusted baseline manifests from injecting Git diff
   options; all pre-tag gates and installed-wheel smoke checks pass.
@@ -132,6 +137,3 @@ and ready for its reviewed PR merge, main-branch tag, and publication checks.
 - 2026-07-13: Completed M6 on `codex/gpt56-modernization` (`0b5ac2e`,
   `56c94d4`): application-owned workflow/outcome/packet/report paths, typed
   root façades, built-wheel compatibility, 520 passing tests, and clean reviews.
-- 2026-07-13: Completed M5 on `codex/gpt56-modernization` (`f5c8610`):
-  packet-bound response validation, combined-context isolation, lifecycle locks,
-  strict handoffs, and truthful v2 artifact paths; 515 tests and release checks pass.

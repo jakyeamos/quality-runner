@@ -3,7 +3,7 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: GPT-5.6 modernization
 status: complete
-last_updated: "2026-07-13T17:32:43Z"
+last_updated: "2026-07-13T17:41:03Z"
 progress:
   total_phases: 8
   completed_phases: 8
@@ -22,12 +22,12 @@ See `.planning/PROJECT.md` for the established product boundary and
 **Core value:** Give developers and agents trustworthy local evidence before
 they authorize repository changes.
 
-**Current focus:** v0.5.1 reviewed PR merge, tag, and publication.
+**Current focus:** v0.5.1 released; no active implementation phase.
 
 ## Current Position
 
-- Branch: `codex/gpt56-modernization`
-- Baseline: `main` at 0.5.0 / commit `0a3def1`
+- Branch: `main`
+- Baseline: `main` at 0.5.1 / commit `a101bd4`
 - Audit and planning: complete
 - M0 — restore trust at the boundary: complete in `f36dcf4`
 - M1 — establish typed review contracts: complete in `cb12746`
@@ -41,15 +41,16 @@ they authorize repository changes.
   source-evidence protection for private fields, malformed syntax, computed
   logs, and tokenless values. `948107f` prepares v0.5.1 metadata and README
   guidance; `c71b130` completes the pre-tag gate with dependency-audit and
-  untrusted-baseline Git-argument hardening.
+  untrusted-baseline Git-argument hardening. PR #2 merged, `v0.5.1` is
+  published to PyPI, and the GitHub Release is public.
 
 ## Active Phase
 
 - **Phase:** M7
 - **Slug:** release-hardening
 - **Status:** Complete
-- **Completion gate:** final v0.5.1 pre-tag validation, reviewed PR merge, tag
-  on `main`, successful PyPI publication, and explicit GitHub Release creation.
+- **Completion gate:** Met: v0.5.1 pre-tag validation, reviewed PR merge, tag
+  on `main`, successful PyPI publication, and GitHub Release creation.
 
 ## Key Decisions
 
@@ -71,11 +72,13 @@ they authorize repository changes.
 
 ## Next Step
 
-Merge the reviewed PR, tag only the resulting `main` commit, then verify PyPI
-and create the GitHub Release.
+Start any future work from `main` as a new scoped follow-up.
 
 ## Recent Progress
 
+- 2026-07-13: v0.5.1 released: PR #2 merged at `a101bd4`, GitHub CI and tag
+  release workflow pass, PyPI publishes both artifacts, GitHub Release is
+  public, and a disposable PyPI install passes CLI, doctor, smoke, and MCP.
 - 2026-07-13: `c71b130` completes pre-tag hardening: pinned pip-audit and
   pytest 9.0.3, validates baseline Git IDs before diffing, and passes the
   556-test release ladder plus installed-wheel smoke.
@@ -116,6 +119,3 @@ and create the GitHub Release.
 - 2026-07-13: M6 completed in `0b5ac2e` and `56c94d4`: application owns
   workflow, outcome, packet, and report execution; root façades preserve v1
   behavior; 520 tests, wheel, smoke, and three reviews passed.
-- 2026-07-13: M5 `f5c8610` completed; two-phase Fresh Review now validates
-  packet-bound responses, preserves v1 paths, isolates combined packets, and
-  records truthful lifecycle/handoff evidence; 515 tests and release checks pass.
