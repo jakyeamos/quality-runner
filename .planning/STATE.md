@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: GPT-5.6 modernization
 status: active
-last_updated: "2026-07-12T21:44:13.000Z"
+last_updated: "2026-07-13T01:02:56Z"
 progress:
   total_phases: 8
-  completed_phases: 5
+  completed_phases: 6
   total_plans: 8
-  completed_plans: 5
-  percent: 62
+  completed_plans: 6
+  percent: 75
 ---
 
 # Planning State
@@ -22,7 +22,8 @@ See `.planning/PROJECT.md` for the established product boundary and
 **Core value:** Give developers and agents trustworthy local evidence before
 they authorize repository changes.
 
-**Current focus:** Plan M5 — make Fresh Review operationally honest end to end.
+**Current focus:** Plan M6 — isolate compatibility and retire duplicate
+foundations.
 
 ## Current Position
 
@@ -34,15 +35,16 @@ they authorize repository changes.
 - M2 — migrate read-only audit workflow: complete in `3f23204`
 - M3 — migrate verification workflow: complete in `8705cc1`
 - M4 — deliver journey-led CLI and MCP outcomes: complete in `75d8ac4`
-- Implementation: M5 next
+- M5 — make Fresh Review operationally honest: complete in `f5c8610`
+- Implementation: M6 next
 
 ## Active Phase
 
-- **Phase:** M5
-- **Slug:** fresh-review-operational-honesty
+- **Phase:** M6
+- **Slug:** compatibility-isolation
 - **Status:** Planned
-- **Completion gate:** review packet, adapter, response validation, and fixing
-  handoff form one auditable end-to-end slice without exposing hidden context.
+- **Completion gate:** legacy projections are explicit adapters and duplicate
+  foundations are retired without changing installed compatibility surfaces.
 
 ## Key Decisions
 
@@ -64,10 +66,13 @@ they authorize repository changes.
 
 ## Next Step
 
-Plan and implement M5 as specified in `docs/modernization/EXEC_PLAN.md`.
+Plan and implement M6 as specified in `docs/modernization/EXEC_PLAN.md`.
 
 ## Recent Progress
 
+- 2026-07-13: M5 `f5c8610` completed; two-phase Fresh Review now validates
+  packet-bound responses, preserves v1 paths, isolates combined packets, and
+  records truthful lifecycle/handoff evidence; 515 tests and release checks pass.
 - 2026-07-12: M4 `75d8ac4` completed; additive v2 audit/review/verify/runs outcomes, MCP tools, truthful safety projection, and full validation passed.
 - 2026-07-12: M3 `8705cc1` completed; typed verification service, v1 artifacts, disposable cleanup, minimal environment, and full validation passed.
 - 2026-07-12: M2 `3f23204` completed; typed audit, v1 artifacts, shared scopes, and compatibility validation passed.

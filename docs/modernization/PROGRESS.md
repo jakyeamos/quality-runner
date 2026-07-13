@@ -2,7 +2,7 @@
 
 ## Current state
 
-M0 through M4 are implemented on the protected branch
+M0 through M5 are implemented on the protected branch
 `codex/gpt56-modernization`, based on `main` commit `0a3def1`. The branch
 remains isolated until review and merge.
 
@@ -82,6 +82,21 @@ projections:
   v2 schema, projection, CLI, MCP, history, and adversarial regression tests
   hold the cross-journey contract.
 
+M5 makes Fresh Review operationally honest from packet preparation through
+fixing handoff without changing the default v1 response surface:
+
+- review preparation and response submission are separate lifecycle steps with
+  strict packet, manifest, and execution invariants;
+- combined review produces task-free coordination guidance plus distinct task
+  and blind packets, then groups only validated responses locally;
+- local response and task-file boundaries reject path escapes, symlinks,
+  non-regular files, oversized inputs, malformed fields, and packet tampering;
+- finalization is lock-gated, rejected responses persist a truthful attempt, and
+  a completed response produces explicit handoff and optional loop artifacts;
+- legacy CLI/MCP payloads retain six artifact paths, while v2 outcomes list the
+  lifecycle files actually written and documentation no longer overclaims
+  reviewer identity or enforced external access.
+
 ## Decisions in force
 
 - Use a parallel typed core with controlled adapters, not a clean rewrite.
@@ -96,12 +111,11 @@ projections:
 
 ## Quality status
 
-- The full `pytest` suite passes (496 tests); Basedpyright reports zero errors.
+- The full `pytest` suite passes (515 tests); Basedpyright reports zero errors.
 - Ruff lint/format, Vulture, a fresh package build, and
   `quality-runner release-smoke --json` pass.
 
 ## Next milestone
 
-M5 makes Fresh Review operationally honest from packet creation through adapter
-response validation and fixing handoff, retaining packet-only review as a clear
-distinct capability.
+M6 isolates compatibility and retires duplicate foundations while preserving
+installed package, CLI, MCP, and artifact compatibility surfaces.

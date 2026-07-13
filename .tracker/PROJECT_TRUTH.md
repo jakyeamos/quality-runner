@@ -15,14 +15,16 @@ changes or remote review execution.
 audit orchestration in `3f23204`, and M3 typed verification orchestration in
 `8705cc1`. M4 in `75d8ac4` adds the additive v2 journey-outcome contract,
 outcome-first CLI/MCP surfaces, bounded run history, and precise safety
-projections. The branch is an unreleased 0.5.1 candidate; no tag or package
-publication has occurred.
+projections. M5 in `f5c8610` completes the two-phase Fresh Review lifecycle:
+strict packet-bound local responses, isolated combined packets, auditable
+handoffs, and truthful artifact/outcome reporting. The branch is an unreleased
+0.5.1 candidate; no tag or package publication has occurred.
 
 ## Current Position
 
 - Target: a typed v2 core behind CLI, MCP, and compatibility adapters.
-- Next implementation slice: M5 — make Fresh Review operationally honest from
-  packet creation through validated response and fixing handoff.
+- Next implementation slice: M6 — isolate compatibility and retire duplicate
+  foundations without breaking installed public surfaces.
 - Canonical planning documents: `docs/modernization/`.
 - Public compatibility: retain `quality_evidence_contract` and
   `repo_quality_certifier` during a published transition window.
@@ -37,7 +39,7 @@ publication has occurred.
 
 ## Baseline Quality
 
-- The full 496-test pytest suite, Ruff lint/format, Basedpyright, Vulture,
+- The full 515-test pytest suite, Ruff lint/format, Basedpyright, Vulture,
   package build, and release smoke pass.
 - Basedpyright reports zero errors; audit, review, verify, and run history now
   have a versioned v2 outcome contract behind preserved v1 projections.
@@ -46,17 +48,20 @@ publication has occurred.
 
 ## Risks
 
-- M5 must make adapter-backed Fresh Review operationally honest without leaking
-  prior context or changing legacy CLI/MCP payload contracts.
+- M6 must isolate legacy projections and remove duplicate foundations without
+  breaking package, CLI, MCP, or compatibility imports.
 - Existing large-file warnings remain in `repo_quality_certifier/core.py` and
   `tests/test_cli.py`.
 - User-authored gate commands remain arbitrary code; M0 requires explicit
   consent and a disposable checkout but does not sandbox those commands.
 - Combined file-adapter task provenance remains the baseline-compatible string
-  `"None"`; M5 owns a behavior redesign after the compatibility window.
+  `"None"` until a published compatibility cutover can change that projection.
 
 ## Recent Progress
 
+- 2026-07-13: Completed M5 on `codex/gpt56-modernization` (`f5c8610`):
+  packet-bound response validation, combined-context isolation, lifecycle locks,
+  strict handoffs, and truthful v2 artifact paths; 515 tests and release checks pass.
 - 2026-07-12: Completed M4 on `codex/gpt56-modernization` (`75d8ac4`): v2
   outcome contract, outcome-first CLI/MCP journeys, bounded history, and
   safety claims tied to observed evidence; 496 tests and release checks pass.
