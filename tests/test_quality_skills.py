@@ -130,6 +130,12 @@ def _pr_risk_skill_toml() -> str:
     return (Path(__file__).parents[1] / "docs/examples/pr-risk.toml").read_text(encoding="utf-8")
 
 
+def _data_integrity_skill_toml() -> str:
+    return (Path(__file__).parents[1] / "docs/examples/data-integrity.toml").read_text(
+        encoding="utf-8"
+    )
+
+
 def _install_skill(tmp_path: Path, skill_id: str, content: str) -> str:
     relative = f".quality-runner/skills/{skill_id}.toml"
     _write(tmp_path / relative, content)
@@ -583,6 +589,75 @@ def test_pr_risk_pack_reports_merge_integrity_and_review_scopes(tmp_path: Path) 
         "scope-and-cohesion",
         "merge-evidence",
         "handoff-and-remediation",
+    }
+    assert len(packet["included_files"]) == 1
+
+
+def test_data_integrity_pack_reports_migration_signals_and_review_scopes(tmp_path: Path) -> None:
+    from quality_runner.code_quality import create_code_quality_scan
+    from quality_runner.skill_config import load_active_skills
+    from quality_runner.skill_review import build_skill_review_packet
+
+    skill_path = _install_skill(tmp_path, "data-integrity", _data_integrity_skill_toml())
+    migration = "DROP TABLE users;\nDELETE FROM sessions;\n"
+    _write(tmp_path / "db/migrations/001_cleanup.sql", migration)
+    config = _skills_enabled_config(
+        active=["data-integrity"],
+        local=[{"id": "data-integrity", "path": skill_path}],
+    )
+
+    result = create_code_quality_scan(tmp_path, scan={"run_id": "data-integrity"}, config=config)
+    rule_ids = {str(finding["rule_id"]) for finding in result["findings"]}
+    assert "data-integrity/destructive-schema-operation" in rule_ids
+    assert "data-integrity/unconditional-delete-operation" in rule_ids
+    assert result["quality_skills"][0]["id"] == "data-integrity"
+
+    reviewed = create_code_quality_scan(
+        tmp_path,
+        scan={"run_id": "data-integrity-reviewed"},
+        config=config,
+        skill_review_report={
+            "schema": SKILL_REVIEW_REPORT_SCHEMA,
+            "run_id": "data-integrity-reviewed",
+            "findings": [
+                {
+                    "skill_id": "data-integrity",
+                    "review_id": "migration-and-backfill",
+                    "rule_id": "migration-and-backfill/missing-recovery-plan",
+                    "severity": "observation",
+                    "confidence": "low",
+                    "file": "db/migrations/001_cleanup.sql",
+                    "line": 1,
+                    "summary": "The destructive migration has no visible recovery or forward-fix evidence.",
+                    "evidence": "DROP TABLE users;",
+                    "risk": "A partial or incorrect migration could remove data without a recoverable path.",
+                    "expected_improvement": "Add or cite backup, restore, rollback, or forward-fix verification for the migration.",
+                    "verification": "Rerun quality-runner and the migration verification command after adding the recovery evidence.",
+                }
+            ],
+        },
+    )
+    assert any(
+        finding["rule_id"] == "migration-and-backfill/missing-recovery-plan"
+        for finding in reviewed["findings"]
+    )
+
+    skills, warnings = load_active_skills(tmp_path, config)
+    assert warnings == []
+    packet = build_skill_review_packet(
+        run_id="data-integrity",
+        repo_root=tmp_path,
+        scanned_files=[{"path": "db/migrations/001_cleanup.sql", "lines": migration.splitlines()}],
+        skills=skills,
+    )
+    assert packet is not None
+    assert len(packet["reviews"]) == 5
+    assert {review["review_id"] for review in packet["reviews"]} == {
+        "schema-and-invariants",
+        "migration-and-backfill",
+        "pipeline-and-reconciliation",
+        "data-loss-and-duplication",
+        "verification-and-fixtures",
     }
     assert len(packet["included_files"]) == 1
 

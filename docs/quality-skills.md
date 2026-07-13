@@ -202,6 +202,18 @@ The pack requires diff or PR metadata for claims about what changed. When that
 metadata is unavailable, the review must report the evidence gap instead of
 guessing the change surface.
 
+### Starter pack: Data Integrity and Migration Safety
+
+The [Data Integrity starter pack](examples/data-integrity.toml) adds observations
+for destructive schema operations and migration deletes. Its agent reviews cover
+invariants, migration and backfill safety, pipeline reconciliation, data-loss and
+duplication risk, and verification fixtures.
+
+The deterministic checks are signals for review, not proof that a migration is
+unsafe. The agent must consider ordering, database constraints, transaction
+behavior, representative data, recovery, and the repository's actual writers
+before elevating a finding.
+
 Merge a validated report during a run:
 
 ```bash

@@ -9,7 +9,7 @@ from quality_runner.scan_exclusions import (
 )
 
 CODE_EXTENSIONS = {".cjs", ".css", ".html", ".js", ".jsx", ".mjs", ".py", ".sh", ".ts", ".tsx"}
-TEXT_EXTENSIONS = {*CODE_EXTENSIONS, ".json", ".md", ".toml", ".yaml", ".yml"}
+TEXT_EXTENSIONS = {*CODE_EXTENSIONS, ".json", ".md", ".sql", ".toml", ".yaml", ".yml"}
 STRUCTURAL_ARTIFACT_TOP_LEVEL_DIRS = TOP_LEVEL_ARTIFACT_DIRECTORY_NAMES - {
     "data",
     "logs",
