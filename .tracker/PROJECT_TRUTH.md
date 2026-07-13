@@ -34,6 +34,8 @@ candidate-aware upgrade, rollback, release, and sensitive-artifact guidance.
 context, manifest, and report artifacts. `9fcea7d` restores legacy positional
 workflow slots, freezes the published v1 Review field shape, and re-exports the
 public `ReviewFinding` type while retaining explicit v2 next-action guidance.
+`4dee5af` shares redaction across security candidates, code-quality findings,
+and remediation excerpts so source-secret markers do not persist in those paths.
 
 ## Current Position
 
@@ -69,7 +71,7 @@ public `ReviewFinding` type while retaining explicit v2 next-action guidance.
 - M7 must keep public v1 readers and rollback guidance accurate while any v2
   default or deprecation policy is documented.
 - Generated evidence can contain target-repository output; it remains local and
-  must be handled as potentially sensitive even after candidate-literal redaction.
+  must be handled as potentially sensitive even after source-evidence redaction.
 - Existing large-file warnings remain in `repo_quality_certifier/core.py` and
   `tests/test_cli.py`.
 - User-authored gate commands remain arbitrary code; M0 requires explicit
@@ -79,6 +81,8 @@ public `ReviewFinding` type while retaining explicit v2 next-action guidance.
 
 ## Recent Progress
 
+- 2026-07-13: `4dee5af` closes the source-evidence redaction bypass across
+  code-quality, slice-enrichment, and security candidate artifacts.
 - 2026-07-13: `9fcea7d` restored positional workflow compatibility, the frozen
   Review v1 field shape, and the `ReviewFinding` facade without weakening the
   default v2 packet-ready outcome.

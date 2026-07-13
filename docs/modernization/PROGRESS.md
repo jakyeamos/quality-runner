@@ -34,6 +34,11 @@ for verification and refresh, freezes Review v1 output and artifact fields, and
 re-exports `ReviewFinding`; default v2 Review remains the explicit
 packet-ready/next-action surface.
 
+Its second confidentiality repair (`4dee5af`) shares secret-like literal
+redaction across security candidates, code-quality findings, and remediation
+source excerpts; inspect, run, and verify regressions scan every generated
+artifact for the original marker.
+
 M0 restores the public trust boundary without changing artifact schema ids:
 
 - package metadata now derives from `quality_runner/_version.py`; the plugin,

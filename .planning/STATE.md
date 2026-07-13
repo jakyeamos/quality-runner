@@ -42,7 +42,8 @@ hardening.
   complete in `113f143` and reproducible distribution evidence is complete in
   `66ce3ef`; Fresh Review v2 is now the default in `32e7b26`, with release and
   rollback guidance in `633b96e`; `9fcea7d` restores the published positional
-  and Review v1 compatibility shapes
+  and Review v1 compatibility shapes; `4dee5af` extends source-evidence
+  redaction through code-quality and remediation artifacts
 
 ## Active Phase
 
@@ -78,6 +79,9 @@ completion, and push the branch.
 
 ## Recent Progress
 
+- 2026-07-13: M7 source-evidence hardening in `4dee5af`: shared redaction now
+  protects security candidates, code-quality findings, and remediation excerpts
+  across inspect, run, and verify without altering arbitrary artifact writes.
 - 2026-07-13: M7 contract repair in `9fcea7d`: public positional verification
   and refresh slots are stable, Review v1 output/artifacts retain their frozen
   field shape, and the `ReviewFinding` façade is restored while default v2
