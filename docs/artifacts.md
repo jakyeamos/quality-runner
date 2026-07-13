@@ -160,7 +160,9 @@ an external agent or human applies changes and reruns Quality Runner.
 - `resolution-ledger.md`: human-readable resolution ledger summary.
 - `security-scan.json`: opt-in security capability discovery, candidate
   findings, and agent-review gate metadata when
-  `[quality_runner.security]` is configured.
+  `[quality_runner.security]` is configured. For secret-like candidates,
+  quoted source literals are redacted before fingerprinting and persistence;
+  downstream security findings inherit that redacted evidence.
 - `slice-specs/`: per-slice Markdown cold-executor plans derived from QR
   evidence. One file per remediation slice:
   `slice-specs/<slice-id>.md`. Each spec is self-contained and includes:
@@ -200,6 +202,20 @@ an external agent or human applies changes and reruns Quality Runner.
   staged-adoption stopping point so a mature repo can add gates, scope scans,
   classify debt, or fix high-signal findings without treating one-pass QR clean
   as the only successful outcome.
+
+## Handling generated artifacts
+
+Treat `.quality-runner/` output as local evidence that may be sensitive. It can
+contain repository paths, author intent, source-derived context, and bounded
+stdout/stderr from explicitly authorized gates. Do not commit, upload, or share
+it by default; review and minimize it first.
+
+The security scan redacts quoted literals in secret-like candidate evidence
+before fingerprinting and serialization. That narrow protection does not make
+an artifact secret-free: another scanner, a repository path, or gate output can
+still expose sensitive context. Retain or remove artifacts using the target
+repository's normal evidence-retention policy. See the
+[Threat Model](threat-model.md) for the remaining execution boundary.
 
 ## Gate Verification Artifacts
 
@@ -330,8 +346,8 @@ Use a real, non-symlinked output path for explicit exports and rollout reports.
 For example, place an export below the target repo's `.quality-runner/` folder
 instead of using an operating-system path that resolves through a symlink.
 
-By default, Quality Runner v1 does not edit files outside its artifact
-directory. `inspect` and `run` can explicitly switch branches first with
+By default, Quality Runner does not edit files outside its artifact directory.
+`inspect` and `run` can explicitly switch branches first with
 `--checkout-most-advanced-branch`; that mode requires a clean git worktree.
 
 ## Compatibility Policy

@@ -4,49 +4,50 @@ Quality Runner publishes Python distributions from the `Release` GitHub Actions
 workflow when a `v*.*.*` tag is pushed. The next release tag is `v0.5.1`.
 
 The package version has one source of truth in `quality_runner/_version.py` and
-is read dynamically by package metadata. The release workflow verifies that the
-tag, built wheel, installed CLI/MCP commands, plugin manifest, and citation
-metadata agree. `CITATION.cff` describes the last published release until the
-release commit updates it for the new tag.
+is read dynamically by package metadata. The release workflow installs the
+built wheel before publishing and checks its CLI doctor contract, release smoke,
+and MCP outcome-tool discovery alongside tag, plugin, and citation parity.
 
-Do not reuse `v0.1.0`, `v0.2.0`, `v0.2.1`, `v0.3.0`, `v0.3.1`, `v0.4.0`, or
-`v0.5.0`. `v0.1.0` already reached the PyPI publish step on 2026-06-28 and
-failed because the PyPI Trusted Publisher was not configured for the GitHub OIDC
-claims. `v0.2.0`, `v0.2.1`, `v0.3.0`, and `v0.3.1` are already published on PyPI.
+`0.5.1` is an unreleased candidate on this branch. `CITATION.cff` and the
+Homebrew formula describe the last published release until the release commit
+and published source distribution exist; do not update either prematurely.
 
-## PyPI
+Release tags are permanent. Check the existing Git tags and PyPI releases before
+choosing a new version; never reuse a tag, including `v0.5.0`.
 
-1. Confirm the local ladder passes:
-   - `quality-runner release-smoke --json`
-   - `repo-quality-certifier plan --repo-root fixtures/corpus/complete-js --run-id release-certifier-smoke --output-dir fixtures/corpus/complete-js/.quality-runner/certifier-smoke --json`
-   - `printf '{"jsonrpc":"2.0","id":1,"method":"tools/list"}\n' | repo-quality-certifier-mcp`
-   - `python3.14 -m pytest -q`
-   - `ruff check .`
-   - `ruff format --check .`
-   - `basedpyright`
-   - `vulture . --min-confidence 70`
-   - `uv run --with pytest pytest -q`
-   - `python3.14 scripts/run_pytest_with_lcov.py`
-   - `uv build`
-   - `pre-cr run --workspace . --json`
+## Pre-tag validation
+
+1. Confirm the committed toolchain and local ladder:
+
+   ```bash
+   uv sync --locked --all-groups
+   uv run --locked pytest -q
+   uv run --locked ruff check .
+   uv run --locked ruff format --check .
+   uv run --locked basedpyright
+   uv run --locked vulture quality_runner quality_evidence_contract repo_quality_certifier tests scripts --min-confidence 70
+   uv run --locked quality-runner release-smoke --json
+   uv build
+   ```
+
 2. Run a self-audit and confirm there are no capability blockers and no default
    structural findings:
-   - `quality-runner run . --run-id pre-release-self-audit --json`
+   `uv run --locked quality-runner audit . --run-id pre-release-self-audit --json`.
 3. Confirm the PyPI Trusted Publisher settings before tagging.
-4. Update `CITATION.cff` to `0.5.1`, commit the release metadata, and merge the
+4. Review the [Upgrade and Compatibility Guide](upgrade.md), then update
+   `CITATION.cff` to `0.5.1`, commit the release metadata, and merge the
    verified release branch to `main`.
 5. Push `v0.5.1` from that release commit.
 6. Confirm the GitHub Actions release workflow publishes the package.
 7. Verify the published artifact:
-   - `curl -sS https://pypi.org/pypi/quality-runner/0.5.1/json`
-   - `uv tool install quality-runner==0.5.1 --force`
-   - `quality-runner --version`
-   - `quality-runner doctor --json`
-   - `quality-runner release-smoke --json`
-   - `python -c "from quality_evidence_contract import QUALITY_FINDING_SCHEMA; from repo_quality_certifier import GATE_MATRIX_SCHEMA; print(QUALITY_FINDING_SCHEMA, GATE_MATRIX_SCHEMA)"`
-   - `repo-quality-certifier plan --repo-root /path/to/small/repo --json`
-   - `printf '{"jsonrpc":"2.0","id":1,"method":"tools/list"}\n' | repo-quality-certifier-mcp`
-   - `quality-runner refresh /path/to/small/repo --run-id-prefix release-smoke --handoff-output /path/to/small/repo/.quality-runner/release-smoke-handoff.md --json`
+
+   ```bash
+   uv tool upgrade 'quality-runner==0.5.1'
+   quality-runner --version
+   quality-runner doctor --json
+   quality-runner release-smoke --json
+   printf '{"jsonrpc":"2.0","id":1,"method":"tools/list"}\n' | quality-runner-mcp
+   ```
 
 The normal refresh smoke records gate evidence but does not execute discovered
 commands. If release proof requires executable gates, run it only with

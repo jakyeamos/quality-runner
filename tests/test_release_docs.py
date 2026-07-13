@@ -12,6 +12,7 @@ def test_release_docs_describe_current_release_plan_and_release_history() -> Non
     changelog = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
     cli_docs = (ROOT / "docs" / "cli.md").read_text(encoding="utf-8")
     release_docs = (ROOT / "docs" / "release.md").read_text(encoding="utf-8")
+    upgrade_docs = (ROOT / "docs" / "upgrade.md").read_text(encoding="utf-8")
 
     assert "## 0.2.0 - 2026-07-02" in changelog
     for term in (
@@ -43,22 +44,21 @@ def test_release_docs_describe_current_release_plan_and_release_history() -> Non
     assert "multi-repo `rollout` workflow" in changelog
     assert "gate controller runs" in changelog
     assert "security scan surfaces" in changelog
-    assert "v0.5.1" in release_docs
-    assert (
-        "Do not reuse `v0.1.0`, `v0.2.0`, `v0.2.1`, `v0.3.0`, `v0.3.1`, `v0.4.0`, or"
-        in release_docs
-    )
-    assert "Do not reuse `v0.1.0`" in release_docs
+    assert "unreleased candidate" in release_docs
+    assert "built wheel" in release_docs
     assert "Trusted Publisher" in release_docs
     assert "before tagging" in release_docs
+    assert "uv sync --locked --all-groups" in release_docs
     assert "quality-runner release-smoke --json" in release_docs
-    assert "repo-quality-certifier plan" in release_docs
-    assert "repo-quality-certifier-mcp" in release_docs
-    assert (
-        "tag, built wheel, installed CLI/MCP commands, plugin manifest, and citation"
-        in release_docs
-    )
+    assert "quality-runner-mcp" in release_docs
     assert "--execute-gates --worktree-mode disposable" in release_docs
+    assert "Upgrade and Compatibility Guide" in release_docs
+    assert "review --legacy-output" in cli_docs
+    assert "review --outcome" not in cli_docs
+    assert "0.7.x" in upgrade_docs
+    assert "0.8.0" in upgrade_docs
+    assert "No artifact conversion is required" in upgrade_docs
+    assert "quality_runner_review" in upgrade_docs
     assert (
         "quality-runner refresh /path/to/repo --run-id-prefix refresh-001 --handoff-output handoff.md --json"
         in cli_docs
@@ -72,6 +72,7 @@ def test_plugin_manifest_and_citation_metadata_follow_their_release_contracts() 
         (ROOT / "quality_runner" / "plugin" / "manifest.json").read_text(encoding="utf-8")
     )
     assert manifest["version"] == __version__
+    assert manifest["commands"]["review"]["args"] == ["review"]
     citation = (ROOT / "CITATION.cff").read_text(encoding="utf-8")
     citation_version = re.search(r'^version: "(?P<version>[^\"]+)"$', citation, re.MULTILINE)
     citation_date = re.search(
@@ -117,3 +118,20 @@ def test_ci_and_release_workflows_smoke_built_wheel_outcome_and_mcp_surfaces() -
         assert "quality-runner release-smoke --json" in workflow
         assert '"method":"tools/list"' in workflow
         assert "quality_runner_audit_outcome" in workflow
+
+
+def test_security_and_research_docs_match_current_artifact_handling() -> None:
+    artifacts = (ROOT / "docs" / "artifacts.md").read_text(encoding="utf-8")
+    threat_model = (ROOT / "docs" / "threat-model.md").read_text(encoding="utf-8")
+    troubleshooting = (ROOT / "docs" / "troubleshooting.md").read_text(encoding="utf-8")
+    security = (ROOT / "SECURITY.md").read_text(encoding="utf-8")
+    research = (ROOT / "RESEARCH_READY.md").read_text(encoding="utf-8")
+
+    assert "Handling generated artifacts" in artifacts
+    assert "quoted source literals are redacted before fingerprinting" in artifacts
+    assert "artifact secret-free" in artifacts
+    assert "Artifact Contract" in threat_model
+    assert "A generated artifact might contain sensitive data" in troubleshooting
+    assert "redaction bypass" in security
+    assert "uv sync --locked --all-groups" in research
+    assert "Full type/format readiness is not yet clean" not in research

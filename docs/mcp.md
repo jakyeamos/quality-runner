@@ -40,10 +40,16 @@ The established MCP tools remain callable and retain their v1
 schemas; do not assume that a legacy CLI projection and a legacy MCP projection
 have identical fields.
 
-`quality_runner_review` remains the v1 review tool. Prefer
-`quality_runner_review_outcome` when a caller needs the cross-journey outcome
-contract. Existing Repo Quality Certifier callers can continue to use
-`repo-quality-certifier-mcp` and its published compatibility tools.
+`quality_runner_review` remains the v1 review tool even though the CLI `review`
+journey is outcome-first by default. Prefer `quality_runner_review_outcome`
+when a caller needs the cross-journey outcome contract. The direct-replacement
+legacy tools identify their support window in `tools/list`; their v1 payloads
+do not gain new fields during the transition. The [Upgrade and Compatibility
+Guide](upgrade.md) is the canonical policy and rollback reference.
+
+Existing Repo Quality Certifier callers can continue to use
+`repo-quality-certifier-mcp` and its published compatibility tools. Those
+compatibility islands do not currently have a retirement schedule.
 
 Fresh Review has the same two-phase contract over MCP as it does on the CLI:
 the first call creates a packet-ready run, and a later call supplies a response

@@ -14,23 +14,24 @@ Certifier callers:
 ## Outcome-first journeys
 
 New users and integrations should start with `audit`, `review`, `verify`, and
-`runs`. `audit`, `verify`, and `runs` render a compact outcome card by default;
-`review` opts into the same projection with `--outcome`. Their v2 JSON uses
+`runs`. All four render a compact outcome card by default. Their v2 JSON uses
 `quality-runner-outcome-v0.2` and leads with state, assessment, evidence
 confidence, writes, safety, and the safest next action.
 
 ```bash
 quality-runner audit /path/to/repo --json
-quality-runner review /path/to/repo --mode blind --outcome --json
+quality-runner review /path/to/repo --mode blind --json
 quality-runner verify /path/to/repo --json
 quality-runner runs /path/to/repo --json
 ```
 
-The v2 outcome is additive. `inspect`, `run`, `verify-gates`, and the default
-`review` projection keep their established v1 schemas and exit behavior. A
-blocked verification or packet-ready review is a truthful outcome, not a parser
-failure; callers should read its `next_action` before deciding whether to run
-commands or request a reviewer.
+`inspect`, `run`, and `verify-gates` remain supported v1 compatibility commands.
+`review --legacy-output` provides the established v1 review JSON when an
+existing CLI consumer requires it; the notice is sent to stderr so stdout stays
+machine-readable. The [Upgrade and Compatibility Guide](upgrade.md) owns the
+command mappings and support window. A blocked verification or packet-ready
+review is a truthful outcome, not a parser failure; callers should read its
+`next_action` before deciding whether to run commands or request a reviewer.
 
 ### `quality-runner audit`
 
@@ -393,10 +394,11 @@ continues to the remaining repos.
 ## `quality-runner release-smoke`
 
 Runs the pre-release CLI smoke path against a generated tiny repository. This is
-the repeatable check for the public happy path: help text, doctor readiness,
-`refresh --handoff-output`, `export-handoff`, and legacy/new controller report
-schema compatibility. It also verifies the compatibility package surfaces that
-ship inside `quality-runner`: `quality_evidence_contract` imports,
+the repeatable package-contract check for help text, doctor readiness, the v2
+inspection outcome, `refresh --handoff-output`, `export-handoff`, and
+legacy/new controller report schema compatibility. It also verifies the
+compatibility package surfaces that ship inside `quality-runner`:
+`quality_evidence_contract` imports,
 `repo_quality_certifier` imports, certifier artifact generation, certifier MCP
 tool metadata, and packaged plugin manifests.
 
@@ -625,7 +627,7 @@ quality-runner review /path/to/repo --mode blind --run-id review-001 --loop --js
 # Fill the generated response template and submit the packet-bound local response.
 quality-runner review /path/to/repo --run-id review-001 \
   --adapter-output .quality-runner/runs/review-001/review-adapter-response.json \
-  --finding-id R-001 --loop-stop critical-high --outcome --json
+  --finding-id R-001 --loop-stop critical-high --json
 ```
 
 The command defaults to `--mode task`, `--scope project`, and project breadth
@@ -646,11 +648,12 @@ Quality Runner validates both responses before grouping findings locally, so tas
 text is never placed in the blind packet. The versioned response schema in
 `quality_runner/schemas/` defines the machine contract.
 
-Human and JSON output expose mode, scope, breadth, adapter status, severity
-counts, evidence limitations, and saved artifact paths. A completed review with
-no findings uses the qualified no-issue message. A missing adapter instead
-returns `review-not-run` with `outcome: packet-ready` and `next_action`; it is
-not a completed review and does not produce finding-specific fix prompts.
+The saved v1 report artifacts and `--legacy-output` JSON expose mode, scope,
+breadth, adapter status, severity counts, evidence limitations, and artifact
+paths. The default v2 result presents the same state through the outcome
+contract. A completed review with no findings uses the qualified no-issue
+message. A missing adapter is packet-ready evidence, not a completed review,
+and does not produce finding-specific fix prompts.
 
 Use `--finding-id` to select the work a separate fixing agent may receive, or
 use the explicit critical/high shortcut. Without a selection, the completed
@@ -662,6 +665,9 @@ intended review boundary, but a
 local file adapter is external to Quality Runner, so its file access is recorded
 as advisory rather than claimed as enforced.
 
-Pass `--outcome` to opt into the v2 journey projection. In that projection,
-packet-only review is `awaiting-evidence` with `assessment: packet-ready`; it is
-never shown as clean. Omitting `--outcome` preserves the v1 review payload.
+Review emits the v2 journey projection by default. Packet-only review is
+`awaiting-evidence` with `assessment: packet-ready`; it is never shown as clean.
+`--outcome` remains a harmless alias. Use `--legacy-output` only when an
+existing CLI consumer requires v1 JSON; it preserves v1 stdout and emits a
+versioned stderr notice. The [Upgrade and Compatibility Guide](upgrade.md)
+defines the support window and rollback path.

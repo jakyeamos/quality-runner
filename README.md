@@ -5,9 +5,8 @@ repositories.
 
 It inspects a target repo, compiles standards, detects available quality gates,
 normalizes evidence-backed findings, writes `.quality-runner/` artifacts, and
-produces an ordered remediation plan. Version 1 does not edit source files,
-install dependencies, create commits, call remote services, or execute
-remediation.
+produces an ordered remediation plan. It does not edit source files, install
+dependencies, create commits, call remote services, or execute remediation.
 
 ## Why this exists
 
@@ -74,16 +73,16 @@ of the evidence, what was written, the safety mode, and one next action.
 
 ```bash
 quality-runner audit /path/to/repo --run-id baseline-001 --json
-quality-runner review /path/to/repo --mode blind --outcome --json
+quality-runner review /path/to/repo --mode blind --json
 quality-runner verify /path/to/repo --run-id baseline-001-verify --json
 quality-runner runs /path/to/repo --json
 ```
 
 `audit` creates evidence and a remediation plan without editing source files.
-`review --outcome` makes a prepared packet visibly `awaiting-evidence`, rather
-than treating the absence of a packet-bound local response as clean. `verify` records
-discovered gates by default; `runs` reads history without adding a summary file.
-The v2 outcome JSON is additive: existing commands retain their v1 projections.
+`review` makes a prepared packet visibly `awaiting-evidence`, rather than
+treating the absence of a packet-bound local response as clean. `verify`
+records discovered gates by default; `runs` reads history without adding a
+summary file. All four journeys emit the v2 outcome by default.
 Fresh Review is deliberately two-phase: prepare a packet first, then submit a
 response that is bound to that packet. The [CLI Reference](docs/cli.md#quality-runner-review)
 explains the boundary and handoff model.
@@ -110,6 +109,10 @@ quality-runner refresh /path/to/repo \
   --handoff-output /path/to/repo/.quality-runner/exports/baseline-001-handoff.md \
   --json
 ```
+
+The [Upgrade and Compatibility Guide](docs/upgrade.md) defines the v2 command
+mappings, v1 support window, and non-destructive rollback procedure. Use
+`review --legacy-output` only when an existing CLI consumer requires v1 JSON.
 
 Quality Runner writes artifacts under the target repo:
 
@@ -152,14 +155,15 @@ For new work, begin with the four outcome-first commands:
 
 ```bash
 quality-runner audit /path/to/repo --json
-quality-runner review /path/to/repo --outcome --json
+quality-runner review /path/to/repo --json
 quality-runner verify /path/to/repo --json
 quality-runner runs /path/to/repo --json
 ```
 
 Their JSON payload uses `quality-runner-outcome-v0.2`; the detailed definitions
 and safety behavior live in the [CLI Reference](docs/cli.md). The established
-commands below remain callable with their v1 payloads.
+commands below remain callable as supported v1 compatibility paths; see the
+[Upgrade and Compatibility Guide](docs/upgrade.md) before migrating automation.
 
 ```bash
 quality-runner doctor
@@ -217,9 +221,8 @@ the delta recommends `stop`. Quality Runner remains read-only; unrelated
 findings are retained as `out_of_scope` without blocking the task.
 
 Before release, run `quality-runner release-smoke --json` to verify the public
-CLI happy path, installed handoff export behavior, report compatibility checks,
-and the packaged `quality_evidence_contract` / `repo_quality_certifier`
-compatibility surfaces in one command.
+doctor contract, v2 audit outcome, handoff export, report compatibility, and
+the packaged `quality_evidence_contract` / `repo_quality_certifier` surfaces.
 
 ## MCP
 
@@ -246,7 +249,9 @@ See [MCP Integration](docs/mcp.md) for JSON-RPC examples and tool payloads.
 
 Quality Runner writes versioned JSON and Markdown artifacts. See
 [Artifact Contract](docs/artifacts.md) for the current v1 artifact set and
-field-level guarantees.
+field-level guarantees. Treat generated target-repository evidence as
+potentially sensitive until it has been reviewed for local paths, gate output,
+and source-derived content.
 
 Semantic code similarity is a structural quality signal, not an automatic
 refactor. When `similarity-ts`, `similarity-py`, or `similarity-rs` are already
@@ -306,13 +311,13 @@ product workspaces. Add repo-specific exclusions in `.quality-runner.toml`:
 scan_exclusions = ["samples", "generated-reports/**"]
 ```
 
-## v1 Safety Boundary
+## Safety Boundary
 
-Quality Runner v1 may create or update files under `.quality-runner/runs/<run-id>/`
-in the target repository. It does not edit source files, install dependencies,
-create commits, call remote services, or execute remediation. Discovered gate
-commands are evidence-only unless the caller explicitly requests disposable
-execution.
+Quality Runner may create or update files under
+`.quality-runner/runs/<run-id>/` in the target repository. It does not edit
+source files, install dependencies, create commits, call remote services, or
+execute remediation. Discovered gate commands are evidence-only unless the
+caller explicitly requests disposable execution.
 
 Every generated remediation slice includes verification guidance, but a separate
 coding agent must receive user approval before implementation.
@@ -322,17 +327,20 @@ coding agent must receive user approval before implementation.
 Run the full local ladder:
 
 ```bash
-python3.14 -m pytest -q
-ruff check .
-ruff format --check .
-basedpyright
-vulture . --min-confidence 70
-uv run --with pytest pytest -q
-python3.14 scripts/run_pytest_with_lcov.py
+uv sync --locked --all-groups
+uv run --locked pytest -q
+uv run --locked ruff check .
+uv run --locked ruff format --check .
+uv run --locked basedpyright
+uv run --locked vulture quality_runner quality_evidence_contract repo_quality_certifier tests scripts --min-confidence 70
+uv run --locked python scripts/run_pytest_with_lcov.py
+uv run --locked quality-runner release-smoke --json
 pre-cr run --workspace . --json  # changed-line readiness; expects changed files
 ```
 
 See [Troubleshooting](docs/troubleshooting.md) for common install and runtime
 issues.
 
-See [Release Checklist](docs/release.md) for PyPI and Homebrew packaging notes.
+See [Release Checklist](docs/release.md) for PyPI and Homebrew packaging notes,
+and the [Upgrade and Compatibility Guide](docs/upgrade.md) for cutover and
+rollback behavior.

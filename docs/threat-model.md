@@ -25,6 +25,9 @@ evidence-only unless a caller explicitly authorizes disposable execution.
 - Local CI status JSON must resolve inside the target repo.
 - Large discovery/status files are ignored or warned on instead of read
   unbounded.
+- Secret-like security candidates redact quoted literals before fingerprinting
+  and artifact persistence; derived audit and handoff evidence uses the
+  redacted candidate excerpt.
 - Commands found in config, package scripts, Makefiles, Docker, Terraform, and
   workflows are recorded as evidence only by default. Execution requires both
   `--execute-gates` and `--worktree-mode disposable`.
@@ -36,6 +39,10 @@ evidence-only unless a caller explicitly authorizes disposable execution.
 - Surface detection is intentionally shallow; it identifies evidence for
   reviewer attention, not full semantic validity of infrastructure, contracts,
   or migrations.
+- Redacted candidate evidence does not make generated artifacts secret-free.
+  Repository paths, author intent, other source-derived context, and bounded
+  stdout/stderr from authorized gates can still be sensitive. Handle artifacts
+  according to the [Artifact Contract](artifacts.md#handling-generated-artifacts).
 - An explicitly authorized command is arbitrary local code. A disposable
   checkout protects the ordinary source worktree from normal mutations, not the
   host, network, secrets, or deliberate path escape; dirty-worktree opt-in
