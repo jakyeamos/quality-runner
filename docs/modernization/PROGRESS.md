@@ -37,7 +37,9 @@ packet-ready/next-action surface.
 Its second confidentiality repair (`4dee5af`) shares secret-like literal
 redaction across security candidates, code-quality findings, and remediation
 source excerpts; inspect, run, and verify regressions scan every generated
-artifact for the original marker.
+artifact for the original marker. `27deaa4` keeps that pure helper at a neutral
+evidence boundary so code-quality imports cannot initialize the security package
+recursively.
 
 M0 restores the public trust boundary without changing artifact schema ids:
 
