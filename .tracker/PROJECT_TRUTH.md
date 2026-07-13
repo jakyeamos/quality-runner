@@ -1,11 +1,13 @@
 # Quality Runner Project Truth
 
-Last updated: 2026-07-12
+Last updated: 2026-07-13
 
 ## Current State
 
 The quality-skills audit contract is hardened on feature branch
-`quality-security-evidence` at commit `d7bf4ad`. The source-backed user packs
+`quality-security-evidence` at commit `6e93ee0`. Release metadata now agrees on
+version `0.5.0` across the runtime package, wheel manifest, citation record,
+and release checklist. The source-backed user packs
 `ui-foundations`, `test-strategy`, `security-privacy`, `release-readiness`,
 `pr-risk`, `data-integrity`, `developer-experience`, and
 `architecture-maintainability` now cover visual and UI-state risks, behavior
@@ -41,9 +43,6 @@ multi-repo configuration. Runtime/browser-dependent skills remain deferred.
 
 ## Blockers
 
-- Full suite reaches 418 passed with the existing packaging entrypoint test
-  failing because it looks for a `0.4.0` wheel metadata path that the current
-  build does not produce.
 - Full-repo Ruff/format and basedpyright retain pre-existing findings outside
   this change; touched-file checks pass. Vulture passes the source roots; its
   broad `vulture .` form needs `.quality-runner` excluded after local uv gate
