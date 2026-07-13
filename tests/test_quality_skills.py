@@ -136,6 +136,12 @@ def _data_integrity_skill_toml() -> str:
     )
 
 
+def _developer_experience_skill_toml() -> str:
+    return (Path(__file__).parents[1] / "docs/examples/developer-experience.toml").read_text(
+        encoding="utf-8"
+    )
+
+
 def _install_skill(tmp_path: Path, skill_id: str, content: str) -> str:
     relative = f".quality-runner/skills/{skill_id}.toml"
     _write(tmp_path / relative, content)
@@ -658,6 +664,79 @@ def test_data_integrity_pack_reports_migration_signals_and_review_scopes(tmp_pat
         "pipeline-and-reconciliation",
         "data-loss-and-duplication",
         "verification-and-fixtures",
+    }
+    assert len(packet["included_files"]) == 1
+
+
+def test_developer_experience_pack_reports_docs_signals_and_review_scopes(tmp_path: Path) -> None:
+    from quality_runner.code_quality import create_code_quality_scan
+    from quality_runner.skill_config import load_active_skills
+    from quality_runner.skill_review import build_skill_review_packet
+
+    skill_path = _install_skill(
+        tmp_path, "developer-experience", _developer_experience_skill_toml()
+    )
+    readme = "# Setup\n\nTODO: document the test command at /Users/jakyeamos/projects/app.\n"
+    _write(tmp_path / "README.md", readme)
+    config = _skills_enabled_config(
+        active=["developer-experience"],
+        local=[{"id": "developer-experience", "path": skill_path}],
+    )
+
+    result = create_code_quality_scan(
+        tmp_path, scan={"run_id": "developer-experience"}, config=config
+    )
+    rule_ids = {str(finding["rule_id"]) for finding in result["findings"]}
+    assert "developer-experience/placeholder-documentation" in rule_ids
+    assert "developer-experience/machine-specific-setup-path" in rule_ids
+    assert result["quality_skills"][0]["id"] == "developer-experience"
+
+    reviewed = create_code_quality_scan(
+        tmp_path,
+        scan={"run_id": "developer-experience-reviewed"},
+        config=config,
+        skill_review_report={
+            "schema": SKILL_REVIEW_REPORT_SCHEMA,
+            "run_id": "developer-experience-reviewed",
+            "findings": [
+                {
+                    "skill_id": "developer-experience",
+                    "review_id": "onboarding-and-setup",
+                    "rule_id": "onboarding-and-setup/missing-first-run-proof",
+                    "severity": "observation",
+                    "confidence": "low",
+                    "file": "README.md",
+                    "line": 1,
+                    "summary": "The onboarding guide does not show a verified first-run path.",
+                    "evidence": "# Setup",
+                    "risk": "Contributors may not know which command proves that setup succeeded.",
+                    "expected_improvement": "Document the install, first-run, and verification commands with expected results.",
+                    "verification": "Rerun quality-runner and follow the documented setup path from a clean environment.",
+                }
+            ],
+        },
+    )
+    assert any(
+        finding["rule_id"] == "onboarding-and-setup/missing-first-run-proof"
+        for finding in reviewed["findings"]
+    )
+
+    skills, warnings = load_active_skills(tmp_path, config)
+    assert warnings == []
+    packet = build_skill_review_packet(
+        run_id="developer-experience",
+        repo_root=tmp_path,
+        scanned_files=[{"path": "README.md", "lines": readme.splitlines()}],
+        skills=skills,
+    )
+    assert packet is not None
+    assert len(packet["reviews"]) == 5
+    assert {review["review_id"] for review in packet["reviews"]} == {
+        "onboarding-and-setup",
+        "command-discoverability",
+        "contribution-and-ci",
+        "repository-wayfinding",
+        "maintainer-handoff",
     }
     assert len(packet["included_files"]) == 1
 

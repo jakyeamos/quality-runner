@@ -214,6 +214,18 @@ unsafe. The agent must consider ordering, database constraints, transaction
 behavior, representative data, recovery, and the repository's actual writers
 before elevating a finding.
 
+### Starter pack: Developer Experience and Onboarding
+
+The [Developer Experience starter pack](examples/developer-experience.toml)
+adds observations for documentation placeholders and machine-specific setup
+paths. Its agent reviews cover onboarding, command discoverability,
+contribution and CI clarity, repository wayfinding, and maintainer handoff.
+
+The pack treats missing or contradictory setup evidence as a finding, but does
+not require one universal toolchain or document filename. Reviewers should use
+the repository's actual scripts, metadata, and maintained guides as the source
+of truth.
+
 Merge a validated report during a run:
 
 ```bash
