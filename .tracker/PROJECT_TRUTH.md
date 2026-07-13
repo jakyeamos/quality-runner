@@ -5,7 +5,7 @@ Last updated: 2026-07-12
 ## Current State
 
 The quality-skills audit contract is hardened on feature branch
-`quality-skills-hardening` at commit `3e84ce5`. The source-backed user packs
+`quality-skills-hardening` at commit `2470008`. The source-backed user packs
 `ui-foundations`, `test-strategy`, `security-privacy`, `release-readiness`,
 `pr-risk`, `data-integrity`, `developer-experience`, and
 `architecture-maintainability` now cover visual and UI-state risks, behavior
@@ -19,9 +19,10 @@ Quality Runner's text scan surface for migration audits.
 
 ## Next Step
 
-Select and convert the motion-quality candidate pack, then exercise the starter
-packs against representative source-only repositories before registering them in
-a personal multi-repo configuration.
+Exercise the starter packs against representative source-only repositories,
+measure false-positive and finding-recall behavior, then register the selected
+packs in a personal multi-repo configuration. Runtime/browser-dependent skills
+remain deferred.
 
 ## Blockers
 
@@ -128,6 +129,12 @@ Current verification:
   `3e84ce5`. Focused quality-skill tests passed (`32 passed`), pack ingest,
   TOML parsing, touched-file Ruff, format, and agent-review report merging
   passed. Full suite reached `410 passed, 1 failed` on the existing
+  packaging-entrypoint mismatch.
+
+- 2026-07-12: Added and committed the `motion-quality` starter pack as
+  `2470008`. Focused quality-skill tests passed (`33 passed`), pack ingest,
+  TOML parsing, touched-file Ruff, format, and agent-review report merging
+  passed. Full suite reached `411 passed, 1 failed` on the existing
   packaging-entrypoint mismatch.
 
 - 2026-07-12: Quality-skills hardening committed as `ccfc12e`. Focused skill and
