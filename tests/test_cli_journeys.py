@@ -20,7 +20,7 @@ def test_root_help_leads_with_journeys_before_advanced_operations() -> None:
     assert result.stdout.index("runs REPO") < result.stdout.index("Advanced operations")
     assert "verify-gates" in result.stdout
     assert "release-smoke" in result.stdout
-    assert "--outcome for v2" in result.stdout
+    assert "review --legacy-output" in result.stdout
 
 
 def test_audit_journey_emits_outcome_json_without_changing_legacy_run(tmp_path: Path) -> None:
@@ -100,19 +100,36 @@ def test_runs_journey_reports_a_missing_selected_run_as_incomplete_evidence(tmp_
     assert payload["history"]["unavailable_run_ids"] == ["missing-run"]
 
 
-def test_review_outcome_is_opt_in_and_packet_ready_is_truthful(tmp_path: Path) -> None:
-    legacy = _cli("review", str(tmp_path), "--mode", "blind", "--json")
-    outcome_result = _cli("review", str(tmp_path), "--mode", "blind", "--outcome", "--json")
+def test_review_defaults_to_outcome_with_explicit_v1_compatibility(tmp_path: Path) -> None:
+    outcome_result = _cli("review", str(tmp_path), "--mode", "blind", "--json")
+    outcome_alias = _cli("review", str(tmp_path), "--mode", "blind", "--outcome", "--json")
+    legacy = _cli("review", str(tmp_path), "--mode", "blind", "--legacy-output", "--json")
 
-    legacy_payload = json.loads(legacy.stdout)
     outcome = json.loads(outcome_result.stdout)
-    assert legacy.returncode == 0
-    assert legacy_payload["schema"] == "quality-runner-review-result-v0.1"
+    legacy_payload = json.loads(legacy.stdout)
     assert outcome_result.returncode == 0
     assert outcome["schema"] == "quality-runner-outcome-v0.2"
     assert outcome["journey"] == "review"
     assert outcome["state"] == "awaiting-evidence"
     assert outcome["assessment"] == "packet-ready"
+    assert outcome_alias.returncode == 0
+    assert json.loads(outcome_alias.stdout)["schema"] == "quality-runner-outcome-v0.2"
+    assert legacy.returncode == 0
+    assert legacy_payload["schema"] == "quality-runner-review-result-v0.1"
+    assert "v1 review projection" in legacy.stderr
+    assert "0.7.x" in legacy.stderr
+
+    conflicting = _cli(
+        "review",
+        str(tmp_path),
+        "--mode",
+        "blind",
+        "--outcome",
+        "--legacy-output",
+        "--json",
+    )
+    assert conflicting.returncode == 1
+    assert "cannot be combined" in conflicting.stderr
 
 
 def _cli(*args: str) -> subprocess.CompletedProcess[str]:

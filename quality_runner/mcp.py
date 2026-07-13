@@ -134,12 +134,18 @@ def list_tools() -> list[dict[str, Any]]:
         },
         {
             "name": "quality_runner_inspect_repo",
-            "description": "Inspect repository shape and quality capabilities.",
+            "description": (
+                "Inspect repository shape and quality capabilities (v1; supported through "
+                "0.7.x). Prefer quality_runner_audit_outcome with mode inspect."
+            ),
             "inputSchema": repo_schema,
         },
         {
             "name": "quality_runner_run",
-            "description": "Run audit-and-plan workflow and write Quality Runner artifacts.",
+            "description": (
+                "Run the audit-and-plan workflow and write Quality Runner artifacts "
+                "(v1; supported through 0.7.x). Prefer quality_runner_audit_outcome."
+            ),
             "inputSchema": repo_schema,
         },
         {

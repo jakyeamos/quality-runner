@@ -126,7 +126,7 @@ def test_review_cli_requires_task_or_blind_mode(tmp_path: Path) -> None:
     assert "--mode blind" in result.stderr
 
 
-def test_review_cli_reports_packet_only_json(tmp_path: Path) -> None:
+def test_review_cli_reports_packet_only_outcome_json(tmp_path: Path) -> None:
     result = subprocess.run(
         [
             sys.executable,
@@ -146,12 +146,9 @@ def test_review_cli_reports_packet_only_json(tmp_path: Path) -> None:
         text=True,
     )
     payload = json.loads(result.stdout)
-    assert payload["status"] == "review-not-run"
-    assert payload["outcome"] == "packet-ready"
-    assert payload["summary"].startswith("Review packet ready:")
-    assert "next_action" in payload
-    assert payload["mode"] == "blind"
-    assert payload["breadth"] == "related"
-    assert "review_report_json" in payload["artifact_paths"]
-    assert payload["report"]["summary"].startswith("Review packet ready:")
-    assert payload["report"]["findings"] == []
+    assert payload["schema"] == "quality-runner-outcome-v0.2"
+    assert payload["journey"] == "review"
+    assert payload["state"] == "awaiting-evidence"
+    assert payload["assessment"] == "packet-ready"
+    assert payload["next_action"]["kind"] == "provide-review-output"
+    assert "review_report_json" in payload["writes"]["artifact_paths"]

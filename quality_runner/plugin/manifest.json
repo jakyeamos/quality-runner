@@ -10,7 +10,7 @@
     },
     "review": {
       "command": "quality-runner",
-      "args": ["review", "--outcome"]
+      "args": ["review"]
     },
     "verify": {
       "command": "quality-runner",

@@ -35,7 +35,7 @@ Quality Runner records local evidence and the safest next action for a repositor
 
 Start with a journey:
   audit REPO            inspect a repository and prepare remediation evidence
-  review REPO           prepare or run a fresh, read-only review (--outcome for v2)
+  review REPO           prepare or run a fresh, read-only review (v2 outcome)
   verify REPO           record gate evidence; execution requires explicit consent
   runs REPO             read recent evidence without creating new artifacts
 
@@ -50,10 +50,16 @@ Advanced operations:
   refresh, rollout, gate, controller-report, skill, proposal, validation,
   release-smoke, and worker handoff tools
 
-Run 'quality-runner <command> --help' for options. Audit, verify, and runs emit
-a compact outcome card by default and v2 JSON with --json; review opts in with
---outcome.
+Run 'quality-runner <command> --help' for options. Audit, review, verify, and
+runs emit a compact outcome card by default and v2 JSON with --json. Use
+review --legacy-output only for the supported v1 compatibility projection.
 """
+
+_LEGACY_COMMAND_REPLACEMENTS = {
+    "inspect": "audit --inspect-only",
+    "run": "audit",
+    "verify-gates": "verify",
+}
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -257,6 +263,10 @@ def main(argv: list[str] | None = None) -> int:
         print(f"quality-runner: error: {error}", file=sys.stderr)
         return 1
 
+    notice = _compatibility_notice(parsed)
+    if notice:
+        print(notice, file=sys.stderr)
+
     if parsed.command == "export-handoff" and not getattr(parsed, "json", False):
         content = payload.get("content")
         if isinstance(content, str):
@@ -289,6 +299,24 @@ def main(argv: list[str] | None = None) -> int:
     if parsed.command == "summarize-run" and has_rejected_self_check(payload):
         return 1
     return 0
+
+
+def _compatibility_notice(parsed: argparse.Namespace) -> str | None:
+    command = parsed.command
+    if not isinstance(command, str):
+        return None
+    if command == "review" and bool(getattr(parsed, "legacy_output", False)):
+        return (
+            "quality-runner: warning: --legacy-output emits the v1 review projection, "
+            "supported through 0.7.x; omit it for the v2 outcome."
+        )
+    replacement = _LEGACY_COMMAND_REPLACEMENTS.get(command)
+    if replacement is None:
+        return None
+    return (
+        f"quality-runner: warning: {command} is a v1 compatibility command, "
+        f"supported through 0.7.x; use {replacement}."
+    )
 
 
 if __name__ == "__main__":

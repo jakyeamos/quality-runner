@@ -34,7 +34,10 @@ MAX_TASK_FILE_BYTES = 262_144
 def review_mcp_tool() -> dict[str, object]:
     return {
         "name": "quality_runner_review",
-        "description": "Run a fresh local read-only review and write canonical artifacts.",
+        "description": (
+            "Run a fresh local read-only review and write canonical v1 artifacts; "
+            "supported through 0.7.x. Prefer quality_runner_review_outcome."
+        ),
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -151,7 +154,12 @@ def add_review_command(subparsers: argparse._SubParsersAction[argparse.ArgumentP
     parser.add_argument(
         "--outcome",
         action="store_true",
-        help="Render the additive v2 journey outcome instead of the legacy result projection",
+        help="Compatibility alias; the v2 journey outcome is now the default",
+    )
+    parser.add_argument(
+        "--legacy-output",
+        action="store_true",
+        help="Emit the established v1 result projection (supported through 0.7.x)",
     )
     parser.add_argument("--json", action="store_true", help="Emit JSON output")
 

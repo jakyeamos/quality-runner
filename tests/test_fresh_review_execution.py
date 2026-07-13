@@ -35,6 +35,9 @@ def _finding(
 
 
 def _review_result(repo_root: Path, *arguments: str) -> subprocess.CompletedProcess[str]:
+    output_arguments = list(arguments)
+    if "--outcome" not in output_arguments and "--legacy-output" not in output_arguments:
+        output_arguments.append("--legacy-output")
     return subprocess.run(
         [
             sys.executable,
@@ -42,7 +45,7 @@ def _review_result(repo_root: Path, *arguments: str) -> subprocess.CompletedProc
             "quality_runner",
             "review",
             str(repo_root),
-            *arguments,
+            *output_arguments,
             "--json",
         ],
         cwd=ROOT,

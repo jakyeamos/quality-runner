@@ -252,6 +252,7 @@ def test_cli_and_mcp_packet_ready_projections_match_persisted_v1_artifacts(tmp_p
         "blind",
         "--run-id",
         "cli-contract",
+        "--legacy-output",
         "--json",
     ]
     cli = subprocess.run(command, cwd=ROOT, check=True, capture_output=True, text=True)
@@ -299,6 +300,7 @@ def test_task_and_combined_cli_mcp_projections_preserve_v1_contracts(
         "known-001",
         "--run-id",
         f"cli-{mode}-contract",
+        "--legacy-output",
         "--json",
     ]
     cli = subprocess.run(command, cwd=ROOT, check=True, capture_output=True, text=True)

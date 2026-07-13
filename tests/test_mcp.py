@@ -9,7 +9,8 @@ from test_support.quality_runner_fixtures import write_js_fixture
 
 
 def test_mcp_lists_quality_runner_tools() -> None:
-    tool_names = {tool["name"] for tool in list_tools()}
+    tools = list_tools()
+    tool_names = {tool["name"] for tool in tools}
 
     assert tool_names == {
         "quality_runner_doctor",
@@ -27,6 +28,10 @@ def test_mcp_lists_quality_runner_tools() -> None:
         "quality_runner_verify_outcome",
         "quality_runner_runs_outcome",
     }
+    descriptions = {tool["name"]: tool["description"] for tool in tools}
+    assert "supported through 0.7.x" in descriptions["quality_runner_review"]
+    assert "quality_runner_audit_outcome" in descriptions["quality_runner_inspect_repo"]
+    assert "quality_runner_audit_outcome" in descriptions["quality_runner_run"]
 
 
 def test_mcp_doctor_reports_ready_without_implementation_permission() -> None:
