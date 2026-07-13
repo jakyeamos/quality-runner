@@ -34,13 +34,20 @@ exports the locked dependency set and runs `pip-audit` without auditing the
 editable local project. Final dogfood reports that gate as passed through the
 Quality Runner executor. The full test suite now passes with `419 passed`
 after aligning the runtime version and packaged metadata on `0.5.0`.
+Fresh `0.5.0` dogfood also ran against BBDSE, Portfolio, and Agent Eval
+Contract. All three now report zero missing dependency-audit capabilities after
+repo-local gate configuration: Agent Eval's lockfile audit passed, BBDSE's gate
+surfaced real high/critical JavaScript advisories, and Portfolio remains blocked
+before audit execution by its existing interactive `pnpm approve-builds`
+requirement. BBDSE and Portfolio now ignore generated `.quality-runner/cache/`
+trees.
 
 ## Next Step
 
-Continue dogfooding the tuned starter packs and security policy against
-representative source-only repositories, measure false-positive and
-finding-recall changes, then register the selected packs in a personal
-multi-repo configuration. Runtime/browser-dependent skills remain deferred.
+Review the pushed Quality Runner feature branch and the three repo-local gate
+branches, then rerun the separate evidence pass and register the selected packs
+in a personal multi-repo configuration. Runtime/browser-dependent skills remain
+deferred.
 
 ## Blockers
 
@@ -102,6 +109,11 @@ Current verification:
   metadata on `0.5.0` in `6e93ee0`; focused packaging checks and the full suite
   passed (`419 passed`). Touched-file Ruff/format and source-root Vulture pass;
   repository-wide Ruff/format/basedpyright retain unrelated baseline findings.
+- 2026-07-13: Dogfooded the `0.5.0` runner against BBDSE, Portfolio, and Agent
+  Eval Contract. Audit totals were 55, 29, and 12 respectively; dependency
+  capability gaps cleared to zero after repo-local configuration. Agent Eval's
+  dependency gate passed, BBDSE's gate reported advisories, and Portfolio's
+  gate was blocked by pnpm build-script approval.
 
 - 2026-07-12: Added and committed the `ui-foundations` starter pack as
   `ed16bb2`. Focused quality-skill tests passed (`24 passed`), pack ingest,
