@@ -5,7 +5,7 @@ Last updated: 2026-07-12
 ## Current State
 
 The quality-skills audit contract is hardened on feature branch
-`quality-skills-hardening` at commit `2470008`. The source-backed user packs
+`quality-skills-hardening` at commit `e34c144`. The source-backed user packs
 `ui-foundations`, `test-strategy`, `security-privacy`, `release-readiness`,
 `pr-risk`, `data-integrity`, `developer-experience`, and
 `architecture-maintainability` now cover visual and UI-state risks, behavior
@@ -15,14 +15,17 @@ verification, compatibility, rollback, changed-surface risk, merge integrity,
 schema and migration safety, pipeline correctness, onboarding, wayfinding,
 contribution flow, ownership, duplication, boundaries, and handoff through
 deterministic observations and high-recall agent reviews. SQL is now included in
-Quality Runner's text scan surface for migration audits.
+Quality Runner's text scan surface for migration audits. The UI Foundations
+empty-state trigger now requires data-shaped collection identifiers for `.map()`
+matches, avoiding static navigation-list noise while preserving fetch/query
+triggers and agent-review coverage.
 
 ## Next Step
 
-Exercise the starter packs against representative source-only repositories,
-measure false-positive and finding-recall behavior, then register the selected
-packs in a personal multi-repo configuration. Runtime/browser-dependent skills
-remain deferred.
+Continue dogfooding the tuned starter packs against representative source-only
+repositories, measure false-positive and finding-recall changes, then register
+the selected packs in a personal multi-repo configuration. Runtime/browser-
+dependent skills remain deferred.
 
 ## Blockers
 
