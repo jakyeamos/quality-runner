@@ -154,6 +154,12 @@ def _performance_readiness_skill_toml() -> str:
     )
 
 
+def _motion_quality_skill_toml() -> str:
+    return (Path(__file__).parents[1] / "docs/examples/motion-quality.toml").read_text(
+        encoding="utf-8"
+    )
+
+
 def _install_skill(tmp_path: Path, skill_id: str, content: str) -> str:
     relative = f".quality-runner/skills/{skill_id}.toml"
     _write(tmp_path / relative, content)
@@ -904,6 +910,82 @@ def test_performance_readiness_pack_reports_static_signals_and_review_scopes(
         "io-and-concurrency",
         "bundle-and-runtime",
         "verification-and-load",
+    }
+    assert len(packet["included_files"]) == 1
+
+
+def test_motion_quality_pack_reports_motion_signals_and_review_scopes(tmp_path: Path) -> None:
+    from quality_runner.code_quality import create_code_quality_scan
+    from quality_runner.skill_config import load_active_skills
+    from quality_runner.skill_review import build_skill_review_packet
+
+    skill_path = _install_skill(tmp_path, "motion-quality", _motion_quality_skill_toml())
+    styles = (
+        ".panel { transition: all 500ms ease-in; }\n"
+        ".drawer { transition: width 300ms; transform: scale(0); }\n"
+        "@keyframes slide { from { opacity: 0; } to { opacity: 1; } }\n"
+    )
+    _write(tmp_path / "src/motion.css", styles)
+    config = _skills_enabled_config(
+        active=["motion-quality"],
+        local=[{"id": "motion-quality", "path": skill_path}],
+    )
+
+    result = create_code_quality_scan(tmp_path, scan={"run_id": "motion-quality"}, config=config)
+    rule_ids = {str(finding["rule_id"]) for finding in result["findings"]}
+    assert "motion-quality/unbounded-transition" in rule_ids
+    assert "motion-quality/layout-property-animation" in rule_ids
+    assert "motion-quality/scale-zero-entry" in rule_ids
+    assert "motion-quality/ease-in-ui-motion" in rule_ids
+    assert "motion-quality/motion-without-reduced-motion" in rule_ids
+    assert result["quality_skills"][0]["id"] == "motion-quality"
+
+    reviewed = create_code_quality_scan(
+        tmp_path,
+        scan={"run_id": "motion-quality-reviewed"},
+        config=config,
+        skill_review_report={
+            "schema": SKILL_REVIEW_REPORT_SCHEMA,
+            "run_id": "motion-quality-reviewed",
+            "findings": [
+                {
+                    "skill_id": "motion-quality",
+                    "review_id": "purpose-and-frequency",
+                    "rule_id": "purpose-and-frequency/unjustified-motion",
+                    "severity": "observation",
+                    "confidence": "low",
+                    "file": "src/motion.css",
+                    "line": 1,
+                    "summary": "The panel animation has no visible purpose or frequency justification.",
+                    "evidence": ".panel { transition: all 500ms ease-in; }",
+                    "risk": "Frequently seen motion may make the interface feel slower without improving comprehension or feedback.",
+                    "expected_improvement": "Delete or reduce the animation unless the interaction has a clear spatial, state, or feedback purpose.",
+                    "verification": "Review the interaction at normal and reduced motion settings, then rerun quality-runner.",
+                }
+            ],
+        },
+    )
+    assert any(
+        finding["rule_id"] == "purpose-and-frequency/unjustified-motion"
+        for finding in reviewed["findings"]
+    )
+
+    skills, warnings = load_active_skills(tmp_path, config)
+    assert warnings == []
+    packet = build_skill_review_packet(
+        run_id="motion-quality",
+        repo_root=tmp_path,
+        scanned_files=[{"path": "src/motion.css", "lines": styles.splitlines()}],
+        skills=skills,
+    )
+    assert packet is not None
+    assert len(packet["reviews"]) == 5
+    assert {review["review_id"] for review in packet["reviews"]} == {
+        "purpose-and-frequency",
+        "easing-duration-and-origin",
+        "interruptibility-and-performance",
+        "accessibility-and-pointer-gating",
+        "cohesion-and-simplification",
     }
     assert len(packet["included_files"]) == 1
 

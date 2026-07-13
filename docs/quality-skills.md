@@ -249,6 +249,18 @@ The pack does not declare code slow from static shape alone. Performance
 findings should identify the workload, runtime path, and missing measurement or
 verification evidence needed to confirm the risk.
 
+### Starter pack: Motion Quality
+
+The [Motion Quality starter pack](examples/motion-quality.toml) adds observations
+for unbounded transitions, layout-property animation, scale-zero entrances,
+ease-in UI motion, and missing reduced-motion handling. Its agent reviews cover
+motion purpose and frequency, physical timing, interruptibility, performance,
+accessibility, pointer gating, and product cohesion.
+
+The pack follows a high-recall motion-review posture. Static matches are review
+prompts; final findings should cite the interaction trigger, component role, and
+source evidence rather than treating every animation as a defect.
+
 Merge a validated report during a run:
 
 ```bash
