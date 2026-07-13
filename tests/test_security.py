@@ -123,7 +123,10 @@ def test_secret_like_source_evidence_is_redacted_across_generated_artifacts(tmp_
     (src / "secrets.js").write_text(
         "\n".join(
             [
-                (f'const apiKey = "{secret}"; const state = one ? two : three ? four : five;'),
+                (
+                    f'const apiKey: string = "{secret}"; '
+                    "const state = one ? two : three ? four : five;"
+                ),
                 f'const apiKey = "{secret}";',
                 "const adjacent = one ? two : three ? four : five;",
                 "const apiKey =",
@@ -143,7 +146,7 @@ def test_secret_like_source_evidence_is_redacted_across_generated_artifacts(tmp_
         ),
     }
     redacted_same_line = (
-        'const apiKey = "<redacted>"; const state = one ? two : three ? four : five;'
+        'const apiKey: string = "<redacted>"; const state = one ? two : three ? four : five;'
     )
     redacted_multiline_finding = (
         '"<redacted>"; const multilineState = one ? two : three ? four : five;'
@@ -204,6 +207,63 @@ def test_secret_like_source_evidence_is_redacted_across_generated_artifacts(tmp_
             validate_slice_spec_content(path.read_text(encoding="utf-8"))["passed"]
             for path in slice_specs
         )
+
+
+def test_secret_assignment_context_redacts_comments_and_expressions(tmp_path: Path) -> None:
+    write_js_fixture(tmp_path)
+    secret = "m7-secret-assignment-context-regression-42"
+    src = tmp_path / "src"
+    src.mkdir()
+    (src / "assignment-context-secrets.js").write_text(
+        "\n".join(
+            [
+                (
+                    "const apiKey /* compiler metadata */ = "
+                    f'"{secret}"; const commentState = one ? two : three ? four : five;'
+                ),
+                (
+                    f'const apiKey = String("{secret}"); '
+                    "const expressionState = one ? two : three ? four : five;"
+                ),
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    payload = run_payload(repo_root=tmp_path, run_id="assignment-context-redaction-001")
+    code_quality_scan = json.loads(
+        Path(payload["artifact_paths"]["code_quality_scan_json"]).read_text(encoding="utf-8")
+    )
+    expected_evidence = {
+        1: (
+            'const apiKey /* compiler metadata */ = "<redacted>"; '
+            "const commentState = one ? two : three ? four : five;"
+        ),
+        2: (
+            'const apiKey = String("<redacted>"); '
+            "const expressionState = one ? two : three ? four : five;"
+        ),
+    }
+
+    for line, evidence in expected_evidence.items():
+        finding = next(
+            item
+            for item in code_quality_scan["findings"]
+            if item["file"] == "src/assignment-context-secrets.js"
+            and item["rule_id"] == "nested-ternary"
+            and item["line"] == line
+        )
+        assert finding["evidence"] == evidence
+
+    artifact_texts = [
+        path.read_text(encoding="utf-8")
+        for path in (
+            tmp_path / ".quality-runner" / "runs" / "assignment-context-redaction-001"
+        ).rglob("*")
+        if path.is_file()
+    ]
+    assert all(secret not in text for text in artifact_texts)
 
 
 def test_expensive_api_candidate_evidence_redacts_secret_like_source(tmp_path: Path) -> None:

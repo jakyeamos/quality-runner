@@ -5,7 +5,9 @@ from collections.abc import Sequence
 
 REDACTED_LITERAL = "<redacted>"
 SECRET_ASSIGNMENT_PATTERN = (
-    r"(?i)(api[_-]?key|secret|password|token|private[_-]?key)\s*[:=]\s*['\"`][^'\"`]{8,}['\"`]"
+    r"(?i)(api[_-]?key|secret|password|token|private[_-]?key)\b"
+    r"(?:\s|/\*.*?\*/)*(?::\s*[^=;'\"`\n]*?=|=|:)\s*"
+    r"[^;\n]*?['\"`][^'\"`]{8,}['\"`]"
 )
 SECRET_FALLBACK_PATTERN = r"(?i)(?:\|\||\?\?)\s*['\"`][^'\"`]{12,}['\"`]"
 SECRET_LOG_PATTERN = (
@@ -47,7 +49,10 @@ def redact_secret_like_source_lines(lines: Sequence[str]) -> list[str]:
     redacted_lines: list[str] = []
 
     for line in lines:
-        redacted_line = redact_secret_like_literals(line)
+        redacted_line = redact_secret_like_literals(
+            line,
+            force=bool(_secret_assignment_right_hand_sides(line)),
+        )
         if pending_secret_value:
             redacted_line, pending_secret_value, open_secret_quote = _redact_pending_secret_value(
                 redacted_line, open_secret_quote
@@ -103,24 +108,7 @@ def _redact_unclosed_secret_assignment(value: str, quote: str) -> str:
 
 
 def _starts_secret_assignment_continuation(value: str) -> tuple[bool, str | None]:
-    secret_names = sorted(
-        [
-            *_SECRET_ASSIGNMENT_NAME.finditer(value),
-            *_CAMEL_SECRET_ASSIGNMENT_NAME.finditer(value),
-        ],
-        key=lambda item: item.start(),
-    )
-    for secret_name in secret_names:
-        remainder = value[secret_name.end() :]
-        statement_end = remainder.find(";")
-        if statement_end >= 0:
-            remainder = remainder[:statement_end]
-        equals = remainder.find("=")
-        colon = remainder.find(":")
-        assignment = equals if equals >= 0 else colon
-        if assignment < 0:
-            continue
-        right_hand_side = remainder[assignment + 1 :].strip()
+    for right_hand_side in _secret_assignment_right_hand_sides(value):
         if not right_hand_side or right_hand_side.startswith(("(", "[", "{", "//", "/*")):
             return True, None
         opening_quote = right_hand_side[0]
@@ -132,6 +120,28 @@ def _starts_secret_assignment_continuation(value: str) -> tuple[bool, str | None
         if _secret_expression_continues(right_hand_side, allow_blank=False):
             return True, None
     return False, None
+
+
+def _secret_assignment_right_hand_sides(value: str) -> list[str]:
+    secret_names = sorted(
+        [
+            *_SECRET_ASSIGNMENT_NAME.finditer(value),
+            *_CAMEL_SECRET_ASSIGNMENT_NAME.finditer(value),
+        ],
+        key=lambda item: item.start(),
+    )
+    right_hand_sides: list[str] = []
+    for secret_name in secret_names:
+        remainder = value[secret_name.end() :]
+        statement_end = remainder.find(";")
+        if statement_end >= 0:
+            remainder = remainder[:statement_end]
+        equals = remainder.find("=")
+        colon = remainder.find(":")
+        assignment = equals if equals >= 0 else colon
+        if assignment >= 0:
+            right_hand_sides.append(remainder[assignment + 1 :].strip())
+    return right_hand_sides
 
 
 def _secret_expression_continues(value: str, *, allow_blank: bool) -> bool:
