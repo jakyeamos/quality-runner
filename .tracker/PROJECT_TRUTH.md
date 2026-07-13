@@ -28,13 +28,14 @@ secret-like candidate literals before they are fingerprinted or persisted, and
 `66ce3ef` locks the development toolchain while testing doctor, v2 outcomes,
 and MCP discovery from the built wheel. `32e7b26` makes CLI Fresh Review v2
 outcome-first, with an explicit stderr-noticed v1 projection through 0.7.x;
-the MCP v1 tool remains a separate compatibility surface.
+the MCP v1 tool remains a separate compatibility surface. `633b96e` records
+candidate-aware upgrade, rollback, release, and sensitive-artifact guidance.
 
 ## Current Position
 
 - Target: a typed v2 core behind CLI, MCP, and compatibility adapters.
-- Next implementation slice: publish the upgrade, rollback, deprecation, and
-  operational guidance for the v2-default cutover.
+- Next implementation slice: run the final locked validation, built-wheel
+  smoke, and adversarial review for M7 completion.
 - Canonical planning documents: `docs/modernization/`.
 - Public compatibility: retain `quality_evidence_contract` and
   `repo_quality_certifier` during a published transition window.
@@ -73,6 +74,8 @@ the MCP v1 tool remains a separate compatibility surface.
 
 ## Recent Progress
 
+- 2026-07-13: M7 guidance in `633b96e`: canonical upgrade/rollback policy,
+  release evidence, and artifact-sensitivity guidance now match the cutover.
 - 2026-07-13: M7 cutover in `32e7b26`: CLI Review defaults to v2, retains
   `--legacy-output` v1 JSON through 0.7.x, and documents legacy MCP discovery.
 - 2026-07-13: Began M7 in `113f143`: security candidates redact secret-like

@@ -20,6 +20,11 @@ explicit `--legacy-output` flag preserves its v1 JSON on stdout and emits a
 versioned stderr notice through 0.7.x; MCP v1 stays unchanged apart from its
 tool-list deprecation guidance.
 
+Its guidance slice (`633b96e`) makes `docs/upgrade.md` the canonical candidate,
+upgrade, rollback, and support-window reference. Release, CLI, MCP, security,
+troubleshooting, and research docs now point to built-wheel evidence and the
+actual sensitive-artifact boundary.
+
 M0 restores the public trust boundary without changing artifact schema ids:
 
 - package metadata now derives from `quality_runner/_version.py`; the plugin,

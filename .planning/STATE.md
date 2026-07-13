@@ -40,7 +40,8 @@ hardening.
   `0b5ac2e` and `56c94d4`
 - M7 — release hardening: in progress; its first confidentiality slice is
   complete in `113f143` and reproducible distribution evidence is complete in
-  `66ce3ef`; Fresh Review v2 is now the default in `32e7b26`
+  `66ce3ef`; Fresh Review v2 is now the default in `32e7b26`, with release and
+  rollback guidance in `633b96e`
 
 ## Active Phase
 
@@ -70,11 +71,14 @@ hardening.
 
 ## Next Step
 
-Publish the upgrade, rollback, deprecation, and operational guidance for the
-v2-default cutover, then run the final M7 validation and review.
+Run the full locked validation ladder, build and smoke the distribution, perform
+an adversarial review, then record M7 completion and push the branch.
 
 ## Recent Progress
 
+- 2026-07-13: M7 guidance in `633b96e`: one upgrade guide now owns candidate,
+  support-window, rollback, and MCP policy; linked docs describe artifact
+  sensitivity and reproducible release evidence without claiming publication.
 - 2026-07-13: M7 cutover in `32e7b26`: Fresh Review defaults to v2 outcomes;
   `--legacy-output` preserves v1 stdout through 0.7.x, while legacy MCP stays
   v1 with discovery notices.
