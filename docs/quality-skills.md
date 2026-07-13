@@ -192,6 +192,16 @@ configured command passed or that a repository-local workflow contains the full
 deployment environment. Those conclusions remain evidence-backed agent review
 questions.
 
+### Starter pack: PR Risk and Merge Readiness
+
+The [PR Risk starter pack](examples/pr-risk.toml) adds a high-confidence merge
+conflict-marker check and agent reviews for changed-surface mapping, contract and
+regression risk, scope cohesion, merge evidence, and review handoff.
+
+The pack requires diff or PR metadata for claims about what changed. When that
+metadata is unavailable, the review must report the evidence gap instead of
+guessing the change surface.
+
 Merge a validated report during a run:
 
 ```bash

@@ -126,6 +126,10 @@ def _release_readiness_skill_toml() -> str:
     )
 
 
+def _pr_risk_skill_toml() -> str:
+    return (Path(__file__).parents[1] / "docs/examples/pr-risk.toml").read_text(encoding="utf-8")
+
+
 def _install_skill(tmp_path: Path, skill_id: str, content: str) -> str:
     relative = f".quality-runner/skills/{skill_id}.toml"
     _write(tmp_path / relative, content)
@@ -513,6 +517,74 @@ def test_release_readiness_pack_reports_release_signals_and_review_scopes(tmp_pa
         "handoff-and-communication",
     }
     assert len(packet["included_files"]) == 2
+
+
+def test_pr_risk_pack_reports_merge_integrity_and_review_scopes(tmp_path: Path) -> None:
+    from quality_runner.code_quality import create_code_quality_scan
+    from quality_runner.skill_config import load_active_skills
+    from quality_runner.skill_review import build_skill_review_packet
+
+    skill_path = _install_skill(tmp_path, "pr-risk", _pr_risk_skill_toml())
+    source = "<<<<<<< HEAD\nexport function feature() { return 'old'; }\n>>>>>>> feature-branch\n"
+    _write(tmp_path / "src/feature.ts", source)
+    config = _skills_enabled_config(
+        active=["pr-risk"],
+        local=[{"id": "pr-risk", "path": skill_path}],
+    )
+
+    result = create_code_quality_scan(tmp_path, scan={"run_id": "pr-risk"}, config=config)
+    rule_ids = {str(finding["rule_id"]) for finding in result["findings"]}
+    assert "pr-risk/merge-conflict-marker" in rule_ids
+    assert result["quality_skills"][0]["id"] == "pr-risk"
+
+    reviewed = create_code_quality_scan(
+        tmp_path,
+        scan={"run_id": "pr-risk-reviewed"},
+        config=config,
+        skill_review_report={
+            "schema": SKILL_REVIEW_REPORT_SCHEMA,
+            "run_id": "pr-risk-reviewed",
+            "findings": [
+                {
+                    "skill_id": "pr-risk",
+                    "review_id": "contract-and-regression-risk",
+                    "rule_id": "contract-and-regression-risk/missing-regression-test",
+                    "severity": "observation",
+                    "confidence": "low",
+                    "file": "src/feature.ts",
+                    "line": 2,
+                    "summary": "The changed feature has no visible regression test for its returned behavior.",
+                    "evidence": "export function feature() { return 'old'; }",
+                    "risk": "A contract change could merge without a test that protects the expected behavior.",
+                    "expected_improvement": "Add or cite a regression test for the feature's public behavior.",
+                    "verification": "Rerun quality-runner and the focused test command after adding the regression coverage.",
+                }
+            ],
+        },
+    )
+    assert any(
+        finding["rule_id"] == "contract-and-regression-risk/missing-regression-test"
+        for finding in reviewed["findings"]
+    )
+
+    skills, warnings = load_active_skills(tmp_path, config)
+    assert warnings == []
+    packet = build_skill_review_packet(
+        run_id="pr-risk",
+        repo_root=tmp_path,
+        scanned_files=[{"path": "src/feature.ts", "lines": source.splitlines()}],
+        skills=skills,
+    )
+    assert packet is not None
+    assert len(packet["reviews"]) == 5
+    assert {review["review_id"] for review in packet["reviews"]} == {
+        "changed-surface-map",
+        "contract-and-regression-risk",
+        "scope-and-cohesion",
+        "merge-evidence",
+        "handoff-and-remediation",
+    }
+    assert len(packet["included_files"]) == 1
 
 
 def test_quality_skill_surfaces_rule_metadata_confidence_and_coverage(tmp_path: Path) -> None:
