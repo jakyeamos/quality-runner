@@ -48,6 +48,39 @@ def test_missing_dependency_audit_for_python_project(tmp_path: Path) -> None:
     assert "security_dependency_audit" in missing_ids
 
 
+def test_configured_dependency_audit_gate_is_available(tmp_path: Path) -> None:
+    write_python_quality_fixture(tmp_path)
+    (tmp_path / ".quality-runner.toml").write_text(
+        "\n".join(
+            [
+                "[[quality_runner.gates]]",
+                'id = "security_dependency_audit"',
+                'command = "uv export --frozen --format requirements.txt --no-dev --no-emit-project | uv run --with pip-audit pip-audit -r /dev/stdin --strict --disable-pip --no-deps"',
+                'ecosystem = "python"',
+                'source = "repository security policy"',
+                'owner = "platform"',
+                "required = true",
+                'severity = "blocker"',
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    security_scan = _run_scan(tmp_path)
+
+    available = {
+        item["id"]: item
+        for item in security_scan["available_capabilities"]
+        if isinstance(item, dict) and isinstance(item.get("id"), str)
+    }
+    assert available["security_dependency_audit"]["command"] == (
+        "uv export --frozen --format requirements.txt --no-dev --no-emit-project | uv run --with pip-audit pip-audit -r /dev/stdin --strict --disable-pip --no-deps"
+    )
+    assert "security_dependency_audit" not in {
+        item["id"] for item in security_scan["missing_capabilities"]
+    }
+
+
 def test_security_scan_artifact_shape(tmp_path: Path) -> None:
     write_js_fixture(tmp_path)
     security_scan = _run_scan(tmp_path)

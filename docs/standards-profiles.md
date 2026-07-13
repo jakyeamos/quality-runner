@@ -27,6 +27,12 @@ required_capabilities = ["lint", "tests", "dead_code"]
 allowed_package_managers = ["pnpm"]
 scan_exclusions = ["samples", "generated-reports/**"]
 
+[quality_runner.artifacts]
+redact_patterns = ["(?i)\\b(?:api[_-]?(?:key|token)|password)\\b\\s*[:=]\\s*[^\\s,;]+"]
+redact_replacement = "[REDACTED]"
+retention_runs = 30
+retention_days = 30
+
 [quality_runner.severity_overrides]
 missing-dead-code = "warning"
 
@@ -85,8 +91,34 @@ Custom profiles are repository-local. They must currently extend `default`.
 Profile-level `required_capabilities` and `allowed_package_managers` provide
 saved defaults; top-level repo policy can still override them.
 
-Configured gates are recorded as command evidence only. Quality Runner does not
-execute them.
+Configured gates are recorded as command evidence during `inspect` and `run`.
+`verify-gates` is the explicit command that executes discovered gates.
+
+Artifact policy is applied to files under `.quality-runner/runs/`. Each configured
+`redact_patterns` entry is a regular expression applied before JSON or Markdown
+content is written. The pattern text is not emitted into artifacts. Retention is
+an explicit cleanup policy: `retention_runs` keeps the newest runs and
+`retention_days` removes runs older than the configured age. Preview or apply it
+with `quality-runner prune-artifacts <repo-path> [--apply]`; the default is a
+dry run. When both retention limits are set, either limit can select a run for
+deletion. Symlinked run directories are skipped.
+
+For Python repositories managed by `uv`, a dependency audit is an executable
+gate rather than a claim inferred from `pyproject.toml` or `uv.lock`:
+
+```toml
+[[quality_runner.gates]]
+id = "security_dependency_audit"
+command = "uv export --frozen --format requirements.txt --no-dev --no-emit-project | uv run --with pip-audit pip-audit -r /dev/stdin --strict --disable-pip --no-deps"
+ecosystem = "python"
+source = "repository security policy"
+owner = "platform"
+required = true
+severity = "blocker"
+```
+
+`verify-gates` executes this command when it is available, so the artifact
+records discovery and pass/fail evidence separately.
 
 `scan_exclusions` augments the default discovery exclusions. Defaults skip
 fixture corpora, generated corpora, docs, vendored directories, and third-party

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 
 
@@ -149,3 +150,54 @@ def test_write_text_creates_parent_returns_path_and_writes_exact_content(tmp_pat
     assert path == target
     assert path.exists()
     assert path.read_text(encoding="utf-8") == "line 1\nline 2"
+
+
+def test_run_artifacts_apply_configured_redaction_before_persisting(tmp_path: Path) -> None:
+    from quality_runner.artifacts import prepare_artifact_dir, write_json, write_text
+
+    (tmp_path / ".quality-runner.toml").write_text(
+        "\n".join(
+            [
+                "[quality_runner.artifacts]",
+                'redact_patterns = ["TOP-SECRET-[A-Z0-9]+"]',
+                'redact_replacement = "<redacted>"',
+            ]
+        ),
+        encoding="utf-8",
+    )
+    run_dir = prepare_artifact_dir(tmp_path, "redaction-run")
+
+    write_json(run_dir / "report.json", {"evidence": "TOP-SECRET-123"})
+    write_text(run_dir / "report.md", "Evidence: TOP-SECRET-456\n")
+
+    assert "TOP-SECRET" not in (run_dir / "report.json").read_text(encoding="utf-8")
+    assert (run_dir / "report.json").read_text(encoding="utf-8").count("<redacted>") == 1
+    assert (run_dir / "report.md").read_text(encoding="utf-8") == "Evidence: <redacted>\n"
+
+
+def test_cleanup_artifacts_previews_and_deletes_by_run_count(tmp_path: Path) -> None:
+    from quality_runner.artifacts import cleanup_artifacts
+
+    (tmp_path / ".quality-runner.toml").write_text(
+        "[quality_runner.artifacts]\nretention_runs = 2\n",
+        encoding="utf-8",
+    )
+    runs_dir = tmp_path / ".quality-runner" / "runs"
+    for index, run_id in enumerate(("old", "middle", "new")):
+        run_dir = runs_dir / run_id
+        run_dir.mkdir(parents=True)
+        (run_dir / "run-manifest.json").write_text("{}\n", encoding="utf-8")
+        timestamp = 100 + index
+        os.utime(run_dir, (timestamp, timestamp))
+
+    preview = cleanup_artifacts(tmp_path, apply=False, now=200)
+    assert preview["status"] == "dry-run"
+    assert preview["would_delete_run_ids"] == ["old"]
+    assert (runs_dir / "old").exists()
+
+    result = cleanup_artifacts(tmp_path, apply=True, now=200)
+    assert result["status"] == "pruned"
+    assert result["deleted_run_ids"] == ["old"]
+    assert not (runs_dir / "old").exists()
+    assert (runs_dir / "middle").exists()
+    assert (runs_dir / "new").exists()

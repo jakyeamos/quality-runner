@@ -9,6 +9,35 @@ Artifacts are written under:
 `run-id` must be a single path segment. Absolute paths, separators, `.` and
 `..` are rejected.
 
+## Artifact Privacy and Retention
+
+Repos can configure privacy and retention under `[quality_runner.artifacts]`:
+
+```toml
+[quality_runner.artifacts]
+redact_patterns = ["(?i)\\bbearer\\s+[A-Za-z0-9._~+/-]+=*"]
+redact_replacement = "[REDACTED]"
+retention_runs = 30
+retention_days = 30
+```
+
+Configured regular expressions are applied to JSON and Markdown immediately
+before files under `.quality-runner/runs/` or `.quality-runner/gate-runs/` are
+persisted. Redaction is local and does not modify source files. The pattern
+definitions themselves are not stored in artifacts.
+
+Retention is applied by the explicit cleanup command:
+
+```bash
+quality-runner prune-artifacts /path/to/repo       # preview
+quality-runner prune-artifacts /path/to/repo --apply
+```
+
+`retention_runs` keeps the newest N run directories and `retention_days` removes
+runs older than the configured age. If both are set, either limit may select a
+run for deletion. The command skips symlinked run directories and reports every
+candidate before deletion.
+
 ## Inspect Artifacts
 
 `quality-runner inspect` writes:
@@ -47,6 +76,8 @@ Artifacts are written under:
   local executor are marked with `local_execution: "ci-only"`. Capabilities also
   include `capability_kind` so local commands, CI-only gates, and file/evidence
   capabilities can be handled independently.
+- `security-scan.json`: security capability discovery, including configured
+  dependency-audit gates and their discovery/execution state.
 - `run-manifest.json`: run metadata, Quality Runner version, artifact paths, and
   git HEAD/branch/dirty state when the target is a git repo. When author intent
   is supplied, the manifest also embeds the resolved `intent` packet.

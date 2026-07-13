@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from quality_runner import __version__
+from quality_runner.cli_artifacts import prune_artifacts_payload
 from quality_runner.cli_controller_reports import (
     controller_report_command_payload,
     controller_report_from_summary_payload,
@@ -21,8 +22,8 @@ from quality_runner.cli_gate import (
 )
 from quality_runner.cli_handoff import handoff_command_payload
 from quality_runner.cli_refresh import refresh_command_payload
-from quality_runner.cli_rollout import rollout_command_payload
 from quality_runner.cli_review import review_command_payload
+from quality_runner.cli_rollout import rollout_command_payload
 from quality_runner.cli_skills import skill_command_payload
 from quality_runner.cli_status import export_handoff_payload, status_payload
 from quality_runner.code_quality import preview_ignored_paths
@@ -147,6 +148,11 @@ def payload_for_args(args: argparse.Namespace) -> dict[str, Any]:
         return handoff_command_payload(args)
     if args.command == "propose-fix":
         return propose_fix_command_payload(args, repo_root=_validated_repo_path(args.repo_path))
+    if args.command == "prune-artifacts":
+        return prune_artifacts_payload(
+            repo_root=_validated_repo_path(args.repo_path),
+            apply=args.apply,
+        )
     raise ValueError(f"unsupported command: {args.command}")
 
 

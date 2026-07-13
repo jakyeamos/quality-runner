@@ -166,6 +166,21 @@ Reports the normalized repo config and latest run metadata.
 quality-runner status /path/to/repo --json
 ```
 
+## `quality-runner prune-artifacts`
+
+Previews or applies the configured artifact retention policy. The default is a
+dry run; deletion requires `--apply`.
+
+```bash
+quality-runner prune-artifacts /path/to/repo --json
+quality-runner prune-artifacts /path/to/repo --apply --json
+```
+
+The command reports the configured `retention_runs` and `retention_days`, the
+run directories selected for deletion, and any skipped unsafe entries. See
+[Artifact Contract](artifacts.md#artifact-privacy-and-retention) for the
+redaction and retention configuration.
+
 ## `quality-runner run`
 
 Runs the full audit-and-plan workflow.

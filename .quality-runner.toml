@@ -1,0 +1,17 @@
+[quality_runner.artifacts]
+redact_patterns = [
+  "(?i)\\b(?:api[_-]?(?:key|token)|access[_-]?token|client[_-]?secret|password|private[_-]?key)\\b\\s*[:=]\\s*[^\\s,;]+",
+  "(?i)\\bbearer\\s+[A-Za-z0-9._~+/-]+=*",
+]
+redact_replacement = "[REDACTED]"
+retention_runs = 30
+retention_days = 30
+
+[[quality_runner.gates]]
+id = "security_dependency_audit"
+command = "uv export --frozen --format requirements.txt --no-dev --no-emit-project | uv run --with pip-audit pip-audit -r /dev/stdin --strict --disable-pip --no-deps"
+ecosystem = "python"
+source = "repository security policy"
+owner = "platform"
+required = true
+severity = "blocker"

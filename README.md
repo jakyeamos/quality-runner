@@ -115,6 +115,22 @@ Quality Runner writes artifacts under the target repo:
   agent-handoff.md
 ```
 
+Sensitive projects can configure artifact redaction and bounded retention in
+`.quality-runner.toml`. Redaction applies before run JSON/Markdown is persisted;
+retention is previewed or applied explicitly:
+
+```toml
+[quality_runner.artifacts]
+redact_patterns = ["(?i)\\bbearer\\s+[A-Za-z0-9._~+/-]+=*"]
+redact_replacement = "[REDACTED]"
+retention_runs = 30
+retention_days = 30
+```
+
+```bash
+quality-runner prune-artifacts /path/to/repo --apply
+```
+
 The normal workflow is:
 
 1. Read `agent-handoff.md`.

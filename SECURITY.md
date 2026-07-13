@@ -17,4 +17,9 @@ Quality Runner v1 is designed to run locally. It does not call remote services
 during an audit. It reads repository files needed for quality evidence and writes
 artifacts under `.quality-runner/runs/<run-id>/` in the target repository.
 
+Repositories can configure regular-expression redaction for persisted run and
+gate-run artifacts. They can also bound artifact lifetime with run-count and
+age retention settings; `quality-runner prune-artifacts` previews deletion and
+requires `--apply` to remove old runs.
+
 Report any behavior that reads or writes outside that boundary.

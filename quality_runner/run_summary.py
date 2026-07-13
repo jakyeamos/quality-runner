@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 from typing import Any
 
+from quality_runner.artifacts import write_json
 from quality_runner.lifecycle_status import compute_lifecycle_status
 from quality_runner.timeout_diagnostics import concise_timeout_diagnostics
 
@@ -28,10 +29,7 @@ def build_run_summary(
         payload["delta"] = _summary_delta(baseline=baseline, final=summary)
     if persist:
         run_dir = repo_root / ".quality-runner" / "runs" / run_id
-        (run_dir / "run-summary.json").write_text(
-            json.dumps(payload, indent=2, sort_keys=True) + "\n",
-            encoding="utf-8",
-        )
+        write_json(run_dir / "run-summary.json", payload)
     return payload
 
 

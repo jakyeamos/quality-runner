@@ -5,6 +5,7 @@ import json
 import sys
 
 from quality_runner import __version__
+from quality_runner.cli_artifacts import add_artifact_commands
 from quality_runner.cli_controller_reports import (
     add_controller_report_command,
     add_controller_report_summary_arguments,
@@ -15,8 +16,8 @@ from quality_runner.cli_gate import add_gate_commands
 from quality_runner.cli_handoff import add_handoff_commands
 from quality_runner.cli_human_summary import human_summary
 from quality_runner.cli_payload import payload_for_args
-from quality_runner.cli_rollout import add_rollout_command
 from quality_runner.cli_review import add_review_command
+from quality_runner.cli_rollout import add_rollout_command
 from quality_runner.cli_skills import add_skill_commands
 from quality_runner.cli_workflow_args import add_workflow_arguments, add_worktree_verify_arguments
 from quality_runner.standards import DEFAULT_PROFILE
@@ -189,6 +190,8 @@ def build_parser() -> argparse.ArgumentParser:
     add_gate_commands(subparsers)
 
     add_fix_proposal_command(subparsers)
+
+    add_artifact_commands(subparsers)
 
     add_handoff_commands(subparsers)
 
