@@ -86,6 +86,14 @@ def write_text(path: Path, content: str) -> Path:
     return path
 
 
+def append_json_line(path: Path, payload: Any) -> Path:
+    _prepare_artifact_file(path)
+    content = json.dumps(payload, sort_keys=True) + "\n"
+    with path.open("a", encoding="utf-8") as handle:
+        handle.write(_redact_content(path, content))
+    return path
+
+
 def cleanup_artifacts(
     repo_root: Path,
     *,

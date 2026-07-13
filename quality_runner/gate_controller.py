@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
-from quality_runner.artifacts import artifact_dir, write_json
+from quality_runner.artifacts import append_json_line, artifact_dir, write_json
 from quality_runner.gate_resolution_bridge import (
     apply_record_disposition,
     enrich_record_disposition_response,
@@ -370,9 +370,7 @@ def _append_gate_response(
     if path.is_symlink():
         raise ValueError("gate response log must not be a symlink")
     path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("a", encoding="utf-8") as handle:
-        handle.write(json.dumps(response, sort_keys=True) + "\n")
-    return path
+    return append_json_line(path, response)
 
 
 def _prepare_gate_run_dir(repo_root: Path, gate_run_id: str) -> Path:
