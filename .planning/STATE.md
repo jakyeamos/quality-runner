@@ -3,7 +3,7 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: GPT-5.6 modernization
 status: complete
-last_updated: "2026-07-13T16:58:09Z"
+last_updated: "2026-07-13T17:14:40Z"
 progress:
   total_phases: 8
   completed_phases: 8
@@ -22,7 +22,7 @@ See `.planning/PROJECT.md` for the established product boundary and
 **Core value:** Give developers and agents trustworthy local evidence before
 they authorize repository changes.
 
-**Current focus:** M7 complete — independent branch review and merge readiness.
+**Current focus:** v0.5.1 pre-tag validation, reviewed PR merge, and publication.
 
 ## Current Position
 
@@ -39,16 +39,16 @@ they authorize repository changes.
   `0b5ac2e` and `56c94d4`
 - M7 — release hardening: complete in `279cc8a`; `141635e` adds lexical
   source-evidence protection for private fields, malformed syntax, computed
-  logs, and tokenless values. Full validation and independent reviews are clean.
+  logs, and tokenless values. `948107f` prepares v0.5.1 metadata and README
+  guidance; the final pre-tag validation is in progress.
 
 ## Active Phase
 
 - **Phase:** M7
 - **Slug:** release-hardening
 - **Status:** Complete
-- **Completion gate:** `141635e` passes 554 tests, lock validation, Ruff,
-  Basedpyright, Vulture, and diff checks; independent follow-up reviews have no
-  P0/P1/P2 findings.
+- **Completion gate:** final v0.5.1 pre-tag validation, reviewed PR merge, tag
+  on `main`, successful PyPI publication, and explicit GitHub Release creation.
 
 ## Key Decisions
 
@@ -70,11 +70,13 @@ they authorize repository changes.
 
 ## Next Step
 
-Merge `codex/gpt56-modernization` when authorized; tag only after the release
-commit is reachable from `main`.
+Complete the pre-tag gate, merge the reviewed PR, tag only the resulting `main`
+commit, then verify PyPI and create the GitHub Release.
 
 ## Recent Progress
 
+- 2026-07-13: `948107f` prepares v0.5.1 citation/changelog/upgrade metadata
+  and README release guidance; pre-tag validation and publication remain.
 - 2026-07-13: `141635e` closes the source-evidence follow-up: lexer-backed
   redaction protects private fields, malformed syntax, computed logs, and
   tokenless values; 554 tests and two independent reviews are clean.
@@ -114,4 +116,3 @@ commit is reachable from `main`.
   packet-bound responses, preserves v1 paths, isolates combined packets, and
   records truthful lifecycle/handoff evidence; 515 tests and release checks pass.
 - 2026-07-12: M4 `75d8ac4` completed; additive v2 audit/review/verify/runs outcomes, MCP tools, truthful safety projection, and full validation passed.
-- 2026-07-12: M3 `8705cc1` completed; typed verification service, v1 artifacts, disposable cleanup, minimal environment, and full validation passed.

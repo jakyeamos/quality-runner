@@ -49,15 +49,14 @@ assignments. `b4b5e6e` preserves the v0.1 gate schema, emits the consent-aware
 v0.2 artifact, and repairs the packaged skill and clean-install release path.
 `141635e` completes the focused source-evidence hardening with lexical context
 for private fields, malformed syntax, computed logging, and tokenless values.
-The full validation suite and two independent follow-up reviews are clean. The
-branch remains unmerged and ready for a user-authorized merge.
+`948107f` prepares the v0.5.1 citation, changelog, upgrade guidance, and public
+README. The branch remains unmerged while the final pre-tag validation runs.
 
 ## Current Position
 
 - Target: a typed v2 core behind CLI, MCP, and compatibility adapters.
-- Next implementation slice: merge `codex/gpt56-modernization` only when the
-  user authorizes it; no P0/P1/P2 findings remain from the release gate or
-  focused follow-up reviews.
+- Next implementation slice: complete the v0.5.1 pre-tag gate, push the branch,
+  merge its reviewed PR, then tag the resulting `main` commit and verify PyPI.
 - Canonical planning documents: `docs/modernization/`.
 - Public compatibility: retain `quality_evidence_contract` and
   `repo_quality_certifier` during a published transition window.
@@ -75,8 +74,8 @@ branch remains unmerged and ready for a user-authorized merge.
 ## Baseline Quality
 
 - `141635e` passes the full 554-test pytest suite, Ruff lint/format,
-  Basedpyright, Vulture, lock validation, and diff check. The two independent
-  source-evidence reviews report no remaining P0/P1/P2 findings.
+  Basedpyright, Vulture, lock validation, and diff check. `948107f` is awaiting
+  the final pre-tag validation with updated citation and public release docs.
 - Basedpyright reports zero errors; audit, review, verify, and run history now
   have a versioned v2 outcome contract behind preserved v1 projections.
 - Release smoke now checks package/runtime/plugin parity and the release
@@ -95,6 +94,9 @@ branch remains unmerged and ready for a user-authorized merge.
 
 ## Recent Progress
 
+- 2026-07-13: `948107f` prepares v0.5.1 metadata and the main README release
+  guidance; final pre-tag checks, PR merge, tag, PyPI publication, and GitHub
+  Release creation remain in sequence.
 - 2026-07-13: `141635e` closes the focused source-evidence follow-up with
   lexer-backed private-field, malformed-syntax, computed-log, and tokenless
   value protection; 554 tests and two independent reviews are clean.
@@ -131,6 +133,3 @@ branch remains unmerged and ready for a user-authorized merge.
 - 2026-07-12: Completed M4 on `codex/gpt56-modernization` (`75d8ac4`): v2
   outcome contract, outcome-first CLI/MCP journeys, bounded history, and
   safety claims tied to observed evidence; 496 tests and release checks pass.
-- 2026-07-12: Completed M3 on `codex/gpt56-modernization` (`8705cc1`): typed
-  verification service and v1 artifact renderer, minimal inherited environment,
-  disposable-worktree recovery, timeout schema alignment, and 454 passing tests.
