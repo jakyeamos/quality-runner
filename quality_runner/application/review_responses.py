@@ -6,6 +6,7 @@ from collections.abc import Mapping, Sequence
 from datetime import datetime
 from typing import cast
 
+from quality_runner.application.review_reporting import build_review_report
 from quality_runner.core.review_contracts import (
     CombinedReviewPacket,
     CombinedReviewResponseProvenance,
@@ -24,7 +25,6 @@ from quality_runner.core.review_packets import (
 from quality_runner.core.review_packets import (
     response_template as _response_template,
 )
-from quality_runner.review_report import build_review_report
 from quality_runner.schema_constants import (
     COMBINED_REVIEW_ADAPTER_RESPONSE_SCHEMA,
     REVIEW_ADAPTER_RESPONSE_SCHEMA,

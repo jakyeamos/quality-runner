@@ -5,7 +5,9 @@ from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import cast
 
+from quality_runner.application.review_context_factory import build_review_context
 from quality_runner.application.review_projection import build_review_manifest
+from quality_runner.application.review_reporting import build_review_report
 from quality_runner.application.review_responses import validate_review_response
 from quality_runner.core.review_contracts import (
     AdapterStatus,
@@ -17,7 +19,6 @@ from quality_runner.core.review_contracts import (
     ReviewPacket,
     ReviewReport,
 )
-from quality_runner.review_context import build_review_context
 from quality_runner.review_execution_artifacts import (
     complete_review_execution_artifacts,
     legacy_review_artifact_paths,
@@ -32,9 +33,7 @@ from quality_runner.review_loop import (
     should_stop,
     start_review_loop,
 )
-from quality_runner.review_report import build_review_report
 from quality_runner.review_response_files import ReviewAdapterResponseError
-from quality_runner.review_types import ReviewOptions as LegacyReviewOptions
 
 _ADVISORY_EXCLUSION_LIMITATION = (
     "Exclusions are advisory for a local file adapter; Quality Runner cannot verify the external "
@@ -52,16 +51,13 @@ def prepare_fresh_review(
     omitted_evidence: Sequence[str],
     save: bool,
 ) -> FreshReviewExecution:
-    context = cast(
-        ReviewPacket,
-        build_review_context(
-            repo_root=repo_root,
-            run_id=run_id,
-            options=cast(LegacyReviewOptions, options),
-            repository_state=repository_state,
-            changed_files=changed_files,
-            omitted_evidence=omitted_evidence,
-        ),
+    context = build_review_context(
+        repo_root=repo_root,
+        run_id=run_id,
+        options=options,
+        repository_state=repository_state,
+        changed_files=changed_files,
+        omitted_evidence=omitted_evidence,
     )
     manifest = build_review_manifest(
         context,

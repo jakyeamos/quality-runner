@@ -13,6 +13,7 @@ from quality_runner.application.fresh_review import (
     incomplete_fresh_review,
     prepare_fresh_review,
 )
+from quality_runner.application.review_context_factory import normalize_review_options
 from quality_runner.application.review_v1_reports import review_report_to_v1
 from quality_runner.core.review_contracts import (
     EvidenceReference,
@@ -20,7 +21,6 @@ from quality_runner.core.review_contracts import (
     NormalizedReviewOptions,
     ReviewLoopStop,
 )
-from quality_runner.review_context import normalize_review_options
 from quality_runner.review_response_files import (
     ReviewAdapterResponseError,
     ReviewAdapterResponsePermissionError,

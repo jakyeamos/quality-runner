@@ -158,6 +158,8 @@ def test_packaged_console_script_invokes_cli(tmp_path: Path) -> None:
     assert "quality_runner/application/outcome_projection.py" in wheel_names
     assert "quality_runner/application/outcome_projection_support.py" in wheel_names
     assert "quality_runner/application/read_only_audit.py" in wheel_names
+    assert "quality_runner/application/review_context_factory.py" in wheel_names
+    assert "quality_runner/application/review_reporting.py" in wheel_names
     assert "quality_runner/application/review_v1_reports.py" in wheel_names
     assert "quality_runner/application/review_v1_serializers.py" in wheel_names
     assert "quality_runner/application/run_history.py" in wheel_names
@@ -228,10 +230,13 @@ def test_packaged_console_script_invokes_cli(tmp_path: Path) -> None:
             "from repo_quality_certifier import GATE_MATRIX_SCHEMA; "
             "from quality_runner import workflow, workflow_verify; "
             "from quality_runner.application import audit_workflows, journey_outcomes, verification_workflows; "
+            "from quality_runner.application import review_context_factory, review_reporting; "
             "from quality_runner.compatibility import journey_outcomes as legacy_journey_outcomes; "
             "from quality_runner.compatibility import legacy_workflow, review_mcp; "
+            "from quality_runner import review_context, review_report; "
             "from quality_runner.application.review_v1_serializers import REVIEW_CONTEXT_SCHEMA; "
-            "from quality_runner.review_types import ReviewPacket; "
+            "from quality_runner.review_types import ReviewOptions, ReviewPacket; "
+            "from typing import get_type_hints; "
             "assert workflow.inspect_payload is audit_workflows.inspect_payload; "
             "assert workflow.run_payload is audit_workflows.run_payload; "
             "assert workflow.verify_gates_payload is verification_workflows.verify_gates_payload; "
@@ -242,6 +247,10 @@ def test_packaged_console_script_invokes_cli(tmp_path: Path) -> None:
             "assert legacy_journey_outcomes.review_mcp_journey_outcome is review_mcp.review_mcp_journey_outcome; "
             "assert callable(workflow.refresh_payload); "
             "assert callable(legacy_workflow.refresh_payload); "
+            "assert get_type_hints(review_context.build_review_context)['options'] is ReviewOptions; "
+            "assert get_type_hints(review_context.build_review_context)['return'] is ReviewPacket; "
+            "assert review_report.build_review_report is review_reporting.build_review_report; "
+            "assert callable(review_context_factory.build_review_context); "
             "print(QUALITY_FINDING_SCHEMA, GATE_MATRIX_SCHEMA, REVIEW_CONTEXT_SCHEMA, 'm6-facades-ok')",
         ],
         check=True,
