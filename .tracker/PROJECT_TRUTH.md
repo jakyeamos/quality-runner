@@ -5,7 +5,7 @@ Last updated: 2026-07-12
 ## Current State
 
 The quality-skills audit contract is hardened on feature branch
-`quality-skills-hardening` at commit `e34c144`. The source-backed user packs
+`quality-skills-hardening` at commit `69e30fc`. The source-backed user packs
 `ui-foundations`, `test-strategy`, `security-privacy`, `release-readiness`,
 `pr-risk`, `data-integrity`, `developer-experience`, and
 `architecture-maintainability` now cover visual and UI-state risks, behavior
@@ -19,6 +19,9 @@ Quality Runner's text scan surface for migration audits. The UI Foundations
 empty-state trigger now requires data-shaped collection identifiers for `.map()`
 matches, avoiding static navigation-list noise while preserving fetch/query
 triggers and agent-review coverage.
+The Architecture and Maintainability compatibility trigger now requires
+code-shaped seam declarations or compatibility terms paired with boundary
+language, avoiding generic documentation/configuration mentions.
 
 ## Next Step
 
