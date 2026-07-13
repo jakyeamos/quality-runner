@@ -5,7 +5,7 @@ Last updated: 2026-07-13
 ## Current State
 
 The quality-skills audit contract is hardened on feature branch
-`quality-security-evidence` at commit `6e93ee0`. Release metadata now agrees on
+`quality-skill-corpus-workflow` at commit `28905ca`. Release metadata now agrees on
 version `0.5.0` across the runtime package, wheel manifest, citation record,
 and release checklist. The source-backed user packs
 `ui-foundations`, `test-strategy`, `security-privacy`, `release-readiness`,
@@ -40,14 +40,17 @@ repo-local gate configuration: Agent Eval's lockfile audit passed, BBDSE's gate
 surfaced real high/critical JavaScript advisories, and Portfolio remains blocked
 before audit execution by its existing interactive `pnpm approve-builds`
 requirement. BBDSE and Portfolio now ignore generated `.quality-runner/cache/`
-trees.
+trees. Personal Quality Skill corpus management now has a versioned
+`quality-runner-corpus.toml` manifest, advisory pack classification, explicit
+append-to-existing-pack with namespaced rule/review ids and `[[sources]]`
+provenance, and additive dry-run-first multi-repository synchronization. Raw
+Markdown skills remain ingest inputs; only validated compiled TOML packs sync.
 
 ## Next Step
 
-Review the pushed Quality Runner feature branch and the three repo-local gate
-branches, then rerun the separate evidence pass and register the selected packs
-in a personal multi-repo configuration. Runtime/browser-dependent skills remain
-deferred.
+Push and review `quality-skill-corpus-workflow`, then create the personal corpus
+manifest and dogfood `skill classify`, `skill append`, and `skill sync` against
+the selected repositories. Runtime/browser-dependent skills remain deferred.
 
 ## Blockers
 
@@ -56,54 +59,14 @@ deferred.
   broad `vulture .` form needs `.quality-runner` excluded after local uv gate
   runs generate ignored dependency-cache code.
 
-Quality Runner is the public, installable quality orchestration package. It owns
-the CLI/MCP workflow for repo inspection, gate evidence, audit generation,
-remediation planning, handoff export, and controller report validation.
-
-Quality Runner now also has DOI-ready software-methods metadata and release
-docs: `CITATION.cff`, `.zenodo.json`, `RESEARCH_READY.md`, and
-`docs/release-notes/v0.3.1-doi.md`.
-
-Version `0.5.0` is the current public release after `0.4.0`. It adds
-fresh-review reports, review state, and review-delta loop controls while
-keeping compatibility surfaces for prior `quality-evidence-contract` and
-`repo-quality-certifier` consumers. Version `0.4.0` added rollout,
-intent/gate-controller semantics, security scanning, quality-skills workflows,
-and unwired-work remediation.
-
-The package also carries compatibility surfaces for earlier extracted quality
-packages when those APIs are still imported by active tools:
-
-- `quality_evidence_contract` remains available for shared evidence and finding
-  schema normalization.
-- `repo_quality_certifier`, `repo-quality-certifier`, and
-  `repo-quality-certifier-mcp` remain available as compatibility surfaces for
-  older gate-certification callers.
-
-New public positioning and new integrations should lead with `quality-runner`.
-
-The README install section now points directly to the live PyPI package page and
-keeps the repository install path as the alternate source-checkout route.
-
-Current package-mining state:
-
-- The `quality-runner` wheel includes `quality_evidence_contract`,
-  `repo_quality_certifier`, both repo-quality-certifier console scripts, and
-  the certifier plugin manifest/skill package data.
-- `quality-runner release-smoke` now verifies compatibility imports,
-  repo-quality-certifier artifact generation, certifier MCP tool metadata, and
-  packaged plugin manifests.
-- Release docs target `v0.5.0` and include post-install checks for the
-  compatibility imports, CLI, MCP, and release smoke before archiving old repos.
-- `quality-runner rollout` is the first-class multi-repo controller workflow
-  for safe sequential refreshes, repo-list parsing, per-repo controller reports,
-  validation artifacts, rollout ledgers, per-repo planning summaries, and
-  fleet remediation phase drafts for all-projects stress passes.
-- AIOS now exposes `aios quality rollout` as a thin launch-and-capture adapter
-  over this workflow; Quality Runner still owns the controller protocol and
-  artifact contract.
+_(9 older entries trimmed)_
 
 Current verification:
+
+- 2026-07-13: Added personal corpus classification, pack append/provenance, and
+  additive multi-repo synchronization in `28905ca`. Full suite passes (`423
+  passed`); touched-file Ruff/format, BasedPyright, and Vulture pass. Full-repo
+  Ruff and BasedPyright retain unrelated baseline findings.
 
 - 2026-07-13: Aligned runtime, plugin, citation, and release-checklist
   metadata on `0.5.0` in `6e93ee0`; focused packaging checks and the full suite
