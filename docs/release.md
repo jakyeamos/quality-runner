@@ -45,7 +45,7 @@ choosing a new version; never reuse a tag, including `v0.5.0`.
 7. Verify the published artifact:
 
    ```bash
-   uv tool upgrade 'quality-runner==0.5.1'
+   uv tool install 'quality-runner==0.5.1' --force
    quality-runner --version
    quality-runner doctor --json
    quality-runner release-smoke --json

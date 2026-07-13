@@ -38,7 +38,7 @@ quality-runner runs /path/to/repo --json
 Agent workflow:
 
 1. Run QR before editing source.
-2. Read `.quality-runner/exports/qr-handoff.md` and the referenced `.quality-runner/runs/<run-id>/` artifacts.
+2. Read `.quality-runner/runs/qr-<date-or-task>/agent-handoff.md` and the referenced artifacts from that run.
 3. Before editing, write or update GSD-style planning artifacts in the target repo.
    Use the repo's existing planning folder if present; otherwise use `.planning/`.
 4. The plan must include phases, batches, evidence, expected touched files,

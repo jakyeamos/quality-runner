@@ -170,7 +170,7 @@ def test_verify_gates_payload_executes_discovered_gates_and_marks_capabilities(
 
     assert payload["schema"] == "quality-runner-verify-gates-result-v0.1"
     assert payload["status"] == "failed"
-    assert verification["schema"] == "quality-runner-gate-verification-v0.1"
+    assert verification["schema"] == "quality-runner-gate-verification-v0.2"
     assert [
         (gate["id"], gate["status"], gate["exit_code"], gate["stderr_tail"])
         for gate in verification["gates"]

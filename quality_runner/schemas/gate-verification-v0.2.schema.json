@@ -1,11 +1,11 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://quality-runner.dev/schemas/gate-verification.schema.json",
-  "title": "Quality Runner Gate Verification",
+  "$id": "https://quality-runner.dev/schemas/gate-verification-v0.2.schema.json",
+  "title": "Quality Runner Gate Verification v0.2",
   "type": "object",
   "required": ["schema", "status", "timeout_seconds", "gates"],
   "properties": {
-    "schema": { "const": "quality-runner-gate-verification-v0.1" },
+    "schema": { "const": "quality-runner-gate-verification-v0.2" },
     "run_id": { "type": "string", "minLength": 1 },
     "status": { "enum": ["passed", "failed", "blocked", "skipped-nonlocal"] },
     "timeout_seconds": { "type": "integer", "minimum": 1 },
@@ -13,6 +13,7 @@
       "type": "object",
       "additionalProperties": { "type": "integer", "minimum": 1 }
     },
+    "execute_discovered_gates": { "type": "boolean" },
     "read_only_gates": { "type": "boolean" },
     "allow_mutating_gates": { "type": "boolean" },
     "failure_type": { "enum": ["workflow-timeout"] },
@@ -35,7 +36,8 @@
         "base_head": { "type": "string", "minLength": 1 },
         "execution_root": { "type": "string", "minLength": 1 },
         "mutations_isolated": { "type": "boolean" },
-        "dirty_source_worktree": { "type": "boolean" }
+        "dirty_source_worktree": { "type": "boolean" },
+        "execution_authorized": { "type": "boolean" }
       },
       "additionalProperties": false
     },
@@ -63,6 +65,7 @@
         "stderr": { "type": "string" },
         "stdout_tail": { "type": "string" },
         "stderr_tail": { "type": "string" },
+        "phase": { "type": "string", "minLength": 1 },
         "reason": { "type": "string", "minLength": 1 },
         "blocked_by": { "type": "string", "minLength": 1 },
         "failure_type": {
@@ -71,12 +74,20 @@
             "timeout",
             "environment-restricted",
             "dependency-setup-blocker",
-            "read-only-mutation"
+            "read-only-mutation",
+            "workflow-timeout"
           ]
         },
-        "skip_type": { "enum": ["mutating-gate-not-run", "dependency-setup-blocked"] },
+        "skip_type": {
+          "enum": [
+            "mutating-gate-not-run",
+            "dependency-setup-blocked",
+            "execution-consent-required"
+          ]
+        },
         "recommended_action": { "type": "string", "minLength": 1 },
         "diagnostics": { "type": "object" },
+        "timeout_diagnostics": { "type": "object" },
         "covered_by": {
           "type": "array",
           "items": { "type": "string", "minLength": 1 }
@@ -105,6 +116,7 @@
         "local_execution_status": {
           "enum": [
             "will-execute",
+            "consent-required",
             "mutating-skipped",
             "ci-only-skipped",
             "evidence-only-skipped",

@@ -23,9 +23,11 @@ uv tool upgrade 'quality-runner==0.5.1'
 ```
 
 No artifact conversion is required. Existing `.quality-runner/` runs remain
-readable by the v1 artifact readers. V2 outcomes are presentation contracts
-derived from the same local evidence; Fresh Review lifecycle files are
-additive. Keep existing evidence in place while you validate the upgrade.
+readable by the v1 artifact readers. Consent-aware gate verification now emits
+`quality-runner-gate-verification-v0.2`; the package retains the v0.1 schema
+and outcome readers accept both versions. V2 outcomes are presentation
+contracts derived from the same local evidence; Fresh Review lifecycle files
+are additive. Keep existing evidence in place while you validate the upgrade.
 
 If a published `0.5.1` needs to be rolled back, preserve the run directory and
 reinstall the prior package:

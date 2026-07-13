@@ -95,7 +95,7 @@ def test_verify_consent_blocked_outcome_preserves_explicit_authorization() -> No
         ),
         repo_root=Path("/repo"),
         verification=_payload(
-            schema="quality-runner-gate-verification-v0.1",
+            schema="quality-runner-gate-verification-v0.2",
             status="blocked",
             timeout_seconds=120,
             execute_discovered_gates=False,

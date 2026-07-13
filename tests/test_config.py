@@ -721,6 +721,7 @@ def test_packaged_schema_files_are_parseable() -> None:
         "capability-matrix.schema.json",
         "package-manager-preflight.schema.json",
         "gate-verification.schema.json",
+        "gate-verification-v0.2.schema.json",
         "quality-audit.schema.json",
         "remediation-plan.schema.json",
         "agent-handoff.schema.json",

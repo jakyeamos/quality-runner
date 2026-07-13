@@ -17,6 +17,10 @@ from quality_runner.core.outcome_contracts import (
     OutcomeState,
     OutcomeWrites,
 )
+from quality_runner.schema_constants import (
+    GATE_VERIFICATION_SCHEMA,
+    LEGACY_GATE_VERIFICATION_SCHEMA,
+)
 
 type LegacyPayload = dict[str, object]
 
@@ -144,7 +148,10 @@ def _execution_details(verification: LegacyPayload | None) -> _ExecutionDetails:
 def _usable_verification(verification: LegacyPayload | None) -> LegacyPayload | None:
     if verification is None:
         return None
-    if verification.get("schema") != "quality-runner-gate-verification-v0.1":
+    if verification.get("schema") not in {
+        LEGACY_GATE_VERIFICATION_SCHEMA,
+        GATE_VERIFICATION_SCHEMA,
+    }:
         return None
     status = verification.get("status")
     if status not in {"passed", "failed", "blocked", "skipped-nonlocal"}:
