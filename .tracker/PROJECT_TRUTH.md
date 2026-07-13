@@ -31,13 +31,16 @@ outcome-first, with an explicit stderr-noticed v1 projection through 0.7.x;
 the MCP v1 tool remains a separate compatibility surface. `633b96e` records
 candidate-aware upgrade, rollback, release, and sensitive-artifact guidance.
 `dc09ec0` proves that a default v2 Review run still persists v1-readable
-context, manifest, and report artifacts.
+context, manifest, and report artifacts. `9fcea7d` restores legacy positional
+workflow slots, freezes the published v1 Review field shape, and re-exports the
+public `ReviewFinding` type while retaining explicit v2 next-action guidance.
 
 ## Current Position
 
 - Target: a typed v2 core behind CLI, MCP, and compatibility adapters.
-- Next implementation slice: run the final locked validation, built-wheel
-  smoke, and adversarial review for M7 completion.
+- Next implementation slice: close final security-evidence and release-pipeline
+  findings, then run locked validation, built-wheel smoke, and adversarial
+  review for M7 completion.
 - Canonical planning documents: `docs/modernization/`.
 - Public compatibility: retain `quality_evidence_contract` and
   `repo_quality_certifier` during a published transition window.
@@ -76,6 +79,9 @@ context, manifest, and report artifacts.
 
 ## Recent Progress
 
+- 2026-07-13: `9fcea7d` restored positional workflow compatibility, the frozen
+  Review v1 field shape, and the `ReviewFinding` facade without weakening the
+  default v2 packet-ready outcome.
 - 2026-07-13: M7 compatibility regression in `dc09ec0`: default Review
   outcomes retain v1-readable persisted artifacts for downgrade safety.
 - 2026-07-13: M7 guidance in `633b96e`: canonical upgrade/rollback policy,

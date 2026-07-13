@@ -41,7 +41,8 @@ hardening.
 - M7 — release hardening: in progress; its first confidentiality slice is
   complete in `113f143` and reproducible distribution evidence is complete in
   `66ce3ef`; Fresh Review v2 is now the default in `32e7b26`, with release and
-  rollback guidance in `633b96e`
+  rollback guidance in `633b96e`; `9fcea7d` restores the published positional
+  and Review v1 compatibility shapes
 
 ## Active Phase
 
@@ -71,11 +72,16 @@ hardening.
 
 ## Next Step
 
-Run the full locked validation ladder, build and smoke the distribution, perform
-an adversarial review, then record M7 completion and push the branch.
+Finish the security-evidence and release-pipeline review fixes, then run the
+full locked validation ladder, build and smoke the distribution, record M7
+completion, and push the branch.
 
 ## Recent Progress
 
+- 2026-07-13: M7 contract repair in `9fcea7d`: public positional verification
+  and refresh slots are stable, Review v1 output/artifacts retain their frozen
+  field shape, and the `ReviewFinding` façade is restored while default v2
+  outcomes keep their explicit next action.
 - 2026-07-13: M7 compatibility regression in `dc09ec0`: a default Review
   outcome's persisted context, manifest, and report still round-trip through
   the v1 readers.
