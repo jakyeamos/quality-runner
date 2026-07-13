@@ -47,14 +47,17 @@ Independent post-M7 review found four P2 release blockers. `bf6c9e7` closes
 the source-evidence redaction bypasses for typed, commented, and expression
 assignments. `b4b5e6e` preserves the v0.1 gate schema, emits the consent-aware
 v0.2 artifact, and repairs the packaged skill and clean-install release path.
-The branch remains unmerged pending full validation and a focused follow-up
-review.
+`141635e` completes the focused source-evidence hardening with lexical context
+for private fields, malformed syntax, computed logging, and tokenless values.
+The full validation suite and two independent follow-up reviews are clean. The
+branch remains unmerged and ready for a user-authorized merge.
 
 ## Current Position
 
 - Target: a typed v2 core behind CLI, MCP, and compatibility adapters.
-- Next implementation slice: repeat the release gate and focused follow-up
-  review, then fast-forward merge only when no P0/P1/P2 findings remain.
+- Next implementation slice: merge `codex/gpt56-modernization` only when the
+  user authorizes it; no P0/P1/P2 findings remain from the release gate or
+  focused follow-up reviews.
 - Canonical planning documents: `docs/modernization/`.
 - Public compatibility: retain `quality_evidence_contract` and
   `repo_quality_certifier` during a published transition window.
@@ -71,10 +74,9 @@ review.
 
 ## Baseline Quality
 
-- The M7 full 533-test pytest suite, Ruff lint/format, Basedpyright, Vulture,
-  lock validation, YAML validation, package build, and release smoke passed.
-  The post-review 87-test security, schema, compatibility, workflow, and
-  documentation suite passes; full release validation remains required.
+- `141635e` passes the full 554-test pytest suite, Ruff lint/format,
+  Basedpyright, Vulture, lock validation, and diff check. The two independent
+  source-evidence reviews report no remaining P0/P1/P2 findings.
 - Basedpyright reports zero errors; audit, review, verify, and run history now
   have a versioned v2 outcome contract behind preserved v1 projections.
 - Release smoke now checks package/runtime/plugin parity and the release
@@ -93,6 +95,9 @@ review.
 
 ## Recent Progress
 
+- 2026-07-13: `141635e` closes the focused source-evidence follow-up with
+  lexer-backed private-field, malformed-syntax, computed-log, and tokenless
+  value protection; 554 tests and two independent reviews are clean.
 - 2026-07-13: Independent merge review found four P2s. `bf6c9e7` closes
   typed/commented/expression source-evidence gaps; `b4b5e6e` preserves v0.1,
   emits v0.2 consent-aware gates, and corrects skill/release instructions.
@@ -129,9 +134,3 @@ review.
 - 2026-07-12: Completed M3 on `codex/gpt56-modernization` (`8705cc1`): typed
   verification service and v1 artifact renderer, minimal inherited environment,
   disposable-worktree recovery, timeout schema alignment, and 454 passing tests.
-- 2026-07-12: Completed M2 on `codex/gpt56-modernization` (`3f23204`): typed
-  audit contracts and use case, v1 artifact rendering, shared bounded scan
-  scopes, preserved CLI/MCP projections, and route-surface regressions covered.
-- 2026-07-12: Completed M1 on `codex/gpt56-modernization` (`cb12746`): strict
-  review core/application contracts, fixed v1 baseline fixtures, closed-schema
-  readers, and public typed compatibility adapters.

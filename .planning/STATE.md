@@ -3,7 +3,7 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: GPT-5.6 modernization
 status: complete
-last_updated: "2026-07-13T03:53:09Z"
+last_updated: "2026-07-13T16:58:09Z"
 progress:
   total_phases: 8
   completed_phases: 8
@@ -37,18 +37,18 @@ they authorize repository changes.
 - M5 — make Fresh Review operationally honest: complete in `f5c8610`
 - M6 — isolate compatibility and retire duplicate foundations: complete in
   `0b5ac2e` and `56c94d4`
-- M7 — release hardening: complete in `279cc8a`; source-evidence redaction now
-  covers same-line, multiline, typed, concatenated, and template-literal values,
-  while CI/release smoke a built wheel's default v2, frozen v1, and MCP outcome
-  paths.
+- M7 — release hardening: complete in `279cc8a`; `141635e` adds lexical
+  source-evidence protection for private fields, malformed syntax, computed
+  logs, and tokenless values. Full validation and independent reviews are clean.
 
 ## Active Phase
 
 - **Phase:** M7
 - **Slug:** release-hardening
 - **Status:** Complete
-- **Completion gate:** passed with 533 tests, locked static checks, a built
-  0.5.1 wheel, release smoke, default/v1 CLI review, and MCP outcome smoke.
+- **Completion gate:** `141635e` passes 554 tests, lock validation, Ruff,
+  Basedpyright, Vulture, and diff checks; independent follow-up reviews have no
+  P0/P1/P2 findings.
 
 ## Key Decisions
 
@@ -70,11 +70,14 @@ they authorize repository changes.
 
 ## Next Step
 
-Run independent branch review and merge `codex/gpt56-modernization`; tag only
-after the release commit is reachable from `main`.
+Merge `codex/gpt56-modernization` when authorized; tag only after the release
+commit is reachable from `main`.
 
 ## Recent Progress
 
+- 2026-07-13: `141635e` closes the source-evidence follow-up: lexer-backed
+  redaction protects private fields, malformed syntax, computed logs, and
+  tokenless values; 554 tests and two independent reviews are clean.
 - 2026-07-13: M7 completed in `279cc8a`: final redaction hardening covers
   multiline typed, concatenated, and template literals across code-quality,
   excerpts, and security candidates; built-wheel MCP execution is smoke-tested.
@@ -112,5 +115,3 @@ after the release commit is reachable from `main`.
   records truthful lifecycle/handoff evidence; 515 tests and release checks pass.
 - 2026-07-12: M4 `75d8ac4` completed; additive v2 audit/review/verify/runs outcomes, MCP tools, truthful safety projection, and full validation passed.
 - 2026-07-12: M3 `8705cc1` completed; typed verification service, v1 artifacts, disposable cleanup, minimal environment, and full validation passed.
-- 2026-07-12: M2 `3f23204` completed; typed audit, v1 artifacts, shared scopes, and compatibility validation passed.
-- 2026-07-12: M1 `cb12746` completed; typed review contracts and v1 projections passed full validation.
