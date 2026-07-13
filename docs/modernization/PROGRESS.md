@@ -2,7 +2,7 @@
 
 ## Current state
 
-M0 through M5 are implemented and M6 is in progress on the protected branch
+M0 through M6 are implemented on the protected branch
 `codex/gpt56-modernization`, based on `main` commit `0a3def1`. The branch
 remains isolated until review and merge.
 
@@ -108,6 +108,9 @@ changing installed surfaces:
   services do not parse CLI or MCP arguments;
 - internal CLI/MCP callers use application services directly, and static plus
   installed-wheel tests lock the import direction and public façade identities.
+- M6 completes in `56c94d4`: packet construction and report normalization now
+  have application owners; root review façades retain v1 type annotations,
+  artifact-dir injection, direct-combined packet semantics, and wheel imports.
 
 ## Decisions in force
 
@@ -123,12 +126,11 @@ changing installed surfaces:
 
 ## Quality status
 
-- The full `pytest` suite passes (518 tests); Basedpyright reports zero errors.
+- The full `pytest` suite passes (520 tests); Basedpyright reports zero errors.
 - Ruff lint/format, Vulture, a fresh package build, and
   `quality-runner release-smoke --json` pass.
 
 ## Next milestone
 
-Finish M6 by moving review-context construction behind a narrow compatibility
-adapter while preserving direct combined v1 semantics and all installed package,
-CLI, MCP, and artifact compatibility surfaces.
+M7 establishes repeatable built-distribution release evidence, explicit upgrade
+and rollback guidance, deprecation notices, and operational troubleshooting.

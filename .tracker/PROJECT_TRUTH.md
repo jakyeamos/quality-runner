@@ -21,13 +21,15 @@ handoffs, and truthful artifact/outcome reporting. The branch is an unreleased
 0.5.1 candidate; no tag or package publication has occurred. M6 began in
 `0b5ac2e`: application-owned audit, verification, and journey services now sit
 behind explicit workflow and outcome façades, with installed-wheel facade
-checks. The remaining M6 slice is the review-context compatibility inversion.
+checks. M6 completes in `56c94d4`: packet construction and report normalization
+now have application owners, while root review façades retain their v1 type and
+direct-combined compatibility contracts. M7 release hardening is next.
 
 ## Current Position
 
 - Target: a typed v2 core behind CLI, MCP, and compatibility adapters.
-- M6 is in progress: finish review-context compatibility inversion and retire
-  duplicate foundations without breaking installed public surfaces.
+- Next implementation slice: M7 — make release, cutover, rollback, and
+  operational evidence reproducible from the built distribution.
 - Canonical planning documents: `docs/modernization/`.
 - Public compatibility: retain `quality_evidence_contract` and
   `repo_quality_certifier` during a published transition window.
@@ -42,7 +44,7 @@ checks. The remaining M6 slice is the review-context compatibility inversion.
 
 ## Baseline Quality
 
-- The full 518-test pytest suite, Ruff lint/format, Basedpyright, Vulture,
+- The full 520-test pytest suite, Ruff lint/format, Basedpyright, Vulture,
   package build, and release smoke pass.
 - Basedpyright reports zero errors; audit, review, verify, and run history now
   have a versioned v2 outcome contract behind preserved v1 projections.
@@ -51,8 +53,8 @@ checks. The remaining M6 slice is the review-context compatibility inversion.
 
 ## Risks
 
-- M6 must finish the review-context inversion without breaking direct combined
-  packet semantics, package, CLI, MCP, or compatibility imports.
+- M7 must keep public v1 readers and rollback guidance accurate while any v2
+  default or deprecation policy is documented.
 - Existing large-file warnings remain in `repo_quality_certifier/core.py` and
   `tests/test_cli.py`.
 - User-authored gate commands remain arbitrary code; M0 requires explicit
@@ -62,9 +64,9 @@ checks. The remaining M6 slice is the review-context compatibility inversion.
 
 ## Recent Progress
 
-- 2026-07-13: M6 first consolidation on `codex/gpt56-modernization` (`0b5ac2e`):
-  application-owned audit/verification/journey services, explicit workflow and
-  MCP compatibility façades, installed-wheel checks, and 518 passing tests.
+- 2026-07-13: Completed M6 on `codex/gpt56-modernization` (`0b5ac2e`,
+  `56c94d4`): application-owned workflow/outcome/packet/report paths, typed
+  root façades, built-wheel compatibility, 520 passing tests, and clean reviews.
 - 2026-07-13: Completed M5 on `codex/gpt56-modernization` (`f5c8610`):
   packet-bound response validation, combined-context isolation, lifecycle locks,
   strict handoffs, and truthful v2 artifact paths; 515 tests and release checks pass.

@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: GPT-5.6 modernization
 status: active
-last_updated: "2026-07-13T01:30:12Z"
+last_updated: "2026-07-13T01:46:51Z"
 progress:
   total_phases: 8
-  completed_phases: 6
+  completed_phases: 7
   total_plans: 8
-  completed_plans: 6
-  percent: 75
+  completed_plans: 7
+  percent: 88
 ---
 
 # Planning State
@@ -22,8 +22,8 @@ See `.planning/PROJECT.md` for the established product boundary and
 **Core value:** Give developers and agents trustworthy local evidence before
 they authorize repository changes.
 
-**Current focus:** M6 — consolidate the remaining review compatibility factories
-and retire duplicate foundations.
+**Current focus:** M7 — release readiness, cutover guidance, and operational
+hardening.
 
 ## Current Position
 
@@ -36,15 +36,17 @@ and retire duplicate foundations.
 - M3 — migrate verification workflow: complete in `8705cc1`
 - M4 — deliver journey-led CLI and MCP outcomes: complete in `75d8ac4`
 - M5 — make Fresh Review operationally honest: complete in `f5c8610`
-- M6 — workflow and journey compatibility consolidation: in progress from `0b5ac2e`
+- M6 — isolate compatibility and retire duplicate foundations: complete in
+  `0b5ac2e` and `56c94d4`
+- Implementation: M7 next
 
 ## Active Phase
 
-- **Phase:** M6
-- **Slug:** compatibility-isolation
+- **Phase:** M7
+- **Slug:** release-hardening
 - **Status:** In progress
-- **Completion gate:** legacy projections are explicit adapters and duplicate
-  foundations are retired without changing installed compatibility surfaces.
+- **Completion gate:** release, cutover, and rollback evidence is reproducible
+  from a built distribution and published guidance reflects actual behavior.
 
 ## Key Decisions
 
@@ -66,14 +68,14 @@ and retire duplicate foundations.
 
 ## Next Step
 
-Extract the application-owned review context factory while preserving direct
-combined v1 packet semantics and installed compatibility imports.
+Map the release, upgrade, deprecation, and operational documentation gaps
+against the built-wheel behavior, then implement the smallest complete M7 slice.
 
 ## Recent Progress
 
-- 2026-07-13: M6 `0b5ac2e` moved audit, verification, and journey execution
-  behind explicit façades; wheel compatibility, full 518-test validation, and
-  three independent reviews passed. Review-factory inversion remains.
+- 2026-07-13: M6 completed in `0b5ac2e` and `56c94d4`: application owns
+  workflow, outcome, packet, and report execution; root façades preserve v1
+  behavior; 520 tests, wheel, smoke, and three reviews passed.
 - 2026-07-13: M5 `f5c8610` completed; two-phase Fresh Review now validates
   packet-bound responses, preserves v1 paths, isolates combined packets, and
   records truthful lifecycle/handoff evidence; 515 tests and release checks pass.
