@@ -2,12 +2,19 @@ from __future__ import annotations
 
 import argparse
 import json
-import platform
 import sys
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
-from quality_runner import __version__
+from quality_runner.application.audit_workflows import inspect_payload, run_payload
+from quality_runner.application.journey_outcomes import (
+    audit_journey_outcome,
+    review_journey_outcome,
+    runs_journey_outcome,
+    verify_journey_outcome,
+)
+from quality_runner.application.outcome_projection import LegacyPayload
+from quality_runner.application.verification_workflows import verify_gates_payload
 from quality_runner.cli_controller_reports import (
     controller_report_command_payload,
     controller_report_from_summary_payload,
@@ -21,20 +28,19 @@ from quality_runner.cli_gate import (
 )
 from quality_runner.cli_handoff import handoff_command_payload
 from quality_runner.cli_refresh import refresh_command_payload
-from quality_runner.cli_rollout import rollout_command_payload
 from quality_runner.cli_review import review_command_payload
+from quality_runner.cli_rollout import rollout_command_payload
 from quality_runner.cli_skills import skill_command_payload
 from quality_runner.cli_status import export_handoff_payload, status_payload
 from quality_runner.code_quality import preview_ignored_paths
 from quality_runner.config import CONFIG_FILE_NAME, load_repo_config
 from quality_runner.controller_reports import validate_controller_report
+from quality_runner.doctor_contract import doctor_payload
 from quality_runner.intent import workflow_intent_from_cli_args
 from quality_runner.release_smoke import release_smoke_payload
 from quality_runner.run_summary import build_run_summary
-from quality_runner.workflow import inspect_payload, run_payload, verify_gates_payload
 from quality_runner.workflow_skills import load_skill_review_report_json
 
-DOCTOR_RESULT_SCHEMA = "quality-runner-doctor-result-v0.1"
 INIT_RESULT_SCHEMA = "quality-runner-init-result-v0.1"
 EXPENSIVE_IGNORED_PATH_TEXT_FILE_THRESHOLD = 100
 EXPENSIVE_IGNORED_PATH_SECONDS_THRESHOLD = 5.0
@@ -43,7 +49,7 @@ MAX_INTERACTIVE_IGNORED_PATHS = 10
 
 def payload_for_args(args: argparse.Namespace) -> dict[str, Any]:
     if args.command == "doctor":
-        return _doctor_payload()
+        return doctor_payload(include_environment=True)
     if args.command == "release-smoke":
         from quality_runner.cli import build_parser
 
@@ -60,6 +66,14 @@ def payload_for_args(args: argparse.Namespace) -> dict[str, Any]:
         )
     if args.command == "status":
         return status_payload(repo_root=_validated_repo_path(args.repo_path))
+    if args.command == "runs":
+        return _result_payload(
+            runs_journey_outcome(
+                repo_root=_validated_repo_path(args.repo_path),
+                run_id=args.run_id,
+                limit=args.limit,
+            )
+        )
     if args.command == "summarize-run":
         repo_root = _validated_repo_path(args.repo_path)
         summary = build_run_summary(
@@ -80,7 +94,7 @@ def payload_for_args(args: argparse.Namespace) -> dict[str, Any]:
         return export_handoff_payload(
             repo_root=_validated_repo_path(args.repo_path),
             run_id=args.run_id,
-            output_path=Path(args.output).expanduser().resolve() if args.output else None,
+            output_path=Path(args.output).expanduser() if args.output else None,
         )
     if args.command in {"validate-skill-review", "skill"}:
         return skill_command_payload(args, validated_repo_path=_validated_repo_path)
@@ -97,6 +111,23 @@ def payload_for_args(args: argparse.Namespace) -> dict[str, Any]:
             checkout_most_advanced_branch=args.checkout_most_advanced_branch,
             skill_review_report=_optional_skill_review_report(args),
             intent=workflow_intent_from_cli_args(args, repo_root=repo_root, run_id=args.run_id),
+        )
+    if args.command == "audit":
+        repo_root = _validated_repo_path(args.repo_path)
+        return _result_payload(
+            audit_journey_outcome(
+                repo_root=repo_root,
+                run_id=args.run_id,
+                profile=args.profile,
+                ci_status_json=Path(args.ci_status_json) if args.ci_status_json else None,
+                include_ignored_paths=_interactive_include_ignored_paths(args, repo_root),
+                checkout_most_advanced_branch=args.checkout_most_advanced_branch,
+                skill_review_report=_legacy_payload(_optional_skill_review_report(args)),
+                intent=_legacy_payload(
+                    workflow_intent_from_cli_args(args, repo_root=repo_root, run_id=args.run_id)
+                ),
+                inspect_only=args.inspect_only,
+            )
         )
     if args.command == "inspect":
         repo_root = _validated_repo_path(args.repo_path)
@@ -119,6 +150,7 @@ def payload_for_args(args: argparse.Namespace) -> dict[str, Any]:
             ci_status_json=Path(args.ci_status_json) if args.ci_status_json else None,
             timeout_seconds=args.timeout_seconds,
             checkout_most_advanced_branch=args.checkout_most_advanced_branch,
+            execute_discovered_gates=getattr(args, "execute_gates", False),
             read_only_gates=args.read_only_gates,
             allow_mutating_gates=args.allow_mutating_gates,
             worktree_mode=args.worktree_mode,
@@ -126,12 +158,47 @@ def payload_for_args(args: argparse.Namespace) -> dict[str, Any]:
             skill_review_report=_optional_skill_review_report(args),
             intent=workflow_intent_from_cli_args(args, repo_root=repo_root, run_id=args.run_id),
         )
+    if args.command == "verify":
+        repo_root = _validated_repo_path(args.repo_path)
+        return _result_payload(
+            verify_journey_outcome(
+                repo_root=repo_root,
+                run_id=args.run_id,
+                profile=args.profile,
+                ci_status_json=Path(args.ci_status_json) if args.ci_status_json else None,
+                timeout_seconds=args.timeout_seconds,
+                checkout_most_advanced_branch=args.checkout_most_advanced_branch,
+                execute_discovered_gates=args.execute_gates,
+                read_only_gates=args.read_only_gates,
+                allow_mutating_gates=args.allow_mutating_gates,
+                worktree_mode=args.worktree_mode,
+                allow_dirty_worktree_verify=args.allow_dirty_worktree_verify,
+                skill_review_report=_legacy_payload(_optional_skill_review_report(args)),
+                intent=_legacy_payload(
+                    workflow_intent_from_cli_args(args, repo_root=repo_root, run_id=args.run_id)
+                ),
+            )
+        )
     if args.command == "refresh":
         return refresh_command_payload(args, _validated_repo_path(args.repo_path))
     if args.command == "rollout":
         return rollout_command_payload(args)
     if args.command == "review":
-        return review_command_payload(args, _validated_repo_path(args.repo_path))
+        repo_root = _validated_repo_path(args.repo_path)
+        legacy_output = bool(getattr(args, "legacy_output", False))
+        if legacy_output and bool(getattr(args, "outcome", False)):
+            raise ValueError("--outcome and --legacy-output cannot be combined")
+        payload = review_command_payload(
+            args,
+            repo_root,
+            include_extended_artifacts=not legacy_output,
+            strict_v1=legacy_output,
+        )
+        if legacy_output:
+            return payload
+        return _result_payload(
+            review_journey_outcome(cast(LegacyPayload, payload), repo_root=repo_root)
+        )
     if args.command == "gate":
         return gate_command_payload(args, repo_root=_validated_repo_path(args.repo_path))
     if args.command == "gate-status":
@@ -148,21 +215,6 @@ def payload_for_args(args: argparse.Namespace) -> dict[str, Any]:
     if args.command == "propose-fix":
         return propose_fix_command_payload(args, repo_root=_validated_repo_path(args.repo_path))
     raise ValueError(f"unsupported command: {args.command}")
-
-
-def _doctor_payload() -> dict[str, Any]:
-    return {
-        "schema": DOCTOR_RESULT_SCHEMA,
-        "status": "ready",
-        "version": __version__,
-        "implementation_allowed": False,
-        "environment": {
-            "cwd": str(Path.cwd()),
-            "platform": platform.platform(),
-            "python_executable": sys.executable,
-            "python_version": platform.python_version(),
-        },
-    }
 
 
 def _init_payload(
@@ -197,6 +249,14 @@ def _optional_skill_review_report(args: argparse.Namespace) -> dict[str, Any] | 
     if not report_path:
         return None
     return load_skill_review_report_json(Path(report_path).expanduser().resolve())
+
+
+def _legacy_payload(payload: dict[str, Any] | None) -> LegacyPayload | None:
+    return cast(LegacyPayload | None, payload)
+
+
+def _result_payload(payload: object) -> dict[str, Any]:
+    return cast(dict[str, Any], payload)
 
 
 def _validated_repo_path(repo_path: str) -> Path:

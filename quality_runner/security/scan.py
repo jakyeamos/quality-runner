@@ -3,9 +3,10 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from quality_runner.code_quality import _discover_text_files
 from quality_runner.code_quality_paths import _split_lines
+from quality_runner.core.audit_contracts import AuditPayload, TextScanScope
 from quality_runner.scan_exclusions import gitignore_scan_exclusions, resolve_scan_exclusions
+from quality_runner.scan_scope import discover_text_files
 from quality_runner.schema_constants import SECURITY_SCAN_SCHEMA
 from quality_runner.security.agent_gates import build_agent_review_gates
 from quality_runner.security.candidates import scan_security_candidates, taxonomy_payload
@@ -14,15 +15,7 @@ from quality_runner.security.capabilities import (
     merge_security_capabilities,
 )
 from quality_runner.security.config import security_settings
-
-API_ROUTE_MARKERS = (
-    "app/api/",
-    "pages/api/",
-    "src/routes/",
-    "routes/api/",
-    "api/",
-)
-WEBHOOK_MARKERS = ("webhook", "webhooks")
+from quality_runner.security_surface_paths import is_api_route_path, is_webhook_path
 
 
 def create_security_scan(
@@ -31,6 +24,7 @@ def create_security_scan(
     scan: dict[str, Any],
     config: dict[str, Any],
     standards_packet: dict[str, Any] | None = None,
+    text_scan_scope: TextScanScope | None = None,
 ) -> dict[str, Any]:
     root = repo_root.expanduser().resolve()
     settings = security_settings(config)
@@ -38,8 +32,13 @@ def create_security_scan(
         return _disabled_security_scan(scan=scan, repo_root=root)
 
     standards = standards_packet or {}
-    surfaces = detect_security_surfaces(root, scan=scan)
-    scanned_files = _scan_files(root, scan=scan, config=config)
+    surfaces = detect_security_surfaces(root, scan=scan, text_scan_scope=text_scan_scope)
+    scanned_files = _scan_files(
+        root,
+        scan=scan,
+        config=config,
+        text_scan_scope=text_scan_scope,
+    )
     disabled_groups = settings["disabled_rule_groups"]
     candidates = scan_security_candidates(
         scanned_files=scanned_files,
@@ -102,7 +101,12 @@ def merge_security_into_capability_map(
     )
 
 
-def detect_security_surfaces(repo_root: Path, *, scan: dict[str, Any]) -> dict[str, bool]:
+def detect_security_surfaces(
+    repo_root: Path,
+    *,
+    scan: dict[str, Any],
+    text_scan_scope: TextScanScope | None = None,
+) -> dict[str, bool]:
     surfaces = {
         "api_routes": False,
         "webhooks": False,
@@ -110,20 +114,19 @@ def detect_security_surfaces(repo_root: Path, *, scan: dict[str, Any]) -> dict[s
         "dangerous_sinks": False,
         "client_framework": False,
     }
-    for path in repo_root.rglob("*"):
-        if not path.is_file():
-            continue
-        relative = path.relative_to(repo_root).as_posix()
-        if any(part.startswith(".") for part in path.parts) and (
-            ".quality-runner" in path.parts or ".git" in path.parts
-        ):
-            continue
-        if any(marker in relative for marker in API_ROUTE_MARKERS):
-            surfaces["api_routes"] = True
-        if any(marker in relative.lower() for marker in WEBHOOK_MARKERS):
-            surfaces["webhooks"] = True
-        if path.name in {"package.json", "pyproject.toml", "Cargo.toml", "go.mod"}:
-            surfaces["dependency_manifest"] = True
+    if text_scan_scope is not None:
+        for relative_path in text_scan_scope.security_surface_paths:
+            _record_security_surface(surfaces, relative_path, Path(relative_path).name)
+    else:
+        for path in repo_root.rglob("*"):
+            if not path.is_file():
+                continue
+            relative = path.relative_to(repo_root).as_posix()
+            if any(part.startswith(".") for part in path.parts) and (
+                ".quality-runner" in path.parts or ".git" in path.parts
+            ):
+                continue
+            _record_security_surface(surfaces, relative, path.name)
 
     languages = scan.get("languages")
     if isinstance(languages, list) and "javascript" in languages:
@@ -136,7 +139,14 @@ def _scan_files(
     *,
     scan: dict[str, Any],
     config: dict[str, Any],
+    text_scan_scope: TextScanScope | None,
 ) -> list[dict[str, Any]]:
+    if text_scan_scope is not None:
+        return [
+            {"path": file_info.path, "text": file_info.text, "lines": file_info.lines}
+            for file_info in text_scan_scope.files
+        ]
+
     scan_exclusions = [
         *resolve_scan_exclusions(config),
         *gitignore_scan_exclusions(repo_root),
@@ -151,19 +161,19 @@ def _scan_files(
     generated = scan.get("generated_code")
     if isinstance(generated, list):
         generated_paths = {item for item in generated if isinstance(item, str)}
-    skipped_files: list[dict[str, Any]] = []
+    skipped_files: list[AuditPayload] = []
     max_text_files = 5000
     if isinstance(structural, dict) and isinstance(structural.get("max_text_files"), int):
         max_text_files = structural["max_text_files"]
 
     scanned: list[dict[str, Any]] = []
-    for path in _discover_text_files(
+    for path in discover_text_files(
         repo_root,
-        skipped_files,
-        generated_paths,
-        include_ignored_paths,
-        scan_exclusions,
-        max_text_files,
+        skipped_files=skipped_files,
+        generated_paths=generated_paths,
+        include_ignored_paths=include_ignored_paths,
+        scan_exclusions=scan_exclusions,
+        max_text_files=max_text_files,
     ):
         relative_path = path.relative_to(repo_root).as_posix()
         try:
@@ -178,6 +188,19 @@ def _scan_files(
             }
         )
     return scanned
+
+
+def _record_security_surface(
+    surfaces: dict[str, bool],
+    relative_path: str,
+    file_name: str,
+) -> None:
+    if is_api_route_path(relative_path):
+        surfaces["api_routes"] = True
+    if is_webhook_path(relative_path):
+        surfaces["webhooks"] = True
+    if file_name in {"package.json", "pyproject.toml", "Cargo.toml", "go.mod"}:
+        surfaces["dependency_manifest"] = True
 
 
 def _disabled_security_scan(*, scan: dict[str, Any], repo_root: Path) -> dict[str, Any]:

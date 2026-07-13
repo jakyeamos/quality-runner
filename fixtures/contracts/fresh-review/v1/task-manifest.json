@@ -1,0 +1,34 @@
+{
+  "schema": "quality-runner-review-manifest-v0.1",
+  "run_id": "golden-task",
+  "mode": "task",
+  "scope": "task",
+  "breadth": "focused",
+  "exclusions": [
+    "generated"
+  ],
+  "evidence_references": [
+    {
+      "path": "quality_runner/review_context.py",
+      "kind": "file",
+      "available": true,
+      "note": ""
+    }
+  ],
+  "freshness": {
+    "new_invocation_required": true,
+    "prior_review_context_included": false,
+    "previous_agent_summary_included": true,
+    "hidden_reasoning_included": false,
+    "active_cycle": false
+  },
+  "input_hashes": {
+    "packet": "packet-task-hash",
+    "task": "task-hash"
+  },
+  "artifact_paths": {
+    "review_context_json": "/workspace/quality-runner/.quality-runner/runs/golden-task/review-context.json",
+    "review_manifest_json": "/workspace/quality-runner/.quality-runner/runs/golden-task/review-manifest.json",
+    "review_report_json": "/workspace/quality-runner/.quality-runner/runs/golden-task/review-report.json"
+  }
+}

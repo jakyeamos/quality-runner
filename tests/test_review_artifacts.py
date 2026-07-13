@@ -62,7 +62,7 @@ def test_persist_review_artifacts_writes_canonical_json_and_markdown(tmp_path: P
         "review_agent_packet_md",
         "review_fix_prompts_md",
     }
-    assert json.loads((run_dir / "review-report.json").read_text()) ["severity_counts"]["high"] == 1
+    assert json.loads((run_dir / "review-report.json").read_text())["severity_counts"]["high"] == 1
     markdown = (run_dir / "review-report.md").read_text()
     assert "Review complete: 0 critical, 1 high, 0 medium issues found." in markdown
     assert "## Suspected issues" in markdown

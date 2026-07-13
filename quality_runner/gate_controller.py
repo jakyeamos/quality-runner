@@ -6,7 +6,12 @@ from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
-from quality_runner.artifacts import artifact_dir, write_json
+from quality_runner.artifacts import (
+    artifact_text_file,
+    existing_artifact_dir,
+    safe_child_file,
+    write_json,
+)
 from quality_runner.gate_resolution_bridge import (
     apply_record_disposition,
     enrich_record_disposition_response,
@@ -39,7 +44,14 @@ def generated_gate_run_id(now: datetime | None = None) -> str:
 
 def gate_run_dir(repo_root: Path, gate_run_id: str) -> Path:
     _validate_gate_run_id(gate_run_id)
-    return repo_root.expanduser().resolve() / ".quality-runner" / "gate-runs" / gate_run_id
+    current = repo_root.expanduser().resolve()
+    for segment in (".quality-runner", "gate-runs", gate_run_id):
+        current = current / segment
+        if current.is_symlink():
+            raise ValueError("gate run path component must not be a symlink")
+        if current.exists() and not current.is_dir():
+            raise ValueError("gate run path component must be a directory")
+    return current
 
 
 def create_gate_run(
@@ -53,13 +65,13 @@ def create_gate_run(
 ) -> dict[str, Any]:
     resolved_run_id = run_id.strip()
     resolved_gate_run_id = gate_run_id or generated_gate_run_id()
-    run_dir = artifact_dir(repo_root, resolved_run_id)
-    if not run_dir.exists():
-        raise FileNotFoundError(f"run does not exist: {resolved_run_id}")
-
-    handoff_path = run_dir / "agent-handoff.json"
-    if not handoff_path.exists():
-        raise FileNotFoundError(f"agent handoff does not exist for run: {resolved_run_id}")
+    try:
+        run_dir = existing_artifact_dir(repo_root, resolved_run_id)
+        handoff_path = artifact_text_file(repo_root, resolved_run_id, "agent-handoff.json")
+    except FileNotFoundError as error:
+        raise FileNotFoundError(
+            f"run or agent handoff does not exist: {resolved_run_id}"
+        ) from error
 
     active_gate_run_id = find_active_gate_run_id(repo_root=repo_root, run_id=resolved_run_id)
     if active_gate_run_id is not None and active_gate_run_id != resolved_gate_run_id:
@@ -75,7 +87,9 @@ def create_gate_run(
     )
     lifecycle_status = _lifecycle_status(handoff, summary)
     handoff_status = handoff.get("status") if isinstance(handoff.get("status"), str) else None
-    phase = "post-verify" if (run_dir / "gate-verification.json").exists() else "post-run"
+    phase = (
+        "post-verify" if safe_child_file(run_dir, "gate-verification.json").exists() else "post-run"
+    )
     awaiting = _derive_awaiting(handoff=handoff, lifecycle_status=lifecycle_status)
     status = "ready-to-proceed" if awaiting is None else "awaiting-response"
     now = datetime.now(UTC).isoformat()
@@ -107,7 +121,7 @@ def create_gate_run(
         "updated_at": now,
         "last_response_at": None,
     }
-    write_json(gate_dir / "gate-run.json", gate_run)
+    write_json(safe_child_file(gate_dir, "gate-run.json"), gate_run)
     return gate_run_payload(gate_run)
 
 
@@ -195,7 +209,7 @@ def record_gate_response(
         gate_run["awaiting"] = None
 
     gate_dir = gate_run_dir(repo_root, gate_run_id)
-    write_json(gate_dir / "gate-run.json", gate_run)
+    write_json(safe_child_file(gate_dir, "gate-run.json"), gate_run)
 
     return {
         "schema": GATE_RESPOND_RESULT_SCHEMA,
@@ -208,9 +222,10 @@ def record_gate_response(
 
 
 def load_gate_run(*, repo_root: Path, gate_run_id: str) -> dict[str, Any]:
-    path = gate_run_dir(repo_root, gate_run_id) / "gate-run.json"
-    if not path.exists():
-        raise FileNotFoundError(f"gate run does not exist: {gate_run_id}")
+    try:
+        path = _gate_run_file(repo_root, gate_run_id, "gate-run.json", require_exists=True)
+    except FileNotFoundError as error:
+        raise FileNotFoundError(f"gate run does not exist: {gate_run_id}") from error
     payload = _load_json(path)
     if payload.get("schema") != GATE_RUN_SCHEMA:
         raise ValueError("gate-run.json schema mismatch")
@@ -218,7 +233,10 @@ def load_gate_run(*, repo_root: Path, gate_run_id: str) -> dict[str, Any]:
 
 
 def load_gate_responses(*, repo_root: Path, gate_run_id: str) -> list[dict[str, Any]]:
-    path = Path(_responses_path(repo_root, gate_run_id))
+    try:
+        path = _gate_run_file(repo_root, gate_run_id, "gate-responses.jsonl")
+    except FileNotFoundError:
+        return []
     if not path.exists():
         return []
     responses: list[dict[str, Any]] = []
@@ -307,23 +325,23 @@ def _artifact_paths(*, repo_root: Path, run_dir: Path, gate_dir: Path) -> dict[s
         return path.resolve().relative_to(repo).as_posix()
 
     paths = {
-        "gate_run_json": relative(gate_dir / "gate-run.json"),
-        "gate_responses_jsonl": relative(gate_dir / "gate-responses.jsonl"),
-        "agent_handoff_json": relative(run_dir / "agent-handoff.json"),
-        "agent_handoff_md": relative(run_dir / "agent-handoff.md"),
-        "quality_audit_json": relative(run_dir / "quality-audit.json"),
-        "run_manifest_json": relative(run_dir / "run-manifest.json"),
+        "gate_run_json": relative(safe_child_file(gate_dir, "gate-run.json")),
+        "gate_responses_jsonl": relative(safe_child_file(gate_dir, "gate-responses.jsonl")),
+        "agent_handoff_json": relative(safe_child_file(run_dir, "agent-handoff.json")),
+        "agent_handoff_md": relative(safe_child_file(run_dir, "agent-handoff.md")),
+        "quality_audit_json": relative(safe_child_file(run_dir, "quality-audit.json")),
+        "run_manifest_json": relative(safe_child_file(run_dir, "run-manifest.json")),
     }
-    gate_verification = run_dir / "gate-verification.json"
+    gate_verification = safe_child_file(run_dir, "gate-verification.json")
     if gate_verification.exists():
         paths["gate_verification_json"] = relative(gate_verification)
-    run_summary = run_dir / "run-summary.json"
+    run_summary = safe_child_file(run_dir, "run-summary.json")
     if run_summary.exists():
         paths["run_summary_json"] = relative(run_summary)
-    intent_path = run_dir / "intent.json"
+    intent_path = safe_child_file(run_dir, "intent.json")
     if intent_path.exists():
         paths["intent_json"] = relative(intent_path)
-    resolution_ledger = run_dir / "resolution-ledger.json"
+    resolution_ledger = safe_child_file(run_dir, "resolution-ledger.json")
     if resolution_ledger.exists():
         paths["resolution_ledger_json"] = relative(resolution_ledger)
     return paths
@@ -339,7 +357,7 @@ def _attach_gate_intent(
     intent_file: Path | None,
     actor: str,
 ) -> str | None:
-    run_intent_path = run_dir / "intent.json"
+    run_intent_path = safe_child_file(run_dir, "intent.json")
     if run_intent_path.exists():
         return run_intent_path.resolve().relative_to(repo_root.resolve()).as_posix()
 
@@ -354,7 +372,7 @@ def _attach_gate_intent(
     if intent is None:
         return None
 
-    intent_path = gate_dir / "intent.json"
+    intent_path = safe_child_file(gate_dir, "intent.json")
     write_json(intent_path, intent)
     return intent_path.resolve().relative_to(repo_root.resolve()).as_posix()
 
@@ -366,10 +384,7 @@ def _append_gate_response(
     response: dict[str, Any],
 ) -> Path:
     gate_dir = _prepare_gate_run_dir(repo_root, gate_run_id)
-    path = gate_dir / "gate-responses.jsonl"
-    if path.is_symlink():
-        raise ValueError("gate response log must not be a symlink")
-    path.parent.mkdir(parents=True, exist_ok=True)
+    path = safe_child_file(gate_dir, "gate-responses.jsonl")
     with path.open("a", encoding="utf-8") as handle:
         handle.write(json.dumps(response, sort_keys=True) + "\n")
     return path
@@ -391,7 +406,15 @@ def _prepare_gate_run_dir(repo_root: Path, gate_run_id: str) -> Path:
 
 
 def _responses_path(repo_root: Path, gate_run_id: str) -> str:
-    return str(gate_run_dir(repo_root, gate_run_id) / "gate-responses.jsonl")
+    return str(_gate_run_file(repo_root, gate_run_id, "gate-responses.jsonl"))
+
+
+def _gate_run_file(
+    repo_root: Path, gate_run_id: str, filename: str, *, require_exists: bool = False
+) -> Path:
+    return safe_child_file(
+        gate_run_dir(repo_root, gate_run_id), filename, require_exists=require_exists
+    )
 
 
 def _gate_run_path(gate_run: dict[str, Any]) -> str | None:

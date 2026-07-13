@@ -4,6 +4,12 @@ import json
 from pathlib import Path
 from typing import Any
 
+from quality_runner.artifacts import (
+    artifact_file,
+    existing_artifact_dir,
+    safe_child_file,
+    write_json,
+)
 from quality_runner.lifecycle_status import compute_lifecycle_status
 from quality_runner.timeout_diagnostics import concise_timeout_diagnostics
 
@@ -27,23 +33,17 @@ def build_run_summary(
         baseline = _run_summary(repo_root=repo_root, run_id=baseline_run_id)
         payload["delta"] = _summary_delta(baseline=baseline, final=summary)
     if persist:
-        run_dir = repo_root / ".quality-runner" / "runs" / run_id
-        (run_dir / "run-summary.json").write_text(
-            json.dumps(payload, indent=2, sort_keys=True) + "\n",
-            encoding="utf-8",
-        )
+        write_json(artifact_file(repo_root, run_id, "run-summary.json"), payload)
     return payload
 
 
 def _run_summary(*, repo_root: Path, run_id: str) -> dict[str, Any]:
-    run_dir = repo_root / ".quality-runner" / "runs" / run_id
-    if not run_dir.exists():
-        raise FileNotFoundError(f"run does not exist: {run_id}")
-    audit = _load_optional_json(run_dir / "quality-audit.json")
-    capability_map = _load_optional_json(run_dir / "capability-matrix.json")
-    gate_verification = _load_optional_json(run_dir / "gate-verification.json")
-    repo_scan = _load_optional_json(run_dir / "repo-scan.json")
-    handoff = _load_optional_json(run_dir / "agent-handoff.json")
+    run_dir = existing_artifact_dir(repo_root, run_id)
+    audit = _load_optional_artifact_json(run_dir, "quality-audit.json")
+    capability_map = _load_optional_artifact_json(run_dir, "capability-matrix.json")
+    gate_verification = _load_optional_artifact_json(run_dir, "gate-verification.json")
+    repo_scan = _load_optional_artifact_json(run_dir, "repo-scan.json")
+    handoff = _load_optional_artifact_json(run_dir, "agent-handoff.json")
     gate_results = _gate_results(gate_verification)
     missing_capabilities = _missing_capabilities(capability_map)
     finding_counts = _finding_counts(audit)
@@ -101,6 +101,11 @@ def _load_optional_json(path: Path) -> dict[str, Any]:
     except json.JSONDecodeError:
         return {}
     return payload if isinstance(payload, dict) else {}
+
+
+def _load_optional_artifact_json(run_dir: Path, filename: str) -> dict[str, Any]:
+    path = safe_child_file(run_dir, filename)
+    return _load_optional_json(path)
 
 
 def _gate_results(gate_verification: dict[str, Any]) -> list[dict[str, Any]]:
@@ -189,6 +194,8 @@ def _recommended_classification(
         for gate in gate_results
     ):
         return "read-only-gate-blocker"
+    if any(gate.get("skip_type") == "execution-consent-required" for gate in gate_results):
+        return "execution-consent-required"
     if status == "failed":
         return "failing-executable-gates"
     if missing_capabilities:
@@ -221,6 +228,8 @@ def _blocker_classes(
             or gate.get("skip_type") == "mutating-gate-not-run"
         ):
             _append_unique(classes, "read-only-policy")
+        elif gate.get("skip_type") == "execution-consent-required":
+            _append_unique(classes, "execution-consent")
         elif gate.get("status") == "failed":
             _append_unique(classes, "command-failure")
     if missing_capabilities:

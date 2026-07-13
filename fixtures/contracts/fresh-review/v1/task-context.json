@@ -1,0 +1,44 @@
+{
+  "schema": "quality-runner-review-context-v0.1",
+  "run_id": "golden-task",
+  "repo_root": "/workspace/quality-runner",
+  "mode": "task",
+  "scope": "task",
+  "breadth": "focused",
+  "task": "Preserve the review artifact contract.",
+  "repository_state": {
+    "detail": "standard"
+  },
+  "changed_files": [
+    "quality_runner/review_context.py"
+  ],
+  "exclusions": [
+    "generated"
+  ],
+  "evidence": [
+    {
+      "path": "quality_runner/review_context.py",
+      "kind": "file",
+      "available": true,
+      "note": ""
+    }
+  ],
+  "omitted_evidence": [
+    "browser access"
+  ],
+  "known_issues": [
+    "known-001"
+  ],
+  "previous_summary": "A prior implementation summary.",
+  "freshness": {
+    "new_invocation_required": true,
+    "prior_review_context_included": false,
+    "previous_agent_summary_included": true,
+    "hidden_reasoning_included": false,
+    "active_cycle": false
+  },
+  "input_hashes": {
+    "packet": "packet-task-hash",
+    "task": "task-hash"
+  }
+}

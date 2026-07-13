@@ -4,6 +4,14 @@ import hashlib
 import re
 from typing import Any
 
+from quality_runner.evidence_redaction import (
+    SECRET_ASSIGNMENT_PATTERN,
+    SECRET_FALLBACK_PATTERN,
+    SECRET_LOG_PATTERN,
+    SecretAssignmentSpan,
+    analyze_secret_like_source_lines,
+    redact_secret_like_literals,
+)
 from quality_runner.security.taxonomy import SECURITY_TAXONOMY_CATEGORIES
 
 _CANDIDATE_ID = 0
@@ -11,19 +19,19 @@ _CANDIDATE_ID = 0
 SECRET_PATTERNS: tuple[tuple[str, str, str, str], ...] = (
     (
         "secrets-exposure",
-        r"(?i)(api[_-]?key|secret|password|token|private[_-]?key)\s*[:=]\s*['\"][^'\"]{8,}['\"]",
+        SECRET_ASSIGNMENT_PATTERN,
         "high",
         "Hardcoded secret-like assignment detected.",
     ),
     (
         "secret-in-fallback",
-        r"(?i)(?:\|\||\?\?)\s*['\"][^'\"]{12,}['\"]",
+        SECRET_FALLBACK_PATTERN,
         "medium",
         "Secret-like fallback value in expression.",
     ),
     (
         "secret-in-log",
-        r"(?i)(?:console\.|logger\.|print\(|logging\.).*(?:password|secret|token|api[_-]?key)",
+        SECRET_LOG_PATTERN,
         "medium",
         "Sensitive value may be logged.",
     ),
@@ -86,6 +94,7 @@ EXPENSIVE_API_PATTERNS: tuple[tuple[str, str, str, str], ...] = (
 
 WEBHOOK_PATTERN = re.compile(r"(?i)webhook")
 SIGNATURE_TERMS = ("signature", "hmac", "verify", "stripe-signature", "x-hub-signature")
+_SECRET_EVIDENCE_CATEGORIES = frozenset({"secrets-exposure", "secret-in-fallback", "secret-in-log"})
 
 
 def scan_security_candidates(
@@ -97,10 +106,19 @@ def scan_security_candidates(
     global _CANDIDATE_ID
     candidates: list[dict[str, Any]] = []
     disabled = set(disabled_groups)
+    additional_candidates: list[tuple[str, str, str, str, int, str, str]] = []
 
     for file_info in scanned_files:
         relative_path = file_info["path"]
         lines = file_info["lines"]
+        source_analysis = analyze_secret_like_source_lines(lines)
+        evidence_lines = source_analysis.lines
+        legacy_assignment_lines = _legacy_span_lines(
+            source_analysis.assignment_spans, lines, SECRET_ASSIGNMENT_PATTERN
+        )
+        legacy_fallback_lines = _legacy_span_lines(
+            source_analysis.fallback_spans, lines, SECRET_FALLBACK_PATTERN
+        )
         for line_number, line in enumerate(lines, start=1):
             if "secrets" in disabled and "secret" in line.lower():
                 continue
@@ -115,6 +133,10 @@ def scan_security_candidates(
                 if group_name in disabled:
                     continue
                 for cat, pattern, severity, description in pattern_group:
+                    if cat == "secrets-exposure" and line_number not in legacy_assignment_lines:
+                        continue
+                    if cat == "secret-in-fallback" and line_number not in legacy_fallback_lines:
+                        continue
                     if re.search(pattern, line):
                         candidates.append(
                             _candidate(
@@ -123,11 +145,37 @@ def scan_security_candidates(
                                 confidence=_confidence_for_match(cat, line),
                                 file=relative_path,
                                 line=line_number,
-                                evidence=line.strip()[:240],
+                                evidence=_candidate_evidence(cat, evidence_lines[line_number - 1]),
                                 description=description,
                                 requires_agent_review=_requires_agent_review(cat),
                             )
                         )
+
+        if "secrets" not in disabled:
+            additional_candidates.extend(
+                _additional_span_candidates(
+                    category="secrets-exposure",
+                    severity="high",
+                    description="Hardcoded secret-like assignment detected.",
+                    relative_path=relative_path,
+                    evidence_lines=evidence_lines,
+                    source_lines=lines,
+                    spans=source_analysis.assignment_spans,
+                    legacy_lines=legacy_assignment_lines,
+                )
+            )
+            additional_candidates.extend(
+                _additional_span_candidates(
+                    category="secret-in-fallback",
+                    severity="medium",
+                    description="Secret-like fallback value in expression.",
+                    relative_path=relative_path,
+                    evidence_lines=evidence_lines,
+                    source_lines=lines,
+                    spans=source_analysis.fallback_spans,
+                    legacy_lines=legacy_fallback_lines,
+                )
+            )
 
         if surfaces.get("api_routes") and "expensive-api" not in disabled:
             for cat, pattern, severity, description in EXPENSIVE_API_PATTERNS:
@@ -142,7 +190,7 @@ def scan_security_candidates(
                                 confidence="medium",
                                 file=relative_path,
                                 line=line_number,
-                                evidence=line.strip()[:240],
+                                evidence=_candidate_evidence(cat, evidence_lines[line_number - 1]),
                                 description=description,
                                 requires_agent_review=True,
                             )
@@ -168,6 +216,28 @@ def scan_security_candidates(
                     requires_agent_review=True,
                 )
             )
+
+    for (
+        category,
+        severity,
+        confidence,
+        relative_path,
+        line,
+        evidence,
+        description,
+    ) in additional_candidates:
+        candidates.append(
+            _candidate(
+                category=category,
+                severity=severity,
+                confidence=confidence,
+                file=relative_path,
+                line=line,
+                evidence=evidence,
+                description=description,
+                requires_agent_review=_requires_agent_review(category),
+            )
+        )
 
     _CANDIDATE_ID = 0
     return _dedupe_candidates(candidates)
@@ -209,6 +279,60 @@ def _candidate(
             evidence=evidence,
         ),
     }
+
+
+def _candidate_evidence(category: str, line: str) -> str:
+    evidence = redact_secret_like_literals(
+        line.strip(), force=category in _SECRET_EVIDENCE_CATEGORIES
+    )
+    return evidence[:240]
+
+
+def _legacy_span_lines(
+    spans: list[SecretAssignmentSpan], lines: list[str], pattern: str
+) -> set[int]:
+    return {span.start_line for span in spans if re.search(pattern, lines[span.start_line - 1])}
+
+
+def _span_evidence(lines: list[str], start_line: int, end_line: int) -> str:
+    return " ".join(line.strip() for line in lines[start_line - 1 : end_line] if line.strip())
+
+
+def _additional_span_candidates(
+    *,
+    category: str,
+    severity: str,
+    description: str,
+    relative_path: str,
+    evidence_lines: list[str],
+    source_lines: list[str],
+    spans: list[SecretAssignmentSpan],
+    legacy_lines: set[int],
+) -> list[tuple[str, str, str, str, int, str, str]]:
+    candidates: list[tuple[str, str, str, str, int, str, str]] = []
+    for span in spans:
+        if any(line in legacy_lines for line in range(span.start_line, span.end_line + 1)):
+            continue
+        evidence = _candidate_evidence(
+            category,
+            _span_evidence(evidence_lines, span.start_line, span.end_line),
+        )
+        confidence = _confidence_for_match(
+            category,
+            _span_evidence(source_lines, span.start_line, span.end_line),
+        )
+        candidates.append(
+            (
+                category,
+                severity,
+                confidence,
+                relative_path,
+                span.start_line,
+                evidence,
+                description,
+            )
+        )
+    return candidates
 
 
 def security_candidate_fingerprint(

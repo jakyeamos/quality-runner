@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import subprocess
 import sys
 from pathlib import Path
 
@@ -35,6 +36,27 @@ def _install_fake_pnpm(repo_root: Path, monkeypatch: pytest.MonkeyPatch) -> None
     monkeypatch.setenv("PATH", f"{bin_dir}:{os.environ.get('PATH', '')}")
 
 
+def _commit_fixture(repo_root: Path) -> None:
+    subprocess.run(["git", "init"], cwd=repo_root, check=True, capture_output=True, text=True)
+    subprocess.run(["git", "add", "."], cwd=repo_root, check=True, capture_output=True, text=True)
+    subprocess.run(
+        [
+            "git",
+            "-c",
+            "user.email=quality-runner@example.com",
+            "-c",
+            "user.name=Quality Runner",
+            "commit",
+            "-m",
+            "Fixture",
+        ],
+        cwd=repo_root,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+
 def test_verify_gates_runs_package_scripts_through_detected_package_manager(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -42,9 +64,7 @@ def test_verify_gates_runs_package_scripts_through_detected_package_manager(
 
     _install_fake_pnpm(tmp_path, monkeypatch)
 
-    bin_dir = tmp_path / "node_modules" / ".bin"
-    bin_dir.mkdir(parents=True)
-    fake_lint = bin_dir / "fake-lint"
+    fake_lint = tmp_path / "fake-bin" / "fake-lint"
     fake_lint.write_text("#!/bin/sh\necho package-bin-ok\n", encoding="utf-8")
     fake_lint.chmod(0o755)
     (tmp_path / "package.json").write_text(
@@ -57,7 +77,13 @@ def test_verify_gates_runs_package_scripts_through_detected_package_manager(
         encoding="utf-8",
     )
 
-    payload = verify_gates_payload(repo_root=tmp_path, run_id="package-manager-gates")
+    _commit_fixture(tmp_path)
+    payload = verify_gates_payload(
+        repo_root=tmp_path,
+        run_id="package-manager-gates",
+        execute_discovered_gates=True,
+        worktree_mode="disposable",
+    )
     verification = json.loads(Path(payload["artifact_paths"]["gate_verification_json"]).read_text())
 
     assert payload["status"] == "passed"
@@ -101,10 +127,10 @@ def test_verify_gates_read_only_mode_skips_mutating_formatter(
     assert payload["status"] == "blocked"
     assert verification["status"] == "blocked"
     assert verification["gates"][0]["status"] == "skipped"
-    assert verification["gates"][0]["skip_type"] == "mutating-gate-not-run"
+    assert verification["gates"][0]["skip_type"] == "execution-consent-required"
     assert verification["gates"][0]["mutating_risk"] == "mutating"
-    assert verification["gates"][1]["status"] == "passed"
-    assert plan[0]["local_execution_status"] == "mutating-skipped"
+    assert verification["gates"][1]["skip_type"] == "execution-consent-required"
+    assert plan[0]["local_execution_status"] == "consent-required"
 
 
 def test_verify_gates_classifies_dependency_setup_blockers(
@@ -138,7 +164,13 @@ def test_verify_gates_classifies_dependency_setup_blockers(
         encoding="utf-8",
     )
 
-    payload = verify_gates_payload(repo_root=tmp_path, run_id="dependency-setup")
+    _commit_fixture(tmp_path)
+    payload = verify_gates_payload(
+        repo_root=tmp_path,
+        run_id="dependency-setup",
+        execute_discovered_gates=True,
+        worktree_mode="disposable",
+    )
     verification = json.loads(Path(payload["artifact_paths"]["gate_verification_json"]).read_text())
 
     assert payload["status"] == "blocked"
@@ -182,7 +214,13 @@ def test_verify_gates_classifies_pnpm_ignored_builds_as_dependency_setup(
         encoding="utf-8",
     )
 
-    payload = verify_gates_payload(repo_root=tmp_path, run_id="pnpm-ignored-builds")
+    _commit_fixture(tmp_path)
+    payload = verify_gates_payload(
+        repo_root=tmp_path,
+        run_id="pnpm-ignored-builds",
+        execute_discovered_gates=True,
+        worktree_mode="disposable",
+    )
     verification = json.loads(Path(payload["artifact_paths"]["gate_verification_json"]).read_text())
     handoff = json.loads(Path(payload["artifact_paths"]["agent_handoff_json"]).read_text())
     handoff_markdown = Path(payload["artifact_paths"]["agent_handoff_md"]).read_text()
@@ -228,7 +266,13 @@ def test_verify_gates_uses_per_gate_timeout_config_and_skips_covered_aggregate(
         encoding="utf-8",
     )
 
-    payload = verify_gates_payload(repo_root=tmp_path, run_id="aggregate-skip")
+    _commit_fixture(tmp_path)
+    payload = verify_gates_payload(
+        repo_root=tmp_path,
+        run_id="aggregate-skip",
+        execute_discovered_gates=True,
+        worktree_mode="disposable",
+    )
     verification = json.loads(Path(payload["artifact_paths"]["gate_verification_json"]).read_text())
 
     assert payload["status"] == "passed"

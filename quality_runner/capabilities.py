@@ -166,6 +166,7 @@ def _configured_quality_commands(standards_packet: dict[str, Any]) -> list[dict[
         ecosystem = gate.get("ecosystem")
         owner = gate.get("owner")
         severity = gate.get("severity")
+        mutating_risk = gate.get("mutating_risk")
         if not (
             isinstance(capability_id, str)
             and capability_id
@@ -187,6 +188,7 @@ def _configured_quality_commands(standards_packet: dict[str, Any]) -> list[dict[
                 "language": ecosystem,
                 "owner": owner,
                 "severity": severity,
+                **_optional_field("mutating_risk", mutating_risk),
             }
         )
     return commands

@@ -1,163 +1,74 @@
 # MCP Integration
 
-Run the stdio MCP server:
+Run the stdio server with `quality-runner-mcp`. It accepts line-delimited
+JSON-RPC on stdin and writes one JSON-RPC response per request on stdout.
 
-```bash
-quality-runner-mcp
-```
+## Preferred outcome tools
 
-The server accepts line-delimited JSON-RPC messages on stdin and writes JSON-RPC
-responses to stdout.
+New integrations should use the additive journey tools:
 
-The optional `standards` argument selects a standards profile. It defaults to
-`default`.
+- `quality_runner_audit_outcome` prepares audit evidence and a remediation plan;
+  it can use `mode: "inspect"` for discovery-only evidence.
+- `quality_runner_review_outcome` makes a packet-only review visibly
+  `awaiting-evidence` rather than treating it as a clean review.
+- `quality_runner_verify_outcome` defaults to evidence-only verification. It
+  only executes commands when `execute_gates` and `worktree_mode: "disposable"`
+  are both explicit; a disposable checkout is not a host sandbox.
+- `quality_runner_runs_outcome` reads bounded run history without writing a new
+  summary artifact.
 
-## Tools
-
-Primary `quality-runner-mcp` tools:
-
-### `quality_runner_doctor`
-
-Checks readiness.
-
-```json
-{}
-```
-
-### `quality_runner_inspect_repo`
-
-Runs the inspect-only workflow.
+Each tool returns the existing `quality-runner-mcp-result-v0.1` wrapper. Its
+`structuredContent` is the new `quality-runner-outcome-v0.2` contract, which
+leads with state, confidence, writes, safety, and a next action. The precise
+argument schemas are advertised through `tools/list` and owned by
+`quality_runner.mcp_journeys`; clients should discover them rather than copying
+a static option table.
 
 ```json
-{
-  "repo_root": "/path/to/repo",
-  "run_id": "inspect-001",
-  "ci_status_json": "/path/to/repo/ci-status.json",
-  "intent": "Ship the auth refactor without widening the public API",
-  "intent_file": "/path/to/repo/.quality-runner/intent.json"
-}
+{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"quality_runner_audit_outcome","arguments":{"repo_root":"/path/to/repo","run_id":"baseline-001"}}}
 ```
 
-`intent` and `intent_file` are optional and mutually usable: when both are
-omitted, no intent artifact is written. `intent_file` must live inside the
-target repository.
+The outcome tools validate their advertised fields strictly. `intent_file`, when
+used by audit or verify, must remain inside the target repository. New tools use
+`profile`; legacy inspect/run tools continue to use `standards` so their v1
+contract is unchanged.
 
-`intent` and `intent_file` are optional and mutually usable: when both are
-omitted, no intent artifact is written. `intent_file` must live inside the
-target repository.
+## Legacy compatibility
 
-### `quality_runner_gate`
+The established MCP tools remain callable and retain their v1
+`structuredContent` shapes. Use `tools/list` for their current names and input
+schemas; do not assume that a legacy CLI projection and a legacy MCP projection
+have identical fields.
 
-Creates a driveable gate run from an existing Quality Runner run.
+`quality_runner_review` remains the v1 review tool even though the CLI `review`
+journey is outcome-first by default. Prefer `quality_runner_review_outcome`
+when a caller needs the cross-journey outcome contract. The direct-replacement
+legacy tools identify their support window in `tools/list`; their v1 payloads
+do not gain new fields during the transition. The [Upgrade and Compatibility
+Guide](upgrade.md) is the canonical policy and rollback reference.
 
-```json
-{
-  "repo_root": "/path/to/repo",
-  "run_id": "refresh-001-verify",
-  "gate_run_id": "gate-20260707-001",
-  "intent": "Land Phase 2 gate controller with JSON-only responses"
-}
-```
+Existing Repo Quality Certifier callers can continue to use
+`repo-quality-certifier-mcp` and its published compatibility tools. Those
+compatibility islands do not currently have a retirement schedule.
 
-### `quality_runner_gate_status`
+Fresh Review has the same two-phase contract over MCP as it does on the CLI:
+the first call creates a packet-ready run, and a later call supplies a response
+inside that run. The response must bind to the saved packet's run id, mode, and
+hash; a response that cannot prove that binding is returned as incomplete review
+evidence. Binding validates the declared packet, not reviewer identity or file
+access outside the packet boundary. Outcome-tool `writes.artifact_paths` lists
+the lifecycle files actually created; legacy review payloads retain their v1
+six-path surface. See the [CLI reference](cli.md#quality-runner-review) for the
+safety and fixer-handoff rules.
 
-Reads an in-flight gate run and append-only response history.
-
-```json
-{
-  "repo_root": "/path/to/repo",
-  "gate_run_id": "gate-20260707-001"
-}
-```
-
-### `quality_runner_gate_respond`
-
-Records a controller decision without executing fixes.
-
-```json
-{
-  "repo_root": "/path/to/repo",
-  "gate_run_id": "gate-20260707-001",
-  "action": "route-next-slice",
-  "finding_ids": ["gate-pnpm-install"],
-  "notes": "Worker should run pnpm install before re-verify."
-}
-```
-
-### `quality_runner_propose_fix`
-
-Writes structured fix proposals for a remediation finding group.
-
-```json
-{
-  "repo_root": "/path/to/repo",
-  "run_id": "refresh-001-verify",
-  "finding_group": "remediate-structural-src-app-page-tsx"
-}
-```
-
-### `quality_runner_run`
-
-Runs the full audit-and-plan workflow.
-
-```json
-{
-  "repo_root": "/path/to/repo",
-  "run_id": "baseline-001",
-  "ci_status_json": "/path/to/repo/ci-status.json",
-  "intent": "Land Phase 1 schema semantics with additive artifacts only"
-}
-```
-
-### `quality_runner_status`
-
-Lists non-symlink run directories under `.quality-runner/runs`.
-
-```json
-{
-  "repo_root": "/path/to/repo"
-}
-```
-
-### `quality_runner_export_handoff`
-
-Returns an existing `agent-handoff.md` for a run.
-
-```json
-{
-  "repo_root": "/path/to/repo",
-  "run_id": "baseline-001"
-}
-```
-
-The export path rejects unsafe run ids and symlinked artifact components before
-reading.
-
-## JSON-RPC Example
+## JSON-RPC behavior
 
 ```json
 {"jsonrpc":"2.0","id":1,"method":"tools/list"}
 ```
 
-```json
-{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"quality_runner_run","arguments":{"repo_root":"/path/to/repo","run_id":"baseline-001"}}}
-```
-
-All successful tool calls return:
-
-- `isError`
-- `content`
-- `structuredContent`
-
-## Repo Quality Certifier Compatibility
-
-Quality Runner also installs `repo-quality-certifier-mcp` for existing
-Repo Quality Certifier integrations. It exposes:
-
-- `repo_quality_certifier_plan`
-- `repo_quality_certifier_doc_quality`
-
-Use these tools only for compatibility with callers that still expect the old
-certifier schema names. New integrations should prefer `quality_runner_run`,
-`quality_runner_gate`, `quality_runner_gate_status`, `quality_runner_gate_respond`,
-`quality_runner_propose_fix`, `quality_runner_status`, and `quality_runner_export_handoff`.
+Successful tool calls expose `isError`, human-readable `content`, and
+machine-readable `structuredContent`. Invalid request shapes are reported as
+JSON-RPC invalid-parameter errors; ordinary outcome states such as blocked
+verification remain successful tool calls so automation can follow the supplied
+next action.

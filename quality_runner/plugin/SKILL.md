@@ -7,28 +7,38 @@ description: Run standalone audit-and-plan quality orchestration for a repositor
 
 Use this skill when the user asks to audit a repository against quality standards, run Quality Runner, inspect available quality gates, or produce a remediation plan.
 
-Quality Runner v1 is audit-and-plan only. It writes `.quality-runner/` artifacts and does not modify target source files.
+Quality Runner's preferred journeys are outcome-first. They write local
+`.quality-runner/` evidence as needed but do not modify target source files.
+Discovered gates remain evidence-only unless a user explicitly authorizes
+`--execute-gates --worktree-mode disposable`; that runs local commands in a
+disposable checkout, not a sandbox.
 
 Preferred MCP tools:
 
-- `quality_runner_inspect_repo` to inspect repo shape and quality capabilities.
-- `quality_runner_run` to write the full audit, remediation plan, and agent handoff.
-- `quality_runner_status` to list existing runs.
-- `quality_runner_export_handoff` to read an existing `agent-handoff.md`.
+- `quality_runner_audit_outcome` to inspect or plan with a clear remediation outcome.
+- `quality_runner_review_outcome` to distinguish a completed review from a packet awaiting evidence.
+- `quality_runner_verify_outcome` to record or explicitly authorize disposable verification.
+- `quality_runner_runs_outcome` to read persisted run history without writing a summary.
+
+Use the legacy MCP tools only when an existing client requires their v1 payloads.
+
+Fresh Review is two phase: first prepare the packet, then submit a locally
+supplied response bound to that packet. A packet-ready outcome is not a clean
+review. Select findings explicitly before giving its fixer prompts to a separate
+agent; Quality Runner does not apply those fixes.
 
 CLI fallback:
 
 ```bash
-quality-runner refresh /path/to/repo \
-  --run-id-prefix qr-<date-or-task> \
-  --handoff-output /tmp/qr-handoff.md \
-  --json
+quality-runner audit /path/to/repo --run-id qr-<date-or-task> --json
+quality-runner verify /path/to/repo --run-id qr-<date-or-task>-verify --json
+quality-runner runs /path/to/repo --json
 ```
 
 Agent workflow:
 
 1. Run QR before editing source.
-2. Read `/tmp/qr-handoff.md` and the referenced `.quality-runner/runs/<run-id>/` artifacts.
+2. Read `.quality-runner/runs/qr-<date-or-task>/agent-handoff.md` and the referenced artifacts from that run.
 3. Before editing, write or update GSD-style planning artifacts in the target repo.
    Use the repo's existing planning folder if present; otherwise use `.planning/`.
 4. The plan must include phases, batches, evidence, expected touched files,

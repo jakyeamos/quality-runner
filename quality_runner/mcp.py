@@ -3,13 +3,15 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
 from quality_runner import __version__
-from quality_runner.artifacts import artifact_dir
-from quality_runner.cli_payload import DOCTOR_RESULT_SCHEMA
+from quality_runner.application.audit_workflows import inspect_payload, run_payload
+from quality_runner.artifacts import artifact_run_ids, artifact_text_file
 from quality_runner.cli_review import review_mcp_payload, review_mcp_tool
+from quality_runner.doctor_contract import doctor_payload
 from quality_runner.fix_proposals import propose_fix
 from quality_runner.gate_controller import (
     create_gate_run,
@@ -17,8 +19,9 @@ from quality_runner.gate_controller import (
     record_gate_response,
 )
 from quality_runner.intent import resolve_workflow_intent
+from quality_runner.mcp_journeys import is_journey_tool, journey_tool_payload, journey_tools
 from quality_runner.standards import DEFAULT_PROFILE
-from quality_runner.workflow import generated_run_id, inspect_payload, run_payload
+from quality_runner.workflow_internal import generated_run_id
 
 MCP_PROTOCOL_VERSION = "2024-11-05"
 MCP_RESULT_SCHEMA = "quality-runner-mcp-result-v0.1"
@@ -131,12 +134,18 @@ def list_tools() -> list[dict[str, Any]]:
         },
         {
             "name": "quality_runner_inspect_repo",
-            "description": "Inspect repository shape and quality capabilities.",
+            "description": (
+                "Inspect repository shape and quality capabilities (v1; supported through "
+                "0.7.x). Prefer quality_runner_audit_outcome with mode inspect."
+            ),
             "inputSchema": repo_schema,
         },
         {
             "name": "quality_runner_run",
-            "description": "Run audit-and-plan workflow and write Quality Runner artifacts.",
+            "description": (
+                "Run the audit-and-plan workflow and write Quality Runner artifacts "
+                "(v1; supported through 0.7.x). Prefer quality_runner_audit_outcome."
+            ),
             "inputSchema": repo_schema,
         },
         {
@@ -175,13 +184,18 @@ def list_tools() -> list[dict[str, Any]]:
             "inputSchema": propose_fix_schema,
         },
         review_mcp_tool(),
+        *journey_tools(),
     ]
 
 
 def call_tool(name: str, arguments: dict[str, Any] | None = None) -> dict[str, Any]:
     args = arguments or {}
     if name == "quality_runner_doctor":
-        return _tool_result(_doctor_payload())
+        return _tool_result(doctor_payload(include_environment=False))
+
+    if is_journey_tool(name):
+        repo_root = _validated_repo_root(args)
+        return _tool_result(journey_tool_payload(name, args, repo_root=repo_root))
 
     if name == "quality_runner_review":
         repo_root = _validated_repo_root(args)
@@ -391,22 +405,8 @@ def _handle_tools_call(params: object) -> dict[str, Any]:
     return call_tool(tool_name, arguments)
 
 
-def _doctor_payload() -> dict[str, Any]:
-    return {
-        "schema": DOCTOR_RESULT_SCHEMA,
-        "status": "ready",
-        "version": __version__,
-        "implementation_allowed": False,
-    }
-
-
 def _status_payload(repo_root: Path) -> dict[str, Any]:
-    runs_dir = repo_root / ".quality-runner" / "runs"
-    runs = (
-        sorted(path.name for path in runs_dir.iterdir() if path.is_dir() and not path.is_symlink())
-        if runs_dir.exists() and not runs_dir.is_symlink()
-        else []
-    )
+    runs = sorted(artifact_run_ids(repo_root))
     return {
         "schema": "quality-runner-status-result-v0.1",
         "repo_root": str(repo_root),
@@ -416,15 +416,7 @@ def _status_payload(repo_root: Path) -> dict[str, Any]:
 
 
 def _export_handoff_payload(repo_root: Path, run_id: str) -> dict[str, Any]:
-    run_dir = artifact_dir(repo_root, run_id)
-    _reject_symlinked_artifact_components(run_dir, repo_root)
-    handoff_path = run_dir / "agent-handoff.md"
-    if handoff_path.is_symlink():
-        raise ValueError("artifact file must not be a symlink")
-    if not handoff_path.exists():
-        raise FileNotFoundError(f"agent handoff does not exist: {handoff_path}")
-    if not handoff_path.is_file():
-        raise ValueError(f"agent handoff is not a file: {handoff_path}")
+    handoff_path = artifact_text_file(repo_root, run_id, "agent-handoff.md")
     return {
         "schema": "quality-runner-export-handoff-result-v0.1",
         "repo_root": str(repo_root),
@@ -435,7 +427,7 @@ def _export_handoff_payload(repo_root: Path, run_id: str) -> dict[str, Any]:
     }
 
 
-def _tool_result(payload: dict[str, Any]) -> dict[str, Any]:
+def _tool_result(payload: Mapping[str, object]) -> dict[str, Any]:
     text = json.dumps(payload, indent=2, sort_keys=True)
     return {
         "schema": MCP_RESULT_SCHEMA,
@@ -465,8 +457,6 @@ def _required_string_arg(arguments: dict[str, Any], key: str) -> str:
     return value
 
 
-
-
 def _path_arg(arguments: dict[str, Any], key: str) -> Path | None:
     value = _string_arg(arguments, key)
     return Path(value).expanduser().resolve() if value is not None else None
@@ -480,13 +470,6 @@ def _validated_repo_root(arguments: dict[str, Any]) -> Path:
     if not repo_root.is_dir():
         raise NotADirectoryError(f"repo root is not a directory: {repo_root}")
     return repo_root
-
-
-def _reject_symlinked_artifact_components(run_dir: Path, repo_root: Path) -> None:
-    root = repo_root.expanduser().resolve()
-    for component in (root / ".quality-runner", root / ".quality-runner" / "runs", run_dir):
-        if component.is_symlink():
-            raise ValueError("artifact path component must not be a symlink")
 
 
 if __name__ == "__main__":

@@ -6,6 +6,7 @@ from typing import Any
 
 from quality_runner.artifacts import write_json, write_text
 from quality_runner.code_quality import create_code_quality_scan
+from quality_runner.core.audit_contracts import TextScanScope
 from quality_runner.skill_config import load_active_skills
 from quality_runner.skill_review import (
     build_skill_review_packet,
@@ -20,6 +21,7 @@ def create_code_quality_scan_with_skills(
     scan: dict[str, Any],
     config: dict[str, Any],
     skill_review_report: dict[str, Any] | None,
+    text_scan_scope: TextScanScope | None = None,
 ) -> tuple[dict[str, Any], list[dict[str, str]]]:
     _, skill_warnings = load_active_skills(repo_root, config)
     code_quality_scan = create_code_quality_scan(
@@ -27,6 +29,7 @@ def create_code_quality_scan_with_skills(
         scan=scan,
         config=config,
         skill_review_report=skill_review_report,
+        text_scan_scope=text_scan_scope,
     )
     return code_quality_scan, skill_warnings
 

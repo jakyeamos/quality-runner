@@ -1,0 +1,27 @@
+{
+  "schema": "quality-runner-review-context-v0.1",
+  "run_id": "golden-blind",
+  "repo_root": "/workspace/quality-runner",
+  "mode": "blind",
+  "scope": "project",
+  "breadth": "related",
+  "repository_state": {
+    "detail": "concise"
+  },
+  "changed_files": [
+    "quality_runner/review_report.py"
+  ],
+  "exclusions": [],
+  "evidence": [],
+  "omitted_evidence": [],
+  "freshness": {
+    "new_invocation_required": true,
+    "prior_review_context_included": false,
+    "previous_agent_summary_included": false,
+    "hidden_reasoning_included": false,
+    "active_cycle": true
+  },
+  "input_hashes": {
+    "packet": "packet-blind-hash"
+  }
+}

@@ -5,6 +5,8 @@ import subprocess
 from pathlib import Path
 from typing import Any
 
+import pytest
+
 from quality_runner.cli_human_summary import human_summary
 from quality_runner.rollout import rollout_payload
 
@@ -143,6 +145,9 @@ def test_rollout_runs_repo_list_and_writes_controller_report(tmp_path: Path) -> 
         total_timeout_reason="controller stress total deadline",
         checkout_most_advanced_branch=False,
         allow_mutating_gates=False,
+        execute_discovered_gates=True,
+        worktree_mode="disposable",
+        allow_dirty_worktree_verify=True,
         refresh_callback=refresh_stub,
     )
 
@@ -155,6 +160,9 @@ def test_rollout_runs_repo_list_and_writes_controller_report(tmp_path: Path) -> 
     assert calls[0]["verify_timeout_seconds"] == 180
     assert calls[0]["total_timeout_seconds"] == 300
     assert calls[0]["allow_mutating_gates"] is False
+    assert calls[0]["execute_discovered_gates"] is True
+    assert calls[0]["worktree_mode"] == "disposable"
+    assert calls[0]["allow_dirty_worktree_verify"] is True
 
     ledger = json.loads(Path(payload["ledger_path"]).read_text(encoding="utf-8"))
     report_path = Path(ledger["results"][0]["report_path"])
@@ -167,6 +175,9 @@ def test_rollout_runs_repo_list_and_writes_controller_report(tmp_path: Path) -> 
     assert report["status"] == "blocked"
     assert report["baseline_artifact_path"].endswith("/.quality-runner/runs/baseline-001")
     assert report["final_qr"]["run_id"] == "stress-pass-target-repo-verify"
+    generation_command = report["verification"][0]["command"]
+    assert "--execute-gates --worktree-mode disposable" in generation_command
+    assert "--allow-dirty-worktree-verify" in generation_command
     assert validation["status"] == "accepted"
 
     fleet_documents = payload["fleet_documents"]
@@ -234,6 +245,83 @@ def test_rollout_records_invalid_repo_without_stopping(tmp_path: Path) -> None:
     assert payload["results"][0]["report_status"] == "rejected"
     assert payload["results"][1]["report_status"] == "accepted"
     assert payload["failed_repos"] == [str(missing_repo.resolve())]
+
+
+def test_rollout_rejects_gate_execution_without_disposable_worktrees(tmp_path: Path) -> None:
+    with pytest.raises(ValueError, match="requires --worktree-mode disposable"):
+        rollout_payload(
+            repo_list_path=None,
+            repos=[str(tmp_path)],
+            run_id_prefix="rollout",
+            output_dir=tmp_path / "artifacts",
+            profile=None,
+            ci_status_json=None,
+            timeout_seconds=120,
+            workflow_timeout_seconds=None,
+            verify_timeout_seconds=None,
+            workflow_timeout_reason=None,
+            total_timeout_seconds=None,
+            total_timeout_reason=None,
+            checkout_most_advanced_branch=False,
+            allow_mutating_gates=False,
+            execute_discovered_gates=True,
+            worktree_mode="in-place",
+        )
+
+
+def test_rollout_rejects_symlinked_output_directory(tmp_path: Path) -> None:
+    external = tmp_path / "external"
+    external.mkdir()
+    output_dir = tmp_path / "output-link"
+    output_dir.symlink_to(external, target_is_directory=True)
+
+    with pytest.raises(ValueError, match="symlink"):
+        rollout_payload(
+            repo_list_path=None,
+            repos=[str(tmp_path / "missing")],
+            run_id_prefix="rollout",
+            output_dir=output_dir,
+            profile=None,
+            ci_status_json=None,
+            timeout_seconds=120,
+            workflow_timeout_seconds=None,
+            verify_timeout_seconds=None,
+            workflow_timeout_reason=None,
+            total_timeout_seconds=None,
+            total_timeout_reason=None,
+            checkout_most_advanced_branch=False,
+            allow_mutating_gates=False,
+        )
+
+    assert not list(external.iterdir())
+
+
+def test_rollout_does_not_overwrite_a_symlinked_ledger(tmp_path: Path) -> None:
+    output_dir = tmp_path / "output"
+    output_dir.mkdir()
+    external = tmp_path / "external-ledger.json"
+    external.write_text("sentinel\n", encoding="utf-8")
+    (output_dir / "rollout-ledger.json").symlink_to(external)
+
+    with pytest.raises(ValueError, match="symlink"):
+        rollout_payload(
+            repo_list_path=None,
+            repos=[str(tmp_path / "missing")],
+            run_id_prefix="rollout",
+            output_dir=output_dir,
+            profile=None,
+            ci_status_json=None,
+            timeout_seconds=120,
+            workflow_timeout_seconds=None,
+            verify_timeout_seconds=None,
+            workflow_timeout_reason=None,
+            total_timeout_seconds=None,
+            total_timeout_reason=None,
+            checkout_most_advanced_branch=False,
+            allow_mutating_gates=False,
+        )
+
+    assert external.read_text(encoding="utf-8") == "sentinel\n"
 
 
 def test_rollout_human_summary_names_ledger_and_report_counts() -> None:

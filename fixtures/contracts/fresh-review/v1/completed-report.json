@@ -1,0 +1,80 @@
+{
+  "schema": "quality-runner-review-report-v0.1",
+  "run_id": "golden-task",
+  "mode": "task",
+  "scope": "task",
+  "breadth": "focused",
+  "adapter_status": "review-complete",
+  "task_provenance": "task-hash",
+  "summary": "Review complete: 0 critical, 1 high, 0 medium issues found.",
+  "severity_counts": {
+    "critical": 0,
+    "high": 1,
+    "medium": 0,
+    "low": 0
+  },
+  "evidence_used": [
+    "quality_runner/review_context.py"
+  ],
+  "evidence_unavailable": [],
+  "exclusions": [
+    "generated"
+  ],
+  "sections": {
+    "missed_requirements": [],
+    "confirmed_issues": [
+      {
+        "id": "FR-001",
+        "fingerprint": "sha256:golden",
+        "severity": "high",
+        "classification": "confirmed",
+        "confidence": "high",
+        "summary": "The projection contract is missing a golden fixture.",
+        "why_it_matters": "A serializer change could silently alter a public artifact.",
+        "location": [
+          "quality_runner/review_context.py:1"
+        ],
+        "evidence": [
+          "quality_runner/review_context.py"
+        ],
+        "recommended_fix": "Add a fixture round-trip test.",
+        "agent_prompt": "Verify the v1 projection before changing the serializer.",
+        "human_confirmation_required": false,
+        "status": "open"
+      }
+    ],
+    "suspected_issues": [],
+    "not_enough_evidence": [],
+    "project_consistency_risks": [],
+    "regression_risks": [],
+    "known_accepted_issues": [],
+    "suggested_fixes": [
+      "Add a fixture round-trip test."
+    ],
+    "agent_handoff_prompts": [
+      "Verify the v1 projection before changing the serializer."
+    ],
+    "remaining_uncertainty": []
+  },
+  "findings": [
+    {
+      "id": "FR-001",
+      "fingerprint": "sha256:golden",
+      "severity": "high",
+      "classification": "confirmed",
+      "confidence": "high",
+      "summary": "The projection contract is missing a golden fixture.",
+      "why_it_matters": "A serializer change could silently alter a public artifact.",
+      "location": [
+        "quality_runner/review_context.py:1"
+      ],
+      "evidence": [
+        "quality_runner/review_context.py"
+      ],
+      "recommended_fix": "Add a fixture round-trip test.",
+      "agent_prompt": "Verify the v1 projection before changing the serializer.",
+      "human_confirmation_required": false,
+      "status": "open"
+    }
+  ]
+}

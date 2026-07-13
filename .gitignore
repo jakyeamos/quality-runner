@@ -1,11 +1,11 @@
 __pycache__/
+.venv/
 .pytest_cache/
 .aios/
 .quality-runner/
 .tmcp/
 .pre-cr/
 *.egg-info/
-uv.lock
 
 # Generated / cache / audit output
 .turbo/

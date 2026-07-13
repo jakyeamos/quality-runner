@@ -166,6 +166,36 @@ def test_module_cli_doc_quality_validates_external_fixture(tmp_path: Path) -> No
     assert Path(payload["artifact_paths"]["adoption_doc_quality_json"]).exists()
 
 
+def test_certifier_rejects_unsafe_run_ids_and_symlinked_output_ancestors(tmp_path: Path) -> None:
+    from repo_quality_certifier.cli import build_plan_payload
+
+    _write_certifier_fixture(tmp_path)
+    for run_id in ("../escape", "/tmp/escape", "nested\\escape"):
+        try:
+            build_plan_payload(repo_root=tmp_path, run_id=run_id)
+        except ValueError as error:
+            assert str(error) == "run_id must be a non-empty single path segment"
+        else:
+            raise AssertionError(f"certifier accepted unsafe run ID: {run_id}")
+
+    external = tmp_path / "external"
+    (external / "nested").mkdir(parents=True)
+    output_link = tmp_path / "output-link"
+    output_link.symlink_to(external, target_is_directory=True)
+    try:
+        build_plan_payload(
+            repo_root=tmp_path,
+            run_id="safe-run",
+            output_dir=output_link / "nested",
+        )
+    except ValueError as error:
+        assert str(error) == "artifact output directory must not contain symlink components"
+    else:
+        raise AssertionError("certifier followed a symlinked output ancestor")
+
+    assert not (external / "nested" / "gate-matrix.json").exists()
+
+
 def test_mcp_lists_and_calls_certifier_tools(tmp_path: Path) -> None:
     _write_certifier_fixture(tmp_path)
 

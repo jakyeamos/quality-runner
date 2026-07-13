@@ -1,0 +1,34 @@
+{
+  "schema": "quality-runner-review-report-v0.1",
+  "run_id": "golden-blind",
+  "mode": "blind",
+  "scope": "project",
+  "breadth": "related",
+  "adapter_status": "review-not-run",
+  "task_provenance": null,
+  "summary": "Review packet ready: no review was run. Send the packet to a reviewer, then rerun with --adapter-output.",
+  "severity_counts": {
+    "critical": 0,
+    "high": 0,
+    "medium": 0,
+    "low": 0
+  },
+  "evidence_used": [],
+  "evidence_unavailable": [
+    "No review adapter was selected."
+  ],
+  "exclusions": [],
+  "sections": {
+    "missed_requirements": [],
+    "confirmed_issues": [],
+    "suspected_issues": [],
+    "not_enough_evidence": [],
+    "project_consistency_risks": [],
+    "regression_risks": [],
+    "known_accepted_issues": [],
+    "suggested_fixes": [],
+    "agent_handoff_prompts": [],
+    "remaining_uncertainty": []
+  },
+  "findings": []
+}

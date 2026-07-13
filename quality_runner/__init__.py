@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from quality_runner._version import __version__
 from quality_runner.evidence_contract import (
     QUALITY_EVIDENCE_SCHEMA,
     QUALITY_FINDING_SCHEMA,
@@ -8,8 +9,6 @@ from quality_runner.evidence_contract import (
     quality_finding_counts,
     validate_quality_finding,
 )
-
-__version__ = "0.4.0"
 
 __all__ = [
     "QUALITY_EVIDENCE_SCHEMA",

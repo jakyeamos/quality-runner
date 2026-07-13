@@ -1,26 +1,20 @@
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 
 from quality_runner.config import load_repo_config
 from quality_runner.security.candidates import security_candidate_fingerprint
 from quality_runner.security.config import security_settings
-from quality_runner.security.scan import create_security_scan, merge_security_into_capability_map
-from quality_runner.workflow import inspect_payload, run_payload
+from quality_runner.security.scan import merge_security_into_capability_map
+from quality_runner.workflow import inspect_payload, run_payload, verify_gates_payload
 from test_support.quality_runner_fixtures import write_js_fixture, write_python_quality_fixture
+from test_support.security_scan import run_security_scan
 
 
 def _run_scan(repo: Path, config_text: str | None = None) -> dict:
-    if config_text is not None:
-        (repo / ".quality-runner.toml").write_text(config_text, encoding="utf-8")
-    from quality_runner.discovery import inspect_repo
-    from quality_runner.standards import compile_standards
-
-    config = load_repo_config(repo)
-    scan = inspect_repo(repo, run_id="sec-test", ci_checks=[], extra_warnings=[], config=config)
-    standards = compile_standards(repo_root=repo, scan=scan, profile="default", config=config)
-    return create_security_scan(repo, scan=scan, config=config, standards_packet=standards)
+    return run_security_scan(repo, config_text)
 
 
 def test_security_capability_detected_from_package_script(tmp_path: Path) -> None:
@@ -80,6 +74,361 @@ def test_candidate_detection_for_secret_exposure(tmp_path: Path) -> None:
     security_scan = _run_scan(tmp_path)
     categories = {item["category"] for item in security_scan["candidates"]}
     assert "secrets-exposure" in categories
+
+
+def test_secret_candidate_evidence_is_redacted_before_artifact_persistence(tmp_path: Path) -> None:
+    write_js_fixture(tmp_path)
+    secret = "m7-security-redaction-regression-secret-42"
+    src = tmp_path / "src"
+    src.mkdir()
+    (src / "secrets.js").write_text(f'const apiKey = "{secret}";\n', encoding="utf-8")
+
+    payload = run_payload(repo_root=tmp_path, run_id="sec-redaction-001", profile="default")
+    security_scan = json.loads(
+        Path(payload["artifact_paths"]["security_scan_json"]).read_text(encoding="utf-8")
+    )
+    candidate = next(
+        item for item in security_scan["candidates"] if item["category"] == "secrets-exposure"
+    )
+
+    assert candidate["evidence"] == 'const apiKey = "<redacted>";'
+    assert candidate["fingerprint"] == security_candidate_fingerprint(
+        category="secrets-exposure",
+        file="src/secrets.js",
+        line=1,
+        evidence=candidate["evidence"],
+    )
+    artifact_texts = [
+        path.read_text(encoding="utf-8")
+        for path in (tmp_path / ".quality-runner" / "runs" / "sec-redaction-001").rglob("*")
+        if path.is_file()
+    ]
+    assert all(secret not in text for text in artifact_texts)
+
+
+def test_secret_like_source_evidence_is_redacted_across_generated_artifacts(tmp_path: Path) -> None:
+    from quality_runner.handoff_lint import validate_slice_spec_content
+
+    write_js_fixture(tmp_path)
+    secret = "m7-shared-redaction-regression-secret-42"
+    src = tmp_path / "src"
+    src.mkdir()
+    (src / "secrets.js").write_text(
+        "\n".join(
+            [
+                (
+                    f'const apiKey: string = "{secret}"; '
+                    "const state = one ? two : three ? four : five;"
+                ),
+                f'const apiKey = "{secret}";',
+                "const adjacent = one ? two : three ? four : five;",
+                "const apiKey =",
+                f'  "{secret}"; const multilineState = one ? two : three ? four : five;',
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    payloads = {
+        "inspect": inspect_payload(repo_root=tmp_path, run_id="shared-redaction-inspect"),
+        "run": run_payload(repo_root=tmp_path, run_id="shared-redaction-run"),
+        "verify": verify_gates_payload(
+            repo_root=tmp_path,
+            run_id="shared-redaction-verify",
+            read_only_gates=True,
+        ),
+    }
+    redacted_same_line = (
+        'const apiKey: string = "<redacted>"; const state = one ? two : three ? four : five;'
+    )
+    redacted_multiline_finding = (
+        '"<redacted>"; const multilineState = one ? two : three ? four : five;'
+    )
+    redacted_multiline_excerpt = (
+        '  "<redacted>"; const multilineState = one ? two : three ? four : five;'
+    )
+
+    for payload in payloads.values():
+        artifact_paths = payload["artifact_paths"]
+        code_quality_scan = json.loads(
+            Path(artifact_paths["code_quality_scan_json"]).read_text(encoding="utf-8")
+        )
+        for line, evidence in ((1, redacted_same_line), (5, redacted_multiline_finding)):
+            finding = next(
+                finding
+                for finding in code_quality_scan["findings"]
+                if finding["rule_id"] == "nested-ternary" and finding["line"] == line
+            )
+            expected_fingerprint = hashlib.sha256(
+                f"nested-ternary:src/secrets.js:{evidence}".encode()
+            ).hexdigest()[:16]
+
+            assert finding["evidence"] == evidence
+            assert finding["fingerprint"] == expected_fingerprint
+        run_dir = Path(artifact_paths["code_quality_scan_json"]).parent
+        artifact_texts = [
+            path.read_text(encoding="utf-8") for path in run_dir.rglob("*") if path.is_file()
+        ]
+        assert all(secret not in text for text in artifact_texts)
+
+    for name in ("run", "verify"):
+        artifact_paths = payloads[name]["artifact_paths"]
+        remediation_plan = json.loads(
+            Path(artifact_paths["remediation_plan_json"]).read_text(encoding="utf-8")
+        )
+        adjacent_finding = next(
+            finding
+            for slice_item in remediation_plan["slices"]
+            for finding in slice_item["findings"]
+            if finding.get("rule_id") == "nested-ternary" and finding.get("line") == 3
+        )
+        excerpt = adjacent_finding["evidence_excerpt"]
+        multiline_finding = next(
+            finding
+            for slice_item in remediation_plan["slices"]
+            for finding in slice_item["findings"]
+            if finding.get("rule_id") == "nested-ternary" and finding.get("line") == 5
+        )
+        slice_specs = list(
+            Path(artifact_paths["remediation_plan_json"]).parent.glob("slice-specs/*.md")
+        )
+
+        assert 'const apiKey = "<redacted>";' in excerpt["context_before"]
+        assert multiline_finding["evidence_excerpt"]["excerpt"] == redacted_multiline_excerpt
+        assert slice_specs
+        assert all(
+            validate_slice_spec_content(path.read_text(encoding="utf-8"))["passed"]
+            for path in slice_specs
+        )
+
+
+def test_secret_assignment_context_redacts_comments_and_expressions(tmp_path: Path) -> None:
+    write_js_fixture(tmp_path)
+    secret = "m7-secret-assignment-context-regression-42"
+    src = tmp_path / "src"
+    src.mkdir()
+    (src / "assignment-context-secrets.js").write_text(
+        "\n".join(
+            [
+                (
+                    "const apiKey /* compiler metadata */ = "
+                    f'"{secret}"; const commentState = one ? two : three ? four : five;'
+                ),
+                (
+                    f'const apiKey = String("{secret}"); '
+                    "const expressionState = one ? two : three ? four : five;"
+                ),
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    payload = run_payload(repo_root=tmp_path, run_id="assignment-context-redaction-001")
+    code_quality_scan = json.loads(
+        Path(payload["artifact_paths"]["code_quality_scan_json"]).read_text(encoding="utf-8")
+    )
+    expected_evidence = {
+        1: (
+            'const apiKey /* compiler metadata */ = "<redacted>"; '
+            "const commentState = one ? two : three ? four : five;"
+        ),
+        2: (
+            'const apiKey = String("<redacted>"); '
+            "const expressionState = one ? two : three ? four : five;"
+        ),
+    }
+
+    for line, evidence in expected_evidence.items():
+        finding = next(
+            item
+            for item in code_quality_scan["findings"]
+            if item["file"] == "src/assignment-context-secrets.js"
+            and item["rule_id"] == "nested-ternary"
+            and item["line"] == line
+        )
+        assert finding["evidence"] == evidence
+
+    artifact_texts = [
+        path.read_text(encoding="utf-8")
+        for path in (
+            tmp_path / ".quality-runner" / "runs" / "assignment-context-redaction-001"
+        ).rglob("*")
+        if path.is_file()
+    ]
+    assert all(secret not in text for text in artifact_texts)
+
+
+def test_expensive_api_candidate_evidence_redacts_secret_like_source(tmp_path: Path) -> None:
+    write_js_fixture(tmp_path)
+    secret = "m7-expensive-api-redaction-regression-secret-42"
+    route = tmp_path / "app" / "api" / "chat" / "route.ts"
+    route.parent.mkdir(parents=True)
+    route.write_text(
+        f'const apiKey = "{secret}"; await openai.chat.completions.create({{}});\n',
+        encoding="utf-8",
+    )
+
+    payload = run_payload(
+        repo_root=tmp_path, run_id="expensive-api-redaction-001", profile="default"
+    )
+    security_scan = json.loads(
+        Path(payload["artifact_paths"]["security_scan_json"]).read_text(encoding="utf-8")
+    )
+    candidate = next(
+        item for item in security_scan["candidates"] if item["category"] == "expensive-api-abuse"
+    )
+    expected_evidence = 'const apiKey = "<redacted>"; await openai.chat.completions.create({});'
+
+    assert candidate["evidence"] == expected_evidence
+    artifact_texts = [
+        path.read_text(encoding="utf-8")
+        for path in (tmp_path / ".quality-runner" / "runs" / "expensive-api-redaction-001").rglob(
+            "*"
+        )
+        if path.is_file()
+    ]
+    assert all(secret not in text for text in artifact_texts)
+
+
+def test_multiline_source_evidence_redacts_typed_and_concatenated_assignments(
+    tmp_path: Path,
+) -> None:
+    from quality_runner.evidence_excerpts import read_line_excerpt
+
+    write_js_fixture(tmp_path)
+    secret = "m7-multiline-source-redaction-regression-secret-42"
+    src = tmp_path / "src"
+    src.mkdir()
+    (src / "multiline-secrets.js").write_text(
+        "\n".join(
+            [
+                "const apiKey: string =",
+                f'  "{secret}"; const typedState = one ? two : three ? four : five;',
+                "const concatKey =",
+                '  "prefix" +',
+                f'  "{secret}"; const concatState = one ? two : three ? four : five;',
+                'const label = "safe"; const API_KEY: string = `',
+                f"{secret}`; const templateState = one ? two : three ? four : five;",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    payload = run_payload(repo_root=tmp_path, run_id="multiline-redaction-001", profile="default")
+    code_quality_scan = json.loads(
+        Path(payload["artifact_paths"]["code_quality_scan_json"]).read_text(encoding="utf-8")
+    )
+    expected_evidence = {
+        2: '"<redacted>"; const typedState = one ? two : three ? four : five;',
+        5: '"<redacted>"; const concatState = one ? two : three ? four : five;',
+        7: '"<redacted>"; const templateState = one ? two : three ? four : five;',
+    }
+
+    for line, evidence in expected_evidence.items():
+        finding = next(
+            item
+            for item in code_quality_scan["findings"]
+            if item["file"] == "src/multiline-secrets.js"
+            and item["rule_id"] == "nested-ternary"
+            and item["line"] == line
+        )
+        assert finding["evidence"] == evidence
+
+    excerpt = read_line_excerpt(tmp_path, "src/multiline-secrets.js", 5)
+    assert excerpt is not None
+    assert (
+        excerpt["excerpt"] == '  "<redacted>"; const concatState = one ? two : three ? four : five;'
+    )
+    artifact_texts = [
+        path.read_text(encoding="utf-8")
+        for path in (tmp_path / ".quality-runner" / "runs" / "multiline-redaction-001").rglob("*")
+        if path.is_file()
+    ]
+    assert all(secret not in text for text in artifact_texts)
+
+
+def test_expensive_api_candidate_evidence_redacts_multiline_template_secret(
+    tmp_path: Path,
+) -> None:
+    write_js_fixture(tmp_path)
+    secret = "m7-template-expensive-api-redaction-regression-secret-42"
+    route = tmp_path / "app" / "api" / "chat" / "route.ts"
+    route.parent.mkdir(parents=True)
+    route.write_text(
+        "\n".join(
+            [
+                'const label = "safe"; const API_KEY: string = `',
+                f"{secret}`; await openai.chat.completions.create({{}});",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    payload = run_payload(
+        repo_root=tmp_path,
+        run_id="template-expensive-api-redaction-001",
+        profile="default",
+    )
+    security_scan = json.loads(
+        Path(payload["artifact_paths"]["security_scan_json"]).read_text(encoding="utf-8")
+    )
+    candidate = next(
+        item for item in security_scan["candidates"] if item["category"] == "expensive-api-abuse"
+    )
+
+    assert candidate["evidence"] == '"<redacted>"; await openai.chat.completions.create({});'
+    artifact_texts = [
+        path.read_text(encoding="utf-8")
+        for path in (
+            tmp_path / ".quality-runner" / "runs" / "template-expensive-api-redaction-001"
+        ).rglob("*")
+        if path.is_file()
+    ]
+    assert all(secret not in text for text in artifact_texts)
+
+
+def test_expensive_api_candidate_evidence_redacts_multiline_secret_like_source(
+    tmp_path: Path,
+) -> None:
+    write_js_fixture(tmp_path)
+    secret = "m7-multiline-expensive-api-redaction-regression-secret-42"
+    route = tmp_path / "app" / "api" / "chat" / "route.ts"
+    route.parent.mkdir(parents=True)
+    route.write_text(
+        "\n".join(
+            [
+                "const apiKey =",
+                f'  "{secret}"; await openai.chat.completions.create({{}});',
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    payload = run_payload(
+        repo_root=tmp_path,
+        run_id="multiline-expensive-api-redaction-001",
+        profile="default",
+    )
+    security_scan = json.loads(
+        Path(payload["artifact_paths"]["security_scan_json"]).read_text(encoding="utf-8")
+    )
+    candidate = next(
+        item for item in security_scan["candidates"] if item["category"] == "expensive-api-abuse"
+    )
+
+    assert candidate["evidence"] == '"<redacted>"; await openai.chat.completions.create({});'
+    artifact_texts = [
+        path.read_text(encoding="utf-8")
+        for path in (
+            tmp_path / ".quality-runner" / "runs" / "multiline-expensive-api-redaction-001"
+        ).rglob("*")
+        if path.is_file()
+    ]
+    assert all(secret not in text for text in artifact_texts)
 
 
 def test_agent_review_gate_for_api_routes(tmp_path: Path) -> None:

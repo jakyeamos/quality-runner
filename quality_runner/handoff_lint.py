@@ -3,8 +3,13 @@ from __future__ import annotations
 import re
 from typing import Any
 
+from quality_runner.evidence_redaction import REDACTED_LITERAL
+
 SECRET_PATTERNS = (
-    re.compile(r"(?i)(api[_-]?key|secret|password|token)\s*[:=]\s*['\"][^'\"]{8,}"),
+    re.compile(
+        rf"(?i)(api[_-]?key|secret|password|token)\s*[:=]\s*['\"]"
+        rf"(?!{re.escape(REDACTED_LITERAL)}['\"])[^'\"]{{8,}}"
+    ),
     re.compile(r"(?i)-----BEGIN (?:RSA |EC )?PRIVATE KEY-----"),
 )
 

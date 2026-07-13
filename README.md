@@ -5,9 +5,8 @@ repositories.
 
 It inspects a target repo, compiles standards, detects available quality gates,
 normalizes evidence-backed findings, writes `.quality-runner/` artifacts, and
-produces an ordered remediation plan. Version 1 does not edit source files,
-install dependencies, create commits, call remote services, or execute
-remediation.
+produces an ordered remediation plan. It does not edit source files, install
+dependencies, create commits, call remote services, or execute remediation.
 
 ## Why this exists
 
@@ -69,31 +68,51 @@ packages it supersedes publicly:
 
 ## Quickstart
 
-Start a fresh, local-only review with a task-aware packet:
+Start with the outcome-first journeys. Each result names the state, the strength
+of the evidence, what was written, the safety mode, and one next action.
 
 ```bash
-quality-runner review /path/to/repo --task "Implement the requested change" --json
+quality-runner audit /path/to/repo --run-id baseline-001 --json
+quality-runner review /path/to/repo --mode blind --json
+quality-runner verify /path/to/repo --run-id baseline-001-verify --json
+quality-runner runs /path/to/repo --json
 ```
 
-Fresh Review is read-only and does not call remote services or apply fixes. Use
-`--mode blind` when no task should be supplied. A missing adapter returns an
-honest `review-not-run` packet-only result; fixing-agent prompts are separate
-artifacts and are not remediation commands.
+`audit` creates evidence and a remediation plan without editing source files.
+`review` makes a prepared packet visibly `awaiting-evidence`, rather than
+treating the absence of a packet-bound local response as clean. `verify`
+records discovered gates by default; `runs` reads history without adding a
+summary file. All four journeys emit the v2 outcome by default.
+Fresh Review is deliberately two-phase: prepare a packet first, then submit a
+response that is bound to that packet. The [CLI Reference](docs/cli.md#quality-runner-review)
+explains the boundary and handoff model.
 
-Run a full repo refresh and write the remediation handoff in the same command:
+To authorize discovered commands after reviewing their evidence, use a disposable
+checkout explicitly:
+
+```bash
+quality-runner verify /path/to/repo \
+  --execute-gates --worktree-mode disposable --json
+```
+
+Disposable execution protects the ordinary source checkout from normal gate
+mutations; it is not a sandbox for arbitrary commands. See the
+[CLI Reference](docs/cli.md) for the full execution and dirty-worktree contract.
+
+Legacy `inspect`, `run`, `verify-gates`, `status`, and orchestration commands
+remain available for compatibility. Use `refresh` when a controller needs its
+established combined v1 workflow and handoff export:
 
 ```bash
 quality-runner refresh /path/to/repo \
   --run-id-prefix baseline-001 \
-  --handoff-output /tmp/baseline-001-handoff.md \
+  --handoff-output /path/to/repo/.quality-runner/exports/baseline-001-handoff.md \
   --json
 ```
 
-For an audit-only pass without gate verification, use `run`:
-
-```bash
-quality-runner run /path/to/repo --run-id baseline-001 --json
-```
+The [Upgrade and Compatibility Guide](docs/upgrade.md) defines the v2 command
+mappings, v1 support window, and non-destructive rollback procedure. Use
+`review --legacy-output` only when an existing CLI consumer requires v1 JSON.
 
 Quality Runner writes artifacts under the target repo:
 
@@ -132,6 +151,20 @@ templates agents should follow.
 
 ## Commands
 
+For new work, begin with the four outcome-first commands:
+
+```bash
+quality-runner audit /path/to/repo --json
+quality-runner review /path/to/repo --mode blind --json
+quality-runner verify /path/to/repo --json
+quality-runner runs /path/to/repo --json
+```
+
+Their JSON payload uses `quality-runner-outcome-v0.2`; the detailed definitions
+and safety behavior live in the [CLI Reference](docs/cli.md). The established
+commands below remain callable as supported v1 compatibility paths; see the
+[Upgrade and Compatibility Guide](docs/upgrade.md) before migrating automation.
+
 ```bash
 quality-runner doctor
 quality-runner init /path/to/repo --json
@@ -164,11 +197,12 @@ before scanning; the worktree must be clean.
 
 See [CLI Reference](docs/cli.md) for command details.
 
-`refresh` runs inspect, run, verify, and summarize in read-only mode. Its
-handoff statuses are intended for controllers: `gates-clean` means discovered
-local gates passed, `gates-blocked` means environment/dependency/read-only
-policy blocked evidence, and `gates-failed` means executable repo gates ran and
-failed. Blocked or failed handoffs include `blocker_groups` and
+`refresh` runs inspect, run, verify, and summarize. Its default verification is
+evidence-only: command-backed gates are reported as
+`execution-consent-required` until explicit disposable execution is authorized.
+`gates-clean` therefore means explicitly run local gates passed, while
+`gates-blocked` and `gates-failed` distinguish missing consent or environment
+constraints from executed command failures. Blocked or failed handoffs include `blocker_groups` and
 `next_slice.action_groups` for structured routing. Use `--handoff-output` when
 you want the scan and the human remediation plan from one command; use
 `export-handoff` later to regenerate or copy a handoff from an existing run.
@@ -187,19 +221,21 @@ the delta recommends `stop`. Quality Runner remains read-only; unrelated
 findings are retained as `out_of_scope` without blocking the task.
 
 Before release, run `quality-runner release-smoke --json` to verify the public
-CLI happy path, installed handoff export behavior, report compatibility checks,
-and the packaged `quality_evidence_contract` / `repo_quality_certifier`
-compatibility surfaces in one command.
+doctor contract, v2 audit outcome, handoff export, report compatibility, and
+the packaged `quality_evidence_contract` / `repo_quality_certifier` surfaces.
 
 ## MCP
 
-The MCP server exposes:
+New MCP integrations should use the additive outcome tools:
 
-- `quality_runner_doctor`
-- `quality_runner_inspect_repo`
-- `quality_runner_run`
-- `quality_runner_status`
-- `quality_runner_export_handoff`
+- `quality_runner_audit_outcome`
+- `quality_runner_review_outcome`
+- `quality_runner_verify_outcome`
+- `quality_runner_runs_outcome`
+
+They retain the standard MCP wrapper while exposing the v2 outcome as
+`structuredContent`. The established v1 MCP tools remain available for existing
+clients; use `tools/list` as the authoritative current tool/schema registry.
 
 For compatibility with prior Repo Quality Certifier consumers, the
 `repo-quality-certifier-mcp` command remains packaged and exposes:
@@ -214,6 +250,14 @@ See [MCP Integration](docs/mcp.md) for JSON-RPC examples and tool payloads.
 Quality Runner writes versioned JSON and Markdown artifacts. See
 [Artifact Contract](docs/artifacts.md) for the current v1 artifact set and
 field-level guarantees.
+
+Recognized secret-like source values are redacted before security and
+code-quality findings are fingerprinted or serialized; source excerpts in
+remediation slices receive the same protection. This does not make artifacts
+secret-free, so treat generated target-repository evidence as potentially
+sensitive until it has been reviewed for local paths, gate output, and
+source-derived content. See the [Upgrade and Compatibility Guide](docs/upgrade.md)
+for the narrow re-triage rule for newly redacted complex or multiline evidence.
 
 Semantic code similarity is a structural quality signal, not an automatic
 refactor. When `similarity-ts`, `similarity-py`, or `similarity-rs` are already
@@ -273,11 +317,13 @@ product workspaces. Add repo-specific exclusions in `.quality-runner.toml`:
 scan_exclusions = ["samples", "generated-reports/**"]
 ```
 
-## v1 Safety Boundary
+## Safety Boundary
 
-Quality Runner v1 may create or update files under `.quality-runner/runs/<run-id>/`
-in the target repository. It must not edit source files, install dependencies,
-create commits, call remote services, or execute remediation.
+Quality Runner may create or update files under
+`.quality-runner/runs/<run-id>/` in the target repository. It does not edit
+source files, install dependencies, create commits, call remote services, or
+execute remediation. Discovered gate commands are evidence-only unless the
+caller explicitly requests disposable execution.
 
 Every generated remediation slice includes verification guidance, but a separate
 coding agent must receive user approval before implementation.
@@ -287,17 +333,21 @@ coding agent must receive user approval before implementation.
 Run the full local ladder:
 
 ```bash
-python3.14 -m pytest -q
-ruff check .
-ruff format --check .
-basedpyright
-vulture . --min-confidence 70
-uv run --with pytest pytest -q
-python3.14 scripts/run_pytest_with_lcov.py
+uv sync --locked --all-groups
+uv run --locked pytest -q
+uv run --locked ruff check .
+uv run --locked ruff format --check .
+uv run --locked basedpyright
+uv run --locked vulture quality_runner quality_evidence_contract repo_quality_certifier tests scripts --min-confidence 70
+uv run --locked pip-audit
+uv run --locked python scripts/run_pytest_with_lcov.py
+uv run --locked quality-runner release-smoke --json
 pre-cr run --workspace . --json  # changed-line readiness; expects changed files
 ```
 
 See [Troubleshooting](docs/troubleshooting.md) for common install and runtime
 issues.
 
-See [Release Checklist](docs/release.md) for PyPI and Homebrew packaging notes.
+See [Release Checklist](docs/release.md) for PyPI and Homebrew packaging notes,
+and the [Upgrade and Compatibility Guide](docs/upgrade.md) for cutover and
+rollback behavior.

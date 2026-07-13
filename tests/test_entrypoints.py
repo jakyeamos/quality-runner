@@ -6,6 +6,7 @@ import shutil
 import subprocess
 import sys
 import zipfile
+from email.parser import BytesParser
 from pathlib import Path
 
 from quality_runner import __version__
@@ -69,7 +70,7 @@ def test_module_entrypoint_version_exits_successfully() -> None:
 
 def test_module_entrypoint_rejects_unknown_commands() -> None:
     result = subprocess.run(
-        [sys.executable, "-m", "quality_runner", "audit", "/tmp", "--json"],
+        [sys.executable, "-m", "quality_runner", "unknown-command", "/tmp", "--json"],
         cwd=ROOT,
         check=False,
         capture_output=True,
@@ -77,7 +78,7 @@ def test_module_entrypoint_rejects_unknown_commands() -> None:
     )
 
     assert result.returncode == 2
-    assert "invalid choice: 'audit'" in result.stderr
+    assert "invalid choice: 'unknown-command'" in result.stderr
 
 
 def test_scaffold_entrypoint_functions_import_and_return_success(monkeypatch) -> None:
@@ -87,7 +88,7 @@ def test_scaffold_entrypoint_functions_import_and_return_success(monkeypatch) ->
     from quality_runner.mcp import main as mcp_main
 
     assert cli_main(["--version"]) == 0
-    assert cli_main(["audit"]) == 2
+    assert cli_main(["unknown-command"]) == 2
     assert mcp_main(["--version"]) == 0
     monkeypatch.setattr("sys.stdin", iter([]))
     assert mcp_main([]) == 0
@@ -134,15 +135,44 @@ def test_packaged_console_script_invokes_cli(tmp_path: Path) -> None:
 
     with zipfile.ZipFile(wheel_path) as wheel:
         wheel_names = wheel.namelist()
-        entry_points = wheel.read(
-            f"quality_runner-{__version__}.dist-info/entry_points.txt"
-        ).decode()
+        metadata_path = next(name for name in wheel_names if name.endswith(".dist-info/METADATA"))
+        metadata = BytesParser().parsebytes(wheel.read(metadata_path))
+        dist_info_dir = metadata_path.removesuffix("/METADATA")
+        entry_points = wheel.read(f"{dist_info_dir}/entry_points.txt").decode()
+        plugin_manifest = json.loads(wheel.read("quality_runner/plugin/manifest.json"))
+    assert metadata["Name"] == "quality-runner"
+    assert metadata["Version"] == __version__
+    assert plugin_manifest["version"] == __version__
     assert "quality-runner = quality_runner.cli:main" in entry_points
     assert "quality-runner-mcp = quality_runner.mcp:main" in entry_points
     assert "repo-quality-certifier = repo_quality_certifier.cli:main" in entry_points
     assert "repo-quality-certifier-mcp = repo_quality_certifier.mcp:main" in entry_points
     assert "quality_runner/plugin/manifest.json" in wheel_names
     assert "quality_runner/plugin/SKILL.md" in wheel_names
+    assert "quality_runner/core/audit_contracts.py" in wheel_names
+    assert "quality_runner/core/outcome_contracts.py" in wheel_names
+    assert "quality_runner/core/review_contracts.py" in wheel_names
+    assert "quality_runner/application/audit_v1_artifacts.py" in wheel_names
+    assert "quality_runner/application/audit_workflows.py" in wheel_names
+    assert "quality_runner/application/journey_outcomes.py" in wheel_names
+    assert "quality_runner/application/outcome_projection.py" in wheel_names
+    assert "quality_runner/application/outcome_projection_support.py" in wheel_names
+    assert "quality_runner/application/read_only_audit.py" in wheel_names
+    assert "quality_runner/application/review_context_factory.py" in wheel_names
+    assert "quality_runner/application/review_reporting.py" in wheel_names
+    assert "quality_runner/application/review_v1_reports.py" in wheel_names
+    assert "quality_runner/application/review_v1_serializers.py" in wheel_names
+    assert "quality_runner/application/run_history.py" in wheel_names
+    assert "quality_runner/application/verification_workflows.py" in wheel_names
+    assert "quality_runner/compatibility/journey_outcomes.py" in wheel_names
+    assert "quality_runner/compatibility/legacy_workflow.py" in wheel_names
+    assert "quality_runner/compatibility/review_mcp.py" in wheel_names
+    assert "quality_runner/mcp_journeys.py" in wheel_names
+    assert "quality_runner/review_types.py" in wheel_names
+    assert "quality_runner/scan_scope.py" in wheel_names
+    assert "quality_runner/security_surface_paths.py" in wheel_names
+    assert "quality_runner/workflow.py" in wheel_names
+    assert "quality_runner/workflow_verify.py" in wheel_names
     assert "repo_quality_certifier/plugin/manifest.json" in wheel_names
     assert "repo_quality_certifier/plugin/SKILL.md" in wheel_names
     assert not any(name.startswith("test_support/") for name in wheel_names)
@@ -160,6 +190,16 @@ def test_packaged_console_script_invokes_cli(tmp_path: Path) -> None:
     quality_runner = venv_dir / "bin" / "quality-runner"
     version_result = subprocess.run(
         [str(quality_runner), "--version"],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    metadata_version_result = subprocess.run(
+        [
+            str(venv_python),
+            "-c",
+            "from importlib.metadata import version; print(version('quality-runner'))",
+        ],
         check=True,
         capture_output=True,
         text=True,
@@ -182,13 +222,101 @@ def test_packaged_console_script_invokes_cli(tmp_path: Path) -> None:
         capture_output=True,
         text=True,
     )
+    installed_review_root = tmp_path / "installed-review-smoke"
+    installed_legacy_review_root = tmp_path / "installed-legacy-review-smoke"
+    installed_mcp_review_root = tmp_path / "installed-mcp-review-smoke"
+    installed_review_root.mkdir()
+    installed_legacy_review_root.mkdir()
+    installed_mcp_review_root.mkdir()
+    review_result = subprocess.run(
+        [
+            str(quality_runner),
+            "review",
+            str(installed_review_root),
+            "--mode",
+            "blind",
+            "--run-id",
+            "installed-review-default",
+            "--json",
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    legacy_review_result = subprocess.run(
+        [
+            str(quality_runner),
+            "review",
+            str(installed_legacy_review_root),
+            "--mode",
+            "blind",
+            "--run-id",
+            "installed-review-legacy",
+            "--legacy-output",
+            "--json",
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    quality_runner_mcp = venv_dir / "bin" / "quality-runner-mcp"
+    mcp_review_result = subprocess.run(
+        [str(quality_runner_mcp)],
+        input=(
+            json.dumps(
+                {
+                    "jsonrpc": "2.0",
+                    "id": 2,
+                    "method": "tools/call",
+                    "params": {
+                        "name": "quality_runner_review_outcome",
+                        "arguments": {
+                            "repo_root": str(installed_mcp_review_root),
+                            "mode": "blind",
+                            "run_id": "installed-mcp-review-default",
+                        },
+                    },
+                }
+            )
+            + "\n"
+        ),
+        check=True,
+        capture_output=True,
+        text=True,
+    )
     compat_import_result = subprocess.run(
         [
             str(venv_python),
             "-c",
             "from quality_evidence_contract import QUALITY_FINDING_SCHEMA; "
             "from repo_quality_certifier import GATE_MATRIX_SCHEMA; "
-            "print(QUALITY_FINDING_SCHEMA, GATE_MATRIX_SCHEMA)",
+            "from quality_runner import workflow, workflow_verify; "
+            "from quality_runner.application import audit_workflows, journey_outcomes, verification_workflows; "
+            "from quality_runner.application import review_context_factory, review_reporting; "
+            "from quality_runner.compatibility import journey_outcomes as legacy_journey_outcomes; "
+            "from quality_runner.compatibility import legacy_workflow, review_mcp; "
+            "from quality_runner import review_context, review_report; "
+            "from quality_runner.core.review_contracts import ReviewFinding as CoreReviewFinding; "
+            "from quality_runner.review_report import ReviewFinding; "
+            "from quality_runner.application.review_v1_serializers import REVIEW_CONTEXT_SCHEMA; "
+            "from quality_runner.review_types import ReviewOptions, ReviewPacket; "
+            "from typing import get_type_hints; "
+            "assert workflow.inspect_payload is audit_workflows.inspect_payload; "
+            "assert workflow.run_payload is audit_workflows.run_payload; "
+            "assert workflow.verify_gates_payload is verification_workflows.verify_gates_payload; "
+            "assert workflow_verify.verify_gates_payload is verification_workflows.verify_gates_payload; "
+            "assert legacy_journey_outcomes.audit_journey_outcome is journey_outcomes.audit_journey_outcome; "
+            "assert legacy_journey_outcomes.review_journey_outcome is journey_outcomes.review_journey_outcome; "
+            "assert legacy_journey_outcomes.review_mcp_input_schema is review_mcp.review_mcp_input_schema; "
+            "assert legacy_journey_outcomes.review_mcp_journey_outcome is review_mcp.review_mcp_journey_outcome; "
+            "assert callable(workflow.refresh_payload); "
+            "assert callable(legacy_workflow.refresh_payload); "
+            "assert get_type_hints(review_context.build_review_context)['options'] is ReviewOptions; "
+            "assert get_type_hints(review_context.build_review_context)['return'] is ReviewPacket; "
+            "assert review_report.build_review_report is review_reporting.build_review_report; "
+            "assert ReviewFinding is CoreReviewFinding; "
+            "assert callable(review_context_factory.build_review_context); "
+            "print(QUALITY_FINDING_SCHEMA, GATE_MATRIX_SCHEMA, REVIEW_CONTEXT_SCHEMA, 'm6-facades-ok')",
         ],
         check=True,
         capture_output=True,
@@ -224,12 +352,44 @@ def test_packaged_console_script_invokes_cli(tmp_path: Path) -> None:
     doctor_payload = json.loads(doctor_result.stdout)
     assert doctor_payload["schema"] == "quality-runner-doctor-result-v0.1"
     assert doctor_payload["status"] == "ready"
+    assert doctor_payload["version"] == __version__
+    assert metadata_version_result.stdout.strip() == __version__
     smoke_payload = json.loads(smoke_result.stdout)
+    review_payload = json.loads(review_result.stdout)
+    legacy_review_payload = json.loads(legacy_review_result.stdout)
+    mcp_review_response = json.loads(mcp_review_result.stdout)
     assert smoke_payload["schema"] == "quality-runner-release-smoke-result-v0.1"
     assert smoke_payload["status"] == "passed"
+    assert {check["id"] for check in smoke_payload["checks"]} >= {
+        "doctor",
+        "outcome_contract",
+    }
     assert Path(smoke_payload["handoff_output"]).exists()
+    assert review_payload["schema"] == "quality-runner-outcome-v0.2"
+    assert review_payload["journey"] == "review"
+    assert review_payload["assessment"] == "packet-ready"
+    assert legacy_review_payload["schema"] == "quality-runner-review-result-v0.1"
+    assert "outcome" not in legacy_review_payload
+    assert "next_action" not in legacy_review_payload
+    assert mcp_review_response["jsonrpc"] == "2.0"
+    assert mcp_review_response["id"] == 2
+    assert "error" not in mcp_review_response
+    mcp_review_result_payload = mcp_review_response["result"]
+    assert mcp_review_result_payload["schema"] == "quality-runner-mcp-result-v0.1"
+    assert mcp_review_result_payload["isError"] is False
+    mcp_review_outcome = mcp_review_result_payload["structuredContent"]
+    assert mcp_review_outcome["schema"] == "quality-runner-outcome-v0.2"
+    assert mcp_review_outcome["journey"] == "review"
+    assert mcp_review_outcome["state"] == "awaiting-evidence"
+    assert mcp_review_outcome["assessment"] == "packet-ready"
+    mcp_artifact_paths = mcp_review_outcome["writes"]["artifact_paths"]
+    assert {"review_execution_json", "review_adapter_response_template_json"}.issubset(
+        mcp_artifact_paths
+    )
+    assert all(Path(path).is_file() for path in mcp_artifact_paths.values())
     assert compat_import_result.stdout.strip() == (
-        "quality-finding-v0.1 aios-repo-gate-matrix-v0.1"
+        "quality-finding-v0.1 aios-repo-gate-matrix-v0.1 quality-runner-review-context-v0.1 "
+        "m6-facades-ok"
     )
     certifier_payload = json.loads(certifier_result.stdout)
     assert certifier_payload["schema"] == "repo-quality-certifier-plan-result-v0.1"

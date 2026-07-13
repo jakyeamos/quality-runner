@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import gzip
 import hashlib
-import os
 from pathlib import Path
 from typing import Any
 
@@ -18,31 +17,28 @@ from quality_runner.code_quality_ledger import (
     build_resolution_ledger,
     render_resolution_ledger_markdown,
 )
-from quality_runner.code_quality_paths import (
-    TEXT_EXTENSIONS,
-    _artifact_directory_reason,
-    _check_coverage,
-    _ignored_directory_reason,
-    _is_generated_file,
-    _is_included_or_included_parent,
-    _join_relative,
-    _split_lines,
-    _string_or_none,
-    _top_level_ignored_directory_reason,
-    _under_generated_path,
-)
+from quality_runner.code_quality_paths import _check_coverage, _string_or_none
 from quality_runner.code_quality_ponytail import ponytail_findings
 from quality_runner.code_quality_rules import _scan_file
-from quality_runner.code_quality_similarity import (
-    collect_deduplicate_scan,
-    similarity_policy_defaults,
-)
+from quality_runner.code_quality_similarity import collect_deduplicate_scan
 from quality_runner.code_quality_skills import skill_findings
 from quality_runner.code_quality_unwired import unwired_findings
-from quality_runner.scan_exclusions import (
-    gitignore_scan_exclusions,
-    matches_scan_exclusion,
-    resolve_scan_exclusions,
+from quality_runner.core.audit_contracts import AuditPayload, TextScanScope
+from quality_runner.evidence_redaction import redact_secret_like_source_lines
+from quality_runner.scan_scope import (
+    DEFAULT_FAT_ROUTER_LINES as _DEFAULT_FAT_ROUTER_LINES,
+)
+from quality_runner.scan_scope import (
+    DEFAULT_LARGE_FILE_LINES as _DEFAULT_LARGE_FILE_LINES,
+)
+from quality_runner.scan_scope import (
+    create_text_scan_scope,
+    discover_text_files,
+    effective_scan_exclusions,
+    generated_paths,
+    scan_budget_summary,
+    skipped_path_summary,
+    structural_scan_policy,
 )
 from quality_runner.schema_constants import CODE_QUALITY_SCAN_SCHEMA
 
@@ -53,12 +49,9 @@ __all__ = [
     "render_resolution_ledger_markdown",
 ]
 
-DEFAULT_LARGE_FILE_LINES = 500
-DEFAULT_FAT_ROUTER_LINES = 500
 DEFAULT_GZIPPED_JS_BUNDLE_BYTES = 200_000
-DEFAULT_SKIPPED_PATH_ESTIMATE_LIMIT = 10_000
-DEFAULT_MAX_TEXT_FILES = 2_500
-ESTIMATED_SCAN_SECONDS_PER_TEXT_FILE = 0.015
+DEFAULT_LARGE_FILE_LINES = _DEFAULT_LARGE_FILE_LINES
+DEFAULT_FAT_ROUTER_LINES = _DEFAULT_FAT_ROUTER_LINES
 JS_BUNDLE_DIRS = (
     ".next/static/chunks",
     "build/static/js",
@@ -73,36 +66,30 @@ def create_code_quality_scan(
     scan: dict[str, Any],
     config: dict[str, Any],
     skill_review_report: dict[str, Any] | None = None,
+    text_scan_scope: TextScanScope | None = None,
 ) -> dict[str, Any]:
     root = repo_root.expanduser().resolve()
-    policy = _structural_policy(config)
+    policy = structural_scan_policy(config)
     disabled_groups = set(policy["disabled_rule_groups"])
-    include_ignored_paths = set(policy["include_ignored_paths"])
-    scan_exclusions = _effective_scan_exclusions(root, config)
-    generated_paths = _generated_paths(scan)
-    skipped_files: list[dict[str, Any]] = []
+    scope = text_scan_scope or create_text_scan_scope(root, scan=scan, config=config)
+    skipped_files = list(scope.skipped_files)
     findings: list[dict[str, Any]] = []
     extracted_functions: list[dict[str, Any]] = []
     accountability: list[dict[str, Any]] = []
     scanned_files: list[dict[str, Any]] = []
 
-    for path in _discover_text_files(
-        root,
-        skipped_files,
-        generated_paths,
-        include_ignored_paths,
-        scan_exclusions,
-        policy["max_text_files"],
-    ):
-        relative_path = path.relative_to(root).as_posix()
-        text = path.read_text(encoding="utf-8", errors="replace")
-        lines = _split_lines(text)
+    for file_info in scope.files:
+        relative_path = file_info.path
+        source_text = file_info.text
+        source_lines = file_info.lines
+        lines = redact_secret_like_source_lines(source_lines)
+        text = "\n".join(lines)
         scanned_files.append({"path": relative_path, "text": text, "lines": lines})
         accountability.append(
             {
                 "path": relative_path,
                 "line_count": len(lines),
-                "sha256": hashlib.sha256(text.encode("utf-8")).hexdigest(),
+                "sha256": hashlib.sha256(source_text.encode("utf-8")).hexdigest(),
                 "scan_status": "scanned",
                 "check_coverage": _check_coverage(relative_path),
             }
@@ -172,145 +159,18 @@ def create_code_quality_scan(
             "duplicate_clusters": len(duplicate_clusters),
             "semantic_similarity_clusters": semantic_similarity_clusters,
             "semantic_similarity_tools": semantic_similarity_tools,
-            "scan_budget": _scan_budget_summary(
+            "scan_budget": scan_budget_summary(
                 scanned_files=len(accountability),
-                max_text_files=policy["max_text_files"],
+                max_text_files=scope.max_text_files,
                 skipped_files=skipped_files,
             ),
-            **_skipped_path_summary(skipped_files),
+            **skipped_path_summary(skipped_files),
         },
         "accountability": accountability,
         "findings": sorted_findings,
         "duplicate_clusters": duplicate_clusters,
-        "skipped_files": sorted(skipped_files, key=lambda item: item["path"]),
+        "skipped_files": sorted(skipped_files, key=_skipped_file_path),
     }
-
-
-def _structural_policy(config: dict[str, Any]) -> dict[str, Any]:
-    policy = config.get("structural_scan")
-    if not isinstance(policy, dict):
-        policy = {}
-    disabled = policy.get("disabled_rule_groups")
-    large_file_lines = policy.get("large_file_lines")
-    fat_router_lines = policy.get("fat_router_lines")
-    max_text_files = policy.get("max_text_files")
-    similarity_enabled = policy.get("similarity_enabled")
-    similarity_threshold = policy.get("similarity_threshold")
-    similarity_min_lines = policy.get("similarity_min_lines")
-    similarity_max_pairs = policy.get("similarity_max_pairs")
-    similarity_timeout_seconds = policy.get("similarity_timeout_seconds")
-    similarity_include_tests = policy.get("similarity_include_tests")
-    resolved = {
-        "disabled_rule_groups": [item for item in disabled if isinstance(item, str)]
-        if isinstance(disabled, list)
-        else [],
-        "include_ignored_paths": _normalized_path_list(policy.get("include_ignored_paths")),
-        "large_file_lines": large_file_lines
-        if isinstance(large_file_lines, int) and large_file_lines > 0
-        else DEFAULT_LARGE_FILE_LINES,
-        "fat_router_lines": fat_router_lines
-        if isinstance(fat_router_lines, int) and fat_router_lines > 0
-        else DEFAULT_FAT_ROUTER_LINES,
-        "max_text_files": max_text_files
-        if isinstance(max_text_files, int) and max_text_files > 0
-        else DEFAULT_MAX_TEXT_FILES,
-        "similarity_enabled": similarity_enabled,
-        "similarity_threshold": similarity_threshold,
-        "similarity_min_lines": similarity_min_lines,
-        "similarity_max_pairs": similarity_max_pairs,
-        "similarity_timeout_seconds": similarity_timeout_seconds,
-        "similarity_include_tests": similarity_include_tests,
-    }
-    return {**resolved, **similarity_policy_defaults(resolved)}
-
-
-def _discover_text_files(
-    root: Path,
-    skipped_files: list[dict[str, Any]],
-    generated_paths: set[str],
-    include_ignored_paths: set[str],
-    scan_exclusions: list[str],
-    max_text_files: int,
-) -> list[Path]:
-    files: list[Path] = []
-    scan_budget_exceeded = False
-    for current_root, dir_names, file_names in os.walk(root):
-        current_path = Path(current_root)
-        relative_current = current_path.relative_to(root).as_posix()
-        if scan_budget_exceeded:
-            skipped_files.append(
-                _skipped_directory_entry(root, current_path, "scan budget exceeded")
-            )
-            dir_names[:] = []
-            continue
-        ignored: list[tuple[str, str]] = []
-        for name in sorted(dir_names):
-            relative_name = _join_relative(relative_current, name)
-            generated = _under_generated_path(relative_name, generated_paths)
-            preferred_reason = _artifact_directory_reason(
-                relative_name, include_ignored_paths=include_ignored_paths
-            ) or _top_level_ignored_directory_reason(
-                relative_name, include_ignored_paths=include_ignored_paths
-            )
-            reason = (
-                "generated directory"
-                if generated
-                else preferred_reason
-                if preferred_reason is not None
-                else "scan exclusion"
-                if _is_scan_excluded(
-                    relative_name,
-                    scan_exclusions=scan_exclusions,
-                    include_ignored_paths=include_ignored_paths,
-                )
-                else _ignored_directory_reason(
-                    relative_name, include_ignored_paths=include_ignored_paths
-                )
-            )
-            if reason is not None:
-                ignored.append((name, reason))
-        for name in ignored:
-            directory_name, reason = name
-            skipped_files.append(
-                _skipped_directory_entry(root, current_path / directory_name, reason)
-            )
-        ignored_names = {name for name, _reason in ignored}
-        dir_names[:] = sorted(name for name in dir_names if name not in ignored_names)
-        for file_name in sorted(file_names):
-            path = current_path / file_name
-            relative_path = path.relative_to(root).as_posix()
-            if path.is_symlink():
-                continue
-            if not path.is_file():
-                continue
-            if _is_scan_excluded(
-                relative_path,
-                scan_exclusions=scan_exclusions,
-                include_ignored_paths=include_ignored_paths,
-            ):
-                if path.suffix in TEXT_EXTENSIONS or path.name in {"Dockerfile", "Makefile"}:
-                    skipped_files.append({"path": relative_path, "reason": "scan exclusion"})
-                continue
-            if _is_generated_file(relative_path):
-                skipped_files.append({"path": relative_path, "reason": "generated file"})
-                continue
-            if path.suffix in TEXT_EXTENSIONS or path.name in {"Dockerfile", "Makefile"}:
-                if len(files) >= max_text_files:
-                    skipped_files.append({"path": relative_path, "reason": "scan budget exceeded"})
-                    scan_budget_exceeded = True
-                    continue
-                files.append(path)
-        if scan_budget_exceeded:
-            for directory_name in dir_names:
-                skipped_files.append(
-                    _skipped_directory_entry(
-                        root,
-                        current_path / directory_name,
-                        "scan budget exceeded",
-                    )
-                )
-            dir_names[:] = []
-    return files
 
 
 def preview_ignored_paths(
@@ -320,138 +180,26 @@ def preview_ignored_paths(
     scan: dict[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
     root = repo_root.expanduser().resolve()
-    policy = _structural_policy(config)
-    skipped_files: list[dict[str, Any]] = []
-    _discover_text_files(
+    policy = structural_scan_policy(config)
+    skipped_files: list[AuditPayload] = []
+    discover_text_files(
         root,
-        skipped_files,
-        _generated_paths(scan or {}),
-        set(policy["include_ignored_paths"]),
-        _effective_scan_exclusions(root, config),
-        policy["max_text_files"],
+        skipped_files=skipped_files,
+        generated_paths=generated_paths(scan or {}),
+        include_ignored_paths=set(policy["include_ignored_paths"]),
+        scan_exclusions=effective_scan_exclusions(root, config),
+        max_text_files=policy["max_text_files"],
     )
     return [
         item
-        for item in sorted(skipped_files, key=lambda skipped: skipped["path"])
+        for item in sorted(skipped_files, key=_skipped_file_path)
         if item.get("reason") == "ignored directory"
     ]
 
 
-def _generated_paths(scan: dict[str, Any]) -> set[str]:
-    generated_code = scan.get("generated_code")
-    if not isinstance(generated_code, list):
-        return set()
-    paths: set[str] = set()
-    for item in generated_code:
-        if not isinstance(item, dict):
-            continue
-        path = item.get("path")
-        if isinstance(path, str) and path:
-            paths.add(path.strip("/"))
-    return paths
-
-
-def _effective_scan_exclusions(root: Path, config: dict[str, Any]) -> list[str]:
-    return [*resolve_scan_exclusions(config), *gitignore_scan_exclusions(root)]
-
-
-def _skipped_directory_entry(root: Path, path: Path, reason: str) -> dict[str, Any]:
-    relative_path = path.relative_to(root).as_posix()
-    estimated_files, estimate_truncated = _estimate_text_files(path)
-    return {
-        "path": relative_path,
-        "reason": reason,
-        "estimated_text_files": estimated_files,
-        "estimated_scan_seconds": _estimated_scan_seconds(estimated_files),
-        "estimate_truncated": estimate_truncated,
-        "include_config_hint": (
-            f'[quality_runner.structural_scan] include_ignored_paths = ["{relative_path}"]'
-        ),
-    }
-
-
-def _is_scan_excluded(
-    relative_path: str,
-    *,
-    scan_exclusions: list[str],
-    include_ignored_paths: set[str],
-) -> bool:
-    normalized = relative_path.strip("/")
-    return bool(
-        normalized
-        and not _is_included_or_included_parent(normalized, include_ignored_paths)
-        and matches_scan_exclusion(normalized, scan_exclusions)
-    )
-
-
-def _estimate_text_files(path: Path) -> tuple[int, bool]:
-    if not path.is_dir():
-        return 0, False
-
-    count = 0
-    for current_root, dir_names, file_names in os.walk(path):
-        dir_names[:] = sorted(
-            name for name in dir_names if not (Path(current_root) / name).is_symlink()
-        )
-        for file_name in sorted(file_names):
-            file_path = Path(current_root) / file_name
-            if file_path.is_symlink() or not file_path.is_file():
-                continue
-            if file_path.suffix in TEXT_EXTENSIONS or file_path.name in {"Dockerfile", "Makefile"}:
-                count += 1
-                if count >= DEFAULT_SKIPPED_PATH_ESTIMATE_LIMIT:
-                    return count, True
-    return count, False
-
-
-def _estimated_scan_seconds(estimated_files: int) -> float:
-    if estimated_files <= 0:
-        return 0.0
-    return max(0.1, round(estimated_files * ESTIMATED_SCAN_SECONDS_PER_TEXT_FILE, 1))
-
-
-def _skipped_path_summary(skipped_files: list[dict[str, Any]]) -> dict[str, Any]:
-    estimated_files = sum(
-        item.get("estimated_text_files", 0)
-        for item in skipped_files
-        if isinstance(item.get("estimated_text_files"), int)
-    )
-    return {
-        "skipped_paths": len(skipped_files),
-        "skipped_estimated_text_files": estimated_files,
-        "skipped_estimated_scan_seconds": _estimated_scan_seconds(estimated_files),
-        "skipped_estimate_truncated": any(
-            item.get("estimate_truncated") is True for item in skipped_files
-        ),
-    }
-
-
-def _scan_budget_summary(
-    *,
-    scanned_files: int,
-    max_text_files: int,
-    skipped_files: list[dict[str, Any]],
-) -> dict[str, Any]:
-    skipped_by_budget = [
-        item for item in skipped_files if item.get("reason") == "scan budget exceeded"
-    ]
-    return {
-        "max_text_files": max_text_files,
-        "scanned_text_files": scanned_files,
-        "budget_exceeded": bool(skipped_by_budget),
-        "skipped_text_files": len(skipped_by_budget),
-    }
-
-
-def _normalized_path_list(value: object) -> list[str]:
-    if not isinstance(value, list):
-        return []
-    paths: list[str] = []
-    for item in value:
-        if not isinstance(item, str) or not item:
-            continue
-        paths.append(item.strip("/"))
-    return paths
+def _skipped_file_path(item: AuditPayload) -> str:
+    path = item.get("path")
+    return path if isinstance(path, str) else ""
 
 
 def _bundle_budget_findings(root: Path) -> list[dict[str, Any]]:

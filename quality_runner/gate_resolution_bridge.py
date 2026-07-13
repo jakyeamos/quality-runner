@@ -5,7 +5,15 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from quality_runner.artifacts import write_json
+from quality_runner.artifacts import (
+    artifact_text_file,
+    existing_artifact_dir,
+    existing_directory,
+    safe_child_file,
+    validate_path_segment,
+    validate_run_id,
+    write_json,
+)
 from quality_runner.code_quality_ledger import ACCEPTED_STATUSES
 
 GATE_RUN_SCHEMA = "quality-runner-gate-run-v0.1"
@@ -15,14 +23,17 @@ DISPOSITION_STATUSES = set(ACCEPTED_STATUSES)
 
 
 def find_active_gate_run_id(*, repo_root: Path, run_id: str) -> str | None:
-    gate_runs_root = repo_root.expanduser().resolve() / ".quality-runner" / "gate-runs"
-    if not gate_runs_root.is_dir():
+    validate_run_id(run_id)
+    gate_runs_root = _existing_gate_runs_dir(repo_root)
+    if gate_runs_root is None:
         return None
     for gate_dir in sorted(gate_runs_root.iterdir(), key=lambda item: item.name):
         if not gate_dir.is_dir() or gate_dir.is_symlink():
             continue
-        gate_run_path = gate_dir / "gate-run.json"
-        if not gate_run_path.is_file():
+        try:
+            validate_path_segment(gate_dir.name, label="gate_run_id")
+            gate_run_path = safe_child_file(gate_dir, "gate-run.json", require_exists=True)
+        except (FileNotFoundError, ValueError):
             continue
         try:
             payload = json.loads(gate_run_path.read_text(encoding="utf-8"))
@@ -111,8 +122,8 @@ def apply_record_disposition(
             }
         )
 
-    run_dir = repo_root.expanduser().resolve() / ".quality-runner" / "runs" / run_id
-    ledger_path = run_dir / "resolution-ledger.json"
+    run_dir = existing_artifact_dir(repo_root, run_id)
+    ledger_path = safe_child_file(run_dir, "resolution-ledger.json")
     if not ledger_path.is_file():
         return None
 
@@ -146,15 +157,19 @@ def merge_gate_finding_dispositions(
 
 
 def load_finding_dispositions(*, repo_root: Path, run_id: str) -> list[dict[str, Any]]:
+    validate_run_id(run_id)
     records: list[dict[str, Any]] = []
-    gate_runs_root = repo_root.expanduser().resolve() / ".quality-runner" / "gate-runs"
-    if not gate_runs_root.is_dir():
+    gate_runs_root = _existing_gate_runs_dir(repo_root)
+    if gate_runs_root is None:
         return records
     for gate_dir in sorted(gate_runs_root.iterdir(), key=lambda item: item.name):
         if not gate_dir.is_dir() or gate_dir.is_symlink():
             continue
-        gate_run_path = gate_dir / "gate-run.json"
-        if not gate_run_path.is_file():
+        try:
+            validate_path_segment(gate_dir.name, label="gate_run_id")
+            gate_run_path = safe_child_file(gate_dir, "gate-run.json", require_exists=True)
+            responses_path = safe_child_file(gate_dir, "gate-responses.jsonl")
+        except (FileNotFoundError, ValueError):
             continue
         try:
             gate_run = _load_json(gate_run_path)
@@ -162,7 +177,7 @@ def load_finding_dispositions(*, repo_root: Path, run_id: str) -> list[dict[str,
             continue
         if gate_run.get("run_id") != run_id:
             continue
-        responses = _load_gate_responses(gate_dir / "gate-responses.jsonl")
+        responses = _load_gate_responses(responses_path)
         for response in responses:
             if response.get("action") != "record-disposition":
                 continue
@@ -311,14 +326,22 @@ def _scan_fingerprints_by_id(scan: dict[str, Any] | None) -> dict[str, str]:
 
 
 def _load_run_json(repo_root: Path, run_id: str, name: str) -> dict[str, Any] | None:
-    path = repo_root.expanduser().resolve() / ".quality-runner" / "runs" / run_id / name
-    if not path.is_file():
+    try:
+        path = artifact_text_file(repo_root, run_id, name)
+    except FileNotFoundError:
         return None
     try:
         payload = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return None
     return payload if isinstance(payload, dict) else None
+
+
+def _existing_gate_runs_dir(repo_root: Path) -> Path | None:
+    try:
+        return existing_directory(repo_root, ".quality-runner", "gate-runs")
+    except FileNotFoundError:
+        return None
 
 
 def _fingerprints_for_finding(response: dict[str, Any], finding_id: str) -> list[str]:

@@ -1,0 +1,82 @@
+{
+  "schema": "quality-runner-review-context-v0.1",
+  "run_id": "golden-combined",
+  "repo_root": "/workspace/quality-runner",
+  "mode": "combined",
+  "scope": "project",
+  "breadth": "related",
+  "exclusions": [
+    "build"
+  ],
+  "evidence": [],
+  "omitted_evidence": [],
+  "freshness": {
+    "new_invocation_required": true,
+    "prior_review_context_included": false,
+    "previous_agent_summary_included": false,
+    "hidden_reasoning_included": false,
+    "active_cycle": false
+  },
+  "input_hashes": {
+    "task_packet": "combined-task-hash",
+    "blind_packet": "combined-blind-hash"
+  },
+  "packets": [
+    {
+      "schema": "quality-runner-review-context-v0.1",
+      "run_id": "golden-combined",
+      "repo_root": "/workspace/quality-runner",
+      "mode": "task",
+      "scope": "project",
+      "breadth": "related",
+      "task": "Review the contract boundary.",
+      "repository_state": {
+        "detail": "standard"
+      },
+      "changed_files": [],
+      "exclusions": [
+        "build"
+      ],
+      "evidence": [],
+      "omitted_evidence": [],
+      "freshness": {
+        "new_invocation_required": true,
+        "prior_review_context_included": false,
+        "previous_agent_summary_included": false,
+        "hidden_reasoning_included": false,
+        "active_cycle": false
+      },
+      "input_hashes": {
+        "packet": "task-child-hash",
+        "task": "task-child-provenance"
+      }
+    },
+    {
+      "schema": "quality-runner-review-context-v0.1",
+      "run_id": "golden-combined",
+      "repo_root": "/workspace/quality-runner",
+      "mode": "blind",
+      "scope": "project",
+      "breadth": "related",
+      "repository_state": {
+        "detail": "standard"
+      },
+      "changed_files": [],
+      "exclusions": [
+        "build"
+      ],
+      "evidence": [],
+      "omitted_evidence": [],
+      "freshness": {
+        "new_invocation_required": true,
+        "prior_review_context_included": false,
+        "previous_agent_summary_included": false,
+        "hidden_reasoning_included": false,
+        "active_cycle": false
+      },
+      "input_hashes": {
+        "packet": "blind-child-hash"
+      }
+    }
+  ]
+}

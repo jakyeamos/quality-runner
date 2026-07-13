@@ -4,6 +4,13 @@ import json
 from pathlib import Path
 from typing import Any
 
+from quality_runner.artifacts import (
+    artifact_run_ids,
+    artifact_text_file,
+    existing_artifact_dir,
+    safe_child_file,
+    write_text,
+)
 from quality_runner.config import load_repo_config
 
 EXPORT_HANDOFF_RESULT_SCHEMA = "quality-runner-export-handoff-result-v0.1"
@@ -33,9 +40,7 @@ def export_handoff_payload(
     if resolved_run_id is None:
         raise FileNotFoundError("no Quality Runner runs found")
 
-    handoff_path = repo_root / ".quality-runner" / "runs" / resolved_run_id / "agent-handoff.md"
-    if not handoff_path.exists():
-        raise FileNotFoundError(f"agent handoff does not exist for run: {resolved_run_id}")
+    handoff_path = artifact_text_file(repo_root, resolved_run_id, "agent-handoff.md")
     content = handoff_path.read_text(encoding="utf-8")
 
     payload = {
@@ -48,8 +53,7 @@ def export_handoff_payload(
     if output_path is None:
         payload["content"] = content
     else:
-        output_path.parent.mkdir(parents=True, exist_ok=True)
-        output_path.write_text(content, encoding="utf-8")
+        write_text(output_path, content)
         payload["output_path"] = str(output_path)
     return payload
 
@@ -58,13 +62,13 @@ def _latest_run(repo_root: Path) -> dict[str, Any] | None:
     run_id = _latest_run_id(repo_root)
     if run_id is None:
         return None
-    run_dir = repo_root / ".quality-runner" / "runs" / run_id
-    gate_verification_status = _gate_verification_status(run_dir)
+    run_dir = existing_artifact_dir(repo_root, run_id)
+    gate_verification_status = _gate_verification_status(repo_root, run_id)
     return {
         "run_id": run_id,
         "path": str(run_dir),
-        "has_handoff": (run_dir / "agent-handoff.md").exists(),
-        "has_audit": (run_dir / "quality-audit.json").exists(),
+        "has_handoff": _artifact_file_exists(run_dir, "agent-handoff.md"),
+        "has_audit": _artifact_file_exists(run_dir, "quality-audit.json"),
         "has_gate_verification": gate_verification_status is not None,
         "gate_verification_status": gate_verification_status,
     }
@@ -79,9 +83,10 @@ def _repo_status(latest_run: dict[str, Any] | None) -> str:
     return "ready"
 
 
-def _gate_verification_status(run_dir: Path) -> str | None:
-    path = run_dir / "gate-verification.json"
-    if not path.exists():
+def _gate_verification_status(repo_root: Path, run_id: str) -> str | None:
+    try:
+        path = artifact_text_file(repo_root, run_id, "gate-verification.json")
+    except FileNotFoundError:
         return None
     try:
         payload = json.loads(path.read_text(encoding="utf-8"))
@@ -91,11 +96,20 @@ def _gate_verification_status(run_dir: Path) -> str | None:
     return status if isinstance(status, str) and status else "blocked"
 
 
+def _artifact_file_exists(run_dir: Path, filename: str) -> bool:
+    try:
+        safe_child_file(run_dir, filename, require_exists=True)
+    except (FileNotFoundError, ValueError):
+        return False
+    return True
+
+
 def _latest_run_id(repo_root: Path) -> str | None:
-    runs_dir = repo_root / ".quality-runner" / "runs"
-    if not runs_dir.exists() or not runs_dir.is_dir():
+    run_ids = artifact_run_ids(repo_root)
+    if not run_ids:
         return None
-    candidates = [path for path in runs_dir.iterdir() if path.is_dir()]
+    runs_dir = existing_artifact_dir(repo_root, run_ids[0]).parent
+    candidates = [runs_dir / run_id for run_id in run_ids]
     if not candidates:
         return None
     latest = max(candidates, key=lambda path: (path.stat().st_mtime_ns, path.name))

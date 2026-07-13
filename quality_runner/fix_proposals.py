@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
-from quality_runner.artifacts import artifact_dir, write_json
+from quality_runner.artifacts import existing_artifact_dir, safe_child_file, write_json
 from quality_runner.schema_constants import FIX_PROPOSALS_SCHEMA
 
 FIX_PROPOSE_RESULT_SCHEMA = "quality-runner-fix-propose-result-v0.1"
@@ -35,9 +35,10 @@ def propose_fix(
     actor: str = "user",
 ) -> dict[str, Any]:
     resolved_run_id = run_id.strip()
-    run_dir = artifact_dir(repo_root, resolved_run_id)
-    if not run_dir.exists():
-        raise FileNotFoundError(f"run does not exist: {resolved_run_id}")
+    try:
+        run_dir = existing_artifact_dir(repo_root, resolved_run_id)
+    except FileNotFoundError as error:
+        raise FileNotFoundError(f"run does not exist: {resolved_run_id}") from error
 
     artifacts = _load_run_artifacts(run_dir)
     slice_item = resolve_finding_group(
@@ -73,7 +74,7 @@ def propose_fix(
         "checksum": _payload_checksum(proposals),
         "created_at": now,
     }
-    output_path = write_json(run_dir / "fix-proposals.json", payload)
+    output_path = write_json(safe_child_file(run_dir, "fix-proposals.json"), payload)
     return {
         "schema": FIX_PROPOSE_RESULT_SCHEMA,
         "status": "proposed",
@@ -109,11 +110,13 @@ def resolve_finding_group(
 
 
 def _load_run_artifacts(run_dir: Path) -> dict[str, Any]:
-    remediation_plan = _load_required_json(run_dir / "remediation-plan.json", "remediation plan")
-    handoff = _load_required_json(run_dir / "agent-handoff.json", "agent handoff")
-    audit = _load_optional_json(run_dir / "quality-audit.json")
-    gate_verification = _load_optional_json(run_dir / "gate-verification.json")
-    ledger = _load_optional_json(run_dir / "resolution-ledger.json")
+    remediation_plan = _load_required_json(
+        safe_child_file(run_dir, "remediation-plan.json"), "remediation plan"
+    )
+    handoff = _load_required_json(safe_child_file(run_dir, "agent-handoff.json"), "agent handoff")
+    audit = _load_optional_json(safe_child_file(run_dir, "quality-audit.json"))
+    gate_verification = _load_optional_json(safe_child_file(run_dir, "gate-verification.json"))
+    ledger = _load_optional_json(safe_child_file(run_dir, "resolution-ledger.json"))
     return {
         "remediation_plan": remediation_plan,
         "handoff": handoff,
@@ -361,15 +364,15 @@ def _artifact_paths(*, repo_root: Path, run_dir: Path) -> dict[str, str]:
         return path.resolve().relative_to(repo).as_posix()
 
     paths = {
-        "fix_proposals_json": relative(run_dir / "fix-proposals.json"),
-        "agent_handoff_json": relative(run_dir / "agent-handoff.json"),
-        "remediation_plan_json": relative(run_dir / "remediation-plan.json"),
-        "quality_audit_json": relative(run_dir / "quality-audit.json"),
+        "fix_proposals_json": relative(safe_child_file(run_dir, "fix-proposals.json")),
+        "agent_handoff_json": relative(safe_child_file(run_dir, "agent-handoff.json")),
+        "remediation_plan_json": relative(safe_child_file(run_dir, "remediation-plan.json")),
+        "quality_audit_json": relative(safe_child_file(run_dir, "quality-audit.json")),
     }
-    gate_verification = run_dir / "gate-verification.json"
+    gate_verification = safe_child_file(run_dir, "gate-verification.json")
     if gate_verification.exists():
         paths["gate_verification_json"] = relative(gate_verification)
-    ledger = run_dir / "resolution-ledger.json"
+    ledger = safe_child_file(run_dir, "resolution-ledger.json")
     if ledger.exists():
         paths["resolution_ledger_json"] = relative(ledger)
     return paths

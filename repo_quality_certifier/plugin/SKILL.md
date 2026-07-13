@@ -38,5 +38,5 @@ Available tools:
 
 - Treat JSON artifacts as the agent-readable source of truth.
 - Do not claim quality-standard compliance unless generated evidence covers the selected gate profile.
-- Keep generated artifacts under `AIOS-backfill/gate-adoption/{run_id}` or an explicitly configured ignored output directory.
+- Keep generated artifacts under `AIOS-backfill/gate-adoption/{run_id}` or an explicitly configured output directory. Repository owners decide whether generated output should be ignored.
 - Use `doc-quality` before handing generated audit or implementation docs to execution agents.

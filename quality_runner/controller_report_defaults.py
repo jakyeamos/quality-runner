@@ -107,7 +107,11 @@ def inferred_blockers(final_qr: dict[str, Any]) -> list[str]:
 
     skipped_gates = gate_descriptions(
         final_qr.get("gate_results"),
-        skip_types={"mutating-gate-not-run", "dependency-setup-blocked"},
+        skip_types={
+            "mutating-gate-not-run",
+            "dependency-setup-blocked",
+            "execution-consent-required",
+        },
     )
     if skipped_gates:
         blockers.append(f"Skipped or blocked gates: {', '.join(skipped_gates)}.")

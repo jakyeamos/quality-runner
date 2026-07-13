@@ -1,40 +1,20 @@
-from __future__ import annotations
+"""Compatibility exports retained until the M6 deprecation cutover."""
 
-from typing import Literal, TypedDict
+from typing import TypedDict
 
-ReviewMode = Literal["task", "blind", "combined"]
-ReviewScope = Literal["task", "project"]
-ReviewBreadth = Literal["focused", "related", "full"]
-AdapterStatus = Literal["review-complete", "review-not-run", "malformed-output", "permission-denied"]
-
-
-class EvidenceReference(TypedDict):
-    path: str
-    kind: str
-    available: bool
-    note: str
-
-
-class FreshnessPolicy(TypedDict):
-    new_invocation_required: bool
-    prior_review_context_included: bool
-    previous_agent_summary_included: bool
-    hidden_reasoning_included: bool
-    active_cycle: bool
-
-
-class ReviewOptions(TypedDict, total=False):
-    mode: ReviewMode
-    scope: ReviewScope
-    breadth: ReviewBreadth
-    task: str
-    exclusions: list[str]
-    evidence: list[EvidenceReference]
-    known_issues: list[str]
-    include_known_issues: bool
-    previous_summary: str
-    prior_review_documents: list[str]
-    active_cycle: bool
+from quality_runner.core.review_contracts import (
+    AdapterStatus,
+    BlindReviewPacket,
+    CombinedReviewPacket,
+    EvidenceReference,
+    FreshnessPolicy,
+    ReviewBreadth,
+    ReviewManifest,
+    ReviewMode,
+    ReviewOptions,
+    ReviewScope,
+    TaskReviewPacket,
+)
 
 
 class ReviewPacket(TypedDict, total=False):
@@ -54,17 +34,20 @@ class ReviewPacket(TypedDict, total=False):
     previous_summary: str
     freshness: FreshnessPolicy
     input_hashes: dict[str, str]
-    packets: list[ReviewPacket]
+    packets: list["ReviewPacket"]
 
 
-class ReviewManifest(TypedDict):
-    schema: str
-    run_id: str
-    mode: ReviewMode
-    scope: ReviewScope
-    breadth: ReviewBreadth
-    exclusions: list[str]
-    evidence_references: list[EvidenceReference]
-    freshness: FreshnessPolicy
-    input_hashes: dict[str, str]
-    artifact_paths: dict[str, str]
+__all__ = [
+    "AdapterStatus",
+    "BlindReviewPacket",
+    "CombinedReviewPacket",
+    "EvidenceReference",
+    "FreshnessPolicy",
+    "ReviewBreadth",
+    "ReviewManifest",
+    "ReviewMode",
+    "ReviewOptions",
+    "ReviewPacket",
+    "ReviewScope",
+    "TaskReviewPacket",
+]

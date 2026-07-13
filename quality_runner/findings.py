@@ -24,6 +24,17 @@ ALLOWED_HANDOFF_STATUSES = {
 }
 
 
+def require_valid(name: str, result: ValidationResult) -> None:
+    if result.get("passed") is True:
+        return
+    errors = result.get("errors")
+    if isinstance(errors, list) and errors:
+        message = "; ".join(str(error) for error in errors)
+    else:
+        message = "unknown validation error"
+    raise ValueError(f"invalid {name}: {message}")
+
+
 def validate_audit_report(report: dict[str, Any]) -> ValidationResult:
     errors: list[str] = []
     if report.get("schema") != AUDIT_REPORT_SCHEMA:

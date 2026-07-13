@@ -94,6 +94,22 @@ def add_rollout_command(
         action="store_true",
         help="Allow known or suspected mutating gates during each refresh",
     )
+    rollout_parser.add_argument(
+        "--execute-gates",
+        action="store_true",
+        help="Execute discovered repository commands in disposable worktrees",
+    )
+    rollout_parser.add_argument(
+        "--worktree-mode",
+        choices=["in-place", "disposable"],
+        default="in-place",
+        help="Use disposable with --execute-gates",
+    )
+    rollout_parser.add_argument(
+        "--allow-dirty-worktree-verify",
+        action="store_true",
+        help="Allow disposable verification against HEAD while preserving local edits",
+    )
     rollout_parser.add_argument("--json", action="store_true", help="Emit JSON output")
 
 
@@ -112,5 +128,8 @@ def rollout_command_payload(args: argparse.Namespace) -> dict[str, Any]:
         total_timeout_seconds=args.total_timeout_seconds,
         total_timeout_reason=args.total_timeout_reason,
         checkout_most_advanced_branch=args.checkout_most_advanced_branch,
+        execute_discovered_gates=getattr(args, "execute_gates", False),
         allow_mutating_gates=args.allow_mutating_gates,
+        worktree_mode=getattr(args, "worktree_mode", "in-place"),
+        allow_dirty_worktree_verify=getattr(args, "allow_dirty_worktree_verify", False),
     )

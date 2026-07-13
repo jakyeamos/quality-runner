@@ -1,9 +1,25 @@
 {
   "schema": "quality-runner-plugin-manifest-v0.1",
   "name": "quality-runner",
-  "version": "0.4.0",
+  "version": "0.5.1",
   "description": "Standalone audit-and-plan quality orchestration for repositories.",
   "commands": {
+    "audit": {
+      "command": "quality-runner",
+      "args": ["audit"]
+    },
+    "review": {
+      "command": "quality-runner",
+      "args": ["review"]
+    },
+    "verify": {
+      "command": "quality-runner",
+      "args": ["verify"]
+    },
+    "runs": {
+      "command": "quality-runner",
+      "args": ["runs"]
+    },
     "inspect": {
       "command": "quality-runner",
       "args": ["inspect"]
@@ -20,7 +36,16 @@
       "quality_runner_inspect_repo",
       "quality_runner_run",
       "quality_runner_status",
-      "quality_runner_export_handoff"
+      "quality_runner_export_handoff",
+      "quality_runner_gate",
+      "quality_runner_gate_status",
+      "quality_runner_gate_respond",
+      "quality_runner_propose_fix",
+      "quality_runner_review",
+      "quality_runner_audit_outcome",
+      "quality_runner_review_outcome",
+      "quality_runner_verify_outcome",
+      "quality_runner_runs_outcome"
     ]
   },
   "skill": "SKILL.md"

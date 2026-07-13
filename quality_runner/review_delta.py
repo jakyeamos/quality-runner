@@ -2,12 +2,23 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 import subprocess
 from pathlib import Path
 from typing import Any
 
-from quality_runner.artifacts import artifact_dir, write_json, write_text
+from quality_runner.artifacts import (
+    artifact_file,
+    artifact_text_file,
+    existing_artifact_dir,
+    safe_child_file,
+    validate_run_id,
+    write_json,
+    write_text,
+)
 from quality_runner.schema_constants import REVIEW_DELTA_SCHEMA
+
+_GIT_OBJECT_ID_PATTERN = re.compile(r"(?:[0-9a-fA-F]{40}|[0-9a-fA-F]{64})")
 
 
 def build_review_delta(
@@ -21,22 +32,19 @@ def build_review_delta(
     changed_paths: list[str] | None = None,
 ) -> dict[str, Any]:
     _validate_review_identity(repo_root, cycle_id, iteration)
-    if baseline_run_id is not None:
-        artifact_dir(repo_root, baseline_run_id)
-
-    current_run_dir = artifact_dir(repo_root, run_id)
-    current_findings = _findings(current_run_dir / "quality-audit.json")
+    current_run_dir = existing_artifact_dir(repo_root, run_id)
+    current_findings = _findings(safe_child_file(current_run_dir, "quality-audit.json"))
     baseline_findings = (
-        _findings(artifact_dir(repo_root, baseline_run_id) / "quality-audit.json")
+        _findings(
+            safe_child_file(existing_artifact_dir(repo_root, baseline_run_id), "quality-audit.json")
+        )
         if baseline_run_id is not None
         else []
     )
     scope_paths = sorted(set(changed_paths or git_changed_paths(repo_root, baseline_run_id)))
     current_by_fingerprint = _index_findings(current_findings)
     baseline_by_fingerprint = _index_findings(baseline_findings)
-    in_scope_current, out_of_scope_current = _partition_findings(
-        current_findings, scope_paths
-    )
+    in_scope_current, out_of_scope_current = _partition_findings(current_findings, scope_paths)
     in_scope_baseline, _ = _partition_findings(baseline_findings, scope_paths)
     current_scope = {item["fingerprint"] for item in in_scope_current}
     baseline_scope = {item["fingerprint"] for item in in_scope_baseline}
@@ -60,7 +68,10 @@ def build_review_delta(
             "scope_basis": "baseline-and-working-tree-diff",
         },
         "findings": {
-            "new": [_finding_ref(current_by_fingerprint[key]) for key in sorted(current_scope - baseline_scope)],
+            "new": [
+                _finding_ref(current_by_fingerprint[key])
+                for key in sorted(current_scope - baseline_scope)
+            ],
             "persisted": [
                 _finding_ref(current_by_fingerprint[key])
                 for key in sorted(current_scope & baseline_scope)
@@ -70,7 +81,8 @@ def build_review_delta(
                 for key in sorted(baseline_scope - current_scope)
             ],
             "out_of_scope": [
-                _finding_ref(item) for item in sorted(out_of_scope_current, key=lambda value: value["fingerprint"])
+                _finding_ref(item)
+                for item in sorted(out_of_scope_current, key=lambda value: value["fingerprint"])
             ],
         },
         "verification": verification,
@@ -79,10 +91,12 @@ def build_review_delta(
         "continue": not clean,
         "stop_reason": _stop_reason(clean=clean, blocked=blocked, scope_paths=scope_paths),
         "source_artifacts": {
-            "quality_audit_json": str(current_run_dir / "quality-audit.json"),
-            "remediation_plan_json": str(current_run_dir / "remediation-plan.json"),
-            "agent_handoff_json": str(current_run_dir / "agent-handoff.json"),
-            "resolution_ledger_json": str(current_run_dir / "resolution-ledger.json"),
+            "quality_audit_json": str(safe_child_file(current_run_dir, "quality-audit.json")),
+            "remediation_plan_json": str(safe_child_file(current_run_dir, "remediation-plan.json")),
+            "agent_handoff_json": str(safe_child_file(current_run_dir, "agent-handoff.json")),
+            "resolution_ledger_json": str(
+                safe_child_file(current_run_dir, "resolution-ledger.json")
+            ),
         },
     }
     return payload
@@ -91,9 +105,11 @@ def build_review_delta(
 def persist_review_delta(
     *, repo_root: Path, run_id: str, payload: dict[str, Any]
 ) -> dict[str, str]:
-    run_dir = artifact_dir(repo_root, run_id)
-    json_path = write_json(run_dir / "review-delta.json", payload)
-    markdown_path = write_text(run_dir / "review-delta.md", render_review_delta_markdown(payload))
+    json_path = write_json(artifact_file(repo_root, run_id, "review-delta.json"), payload)
+    markdown_path = write_text(
+        artifact_file(repo_root, run_id, "review-delta.md"),
+        render_review_delta_markdown(payload),
+    )
     return {"review_delta_json": str(json_path), "review_delta_md": str(markdown_path)}
 
 
@@ -120,14 +136,33 @@ def render_review_delta_markdown(payload: dict[str, Any]) -> str:
         lines.append(f"### {title} ({len(items) if isinstance(items, list) else 0})")
         lines.append("")
         if isinstance(items, list) and items:
-            lines.extend(f"- `{item.get('fingerprint')}`: {item.get('summary', 'No summary')}" for item in items if isinstance(item, dict))
+            lines.extend(
+                f"- `{item.get('fingerprint')}`: {item.get('summary', 'No summary')}"
+                for item in items
+                if isinstance(item, dict)
+            )
         else:
             lines.append("- None")
         lines.append("")
     out_of_scope = findings.get("out_of_scope", [])
-    lines.extend(["## Out of scope", "", f"{len(out_of_scope) if isinstance(out_of_scope, list) else 0} finding(s) retained for visibility; they do not block this task.", ""])
+    lines.extend(
+        [
+            "## Out of scope",
+            "",
+            f"{len(out_of_scope) if isinstance(out_of_scope, list) else 0} finding(s) retained for visibility; they do not block this task.",
+            "",
+        ]
+    )
     verification = payload.get("verification", {})
-    lines.extend(["## Verification", "", f"- Status: `{verification.get('status', 'unknown') if isinstance(verification, dict) else 'unknown'}`", f"- Blocked: `{verification.get('blocked', True) if isinstance(verification, dict) else True}`", ""])
+    lines.extend(
+        [
+            "## Verification",
+            "",
+            f"- Status: `{verification.get('status', 'unknown') if isinstance(verification, dict) else 'unknown'}`",
+            f"- Blocked: `{verification.get('blocked', True) if isinstance(verification, dict) else True}`",
+            "",
+        ]
+    )
     return "\n".join(lines)
 
 
@@ -138,14 +173,14 @@ def git_changed_paths(repo_root: Path, baseline_run_id: str | None = None) -> li
     paths: set[str] = set()
     baseline_sha = _baseline_head_sha(root, baseline_run_id)
     if baseline_sha:
-        paths.update(_git_names(root, "diff", "--name-only", baseline_sha, "HEAD"))
-    paths.update(_git_names(root, "diff", "--name-only", "HEAD"))
+        paths.update(_git_names(root, "diff", "--name-only", baseline_sha, "HEAD", "--"))
+    paths.update(_git_names(root, "diff", "--name-only", "HEAD", "--"))
     paths.update(_git_names(root, "ls-files", "--others", "--exclude-standard"))
     return sorted(path for path in paths if path and not path.startswith(".quality-runner/"))
 
 
 def _validate_review_identity(repo_root: Path, cycle_id: str, iteration: int) -> None:
-    artifact_dir(repo_root, cycle_id)
+    validate_run_id(cycle_id)
     if iteration < 1:
         raise ValueError("review iteration must be at least 1")
 
@@ -155,11 +190,7 @@ def _findings(path: Path) -> list[dict[str, Any]]:
         return []
     payload = json.loads(path.read_text(encoding="utf-8"))
     findings = payload.get("findings", []) if isinstance(payload, dict) else []
-    return [
-        _normalize_finding(item)
-        for item in findings
-        if isinstance(item, dict)
-    ]
+    return [_normalize_finding(item) for item in findings if isinstance(item, dict)]
 
 
 def _normalize_finding(finding: dict[str, Any]) -> dict[str, Any]:
@@ -186,7 +217,9 @@ def _partition_findings(
     outside: list[dict[str, Any]] = []
     for finding in findings:
         path = _finding_path(finding)
-        if path and any(path == candidate or path.startswith(f"{candidate}/") for candidate in scope_paths):
+        if path and any(
+            path == candidate or path.startswith(f"{candidate}/") for candidate in scope_paths
+        ):
             scoped.append(finding)
         else:
             outside.append(finding)
@@ -214,7 +247,7 @@ def _finding_ref(finding: dict[str, Any]) -> dict[str, Any]:
 
 
 def _verification_state(run_dir: Path) -> dict[str, Any]:
-    path = run_dir / "gate-verification.json"
+    path = safe_child_file(run_dir, "gate-verification.json")
     payload = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
     status = payload.get("status", "unavailable") if isinstance(payload, dict) else "unavailable"
     blockers = payload.get("blockers", []) if isinstance(payload, dict) else []
@@ -231,7 +264,9 @@ def _verification_state(run_dir: Path) -> dict[str, Any]:
 def _evidence_limitations(scope_paths: list[str], findings: list[dict[str, Any]]) -> list[str]:
     limitations: list[str] = []
     if not scope_paths:
-        limitations.append("No changed paths were available; findings were not treated as task-scoped.")
+        limitations.append(
+            "No changed paths were available; findings were not treated as task-scoped."
+        )
     if not findings:
         limitations.append("No quality-audit findings were available for this run.")
     return limitations
@@ -255,17 +290,23 @@ def _hash_payload(payload: object) -> str:
 def _baseline_head_sha(repo_root: Path, baseline_run_id: str | None) -> str | None:
     if baseline_run_id is None:
         return None
-    path = artifact_dir(repo_root, baseline_run_id) / "run-manifest.json"
-    if not path.exists():
+    try:
+        path = artifact_text_file(repo_root, baseline_run_id, "run-manifest.json")
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (FileNotFoundError, OSError, json.JSONDecodeError):
         return None
-    payload = json.loads(path.read_text(encoding="utf-8"))
     git = payload.get("git", {}) if isinstance(payload, dict) else {}
-    return git.get("head_sha") if isinstance(git, dict) and isinstance(git.get("head_sha"), str) else None
+    head_sha = git.get("head_sha") if isinstance(git, dict) else None
+    if not isinstance(head_sha, str) or not _GIT_OBJECT_ID_PATTERN.fullmatch(head_sha):
+        return None
+    return head_sha
 
 
 def _git_names(repo_root: Path, *args: str) -> list[str]:
     try:
-        result = subprocess.run(["git", *args], cwd=repo_root, capture_output=True, text=True, check=False, timeout=5)
+        result = subprocess.run(
+            ["git", *args], cwd=repo_root, capture_output=True, text=True, check=False, timeout=5
+        )
     except (OSError, subprocess.TimeoutExpired):
         return []
     if result.returncode != 0:

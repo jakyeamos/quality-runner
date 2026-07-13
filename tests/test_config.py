@@ -81,6 +81,7 @@ def test_load_repo_config_reads_gates_and_severity_overrides(tmp_path) -> None:
                 'owner = "platform"',
                 "required = true",
                 'severity = "blocker"',
+                'mutating_risk = "unknown"',
                 "",
                 "[[quality_runner.accepted_exceptions]]",
                 'capability = "tests"',
@@ -104,6 +105,7 @@ def test_load_repo_config_reads_gates_and_severity_overrides(tmp_path) -> None:
             "owner": "platform",
             "required": True,
             "severity": "blocker",
+            "mutating_risk": "unknown",
         }
     ]
     assert config["allowed_package_managers"] == ["bun", "pnpm"]
@@ -478,6 +480,7 @@ def test_configured_gates_satisfy_capabilities_and_policy_metadata_reaches_audit
                 'owner = "platform"',
                 "required = true",
                 'severity = "blocker"',
+                'mutating_risk = "mutating"',
                 "",
             ]
         ),
@@ -500,6 +503,7 @@ def test_configured_gates_satisfy_capabilities_and_policy_metadata_reaches_audit
             "required_by": "config",
             "owner": "platform",
             "severity": "blocker",
+            "mutating_risk": "mutating",
             "verification_state": {
                 "discovery": "command-discovered",
                 "execution": "not-run",
@@ -717,6 +721,7 @@ def test_packaged_schema_files_are_parseable() -> None:
         "capability-matrix.schema.json",
         "package-manager-preflight.schema.json",
         "gate-verification.schema.json",
+        "gate-verification-v0.2.schema.json",
         "quality-audit.schema.json",
         "remediation-plan.schema.json",
         "agent-handoff.schema.json",
@@ -729,8 +734,10 @@ def test_packaged_schema_files_are_parseable() -> None:
         "gate-response.schema.json",
         "fix-proposals.schema.json",
         "review-context.schema.json",
+        "review-adapter-response.schema.json",
         "review-manifest.schema.json",
         "review-delta.schema.json",
+        "outcome.schema.json",
     }
 
     loaded = {}

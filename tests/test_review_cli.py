@@ -35,21 +35,77 @@ def test_no_adapter_is_explicitly_packet_only() -> None:
 
 
 def test_file_adapter_validates_local_report(tmp_path: Path) -> None:
-    output = tmp_path / "report.json"
-    output.write_text(json.dumps({"findings": [_finding()]}), encoding="utf-8")
-    result = FileReviewAdapter(output).review(
-        {
-            "run_id": "run",
-            "mode": "blind",
-            "scope": "project",
-            "breadth": "related",
-        },
-        tmp_path,
+    from quality_runner.application.review_responses import response_template
+    from quality_runner.review_context import build_review_context, normalize_review_options
+
+    packet = build_review_context(
+        repo_root=tmp_path,
+        run_id="run",
+        options=normalize_review_options(
+            mode="blind", scope="project", breadth="related", task=None
+        ),
     )
+    response = response_template(packet)
+    response["completed_at"] = "2026-07-12T12:00:00+00:00"
+    response["findings"] = [_finding()]
+    output = tmp_path / "report.json"
+    output.write_text(json.dumps(response), encoding="utf-8")
+    result = FileReviewAdapter(output).review(packet, tmp_path)
     assert result["status"] == "review-complete"
     report = result["report"]
     assert report is not None
     assert report["severity_counts"] == {"critical": 0, "high": 1, "medium": 0, "low": 0}
+
+
+def test_combined_file_adapter_preserves_v1_task_provenance(tmp_path: Path) -> None:
+    from quality_runner.review_context import build_review_context, normalize_review_options
+
+    output = tmp_path / "combined-report.json"
+    packet = build_review_context(
+        repo_root=tmp_path,
+        run_id="combined-adapter-report",
+        options=normalize_review_options(
+            mode="combined",
+            scope="project",
+            breadth="related",
+            task="Review the integration boundary",
+        ),
+    )
+    from quality_runner.application.review_responses import response_template
+
+    response = response_template(packet)
+    responses = response["responses"]
+    assert isinstance(responses, list)
+    assert len(responses) == 2
+    responses[0]["completed_at"] = "2026-07-12T12:00:00+00:00"
+    responses[0]["findings"] = [_finding()]
+    responses[1]["completed_at"] = "2026-07-12T12:01:00+00:00"
+    responses[1]["findings"] = []
+    output.write_text(json.dumps(response), encoding="utf-8")
+
+    result = FileReviewAdapter(output).review(packet, tmp_path)
+
+    assert result["status"] == "review-complete"
+    assert result["report"] is not None
+    assert result["report"]["task_provenance"] == "None"
+
+
+def test_file_adapter_rejects_unbound_legacy_payload(tmp_path: Path) -> None:
+    from quality_runner.review_context import build_review_context, normalize_review_options
+
+    output = tmp_path / "report.json"
+    output.write_text(json.dumps({"findings": [_finding()]}), encoding="utf-8")
+    packet = build_review_context(
+        repo_root=tmp_path,
+        run_id="unbound-response",
+        options=normalize_review_options(
+            mode="blind", scope="project", breadth="related", task=None
+        ),
+    )
+
+    result = FileReviewAdapter(output).review(packet, tmp_path)
+
+    assert result["status"] == "malformed-output"
 
 
 def test_file_adapter_rejects_path_escape(tmp_path: Path) -> None:
@@ -70,7 +126,7 @@ def test_review_cli_requires_task_or_blind_mode(tmp_path: Path) -> None:
     assert "--mode blind" in result.stderr
 
 
-def test_review_cli_reports_packet_only_json(tmp_path: Path) -> None:
+def test_review_cli_reports_packet_only_outcome_json(tmp_path: Path) -> None:
     result = subprocess.run(
         [
             sys.executable,
@@ -90,7 +146,9 @@ def test_review_cli_reports_packet_only_json(tmp_path: Path) -> None:
         text=True,
     )
     payload = json.loads(result.stdout)
-    assert payload["status"] == "review-not-run"
-    assert payload["mode"] == "blind"
-    assert payload["breadth"] == "related"
-    assert "review_report_json" in payload["artifact_paths"]
+    assert payload["schema"] == "quality-runner-outcome-v0.2"
+    assert payload["journey"] == "review"
+    assert payload["state"] == "awaiting-evidence"
+    assert payload["assessment"] == "packet-ready"
+    assert payload["next_action"]["kind"] == "provide-review-output"
+    assert "review_report_json" in payload["writes"]["artifact_paths"]

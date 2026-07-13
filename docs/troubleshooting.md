@@ -56,3 +56,29 @@ worker dispatch, validate the handoff and slice spec before editing:
 quality-runner validate-handoff .quality-runner/runs/<run-id>/agent-handoff.json --json
 quality-runner validate-slice-spec .quality-runner/runs/<run-id>/slice-specs/<slice-id>.md --json
 ```
+
+## A generated artifact might contain sensitive data
+
+Treat the run as local evidence and stop sharing or committing its artifacts
+until it has been reviewed. If a real credential appears, rotate or revoke it
+using the owning service's process, preserve only the minimum evidence needed
+for the incident, then apply the repository's normal retention policy. The
+security and code-quality scanners redact quoted literals in secret-like source
+evidence and remediation excerpts; other source-derived context and authorized
+gate output can still be sensitive.
+See [Artifact Handling](artifacts.md#handling-generated-artifacts).
+
+## A Fresh Review response is rejected
+
+Read the saved `review-execution.json` and adapter-attempt artifact for the
+reported binding or validation error. Correct the response against the original
+packet-bound template and resubmit it with the same run id. If the task or
+evidence boundary has changed, prepare a new review instead of altering the
+saved context.
+
+## I need to roll back an upgrade
+
+Do not delete `.quality-runner/` artifacts to roll back the executable. Keep
+the evidence, install the prior package version, and verify the result with
+`quality-runner doctor --json`. The exact supported procedure and v1/v2 command
+mappings are in the [Upgrade and Compatibility Guide](upgrade.md).

@@ -266,6 +266,7 @@ def _gates(value: object, warnings: list[dict[str, str]]) -> list[dict[str, Any]
         owner = item.get("owner")
         required = item.get("required")
         severity = item.get("severity")
+        mutating_risk = item.get("mutating_risk")
         if (
             isinstance(capability_id, str)
             and capability_id
@@ -280,6 +281,7 @@ def _gates(value: object, warnings: list[dict[str, str]]) -> list[dict[str, Any]
             and isinstance(required, bool)
             and isinstance(severity, str)
             and severity
+            and (mutating_risk is None or mutating_risk in {"safe", "unknown", "mutating"})
         ):
             gates.append(
                 {
@@ -290,6 +292,7 @@ def _gates(value: object, warnings: list[dict[str, str]]) -> list[dict[str, Any]
                     "owner": owner,
                     "required": required,
                     "severity": severity,
+                    **({"mutating_risk": mutating_risk} if mutating_risk is not None else {}),
                 }
             )
         else:
@@ -301,7 +304,7 @@ def _gate_warning(index: int, warnings: list[dict[str, str]]) -> None:
     warnings.append(
         _warning(
             "invalid_quality_runner_config_field",
-            f"quality_runner.gates[{index}] must include id, command, ecosystem, source, owner, required, and severity",
+            f"quality_runner.gates[{index}] must include id, command, ecosystem, source, owner, required, and severity; mutating_risk must be safe, unknown, or mutating when set",
         )
     )
 

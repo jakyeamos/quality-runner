@@ -8,12 +8,13 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from quality_runner.artifacts import prepare_safe_directory, write_json
+from quality_runner.compatibility.legacy_workflow import refresh_payload
 from quality_runner.controller_reports import (
     build_controller_report_from_summary,
     validate_controller_report,
 )
 from quality_runner.fleet_documents import write_fleet_documents
-from quality_runner.workflow import refresh_payload
 
 ROLLOUT_RESULT_SCHEMA = "quality-runner-rollout-result-v0.1"
 ROLLOUT_LEDGER_SCHEMA = "quality-runner-rollout-ledger-v0.1"
@@ -37,19 +38,25 @@ def rollout_payload(
     total_timeout_reason: str | None,
     checkout_most_advanced_branch: bool,
     allow_mutating_gates: bool,
+    execute_discovered_gates: bool = False,
+    worktree_mode: str = "in-place",
+    allow_dirty_worktree_verify: bool = False,
     refresh_callback: RefreshCallback = refresh_payload,
 ) -> dict[str, Any]:
+    if execute_discovered_gates and worktree_mode != "disposable":
+        raise ValueError(
+            "executing discovered gates requires --worktree-mode disposable to isolate target repositories"
+        )
     entries = _load_rollout_entries(repo_list_path=repo_list_path, repos=repos)
     if not entries:
         raise ValueError("rollout requires at least one repo from --repo or repo_list")
 
     resolved_run_id_prefix = run_id_prefix or _default_rollout_id()
-    resolved_output_dir = (
-        output_dir.expanduser().resolve()
+    resolved_output_dir = prepare_safe_directory(
+        output_dir.expanduser()
         if output_dir
-        else (Path.cwd() / ".quality-runner" / "rollouts" / resolved_run_id_prefix).resolve()
+        else Path.cwd() / ".quality-runner" / "rollouts" / resolved_run_id_prefix
     )
-    resolved_output_dir.mkdir(parents=True, exist_ok=True)
 
     results: list[dict[str, Any]] = []
     for index, entry in enumerate(entries, start=1):
@@ -68,7 +75,10 @@ def rollout_payload(
                 total_timeout_seconds=total_timeout_seconds,
                 total_timeout_reason=total_timeout_reason,
                 checkout_most_advanced_branch=checkout_most_advanced_branch,
+                execute_discovered_gates=execute_discovered_gates,
                 allow_mutating_gates=allow_mutating_gates,
+                worktree_mode=worktree_mode,
+                allow_dirty_worktree_verify=allow_dirty_worktree_verify,
                 refresh_callback=refresh_callback,
             )
         )
@@ -125,6 +135,9 @@ def _run_rollout_entry(
     total_timeout_reason: str | None,
     checkout_most_advanced_branch: bool,
     allow_mutating_gates: bool,
+    execute_discovered_gates: bool,
+    worktree_mode: str,
+    allow_dirty_worktree_verify: bool,
     refresh_callback: RefreshCallback,
 ) -> dict[str, Any]:
     repo_root = Path(entry["repo_path"]).expanduser().resolve()
@@ -164,7 +177,10 @@ def _run_rollout_entry(
             total_timeout_seconds=total_timeout_seconds,
             total_timeout_reason=total_timeout_reason,
             checkout_most_advanced_branch=checkout_most_advanced_branch,
+            execute_discovered_gates=execute_discovered_gates,
             allow_mutating_gates=allow_mutating_gates,
+            worktree_mode=worktree_mode,
+            allow_dirty_worktree_verify=allow_dirty_worktree_verify,
         )
         summary = refresh.get("summary")
         if not isinstance(summary, dict):
@@ -187,6 +203,10 @@ def _run_rollout_entry(
                 repo_root=repo_root,
                 repo_run_id_prefix=repo_run_id_prefix,
                 baseline_run_id=entry.get("baseline_run_id"),
+                execute_discovered_gates=execute_discovered_gates,
+                worktree_mode=worktree_mode,
+                allow_mutating_gates=allow_mutating_gates,
+                allow_dirty_worktree_verify=allow_dirty_worktree_verify,
             ),
         )
         validation = validate_controller_report(report)
@@ -232,6 +252,10 @@ def _run_rollout_entry(
                 repo_root=repo_root,
                 repo_run_id_prefix=repo_run_id_prefix,
                 baseline_run_id=entry.get("baseline_run_id"),
+                execute_discovered_gates=execute_discovered_gates,
+                worktree_mode=worktree_mode,
+                allow_mutating_gates=allow_mutating_gates,
+                allow_dirty_worktree_verify=allow_dirty_worktree_verify,
             ),
         )
         validation = validate_controller_report(report)
@@ -376,11 +400,28 @@ def _refresh_generation_command(
     repo_root: Path,
     repo_run_id_prefix: str,
     baseline_run_id: str | None,
+    execute_discovered_gates: bool,
+    worktree_mode: str,
+    allow_mutating_gates: bool,
+    allow_dirty_worktree_verify: bool,
 ) -> str:
-    command = f"quality-runner refresh {repo_root} --run-id-prefix {repo_run_id_prefix} --json"
+    command = [
+        "quality-runner",
+        "refresh",
+        str(repo_root),
+        "--run-id-prefix",
+        repo_run_id_prefix,
+        "--json",
+    ]
     if baseline_run_id:
-        command += f" --baseline-run-id {baseline_run_id}"
-    return command
+        command.extend(["--baseline-run-id", baseline_run_id])
+    if execute_discovered_gates:
+        command.extend(["--execute-gates", "--worktree-mode", worktree_mode])
+    if allow_mutating_gates:
+        command.append("--allow-mutating-gates")
+    if allow_dirty_worktree_verify:
+        command.append("--allow-dirty-worktree-verify")
+    return shlex.join(command)
 
 
 def _string_value(value: object) -> str:
@@ -396,4 +437,4 @@ def _error_validation(error: str) -> dict[str, Any]:
 
 
 def _write_json(path: Path, payload: dict[str, Any]) -> None:
-    path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    write_json(path, payload)

@@ -6,6 +6,16 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
+from quality_runner.artifacts import (
+    existing_directory,
+    prepare_directory,
+    safe_child_file,
+    validate_path_segment,
+    validate_run_id,
+    write_json,
+    write_text,
+)
+
 REPO_SCAN_SCHEMA = "aios-repo-gate-scan-v0.1"
 GATE_MATRIX_SCHEMA = "aios-repo-gate-matrix-v0.1"
 TMCP_EXPERT_ENRICHMENT_SCHEMA = "aios-repo-gate-tmcp-expert-enrichment-v0.1"
@@ -469,8 +479,33 @@ ValidationResult = dict[str, Any]
 
 
 def _json_dump(path: Path, payload: dict[str, Any]) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    write_json(path, payload)
+
+
+def _checked_output_dir(output_dir: Path) -> Path:
+    expanded = output_dir.expanduser()
+    path = expanded if expanded.is_absolute() else Path.cwd() / expanded
+    _reject_symlinked_output_components(path)
+    if path.exists():
+        if not path.is_dir():
+            raise ValueError("artifact output directory must be a directory")
+    else:
+        path.mkdir(parents=True, exist_ok=True)
+    _reject_symlinked_output_components(path)
+    if not path.is_dir():
+        raise ValueError("artifact output directory must be a directory")
+    return path
+
+
+def _reject_symlinked_output_components(path: Path) -> None:
+    current = Path(path.anchor) if path.is_absolute() else Path.cwd()
+    parts = path.parts[1:] if path.is_absolute() else path.parts
+    for segment in parts:
+        if segment in {".", ".."}:
+            raise ValueError("artifact output directory must not contain dot path segments")
+        current = current / segment
+        if current.is_symlink():
+            raise ValueError("artifact output directory must not contain symlink components")
 
 
 def _read_json(path: Path) -> dict[str, Any]:
@@ -1294,10 +1329,13 @@ def build_gate_matrix(*, scan: dict[str, Any], run_id: str) -> dict[str, Any]:
 
 
 def gate_adoption_output_dir(repo_root: Path, run_id: str) -> Path:
-    return repo_root / AIOS_BACKFILL_DIR_NAME / "gate-adoption" / run_id
+    validate_run_id(run_id)
+    return prepare_directory(repo_root, AIOS_BACKFILL_DIR_NAME, "gate-adoption", run_id)
 
 
 def _rubric_detail_path(run_id: str, rubric_id: str, doc_kind: str, extension: str) -> str:
+    validate_run_id(run_id)
+    validate_path_segment(rubric_id, label="rubric_id")
     return (
         f"{AIOS_BACKFILL_DIR_NAME}/gate-adoption/{run_id}/rubrics/"
         f"{rubric_id}.{doc_kind}.{extension}"
@@ -1305,22 +1343,16 @@ def _rubric_detail_path(run_id: str, rubric_id: str, doc_kind: str, extension: s
 
 
 def _git_info_exclude_path(repo_root: Path) -> Path | None:
-    git_path = repo_root / ".git"
-    if git_path.is_dir():
-        return git_path / "info" / "exclude"
-    if not git_path.is_file():
+    git_path = repo_root.expanduser().resolve() / ".git"
+    if git_path.is_symlink() or not git_path.is_dir():
         return None
-    try:
-        raw = git_path.read_text(encoding="utf-8", errors="replace").strip()
-    except OSError:
+    info_dir = git_path / "info"
+    if info_dir.is_symlink():
         return None
-    prefix = "gitdir:"
-    if not raw.startswith(prefix):
+    if info_dir.exists() and not info_dir.is_dir():
         return None
-    git_dir = Path(raw.removeprefix(prefix).strip())
-    if not git_dir.is_absolute():
-        git_dir = (repo_root / git_dir).resolve()
-    return git_dir / "info" / "exclude"
+    exclude_path = info_dir / "exclude"
+    return None if exclude_path.is_symlink() else exclude_path
 
 
 def ensure_aios_backfill_gitignored(repo_root: Path) -> Path | None:
@@ -1333,7 +1365,11 @@ def ensure_aios_backfill_gitignored(repo_root: Path) -> Path | None:
         existing = exclude_path.read_text(encoding="utf-8", errors="replace")
         if any(line.strip() == ignore_rule for line in existing.splitlines()):
             return exclude_path
+    if exclude_path.parent.is_symlink():
+        return None
     exclude_path.parent.mkdir(parents=True, exist_ok=True)
+    if exclude_path.parent.is_symlink() or exclude_path.is_symlink():
+        return None
     separator = "" if not existing or existing.endswith("\n") else "\n"
     exclude_path.write_text(f"{existing}{separator}{ignore_rule}\n", encoding="utf-8")
     return exclude_path
@@ -2849,26 +2885,26 @@ def render_rubric_implementation_markdown(document: dict[str, Any]) -> str:
 def write_rubric_detail_documents(
     *, output_dir: Path, rubric_pack: dict[str, Any]
 ) -> dict[str, Any]:
-    rubrics_dir = output_dir / "rubrics"
-    rubrics_dir.mkdir(parents=True, exist_ok=True)
+    output_dir = _checked_output_dir(output_dir)
+    rubrics_dir = prepare_directory(output_dir, "rubrics")
     documents: list[dict[str, Any]] = []
     for rubric in _rubric_rows(rubric_pack):
         rubric_id = str(rubric.get("id", "rubric"))
+        validate_path_segment(rubric_id, label="rubric_id")
         audit_document = build_rubric_audit_document(rubric, rubric_pack)
         implementation_document = build_rubric_implementation_document(rubric, rubric_pack)
-        audit_json_path = rubrics_dir / f"{rubric_id}.audit.json"
-        audit_markdown_path = rubrics_dir / f"{rubric_id}.audit.md"
-        implementation_json_path = rubrics_dir / f"{rubric_id}.implementation.json"
-        implementation_markdown_path = rubrics_dir / f"{rubric_id}.implementation.md"
-        _json_dump(audit_json_path, audit_document)
-        audit_markdown_path.write_text(
-            render_rubric_audit_markdown(audit_document),
-            encoding="utf-8",
+        audit_json_path = safe_child_file(rubrics_dir, f"{rubric_id}.audit.json")
+        audit_markdown_path = safe_child_file(rubrics_dir, f"{rubric_id}.audit.md")
+        implementation_json_path = safe_child_file(rubrics_dir, f"{rubric_id}.implementation.json")
+        implementation_markdown_path = safe_child_file(
+            rubrics_dir, f"{rubric_id}.implementation.md"
         )
+        _json_dump(audit_json_path, audit_document)
+        write_text(audit_markdown_path, render_rubric_audit_markdown(audit_document))
         _json_dump(implementation_json_path, implementation_document)
-        implementation_markdown_path.write_text(
+        write_text(
+            implementation_markdown_path,
             render_rubric_implementation_markdown(implementation_document),
-            encoding="utf-8",
         )
         documents.append(
             {
@@ -2980,7 +3016,8 @@ def _phase_planning_blockers(
 
 
 def evaluate_adoption_doc_quality(output_dir: Path) -> dict[str, Any]:
-    manifest_path = output_dir / "rubric-detail-manifest.json"
+    output_dir = _checked_output_dir(output_dir)
+    manifest_path = safe_child_file(output_dir, "rubric-detail-manifest.json", require_exists=True)
     manifest = _read_json_file(manifest_path)
     blockers: list[dict[str, str]] = []
     warnings: list[dict[str, str]] = []
@@ -3005,21 +3042,30 @@ def evaluate_adoption_doc_quality(output_dir: Path) -> dict[str, Any]:
         if not isinstance(row, dict):
             continue
         rubric_id = str(row.get("rubric_id", "unknown"))
-        path_pairs = (
+        try:
+            validate_path_segment(rubric_id, label="rubric_id")
+            rubrics_dir = existing_directory(output_dir, "rubrics")
+        except (FileNotFoundError, ValueError):
+            blockers.append(
+                {
+                    "code": "rubric_path_invalid",
+                    "message": f"{rubric_id} has an unsafe or missing rubric artifact directory.",
+                }
+            )
+            continue
+        path_pairs = tuple(
             (
-                "audit",
-                Path(str(row.get("audit_markdown_path", ""))),
-                Path(str(row.get("audit_json_path", ""))),
-            ),
-            (
-                "implementation",
-                Path(str(row.get("implementation_markdown_path", ""))),
-                Path(str(row.get("implementation_json_path", ""))),
-            ),
+                kind,
+                f"{rubric_id}.{kind}.md",
+                f"{rubric_id}.{kind}.json",
+            )
+            for kind in ("audit", "implementation")
         )
-        for kind, markdown_path, json_path in path_pairs:
+        for kind, markdown_name, json_name in path_pairs:
             checked_docs += 1
-            if not markdown_path.exists():
+            try:
+                markdown_path = safe_child_file(rubrics_dir, markdown_name, require_exists=True)
+            except (FileNotFoundError, ValueError):
                 blockers.append(
                     {
                         "code": f"{kind}_markdown_missing",
@@ -3027,7 +3073,9 @@ def evaluate_adoption_doc_quality(output_dir: Path) -> dict[str, Any]:
                     }
                 )
                 continue
-            if not json_path.exists():
+            try:
+                json_path = safe_child_file(rubrics_dir, json_name, require_exists=True)
+            except (FileNotFoundError, ValueError):
                 blockers.append(
                     {
                         "code": f"{kind}_json_missing",
@@ -3178,11 +3226,12 @@ def render_adoption_doc_quality_markdown(report: dict[str, Any]) -> str:
 
 
 def write_adoption_doc_quality_report(output_dir: Path) -> dict[str, Path]:
+    output_dir = _checked_output_dir(output_dir)
     report = evaluate_adoption_doc_quality(output_dir)
-    json_path = output_dir / "adoption-doc-quality.json"
-    markdown_path = output_dir / "adoption-doc-quality.md"
+    json_path = safe_child_file(output_dir, "adoption-doc-quality.json")
+    markdown_path = safe_child_file(output_dir, "adoption-doc-quality.md")
     _json_dump(json_path, report)
-    markdown_path.write_text(render_adoption_doc_quality_markdown(report), encoding="utf-8")
+    write_text(markdown_path, render_adoption_doc_quality_markdown(report))
     return {
         "adoption_doc_quality_json": json_path,
         "adoption_doc_quality_markdown": markdown_path,
@@ -3260,53 +3309,42 @@ def write_gate_adoption_artifacts(
     rubric_pack: dict[str, Any],
     rollout_plan: dict[str, Any],
 ) -> dict[str, Path]:
-    if repo_root is not None:
-        ensure_aios_backfill_gitignored(repo_root)
-    output_dir.mkdir(parents=True, exist_ok=True)
+    output_dir = _checked_output_dir(output_dir)
     paths = {
-        "repo_scan_json": output_dir / "repo-scan.json",
-        "gate_matrix_json": output_dir / "gate-matrix.json",
-        "gate_matrix_markdown": output_dir / "gate-matrix.md",
-        "tmcp_expert_enrichment_json": output_dir / "tmcp-expert-enrichment.json",
-        "tmcp_expert_enrichment_markdown": output_dir / "tmcp-expert-enrichment.md",
-        "rubric_pack_json": output_dir / "rubric-pack.json",
-        "rubric_pack_markdown": output_dir / "rubric-pack.md",
-        "rubric_docs_dir": output_dir / "rubrics",
-        "rubric_detail_manifest_json": output_dir / "rubric-detail-manifest.json",
-        "rubric_detail_manifest_markdown": output_dir / "rubric-detail-manifest.md",
-        "rollout_plan_json": output_dir / "rollout-plan.json",
-        "rollout_plan_markdown": output_dir / "rollout-plan.md",
+        "repo_scan_json": safe_child_file(output_dir, "repo-scan.json"),
+        "gate_matrix_json": safe_child_file(output_dir, "gate-matrix.json"),
+        "gate_matrix_markdown": safe_child_file(output_dir, "gate-matrix.md"),
+        "tmcp_expert_enrichment_json": safe_child_file(output_dir, "tmcp-expert-enrichment.json"),
+        "tmcp_expert_enrichment_markdown": safe_child_file(output_dir, "tmcp-expert-enrichment.md"),
+        "rubric_pack_json": safe_child_file(output_dir, "rubric-pack.json"),
+        "rubric_pack_markdown": safe_child_file(output_dir, "rubric-pack.md"),
+        "rubric_docs_dir": prepare_directory(output_dir, "rubrics"),
+        "rubric_detail_manifest_json": safe_child_file(output_dir, "rubric-detail-manifest.json"),
+        "rubric_detail_manifest_markdown": safe_child_file(output_dir, "rubric-detail-manifest.md"),
+        "rollout_plan_json": safe_child_file(output_dir, "rollout-plan.json"),
+        "rollout_plan_markdown": safe_child_file(output_dir, "rollout-plan.md"),
     }
     _json_dump(paths["repo_scan_json"], repo_scan)
     _json_dump(paths["gate_matrix_json"], gate_matrix)
-    paths["gate_matrix_markdown"].write_text(
-        render_gate_matrix_markdown(gate_matrix),
-        encoding="utf-8",
-    )
+    write_text(paths["gate_matrix_markdown"], render_gate_matrix_markdown(gate_matrix))
     tmcp_enrichment = rubric_pack.get("tmcp_expert_enrichment")
     tmcp_enrichment = tmcp_enrichment if isinstance(tmcp_enrichment, dict) else {}
     _json_dump(paths["tmcp_expert_enrichment_json"], tmcp_enrichment)
-    paths["tmcp_expert_enrichment_markdown"].write_text(
+    write_text(
+        paths["tmcp_expert_enrichment_markdown"],
         render_tmcp_expert_enrichment_markdown(tmcp_enrichment),
-        encoding="utf-8",
     )
     _json_dump(paths["rubric_pack_json"], rubric_pack)
-    paths["rubric_pack_markdown"].write_text(
-        render_rubric_pack_markdown(rubric_pack),
-        encoding="utf-8",
-    )
+    write_text(paths["rubric_pack_markdown"], render_rubric_pack_markdown(rubric_pack))
     rubric_detail_manifest = write_rubric_detail_documents(
         output_dir=output_dir,
         rubric_pack=rubric_pack,
     )
     _json_dump(paths["rubric_detail_manifest_json"], rubric_detail_manifest)
-    paths["rubric_detail_manifest_markdown"].write_text(
+    write_text(
+        paths["rubric_detail_manifest_markdown"],
         render_rubric_detail_manifest_markdown(rubric_detail_manifest),
-        encoding="utf-8",
     )
     _json_dump(paths["rollout_plan_json"], rollout_plan)
-    paths["rollout_plan_markdown"].write_text(
-        render_gate_rollout_markdown(rollout_plan),
-        encoding="utf-8",
-    )
+    write_text(paths["rollout_plan_markdown"], render_gate_rollout_markdown(rollout_plan))
     return paths

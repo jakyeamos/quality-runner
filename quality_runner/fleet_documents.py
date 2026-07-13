@@ -5,10 +5,12 @@ from collections import Counter, defaultdict
 from pathlib import Path
 from typing import Any
 
+from quality_runner.artifacts import prepare_safe_directory, write_text
+
 
 def write_fleet_documents(*, output_dir: Path, results: list[dict[str, Any]]) -> dict[str, str]:
-    per_repo_dir = output_dir / "per-repo-summaries"
-    per_repo_dir.mkdir(parents=True, exist_ok=True)
+    output_dir = prepare_safe_directory(output_dir)
+    per_repo_dir = prepare_safe_directory(output_dir / "per-repo-summaries")
 
     repo_docs: list[dict[str, Any]] = []
     for index, result in enumerate(results, start=1):
@@ -16,17 +18,13 @@ def write_fleet_documents(*, output_dir: Path, results: list[dict[str, Any]]) ->
         slug = _slug(result.get("repo_slug") or repo_name, fallback=f"repo-{index}")
         doc_path = per_repo_dir / f"{index:03d}-{slug}.md"
         context = _repo_context(result=result, repo_name=repo_name, doc_path=doc_path)
-        doc_path.write_text(_render_repo_doc(context), encoding="utf-8")
+        write_text(doc_path, _render_repo_doc(context))
         repo_docs.append(context)
 
     index_path = per_repo_dir / "INDEX.md"
     phase_path = output_dir / "fleet-remediation-phases.md"
-    index_path.write_text(
-        _render_index(repo_docs=repo_docs, phase_path=phase_path), encoding="utf-8"
-    )
-    phase_path.write_text(
-        _render_phase_draft(repo_docs=repo_docs, index_path=index_path), encoding="utf-8"
-    )
+    write_text(index_path, _render_index(repo_docs=repo_docs, phase_path=phase_path))
+    write_text(phase_path, _render_phase_draft(repo_docs=repo_docs, index_path=index_path))
     return {
         "per_repo_dir": str(per_repo_dir),
         "index_md": str(index_path),

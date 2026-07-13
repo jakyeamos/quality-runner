@@ -6,10 +6,10 @@ from quality_runner import __version__
 from quality_runner.cli_fix_proposals import FIX_PROPOSAL_RESULT_SCHEMAS
 from quality_runner.cli_gate import GATE_RESULT_SCHEMAS
 from quality_runner.cli_status import EXPORT_HANDOFF_RESULT_SCHEMA, STATUS_RESULT_SCHEMA
+from quality_runner.doctor_contract import DOCTOR_RESULT_SCHEMA
 from quality_runner.release_smoke import RELEASE_SMOKE_SCHEMA
 from quality_runner.run_summary import RUN_SUMMARY_SCHEMA
 
-DOCTOR_RESULT_SCHEMA = "quality-runner-doctor-result-v0.1"
 INIT_RESULT_SCHEMA = "quality-runner-init-result-v0.1"
 
 
@@ -21,8 +21,9 @@ def human_summary(payload: dict[str, Any]) -> str:
     if payload.get("schema") == INIT_RESULT_SCHEMA:
         return f"config: {payload.get('config_path')}"
     if payload.get("schema") == "quality-runner-review-result-v0.1":
+        packet_ready = status == "review-not-run"
         lines = [
-            f"status: {status}",
+            "outcome: review packet ready" if packet_ready else f"status: {status}",
             f"summary: {payload.get('summary')}",
             f"mode: {payload.get('mode')} scope: {payload.get('scope')} breadth: {payload.get('breadth')}",
             f"adapter: {payload.get('adapter_status')}",
@@ -32,6 +33,17 @@ def human_summary(payload: dict[str, Any]) -> str:
         saved_path = payload.get("saved_path")
         if isinstance(saved_path, str):
             lines.append(f"saved: {saved_path}")
+        artifact_paths = payload.get("artifact_paths")
+        packet_path = (
+            artifact_paths.get("review_agent_packet_md")
+            if isinstance(artifact_paths, dict)
+            else None
+        )
+        if packet_ready and isinstance(packet_path, str):
+            lines.append(f"review packet: {packet_path}")
+        next_action = payload.get("next_action")
+        if isinstance(next_action, str) and next_action:
+            lines.append(f"next action: {next_action}")
         return "\n".join(lines)
     if payload.get("schema") == RELEASE_SMOKE_SCHEMA:
         return _release_smoke_summary(payload, status)

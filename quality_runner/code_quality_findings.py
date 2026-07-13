@@ -3,6 +3,8 @@ from __future__ import annotations
 import hashlib
 from typing import Any
 
+from quality_runner.evidence_redaction import redact_secret_like_literals
+
 CATEGORY_ORDER = [
     "harden",
     "simplify",
@@ -33,7 +35,8 @@ def _finding(
     verification: str,
     remediation_bucket: str,
 ) -> dict[str, Any]:
-    fingerprint = _fingerprint(rule_id, file, evidence)
+    redacted_evidence = redact_secret_like_literals(evidence).strip()
+    fingerprint = _fingerprint(rule_id, file, redacted_evidence)
     return {
         "id": "",
         "fingerprint": fingerprint,
@@ -44,7 +47,7 @@ def _finding(
         "file": file,
         "line": line,
         "rule_id": rule_id,
-        "evidence": evidence.strip(),
+        "evidence": redacted_evidence,
         "expected_improvement": expected_improvement,
         "risk": risk,
         "verification": verification,

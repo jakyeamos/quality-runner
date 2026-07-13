@@ -13,6 +13,7 @@ they are committed as examples.
 | --- | --- |
 | `quality_runner/` | Core scan, standards, evidence, planning, CLI, and MCP implementation. |
 | `docs/artifacts.md` | Versioned artifact contract and field-level guarantees. |
+| `docs/upgrade.md` | Cutover, compatibility, and non-destructive rollback policy. |
 | `docs/case-study.md` and `docs/dogfood-report.md` | Public design narrative and self-audit evidence. |
 | `docs/release.md` | Release process and package verification notes. |
 | `docs/examples/` | Example handoff outputs for clean, blocked, and timeout cases. |
@@ -20,18 +21,22 @@ they are committed as examples.
 
 ## Validation
 
-Non-network release validation:
+The current release candidate uses the locked validation ladder in
+[`docs/release.md`](docs/release.md). Run it against the release commit:
 
 ```bash
-uv run ruff check quality_runner tests
-uv run pytest -q
-uv run quality-runner release-smoke --json
+uv sync --locked --all-groups
+uv run --locked pytest -q
+uv run --locked ruff check .
+uv run --locked ruff format --check .
+uv run --locked basedpyright
+uv run --locked vulture quality_runner quality_evidence_contract repo_quality_certifier tests scripts --min-confidence 70
+uv run --locked quality-runner release-smoke --json
 ```
 
-Full type/format readiness is not yet clean: `uv run ruff format --check
-quality_runner tests` reports five files that need formatting, and
-`uv run basedpyright quality_runner tests` reports pre-existing test typing
-errors around monkeypatch objects. Treat those as blockers before DOI minting.
+Do not treat historical format or type failures as current release evidence.
+The built-distribution CI and release workflows repeat the package checks from
+the committed lockfile; record their result for the exact archived commit.
 
 ## Data Availability
 

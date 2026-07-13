@@ -1,20 +1,27 @@
 from __future__ import annotations
 
 import tempfile
+from collections.abc import Mapping
 from importlib.resources import files
 from pathlib import Path
 from typing import Any
 
+from quality_runner.application.journey_outcomes import audit_journey_outcome
+from quality_runner.artifacts import prepare_safe_directory
 from quality_runner.cli_status import export_handoff_payload
+from quality_runner.compatibility.legacy_workflow import refresh_payload
 from quality_runner.controller_reports import lint_controller_report
-from quality_runner.workflow import refresh_payload
+from quality_runner.doctor_contract import DOCTOR_RESULT_SCHEMA, doctor_payload
 
 RELEASE_SMOKE_SCHEMA = "quality-runner-release-smoke-result-v0.1"
 
 
 def release_smoke_payload(*, work_dir: Path | None, help_text: str) -> dict[str, Any]:
-    root = work_dir.expanduser().resolve() if work_dir is not None else Path(tempfile.mkdtemp())
-    root.mkdir(parents=True, exist_ok=True)
+    root = (
+        prepare_safe_directory(work_dir)
+        if work_dir is not None
+        else Path(tempfile.mkdtemp()).resolve()
+    )
     repo_root = root / "sample-repo"
     _write_sample_repo(repo_root)
 
@@ -28,7 +35,30 @@ def release_smoke_payload(*, work_dir: Path | None, help_text: str) -> dict[str,
         "release-smoke" in help_text,
         "CLI help includes release-smoke",
     )
-    _record_check(checks, "doctor", True, "doctor payload is available")
+    _record_check(
+        checks,
+        "doctor",
+        _doctor_contract_passed(doctor_payload(include_environment=True)),
+        "doctor payload meets the public CLI contract",
+    )
+
+    outcome = audit_journey_outcome(
+        repo_root=repo_root,
+        run_id="release-smoke-outcome",
+        profile="default",
+        ci_status_json=None,
+        include_ignored_paths=[],
+        checkout_most_advanced_branch=False,
+        skill_review_report=None,
+        intent=None,
+        inspect_only=True,
+    )
+    _record_check(
+        checks,
+        "outcome_contract",
+        _outcome_contract_passed(outcome),
+        "audit outcome preserves the v2 inspection contract",
+    )
 
     refresh = refresh_payload(
         repo_root=repo_root,
@@ -120,6 +150,44 @@ def _record_check(
             "status": "passed" if passed else "failed",
             "detail": detail,
         }
+    )
+
+
+def _doctor_contract_passed(payload: Mapping[str, object]) -> bool:
+    environment = payload.get("environment")
+    return (
+        payload.get("schema") == DOCTOR_RESULT_SCHEMA
+        and payload.get("status") == "ready"
+        and isinstance(payload.get("version"), str)
+        and payload.get("implementation_allowed") is False
+        and isinstance(environment, dict)
+        and all(
+            isinstance(environment.get(key), str) and bool(environment[key])
+            for key in ("cwd", "platform", "python_executable", "python_version")
+        )
+    )
+
+
+def _outcome_contract_passed(outcome: Mapping[str, object]) -> bool:
+    writes = outcome.get("writes")
+    safety = outcome.get("safety")
+    next_action = outcome.get("next_action")
+    artifact_paths = writes.get("artifact_paths") if isinstance(writes, dict) else None
+    return (
+        outcome.get("schema") == "quality-runner-outcome-v0.2"
+        and outcome.get("journey") == "audit"
+        and outcome.get("state") == "complete"
+        and outcome.get("assessment") == "inspection-only"
+        and isinstance(writes, dict)
+        and writes.get("state") == "artifacts-written"
+        and isinstance(safety, dict)
+        and safety.get("mode") == "scan-only"
+        and safety.get("commands_executed") is False
+        and isinstance(next_action, dict)
+        and next_action.get("kind") == "start-audit"
+        and isinstance(artifact_paths, dict)
+        and bool(artifact_paths)
+        and all(isinstance(path, str) and Path(path).is_file() for path in artifact_paths.values())
     )
 
 

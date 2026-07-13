@@ -59,13 +59,37 @@ def test_verify_gates_read_only_mode_skips_pre_cr_workspace_command(tmp_path: Pa
     )
     verification = json.loads(Path(payload["artifact_paths"]["gate_verification_json"]).read_text())
     plan = json.loads(Path(payload["artifact_paths"]["gate_execution_plan_json"]).read_text())
+    handoff = json.loads(Path(payload["artifact_paths"]["agent_handoff_json"]).read_text())
 
     assert payload["status"] == "blocked"
     assert verification["gates"][0]["id"] == "pre_cr"
     assert verification["gates"][0]["status"] == "skipped"
-    assert verification["gates"][0]["skip_type"] == "mutating-gate-not-run"
+    assert verification["gates"][0]["skip_type"] == "execution-consent-required"
     assert verification["gates"][0]["mutating_risk"] == "unknown"
-    assert plan[0]["local_execution_status"] == "mutating-skipped"
+    assert plan[0]["local_execution_status"] == "consent-required"
+    assert handoff["gate_verification"]["primary_blocker_class"] == "execution-consent"
+    assert handoff["gate_verification"]["blocker_groups"] == [
+        {"class": "execution-consent", "gate_ids": ["pre_cr"]}
+    ]
+    assert handoff["next_slice"]["title"] == "Authorize or retain evidence-only gate verification"
+    assert handoff["next_slice"]["action_groups"][0]["class"] == "execution-consent"
+
+
+def test_verify_gates_preserves_legacy_positional_read_only_slot(tmp_path: Path) -> None:
+    from quality_runner.workflow import verify_gates_payload
+
+    (tmp_path / ".pre-cr.json").write_text("{}\n", encoding="utf-8")
+    (tmp_path / ".quality-runner.toml").write_text(
+        '[quality_runner]\nrequired_capabilities = ["pre_cr"]\n',
+        encoding="utf-8",
+    )
+
+    payload = verify_gates_payload(tmp_path, None, None, None, 120, False, True)
+    verification = json.loads(Path(payload["artifact_paths"]["gate_verification_json"]).read_text())
+
+    assert verification["execute_discovered_gates"] is False
+    assert verification["gates"][0]["status"] == "skipped"
+    assert verification["gates"][0]["skip_type"] == "execution-consent-required"
 
 
 def test_refresh_payload_finalizes_partial_verify_artifacts_when_verify_times_out(

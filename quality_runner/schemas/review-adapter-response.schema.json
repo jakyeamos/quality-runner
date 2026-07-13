@@ -1,0 +1,76 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://quality-runner.dev/schemas/review-adapter-response.schema.json",
+  "title": "Quality Runner Fresh Review Adapter Response",
+  "type": "object",
+  "oneOf": [
+    { "$ref": "#/$defs/singleResponse" },
+    { "$ref": "#/$defs/combinedResponse" }
+  ],
+  "$defs": {
+    "adapter": {
+      "type": "object",
+      "required": ["name", "version", "transport"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "version": { "type": "string", "minLength": 1 },
+        "transport": { "const": "local-file" }
+      },
+      "additionalProperties": false
+    },
+    "finding": {
+      "type": "object",
+      "required": ["id", "fingerprint", "severity", "classification", "confidence", "summary", "why_it_matters", "location", "evidence", "recommended_fix", "agent_prompt", "human_confirmation_required", "status"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "fingerprint": { "type": "string", "minLength": 1 },
+        "severity": { "enum": ["critical", "high", "medium", "low"] },
+        "classification": { "enum": ["confirmed", "suspected", "not-enough-evidence", "known-accepted"] },
+        "confidence": { "enum": ["high", "medium", "low"] },
+        "summary": { "type": "string", "minLength": 1 },
+        "why_it_matters": { "type": "string", "minLength": 1 },
+        "location": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "evidence": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "recommended_fix": { "type": "string", "minLength": 1 },
+        "agent_prompt": { "type": "string", "minLength": 1 },
+        "human_confirmation_required": { "type": "boolean" },
+        "status": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": false
+    },
+    "singleResponse": {
+      "type": "object",
+      "required": ["schema", "run_id", "mode", "packet_hash", "status", "adapter", "completed_at", "findings", "evidence_used", "evidence_unavailable"],
+      "properties": {
+        "schema": { "const": "quality-runner-review-adapter-response-v0.1" },
+        "run_id": { "type": "string", "minLength": 1 },
+        "mode": { "enum": ["task", "blind"] },
+        "packet_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "status": { "const": "review-complete" },
+        "adapter": { "$ref": "#/$defs/adapter" },
+        "completed_at": { "type": "string", "format": "date-time" },
+        "findings": { "type": "array", "items": { "$ref": "#/$defs/finding" } },
+        "evidence_used": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "evidence_unavailable": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "raw_output": { "type": "string", "maxLength": 2000000 }
+      },
+      "additionalProperties": false
+    },
+    "combinedResponse": {
+      "type": "object",
+      "required": ["schema", "run_id", "mode", "responses"],
+      "properties": {
+        "schema": { "const": "quality-runner-review-combined-adapter-response-v0.1" },
+        "run_id": { "type": "string", "minLength": 1 },
+        "mode": { "const": "combined" },
+        "responses": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "items": { "$ref": "#/$defs/singleResponse" }
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

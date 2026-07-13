@@ -61,6 +61,11 @@ def prepare_scan_branch(
     return []
 
 
+def checked_out_branch(repo_root: Path) -> str | None:
+    root = repo_root.expanduser().resolve()
+    return _git_output(root, "rev-parse", "--abbrev-ref", "HEAD")
+
+
 def _branch_state(repo_root: Path) -> dict[str, Any]:
     if _git_output(repo_root, "rev-parse", "--is-inside-work-tree") != "true":
         return {"is_repo": False}

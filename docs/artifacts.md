@@ -160,7 +160,15 @@ an external agent or human applies changes and reruns Quality Runner.
 - `resolution-ledger.md`: human-readable resolution ledger summary.
 - `security-scan.json`: opt-in security capability discovery, candidate
   findings, and agent-review gate metadata when
-  `[quality_runner.security]` is configured.
+  `[quality_runner.security]` is configured. For secret-like source evidence,
+  quoted source literals are redacted before fingerprinting and persistence in
+  security candidates and code-quality findings; additional recognized
+  secret-like source values receive the same treatment. Downstream plans inherit
+  the redacted evidence. Multiline or complex values newly
+  recognized by the redactor can receive a new evidence-derived fingerprint
+  rather than retain an earlier raw-evidence fingerprint. Re-triage those
+  findings in the resolution ledger; established simple quoted-literal evidence
+  and fingerprints remain stable.
 - `slice-specs/`: per-slice Markdown cold-executor plans derived from QR
   evidence. One file per remediation slice:
   `slice-specs/<slice-id>.md`. Each spec is self-contained and includes:
@@ -201,11 +209,28 @@ an external agent or human applies changes and reruns Quality Runner.
   classify debt, or fix high-signal findings without treating one-pass QR clean
   as the only successful outcome.
 
+## Handling generated artifacts
+
+Treat `.quality-runner/` output as local evidence that may be sensitive. It can
+contain repository paths, author intent, source-derived context, and bounded
+stdout/stderr from explicitly authorized gates. Do not commit, upload, or share
+it by default; review and minimize it first.
+
+The security and code-quality scans redact recognized secret-like source values
+before fingerprinting and serialization. Source excerpts used to enrich
+remediation slices receive the same redaction. That narrow protection does not
+make an artifact secret-free: another scanner, a repository path, or gate output
+can still expose sensitive context. Retain or remove artifacts using the target
+repository's normal evidence-retention policy. See the [Threat Model](threat-model.md)
+for the remaining execution boundary.
+
 ## Gate Verification Artifacts
 
-`quality-runner verify-gates` executes discovered command-backed capabilities,
-skips CI-only capabilities that have no local executor, skips non-executable
-file/evidence capabilities without blocking, and writes:
+`quality-runner verify-gates` records discovered command-backed capabilities,
+their execution plan, and their evidence state. By default it does not execute
+commands: executable gates carry `skip_type: execution-consent-required` and
+the run is blocked pending authorization. CI-only and file/evidence capabilities
+remain non-executable evidence.
 
 - `repo-scan.json`
 - `code-quality-scan.json`
@@ -214,6 +239,8 @@ file/evidence capabilities without blocking, and writes:
 - `capability-matrix.json`: updated so locally executed gates have
   `verification_state.execution = "local-executed"` and result `passed` or
   `failed`.
+- `gate-execution-plan.json`: the discovered command, working directory,
+  mutation risk, timeout, and whether execution needs consent.
 - `gate-verification.json`: per-gate command, source, exit code, duration,
   timeout, capability kind, bounded stdout/stderr tail fields, skipped reason,
   failure type, recommended environment action, and status.
@@ -224,24 +251,17 @@ file/evidence capabilities without blocking, and writes:
 - `agent-handoff.md`
 - `run-manifest.json`
 
-When `read_only_gates` is active, QR snapshots the tracked git diff before each
-executed local command. If a safe-looking command mutates tracked files, QR
-restores the pre-gate tracked diff, marks the gate with
-`failure_type=read-only-mutation`, and classifies the run as a
-`read-only-gate-blocker`.
-
-`verify-gates` and `refresh` accept `--worktree-mode in-place|disposable`.
-Disposable mode creates a detached git worktree at the current `HEAD` under
-`.quality-runner/worktrees/<run-id>/`, executes gates inside that isolated copy,
-writes QR artifacts to the original repository, and removes the worktree when
-verification completes. Gate results record `verification_context` on
+Execution requires both `--execute-gates` and `--worktree-mode disposable`.
+The disposable checkout is created at `HEAD`, QR writes artifacts to the
+original repository, and the checkout is removed after verification. It avoids
+ordinary source-worktree mutations but does not sandbox an explicitly
+authorized command. Gate results record `verification_context` on
 `gate-verification.json` with `worktree_mode`, `base_head`, `execution_root`,
 `mutations_isolated`, and optional `dirty_source_worktree`.
 
 Disposable mode refuses a dirty source worktree unless
-`--allow-dirty-worktree-verify` is set. In disposable mode, mutating gates may
-run inside the isolated worktree even when `read_only_gates` is active, because
-the user's working tree is not mutated.
+`--allow-dirty-worktree-verify` is set; that opt-in verifies `HEAD`, not the
+local edits. An in-place execution request is rejected.
 
 This command is intentionally separate from `inspect` and `run` so capability
 discovery, command execution, and command pass/fail are distinguishable. For
@@ -324,12 +344,17 @@ to consume between iterations; Quality Runner does not apply their fixes.
 Quality Runner rejects:
 
 - unsafe run ids
-- symlinked `.quality-runner`, `runs`, or run-directory components before writes
-- symlinked artifact leaf files before writes
-- symlinked handoff export paths before reads
+- symlinked artifact namespace components and leaf files before artifact reads
+  or writes, including status, export, summarization, review, and gate surfaces
+- symlinked ancestors or leaf files on explicit handoff and report outputs
+- unsafe compatibility-certifier run ids, rubric ids, or output directories
 
-By default, Quality Runner v1 does not edit files outside its artifact
-directory. `inspect` and `run` can explicitly switch branches first with
+Use a real, non-symlinked output path for explicit exports and rollout reports.
+For example, place an export below the target repo's `.quality-runner/` folder
+instead of using an operating-system path that resolves through a symlink.
+
+By default, Quality Runner does not edit files outside its artifact directory.
+`inspect` and `run` can explicitly switch branches first with
 `--checkout-most-advanced-branch`; that mode requires a clean git worktree.
 
 ## Compatibility Policy
@@ -405,10 +430,32 @@ The active list is written to `repo-scan.json` as `scan_exclusions`.
 - `review-agent-packet.md`: bounded packet for a separate reviewing agent.
 - `review-fix-prompts.md`: selected finding prompts for a separate fixing agent.
 
+Those are the stable v1 paths. Fresh Review also writes additive lifecycle files
+when their corresponding state exists:
+
+- `review-adapter-response.template.json` and `review-execution.json` at packet
+  preparation;
+- `review-adapter-response.json` and `review-fix-handoff.json` after a valid
+  packet-bound response completes;
+- `review-loop-state.json` for an active loop; and
+- `review-adapter-attempt.json` for a rejected local response.
+
+For combined mode, `review-agent-packet.md` is a task-free coordination guide;
+`review-agent-packet-task.md` and `review-agent-packet-blind.md` are the
+separately scoped reviewer packets. The lifecycle record and response template
+make preparation distinct from completion. A local response is retained with
+declared adapter metadata only after it matches the prepared packet; that
+metadata is not identity attestation. V2 outcome writes list only files that
+exist, while legacy manifests and response payloads retain the v1 six-path
+surface.
+
 Review packets never include hidden reasoning. Active implement-review loops do
 not compare prior review documents; comparison and resolution classification
 occur only during final cycle summarization. Known issues are stored locally in
 `.quality-runner/known-issues.json`, remain visible as known-accepted findings,
-and can trigger explicit re-verification after major changes. No adapter yields
-a packet-only `review-not-run` result. All review artifacts and state are local;
-Quality Runner does not edit source files or call remote services.
+and can trigger explicit re-verification after major changes. The default v2
+outcome reports no adapter as `review-not-run` with `assessment: packet-ready`
+and a next action, not a finding conclusion; the frozen v1 report retains only
+its established fields. Its fix-prompts artifact records that no review
+completed. All review artifacts and state are local; Quality Runner does not
+edit source files or call remote services.
