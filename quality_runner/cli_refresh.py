@@ -5,8 +5,8 @@ from pathlib import Path
 from typing import Any
 
 from quality_runner.cli_status import export_handoff_payload
+from quality_runner.compatibility.legacy_workflow import refresh_payload
 from quality_runner.intent import resolve_workflow_intent
-from quality_runner.workflow import refresh_payload
 
 
 def refresh_command_payload(args: argparse.Namespace, repo_root: Path) -> dict[str, Any]:

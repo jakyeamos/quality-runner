@@ -9,12 +9,12 @@ from pathlib import Path
 from typing import Any
 
 from quality_runner.artifacts import prepare_safe_directory, write_json
+from quality_runner.compatibility.legacy_workflow import refresh_payload
 from quality_runner.controller_reports import (
     build_controller_report_from_summary,
     validate_controller_report,
 )
 from quality_runner.fleet_documents import write_fleet_documents
-from quality_runner.workflow import refresh_payload
 
 ROLLOUT_RESULT_SCHEMA = "quality-runner-rollout-result-v0.1"
 ROLLOUT_LEDGER_SCHEMA = "quality-runner-rollout-ledger-v0.1"

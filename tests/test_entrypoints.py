@@ -153,17 +153,24 @@ def test_packaged_console_script_invokes_cli(tmp_path: Path) -> None:
     assert "quality_runner/core/outcome_contracts.py" in wheel_names
     assert "quality_runner/core/review_contracts.py" in wheel_names
     assert "quality_runner/application/audit_v1_artifacts.py" in wheel_names
+    assert "quality_runner/application/audit_workflows.py" in wheel_names
+    assert "quality_runner/application/journey_outcomes.py" in wheel_names
     assert "quality_runner/application/outcome_projection.py" in wheel_names
     assert "quality_runner/application/outcome_projection_support.py" in wheel_names
     assert "quality_runner/application/read_only_audit.py" in wheel_names
     assert "quality_runner/application/review_v1_reports.py" in wheel_names
     assert "quality_runner/application/review_v1_serializers.py" in wheel_names
     assert "quality_runner/application/run_history.py" in wheel_names
+    assert "quality_runner/application/verification_workflows.py" in wheel_names
     assert "quality_runner/compatibility/journey_outcomes.py" in wheel_names
+    assert "quality_runner/compatibility/legacy_workflow.py" in wheel_names
+    assert "quality_runner/compatibility/review_mcp.py" in wheel_names
     assert "quality_runner/mcp_journeys.py" in wheel_names
     assert "quality_runner/review_types.py" in wheel_names
     assert "quality_runner/scan_scope.py" in wheel_names
     assert "quality_runner/security_surface_paths.py" in wheel_names
+    assert "quality_runner/workflow.py" in wheel_names
+    assert "quality_runner/workflow_verify.py" in wheel_names
     assert "repo_quality_certifier/plugin/manifest.json" in wheel_names
     assert "repo_quality_certifier/plugin/SKILL.md" in wheel_names
     assert not any(name.startswith("test_support/") for name in wheel_names)
@@ -219,9 +226,23 @@ def test_packaged_console_script_invokes_cli(tmp_path: Path) -> None:
             "-c",
             "from quality_evidence_contract import QUALITY_FINDING_SCHEMA; "
             "from repo_quality_certifier import GATE_MATRIX_SCHEMA; "
+            "from quality_runner import workflow, workflow_verify; "
+            "from quality_runner.application import audit_workflows, journey_outcomes, verification_workflows; "
+            "from quality_runner.compatibility import journey_outcomes as legacy_journey_outcomes; "
+            "from quality_runner.compatibility import legacy_workflow, review_mcp; "
             "from quality_runner.application.review_v1_serializers import REVIEW_CONTEXT_SCHEMA; "
             "from quality_runner.review_types import ReviewPacket; "
-            "print(QUALITY_FINDING_SCHEMA, GATE_MATRIX_SCHEMA, REVIEW_CONTEXT_SCHEMA)",
+            "assert workflow.inspect_payload is audit_workflows.inspect_payload; "
+            "assert workflow.run_payload is audit_workflows.run_payload; "
+            "assert workflow.verify_gates_payload is verification_workflows.verify_gates_payload; "
+            "assert workflow_verify.verify_gates_payload is verification_workflows.verify_gates_payload; "
+            "assert legacy_journey_outcomes.audit_journey_outcome is journey_outcomes.audit_journey_outcome; "
+            "assert legacy_journey_outcomes.review_journey_outcome is journey_outcomes.review_journey_outcome; "
+            "assert legacy_journey_outcomes.review_mcp_input_schema is review_mcp.review_mcp_input_schema; "
+            "assert legacy_journey_outcomes.review_mcp_journey_outcome is review_mcp.review_mcp_journey_outcome; "
+            "assert callable(workflow.refresh_payload); "
+            "assert callable(legacy_workflow.refresh_payload); "
+            "print(QUALITY_FINDING_SCHEMA, GATE_MATRIX_SCHEMA, REVIEW_CONTEXT_SCHEMA, 'm6-facades-ok')",
         ],
         check=True,
         capture_output=True,
@@ -264,7 +285,8 @@ def test_packaged_console_script_invokes_cli(tmp_path: Path) -> None:
     assert smoke_payload["status"] == "passed"
     assert Path(smoke_payload["handoff_output"]).exists()
     assert compat_import_result.stdout.strip() == (
-        "quality-finding-v0.1 aios-repo-gate-matrix-v0.1 quality-runner-review-context-v0.1"
+        "quality-finding-v0.1 aios-repo-gate-matrix-v0.1 quality-runner-review-context-v0.1 "
+        "m6-facades-ok"
     )
     certifier_payload = json.loads(certifier_result.stdout)
     assert certifier_payload["schema"] == "repo-quality-certifier-plan-result-v0.1"

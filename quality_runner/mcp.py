@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from quality_runner import __version__
+from quality_runner.application.audit_workflows import inspect_payload, run_payload
 from quality_runner.artifacts import artifact_run_ids, artifact_text_file
 from quality_runner.cli_payload import DOCTOR_RESULT_SCHEMA
 from quality_runner.cli_review import review_mcp_payload, review_mcp_tool
@@ -20,7 +21,7 @@ from quality_runner.gate_controller import (
 from quality_runner.intent import resolve_workflow_intent
 from quality_runner.mcp_journeys import is_journey_tool, journey_tool_payload, journey_tools
 from quality_runner.standards import DEFAULT_PROFILE
-from quality_runner.workflow import generated_run_id, inspect_payload, run_payload
+from quality_runner.workflow_internal import generated_run_id
 
 MCP_PROTOCOL_VERSION = "2024-11-05"
 MCP_RESULT_SCHEMA = "quality-runner-mcp-result-v0.1"

@@ -8,7 +8,15 @@ from pathlib import Path
 from typing import Any, cast
 
 from quality_runner import __version__
+from quality_runner.application.audit_workflows import inspect_payload, run_payload
+from quality_runner.application.journey_outcomes import (
+    audit_journey_outcome,
+    review_journey_outcome,
+    runs_journey_outcome,
+    verify_journey_outcome,
+)
 from quality_runner.application.outcome_projection import LegacyPayload
+from quality_runner.application.verification_workflows import verify_gates_payload
 from quality_runner.cli_controller_reports import (
     controller_report_command_payload,
     controller_report_from_summary_payload,
@@ -27,18 +35,11 @@ from quality_runner.cli_rollout import rollout_command_payload
 from quality_runner.cli_skills import skill_command_payload
 from quality_runner.cli_status import export_handoff_payload, status_payload
 from quality_runner.code_quality import preview_ignored_paths
-from quality_runner.compatibility.journey_outcomes import (
-    audit_journey_outcome,
-    review_journey_outcome,
-    runs_journey_outcome,
-    verify_journey_outcome,
-)
 from quality_runner.config import CONFIG_FILE_NAME, load_repo_config
 from quality_runner.controller_reports import validate_controller_report
 from quality_runner.intent import workflow_intent_from_cli_args
 from quality_runner.release_smoke import release_smoke_payload
 from quality_runner.run_summary import build_run_summary
-from quality_runner.workflow import inspect_payload, run_payload, verify_gates_payload
 from quality_runner.workflow_skills import load_skill_review_report_json
 
 DOCTOR_RESULT_SCHEMA = "quality-runner-doctor-result-v0.1"

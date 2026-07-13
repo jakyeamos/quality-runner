@@ -7,8 +7,8 @@ from typing import Any
 
 from quality_runner.artifacts import prepare_safe_directory
 from quality_runner.cli_status import export_handoff_payload
+from quality_runner.compatibility.legacy_workflow import refresh_payload
 from quality_runner.controller_reports import lint_controller_report
-from quality_runner.workflow import refresh_payload
 
 RELEASE_SMOKE_SCHEMA = "quality-runner-release-smoke-result-v0.1"
 

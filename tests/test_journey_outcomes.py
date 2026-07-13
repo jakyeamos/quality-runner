@@ -4,7 +4,20 @@ from pathlib import Path
 
 import pytest
 
-from quality_runner.compatibility import journey_outcomes
+from quality_runner.application import journey_outcomes
+from quality_runner.compatibility import journey_outcomes as legacy_journey_outcomes
+from quality_runner.compatibility import review_mcp
+
+
+def test_legacy_journey_outcomes_are_application_facades() -> None:
+    assert legacy_journey_outcomes.audit_journey_outcome is journey_outcomes.audit_journey_outcome
+    assert legacy_journey_outcomes.review_journey_outcome is journey_outcomes.review_journey_outcome
+    assert legacy_journey_outcomes.review_mcp_input_schema is review_mcp.review_mcp_input_schema
+    assert (
+        legacy_journey_outcomes.review_mcp_journey_outcome is review_mcp.review_mcp_journey_outcome
+    )
+    assert legacy_journey_outcomes.runs_journey_outcome is journey_outcomes.runs_journey_outcome
+    assert legacy_journey_outcomes.verify_journey_outcome is journey_outcomes.verify_journey_outcome
 
 
 @pytest.mark.parametrize(

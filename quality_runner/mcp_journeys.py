@@ -3,18 +3,20 @@ from __future__ import annotations
 from collections.abc import Mapping
 from pathlib import Path
 
-from quality_runner.application.run_history import DEFAULT_HISTORY_LIMIT, MAX_HISTORY_LIMIT
-from quality_runner.compatibility.journey_outcomes import (
+from quality_runner.application.journey_outcomes import (
     audit_journey_outcome,
-    review_mcp_input_schema,
-    review_mcp_journey_outcome,
     runs_journey_outcome,
     verify_journey_outcome,
+)
+from quality_runner.application.run_history import DEFAULT_HISTORY_LIMIT, MAX_HISTORY_LIMIT
+from quality_runner.compatibility.review_mcp import (
+    review_mcp_input_schema,
+    review_mcp_journey_outcome,
 )
 from quality_runner.core.audit_contracts import AuditPayload
 from quality_runner.core.outcome_contracts import JourneyOutcome
 from quality_runner.intent import resolve_workflow_intent
-from quality_runner.workflow import generated_run_id
+from quality_runner.workflow_internal import generated_run_id
 
 AUDIT_OUTCOME_TOOL = "quality_runner_audit_outcome"
 REVIEW_OUTCOME_TOOL = "quality_runner_review_outcome"
