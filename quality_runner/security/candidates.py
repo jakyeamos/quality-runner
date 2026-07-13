@@ -86,6 +86,8 @@ EXPENSIVE_API_PATTERNS: tuple[tuple[str, str, str, str], ...] = (
 
 WEBHOOK_PATTERN = re.compile(r"(?i)webhook")
 SIGNATURE_TERMS = ("signature", "hmac", "verify", "stripe-signature", "x-hub-signature")
+_SECRET_EVIDENCE_CATEGORIES = frozenset({"secrets-exposure", "secret-in-fallback", "secret-in-log"})
+_QUOTED_LITERAL = re.compile(r""""(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|`(?:\\.|[^`\\])*`""")
 
 
 def scan_security_candidates(
@@ -123,7 +125,7 @@ def scan_security_candidates(
                                 confidence=_confidence_for_match(cat, line),
                                 file=relative_path,
                                 line=line_number,
-                                evidence=line.strip()[:240],
+                                evidence=_candidate_evidence(cat, line),
                                 description=description,
                                 requires_agent_review=_requires_agent_review(cat),
                             )
@@ -209,6 +211,13 @@ def _candidate(
             evidence=evidence,
         ),
     }
+
+
+def _candidate_evidence(category: str, line: str) -> str:
+    evidence = line.strip()
+    if category in _SECRET_EVIDENCE_CATEGORIES:
+        evidence = _QUOTED_LITERAL.sub('"<redacted>"', evidence)
+    return evidence[:240]
 
 
 def security_candidate_fingerprint(

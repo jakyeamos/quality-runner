@@ -82,6 +82,36 @@ def test_candidate_detection_for_secret_exposure(tmp_path: Path) -> None:
     assert "secrets-exposure" in categories
 
 
+def test_secret_candidate_evidence_is_redacted_before_artifact_persistence(tmp_path: Path) -> None:
+    write_js_fixture(tmp_path)
+    secret = "m7-security-redaction-regression-secret-42"
+    src = tmp_path / "src"
+    src.mkdir()
+    (src / "secrets.js").write_text(f'const apiKey = "{secret}";\n', encoding="utf-8")
+
+    payload = run_payload(repo_root=tmp_path, run_id="sec-redaction-001", profile="default")
+    security_scan = json.loads(
+        Path(payload["artifact_paths"]["security_scan_json"]).read_text(encoding="utf-8")
+    )
+    candidate = next(
+        item for item in security_scan["candidates"] if item["category"] == "secrets-exposure"
+    )
+
+    assert candidate["evidence"] == 'const apiKey = "<redacted>";'
+    assert candidate["fingerprint"] == security_candidate_fingerprint(
+        category="secrets-exposure",
+        file="src/secrets.js",
+        line=1,
+        evidence=candidate["evidence"],
+    )
+    artifact_texts = [
+        path.read_text(encoding="utf-8")
+        for path in (tmp_path / ".quality-runner" / "runs" / "sec-redaction-001").rglob("*")
+        if path.is_file()
+    ]
+    assert all(secret not in text for text in artifact_texts)
+
+
 def test_agent_review_gate_for_api_routes(tmp_path: Path) -> None:
     write_js_fixture(tmp_path)
     api_dir = tmp_path / "app" / "api" / "users"
