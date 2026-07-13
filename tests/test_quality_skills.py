@@ -784,6 +784,10 @@ def test_architecture_maintainability_pack_reports_seams_and_review_scopes(
     )
     source = "def legacy_adapter(value):\n    return value\n"
     _write(tmp_path / "src/compat.py", source)
+    _write(
+        tmp_path / "src/ordinary.py",
+        "def calculate_compatibility_score(value):\n    return value\n",
+    )
     config = _skills_enabled_config(
         active=["architecture-maintainability"],
         local=[{"id": "architecture-maintainability", "path": skill_path}],
@@ -794,6 +798,12 @@ def test_architecture_maintainability_pack_reports_seams_and_review_scopes(
     )
     rule_ids = {str(finding["rule_id"]) for finding in result["findings"]}
     assert "architecture-maintainability/compatibility-seam-without-removal-boundary" in rule_ids
+    assert not any(
+        finding["file"] == "src/ordinary.py"
+        and finding["rule_id"]
+        == "architecture-maintainability/compatibility-seam-without-removal-boundary"
+        for finding in result["findings"]
+    )
     assert result["quality_skills"][0]["id"] == "architecture-maintainability"
 
     reviewed = create_code_quality_scan(

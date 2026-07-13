@@ -10,7 +10,12 @@ category = "architecture-maintainability"
 severity = "observation"
 confidence = "low"
 paths = ["*.py", "**/*.py", "*.js", "**/*.js", "*.jsx", "**/*.jsx", "*.ts", "**/*.ts", "*.tsx", "**/*.tsx", "*.go", "**/*.go", "*.rs", "**/*.rs", "*.java", "**/*.java", "*.md", "**/*.md", "*.yml", "**/*.yml", "*.yaml", "**/*.yaml", "*.toml", "**/*.toml", "*.json", "**/*.json"]
-trigger_patterns = ['(?i)(?:adapter|compat(?:ibility)?|shim|legacy|deprecated)']
+trigger_patterns = [
+  '(?i)\b(?:class|interface|type|const|let|var|def|function)\s+\w*(?:adapter|shim|legacy|deprecated)\w*\b',
+  '(?i)\b(?:adapter|shim|legacy|deprecated)\w*\s*(?:=|:|\(|\[)',
+  '(?i)\b(?:compat|compatibility)(?:_|-|\s)*(?:layer|path|wrapper|route|api|mode|contract|boundary|seam)\b',
+  '(?i)\b(?:layer|path|wrapper|route|api|mode|contract|boundary|seam)(?:_|-|\s)*(?:compat|compatibility)\b',
+]
 required_patterns = ['(?i)\b(?:remove|removal|until|deprecat(?:e|ed|ion)|sunset|delete\s+by|issue\s*#)\b']
 message = "A compatibility or legacy seam has no visible removal, deprecation, or tracking boundary."
 risk = "A temporary bridge may become a permanent second owner that lets concepts and behavior drift."
