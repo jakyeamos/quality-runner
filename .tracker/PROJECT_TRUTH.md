@@ -5,7 +5,7 @@ Last updated: 2026-07-12
 ## Current State
 
 The quality-skills audit contract is hardened on feature branch
-`quality-security-evidence` at commit `d7bf4ad`. The source-backed user packs
+`quality-security-evidence` at commit `3e13bcb`. The source-backed user packs
 `ui-foundations`, `test-strategy`, `security-privacy`, `release-readiness`,
 `pr-risk`, `data-integrity`, `developer-experience`, and
 `architecture-maintainability` now cover visual and UI-state risks, behavior
@@ -29,7 +29,8 @@ Run artifacts now support configured regex redaction for JSON/Markdown writes,
 dry-run-first retention pruning, and redaction-safe gate-run persistence. The
 repository config declares an executable `security_dependency_audit` gate that
 exports the locked dependency set and runs `pip-audit` without auditing the
-editable local project.
+editable local project. Final dogfood reports that gate as passed through the
+Quality Runner executor.
 
 ## Next Step
 
@@ -40,10 +41,13 @@ multi-repo configuration. Runtime/browser-dependent skills remain deferred.
 
 ## Blockers
 
-- Existing packaging entrypoint test fails because it looks for a `0.4.0`
-  wheel metadata path that the current build does not produce.
+- Full suite reaches 418 passed with the existing packaging entrypoint test
+  failing because it looks for a `0.4.0` wheel metadata path that the current
+  build does not produce.
 - Full-repo Ruff/format and basedpyright retain pre-existing findings outside
-  this change; touched-file checks pass.
+  this change; touched-file checks pass. Vulture passes the source roots; its
+  broad `vulture .` form needs `.quality-runner` excluded after local uv gate
+  runs generate ignored dependency-cache code.
 
 Quality Runner is the public, installable quality orchestration package. It owns
 the CLI/MCP workflow for repo inspection, gate evidence, audit generation,
