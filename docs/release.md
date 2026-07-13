@@ -10,10 +10,11 @@ is read dynamically by package metadata. The release workflow installs the
 built wheel before publishing and checks its CLI doctor contract, release smoke,
 and MCP outcome-tool discovery alongside tag, plugin, and citation parity.
 
-`0.5.1` is an unreleased candidate on this branch. `CITATION.cff` describes
-the last published release until the release commit exists. The checked-in
-Homebrew formula is an older `0.2.0` template, not current published-release
-metadata; update it only after the `0.5.1` source distribution is live.
+`0.5.1` is an unreleased candidate until the tag workflow has completed and
+PyPI verification succeeds. Its committed `CITATION.cff` metadata must match
+the tag; neither is evidence of publication by itself. The checked-in Homebrew
+formula is an older `0.2.0` template, not current published-release metadata;
+update it only after the `0.5.1` source distribution is live.
 
 Release tags are permanent. Check the existing Git tags and PyPI releases before
 choosing a new version; never reuse a tag, including `v0.5.0`.
@@ -29,13 +30,17 @@ choosing a new version; never reuse a tag, including `v0.5.0`.
    uv run --locked ruff format --check .
    uv run --locked basedpyright
    uv run --locked vulture quality_runner quality_evidence_contract repo_quality_certifier tests scripts --min-confidence 70
+   uv run --locked pip-audit
    uv run --locked quality-runner release-smoke --json
    uv build
    ```
 
-2. Run a self-audit and confirm there are no capability blockers and no default
-   structural findings:
+2. Run a self-audit and review its capability findings, default structural
+   findings, and high-severity security candidates:
    `uv run --locked quality-runner audit . --run-id pre-release-self-audit --json`.
+   Candidate and agent-review items are heuristic obligations, not deterministic
+   pass/fail verdicts; record the code-context review and do not tag with a
+   confirmed vulnerability or unresolved structural defect.
 3. Confirm the PyPI Trusted Publisher settings before tagging.
 4. Review the [Upgrade and Compatibility Guide](upgrade.md), then update
    `CITATION.cff` to `0.5.1`, commit the release metadata, and merge the

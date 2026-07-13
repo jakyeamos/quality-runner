@@ -15,6 +15,10 @@ All notable changes to Quality Runner are documented here.
   retaining published v1 CLI, MCP, artifact, and compatibility projections.
 - Hardened source-evidence redaction across security, code-quality, and
   remediation artifacts, including complex multiline and lexical edge cases.
+- Added a pinned Python dependency audit to CI and release validation, and
+  updated the development test dependency to `pytest 9.0.3`.
+- Validated baseline artifact Git revisions before review-delta comparisons,
+  preventing Git option injection from untrusted prior-run metadata.
 
 ## 0.5.0 - 2026-07-09
 

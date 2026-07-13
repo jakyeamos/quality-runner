@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 import json
+import subprocess
 from pathlib import Path
 
 import pytest
 
-from quality_runner.review_delta import build_review_delta, persist_review_delta
+from quality_runner.review_delta import build_review_delta, git_changed_paths, persist_review_delta
 
 
 def _write_run(
@@ -41,6 +42,66 @@ def _finding(fingerprint: str, file: str) -> dict[str, str]:
 
 def _intent() -> dict[str, str]:
     return {"goal": "Implement the requested task"}
+
+
+def _initialize_git_repo(repo_root: Path) -> str:
+    subprocess.run(["git", "init"], cwd=repo_root, check=True, capture_output=True)
+    subprocess.run(
+        ["git", "config", "user.email", "quality-runner@example.test"],
+        cwd=repo_root,
+        check=True,
+        capture_output=True,
+    )
+    subprocess.run(
+        ["git", "config", "user.name", "Quality Runner Tests"],
+        cwd=repo_root,
+        check=True,
+        capture_output=True,
+    )
+    (repo_root / "tracked.py").write_text("value = 1\n", encoding="utf-8")
+    blob = subprocess.run(
+        ["git", "hash-object", "-w", "tracked.py"],
+        cwd=repo_root,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    tree = subprocess.run(
+        ["git", "mktree"],
+        cwd=repo_root,
+        check=True,
+        capture_output=True,
+        input=f"100644 blob {blob}\ttracked.py\n",
+        text=True,
+    ).stdout.strip()
+    commit = subprocess.run(
+        ["git", "commit-tree", tree, "-m", "initial"],
+        cwd=repo_root,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    subprocess.run(
+        ["git", "update-ref", "refs/heads/main", commit],
+        cwd=repo_root,
+        check=True,
+        capture_output=True,
+    )
+    subprocess.run(
+        ["git", "symbolic-ref", "HEAD", "refs/heads/main"],
+        cwd=repo_root,
+        check=True,
+        capture_output=True,
+    )
+    subprocess.run(["git", "read-tree", tree], cwd=repo_root, check=True, capture_output=True)
+    result = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=repo_root,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    return result.stdout.strip()
 
 
 def test_review_delta_classifies_new_persisted_resolved_and_out_of_scope(tmp_path: Path) -> None:
@@ -140,6 +201,29 @@ def test_review_delta_rejects_invalid_identity(tmp_path: Path) -> None:
             intent=_intent(),
             changed_paths=["src/main.py"],
         )
+
+
+def test_review_delta_ignores_untrusted_baseline_sha_options(tmp_path: Path) -> None:
+    _initialize_git_repo(tmp_path)
+    _write_run(tmp_path, "baseline", [])
+    injected_output = tmp_path / "injected-diff-output"
+    manifest = tmp_path / ".quality-runner" / "runs" / "baseline" / "run-manifest.json"
+    manifest.write_text(
+        json.dumps({"git": {"head_sha": f"--output={injected_output}"}}), encoding="utf-8"
+    )
+
+    assert git_changed_paths(tmp_path, "baseline") == []
+    assert not injected_output.exists()
+
+
+def test_review_delta_uses_a_valid_baseline_sha_with_delimited_revisions(tmp_path: Path) -> None:
+    baseline_sha = _initialize_git_repo(tmp_path)
+    _write_run(tmp_path, "baseline", [])
+    manifest = tmp_path / ".quality-runner" / "runs" / "baseline" / "run-manifest.json"
+    manifest.write_text(json.dumps({"git": {"head_sha": baseline_sha}}), encoding="utf-8")
+    (tmp_path / "tracked.py").write_text("value = 2\n", encoding="utf-8")
+
+    assert git_changed_paths(tmp_path, "baseline") == ["tracked.py"]
 
 
 def test_refresh_parser_exposes_review_loop_flags() -> None:

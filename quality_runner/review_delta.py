@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 import subprocess
 from pathlib import Path
 from typing import Any
@@ -16,6 +17,8 @@ from quality_runner.artifacts import (
     write_text,
 )
 from quality_runner.schema_constants import REVIEW_DELTA_SCHEMA
+
+_GIT_OBJECT_ID_PATTERN = re.compile(r"(?:[0-9a-fA-F]{40}|[0-9a-fA-F]{64})")
 
 
 def build_review_delta(
@@ -170,8 +173,8 @@ def git_changed_paths(repo_root: Path, baseline_run_id: str | None = None) -> li
     paths: set[str] = set()
     baseline_sha = _baseline_head_sha(root, baseline_run_id)
     if baseline_sha:
-        paths.update(_git_names(root, "diff", "--name-only", baseline_sha, "HEAD"))
-    paths.update(_git_names(root, "diff", "--name-only", "HEAD"))
+        paths.update(_git_names(root, "diff", "--name-only", baseline_sha, "HEAD", "--"))
+    paths.update(_git_names(root, "diff", "--name-only", "HEAD", "--"))
     paths.update(_git_names(root, "ls-files", "--others", "--exclude-standard"))
     return sorted(path for path in paths if path and not path.startswith(".quality-runner/"))
 
@@ -289,15 +292,14 @@ def _baseline_head_sha(repo_root: Path, baseline_run_id: str | None) -> str | No
         return None
     try:
         path = artifact_text_file(repo_root, baseline_run_id, "run-manifest.json")
-    except FileNotFoundError:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (FileNotFoundError, OSError, json.JSONDecodeError):
         return None
-    payload = json.loads(path.read_text(encoding="utf-8"))
     git = payload.get("git", {}) if isinstance(payload, dict) else {}
-    return (
-        git.get("head_sha")
-        if isinstance(git, dict) and isinstance(git.get("head_sha"), str)
-        else None
-    )
+    head_sha = git.get("head_sha") if isinstance(git, dict) else None
+    if not isinstance(head_sha, str) or not _GIT_OBJECT_ID_PATTERN.fullmatch(head_sha):
+        return None
+    return head_sha
 
 
 def _git_names(repo_root: Path, *args: str) -> list[str]:

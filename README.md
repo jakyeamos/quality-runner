@@ -339,6 +339,7 @@ uv run --locked ruff check .
 uv run --locked ruff format --check .
 uv run --locked basedpyright
 uv run --locked vulture quality_runner quality_evidence_contract repo_quality_certifier tests scripts --min-confidence 70
+uv run --locked pip-audit
 uv run --locked python scripts/run_pytest_with_lcov.py
 uv run --locked quality-runner release-smoke --json
 pre-cr run --workspace . --json  # changed-line readiness; expects changed files

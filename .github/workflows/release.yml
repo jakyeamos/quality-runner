@@ -50,6 +50,7 @@ jobs:
           uv run --locked ruff format --check .
           uv run --locked basedpyright
           uv run --locked vulture quality_runner quality_evidence_contract repo_quality_certifier tests scripts --min-confidence 70
+          uv run --locked pip-audit
 
       - name: Build package
         run: uv build

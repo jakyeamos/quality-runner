@@ -51,6 +51,9 @@ jobs:
       - name: Run Vulture
         run: uv run --locked vulture quality_runner quality_evidence_contract repo_quality_certifier tests scripts --min-confidence 70
 
+      - name: Audit Python dependencies
+        run: uv run --locked pip-audit
+
       - name: Build package
         run: uv build
 

@@ -46,10 +46,12 @@ def test_release_docs_describe_current_release_plan_and_release_history() -> Non
     assert "gate controller runs" in changelog
     assert "security scan surfaces" in changelog
     assert "unreleased candidate" in release_docs
+    assert "PyPI verification succeeds" in release_docs
     assert "built wheel" in release_docs
     assert "Trusted Publisher" in release_docs
     assert "before tagging" in release_docs
     assert "uv sync --locked --all-groups" in release_docs
+    assert "uv run --locked pip-audit" in release_docs
     assert "quality-runner release-smoke --json" in release_docs
     assert "quality-runner-mcp" in release_docs
     assert "uv tool install 'quality-runner==0.5.1' --force" in release_docs
@@ -124,6 +126,7 @@ def test_ci_and_release_workflows_smoke_built_wheel_outcome_and_mcp_surfaces() -
 
     for workflow in (ci, release):
         assert "uv sync --locked --all-groups" in workflow
+        assert "uv run --locked pip-audit" in workflow
         assert "quality-runner release-smoke --json" in workflow
         assert "quality-runner review" in workflow
         assert "review-default" in workflow

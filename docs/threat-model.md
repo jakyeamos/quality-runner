@@ -23,6 +23,8 @@ evidence-only unless a caller explicitly authorizes disposable execution.
   containment-checked; it does not edit `.git/info/exclude`.
 - Symlinked CI paths and CI status files are skipped.
 - Local CI status JSON must resolve inside the target repo.
+- Artifact-derived Git revisions must be full object identifiers and are passed
+  to Git as option-delimited revision arguments.
 - Large discovery/status files are ignored or warned on instead of read
   unbounded.
 - Secret-like security candidates, code-quality findings, and remediation
