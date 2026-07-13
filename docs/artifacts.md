@@ -160,9 +160,10 @@ an external agent or human applies changes and reruns Quality Runner.
 - `resolution-ledger.md`: human-readable resolution ledger summary.
 - `security-scan.json`: opt-in security capability discovery, candidate
   findings, and agent-review gate metadata when
-  `[quality_runner.security]` is configured. For secret-like candidates,
-  quoted source literals are redacted before fingerprinting and persistence;
-  downstream security findings inherit that redacted evidence.
+  `[quality_runner.security]` is configured. For secret-like source evidence,
+  quoted source literals are redacted before fingerprinting and persistence in
+  security candidates and code-quality findings; downstream plans inherit the
+  redacted evidence.
 - `slice-specs/`: per-slice Markdown cold-executor plans derived from QR
   evidence. One file per remediation slice:
   `slice-specs/<slice-id>.md`. Each spec is self-contained and includes:
@@ -210,12 +211,13 @@ contain repository paths, author intent, source-derived context, and bounded
 stdout/stderr from explicitly authorized gates. Do not commit, upload, or share
 it by default; review and minimize it first.
 
-The security scan redacts quoted literals in secret-like candidate evidence
-before fingerprinting and serialization. That narrow protection does not make
-an artifact secret-free: another scanner, a repository path, or gate output can
-still expose sensitive context. Retain or remove artifacts using the target
-repository's normal evidence-retention policy. See the
-[Threat Model](threat-model.md) for the remaining execution boundary.
+The security and code-quality scans redact quoted literals in secret-like source
+evidence before fingerprinting and serialization. Source excerpts used to enrich
+remediation slices receive the same redaction. That narrow protection does not
+make an artifact secret-free: another scanner, a repository path, or gate output
+can still expose sensitive context. Retain or remove artifacts using the target
+repository's normal evidence-retention policy. See the [Threat Model](threat-model.md)
+for the remaining execution boundary.
 
 ## Gate Verification Artifacts
 

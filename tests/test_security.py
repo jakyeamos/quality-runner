@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 
@@ -7,7 +8,7 @@ from quality_runner.config import load_repo_config
 from quality_runner.security.candidates import security_candidate_fingerprint
 from quality_runner.security.config import security_settings
 from quality_runner.security.scan import create_security_scan, merge_security_into_capability_map
-from quality_runner.workflow import inspect_payload, run_payload
+from quality_runner.workflow import inspect_payload, run_payload, verify_gates_payload
 from test_support.quality_runner_fixtures import write_js_fixture, write_python_quality_fixture
 
 
@@ -110,6 +111,83 @@ def test_secret_candidate_evidence_is_redacted_before_artifact_persistence(tmp_p
         if path.is_file()
     ]
     assert all(secret not in text for text in artifact_texts)
+
+
+def test_secret_like_source_evidence_is_redacted_across_generated_artifacts(tmp_path: Path) -> None:
+    from quality_runner.handoff_lint import validate_slice_spec_content
+
+    write_js_fixture(tmp_path)
+    secret = "m7-shared-redaction-regression-secret-42"
+    src = tmp_path / "src"
+    src.mkdir()
+    (src / "secrets.js").write_text(
+        "\n".join(
+            [
+                (f'const apiKey = "{secret}"; const state = one ? two : three ? four : five;'),
+                f'const apiKey = "{secret}";',
+                "const adjacent = one ? two : three ? four : five;",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    payloads = {
+        "inspect": inspect_payload(repo_root=tmp_path, run_id="shared-redaction-inspect"),
+        "run": run_payload(repo_root=tmp_path, run_id="shared-redaction-run"),
+        "verify": verify_gates_payload(
+            repo_root=tmp_path,
+            run_id="shared-redaction-verify",
+            read_only_gates=True,
+        ),
+    }
+    redacted_same_line = (
+        'const apiKey = "<redacted>"; const state = one ? two : three ? four : five;'
+    )
+
+    for payload in payloads.values():
+        artifact_paths = payload["artifact_paths"]
+        code_quality_scan = json.loads(
+            Path(artifact_paths["code_quality_scan_json"]).read_text(encoding="utf-8")
+        )
+        same_line_finding = next(
+            finding
+            for finding in code_quality_scan["findings"]
+            if finding["rule_id"] == "nested-ternary" and finding["line"] == 1
+        )
+        expected_fingerprint = hashlib.sha256(
+            f"nested-ternary:src/secrets.js:{redacted_same_line}".encode()
+        ).hexdigest()[:16]
+
+        assert same_line_finding["evidence"] == redacted_same_line
+        assert same_line_finding["fingerprint"] == expected_fingerprint
+        run_dir = Path(artifact_paths["code_quality_scan_json"]).parent
+        artifact_texts = [
+            path.read_text(encoding="utf-8") for path in run_dir.rglob("*") if path.is_file()
+        ]
+        assert all(secret not in text for text in artifact_texts)
+
+    for name in ("run", "verify"):
+        artifact_paths = payloads[name]["artifact_paths"]
+        remediation_plan = json.loads(
+            Path(artifact_paths["remediation_plan_json"]).read_text(encoding="utf-8")
+        )
+        adjacent_finding = next(
+            finding
+            for slice_item in remediation_plan["slices"]
+            for finding in slice_item["findings"]
+            if finding.get("rule_id") == "nested-ternary" and finding.get("line") == 3
+        )
+        excerpt = adjacent_finding["evidence_excerpt"]
+        slice_specs = list(
+            Path(artifact_paths["remediation_plan_json"]).parent.glob("slice-specs/*.md")
+        )
+
+        assert 'const apiKey = "<redacted>";' in excerpt["context_before"]
+        assert slice_specs
+        assert all(
+            validate_slice_spec_content(path.read_text(encoding="utf-8"))["passed"]
+            for path in slice_specs
+        )
 
 
 def test_agent_review_gate_for_api_routes(tmp_path: Path) -> None:

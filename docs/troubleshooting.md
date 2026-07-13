@@ -63,8 +63,9 @@ Treat the run as local evidence and stop sharing or committing its artifacts
 until it has been reviewed. If a real credential appears, rotate or revoke it
 using the owning service's process, preserve only the minimum evidence needed
 for the incident, then apply the repository's normal retention policy. The
-security scanner redacts quoted literals only in secret-like candidate evidence;
-other source-derived context and authorized gate output can still be sensitive.
+security and code-quality scanners redact quoted literals in secret-like source
+evidence and remediation excerpts; other source-derived context and authorized
+gate output can still be sensitive.
 See [Artifact Handling](artifacts.md#handling-generated-artifacts).
 
 ## A Fresh Review response is rejected

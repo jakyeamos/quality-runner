@@ -18,7 +18,8 @@ during an audit. It reads repository files needed for quality evidence and
 writes artifacts under `.quality-runner/runs/<run-id>/` in the target repository.
 
 Generated artifacts can contain local repository evidence and should be handled
-as potentially sensitive. Secret-like candidate literals are redacted before
-their security-scan evidence is persisted, but artifacts are not a guarantee of
-secret-free output. Report any redaction bypass or behavior that reads or writes
-outside that boundary through a private security advisory.
+as potentially sensitive. Secret-like literals are redacted in security
+candidates, code-quality findings, and remediation source excerpts before they
+are persisted, but artifacts are not a guarantee of secret-free output. Report
+any redaction bypass or behavior that reads or writes outside that boundary
+through a private security advisory.

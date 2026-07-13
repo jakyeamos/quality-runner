@@ -3,6 +3,8 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+from quality_runner.security.redaction import redact_secret_like_literals
+
 
 def read_line_excerpt(
     repo_root: Path,
@@ -29,9 +31,11 @@ def read_line_excerpt(
     return {
         "file": file,
         "line": line,
-        "excerpt": lines[index],
-        "context_before": lines[before_start:index],
-        "context_after": lines[index + 1 : after_end],
+        "excerpt": redact_secret_like_literals(lines[index]),
+        "context_before": [redact_secret_like_literals(item) for item in lines[before_start:index]],
+        "context_after": [
+            redact_secret_like_literals(item) for item in lines[index + 1 : after_end]
+        ],
     }
 
 

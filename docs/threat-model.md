@@ -25,9 +25,9 @@ evidence-only unless a caller explicitly authorizes disposable execution.
 - Local CI status JSON must resolve inside the target repo.
 - Large discovery/status files are ignored or warned on instead of read
   unbounded.
-- Secret-like security candidates redact quoted literals before fingerprinting
-  and artifact persistence; derived audit and handoff evidence uses the
-  redacted candidate excerpt.
+- Secret-like security candidates, code-quality findings, and remediation
+  source excerpts redact quoted literals before fingerprinting and artifact
+  persistence; derived audit and handoff evidence uses the redacted excerpt.
 - Commands found in config, package scripts, Makefiles, Docker, Terraform, and
   workflows are recorded as evidence only by default. Execution requires both
   `--execute-gates` and `--worktree-mode disposable`.

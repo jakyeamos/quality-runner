@@ -4,6 +4,12 @@ import hashlib
 import re
 from typing import Any
 
+from quality_runner.security.redaction import (
+    SECRET_ASSIGNMENT_PATTERN,
+    SECRET_FALLBACK_PATTERN,
+    SECRET_LOG_PATTERN,
+    redact_secret_like_literals,
+)
 from quality_runner.security.taxonomy import SECURITY_TAXONOMY_CATEGORIES
 
 _CANDIDATE_ID = 0
@@ -11,19 +17,19 @@ _CANDIDATE_ID = 0
 SECRET_PATTERNS: tuple[tuple[str, str, str, str], ...] = (
     (
         "secrets-exposure",
-        r"(?i)(api[_-]?key|secret|password|token|private[_-]?key)\s*[:=]\s*['\"][^'\"]{8,}['\"]",
+        SECRET_ASSIGNMENT_PATTERN,
         "high",
         "Hardcoded secret-like assignment detected.",
     ),
     (
         "secret-in-fallback",
-        r"(?i)(?:\|\||\?\?)\s*['\"][^'\"]{12,}['\"]",
+        SECRET_FALLBACK_PATTERN,
         "medium",
         "Secret-like fallback value in expression.",
     ),
     (
         "secret-in-log",
-        r"(?i)(?:console\.|logger\.|print\(|logging\.).*(?:password|secret|token|api[_-]?key)",
+        SECRET_LOG_PATTERN,
         "medium",
         "Sensitive value may be logged.",
     ),
@@ -87,7 +93,6 @@ EXPENSIVE_API_PATTERNS: tuple[tuple[str, str, str, str], ...] = (
 WEBHOOK_PATTERN = re.compile(r"(?i)webhook")
 SIGNATURE_TERMS = ("signature", "hmac", "verify", "stripe-signature", "x-hub-signature")
 _SECRET_EVIDENCE_CATEGORIES = frozenset({"secrets-exposure", "secret-in-fallback", "secret-in-log"})
-_QUOTED_LITERAL = re.compile(r""""(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|`(?:\\.|[^`\\])*`""")
 
 
 def scan_security_candidates(
@@ -214,9 +219,9 @@ def _candidate(
 
 
 def _candidate_evidence(category: str, line: str) -> str:
-    evidence = line.strip()
-    if category in _SECRET_EVIDENCE_CATEGORIES:
-        evidence = _QUOTED_LITERAL.sub('"<redacted>"', evidence)
+    evidence = redact_secret_like_literals(
+        line.strip(), force=category in _SECRET_EVIDENCE_CATEGORIES
+    )
     return evidence[:240]
 
 
