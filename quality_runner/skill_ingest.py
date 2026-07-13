@@ -115,19 +115,21 @@ def validate_skill_pack(
             errors=["candidate skill pack failed validation"],
         )
 
-    validation_warnings = skill_pack.get("validation_warnings")
-    if isinstance(validation_warnings, list):
-        warnings.extend(
-            str(item["message"])
-            for item in validation_warnings
-            if isinstance(item, dict) and isinstance(item.get("message"), str)
+    validation_warnings = skill_pack["validation_warnings"]
+    warnings = [*warnings, *validation_warnings]
+
+    regex_errors = skill_pack["regex_errors"]
+    if regex_errors:
+        return _result(
+            status="rejected",
+            skill_id=normalized_id,
+            warnings=warnings,
+            errors=regex_errors,
         )
 
     return _result(
         status="validated",
-        write=False,
         skill_id=normalized_id,
-        active=False,
         warnings=warnings,
         errors=[],
         canonical_content=_canonical_skill_toml(raw, normalized_id),
@@ -443,11 +445,11 @@ def _namespace_pack_items(value: object, *, source_id: str) -> list[dict[str, An
 def _result(
     *,
     status: str,
-    write: bool,
     skill_id: str,
-    active: bool,
     warnings: list[str] | list[dict[str, str]],
     errors: list[str],
+    write: bool = False,
+    active: bool = False,
     canonical_content: str | None = None,
 ) -> dict[str, Any]:
     normalized_warnings = [

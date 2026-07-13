@@ -51,6 +51,12 @@ Behavior:
 - If `active` is absent, all configured local skills may run.
 - Skill paths must stay inside the repo. Path traversal is rejected.
 - Missing or malformed skill files are skipped safely and surfaced as warnings.
+- Skill scans cover frontend source and content extensions including `.astro`,
+  `.less`, `.mdx`, `.sass`, `.scss`, `.svelte`, and `.vue` in addition to the
+  existing JavaScript, CSS, HTML, Markdown, and configuration formats.
+- Skill ingest compiles every regex-bearing rule before registration. Invalid
+  expressions reject ingest with the rule, field, pattern index, and error
+  column; manually configured invalid rules remain visible as skipped coverage.
 
 ## Personal corpus and pack assignment
 
@@ -250,6 +256,28 @@ The pack is intentionally high-recall. Its low-confidence observations are
 review prompts, not automatic proof that a design choice is wrong. Copy it into
 `.quality-runner/skills/`, add it to `[quality_runner.skills.local]`, and scope it
 to the repository's UI source paths before activating it.
+
+### Starter packs: UI Specificity and Copy Specificity
+
+The [UI Specificity starter pack](examples/ui-specificity.toml) and [Copy
+Specificity starter pack](examples/copy-specificity.toml) are clean-room,
+opt-in translations of a mined anti-template workflow. They retain only the
+useful Quality Runner behavior: deterministic signals, contextual review,
+evidence-backed findings, and explicit verification. They do not assert that a
+pattern proves AI authorship, and they do not vendor an upstream scanner,
+taxonomy prose, demos, or remediation code.
+
+The UI pack is scoped to frontend source and treats gradients, colored glows,
+blurred translucent surfaces, and full rounding as design-intent candidates.
+The copy pack is deliberately scoped to product-facing content paths rather than
+generic documentation, fixtures, or examples. Both packs are observations by
+default and should be activated only after a maintainer reviews the false-positive
+profile for the target repository.
+
+The upstream repository and inspected revision are recorded in each pack's
+`[[sources]]` metadata for provenance. The inspected checkout did not include a
+license notice, so future additions must remain independently authored unless the
+upstream maintainer grants permission for reuse.
 
 ### Starter pack: Test Strategy and Regression
 

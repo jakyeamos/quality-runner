@@ -219,11 +219,12 @@ def _code_quality_findings(code_quality_scan: dict[str, Any] | None) -> list[dic
         count = len(group)
         score = _structural_score(group)
         integrate = category == "integrate"
+        audit_category = category if category.startswith("skill:") else f"structural:{category}"
         quality = compute_finding_quality(
             {
                 "id": f"structural-{category}-{rule_id}",
                 "severity": _structural_severity(group),
-                "category": f"structural:{category}",
+                "category": audit_category,
                 "score": score,
             },
             raw_findings=group,
@@ -232,7 +233,7 @@ def _code_quality_findings(code_quality_scan: dict[str, Any] | None) -> list[dic
             {
                 "id": f"structural-{category}-{rule_id}",
                 "severity": _structural_severity(group),
-                "category": f"structural:{category}",
+                "category": audit_category,
                 "summary": _structural_summary(
                     count=count,
                     rule_id=rule_id,

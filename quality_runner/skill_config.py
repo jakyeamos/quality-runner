@@ -171,6 +171,11 @@ def _load_skill_pack(
         "agent_reviews": agent_reviews,
         "sources": sources,
         "validation_warnings": [*deterministic_warnings, *review_warnings, *source_warnings],
+        "regex_errors": [
+            str(item["message"])
+            for item in [*deterministic_warnings, *review_warnings, *source_warnings]
+            if item.get("code") == "invalid_quality_skill_regex"
+        ],
     }, None
 
 
@@ -257,6 +262,14 @@ def _parse_deterministic_rules(
             patterns = _string_list(item.get("disallowed_patterns"))
             if patterns:
                 rule["disallowed_patterns"] = patterns
+                _record_regex_validation(
+                    rule,
+                    skill_id=skill_id,
+                    rule_index=index,
+                    rule_id=rule_id,
+                    fields=[("disallowed_patterns", patterns)],
+                    warnings=warnings,
+                )
                 rules.append(rule)
             else:
                 warnings.append(
@@ -271,6 +284,17 @@ def _parse_deterministic_rules(
             if triggers and required:
                 rule["trigger_patterns"] = triggers
                 rule["required_patterns"] = required
+                _record_regex_validation(
+                    rule,
+                    skill_id=skill_id,
+                    rule_index=index,
+                    rule_id=rule_id,
+                    fields=[
+                        ("trigger_patterns", triggers),
+                        ("required_patterns", required),
+                    ],
+                    warnings=warnings,
+                )
                 rules.append(rule)
             else:
                 warnings.append(
@@ -300,6 +324,34 @@ def _parse_deterministic_rules(
                 )
             )
     return rules, warnings
+
+
+def _record_regex_validation(
+    rule: dict[str, Any],
+    *,
+    skill_id: str,
+    rule_index: int,
+    rule_id: str,
+    fields: list[tuple[str, list[str]]],
+    warnings: list[dict[str, str]],
+) -> None:
+    errors: list[str] = []
+    for field, patterns in fields:
+        for pattern_index, pattern in enumerate(patterns):
+            try:
+                re.compile(pattern)
+            except re.error as error:
+                column = error.pos + 1 if error.pos is not None else "unknown"
+                errors.append(
+                    f"deterministic_rules[{rule_index}] {rule_id} {field}[{pattern_index}] "
+                    f"invalid regular expression at column {column}: {error.msg}"
+                )
+    if not errors:
+        return
+    rule["regex_errors"] = errors
+    warnings.extend(
+        _skill_warning(skill_id, error, code="invalid_quality_skill_regex") for error in errors
+    )
 
 
 def _parse_agent_reviews(
@@ -394,9 +446,14 @@ def _string_list(value: object) -> list[str]:
     return [item for item in value if isinstance(item, str) and item]
 
 
-def _skill_warning(skill_id: str, message: str) -> dict[str, str]:
+def _skill_warning(
+    skill_id: str,
+    message: str,
+    *,
+    code: str = "invalid_quality_skill",
+) -> dict[str, str]:
     return {
-        "code": "invalid_quality_skill",
+        "code": code,
         "message": f"skill {skill_id}: {message}",
         "path": f".quality-runner/skills/{skill_id}.toml",
     }

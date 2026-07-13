@@ -108,6 +108,18 @@ def _ui_foundations_skill_toml() -> str:
     )
 
 
+def _ui_specificity_skill_toml() -> str:
+    return (Path(__file__).parents[1] / "docs/examples/ui-specificity.toml").read_text(
+        encoding="utf-8"
+    )
+
+
+def _copy_specificity_skill_toml() -> str:
+    return (Path(__file__).parents[1] / "docs/examples/copy-specificity.toml").read_text(
+        encoding="utf-8"
+    )
+
+
 def _test_strategy_skill_toml() -> str:
     return (Path(__file__).parents[1] / "docs/examples/test-strategy.toml").read_text(
         encoding="utf-8"
@@ -200,6 +212,44 @@ def test_quality_skill_disallowed_pattern_detects_line(tmp_path: Path) -> None:
     assert "onClick" in finding["evidence"]
     assert "assistive technology" in finding["risk"]
     assert "button/link" in finding["expected_improvement"]
+
+
+def test_quality_skill_scans_frontend_source_extensions(tmp_path: Path) -> None:
+    from quality_runner.code_quality import create_code_quality_scan
+
+    skill_content = _clickable_div_skill_toml().replace(
+        'paths = ["**/*.tsx", "**/*.jsx"]',
+        'paths = ["**/*.astro", "**/*.less", "**/*.mdx", "**/*.sass", "**/*.scss", '
+        '"**/*.svelte", "**/*.vue"]',
+    )
+    skill_path = _install_skill(tmp_path, "ui-polish", skill_content)
+    relative_paths = {
+        "apps/web/page.astro",
+        "apps/web/page.less",
+        "apps/web/page.mdx",
+        "apps/web/page.sass",
+        "apps/web/page.scss",
+        "apps/web/page.svelte",
+        "apps/web/page.vue",
+    }
+    for relative_path in relative_paths:
+        _write(tmp_path / relative_path, "<div onClick={onOpen}>Open</div>\n")
+
+    result = create_code_quality_scan(
+        tmp_path,
+        scan={"run_id": "scan-frontend-extensions"},
+        config=_skills_enabled_config(
+            active=["ui-polish"],
+            local=[{"id": "ui-polish", "path": skill_path}],
+        ),
+    )
+
+    matched_paths = {
+        str(finding["file"])
+        for finding in result["findings"]
+        if finding["rule_id"] == "ui-polish/ui-clickable-div"
+    }
+    assert matched_paths == relative_paths
 
 
 def test_ui_foundations_pack_reports_source_findings_and_review_scopes(tmp_path: Path) -> None:
@@ -305,6 +355,84 @@ def test_ui_foundations_pack_reports_source_findings_and_review_scopes(tmp_path:
         "visual-restraint-and-system-fit",
     }
     assert len(packet["included_files"]) == 2
+
+
+def test_ui_specificity_pack_keeps_visual_signals_reviewable(tmp_path: Path) -> None:
+    from quality_runner.code_quality import create_code_quality_scan
+    from quality_runner.skill_config import load_active_skills
+    from quality_runner.skill_review import build_skill_review_packet
+
+    skill_path = _install_skill(tmp_path, "ui-specificity", _ui_specificity_skill_toml())
+    _write(
+        tmp_path / "src/components/Hero.tsx",
+        'export const Hero = () => <section className="bg-gradient-to-r '
+        'from-indigo-500 to-purple-500 shadow-purple-500/50 rounded-full" />;\n',
+    )
+    _write(tmp_path / "src/styles.scss", ".glass { backdrop-filter: blur(20px); }\n")
+    config = _skills_enabled_config(
+        active=["ui-specificity"],
+        local=[{"id": "ui-specificity", "path": skill_path}],
+    )
+
+    result = create_code_quality_scan(tmp_path, scan={"run_id": "ui-specificity"}, config=config)
+    rule_ids = {str(finding["rule_id"]) for finding in result["findings"]}
+    assert {
+        "ui-specificity/multi-hue-accent-gradient",
+        "ui-specificity/accent-colored-glow",
+        "ui-specificity/translucent-blur-surface",
+        "ui-specificity/pill-shaped-surface",
+    } <= rule_ids
+    assert all(
+        finding["severity"] == "observation"
+        for finding in result["findings"]
+        if str(finding["rule_id"]).startswith("ui-specificity/")
+    )
+
+    skills, warnings = load_active_skills(tmp_path, config)
+    assert warnings == []
+    assert skills[0]["sources"][0]["id"] == "kill-ai-slop-clean-room"
+    packet = build_skill_review_packet(
+        run_id="ui-specificity",
+        repo_root=tmp_path,
+        scanned_files=[
+            {"path": "src/components/Hero.tsx", "lines": ["<section />"]},
+            {"path": "src/styles.scss", "lines": [".glass { backdrop-filter: blur(20px); }"]},
+        ],
+        skills=skills,
+    )
+    assert packet is not None
+    assert {review["review_id"] for review in packet["reviews"]} == {"visual-intent-and-system-fit"}
+
+
+def test_copy_specificity_pack_is_scoped_to_product_content(tmp_path: Path) -> None:
+    from quality_runner.code_quality import create_code_quality_scan
+
+    skill_path = _install_skill(tmp_path, "copy-specificity", _copy_specificity_skill_toml())
+    _write(
+        tmp_path / "apps/web/content/landing.mdx",
+        "Not just a dashboard — it's the workflow your support team can measure.\n"
+        "Build a seamless handoff from the same source.\n",
+    )
+    _write(tmp_path / "docs/example.md", "Not just a test fixture — it's an example.\n")
+    result = create_code_quality_scan(
+        tmp_path,
+        scan={"run_id": "copy-specificity"},
+        config=_skills_enabled_config(
+            active=["copy-specificity"],
+            local=[{"id": "copy-specificity", "path": skill_path}],
+        ),
+    )
+
+    matches = [
+        finding
+        for finding in result["findings"]
+        if str(finding["rule_id"]).startswith("copy-specificity/")
+    ]
+    assert {str(finding["file"]) for finding in matches} == {"apps/web/content/landing.mdx"}
+    assert {str(finding["rule_id"]) for finding in matches} == {
+        "copy-specificity/contrastive-slogan",
+        "copy-specificity/generic-benefit-language",
+    }
 
 
 def test_test_strategy_pack_reports_source_findings_and_review_scopes(tmp_path: Path) -> None:
@@ -1093,6 +1221,33 @@ paths = ["**/*.tsx"]
     assert any("deterministic_rules[0]" in warning for warning in result["warnings"])
 
 
+def test_quality_skill_ingest_rejects_invalid_regex_with_precise_error(tmp_path: Path) -> None:
+    from quality_runner.skill_ingest import ingest_skill_pack
+
+    candidate = tmp_path / "candidate.toml"
+    candidate.write_text(
+        _clickable_div_skill_toml().replace(
+            'disallowed_patterns = ["<div[^>]+onClick="]',
+            'disallowed_patterns = ["["]',
+        ),
+        encoding="utf-8",
+    )
+
+    result = ingest_skill_pack(
+        candidate,
+        skill_id="ui-polish",
+        repo_root=tmp_path,
+        write=False,
+    )
+
+    assert result["status"] == "rejected"
+    assert any(
+        "deterministic_rules[0] ui-clickable-div disallowed_patterns[0]"
+        " invalid regular expression" in error
+        for error in result["errors"]
+    )
+
+
 def test_quality_skill_trigger_without_required_detects_missing_empty_state(
     tmp_path: Path,
 ) -> None:
@@ -1410,6 +1565,8 @@ def test_quality_skill_metadata_surfaces_in_audit_report(tmp_path: Path) -> None
         if finding.get("rule_message")
         == "Clickable divs should usually be semantic buttons or links."
     )
+    assert finding["category"] == "skill:ui-polish"
+    assert finding["actionability"] == "needs-maintainer-policy"
     assert finding["rule_category"] == "accessibility"
     assert "Clickable divs should usually be semantic buttons or links." in finding["summary"]
     assert "Rule category: accessibility" in render_audit_markdown(report)
