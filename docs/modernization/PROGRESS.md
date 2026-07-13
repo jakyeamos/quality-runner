@@ -2,7 +2,7 @@
 
 ## Current state
 
-M0 through M5 are implemented on the protected branch
+M0 through M5 are implemented and M6 is in progress on the protected branch
 `codex/gpt56-modernization`, based on `main` commit `0a3def1`. The branch
 remains isolated until review and merge.
 
@@ -97,6 +97,18 @@ fixing handoff without changing the default v1 response surface:
   lifecycle files actually written and documentation no longer overclaims
   reviewer identity or enforced external access.
 
+M6 first consolidates workflow and outcome ownership in `0b5ac2e` without
+changing installed surfaces:
+
+- application services now own audit, verification, and journey execution;
+  root workflow modules and legacy outcome paths are explicit façades;
+- refresh retains its injectable legacy collaborators and review-delta behavior,
+  while obsolete workflow-internal orchestration was deleted;
+- raw MCP review schema handling remains a compatibility adapter, so application
+  services do not parse CLI or MCP arguments;
+- internal CLI/MCP callers use application services directly, and static plus
+  installed-wheel tests lock the import direction and public façade identities.
+
 ## Decisions in force
 
 - Use a parallel typed core with controlled adapters, not a clean rewrite.
@@ -111,11 +123,12 @@ fixing handoff without changing the default v1 response surface:
 
 ## Quality status
 
-- The full `pytest` suite passes (515 tests); Basedpyright reports zero errors.
+- The full `pytest` suite passes (518 tests); Basedpyright reports zero errors.
 - Ruff lint/format, Vulture, a fresh package build, and
   `quality-runner release-smoke --json` pass.
 
 ## Next milestone
 
-M6 isolates compatibility and retires duplicate foundations while preserving
-installed package, CLI, MCP, and artifact compatibility surfaces.
+Finish M6 by moving review-context construction behind a narrow compatibility
+adapter while preserving direct combined v1 semantics and all installed package,
+CLI, MCP, and artifact compatibility surfaces.

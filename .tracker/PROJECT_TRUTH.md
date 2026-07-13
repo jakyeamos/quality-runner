@@ -1,6 +1,6 @@
 # Quality Runner Project Truth
 
-Last updated: 2026-07-12
+Last updated: 2026-07-13
 
 ## Current State
 
@@ -18,13 +18,16 @@ outcome-first CLI/MCP surfaces, bounded run history, and precise safety
 projections. M5 in `f5c8610` completes the two-phase Fresh Review lifecycle:
 strict packet-bound local responses, isolated combined packets, auditable
 handoffs, and truthful artifact/outcome reporting. The branch is an unreleased
-0.5.1 candidate; no tag or package publication has occurred.
+0.5.1 candidate; no tag or package publication has occurred. M6 began in
+`0b5ac2e`: application-owned audit, verification, and journey services now sit
+behind explicit workflow and outcome façades, with installed-wheel facade
+checks. The remaining M6 slice is the review-context compatibility inversion.
 
 ## Current Position
 
 - Target: a typed v2 core behind CLI, MCP, and compatibility adapters.
-- Next implementation slice: M6 — isolate compatibility and retire duplicate
-  foundations without breaking installed public surfaces.
+- M6 is in progress: finish review-context compatibility inversion and retire
+  duplicate foundations without breaking installed public surfaces.
 - Canonical planning documents: `docs/modernization/`.
 - Public compatibility: retain `quality_evidence_contract` and
   `repo_quality_certifier` during a published transition window.
@@ -39,7 +42,7 @@ handoffs, and truthful artifact/outcome reporting. The branch is an unreleased
 
 ## Baseline Quality
 
-- The full 515-test pytest suite, Ruff lint/format, Basedpyright, Vulture,
+- The full 518-test pytest suite, Ruff lint/format, Basedpyright, Vulture,
   package build, and release smoke pass.
 - Basedpyright reports zero errors; audit, review, verify, and run history now
   have a versioned v2 outcome contract behind preserved v1 projections.
@@ -48,8 +51,8 @@ handoffs, and truthful artifact/outcome reporting. The branch is an unreleased
 
 ## Risks
 
-- M6 must isolate legacy projections and remove duplicate foundations without
-  breaking package, CLI, MCP, or compatibility imports.
+- M6 must finish the review-context inversion without breaking direct combined
+  packet semantics, package, CLI, MCP, or compatibility imports.
 - Existing large-file warnings remain in `repo_quality_certifier/core.py` and
   `tests/test_cli.py`.
 - User-authored gate commands remain arbitrary code; M0 requires explicit
@@ -59,6 +62,9 @@ handoffs, and truthful artifact/outcome reporting. The branch is an unreleased
 
 ## Recent Progress
 
+- 2026-07-13: M6 first consolidation on `codex/gpt56-modernization` (`0b5ac2e`):
+  application-owned audit/verification/journey services, explicit workflow and
+  MCP compatibility façades, installed-wheel checks, and 518 passing tests.
 - 2026-07-13: Completed M5 on `codex/gpt56-modernization` (`f5c8610`):
   packet-bound response validation, combined-context isolation, lifecycle locks,
   strict handoffs, and truthful v2 artifact paths; 515 tests and release checks pass.

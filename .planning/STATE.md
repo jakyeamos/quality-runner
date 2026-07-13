@@ -3,7 +3,7 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: GPT-5.6 modernization
 status: active
-last_updated: "2026-07-13T01:02:56Z"
+last_updated: "2026-07-13T01:30:12Z"
 progress:
   total_phases: 8
   completed_phases: 6
@@ -22,8 +22,8 @@ See `.planning/PROJECT.md` for the established product boundary and
 **Core value:** Give developers and agents trustworthy local evidence before
 they authorize repository changes.
 
-**Current focus:** Plan M6 — isolate compatibility and retire duplicate
-foundations.
+**Current focus:** M6 — consolidate the remaining review compatibility factories
+and retire duplicate foundations.
 
 ## Current Position
 
@@ -36,13 +36,13 @@ foundations.
 - M3 — migrate verification workflow: complete in `8705cc1`
 - M4 — deliver journey-led CLI and MCP outcomes: complete in `75d8ac4`
 - M5 — make Fresh Review operationally honest: complete in `f5c8610`
-- Implementation: M6 next
+- M6 — workflow and journey compatibility consolidation: in progress from `0b5ac2e`
 
 ## Active Phase
 
 - **Phase:** M6
 - **Slug:** compatibility-isolation
-- **Status:** Planned
+- **Status:** In progress
 - **Completion gate:** legacy projections are explicit adapters and duplicate
   foundations are retired without changing installed compatibility surfaces.
 
@@ -66,10 +66,14 @@ foundations.
 
 ## Next Step
 
-Plan and implement M6 as specified in `docs/modernization/EXEC_PLAN.md`.
+Extract the application-owned review context factory while preserving direct
+combined v1 packet semantics and installed compatibility imports.
 
 ## Recent Progress
 
+- 2026-07-13: M6 `0b5ac2e` moved audit, verification, and journey execution
+  behind explicit façades; wheel compatibility, full 518-test validation, and
+  three independent reviews passed. Review-factory inversion remains.
 - 2026-07-13: M5 `f5c8610` completed; two-phase Fresh Review now validates
   packet-bound responses, preserves v1 paths, isolates combined packets, and
   records truthful lifecycle/handoff evidence; 515 tests and release checks pass.
