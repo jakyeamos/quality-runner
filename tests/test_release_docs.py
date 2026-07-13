@@ -13,6 +13,7 @@ def test_release_docs_describe_current_release_plan_and_release_history() -> Non
     cli_docs = (ROOT / "docs" / "cli.md").read_text(encoding="utf-8")
     release_docs = (ROOT / "docs" / "release.md").read_text(encoding="utf-8")
     upgrade_docs = (ROOT / "docs" / "upgrade.md").read_text(encoding="utf-8")
+    readme = (ROOT / "README.md").read_text(encoding="utf-8")
 
     assert "## 0.2.0 - 2026-07-02" in changelog
     for term in (
@@ -59,6 +60,10 @@ def test_release_docs_describe_current_release_plan_and_release_history() -> Non
     assert "0.8.0" in upgrade_docs
     assert "No artifact conversion is required" in upgrade_docs
     assert "quality_runner_review" in upgrade_docs
+    assert "historical runtime-display mismatch" in upgrade_docs
+    assert "uv tool list" in upgrade_docs
+    assert "quality-runner review /path/to/repo --mode blind --json" in readme
+    assert "older `0.2.0` template" in release_docs
     assert (
         "quality-runner refresh /path/to/repo --run-id-prefix refresh-001 --handoff-output handoff.md --json"
         in cli_docs
@@ -116,8 +121,15 @@ def test_ci_and_release_workflows_smoke_built_wheel_outcome_and_mcp_surfaces() -
     for workflow in (ci, release):
         assert "uv sync --locked --all-groups" in workflow
         assert "quality-runner release-smoke --json" in workflow
+        assert "quality-runner review" in workflow
+        assert "review-default" in workflow
+        assert "quality-runner-outcome-v0.2" in workflow
+        assert "--legacy-output" in workflow
         assert '"method":"tools/list"' in workflow
         assert "quality_runner_audit_outcome" in workflow
+
+    assert "fetch-depth: 0" in release
+    assert 'git merge-base --is-ancestor "$GITHUB_SHA" origin/main' in release
 
 
 def test_security_and_research_docs_match_current_artifact_handling() -> None:

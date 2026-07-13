@@ -61,6 +61,11 @@ jobs:
           /tmp/quality-runner-smoke/bin/quality-runner --version
           /tmp/quality-runner-smoke/bin/quality-runner doctor --json
           /tmp/quality-runner-smoke/bin/quality-runner release-smoke --json
+          mkdir -p /tmp/quality-runner-review-smoke
+          /tmp/quality-runner-smoke/bin/quality-runner review /tmp/quality-runner-review-smoke --mode blind --run-id review-default --json \
+            | /tmp/quality-runner-smoke/bin/python -c "import json, sys; payload = json.load(sys.stdin); assert payload['schema'] == 'quality-runner-outcome-v0.2' and payload['journey'] == 'review' and payload['assessment'] == 'packet-ready', payload"
+          /tmp/quality-runner-smoke/bin/quality-runner review /tmp/quality-runner-review-smoke --mode blind --run-id review-legacy --legacy-output --json \
+            | /tmp/quality-runner-smoke/bin/python -c "import json, sys; payload = json.load(sys.stdin); assert payload['schema'] == 'quality-runner-review-result-v0.1' and 'outcome' not in payload and 'next_action' not in payload, payload"
           /tmp/quality-runner-smoke/bin/quality-runner-mcp --version
           printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"tools/list"}' \
             | /tmp/quality-runner-smoke/bin/quality-runner-mcp \

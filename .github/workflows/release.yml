@@ -21,6 +21,14 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v7.0.0
+        with:
+          fetch-depth: 0
+
+      - name: Require release tag on main
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          git fetch origin main
+          git merge-base --is-ancestor "$GITHUB_SHA" origin/main
 
       - name: Install uv
         uses: astral-sh/setup-uv@v8.2.0
@@ -78,6 +86,11 @@ jobs:
           test "$(.release-version-check/bin/quality-runner-mcp --version)" = "$RELEASE_VERSION"
           .release-version-check/bin/quality-runner doctor --json
           .release-version-check/bin/quality-runner release-smoke --json
+          mkdir -p /tmp/quality-runner-release-review-smoke
+          .release-version-check/bin/quality-runner review /tmp/quality-runner-release-review-smoke --mode blind --run-id review-default --json \
+            | .release-version-check/bin/python -c "import json, sys; payload = json.load(sys.stdin); assert payload['schema'] == 'quality-runner-outcome-v0.2' and payload['journey'] == 'review' and payload['assessment'] == 'packet-ready', payload"
+          .release-version-check/bin/quality-runner review /tmp/quality-runner-release-review-smoke --mode blind --run-id review-legacy --legacy-output --json \
+            | .release-version-check/bin/python -c "import json, sys; payload = json.load(sys.stdin); assert payload['schema'] == 'quality-runner-review-result-v0.1' and 'outcome' not in payload and 'next_action' not in payload, payload"
           printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"tools/list"}' \
             | .release-version-check/bin/quality-runner-mcp \
             | .release-version-check/bin/python -c "import json, sys; names = {tool['name'] for tool in json.load(sys.stdin)['result']['tools']}; assert {'quality_runner_audit_outcome', 'quality_runner_review_outcome', 'quality_runner_verify_outcome', 'quality_runner_runs_outcome'}.issubset(names), names"

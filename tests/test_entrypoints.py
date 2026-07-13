@@ -222,6 +222,41 @@ def test_packaged_console_script_invokes_cli(tmp_path: Path) -> None:
         capture_output=True,
         text=True,
     )
+    installed_review_root = tmp_path / "installed-review-smoke"
+    installed_legacy_review_root = tmp_path / "installed-legacy-review-smoke"
+    installed_review_root.mkdir()
+    installed_legacy_review_root.mkdir()
+    review_result = subprocess.run(
+        [
+            str(quality_runner),
+            "review",
+            str(installed_review_root),
+            "--mode",
+            "blind",
+            "--run-id",
+            "installed-review-default",
+            "--json",
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    legacy_review_result = subprocess.run(
+        [
+            str(quality_runner),
+            "review",
+            str(installed_legacy_review_root),
+            "--mode",
+            "blind",
+            "--run-id",
+            "installed-review-legacy",
+            "--legacy-output",
+            "--json",
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
     compat_import_result = subprocess.run(
         [
             str(venv_python),
@@ -234,6 +269,8 @@ def test_packaged_console_script_invokes_cli(tmp_path: Path) -> None:
             "from quality_runner.compatibility import journey_outcomes as legacy_journey_outcomes; "
             "from quality_runner.compatibility import legacy_workflow, review_mcp; "
             "from quality_runner import review_context, review_report; "
+            "from quality_runner.core.review_contracts import ReviewFinding as CoreReviewFinding; "
+            "from quality_runner.review_report import ReviewFinding; "
             "from quality_runner.application.review_v1_serializers import REVIEW_CONTEXT_SCHEMA; "
             "from quality_runner.review_types import ReviewOptions, ReviewPacket; "
             "from typing import get_type_hints; "
@@ -250,6 +287,7 @@ def test_packaged_console_script_invokes_cli(tmp_path: Path) -> None:
             "assert get_type_hints(review_context.build_review_context)['options'] is ReviewOptions; "
             "assert get_type_hints(review_context.build_review_context)['return'] is ReviewPacket; "
             "assert review_report.build_review_report is review_reporting.build_review_report; "
+            "assert ReviewFinding is CoreReviewFinding; "
             "assert callable(review_context_factory.build_review_context); "
             "print(QUALITY_FINDING_SCHEMA, GATE_MATRIX_SCHEMA, REVIEW_CONTEXT_SCHEMA, 'm6-facades-ok')",
         ],
@@ -290,6 +328,8 @@ def test_packaged_console_script_invokes_cli(tmp_path: Path) -> None:
     assert doctor_payload["version"] == __version__
     assert metadata_version_result.stdout.strip() == __version__
     smoke_payload = json.loads(smoke_result.stdout)
+    review_payload = json.loads(review_result.stdout)
+    legacy_review_payload = json.loads(legacy_review_result.stdout)
     assert smoke_payload["schema"] == "quality-runner-release-smoke-result-v0.1"
     assert smoke_payload["status"] == "passed"
     assert {check["id"] for check in smoke_payload["checks"]} >= {
@@ -297,6 +337,12 @@ def test_packaged_console_script_invokes_cli(tmp_path: Path) -> None:
         "outcome_contract",
     }
     assert Path(smoke_payload["handoff_output"]).exists()
+    assert review_payload["schema"] == "quality-runner-outcome-v0.2"
+    assert review_payload["journey"] == "review"
+    assert review_payload["assessment"] == "packet-ready"
+    assert legacy_review_payload["schema"] == "quality-runner-review-result-v0.1"
+    assert "outcome" not in legacy_review_payload
+    assert "next_action" not in legacy_review_payload
     assert compat_import_result.stdout.strip() == (
         "quality-finding-v0.1 aios-repo-gate-matrix-v0.1 quality-runner-review-context-v0.1 "
         "m6-facades-ok"

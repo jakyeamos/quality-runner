@@ -155,7 +155,7 @@ For new work, begin with the four outcome-first commands:
 
 ```bash
 quality-runner audit /path/to/repo --json
-quality-runner review /path/to/repo --json
+quality-runner review /path/to/repo --mode blind --json
 quality-runner verify /path/to/repo --json
 quality-runner runs /path/to/repo --json
 ```

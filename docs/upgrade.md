@@ -32,8 +32,14 @@ reinstall the prior package:
 
 ```bash
 uv tool install 'quality-runner==0.5.0' --force
-quality-runner doctor --json
+uv tool list
+"$(uv tool dir)/quality-runner/bin/python" -c 'from importlib.metadata import version; print(version("quality-runner"))'
 ```
+
+`v0.5.0` has a historical runtime-display mismatch: `quality-runner --version`
+and its doctor payload report `0.4.0` even when the installed package metadata
+is `0.5.0`. Use `uv tool list` or the metadata command above to verify the
+rollback target; do not use the v0.5.0 runtime display as version proof.
 
 There is no destructive downgrade step. Do not delete artifacts merely to make
 the older tool run; remove local evidence only under your repository's normal

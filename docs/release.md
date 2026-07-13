@@ -2,15 +2,18 @@
 
 Quality Runner publishes Python distributions from the `Release` GitHub Actions
 workflow when a `v*.*.*` tag is pushed. The next release tag is `v0.5.1`.
+For tag-triggered publication, the workflow verifies that the tagged commit is
+an ancestor of `main` before it can publish.
 
 The package version has one source of truth in `quality_runner/_version.py` and
 is read dynamically by package metadata. The release workflow installs the
 built wheel before publishing and checks its CLI doctor contract, release smoke,
 and MCP outcome-tool discovery alongside tag, plugin, and citation parity.
 
-`0.5.1` is an unreleased candidate on this branch. `CITATION.cff` and the
-Homebrew formula describe the last published release until the release commit
-and published source distribution exist; do not update either prematurely.
+`0.5.1` is an unreleased candidate on this branch. `CITATION.cff` describes
+the last published release until the release commit exists. The checked-in
+Homebrew formula is an older `0.2.0` template, not current published-release
+metadata; update it only after the `0.5.1` source distribution is live.
 
 Release tags are permanent. Check the existing Git tags and PyPI releases before
 choosing a new version; never reuse a tag, including `v0.5.0`.
@@ -80,7 +83,8 @@ the GitHub workflow.
 
 ## Homebrew
 
-Use `packaging/homebrew/quality-runner.rb` as the formula template after the
-PyPI source distribution for `0.5.1` is live. Recompute the `sha256` from the
-published source artifact, update the formula URL/version, run the formula
-install/audit checks, and commit the formula update after PyPI verification.
+`packaging/homebrew/quality-runner.rb` is currently an older `0.2.0` template.
+Use it only after the PyPI source distribution for `0.5.1` is live. Recompute
+the `sha256` from the published source artifact, update the formula URL/version,
+run the formula install/audit checks, and commit the formula update after PyPI
+verification.
