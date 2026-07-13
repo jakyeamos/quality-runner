@@ -30,6 +30,8 @@ and MCP discovery from the built wheel. `32e7b26` makes CLI Fresh Review v2
 outcome-first, with an explicit stderr-noticed v1 projection through 0.7.x;
 the MCP v1 tool remains a separate compatibility surface. `633b96e` records
 candidate-aware upgrade, rollback, release, and sensitive-artifact guidance.
+`dc09ec0` proves that a default v2 Review run still persists v1-readable
+context, manifest, and report artifacts.
 
 ## Current Position
 
@@ -74,6 +76,8 @@ candidate-aware upgrade, rollback, release, and sensitive-artifact guidance.
 
 ## Recent Progress
 
+- 2026-07-13: M7 compatibility regression in `dc09ec0`: default Review
+  outcomes retain v1-readable persisted artifacts for downgrade safety.
 - 2026-07-13: M7 guidance in `633b96e`: canonical upgrade/rollback policy,
   release evidence, and artifact-sensitivity guidance now match the cutover.
 - 2026-07-13: M7 cutover in `32e7b26`: CLI Review defaults to v2, retains

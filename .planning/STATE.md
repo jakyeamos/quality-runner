@@ -76,6 +76,9 @@ an adversarial review, then record M7 completion and push the branch.
 
 ## Recent Progress
 
+- 2026-07-13: M7 compatibility regression in `dc09ec0`: a default Review
+  outcome's persisted context, manifest, and report still round-trip through
+  the v1 readers.
 - 2026-07-13: M7 guidance in `633b96e`: one upgrade guide now owns candidate,
   support-window, rollback, and MCP policy; linked docs describe artifact
   sensitivity and reproducible release evidence without claiming publication.

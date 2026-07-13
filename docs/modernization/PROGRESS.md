@@ -25,6 +25,10 @@ upgrade, rollback, and support-window reference. Release, CLI, MCP, security,
 troubleshooting, and research docs now point to built-wheel evidence and the
 actual sensitive-artifact boundary.
 
+Its compatibility regression (`dc09ec0`) proves a default v2 Review run still
+persists context, manifest, and report artifacts that round-trip through the v1
+readers.
+
 M0 restores the public trust boundary without changing artifact schema ids:
 
 - package metadata now derives from `quality_runner/_version.py`; the plugin,
