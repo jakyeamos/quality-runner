@@ -50,13 +50,15 @@ v0.2 artifact, and repairs the packaged skill and clean-install release path.
 `141635e` completes the focused source-evidence hardening with lexical context
 for private fields, malformed syntax, computed logging, and tokenless values.
 `948107f` prepares the v0.5.1 citation, changelog, upgrade guidance, and public
-README. The branch remains unmerged while the final pre-tag validation runs.
+README. `c71b130` adds a pinned Python dependency audit and validates untrusted
+baseline Git revisions before review-delta comparisons. The branch is validated
+and ready for its reviewed PR merge, main-branch tag, and publication checks.
 
 ## Current Position
 
 - Target: a typed v2 core behind CLI, MCP, and compatibility adapters.
-- Next implementation slice: complete the v0.5.1 pre-tag gate, push the branch,
-  merge its reviewed PR, then tag the resulting `main` commit and verify PyPI.
+- Next implementation slice: push the validated v0.5.1 branch, merge its
+  reviewed PR, then tag the resulting `main` commit and verify PyPI.
 - Canonical planning documents: `docs/modernization/`.
 - Public compatibility: retain `quality_evidence_contract` and
   `repo_quality_certifier` during a published transition window.
@@ -73,9 +75,9 @@ README. The branch remains unmerged while the final pre-tag validation runs.
 
 ## Baseline Quality
 
-- `141635e` passes the full 554-test pytest suite, Ruff lint/format,
-  Basedpyright, Vulture, lock validation, and diff check. `948107f` is awaiting
-  the final pre-tag validation with updated citation and public release docs.
+- `c71b130` passes the full 556-test pytest suite, Ruff lint/format,
+  Basedpyright, Vulture, lock validation, pip-audit, release smoke, build, and
+  installed-wheel smoke checks.
 - Basedpyright reports zero errors; audit, review, verify, and run history now
   have a versioned v2 outcome contract behind preserved v1 projections.
 - Release smoke now checks package/runtime/plugin parity and the release
@@ -94,6 +96,9 @@ README. The branch remains unmerged while the final pre-tag validation runs.
 
 ## Recent Progress
 
+- 2026-07-13: `c71b130` adds a pinned Python dependency audit, upgrades pytest
+  to 9.0.3, and prevents untrusted baseline manifests from injecting Git diff
+  options; all pre-tag gates and installed-wheel smoke checks pass.
 - 2026-07-13: `948107f` prepares v0.5.1 metadata and the main README release
   guidance; final pre-tag checks, PR merge, tag, PyPI publication, and GitHub
   Release creation remain in sequence.
@@ -130,6 +135,3 @@ README. The branch remains unmerged while the final pre-tag validation runs.
 - 2026-07-13: Completed M5 on `codex/gpt56-modernization` (`f5c8610`):
   packet-bound response validation, combined-context isolation, lifecycle locks,
   strict handoffs, and truthful v2 artifact paths; 515 tests and release checks pass.
-- 2026-07-12: Completed M4 on `codex/gpt56-modernization` (`75d8ac4`): v2
-  outcome contract, outcome-first CLI/MCP journeys, bounded history, and
-  safety claims tied to observed evidence; 496 tests and release checks pass.

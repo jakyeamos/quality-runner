@@ -3,7 +3,7 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: GPT-5.6 modernization
 status: complete
-last_updated: "2026-07-13T17:14:40Z"
+last_updated: "2026-07-13T17:32:43Z"
 progress:
   total_phases: 8
   completed_phases: 8
@@ -22,7 +22,7 @@ See `.planning/PROJECT.md` for the established product boundary and
 **Core value:** Give developers and agents trustworthy local evidence before
 they authorize repository changes.
 
-**Current focus:** v0.5.1 pre-tag validation, reviewed PR merge, and publication.
+**Current focus:** v0.5.1 reviewed PR merge, tag, and publication.
 
 ## Current Position
 
@@ -40,7 +40,8 @@ they authorize repository changes.
 - M7 — release hardening: complete in `279cc8a`; `141635e` adds lexical
   source-evidence protection for private fields, malformed syntax, computed
   logs, and tokenless values. `948107f` prepares v0.5.1 metadata and README
-  guidance; the final pre-tag validation is in progress.
+  guidance; `c71b130` completes the pre-tag gate with dependency-audit and
+  untrusted-baseline Git-argument hardening.
 
 ## Active Phase
 
@@ -70,11 +71,14 @@ they authorize repository changes.
 
 ## Next Step
 
-Complete the pre-tag gate, merge the reviewed PR, tag only the resulting `main`
-commit, then verify PyPI and create the GitHub Release.
+Merge the reviewed PR, tag only the resulting `main` commit, then verify PyPI
+and create the GitHub Release.
 
 ## Recent Progress
 
+- 2026-07-13: `c71b130` completes pre-tag hardening: pinned pip-audit and
+  pytest 9.0.3, validates baseline Git IDs before diffing, and passes the
+  556-test release ladder plus installed-wheel smoke.
 - 2026-07-13: `948107f` prepares v0.5.1 citation/changelog/upgrade metadata
   and README release guidance; pre-tag validation and publication remain.
 - 2026-07-13: `141635e` closes the source-evidence follow-up: lexer-backed
@@ -115,4 +119,3 @@ commit, then verify PyPI and create the GitHub Release.
 - 2026-07-13: M5 `f5c8610` completed; two-phase Fresh Review now validates
   packet-bound responses, preserves v1 paths, isolates combined packets, and
   records truthful lifecycle/handoff evidence; 515 tests and release checks pass.
-- 2026-07-12: M4 `75d8ac4` completed; additive v2 audit/review/verify/runs outcomes, MCP tools, truthful safety projection, and full validation passed.
