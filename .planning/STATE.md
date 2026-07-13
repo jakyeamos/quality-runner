@@ -39,7 +39,8 @@ hardening.
 - M6 — isolate compatibility and retire duplicate foundations: complete in
   `0b5ac2e` and `56c94d4`
 - M7 — release hardening: in progress; its first confidentiality slice is
-  complete in `113f143`
+  complete in `113f143` and reproducible distribution evidence is complete in
+  `66ce3ef`
 
 ## Active Phase
 
@@ -69,11 +70,14 @@ hardening.
 
 ## Next Step
 
-Make built-distribution release evidence exercise the public CLI and MCP
-surfaces, then complete the v2 cutover, upgrade guidance, and operational docs.
+Make Fresh Review v2-default with an explicit v1 escape hatch, then complete
+the upgrade, rollback, deprecation, and operational guidance.
 
 ## Recent Progress
 
+- 2026-07-13: M7 release evidence in `66ce3ef`: a committed uv lock pins the
+  validation tools; CI/release install the wheel, run doctor and release smoke,
+  and discover the v2 MCP tools before publish.
 - 2026-07-13: M7 began in `113f143`: secret-like candidate literals are
   redacted before fingerprinting or artifact persistence; the normal-run
   regression scans all generated artifacts for the original marker.

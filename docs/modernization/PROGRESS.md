@@ -11,6 +11,10 @@ redacts secret-like source literals before candidate fingerprints and any
 security-scan, audit, or handoff artifact persistence; a normal-run regression
 scans every generated artifact for the original marker.
 
+Its release-evidence slice (`66ce3ef`) commits the development lockfile, uses
+it in CI/release validation, and installs the built wheel to check doctor,
+release-smoke’s v2 audit contract, and v2 MCP tool discovery before publishing.
+
 M0 restores the public trust boundary without changing artifact schema ids:
 
 - package metadata now derives from `quality_runner/_version.py`; the plugin,

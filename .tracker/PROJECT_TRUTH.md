@@ -24,13 +24,15 @@ behind explicit workflow and outcome façades, with installed-wheel facade
 checks. M6 completes in `56c94d4`: packet construction and report normalization
 now have application owners, while root review façades retain their v1 type and
 direct-combined compatibility contracts. M7 is in progress: `113f143` redacts
-secret-like candidate literals before they are fingerprinted or persisted.
+secret-like candidate literals before they are fingerprinted or persisted, and
+`66ce3ef` locks the development toolchain while testing doctor, v2 outcomes,
+and MCP discovery from the built wheel.
 
 ## Current Position
 
 - Target: a typed v2 core behind CLI, MCP, and compatibility adapters.
-- Next implementation slice: make release, cutover, rollback, and operational
-  evidence reproducible from the built distribution.
+- Next implementation slice: make Fresh Review outcome-first by default while
+  keeping an explicit, versioned v1 compatibility path.
 - Canonical planning documents: `docs/modernization/`.
 - Public compatibility: retain `quality_evidence_contract` and
   `repo_quality_certifier` during a published transition window.
@@ -69,6 +71,8 @@ secret-like candidate literals before they are fingerprinted or persisted.
 
 - 2026-07-13: Began M7 in `113f143`: security candidates redact secret-like
   literals before fingerprints and persisted scan/audit/handoff evidence.
+- 2026-07-13: M7 release evidence in `66ce3ef`: pinned development tools and
+  installed-wheel doctor, release-smoke, and MCP outcome discovery checks.
 - 2026-07-13: Completed M6 on `codex/gpt56-modernization` (`0b5ac2e`,
   `56c94d4`): application-owned workflow/outcome/packet/report paths, typed
   root façades, built-wheel compatibility, 520 passing tests, and clean reviews.
