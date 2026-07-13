@@ -7,21 +7,14 @@ from pathlib import Path
 from quality_runner.config import load_repo_config
 from quality_runner.security.candidates import security_candidate_fingerprint
 from quality_runner.security.config import security_settings
-from quality_runner.security.scan import create_security_scan, merge_security_into_capability_map
+from quality_runner.security.scan import merge_security_into_capability_map
 from quality_runner.workflow import inspect_payload, run_payload, verify_gates_payload
 from test_support.quality_runner_fixtures import write_js_fixture, write_python_quality_fixture
+from test_support.security_scan import run_security_scan
 
 
 def _run_scan(repo: Path, config_text: str | None = None) -> dict:
-    if config_text is not None:
-        (repo / ".quality-runner.toml").write_text(config_text, encoding="utf-8")
-    from quality_runner.discovery import inspect_repo
-    from quality_runner.standards import compile_standards
-
-    config = load_repo_config(repo)
-    scan = inspect_repo(repo, run_id="sec-test", ci_checks=[], extra_warnings=[], config=config)
-    standards = compile_standards(repo_root=repo, scan=scan, profile="default", config=config)
-    return create_security_scan(repo, scan=scan, config=config, standards_packet=standards)
+    return run_security_scan(repo, config_text)
 
 
 def test_security_capability_detected_from_package_script(tmp_path: Path) -> None:

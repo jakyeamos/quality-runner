@@ -162,8 +162,13 @@ an external agent or human applies changes and reruns Quality Runner.
   findings, and agent-review gate metadata when
   `[quality_runner.security]` is configured. For secret-like source evidence,
   quoted source literals are redacted before fingerprinting and persistence in
-  security candidates and code-quality findings; downstream plans inherit the
-  redacted evidence.
+  security candidates and code-quality findings; additional recognized
+  secret-like source values receive the same treatment. Downstream plans inherit
+  the redacted evidence. Multiline or complex values newly
+  recognized by the redactor can receive a new evidence-derived fingerprint
+  rather than retain an earlier raw-evidence fingerprint. Re-triage those
+  findings in the resolution ledger; established simple quoted-literal evidence
+  and fingerprints remain stable.
 - `slice-specs/`: per-slice Markdown cold-executor plans derived from QR
   evidence. One file per remediation slice:
   `slice-specs/<slice-id>.md`. Each spec is self-contained and includes:
@@ -211,8 +216,8 @@ contain repository paths, author intent, source-derived context, and bounded
 stdout/stderr from explicitly authorized gates. Do not commit, upload, or share
 it by default; review and minimize it first.
 
-The security and code-quality scans redact quoted literals in secret-like source
-evidence before fingerprinting and serialization. Source excerpts used to enrich
+The security and code-quality scans redact recognized secret-like source values
+before fingerprinting and serialization. Source excerpts used to enrich
 remediation slices receive the same redaction. That narrow protection does not
 make an artifact secret-free: another scanner, a repository path, or gate output
 can still expose sensitive context. Retain or remove artifacts using the target

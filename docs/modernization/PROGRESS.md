@@ -51,6 +51,13 @@ through typed, concatenated, and template-literal forms before code-quality,
 excerpt, or security-candidate persistence. CI/release and installed-wheel
 tests now execute the MCP v2 Review outcome, not just tool discovery.
 
+The current source-evidence hardening extends that boundary through escaped and
+composed keys, private fields, raw or malformed regex values, nested templates,
+commented, multiline, optional, and computed logs, tokenless YAML, shell, and
+Docker assignments, and shell here-docs. Newly protected complex evidence
+intentionally receives a new safe fingerprint instead of preserving an older
+raw-evidence fingerprint; simple quoted-literal compatibility remains stable.
+
 M0 restores the public trust boundary without changing artifact schema ids:
 
 - package metadata now derives from `quality_runner/_version.py`; the plugin,

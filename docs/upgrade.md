@@ -28,6 +28,10 @@ readable by the v1 artifact readers. Consent-aware gate verification now emits
 and outcome readers accept both versions. V2 outcomes are presentation
 contracts derived from the same local evidence; Fresh Review lifecycle files
 are additive. Keep existing evidence in place while you validate the upgrade.
+Rescan source-evidence findings after upgrading: complex or multiline secrets
+that were previously persisted as raw evidence are now redacted and can receive
+new fingerprints. Re-triage only those migrated resolution-ledger entries;
+established simple quoted-literal fingerprints remain stable.
 
 If a published `0.5.1` needs to be rolled back, preserve the run directory and
 reinstall the prior package:
