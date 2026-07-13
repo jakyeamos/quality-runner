@@ -25,7 +25,7 @@ jobs:
       - name: Install uv
         uses: astral-sh/setup-uv@v8.2.0
         with:
-          cache-dependency-glob: pyproject.toml
+          cache-dependency-glob: uv.lock
           cache-suffix: py-${{ matrix.python-version }}
 
       - name: Set up Python
@@ -33,20 +33,23 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
+      - name: Install locked development environment
+        run: uv sync --locked --all-groups --python ${{ matrix.python-version }}
+
       - name: Run tests
-        run: uv run --python ${{ matrix.python-version }} --with pytest pytest -q
+        run: uv run --locked pytest -q
 
       - name: Run Ruff lint
-        run: uv run --python ${{ matrix.python-version }} --with ruff ruff check .
+        run: uv run --locked ruff check .
 
       - name: Run Ruff format check
-        run: uv run --python ${{ matrix.python-version }} --with ruff ruff format --check .
+        run: uv run --locked ruff format --check .
 
       - name: Run BasedPyright
-        run: uv run --python ${{ matrix.python-version }} --with basedpyright basedpyright
+        run: uv run --locked basedpyright
 
       - name: Run Vulture
-        run: uv run --python ${{ matrix.python-version }} --with vulture vulture . --min-confidence 70
+        run: uv run --locked vulture quality_runner quality_evidence_contract repo_quality_certifier tests scripts --min-confidence 70
 
       - name: Build package
         run: uv build
@@ -57,4 +60,8 @@ jobs:
           /tmp/quality-runner-smoke/bin/python -m pip install --no-deps dist/*.whl
           /tmp/quality-runner-smoke/bin/quality-runner --version
           /tmp/quality-runner-smoke/bin/quality-runner doctor --json
+          /tmp/quality-runner-smoke/bin/quality-runner release-smoke --json
           /tmp/quality-runner-smoke/bin/quality-runner-mcp --version
+          printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"tools/list"}' \
+            | /tmp/quality-runner-smoke/bin/quality-runner-mcp \
+            | /tmp/quality-runner-smoke/bin/python -c "import json, sys; names = {tool['name'] for tool in json.load(sys.stdin)['result']['tools']}; assert {'quality_runner_audit_outcome', 'quality_runner_review_outcome', 'quality_runner_verify_outcome', 'quality_runner_runs_outcome'}.issubset(names), names"

@@ -292,6 +292,10 @@ def test_packaged_console_script_invokes_cli(tmp_path: Path) -> None:
     smoke_payload = json.loads(smoke_result.stdout)
     assert smoke_payload["schema"] == "quality-runner-release-smoke-result-v0.1"
     assert smoke_payload["status"] == "passed"
+    assert {check["id"] for check in smoke_payload["checks"]} >= {
+        "doctor",
+        "outcome_contract",
+    }
     assert Path(smoke_payload["handoff_output"]).exists()
     assert compat_import_result.stdout.strip() == (
         "quality-finding-v0.1 aios-repo-gate-matrix-v0.1 quality-runner-review-context-v0.1 "

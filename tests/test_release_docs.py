@@ -106,3 +106,14 @@ def test_release_docs_include_example_handoffs() -> None:
         content = (examples_root / name).read_text(encoding="utf-8")
         assert "# Quality Runner Agent Handoff" in content
         assert expected in content
+
+
+def test_ci_and_release_workflows_smoke_built_wheel_outcome_and_mcp_surfaces() -> None:
+    ci = (ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+    release = (ROOT / ".github" / "workflows" / "release.yml").read_text(encoding="utf-8")
+
+    for workflow in (ci, release):
+        assert "uv sync --locked --all-groups" in workflow
+        assert "quality-runner release-smoke --json" in workflow
+        assert '"method":"tools/list"' in workflow
+        assert "quality_runner_audit_outcome" in workflow

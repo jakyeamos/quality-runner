@@ -10,8 +10,8 @@ from typing import Any
 from quality_runner import __version__
 from quality_runner.application.audit_workflows import inspect_payload, run_payload
 from quality_runner.artifacts import artifact_run_ids, artifact_text_file
-from quality_runner.cli_payload import DOCTOR_RESULT_SCHEMA
 from quality_runner.cli_review import review_mcp_payload, review_mcp_tool
+from quality_runner.doctor_contract import doctor_payload
 from quality_runner.fix_proposals import propose_fix
 from quality_runner.gate_controller import (
     create_gate_run,
@@ -185,7 +185,7 @@ def list_tools() -> list[dict[str, Any]]:
 def call_tool(name: str, arguments: dict[str, Any] | None = None) -> dict[str, Any]:
     args = arguments or {}
     if name == "quality_runner_doctor":
-        return _tool_result(_doctor_payload())
+        return _tool_result(doctor_payload(include_environment=False))
 
     if is_journey_tool(name):
         repo_root = _validated_repo_root(args)
@@ -397,15 +397,6 @@ def _handle_tools_call(params: object) -> dict[str, Any]:
     if not isinstance(arguments, dict):
         raise JsonRpcError(JSONRPC_INVALID_PARAMS, "tools/call params.arguments must be an object")
     return call_tool(tool_name, arguments)
-
-
-def _doctor_payload() -> dict[str, Any]:
-    return {
-        "schema": DOCTOR_RESULT_SCHEMA,
-        "status": "ready",
-        "version": __version__,
-        "implementation_allowed": False,
-    }
 
 
 def _status_payload(repo_root: Path) -> dict[str, Any]:

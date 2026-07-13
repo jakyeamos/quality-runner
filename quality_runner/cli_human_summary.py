@@ -6,10 +6,10 @@ from quality_runner import __version__
 from quality_runner.cli_fix_proposals import FIX_PROPOSAL_RESULT_SCHEMAS
 from quality_runner.cli_gate import GATE_RESULT_SCHEMAS
 from quality_runner.cli_status import EXPORT_HANDOFF_RESULT_SCHEMA, STATUS_RESULT_SCHEMA
+from quality_runner.doctor_contract import DOCTOR_RESULT_SCHEMA
 from quality_runner.release_smoke import RELEASE_SMOKE_SCHEMA
 from quality_runner.run_summary import RUN_SUMMARY_SCHEMA
 
-DOCTOR_RESULT_SCHEMA = "quality-runner-doctor-result-v0.1"
 INIT_RESULT_SCHEMA = "quality-runner-init-result-v0.1"
 
 

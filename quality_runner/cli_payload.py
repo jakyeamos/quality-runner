@@ -2,12 +2,10 @@ from __future__ import annotations
 
 import argparse
 import json
-import platform
 import sys
 from pathlib import Path
 from typing import Any, cast
 
-from quality_runner import __version__
 from quality_runner.application.audit_workflows import inspect_payload, run_payload
 from quality_runner.application.journey_outcomes import (
     audit_journey_outcome,
@@ -37,12 +35,12 @@ from quality_runner.cli_status import export_handoff_payload, status_payload
 from quality_runner.code_quality import preview_ignored_paths
 from quality_runner.config import CONFIG_FILE_NAME, load_repo_config
 from quality_runner.controller_reports import validate_controller_report
+from quality_runner.doctor_contract import doctor_payload
 from quality_runner.intent import workflow_intent_from_cli_args
 from quality_runner.release_smoke import release_smoke_payload
 from quality_runner.run_summary import build_run_summary
 from quality_runner.workflow_skills import load_skill_review_report_json
 
-DOCTOR_RESULT_SCHEMA = "quality-runner-doctor-result-v0.1"
 INIT_RESULT_SCHEMA = "quality-runner-init-result-v0.1"
 EXPENSIVE_IGNORED_PATH_TEXT_FILE_THRESHOLD = 100
 EXPENSIVE_IGNORED_PATH_SECONDS_THRESHOLD = 5.0
@@ -51,7 +49,7 @@ MAX_INTERACTIVE_IGNORED_PATHS = 10
 
 def payload_for_args(args: argparse.Namespace) -> dict[str, Any]:
     if args.command == "doctor":
-        return _doctor_payload()
+        return doctor_payload(include_environment=True)
     if args.command == "release-smoke":
         from quality_runner.cli import build_parser
 
@@ -213,21 +211,6 @@ def payload_for_args(args: argparse.Namespace) -> dict[str, Any]:
     if args.command == "propose-fix":
         return propose_fix_command_payload(args, repo_root=_validated_repo_path(args.repo_path))
     raise ValueError(f"unsupported command: {args.command}")
-
-
-def _doctor_payload() -> dict[str, Any]:
-    return {
-        "schema": DOCTOR_RESULT_SCHEMA,
-        "status": "ready",
-        "version": __version__,
-        "implementation_allowed": False,
-        "environment": {
-            "cwd": str(Path.cwd()),
-            "platform": platform.platform(),
-            "python_executable": sys.executable,
-            "python_version": platform.python_version(),
-        },
-    }
 
 
 def _init_payload(
