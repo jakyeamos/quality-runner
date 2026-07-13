@@ -51,6 +51,14 @@ def test_mcp_review_blind_mode_is_packet_only(tmp_path: Path) -> None:
     assert structured["summary"].startswith("Review packet ready:")
     assert "next_action" in structured
     assert structured["breadth"] == "related"
+    assert set(structured["artifact_paths"]) == {
+        "review_manifest_json",
+        "review_context_json",
+        "review_report_json",
+        "review_report_md",
+        "review_agent_packet_md",
+        "review_fix_prompts_md",
+    }
 
 
 def test_mcp_audit_outcome_returns_additive_v2_projection(tmp_path: Path) -> None:
@@ -87,6 +95,11 @@ def test_mcp_review_outcome_keeps_packet_ready_truthful(tmp_path: Path) -> None:
     assert structured["assessment"] == "packet-ready"
     assert structured["confidence"]["level"] == "none"
     assert structured["source"]["legacy_schema"] == "quality-runner-review-result-v0.1"
+    paths = structured["writes"]["artifact_paths"]
+    assert "review_adapter_response_template_json" in paths
+    assert "review_execution_json" in paths
+    assert "review_adapter_response_json" not in paths
+    assert all(Path(path).exists() for path in paths.values())
 
 
 def test_mcp_verify_outcome_defaults_to_evidence_only(tmp_path: Path) -> None:

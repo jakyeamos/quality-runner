@@ -81,9 +81,12 @@ quality-runner runs /path/to/repo --json
 
 `audit` creates evidence and a remediation plan without editing source files.
 `review --outcome` makes a prepared packet visibly `awaiting-evidence`, rather
-than treating the absence of an independent review as clean. `verify` records
+than treating the absence of a packet-bound local response as clean. `verify` records
 discovered gates by default; `runs` reads history without adding a summary file.
 The v2 outcome JSON is additive: existing commands retain their v1 projections.
+Fresh Review is deliberately two-phase: prepare a packet first, then submit a
+response that is bound to that packet. The [CLI Reference](docs/cli.md#quality-runner-review)
+explains the boundary and handoff model.
 
 To authorize discovered commands after reviewing their evidence, use a disposable
 checkout explicitly:

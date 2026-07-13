@@ -13,6 +13,11 @@ type ReviewClassification = Literal[
     "confirmed", "suspected", "not-enough-evidence", "known-accepted"
 ]
 type ReviewConfidence = Literal["high", "medium", "low"]
+type ReviewResponseMode = Literal["task", "blind"]
+type ReviewAdapterTransport = Literal["local-file"]
+type ReviewExecutionState = Literal["packet-ready", "review-complete", "review-incomplete"]
+type ReviewHandoffStatus = Literal["not-ready", "selection-required", "ready", "not-needed"]
+type ReviewLoopStop = Literal["critical-high", "none"]
 
 
 class EvidenceReference(TypedDict):
@@ -160,6 +165,48 @@ class ReviewReport(TypedDict):
     sections: ReviewSections
     findings: list[ReviewFinding]
     next_action: NotRequired[str]
+
+
+class ReviewAdapterIdentity(TypedDict):
+    name: str
+    version: str
+    transport: ReviewAdapterTransport
+
+
+class ReviewResponseProvenance(TypedDict):
+    schema: str
+    run_id: str
+    mode: ReviewResponseMode
+    packet_hash: str
+    completed_at: str
+    adapter: ReviewAdapterIdentity
+    response_digest: str
+
+
+class CombinedReviewResponseProvenance(TypedDict):
+    schema: str
+    run_id: str
+    mode: Literal["combined"]
+    responses: list[ReviewResponseProvenance]
+    response_digest: str
+
+
+class ReviewHandoff(TypedDict):
+    status: ReviewHandoffStatus
+    selected_finding_ids: list[str]
+    selected_findings: list[ReviewFinding]
+    loop_state: NotRequired[dict[str, object]]
+    next_action: NotRequired[str]
+
+
+class FreshReviewExecution(TypedDict):
+    state: ReviewExecutionState
+    context: ReviewPacket
+    manifest: ReviewManifest
+    report: ReviewReport
+    artifact_paths: dict[str, str]
+    handoff: ReviewHandoff
+    response_provenance: NotRequired[ReviewResponseProvenance | CombinedReviewResponseProvenance]
 
 
 class AdapterResult(TypedDict):

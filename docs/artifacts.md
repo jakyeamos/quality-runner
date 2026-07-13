@@ -407,6 +407,25 @@ The active list is written to `repo-scan.json` as `scan_exclusions`.
 - `review-agent-packet.md`: bounded packet for a separate reviewing agent.
 - `review-fix-prompts.md`: selected finding prompts for a separate fixing agent.
 
+Those are the stable v1 paths. Fresh Review also writes additive lifecycle files
+when their corresponding state exists:
+
+- `review-adapter-response.template.json` and `review-execution.json` at packet
+  preparation;
+- `review-adapter-response.json` and `review-fix-handoff.json` after a valid
+  packet-bound response completes;
+- `review-loop-state.json` for an active loop; and
+- `review-adapter-attempt.json` for a rejected local response.
+
+For combined mode, `review-agent-packet.md` is a task-free coordination guide;
+`review-agent-packet-task.md` and `review-agent-packet-blind.md` are the
+separately scoped reviewer packets. The lifecycle record and response template
+make preparation distinct from completion. A local response is retained with
+declared adapter metadata only after it matches the prepared packet; that
+metadata is not identity attestation. V2 outcome writes list only files that
+exist, while legacy manifests and response payloads retain the v1 six-path
+surface.
+
 Review packets never include hidden reasoning. Active implement-review loops do
 not compare prior review documents; comparison and resolution classification
 occur only during final cycle summarization. Known issues are stored locally in

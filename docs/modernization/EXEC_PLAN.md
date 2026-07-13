@@ -110,7 +110,7 @@ deleted in the same milestone or scheduled in the published deprecation plan.
 - **Systems:** review context/report/state, adapter protocol, CLI/MCP review
   adapters, artifact renderers, user documentation.
 - **Depends on:** M1 and M4.
-- **Preserve:** local-first packet generation and the independent reviewer/fixer
+- **Preserve:** local-first packet generation and the separate reviewer/fixer
   boundary.
 - **Change intentionally:** no-adapter runs report packet readiness, not zero
   findings; documented defaults and implemented flags become one contract.

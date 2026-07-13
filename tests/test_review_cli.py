@@ -35,17 +35,22 @@ def test_no_adapter_is_explicitly_packet_only() -> None:
 
 
 def test_file_adapter_validates_local_report(tmp_path: Path) -> None:
-    output = tmp_path / "report.json"
-    output.write_text(json.dumps({"findings": [_finding()]}), encoding="utf-8")
-    result = FileReviewAdapter(output).review(
-        {
-            "run_id": "run",
-            "mode": "blind",
-            "scope": "project",
-            "breadth": "related",
-        },
-        tmp_path,
+    from quality_runner.application.review_responses import response_template
+    from quality_runner.review_context import build_review_context, normalize_review_options
+
+    packet = build_review_context(
+        repo_root=tmp_path,
+        run_id="run",
+        options=normalize_review_options(
+            mode="blind", scope="project", breadth="related", task=None
+        ),
     )
+    response = response_template(packet)
+    response["completed_at"] = "2026-07-12T12:00:00+00:00"
+    response["findings"] = [_finding()]
+    output = tmp_path / "report.json"
+    output.write_text(json.dumps(response), encoding="utf-8")
+    result = FileReviewAdapter(output).review(packet, tmp_path)
     assert result["status"] == "review-complete"
     report = result["report"]
     assert report is not None
@@ -56,7 +61,6 @@ def test_combined_file_adapter_preserves_v1_task_provenance(tmp_path: Path) -> N
     from quality_runner.review_context import build_review_context, normalize_review_options
 
     output = tmp_path / "combined-report.json"
-    output.write_text(json.dumps({"findings": [_finding()]}), encoding="utf-8")
     packet = build_review_context(
         repo_root=tmp_path,
         run_id="combined-adapter-report",
@@ -67,12 +71,41 @@ def test_combined_file_adapter_preserves_v1_task_provenance(tmp_path: Path) -> N
             task="Review the integration boundary",
         ),
     )
+    from quality_runner.application.review_responses import response_template
+
+    response = response_template(packet)
+    responses = response["responses"]
+    assert isinstance(responses, list)
+    assert len(responses) == 2
+    responses[0]["completed_at"] = "2026-07-12T12:00:00+00:00"
+    responses[0]["findings"] = [_finding()]
+    responses[1]["completed_at"] = "2026-07-12T12:01:00+00:00"
+    responses[1]["findings"] = []
+    output.write_text(json.dumps(response), encoding="utf-8")
 
     result = FileReviewAdapter(output).review(packet, tmp_path)
 
     assert result["status"] == "review-complete"
     assert result["report"] is not None
     assert result["report"]["task_provenance"] == "None"
+
+
+def test_file_adapter_rejects_unbound_legacy_payload(tmp_path: Path) -> None:
+    from quality_runner.review_context import build_review_context, normalize_review_options
+
+    output = tmp_path / "report.json"
+    output.write_text(json.dumps({"findings": [_finding()]}), encoding="utf-8")
+    packet = build_review_context(
+        repo_root=tmp_path,
+        run_id="unbound-response",
+        options=normalize_review_options(
+            mode="blind", scope="project", breadth="related", task=None
+        ),
+    )
+
+    result = FileReviewAdapter(output).review(packet, tmp_path)
+
+    assert result["status"] == "malformed-output"
 
 
 def test_file_adapter_rejects_path_escape(tmp_path: Path) -> None:

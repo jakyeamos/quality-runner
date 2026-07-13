@@ -48,7 +48,7 @@ Recommended initial options:
 
 ```text
 --mode task|blind|combined       default: task
---scope task|project            default: task for task mode, project for blind
+--scope task|project            default: project
 --breadth focused|related|full  default: related for project scope
 --task TEXT
 --task-file PATH
@@ -59,8 +59,8 @@ Recommended initial options:
 --detail concise|standard|full  default: standard
 --save / --no-save              default: save
 --known-issues accept|edit|remove|skip
---loop-stop critical-high|none  loop mode only
---loop                         manually start an implement-review cycle
+--loop-stop critical-high|none  active-loop response submission only
+--loop                         start an implement-review cycle when preparing a packet
 --finding-id ID                 repeatable fixing-agent selection
 --all-critical-high             handoff shortcut
 --json
@@ -80,9 +80,10 @@ and practical size limits.
 ## 4. Freshness contract
 
 Freshness is a context-packaging guarantee, not a claim about a model’s hidden
-memory. Every review pass receives a newly constructed input packet and a new
-agent invocation/session. The packet is recorded in the run manifest by hashes
-and provenance, not by duplicating sensitive content unnecessarily.
+memory. Quality Runner records an immutable packet and requires a local response
+to bind to that packet's run identity and hash. That proves the response matches
+the declared package; it does not prove an external reviewer's session history
+or filesystem access.
 
 ### Task mode input
 
@@ -107,9 +108,9 @@ included only through `--previous-summary`. Prior review documents are never
 provided to a reviewer during an active implement-review cycle. They may be
 used only by the end-of-cycle summarizer to correlate findings and statuses.
 
-Combined mode runs task and blind packets independently, then performs a local
-post-processing pass to group related findings. One review’s findings are not
-fed into the other review.
+Combined mode runs separately scoped task and blind packets, then performs a
+local post-processing pass to group related findings. One review’s findings are
+not fed into the other review.
 
 ## 5. Agent boundary and BYO-agent integration
 
@@ -118,17 +119,20 @@ local persistence. The user’s selected agent owns model execution and its own
 permission/allowance prompts. The product must not silently transmit project
 content to a remote service.
 
-The adapter contract should support at least:
+The adapter boundary should support at least:
 
 1. Create a fresh invocation with a rendered review packet.
 2. Return structured JSON when available, plus raw agent output for auditability.
 3. Request optional evidence access through the agent’s native permission flow.
 4. Report unavailable capabilities without converting them into false findings.
 
-The first implementation may support one local adapter plus a file-based adapter
-for any agent: write a review packet and read a returned report. Agent-specific
-permission breadth, browser automation, and logged-in application access remain
-adapter concerns. Quality Runner must not implement a universal permission model.
+The current local-file flow is two phase: Quality Runner writes a packet and a
+bound response template, then later validates a completed response before it
+changes the canonical report. Combined reviews require separately scoped task
+and blind responses and group them locally. Agent-specific permission breadth,
+browser automation, and logged-in application access remain adapter concerns.
+Quality Runner must not implement a universal permission model or imply that an
+external reviewer honored a path exclusion it cannot enforce.
 
 If no agent adapter is available, the command still produces a validated,
 shareable packet and explains how to run it manually; it must not claim that a
@@ -203,24 +207,27 @@ Review artifacts extend the existing run directory:
   review-report.md
   review-agent-packet.md
   review-fix-prompts.md
+  review-adapter-response.template.json
+  review-execution.json
 ```
 
-Combined runs additionally contain separate task and blind result payloads
-before final grouping. The exact filenames may be versioned with the schema, but
-the human report, machine report, packet, and fix prompts must remain separately
+Completed runs add the accepted response and fixing handoff; rejected responses
+write an attempt record, and active loops write their state. Combined runs add
+separate task and blind packets while keeping the coordinator packet task-free.
+The lifecycle record keeps packet-ready and completed evidence distinct, while
+the human report, machine report, packet, and fix prompts remain separately
 available.
 
-`review-manifest.json` records run id, schema version, timestamps, git HEAD and
-dirty state, mode, scope, breadth, exclusions, evidence references, adapter,
-freshness policy, and hashes of context inputs. It must not include hidden model
-reasoning.
+The v1 manifest records the packet contract and must not include hidden model
+reasoning. The additive lifecycle record carries response provenance and the
+packet binding so that v1 readers remain stable.
 
 `review-report.json` is the canonical machine-readable contract. Markdown is a
 rendering of the same normalized findings, not a second source of truth.
 
 Reports are saved by default under `.quality-runner/runs/<run-id>/`. A no-save
-option may suppress report persistence, but the command must still state that no
-shareable report was written.
+option may suppress report persistence, but cannot support a later asynchronous
+adapter response because there is no packet to bind it to.
 
 ## 8. Status, known issues, and resolution tracking
 
@@ -262,12 +269,14 @@ review cannot verify behavior.
 
 ## 9. Implement-review loop
 
-The loop is explicitly started by the user with `--loop`. Each iteration is:
+The loop is explicitly started by the user with `--loop` when the packet is
+prepared. Response submission derives that state from the packet and may set
+`--loop-stop`. Each iteration is:
 
 1. Run a fresh review.
 2. Save the current report and show ranked findings.
-3. Hand selected findings, or the critical/high shortcut, to a separate fixing
-   agent through `review-fix-prompts.md`.
+3. Hand only selected findings, or the explicit critical/high shortcut, to a
+   separate fixing agent through `review-fix-prompts.md`.
 4. Wait for the fixing agent to report completion.
 5. Start a new fresh review without prior review context.
 6. Stop when the selected condition is met or the user stops manually.
@@ -298,8 +307,8 @@ privacy review is required before broad use on sensitive or regulated projects.
   agent’s conversation or reasoning by default.
 - Blind mode cannot receive the original task and does not call findings
   missed requirements.
-- Combined mode produces independent task and blind results and only groups
-  overlaps after both complete.
+- Combined mode produces separately scoped task and blind results and only
+  groups overlaps after both complete.
 - Every run records its freshness policy and input provenance.
 - Reviewers never edit source files, install dependencies, commit, or execute
   remediation.
@@ -309,8 +318,8 @@ privacy review is required before broad use on sensitive or regulated projects.
 - Reports are saved locally by default in the existing run artifact area.
 - Known issues are visible, editable, and never silently hidden.
 - Active loops do not compare prior review reports until final summarization.
-- Fixing-agent handoff is separate from reviewing and is limited to selected
-  findings or the explicit critical/high shortcut.
+- Fixing-agent handoff is separate from reviewing, is limited to selected
+  findings or the explicit critical/high shortcut, and never invokes a fixer.
 - The CLI reports adapter or evidence-access limitations without fabricating
   review results.
 

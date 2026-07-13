@@ -93,7 +93,25 @@ def render_agent_packet(context: Mapping[str, object]) -> str:
     )
 
 
-def render_fix_prompts(report: Mapping[str, object]) -> str:
+def render_combined_agent_packet_guide() -> str:
+    """Keep the coordinator artifact free of task content for blind-review isolation."""
+    return "\n".join(
+        [
+            "# Fresh Review Combined Packet Guide",
+            "",
+            "Run two separately scoped reviews before grouping findings locally.",
+            "",
+            "- Give `review-agent-packet-task.md` only to the task-aware reviewer.",
+            "- Give `review-agent-packet-blind.md` only to the blind reviewer.",
+            "- Return both bound entries in `review-adapter-response.template.json`.",
+            "",
+        ]
+    )
+
+
+def render_fix_prompts(
+    report: Mapping[str, object], *, selected_findings: Sequence[Mapping[str, object]] | None = None
+) -> str:
     lines = [
         "# Fresh Review Fix Prompts",
         "",
@@ -101,7 +119,9 @@ def render_fix_prompts(report: Mapping[str, object]) -> str:
         "Investigate each finding, stay within the declared scope, obtain approval before edits, and verify the result.",
         "",
     ]
-    findings = report.get("findings")
+    findings: object = (
+        selected_findings if selected_findings is not None else report.get("findings")
+    )
     if not isinstance(findings, Sequence) or isinstance(findings, (str, bytes)) or not findings:
         if report.get("adapter_status") != "review-complete":
             lines.append("No fixing prompts were generated because a review did not complete.")
@@ -109,7 +129,12 @@ def render_fix_prompts(report: Mapping[str, object]) -> str:
             if isinstance(next_action, str) and next_action:
                 lines.append(next_action)
             return "\n".join(lines).rstrip() + "\n"
-        lines.append("No finding-specific prompts were generated.")
+        if selected_findings is not None:
+            lines.append(
+                "No fixing prompts were generated; select findings before handing work to a fixer."
+            )
+        else:
+            lines.append("No finding-specific prompts were generated.")
         return "\n".join(lines).rstrip() + "\n"
     for finding in findings:
         if not isinstance(finding, Mapping):

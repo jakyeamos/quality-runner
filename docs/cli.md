@@ -616,29 +616,51 @@ the compatibility command does not edit Git ignore configuration.
 Errors are printed to stderr without Python tracebacks.
 ## `quality-runner review`
 
-Runs a fresh local review packet without modifying source files:
+Fresh Review is a local, two-phase evidence workflow. It never edits source
+files: Quality Runner first prepares an immutable context package, then a
+locally supplied response is validated against that exact package.
 
 ```bash
-quality-runner review /path/to/repo --task "Implement the requested change" --json
-quality-runner review /path/to/repo --mode blind --breadth full --no-save
-quality-runner review /path/to/repo --mode blind --outcome --json
+quality-runner review /path/to/repo --mode blind --run-id review-001 --loop --json
+# Fill the generated response template and submit the packet-bound local response.
+quality-runner review /path/to/repo --run-id review-001 \
+  --adapter-output .quality-runner/runs/review-001/review-adapter-response.json \
+  --finding-id R-001 --loop-stop critical-high --outcome --json
 ```
 
 The command defaults to `--mode task`, `--scope project`, and project breadth
-`--breadth related`. It supports `--mode task|blind|combined`,
-`--scope task|project`, `--breadth focused|related|full`, `--task`,
-`--task-file`, `--reuse-task`, `--previous-summary`, repeated `--exclude` and
-`--evidence`, `--detail`, `--save/--no-save`, `--known-issues`, `--loop`,
-`--loop-stop`, `--finding-id`, `--all-critical-high`, and the local
-`--adapter-output` JSON path. Task and combined modes require task input;
-Quality Runner suggests blind mode when it is absent.
+`--breadth related`. Task and combined modes require task input; Quality Runner
+suggests blind mode when it is absent. The exact parser and MCP input schema are
+the source of truth for available options.
+
+Preparation writes the packet (`review-agent-packet.md`), response template,
+and lifecycle record under the selected run. The response must carry the run id,
+mode, and packet hash from that template; a stale, cross-run, malformed, or
+path-escaped response is kept as incomplete evidence rather than turned into a
+clean review. `--task-file` must be a bounded regular file inside the target
+repository. `--no-save` is a local preview only and cannot accept a later
+adapter response.
+
+Combined mode uses separately scoped task and blind packets and responses.
+Quality Runner validates both responses before grouping findings locally, so task
+text is never placed in the blind packet. The versioned response schema in
+`quality_runner/schemas/` defines the machine contract.
 
 Human and JSON output expose mode, scope, breadth, adapter status, severity
 counts, evidence limitations, and saved artifact paths. A completed review with
 no findings uses the qualified no-issue message. A missing adapter instead
 returns `review-not-run` with `outcome: packet-ready` and `next_action`; it is
 not a completed review and does not produce finding-specific fix prompts.
-Saved output includes `review-agent-packet.md` for the next reviewer.
+
+Use `--finding-id` to select the work a separate fixing agent may receive, or
+use the explicit critical/high shortcut. Without a selection, the completed
+report remains evidence and the handoff asks for a decision. Pass `--loop` when
+preparing the packet to start a manual cycle; response submission derives that
+state from the saved packet and may set `--loop-stop`. Neither flag invokes a
+fixer; the next iteration is another fresh review. Exclusions describe the
+intended review boundary, but a
+local file adapter is external to Quality Runner, so its file access is recorded
+as advisory rather than claimed as enforced.
 
 Pass `--outcome` to opt into the v2 journey projection. In that projection,
 packet-only review is `awaiting-evidence` with `assessment: packet-ready`; it is

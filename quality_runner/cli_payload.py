@@ -186,7 +186,11 @@ def payload_for_args(args: argparse.Namespace) -> dict[str, Any]:
         return rollout_command_payload(args)
     if args.command == "review":
         repo_root = _validated_repo_path(args.repo_path)
-        payload = review_command_payload(args, repo_root)
+        payload = review_command_payload(
+            args,
+            repo_root,
+            include_extended_artifacts=bool(getattr(args, "outcome", False)),
+        )
         if getattr(args, "outcome", False):
             return _result_payload(
                 review_journey_outcome(cast(LegacyPayload, payload), repo_root=repo_root)

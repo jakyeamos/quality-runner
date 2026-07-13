@@ -133,16 +133,16 @@ def project_review_outcome(payload: LegacyPayload, *, repo_root: Path) -> Journe
             confidence=_confidence(
                 level="none",
                 basis=["review packet prepared"],
-                limitations=["No independent review result was supplied."],
+                limitations=["No packet-bound local review response was supplied."],
             ),
             writes=writes,
             safety=safety,
             next_action=_next_action(
                 kind="provide-review-output",
                 summary=next_summary
-                or "Provide independent review output for this prepared packet.",
+                or "Provide a packet-bound local review response for this prepared packet.",
             ),
-            summary="Review packet is ready, but no independent review has completed.",
+            summary="Review packet is ready, but no packet-bound local response has completed.",
             payload=payload,
             run_id=run_id,
         )
@@ -163,7 +163,7 @@ def project_review_outcome(payload: LegacyPayload, *, repo_root: Path) -> Journe
                 summary=next_summary
                 or "Resolve the review adapter issue before relying on review evidence.",
             ),
-            summary="Review could not produce a usable independent result.",
+            summary="Review could not produce a usable packet-bound local response.",
             payload=payload,
             run_id=run_id,
         )
@@ -180,7 +180,8 @@ def project_review_outcome(payload: LegacyPayload, *, repo_root: Path) -> Journe
             safety=safety,
             next_action=_next_action(
                 kind="inspect-run",
-                summary="Inspect the saved review report before selecting remediation work.",
+                summary=next_summary
+                or "Inspect the saved review report before selecting remediation work.",
             ),
             summary=f"Review completed with {finding_count} recorded finding(s).",
             payload=payload,
@@ -456,7 +457,7 @@ def project_runs_outcome(history: HistoryPayload, *, repo_root: Path) -> Journey
 def _review_confidence(limitations: list[str]) -> OutcomeConfidence:
     return _confidence(
         level="limited" if limitations else "confirmed",
-        basis=["independent review result"],
+        basis=["validated packet-bound local response"],
         limitations=limitations,
     )
 

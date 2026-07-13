@@ -111,7 +111,10 @@ def review_journey_outcome(payload: LegacyPayload, *, repo_root: Path) -> Journe
 def review_mcp_journey_outcome(
     arguments: Mapping[str, object], *, repo_root: Path
 ) -> JourneyOutcome:
-    return review_journey_outcome(review_mcp_payload(arguments, repo_root), repo_root=repo_root)
+    return review_journey_outcome(
+        review_mcp_payload(arguments, repo_root, include_extended_artifacts=True),
+        repo_root=repo_root,
+    )
 
 
 def review_mcp_input_schema() -> dict[str, object]:

@@ -45,6 +45,16 @@ have identical fields.
 contract. Existing Repo Quality Certifier callers can continue to use
 `repo-quality-certifier-mcp` and its published compatibility tools.
 
+Fresh Review has the same two-phase contract over MCP as it does on the CLI:
+the first call creates a packet-ready run, and a later call supplies a response
+inside that run. The response must bind to the saved packet's run id, mode, and
+hash; a response that cannot prove that binding is returned as incomplete review
+evidence. Binding validates the declared packet, not reviewer identity or file
+access outside the packet boundary. Outcome-tool `writes.artifact_paths` lists
+the lifecycle files actually created; legacy review payloads retain their v1
+six-path surface. See the [CLI reference](cli.md#quality-runner-review) for the
+safety and fixer-handoff rules.
+
 ## JSON-RPC behavior
 
 ```json

@@ -22,6 +22,11 @@ Preferred MCP tools:
 
 Use the legacy MCP tools only when an existing client requires their v1 payloads.
 
+Fresh Review is two phase: first prepare the packet, then submit a locally
+supplied response bound to that packet. A packet-ready outcome is not a clean
+review. Select findings explicitly before giving its fixer prompts to a separate
+agent; Quality Runner does not apply those fixes.
+
 CLI fallback:
 
 ```bash
