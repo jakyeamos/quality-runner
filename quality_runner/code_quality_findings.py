@@ -3,7 +3,7 @@ from __future__ import annotations
 import hashlib
 from typing import Any
 
-from quality_runner.security.redaction import redact_secret_like_literals
+from quality_runner.evidence_redaction import redact_secret_like_literals
 
 CATEGORY_ORDER = [
     "harden",

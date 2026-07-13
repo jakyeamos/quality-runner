@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 from typing import Any
 
-from quality_runner.security.redaction import REDACTED_LITERAL
+from quality_runner.evidence_redaction import REDACTED_LITERAL
 
 SECRET_PATTERNS = (
     re.compile(

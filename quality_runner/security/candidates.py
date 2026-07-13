@@ -4,7 +4,7 @@ import hashlib
 import re
 from typing import Any
 
-from quality_runner.security.redaction import (
+from quality_runner.evidence_redaction import (
     SECRET_ASSIGNMENT_PATTERN,
     SECRET_FALLBACK_PATTERN,
     SECRET_LOG_PATTERN,

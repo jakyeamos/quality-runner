@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from quality_runner.security.redaction import redact_secret_like_literals
+from quality_runner.evidence_redaction import redact_secret_like_literals
 
 
 def read_line_excerpt(
