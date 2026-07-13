@@ -40,7 +40,7 @@ hardening.
   `0b5ac2e` and `56c94d4`
 - M7 — release hardening: in progress; its first confidentiality slice is
   complete in `113f143` and reproducible distribution evidence is complete in
-  `66ce3ef`
+  `66ce3ef`; Fresh Review v2 is now the default in `32e7b26`
 
 ## Active Phase
 
@@ -63,18 +63,21 @@ hardening.
   the published compatibility cutover.
 - Keep executable verification disposable-only; outcome presentation must retain
   its evidence and artifact semantics.
-- Keep v2 journey outcomes additive and preserve v1 CLI/MCP projections until
-  the published compatibility cutover.
+- Make v2 outcomes default for primary CLI journeys while retaining v1 as an
+  explicit compatibility projection through the published support window.
 - Derive outcome safety claims from observed branch and execution evidence, not
   from requested flags or planned behavior.
 
 ## Next Step
 
-Make Fresh Review v2-default with an explicit v1 escape hatch, then complete
-the upgrade, rollback, deprecation, and operational guidance.
+Publish the upgrade, rollback, deprecation, and operational guidance for the
+v2-default cutover, then run the final M7 validation and review.
 
 ## Recent Progress
 
+- 2026-07-13: M7 cutover in `32e7b26`: Fresh Review defaults to v2 outcomes;
+  `--legacy-output` preserves v1 stdout through 0.7.x, while legacy MCP stays
+  v1 with discovery notices.
 - 2026-07-13: M7 release evidence in `66ce3ef`: a committed uv lock pins the
   validation tools; CI/release install the wheel, run doctor and release smoke,
   and discover the v2 MCP tools before publish.

@@ -26,13 +26,15 @@ now have application owners, while root review façades retain their v1 type and
 direct-combined compatibility contracts. M7 is in progress: `113f143` redacts
 secret-like candidate literals before they are fingerprinted or persisted, and
 `66ce3ef` locks the development toolchain while testing doctor, v2 outcomes,
-and MCP discovery from the built wheel.
+and MCP discovery from the built wheel. `32e7b26` makes CLI Fresh Review v2
+outcome-first, with an explicit stderr-noticed v1 projection through 0.7.x;
+the MCP v1 tool remains a separate compatibility surface.
 
 ## Current Position
 
 - Target: a typed v2 core behind CLI, MCP, and compatibility adapters.
-- Next implementation slice: make Fresh Review outcome-first by default while
-  keeping an explicit, versioned v1 compatibility path.
+- Next implementation slice: publish the upgrade, rollback, deprecation, and
+  operational guidance for the v2-default cutover.
 - Canonical planning documents: `docs/modernization/`.
 - Public compatibility: retain `quality_evidence_contract` and
   `repo_quality_certifier` during a published transition window.
@@ -44,6 +46,8 @@ and MCP discovery from the built wheel.
 - JSON artifacts remain canonical; Markdown remains the human decision surface.
 - Scan-only and code-executing verification are explicit, separately reported
   modes.
+- Primary CLI journeys are outcome-first; legacy JSON is an explicit supported
+  compatibility projection rather than a silent default.
 
 ## Baseline Quality
 
@@ -69,6 +73,8 @@ and MCP discovery from the built wheel.
 
 ## Recent Progress
 
+- 2026-07-13: M7 cutover in `32e7b26`: CLI Review defaults to v2, retains
+  `--legacy-output` v1 JSON through 0.7.x, and documents legacy MCP discovery.
 - 2026-07-13: Began M7 in `113f143`: security candidates redact secret-like
   literals before fingerprints and persisted scan/audit/handoff evidence.
 - 2026-07-13: M7 release evidence in `66ce3ef`: pinned development tools and

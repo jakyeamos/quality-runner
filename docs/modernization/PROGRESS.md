@@ -15,6 +15,11 @@ Its release-evidence slice (`66ce3ef`) commits the development lockfile, uses
 it in CI/release validation, and installs the built wheel to check doctor,
 release-smoke’s v2 audit contract, and v2 MCP tool discovery before publishing.
 
+Its cutover slice (`32e7b26`) makes CLI Fresh Review v2 outcome-first. The
+explicit `--legacy-output` flag preserves its v1 JSON on stdout and emits a
+versioned stderr notice through 0.7.x; MCP v1 stays unchanged apart from its
+tool-list deprecation guidance.
+
 M0 restores the public trust boundary without changing artifact schema ids:
 
 - package metadata now derives from `quality_runner/_version.py`; the plugin,
@@ -79,9 +84,9 @@ projections:
 - `quality-runner-outcome-v0.2` presents audit, review, verify, and bounded run
   history with explicit state, assessment, confidence, writes, safety, and one
   safest next action;
-- `audit`, `verify`, and `runs` are outcome-first CLI journeys, while
-  `review --outcome` is an explicit opt-in that preserves default v1 review
-  behavior;
+- `audit`, `verify`, and `runs` were outcome-first CLI journeys, while M4 kept
+  `review --outcome` as an opt-in; M7 subsequently makes Review outcome-first
+  and retains its v1 CLI projection only behind `--legacy-output`;
 - four additive MCP tools expose the same contract as structured content while
   leaving legacy tools and schemas unchanged;
 - safety claims are derived from observed branch/execution evidence, malformed
