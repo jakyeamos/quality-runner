@@ -126,7 +126,9 @@ def test_ci_and_release_workflows_smoke_built_wheel_outcome_and_mcp_surfaces() -
         assert "quality-runner-outcome-v0.2" in workflow
         assert "--legacy-output" in workflow
         assert '"method":"tools/list"' in workflow
+        assert '"method":"tools/call"' in workflow
         assert "quality_runner_audit_outcome" in workflow
+        assert "quality_runner_review_outcome" in workflow
 
     assert "fetch-depth: 0" in release
     assert 'git merge-base --is-ancestor "$GITHUB_SHA" origin/main' in release

@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from quality_runner.evidence_redaction import redact_secret_like_literals
+from quality_runner.evidence_redaction import redact_secret_like_source_lines
 
 
 def read_line_excerpt(
@@ -25,17 +25,16 @@ def read_line_excerpt(
         return None
     if line > len(lines):
         return None
+    redacted_lines = redact_secret_like_source_lines(lines)
     index = line - 1
     before_start = max(0, index - context)
     after_end = min(len(lines), index + context + 1)
     return {
         "file": file,
         "line": line,
-        "excerpt": redact_secret_like_literals(lines[index]),
-        "context_before": [redact_secret_like_literals(item) for item in lines[before_start:index]],
-        "context_after": [
-            redact_secret_like_literals(item) for item in lines[index + 1 : after_end]
-        ],
+        "excerpt": redacted_lines[index],
+        "context_before": redacted_lines[before_start:index],
+        "context_after": redacted_lines[index + 1 : after_end],
     }
 
 

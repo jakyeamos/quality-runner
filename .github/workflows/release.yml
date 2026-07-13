@@ -94,6 +94,10 @@ jobs:
           printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"tools/list"}' \
             | .release-version-check/bin/quality-runner-mcp \
             | .release-version-check/bin/python -c "import json, sys; names = {tool['name'] for tool in json.load(sys.stdin)['result']['tools']}; assert {'quality_runner_audit_outcome', 'quality_runner_review_outcome', 'quality_runner_verify_outcome', 'quality_runner_runs_outcome'}.issubset(names), names"
+          mkdir -p /tmp/quality-runner-release-mcp-review-smoke
+          printf '%s\n' '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"quality_runner_review_outcome","arguments":{"repo_root":"/tmp/quality-runner-release-mcp-review-smoke","mode":"blind","run_id":"mcp-review-default"}}}' \
+            | .release-version-check/bin/quality-runner-mcp \
+            | .release-version-check/bin/python -c "import json, sys; from pathlib import Path; response = json.load(sys.stdin); assert response['jsonrpc'] == '2.0' and response['id'] == 2 and 'error' not in response, response; result = response['result']; assert result['schema'] == 'quality-runner-mcp-result-v0.1' and result['isError'] is False, result; outcome = result['structuredContent']; assert outcome['schema'] == 'quality-runner-outcome-v0.2' and outcome['journey'] == 'review' and outcome['state'] == 'awaiting-evidence' and outcome['assessment'] == 'packet-ready', outcome; paths = outcome['writes']['artifact_paths']; assert {'review_execution_json', 'review_adapter_response_template_json'}.issubset(paths) and all(Path(path).is_file() for path in paths.values()), paths"
 
       - name: Publish to PyPI
         if: startsWith(github.ref, 'refs/tags/')

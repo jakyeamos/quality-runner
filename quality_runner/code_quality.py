@@ -24,6 +24,7 @@ from quality_runner.code_quality_similarity import collect_deduplicate_scan
 from quality_runner.code_quality_skills import skill_findings
 from quality_runner.code_quality_unwired import unwired_findings
 from quality_runner.core.audit_contracts import AuditPayload, TextScanScope
+from quality_runner.evidence_redaction import redact_secret_like_source_lines
 from quality_runner.scan_scope import (
     DEFAULT_FAT_ROUTER_LINES as _DEFAULT_FAT_ROUTER_LINES,
 )
@@ -79,14 +80,16 @@ def create_code_quality_scan(
 
     for file_info in scope.files:
         relative_path = file_info.path
-        text = file_info.text
-        lines = file_info.lines
+        source_text = file_info.text
+        source_lines = file_info.lines
+        lines = redact_secret_like_source_lines(source_lines)
+        text = "\n".join(lines)
         scanned_files.append({"path": relative_path, "text": text, "lines": lines})
         accountability.append(
             {
                 "path": relative_path,
                 "line_count": len(lines),
-                "sha256": hashlib.sha256(text.encode("utf-8")).hexdigest(),
+                "sha256": hashlib.sha256(source_text.encode("utf-8")).hexdigest(),
                 "scan_status": "scanned",
                 "check_coverage": _check_coverage(relative_path),
             }

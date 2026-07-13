@@ -224,8 +224,10 @@ def test_packaged_console_script_invokes_cli(tmp_path: Path) -> None:
     )
     installed_review_root = tmp_path / "installed-review-smoke"
     installed_legacy_review_root = tmp_path / "installed-legacy-review-smoke"
+    installed_mcp_review_root = tmp_path / "installed-mcp-review-smoke"
     installed_review_root.mkdir()
     installed_legacy_review_root.mkdir()
+    installed_mcp_review_root.mkdir()
     review_result = subprocess.run(
         [
             str(quality_runner),
@@ -253,6 +255,31 @@ def test_packaged_console_script_invokes_cli(tmp_path: Path) -> None:
             "--legacy-output",
             "--json",
         ],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    quality_runner_mcp = venv_dir / "bin" / "quality-runner-mcp"
+    mcp_review_result = subprocess.run(
+        [str(quality_runner_mcp)],
+        input=(
+            json.dumps(
+                {
+                    "jsonrpc": "2.0",
+                    "id": 2,
+                    "method": "tools/call",
+                    "params": {
+                        "name": "quality_runner_review_outcome",
+                        "arguments": {
+                            "repo_root": str(installed_mcp_review_root),
+                            "mode": "blind",
+                            "run_id": "installed-mcp-review-default",
+                        },
+                    },
+                }
+            )
+            + "\n"
+        ),
         check=True,
         capture_output=True,
         text=True,
@@ -330,6 +357,7 @@ def test_packaged_console_script_invokes_cli(tmp_path: Path) -> None:
     smoke_payload = json.loads(smoke_result.stdout)
     review_payload = json.loads(review_result.stdout)
     legacy_review_payload = json.loads(legacy_review_result.stdout)
+    mcp_review_response = json.loads(mcp_review_result.stdout)
     assert smoke_payload["schema"] == "quality-runner-release-smoke-result-v0.1"
     assert smoke_payload["status"] == "passed"
     assert {check["id"] for check in smoke_payload["checks"]} >= {
@@ -343,6 +371,22 @@ def test_packaged_console_script_invokes_cli(tmp_path: Path) -> None:
     assert legacy_review_payload["schema"] == "quality-runner-review-result-v0.1"
     assert "outcome" not in legacy_review_payload
     assert "next_action" not in legacy_review_payload
+    assert mcp_review_response["jsonrpc"] == "2.0"
+    assert mcp_review_response["id"] == 2
+    assert "error" not in mcp_review_response
+    mcp_review_result_payload = mcp_review_response["result"]
+    assert mcp_review_result_payload["schema"] == "quality-runner-mcp-result-v0.1"
+    assert mcp_review_result_payload["isError"] is False
+    mcp_review_outcome = mcp_review_result_payload["structuredContent"]
+    assert mcp_review_outcome["schema"] == "quality-runner-outcome-v0.2"
+    assert mcp_review_outcome["journey"] == "review"
+    assert mcp_review_outcome["state"] == "awaiting-evidence"
+    assert mcp_review_outcome["assessment"] == "packet-ready"
+    mcp_artifact_paths = mcp_review_outcome["writes"]["artifact_paths"]
+    assert {"review_execution_json", "review_adapter_response_template_json"}.issubset(
+        mcp_artifact_paths
+    )
+    assert all(Path(path).is_file() for path in mcp_artifact_paths.values())
     assert compat_import_result.stdout.strip() == (
         "quality-finding-v0.1 aios-repo-gate-matrix-v0.1 quality-runner-review-context-v0.1 "
         "m6-facades-ok"

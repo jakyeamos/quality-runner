@@ -9,6 +9,7 @@ from quality_runner.evidence_redaction import (
     SECRET_FALLBACK_PATTERN,
     SECRET_LOG_PATTERN,
     redact_secret_like_literals,
+    redact_secret_like_source_lines,
 )
 from quality_runner.security.taxonomy import SECURITY_TAXONOMY_CATEGORIES
 
@@ -108,7 +109,9 @@ def scan_security_candidates(
     for file_info in scanned_files:
         relative_path = file_info["path"]
         lines = file_info["lines"]
+        evidence_lines = redact_secret_like_source_lines(lines)
         for line_number, line in enumerate(lines, start=1):
+            evidence_line = evidence_lines[line_number - 1]
             if "secrets" in disabled and "secret" in line.lower():
                 continue
             for pattern_group in (
@@ -130,7 +133,7 @@ def scan_security_candidates(
                                 confidence=_confidence_for_match(cat, line),
                                 file=relative_path,
                                 line=line_number,
-                                evidence=_candidate_evidence(cat, line),
+                                evidence=_candidate_evidence(cat, evidence_line),
                                 description=description,
                                 requires_agent_review=_requires_agent_review(cat),
                             )
@@ -149,7 +152,7 @@ def scan_security_candidates(
                                 confidence="medium",
                                 file=relative_path,
                                 line=line_number,
-                                evidence=line.strip()[:240],
+                                evidence=_candidate_evidence(cat, evidence_lines[line_number - 1]),
                                 description=description,
                                 requires_agent_review=True,
                             )
