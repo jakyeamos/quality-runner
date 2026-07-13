@@ -32,13 +32,13 @@ def refresh_payload(
     total_timeout_seconds: int | None = None,
     total_timeout_reason: str | None = None,
     checkout_most_advanced_branch: bool = False,
-    execute_discovered_gates: bool = False,
     allow_mutating_gates: bool = False,
     worktree_mode: str = "in-place",
     allow_dirty_worktree_verify: bool = False,
     intent: dict[str, Any] | None = None,
     review_cycle_id: str | None = None,
     review_iteration: int | None = None,
+    execute_discovered_gates: bool = False,
 ) -> dict[str, Any]:
     return _refresh_payload(
         repo_root=repo_root,

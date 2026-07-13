@@ -91,7 +91,7 @@ def test_prepare_writes_immutable_packet_and_bound_response_template(tmp_path: P
     payload, run_dir = _prepared_blind_review(tmp_path, "prepare-response")
 
     assert payload["status"] == "review-not-run"
-    assert payload["outcome"] == "packet-ready"
+    assert "outcome" not in payload
     assert set(payload["artifact_paths"]) == {
         "review_manifest_json",
         "review_context_json",
@@ -185,7 +185,7 @@ def test_invalid_adapter_response_never_finalizes_a_review(
     persisted_report = json.loads((run_dir / "review-report.json").read_text())
 
     assert payload["status"] == "malformed-output"
-    assert payload["outcome"] == "malformed-output"
+    assert "outcome" not in payload
     assert execution["state"] == "packet-ready"
     assert persisted_report == payload["report"]
     assert persisted_report["adapter_status"] == "malformed-output"
@@ -292,7 +292,7 @@ def test_handoff_limits_prompts_to_selected_findings_and_records_loop_state(tmp_
     assert payload["status"] == "review-complete"
     assert handoff["status"] == "ready"
     assert handoff["selected_finding_ids"] == ["H-1"]
-    assert "review-fix-prompts.md" in payload["next_action"]
+    assert "review-fix-prompts.md" in handoff["next_action"]
     assert "H-1" in prompts
     assert "M-1" not in prompts
     assert loop_state["active_cycle"] is True
@@ -314,7 +314,7 @@ def test_adapter_path_escape_is_reported_as_permission_denied(tmp_path: Path) ->
     )
 
     assert payload["status"] == "permission-denied"
-    assert payload["outcome"] == "permission-denied"
+    assert "outcome" not in payload
 
 
 def test_tampered_packet_or_manifest_cannot_finalize_a_review(tmp_path: Path) -> None:

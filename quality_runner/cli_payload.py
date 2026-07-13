@@ -192,6 +192,7 @@ def payload_for_args(args: argparse.Namespace) -> dict[str, Any]:
             args,
             repo_root,
             include_extended_artifacts=not legacy_output,
+            strict_v1=legacy_output,
         )
         if legacy_output:
             return payload

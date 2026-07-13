@@ -12,7 +12,12 @@ def review_mcp_journey_outcome(
     arguments: Mapping[str, object], *, repo_root: Path
 ) -> JourneyOutcome:
     return review_journey_outcome(
-        review_mcp_payload(arguments, repo_root, include_extended_artifacts=True),
+        review_mcp_payload(
+            arguments,
+            repo_root,
+            include_extended_artifacts=True,
+            strict_v1=False,
+        ),
         repo_root=repo_root,
     )
 

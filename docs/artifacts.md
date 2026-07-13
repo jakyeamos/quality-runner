@@ -446,8 +446,9 @@ Review packets never include hidden reasoning. Active implement-review loops do
 not compare prior review documents; comparison and resolution classification
 occur only during final cycle summarization. Known issues are stored locally in
 `.quality-runner/known-issues.json`, remain visible as known-accepted findings,
-and can trigger explicit re-verification after major changes. No adapter yields
-`review-not-run` with `outcome: packet-ready` and a next action, not a finding
-conclusion; its fix-prompts artifact records that no review completed. All review
-artifacts and state are local; Quality Runner does not edit source files or call
-remote services.
+and can trigger explicit re-verification after major changes. The default v2
+outcome reports no adapter as `review-not-run` with `assessment: packet-ready`
+and a next action, not a finding conclusion; the frozen v1 report retains only
+its established fields. Its fix-prompts artifact records that no review
+completed. All review artifacts and state are local; Quality Runner does not
+edit source files or call remote services.

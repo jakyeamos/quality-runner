@@ -24,6 +24,7 @@ from quality_runner.application.review_reporting import (
 from quality_runner.application.review_reporting import (
     build_review_report as _build_review_report,
 )
+from quality_runner.core.review_contracts import ReviewFinding as ReviewFinding
 
 ADAPTER_STATUSES = _ADAPTER_STATUSES
 CLASSIFICATIONS = _CLASSIFICATIONS

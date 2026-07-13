@@ -52,9 +52,9 @@ def test_mcp_review_blind_mode_is_packet_only(tmp_path: Path) -> None:
     assert result["isError"] is False
     structured = result["structuredContent"]
     assert structured["status"] == "review-not-run"
-    assert structured["outcome"] == "packet-ready"
     assert structured["summary"].startswith("Review packet ready:")
-    assert "next_action" in structured
+    assert "outcome" not in structured
+    assert "next_action" not in structured
     assert structured["breadth"] == "related"
     assert set(structured["artifact_paths"]) == {
         "review_manifest_json",

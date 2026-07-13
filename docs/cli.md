@@ -26,12 +26,13 @@ quality-runner runs /path/to/repo --json
 ```
 
 `inspect`, `run`, and `verify-gates` remain supported v1 compatibility commands.
-`review --legacy-output` provides the established v1 review JSON when an
-existing CLI consumer requires it; the notice is sent to stderr so stdout stays
-machine-readable. The [Upgrade and Compatibility Guide](upgrade.md) owns the
-command mappings and support window. A blocked verification or packet-ready
-review is a truthful outcome, not a parser failure; callers should read its
-`next_action` before deciding whether to run commands or request a reviewer.
+`review --legacy-output` provides the established v1 review JSON field shape
+when an existing CLI consumer requires it; the notice is sent to stderr so
+stdout stays machine-readable. The [Upgrade and Compatibility Guide](upgrade.md)
+owns the command mappings and support window. A blocked verification or
+packet-ready review is a truthful v2 outcome, not a parser failure; callers
+should read its `next_action` before deciding whether to run commands or request
+a reviewer.
 
 ### `quality-runner audit`
 
@@ -650,10 +651,10 @@ text is never placed in the blind packet. The versioned response schema in
 
 The saved v1 report artifacts and `--legacy-output` JSON expose mode, scope,
 breadth, adapter status, severity counts, evidence limitations, and artifact
-paths. The default v2 result presents the same state through the outcome
-contract. A completed review with no findings uses the qualified no-issue
-message. A missing adapter is packet-ready evidence, not a completed review,
-and does not produce finding-specific fix prompts.
+paths without v2-only fields. The default v2 result presents the same state
+through the outcome contract. A completed review with no findings uses the
+qualified no-issue message. A missing adapter is packet-ready evidence, not a
+completed review, and does not produce finding-specific fix prompts.
 
 Use `--finding-id` to select the work a separate fixing agent may receive, or
 use the explicit critical/high shortcut. Without a selection, the completed
@@ -668,6 +669,6 @@ as advisory rather than claimed as enforced.
 Review emits the v2 journey projection by default. Packet-only review is
 `awaiting-evidence` with `assessment: packet-ready`; it is never shown as clean.
 `--outcome` remains a harmless alias. Use `--legacy-output` only when an
-existing CLI consumer requires v1 JSON; it preserves v1 stdout and emits a
-versioned stderr notice. The [Upgrade and Compatibility Guide](upgrade.md)
-defines the support window and rollback path.
+existing CLI consumer requires the frozen v1 field shape; it emits a versioned
+stderr notice. The [Upgrade and Compatibility Guide](upgrade.md) defines the
+support window and rollback path.

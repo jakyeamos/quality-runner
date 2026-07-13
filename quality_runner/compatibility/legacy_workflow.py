@@ -28,7 +28,6 @@ def refresh_payload(
     total_timeout_seconds: int | None = None,
     total_timeout_reason: str | None = None,
     checkout_most_advanced_branch: bool = False,
-    execute_discovered_gates: bool = False,
     allow_mutating_gates: bool = False,
     worktree_mode: str = "in-place",
     allow_dirty_worktree_verify: bool = False,
@@ -40,6 +39,7 @@ def refresh_payload(
     verify_callback: PayloadCallback = verify_gates_payload,
     summary_callback: PayloadCallback = build_run_summary,
     refresh_runner: Callable[..., dict[str, Any]] = run_refresh_payload,
+    execute_discovered_gates: bool = False,
 ) -> dict[str, Any]:
     review_enabled = review_cycle_id is not None or review_iteration is not None
     if review_enabled:

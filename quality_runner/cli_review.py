@@ -76,6 +76,7 @@ def review_mcp_payload(
     repo_root: Path,
     *,
     include_extended_artifacts: bool = False,
+    strict_v1: bool = True,
 ) -> dict[str, object]:
     def strings(key: str) -> list[str]:
         value = arguments.get(key, [])
@@ -109,6 +110,7 @@ def review_mcp_payload(
         args,
         repo_root,
         include_extended_artifacts=include_extended_artifacts,
+        strict_v1=strict_v1,
     )
 
 
@@ -169,6 +171,7 @@ def review_command_payload(
     repo_root: Path,
     *,
     include_extended_artifacts: bool = False,
+    strict_v1: bool = False,
 ) -> dict[str, object]:
     run_id = args.run_id or f"{generated_run_id()}-review"
     loop_stop = _resolved_loop_stop(args.loop_stop)
@@ -204,6 +207,7 @@ def review_command_payload(
         return _legacy_result_payload(
             execution,
             include_extended_artifacts=include_extended_artifacts,
+            strict_v1=strict_v1,
         )
     if args.finding_id or args.all_critical_high:
         raise ValueError(
@@ -240,13 +244,18 @@ def review_command_payload(
         omitted_evidence=omitted,
         save=args.save,
     )
-    return _legacy_result_payload(execution, include_extended_artifacts=include_extended_artifacts)
+    return _legacy_result_payload(
+        execution,
+        include_extended_artifacts=include_extended_artifacts,
+        strict_v1=strict_v1,
+    )
 
 
 def _legacy_result_payload(
     execution: FreshReviewExecution,
     *,
     include_extended_artifacts: bool = False,
+    strict_v1: bool = False,
 ) -> dict[str, object]:
     context = execution["context"]
     report = execution["report"]
@@ -264,10 +273,10 @@ def _legacy_result_payload(
             "review_fix_prompts_md",
         }
     }
-    if include_extended_artifacts:
+    if include_extended_artifacts and not strict_v1:
         artifact_paths = dict(execution["artifact_paths"])
     next_action = report.get("next_action")
-    return {
+    payload: dict[str, object] = {
         "schema": REVIEW_RESULT_SCHEMA,
         "status": status,
         "run_id": context["run_id"],
@@ -275,15 +284,18 @@ def _legacy_result_payload(
         "scope": context["scope"],
         "breadth": context["breadth"],
         "adapter_status": status,
-        "outcome": "packet-ready" if status == "review-not-run" else status,
         "summary": report["summary"],
         "severity_counts": report["severity_counts"],
         "evidence_unavailable": list(report["evidence_unavailable"]),
         "artifact_paths": artifact_paths,
         "saved_path": artifact_paths.get("review_report_json"),
-        **({"next_action": next_action} if isinstance(next_action, str) and next_action else {}),
         "report": review_report_to_v1(report),
     }
+    if not strict_v1:
+        payload["outcome"] = "packet-ready" if status == "review-not-run" else status
+        if isinstance(next_action, str) and next_action:
+            payload["next_action"] = next_action
+    return payload
 
 
 def _task_input(args: argparse.Namespace, repo_root: Path) -> str | None:

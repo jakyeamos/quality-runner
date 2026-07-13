@@ -13,7 +13,6 @@
     "adapter_status": { "enum": ["review-complete", "review-not-run", "malformed-output", "permission-denied"] },
     "task_provenance": { "type": ["string", "null"] },
     "summary": { "type": "string", "minLength": 1 },
-    "next_action": { "type": "string", "minLength": 1 },
     "severity_counts": {
       "type": "object",
       "required": ["critical", "high", "medium", "low"],

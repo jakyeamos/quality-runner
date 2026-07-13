@@ -50,7 +50,6 @@ _REPORT_KEYS = frozenset(
         "adapter_status",
         "task_provenance",
         "summary",
-        "next_action",
         "severity_counts",
         "evidence_used",
         "evidence_unavailable",
@@ -99,8 +98,6 @@ def review_report_to_v1(report: ReviewReport) -> dict[str, object]:
         "sections": _sections_to_v1(report["sections"]),
         "findings": [_finding_to_v1(item) for item in report["findings"]],
     }
-    if "next_action" in report:
-        payload["next_action"] = report["next_action"]
     return payload
 
 
@@ -128,8 +125,6 @@ def review_report_from_v1(payload: Mapping[str, object]) -> ReviewReport:
         "sections": _sections_from_v1(_object(payload, "sections")),
         "findings": _findings(_sequence(payload, "findings")),
     }
-    if "next_action" in payload:
-        report["next_action"] = _string(payload, "next_action")
     return report
 
 

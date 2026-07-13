@@ -75,6 +75,23 @@ def test_verify_gates_read_only_mode_skips_pre_cr_workspace_command(tmp_path: Pa
     assert handoff["next_slice"]["action_groups"][0]["class"] == "execution-consent"
 
 
+def test_verify_gates_preserves_legacy_positional_read_only_slot(tmp_path: Path) -> None:
+    from quality_runner.workflow import verify_gates_payload
+
+    (tmp_path / ".pre-cr.json").write_text("{}\n", encoding="utf-8")
+    (tmp_path / ".quality-runner.toml").write_text(
+        '[quality_runner]\nrequired_capabilities = ["pre_cr"]\n',
+        encoding="utf-8",
+    )
+
+    payload = verify_gates_payload(tmp_path, None, None, None, 120, False, True)
+    verification = json.loads(Path(payload["artifact_paths"]["gate_verification_json"]).read_text())
+
+    assert verification["execute_discovered_gates"] is False
+    assert verification["gates"][0]["status"] == "skipped"
+    assert verification["gates"][0]["skip_type"] == "execution-consent-required"
+
+
 def test_refresh_payload_finalizes_partial_verify_artifacts_when_verify_times_out(
     tmp_path: Path, monkeypatch: object
 ) -> None:

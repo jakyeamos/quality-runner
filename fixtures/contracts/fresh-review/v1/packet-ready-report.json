@@ -7,7 +7,6 @@
   "adapter_status": "review-not-run",
   "task_provenance": null,
   "summary": "Review packet ready: no review was run. Send the packet to a reviewer, then rerun with --adapter-output.",
-  "next_action": "Provide --adapter-output with a local structured review result.",
   "severity_counts": {
     "critical": 0,
     "high": 0,

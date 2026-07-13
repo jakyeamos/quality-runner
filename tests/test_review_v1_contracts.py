@@ -202,6 +202,8 @@ def test_v1_review_report_goldens_round_trip(name: str) -> None:
 def test_v1_review_report_reader_rejects_schema_forbidden_object_fields() -> None:
     root = _fixture("completed-report.json")
     root["unexpected"] = True
+    published_extension = _fixture("completed-report.json")
+    published_extension["next_action"] = "Use the v2 outcome for next-step guidance."
     counts = _fixture("completed-report.json")
     counts["severity_counts"]["unexpected"] = 0
     sections = _fixture("completed-report.json")
@@ -209,7 +211,7 @@ def test_v1_review_report_reader_rejects_schema_forbidden_object_fields() -> Non
     finding = _fixture("completed-report.json")
     finding["findings"][0]["unexpected"] = True
 
-    for payload in (root, counts, sections, finding):
+    for payload in (root, published_extension, counts, sections, finding):
         with pytest.raises(ValueError, match="unsupported fields"):
             review_report_from_v1(payload)
 
@@ -277,6 +279,67 @@ def test_cli_and_mcp_packet_ready_projections_match_persisted_v1_artifacts(tmp_p
 
     assert structured["report"] == mcp_report
     assert review_report_to_v1(review_report_from_v1(mcp_report)) == mcp_report
+
+
+def test_legacy_review_projections_preserve_the_published_v1_shape(tmp_path: Path) -> None:
+    command = [
+        sys.executable,
+        "-m",
+        "quality_runner",
+        "review",
+        str(tmp_path),
+        "--mode",
+        "blind",
+        "--run-id",
+        "published-v1-cli",
+        "--legacy-output",
+        "--json",
+    ]
+    cli = subprocess.run(command, cwd=ROOT, check=True, capture_output=True, text=True)
+    cli_payload = json.loads(cli.stdout)
+    mcp = call_tool(
+        "quality_runner_review",
+        {"repo_root": str(tmp_path), "mode": "blind", "run_id": "published-v1-mcp"},
+    )
+    mcp_payload = mcp["structuredContent"]
+    expected_result_keys = {
+        "schema",
+        "status",
+        "run_id",
+        "mode",
+        "scope",
+        "breadth",
+        "adapter_status",
+        "summary",
+        "severity_counts",
+        "evidence_unavailable",
+        "artifact_paths",
+        "saved_path",
+        "report",
+    }
+    expected_report_keys = {
+        "schema",
+        "run_id",
+        "mode",
+        "scope",
+        "breadth",
+        "adapter_status",
+        "task_provenance",
+        "summary",
+        "severity_counts",
+        "evidence_used",
+        "evidence_unavailable",
+        "exclusions",
+        "sections",
+        "findings",
+    }
+
+    for payload in (cli_payload, mcp_payload):
+        assert set(payload) == expected_result_keys
+        assert set(payload["report"]) == expected_report_keys
+        assert payload["summary"].startswith("Review packet ready:")
+        persisted = json.loads(Path(payload["artifact_paths"]["review_report_json"]).read_text())
+        assert payload["report"] == persisted
 
 
 def test_default_cli_outcome_keeps_persisted_v1_review_artifacts_readable(tmp_path: Path) -> None:

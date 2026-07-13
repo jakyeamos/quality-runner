@@ -3,6 +3,8 @@ from __future__ import annotations
 import ast
 from pathlib import Path
 
+import pytest
+
 from quality_runner.core.review_packets import validate_prepared_packet
 
 ROOT = Path(__file__).parents[1]
@@ -16,6 +18,54 @@ def test_legacy_workflow_modules_are_application_facades() -> None:
     assert workflow.run_payload is audit_workflows.run_payload
     assert workflow.verify_gates_payload is verification_workflows.verify_gates_payload
     assert workflow_verify.verify_gates_payload is verification_workflows.verify_gates_payload
+
+
+def test_public_workflow_positional_slots_and_review_finding_facade_are_preserved(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from quality_runner import workflow
+    from quality_runner.compatibility import legacy_workflow
+    from quality_runner.core.review_contracts import ReviewFinding as CoreReviewFinding
+    from quality_runner.review_report import ReviewFinding
+
+    root_calls: dict[str, object] = {}
+    legacy_calls: dict[str, object] = {}
+
+    def root_refresh(**kwargs: object) -> dict[str, object]:
+        root_calls.update(kwargs)
+        return {"schema": "test-refresh"}
+
+    def legacy_refresh(**kwargs: object) -> dict[str, object]:
+        legacy_calls.update(kwargs)
+        return {"schema": "test-refresh"}
+
+    monkeypatch.setattr(workflow, "_refresh_payload", root_refresh)
+    legacy_args = (
+        tmp_path,
+        "legacy-refresh",
+        None,
+        None,
+        None,
+        120,
+        None,
+        None,
+        None,
+        None,
+        None,
+        False,
+        True,
+    )
+
+    assert workflow.refresh_payload(*legacy_args) == {"schema": "test-refresh"}
+    assert root_calls["allow_mutating_gates"] is True
+    assert root_calls["execute_discovered_gates"] is False
+
+    assert legacy_workflow.refresh_payload(*legacy_args, refresh_runner=legacy_refresh) == {
+        "schema": "test-refresh"
+    }
+    assert legacy_calls["allow_mutating_gates"] is True
+    assert legacy_calls["execute_discovered_gates"] is False
+    assert ReviewFinding is CoreReviewFinding
 
 
 def test_application_workflows_do_not_depend_on_legacy_workflow_paths() -> None:

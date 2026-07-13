@@ -16,13 +16,13 @@ def verify_gates_payload(
     ci_status_json: Path | None = None,
     timeout_seconds: int = 120,
     checkout_most_advanced_branch: bool = False,
-    execute_discovered_gates: bool = False,
     read_only_gates: bool = False,
     allow_mutating_gates: bool = False,
     worktree_mode: str = "in-place",
     allow_dirty_worktree_verify: bool = False,
     skill_review_report: AuditPayload | None = None,
     intent: AuditPayload | None = None,
+    execute_discovered_gates: bool = False,
 ) -> dict[str, Any]:
     result = run_gate_verification(
         VerificationRequest(

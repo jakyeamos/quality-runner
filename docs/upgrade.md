@@ -53,9 +53,10 @@ New work should use the outcome-first journeys:
 | `refresh` | No direct replacement | Retained for the established combined controller workflow. |
 
 `review --outcome` remains a harmless alias for the default. Pass
-`--legacy-output` only when an existing CLI consumer requires the exact v1
-review projection. Its warning is written to stderr, so its JSON stdout stays
-machine-readable and v1-shaped.
+`--legacy-output` only when an existing CLI consumer requires the established
+v1 field shape. Its warning is written to stderr, so its JSON stdout stays
+machine-readable; use the default v2 outcome for packet-ready assessment and
+next-action guidance.
 
 ## Support window
 
