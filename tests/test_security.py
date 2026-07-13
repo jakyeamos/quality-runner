@@ -82,6 +82,38 @@ def test_candidate_detection_for_secret_exposure(tmp_path: Path) -> None:
     assert "secrets-exposure" in categories
 
 
+def test_candidate_detection_for_secret_fallback_preserves_credentials_and_filters_defaults(
+    tmp_path: Path,
+) -> None:
+    write_js_fixture(tmp_path)
+    src = tmp_path / "src"
+    src.mkdir()
+    (src / "fallbacks.js").write_text(
+        "\n".join(
+            [
+                'const apiToken = process.env.API_TOKEN ?? "dev-api-token-123456";',
+                'const generic = config.value ?? "sk_test_1234567890";',
+                'const label = input ?? "Unknown published season";',
+                'const contentType = response ?? "text/plain; charset=utf-8";',
+                'const error = message ?? "The request could not be completed";',
+                'const demoId = value ?? "court-vision-demo";',
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    security_scan = _run_scan(tmp_path)
+    fallback_candidates = [
+        item for item in security_scan["candidates"] if item["category"] == "secret-in-fallback"
+    ]
+
+    assert len(fallback_candidates) == 2
+    assert {item["line"] for item in fallback_candidates} == {1, 2}
+    gate_ids = {gate["id"] for gate in security_scan["agent_review_gates"]}
+    assert "security_secret_exposure_review" in gate_ids
+
+
 def test_agent_review_gate_for_api_routes(tmp_path: Path) -> None:
     write_js_fixture(tmp_path)
     api_dir = tmp_path / "app" / "api" / "users"

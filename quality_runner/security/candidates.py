@@ -17,9 +17,15 @@ SECRET_PATTERNS: tuple[tuple[str, str, str, str], ...] = (
     ),
     (
         "secret-in-fallback",
-        r"(?i)(?:\|\||\?\?)\s*['\"][^'\"]{12,}['\"]",
+        r"(?i)\b(?:api[_-]?(?:key|token)|access[_-]?token|auth(?:entication)?[_-]?token|refresh[_-]?token|client[_-]?secret|secret|password|private[_-]?key|authorization)\b[^\n;]{0,120}(?:\|\||\?\?)\s*['\"][^'\"]{8,}['\"]",
         "medium",
-        "Secret-like fallback value in expression.",
+        "Secret-like fallback value in credential-named expression.",
+    ),
+    (
+        "secret-in-fallback",
+        r"(?i)(?:\|\||\?\?)\s*['\"](?:bearer\s+|sk_(?:live|test)_|gh[pous]_|github_pat_|xox[baprs]-|AIza|AKIA|eyJ[A-Za-z0-9_-]+\.|-----BEGIN(?: [A-Z]+)? PRIVATE KEY-----)[^'\"]{8,}['\"]",
+        "medium",
+        "Credential-shaped fallback value detected.",
     ),
     (
         "secret-in-log",
