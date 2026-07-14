@@ -166,6 +166,58 @@ Reports the normalized repo config and latest run metadata.
 quality-runner status /path/to/repo --json
 ```
 
+## Native QR planning
+
+QR can maintain its own evidence-backed phase workflow without importing GSD
+runtime behavior. These commands write only the QR-owned namespace
+`.planning/quality-runner/`; they never edit source files, run remediation,
+create commits, or push branches. The `--json` form is intended for agents and
+controllers; the default form is a short human summary.
+
+```bash
+quality-runner plan init /path/to/repo --json
+quality-runner plan status /path/to/repo --json
+quality-runner phase add /path/to/repo "Capability baseline" --json
+quality-runner phase plan /path/to/repo \
+  --phase 1 --run-id qr-baseline-run --json
+quality-runner phase next /path/to/repo --phase 1 --json
+quality-runner phase record-batch /path/to/repo \
+  --phase 1 --plan 1 --result-file batch-result.json --json
+quality-runner phase update /path/to/repo \
+  --phase 1 --baseline-run-id qr-before --run-id qr-after --json
+quality-runner phase verify /path/to/repo --phase 1 --run-id qr-after --json
+quality-runner phase close /path/to/repo --phase 1 --run-id qr-after --json
+```
+
+`phase plan` accepts either a QR run containing `remediation-plan.json` or an
+existing `agent-handoff.json` with a resolvable remediation-plan artifact. QR
+creates one `PLAN.md` per remediation cluster, assigns deterministic waves and
+dependencies, and preserves existing plans. `phase next` emits the lowest
+incomplete ready wave only. `phase record-batch` consumes a structured result
+and writes the matching `SUMMARY.md`; the external human or agent remains
+responsible for all implementation and git operations. `phase update` consumes
+the current run's `remediation-delta.json` when present, or builds that
+evidence from the two QR runs. `phase verify` and `phase close` require every
+plan to be verified and every required check to pass.
+
+The native files are:
+
+```text
+.planning/quality-runner/
+  ROADMAP.md
+  STATE.md
+  config.json
+  phases/<nn>-<slug>/
+    <nn>-CONTEXT.md
+    <nn>-<nn>-PLAN.md
+    <nn>-<nn>-SUMMARY.md
+    <nn>-VERIFICATION.md
+```
+
+Existing `.planning/ROADMAP.md`, `.planning/STATE.md`, and GSD phase
+directories are untouched. The native configuration defaults to committing
+planning documents, but QR never performs the commit.
+
 ## `quality-runner remediation-delta`
 
 Compares two QR runs and writes a tool-neutral remediation update into the

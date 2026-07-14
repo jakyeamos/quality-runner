@@ -24,7 +24,8 @@ detection identifies available and missing gates, audit generation normalizes
 findings, and remediation planning writes a consumer-neutral handoff.
 
 Planning and execution systems are separate consumers of those artifacts. QR
-does not require GSD or any other project-planning framework. See
+can optionally own a phase plan under `.planning/quality-runner/` without
+executing source changes. GSD remains an optional external consumer. See
 [Integration Boundaries](docs/integration-boundaries.md) for the contract.
 
 See [Backend Platform Case Study](docs/case-study.md) for the design narrative,
@@ -142,10 +143,10 @@ The normal workflow is:
 3. Review `quality-audit.json` for evidence-backed findings.
 4. Review `code-quality-scan.json` for structural warnings and line evidence.
 5. Review `remediation-plan.json` for ordered actions and verification gates.
-6. For multi-slice work, convert the QR handoff into the planning system's
-   native work items before editing. GSD is one optional consumer.
-7. Execute one coherent batch at a time.
-8. Rerun Quality Runner to confirm findings clear and update the resolution ledger.
+6. Initialize QR's native phase plan and add a bounded phase for multi-slice work.
+7. Generate one plan per coherent QR cluster, then dispatch the next ready wave.
+8. Execute one coherent batch externally and record its result with QR.
+9. Rerun Quality Runner to confirm findings clear and refresh the phase evidence.
 
 See [Agent Usage](docs/agent-usage.md) for the copy-paste phase and batch
 templates agents should follow.
@@ -172,6 +173,15 @@ quality-runner controller-report lint worker-report.json --strict --json
 quality-runner export-handoff /path/to/repo
 quality-runner export-slice-specs /path/to/repo --run-id run-001 --json
 quality-runner remediation-delta /path/to/repo --run-id current --baseline-run-id baseline --json
+quality-runner plan init /path/to/repo --json
+quality-runner plan status /path/to/repo --json
+quality-runner phase add /path/to/repo "Capability baseline" --json
+quality-runner phase plan /path/to/repo --phase 1 --run-id baseline-001-run --json
+quality-runner phase next /path/to/repo --phase 1 --json
+quality-runner phase record-batch /path/to/repo --phase 1 --plan 1 --result-file batch.json --json
+quality-runner phase update /path/to/repo --phase 1 --baseline-run-id before --run-id after --json
+quality-runner phase verify /path/to/repo --phase 1 --run-id after --json
+quality-runner phase close /path/to/repo --phase 1 --run-id after --json
 quality-runner-mcp
 repo-quality-certifier plan --repo-root /path/to/repo --json
 repo-quality-certifier-mcp
@@ -196,8 +206,10 @@ you want the scan and the human remediation plan from one command; use
 `export-slice-specs` regenerates per-slice cold-executor plans under
 `slice-specs/`. `remediation-delta` compares two completed QR runs and writes a
 tool-neutral update for existing work items. It does not read or modify
-`.planning/` or any other planning-system files. For a single queued slice,
-start from the matching `slice-specs/<slice-id>.md` when present.
+`.planning/` or any other planning-system files. Native phase commands use only
+`.planning/quality-runner/`, preserve the root GSD namespace, and still never
+edit source files, execute remediation commands, commit, or push. For a single
+queued slice, start from the matching `slice-specs/<slice-id>.md` when present.
 
 For an agent-driven implement-review loop, pass the task through the existing
 `--intent` or `--intent-file` input and add `--review-cycle-id` plus a

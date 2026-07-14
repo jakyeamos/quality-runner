@@ -16,6 +16,7 @@ from quality_runner.cli_gate import add_gate_commands
 from quality_runner.cli_handoff import add_handoff_commands
 from quality_runner.cli_human_summary import human_summary
 from quality_runner.cli_payload import payload_for_args
+from quality_runner.cli_planning import add_planning_commands
 from quality_runner.cli_remediation import add_remediation_commands
 from quality_runner.cli_review import add_review_command
 from quality_runner.cli_rollout import add_rollout_command
@@ -198,6 +199,8 @@ def build_parser() -> argparse.ArgumentParser:
 
     add_remediation_commands(subparsers)
 
+    add_planning_commands(subparsers)
+
     doctor_parser = subparsers.add_parser("doctor", help="Check Quality Runner readiness")
     doctor_parser.add_argument("--json", action="store_true", help="Emit JSON output")
 
@@ -261,6 +264,8 @@ def main(argv: list[str] | None = None) -> int:
     if parsed.command == "skill" and payload.get("status") == "rejected":
         return 1
     if parsed.command == "release-smoke" and payload.get("status") != "passed":
+        return 1
+    if parsed.command == "phase" and payload.get("status") in {"failed", "blocked"}:
         return 1
     if parsed.command == "summarize-run" and has_rejected_self_check(payload):
         return 1

@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://quality-runner.dev/schemas/phase-batch-result.schema.json",
+  "title": "Quality Runner Native Phase Batch Result",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "status", "summary", "verification", "remaining_findings", "blockers"],
+  "properties": {
+    "schema": { "const": "quality-runner-phase-batch-result-v0.1" },
+    "status": { "enum": ["complete", "blocked", "failed", "skipped", "in_progress"] },
+    "summary": { "type": "string", "minLength": 1 },
+    "verification": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["command", "status"],
+        "properties": {
+          "command": { "type": "string" },
+          "status": { "type": "string" },
+          "details": { "type": "string" }
+        },
+        "additionalProperties": true
+      }
+    },
+    "qr_run_id": { "type": "string" },
+    "commit": { "type": "string" },
+    "remaining_findings": { "type": "array", "items": { "type": "string" } },
+    "blockers": { "type": "array", "items": { "type": "string" } }
+  }
+}

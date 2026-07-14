@@ -1,9 +1,10 @@
 # Agent Usage
 
-Quality Runner gives agents evidence and a handoff. The agent or planning
-system still owns the work plan. For large or repo-wide remediation, convert
-the QR handoff into the consumer's native work items and execute one coherent
-batch at a time.
+Quality Runner gives agents evidence, a handoff, and an optional native phase
+workflow. QR owns the phase documents and evidence progression, while the
+agent or human still owns source edits, verification command execution, and
+git operations. For large or repo-wide remediation, use one coherent batch at
+a time.
 
 ## Start With QR
 
@@ -91,12 +92,49 @@ quality-runner review-worker /path/to/repo \
   --json
 ```
 
-## Planning-System Boundary
+## Native QR Phase Workflow
 
-Before changing code, the executor must record a bounded work item using its
-native planning mechanism. QR only supplies evidence and verification
-contracts. It does not create planning files. If the repository uses GSD, the
-following layout is one valid consumer choice:
+Initialize the QR-owned namespace after the first useful run:
+
+```bash
+quality-runner plan init /path/to/repo --json
+quality-runner phase add /path/to/repo "Capability baseline" --json
+quality-runner phase plan /path/to/repo \
+  --phase 1 --run-id qr-baseline-run --json
+quality-runner phase next /path/to/repo --phase 1 --json
+```
+
+`phase plan` can consume a run or an existing `agent-handoff.json`. Each plan
+is one QR remediation cluster with source references, scope, tasks, stop
+conditions, verification gates, dependencies, and a deterministic wave. QR
+dispatches the next ready plan but does not execute it.
+
+After an external batch, write a result file using the
+`quality-runner-phase-batch-result-v0.1` schema and record it:
+
+```bash
+quality-runner phase record-batch /path/to/repo \
+  --phase 1 --plan 1 --result-file batch-result.json --json
+quality-runner phase update /path/to/repo \
+  --phase 1 --baseline-run-id qr-before --run-id qr-after --json
+quality-runner phase verify /path/to/repo --phase 1 --run-id qr-after --json
+```
+
+When every plan is verified, close the phase:
+
+```bash
+quality-runner phase close /path/to/repo --phase 1 --run-id qr-after --json
+```
+
+Native planning files live only under `.planning/quality-runner/`. QR does not
+modify root GSD files, import or export GSD state, run source changes, commit,
+or push.
+
+## Optional External Planning Systems
+
+Before changing code, the executor must record a bounded work item using the
+native QR phase workflow or another planning mechanism. If the repository uses
+GSD, the following layout remains a valid independent consumer choice:
 
 ```text
 .planning/

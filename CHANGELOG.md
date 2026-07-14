@@ -6,6 +6,9 @@ All notable changes to Quality Runner are documented here.
 
 - Added the tool-neutral `remediation-delta` command for comparing QR runs
   without requiring GSD or another project-planning framework.
+- Added native QR phase planning under `.planning/quality-runner/`, including
+  deterministic cluster plans, wave dispatch, batch results, and evidence
+  verification without source execution or GSD state changes.
 - Documented the boundary between QR evidence artifacts and optional planning
   system adapters.
 

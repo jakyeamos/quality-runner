@@ -8,7 +8,10 @@ from quality_runner.cli_gate import GATE_RESULT_SCHEMAS
 from quality_runner.cli_status import EXPORT_HANDOFF_RESULT_SCHEMA, STATUS_RESULT_SCHEMA
 from quality_runner.release_smoke import RELEASE_SMOKE_SCHEMA
 from quality_runner.run_summary import RUN_SUMMARY_SCHEMA
-from quality_runner.schema_constants import REMEDIATION_DELTA_SCHEMA
+from quality_runner.schema_constants import (
+    PHASE_VERIFICATION_SCHEMA,
+    REMEDIATION_DELTA_SCHEMA,
+)
 
 DOCTOR_RESULT_SCHEMA = "quality-runner-doctor-result-v0.1"
 INIT_RESULT_SCHEMA = "quality-runner-init-result-v0.1"
@@ -63,6 +66,10 @@ def human_summary(payload: dict[str, Any]) -> str:
         ):
             lines.append(f"delta: {artifact_paths['remediation_delta_md']}")
         return "\n".join(lines)
+    if payload.get("schema") == PHASE_VERIFICATION_SCHEMA:
+        return _phase_verification_summary(payload)
+    if payload.get("schema") == "quality-runner-phase-result-v0.1":
+        return _phase_result_summary(payload, status)
     if payload.get("schema") in GATE_RESULT_SCHEMAS:
         gate_run = payload.get("gate_run")
         gate_run_id = gate_run.get("gate_run_id") if isinstance(gate_run, dict) else None
@@ -99,6 +106,35 @@ def _release_smoke_summary(payload: dict[str, Any], status: object) -> str:
     lines = [f"status: {status}"]
     if isinstance(handoff, str):
         lines.append(f"handoff: {handoff}")
+    return "\n".join(lines)
+
+
+def _phase_result_summary(payload: dict[str, Any], status: object) -> str:
+    lines = [f"status: {status}"]
+    phase = payload.get("phase")
+    if isinstance(phase, dict):
+        lines.append(f"phase: {phase.get('number')} {phase.get('title')}")
+    elif isinstance(phase, int):
+        lines.append(f"phase: {phase:02d}")
+    plan = payload.get("plan")
+    if isinstance(plan, dict):
+        lines.append(f"plan: {plan.get('id')} {plan.get('title', '')}".rstrip())
+    plans = payload.get("plans")
+    if isinstance(plans, list):
+        lines.append(f"plans: {len(plans)}")
+    for key in ("root", "phase_directory", "context_path", "summary_path", "verification_path"):
+        value = payload.get(key)
+        if isinstance(value, str):
+            lines.append(f"{key.replace('_', ' ')}: {value}")
+    return "\n".join(lines)
+
+
+def _phase_verification_summary(payload: dict[str, Any]) -> str:
+    status = payload.get("status", "unknown")
+    lines = [f"status: {status}", f"phase: {payload.get('phase')}", f"run id: {payload.get('run_id')}"]
+    lines.append(f"verified plans: {len(payload.get('verified_plan_ids', []))}")
+    lines.append(f"unresolved plans: {len(payload.get('unresolved_plan_ids', []))}")
+    lines.append(f"failed checks: {len(payload.get('failed_checks', []))}")
     return "\n".join(lines)
 
 

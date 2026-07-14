@@ -21,6 +21,7 @@ from quality_runner.cli_gate import (
     gate_status_command_payload,
 )
 from quality_runner.cli_handoff import handoff_command_payload
+from quality_runner.cli_planning import planning_command_payload
 from quality_runner.cli_refresh import refresh_command_payload
 from quality_runner.cli_remediation import remediation_delta_command_payload
 from quality_runner.cli_review import review_command_payload
@@ -132,6 +133,8 @@ def payload_for_args(args: argparse.Namespace) -> dict[str, Any]:
         return refresh_command_payload(args, _validated_repo_path(args.repo_path))
     if args.command == "remediation-delta":
         return remediation_delta_command_payload(args, _validated_repo_path(args.repo_path))
+    if args.command in {"plan", "phase"}:
+        return planning_command_payload(args, _validated_repo_path)
     if args.command == "rollout":
         return rollout_command_payload(args)
     if args.command == "review":
