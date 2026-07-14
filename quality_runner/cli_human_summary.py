@@ -8,6 +8,7 @@ from quality_runner.cli_gate import GATE_RESULT_SCHEMAS
 from quality_runner.cli_status import EXPORT_HANDOFF_RESULT_SCHEMA, STATUS_RESULT_SCHEMA
 from quality_runner.release_smoke import RELEASE_SMOKE_SCHEMA
 from quality_runner.run_summary import RUN_SUMMARY_SCHEMA
+from quality_runner.schema_constants import REMEDIATION_DELTA_SCHEMA
 
 DOCTOR_RESULT_SCHEMA = "quality-runner-doctor-result-v0.1"
 INIT_RESULT_SCHEMA = "quality-runner-init-result-v0.1"
@@ -49,6 +50,18 @@ def human_summary(payload: dict[str, Any]) -> str:
         lines = [f"status: {status}", f"run id: {payload.get('run_id')}"]
         if isinstance(lifecycle, str) and lifecycle:
             lines.append(f"lifecycle: {lifecycle}")
+        return "\n".join(lines)
+    if payload.get("schema") == REMEDIATION_DELTA_SCHEMA:
+        lines = [
+            f"status: {status}",
+            f"current run: {payload.get('current_run_id')}",
+            f"baseline run: {payload.get('baseline_run_id')}",
+        ]
+        artifact_paths = payload.get("artifact_paths")
+        if isinstance(artifact_paths, dict) and isinstance(
+            artifact_paths.get("remediation_delta_md"), str
+        ):
+            lines.append(f"delta: {artifact_paths['remediation_delta_md']}")
         return "\n".join(lines)
     if payload.get("schema") in GATE_RESULT_SCHEMAS:
         gate_run = payload.get("gate_run")

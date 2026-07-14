@@ -757,6 +757,7 @@ def test_packaged_schema_files_are_parseable() -> None:
         "review-context.schema.json",
         "review-manifest.schema.json",
         "review-delta.schema.json",
+        "remediation-delta.schema.json",
     }
 
     loaded = {}

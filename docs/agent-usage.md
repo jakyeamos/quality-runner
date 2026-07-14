@@ -1,8 +1,9 @@
 # Agent Usage
 
-Quality Runner gives agents evidence and a handoff. The agent still owns the
-work plan. For large or repo-wide remediation, agents should convert the QR
-handoff into GSD-style phases and execute one coherent batch at a time.
+Quality Runner gives agents evidence and a handoff. The agent or planning
+system still owns the work plan. For large or repo-wide remediation, convert
+the QR handoff into the consumer's native work items and execute one coherent
+batch at a time.
 
 ## Start With QR
 
@@ -32,8 +33,27 @@ Do not edit source before reading the handoff and the relevant artifacts.
 
 For a single slice, prefer the matching `slice-specs/*.md` file as the
 execution contract. Use `remediation-plan.json` for ordering across slices and
-`agent-handoff.md` for controller routing. Convert to GSD-style phase plans only
-when the remediation spans multiple slices or needs repo-local planning history.
+`agent-handoff.md` for controller routing. The executor or planning system
+chooses its own representation for work items; QR does not require GSD or
+repo-local `.planning/` files.
+
+After package, lockfile, configuration, or source changes, rerun QR against a
+known baseline and compare the evidence:
+
+```bash
+quality-runner refresh /path/to/repo \
+  --run-id-prefix qr-after-update \
+  --baseline-run-id qr-before-update \
+  --json
+quality-runner remediation-delta /path/to/repo \
+  --run-id qr-after-update-verify \
+  --baseline-run-id qr-before-update-verify \
+  --json
+```
+
+Use `remediation-delta.json` or `.md` to update the chosen planning system.
+Keep ownership, design decisions, and plan structure in that system. Do not
+ask QR to rewrite its files.
 
 ## QR Slice Spec Contract
 
@@ -71,10 +91,12 @@ quality-runner review-worker /path/to/repo \
   --json
 ```
 
-## Required Agent Protocol
+## Planning-System Boundary
 
-Before changing code, write or update planning artifacts in the target repo.
-Use the repo's existing planning location when one exists. Otherwise use:
+Before changing code, the executor must record a bounded work item using its
+native planning mechanism. QR only supplies evidence and verification
+contracts. It does not create planning files. If the repository uses GSD, the
+following layout is one valid consumer choice:
 
 ```text
 .planning/
@@ -86,10 +108,10 @@ Use the repo's existing planning location when one exists. Otherwise use:
       <batch-number>-SUMMARY.md
 ```
 
-Do not treat this as QR-owned output. These files are agent planning artifacts.
-QR may reference them later, but QR does not execute them.
+These files are GSD-owned planning artifacts, not QR-owned output. Other
+planning systems can use the same QR artifacts without adopting this layout.
 
-## GSD-Style Phase Plan Template
+## Optional GSD Adapter Template
 
 Each phase `PLAN.md` should use this shape:
 

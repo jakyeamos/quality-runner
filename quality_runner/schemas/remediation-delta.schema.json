@@ -1,0 +1,86 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://quality-runner.dev/schemas/remediation-delta.schema.json",
+  "title": "Quality Runner Remediation Delta",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "implementation_allowed",
+    "status",
+    "current_run_id",
+    "baseline_run_id",
+    "findings",
+    "slices",
+    "capabilities",
+    "package_evidence",
+    "verification",
+    "recommendations",
+    "source_artifacts"
+  ],
+  "properties": {
+    "schema": { "const": "quality-runner-remediation-delta-v0.1" },
+    "implementation_allowed": { "const": false },
+    "status": { "enum": ["changed", "unchanged"] },
+    "current_run_id": { "type": "string", "minLength": 1 },
+    "baseline_run_id": { "type": "string", "minLength": 1 },
+    "findings": { "$ref": "#/$defs/findingDelta" },
+    "slices": { "$ref": "#/$defs/sliceDelta" },
+    "capabilities": { "type": "object" },
+    "package_evidence": { "type": "object" },
+    "verification": { "type": "object" },
+    "recommendations": { "type": "array", "items": { "type": "string" } },
+    "source_artifacts": { "type": "object", "additionalProperties": { "type": "string" } },
+    "artifact_paths": { "type": "object", "additionalProperties": { "type": "string" } },
+    "output_path": { "type": "string" }
+  },
+  "$defs": {
+    "finding": {
+      "type": "object",
+      "required": ["fingerprint", "summary"],
+      "properties": {
+        "fingerprint": { "type": "string", "minLength": 1 },
+        "id": { "type": ["string", "null"] },
+        "rule_id": { "type": ["string", "null"] },
+        "file": { "type": ["string", "null"] },
+        "severity": { "type": ["string", "null"] },
+        "category": { "type": ["string", "null"] },
+        "summary": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": false
+    },
+    "findingDelta": {
+      "type": "object",
+      "required": ["new", "persisted", "resolved"],
+      "properties": {
+        "new": { "type": "array", "items": { "$ref": "#/$defs/finding" } },
+        "persisted": { "type": "array", "items": { "$ref": "#/$defs/finding" } },
+        "resolved": { "type": "array", "items": { "$ref": "#/$defs/finding" } }
+      },
+      "additionalProperties": false
+    },
+    "slice": {
+      "type": "object",
+      "required": ["id", "title", "finding_ids", "actions", "verification_gates"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "title": { "type": "string", "minLength": 1 },
+        "priority": { "type": ["string", "null"] },
+        "finding_ids": { "type": "array", "items": { "type": "string" } },
+        "actions": { "type": "array", "items": { "type": "string" } },
+        "verification_gates": { "type": "array", "items": { "type": "string" } }
+      },
+      "additionalProperties": false
+    },
+    "sliceDelta": {
+      "type": "object",
+      "required": ["added", "persisted", "removed"],
+      "properties": {
+        "added": { "type": "array", "items": { "$ref": "#/$defs/slice" } },
+        "persisted": { "type": "array", "items": { "type": "object" } },
+        "removed": { "type": "array", "items": { "$ref": "#/$defs/slice" } }
+      },
+      "additionalProperties": false
+    }
+  }
+}

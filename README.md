@@ -21,7 +21,11 @@ before approving implementation work.
 The pipeline is intentionally small: repository discovery compiles facts and
 quality-command evidence, standards compilation applies a profile, capability
 detection identifies available and missing gates, audit generation normalizes
-findings, and remediation planning writes an agent handoff.
+findings, and remediation planning writes a consumer-neutral handoff.
+
+Planning and execution systems are separate consumers of those artifacts. QR
+does not require GSD or any other project-planning framework. See
+[Integration Boundaries](docs/integration-boundaries.md) for the contract.
 
 See [Backend Platform Case Study](docs/case-study.md) for the design narrative,
 self-audit improvements, and release-readiness proof.
@@ -138,8 +142,8 @@ The normal workflow is:
 3. Review `quality-audit.json` for evidence-backed findings.
 4. Review `code-quality-scan.json` for structural warnings and line evidence.
 5. Review `remediation-plan.json` for ordered actions and verification gates.
-6. For multi-slice work, convert the QR handoff into GSD-style phases, plans,
-   ledgers, and batch summaries before editing.
+6. For multi-slice work, convert the QR handoff into the planning system's
+   native work items before editing. GSD is one optional consumer.
 7. Execute one coherent batch at a time.
 8. Rerun Quality Runner to confirm findings clear and update the resolution ledger.
 
@@ -167,6 +171,7 @@ quality-runner review-worker /path/to/repo --baseline-run-id before --final-run-
 quality-runner controller-report lint worker-report.json --strict --json
 quality-runner export-handoff /path/to/repo
 quality-runner export-slice-specs /path/to/repo --run-id run-001 --json
+quality-runner remediation-delta /path/to/repo --run-id current --baseline-run-id baseline --json
 quality-runner-mcp
 repo-quality-certifier plan --repo-root /path/to/repo --json
 repo-quality-certifier-mcp
@@ -189,10 +194,10 @@ failed. Blocked or failed handoffs include `blocker_groups` and
 you want the scan and the human remediation plan from one command; use
 `export-handoff` later to regenerate or copy a handoff from an existing run.
 `export-slice-specs` regenerates per-slice cold-executor plans under
-`slice-specs/`. For large remediations, agents should use QR output as evidence
-for a GSD-style phase plan rather than editing directly from the handoff. For a
-single queued slice, start from the matching `slice-specs/<slice-id>.md` when
-present.
+`slice-specs/`. `remediation-delta` compares two completed QR runs and writes a
+tool-neutral update for existing work items. It does not read or modify
+`.planning/` or any other planning-system files. For a single queued slice,
+start from the matching `slice-specs/<slice-id>.md` when present.
 
 For an agent-driven implement-review loop, pass the task through the existing
 `--intent` or `--intent-file` input and add `--review-cycle-id` plus a

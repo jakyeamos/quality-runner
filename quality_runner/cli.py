@@ -16,6 +16,7 @@ from quality_runner.cli_gate import add_gate_commands
 from quality_runner.cli_handoff import add_handoff_commands
 from quality_runner.cli_human_summary import human_summary
 from quality_runner.cli_payload import payload_for_args
+from quality_runner.cli_remediation import add_remediation_commands
 from quality_runner.cli_review import add_review_command
 from quality_runner.cli_rollout import add_rollout_command
 from quality_runner.cli_skills import add_skill_commands
@@ -194,6 +195,8 @@ def build_parser() -> argparse.ArgumentParser:
     add_artifact_commands(subparsers)
 
     add_handoff_commands(subparsers)
+
+    add_remediation_commands(subparsers)
 
     doctor_parser = subparsers.add_parser("doctor", help="Check Quality Runner readiness")
     doctor_parser.add_argument("--json", action="store_true", help="Emit JSON output")

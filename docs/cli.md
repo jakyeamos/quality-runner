@@ -166,6 +166,24 @@ Reports the normalized repo config and latest run metadata.
 quality-runner status /path/to/repo --json
 ```
 
+## `quality-runner remediation-delta`
+
+Compares two QR runs and writes a tool-neutral remediation update into the
+current run. It reports new, persisted, and resolved findings; remediation
+cluster changes; capability changes; package-manager evidence; and gate-state
+changes. It never reads or writes project-planning files.
+
+```bash
+quality-runner remediation-delta /path/to/repo \
+  --run-id current-verify \
+  --baseline-run-id baseline-verify \
+  --output /tmp/remediation-update.md \
+  --json
+```
+
+The canonical artifacts are `.quality-runner/runs/<run-id>/remediation-delta.json`
+and `remediation-delta.md`. A planning system may consume either format.
+
 ## `quality-runner skill`
 
 Quality Skill management is split into candidate validation, pack assignment,

@@ -2,6 +2,13 @@
 
 All notable changes to Quality Runner are documented here.
 
+## Unreleased
+
+- Added the tool-neutral `remediation-delta` command for comparing QR runs
+  without requiring GSD or another project-planning framework.
+- Documented the boundary between QR evidence artifacts and optional planning
+  system adapters.
+
 ## 0.5.0 - 2026-07-09
 
 - Added fresh-review reports, review state, and review-delta loop controls.
