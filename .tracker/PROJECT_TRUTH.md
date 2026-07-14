@@ -4,9 +4,15 @@ Last updated: 2026-07-14
 
 ## Current State
 
+The native QR phase-planning contract shipped in `1f44c21`. Quality Runner now
+owns evidence-backed phase and plan documents under `.planning/quality-runner/`,
+including deterministic waves, dependency metadata, next-plan dispatch, batch
+result recording, remediation-delta updates, and phase verification. QR still
+does not execute source changes, create commits, push branches, or modify root
+GSD files; GSD remains an optional external consumer.
+
 The tool-neutral `remediation-delta` contract shipped in `b50413a`. Quality
-Runner now compares QR runs and emits evidence updates without requiring GSD;
-this repository may continue using GSD as an optional planning consumer.
+Runner compares QR runs and emits evidence updates without requiring GSD.
 
 The quality-skills audit contract is hardened on feature branch
 `quality-skill-corpus-workflow` at commit `b879c63`. Release metadata now agrees on
@@ -57,11 +63,10 @@ opt-in observations with contextual review and rendered/copy verification.
 
 ## Next Step
 
-Push and review `quality-skill-corpus-workflow`, then create the personal corpus
-manifest and dogfood `skill classify`, `skill append`, and `skill sync` against
-the selected repositories. Use `remediation-delta` when package or source
-updates require existing work items to be refreshed. Runtime/browser-dependent
-skills remain deferred.
+Use `quality-runner plan init`, `phase add`, and `phase plan` to turn each QR
+remediation run into native cluster-oriented work. Dispatch one ready plan at a
+time, record the external batch result, refresh QR evidence with `phase update`,
+and close only after `phase verify` passes. GSD remains optional and independent.
 
 ## Blockers
 
@@ -69,14 +74,22 @@ skills remain deferred.
   this change; touched-file checks pass. Vulture passes the source roots; its
   broad `vulture .` form needs `.quality-runner` excluded after local uv gate
   runs generate ignored dependency-cache code.
-- The packaging console-script test remains environment-blocked: its offline
-  wheel build falls back to an online `uv` fetch and DNS is unavailable. The
-  remaining suite passes with that one test deselected.
+- The packaged console-script smoke requires a writable UV cache and network
+  access when the offline wheel build cannot reuse dependencies; it passed with
+  a temporary cache. Full-repo Ruff and basedpyright remain blocked by the
+  pre-existing findings listed above.
 
 _(9 older entries trimmed)_
 
 Current verification:
 
+- 2026-07-14: Added native QR phase planning in `1f44c21`: nested plan/phase
+  CLI commands, QR-owned planning storage, deterministic cluster plans and
+  waves, batch summaries, remediation-delta lifecycle updates, verification,
+  schemas, docs, and focused tests. Focused planning/schema tests passed
+  (`25 passed`), the full suite passed (`436 passed`), touched-file Ruff and
+  basedpyright passed, the packaged entrypoint smoke passed with a temporary
+  UV cache, and the Pre-CR commit gate passed.
 - 2026-07-13: Mined the anti-template workflow in `b879c63`. Added clean-room
   UI and copy specificity packs, frontend extension coverage, strict regex
   ingest rejection, and skill category preservation. Focused tests, touched-file
