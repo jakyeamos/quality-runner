@@ -1,8 +1,12 @@
 # Quality Runner Project Truth
 
-Last updated: 2026-07-13
+Last updated: 2026-07-14
 
 ## Current State
+
+The tool-neutral `remediation-delta` contract shipped in `b50413a`. Quality
+Runner now compares QR runs and emits evidence updates without requiring GSD;
+this repository may continue using GSD as an optional planning consumer.
 
 The quality-skills audit contract is hardened on feature branch
 `quality-skill-corpus-workflow` at commit `b879c63`. Release metadata now agrees on
@@ -55,7 +59,9 @@ opt-in observations with contextual review and rendered/copy verification.
 
 Push and review `quality-skill-corpus-workflow`, then create the personal corpus
 manifest and dogfood `skill classify`, `skill append`, and `skill sync` against
-the selected repositories. Runtime/browser-dependent skills remain deferred.
+the selected repositories. Use `remediation-delta` when package or source
+updates require existing work items to be refreshed. Runtime/browser-dependent
+skills remain deferred.
 
 ## Blockers
 

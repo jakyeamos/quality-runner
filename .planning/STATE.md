@@ -3,7 +3,7 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-last_updated: "2026-07-10T00:55:07.273Z"
+last_updated: "2026-07-14T00:00:00.000Z"
 progress:
   total_phases: 2
   completed_phases: 1
@@ -47,7 +47,8 @@ See: `.planning/PROJECT.md` (updated 2026-07-04)
 ## Workflow Notes
 
 - Quality Runner remains advisory-only.
-- Execute QR remediation through repo-local GSD plans, verification, git commits, and pushes.
+- This repository uses GSD as an optional consumer of QR artifacts.
+- Use `remediation-delta` to refresh evidence after package or source updates; QR does not write GSD files.
 
 ## Accumulated Context
 
@@ -55,6 +56,7 @@ See: `.planning/PROJECT.md` (updated 2026-07-04)
 
 - 2026-07-04: Phase 1 planned: QR remediation: quality-runner from QR run qr-fleet-continue-20260704-quality-runner.
 - 2026-07-04: Initialized GSD planning from QR summary /Users/jakyeamos/.local/state/quality-runner/fleet/per-repo-summaries-20260704/quality-runner.md.
+- 2026-07-14: Added the tool-neutral QR remediation-delta contract in `b50413a`; GSD remains a repository-local planning choice.
 
 ## Next Command
 
