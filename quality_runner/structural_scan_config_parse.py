@@ -48,6 +48,12 @@ def parse_structural_scan_section(
         "quality_runner.structural_scan.similarity_enabled",
         warnings,
     )
+    similarity_backend = _choice(
+        value.get("similarity_backend"),
+        "quality_runner.structural_scan.similarity_backend",
+        {"external", "native"},
+        warnings,
+    )
     similarity_threshold = _unit_interval(
         value.get("similarity_threshold"),
         "quality_runner.structural_scan.similarity_threshold",
@@ -84,6 +90,8 @@ def parse_structural_scan_section(
         result["max_text_files"] = max_text_files
     if similarity_enabled is not None:
         result["similarity_enabled"] = similarity_enabled
+    if similarity_backend is not None:
+        result["similarity_backend"] = similarity_backend
     if similarity_threshold is not None:
         result["similarity_threshold"] = similarity_threshold
     if similarity_min_lines is not None:
@@ -127,6 +135,23 @@ def _bool_value(value: object, field: str, warnings: list[dict[str, str]]) -> bo
     if isinstance(value, bool):
         return value
     warnings.append(_warning("invalid_quality_runner_config_field", f"{field} must be a boolean"))
+    return None
+
+
+def _choice(
+    value: object,
+    field: str,
+    choices: set[str],
+    warnings: list[dict[str, str]],
+) -> str | None:
+    if value is None:
+        return None
+    if isinstance(value, str) and value in choices:
+        return value
+    allowed = ", ".join(sorted(choices))
+    warnings.append(
+        _warning("invalid_quality_runner_config_field", f"{field} must be one of: {allowed}")
+    )
     return None
 
 

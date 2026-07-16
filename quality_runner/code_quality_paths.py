@@ -18,6 +18,7 @@ CODE_EXTENSIONS = {
     ".less",
     ".mjs",
     ".py",
+    ".rs",
     ".sass",
     ".scss",
     ".sh",
@@ -225,6 +226,8 @@ def _check_coverage(relative_path: str) -> list[str]:
 def _verification_for_path(relative_path: str) -> str:
     if relative_path.startswith("quality_runner/") or relative_path.startswith("tests/"):
         return "python3.14 -m pytest -q"
+    if Path(relative_path).suffix == ".rs":
+        return "Run cargo fmt, cargo check, and the relevant Rust tests for the touched crate."
     if Path(relative_path).suffix in {
         ".cjs",
         ".css",
@@ -347,6 +350,7 @@ def _is_source_file(relative_path: str) -> bool:
         ".jsx",
         ".mjs",
         ".py",
+        ".rs",
         ".svelte",
         ".ts",
         ".tsx",

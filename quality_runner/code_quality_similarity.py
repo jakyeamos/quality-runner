@@ -4,20 +4,27 @@ import hashlib
 import os
 import shutil
 import subprocess
+from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
 from quality_runner.code_quality_duplicates import _duplicate_clusters
 from quality_runner.code_quality_findings import _finding
+from quality_runner.code_quality_native_similarity import (
+    NATIVE_SIMILARITY_SCHEMA,
+    native_similarity_scan,
+)
 from quality_runner.code_quality_paths import _verification_for_path
 from quality_runner.code_quality_similarity_parse import parse_similarity_output
 
 DEFAULT_SIMILARITY_ENABLED = True
+DEFAULT_SIMILARITY_BACKEND = "native"
 DEFAULT_SIMILARITY_THRESHOLD = 0.87
 DEFAULT_SIMILARITY_MIN_LINES = 8
 DEFAULT_SIMILARITY_MAX_PAIRS = 25
 DEFAULT_SIMILARITY_TIMEOUT_SECONDS = 30
 DEFAULT_SIMILARITY_INCLUDE_TESTS = False
+NATIVE_SIMILARITY_ENGINE = "quality-runner-native"
 
 SIMILARITY_CLUSTER_ID_PREFIX = "SIM"
 RULE_ID_CLUSTER = "semantic-similarity-cluster"
@@ -40,6 +47,7 @@ EXCLUDED_PATH_PARTS = {
 
 def similarity_policy_defaults(policy: dict[str, Any]) -> dict[str, Any]:
     similarity_enabled = policy.get("similarity_enabled")
+    similarity_backend = policy.get("similarity_backend")
     similarity_threshold = policy.get("similarity_threshold")
     similarity_min_lines = policy.get("similarity_min_lines")
     similarity_max_pairs = policy.get("similarity_max_pairs")
@@ -49,6 +57,9 @@ def similarity_policy_defaults(policy: dict[str, Any]) -> dict[str, Any]:
         "similarity_enabled": similarity_enabled
         if isinstance(similarity_enabled, bool)
         else DEFAULT_SIMILARITY_ENABLED,
+        "similarity_backend": similarity_backend
+        if similarity_backend in {"native", "external"}
+        else DEFAULT_SIMILARITY_BACKEND,
         "similarity_threshold": similarity_threshold
         if isinstance(similarity_threshold, (int, float)) and 0 <= float(similarity_threshold) <= 1
         else DEFAULT_SIMILARITY_THRESHOLD,
@@ -71,6 +82,7 @@ def collect_deduplicate_scan(
     repo_root: Path,
     *,
     extracted_functions: list[dict[str, Any]],
+    scanned_files: Sequence[Mapping[str, object]] | None = None,
     policy: dict[str, Any],
     disabled_groups: set[str],
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], int, dict[str, str]]:
@@ -101,6 +113,7 @@ def collect_deduplicate_scan(
 
     similarity_result = semantic_similarity_scan(
         repo_root,
+        scanned_files=scanned_files,
         policy=policy,
         disabled_groups=disabled_groups,
     )
@@ -122,6 +135,25 @@ def collect_deduplicate_scan(
 def semantic_similarity_scan(
     repo_root: Path,
     *,
+    scanned_files: Sequence[Mapping[str, object]] | None = None,
+    policy: dict[str, Any],
+    disabled_groups: set[str],
+) -> dict[str, Any]:
+    backend = policy.get("similarity_backend", DEFAULT_SIMILARITY_BACKEND)
+    if backend == "native":
+        native_report = native_similarity_scan(
+            repo_root,
+            scanned_files=scanned_files,
+            policy=policy,
+            disabled_groups=disabled_groups,
+        )
+        return _materialize_similarity_report(native_report)
+    return _external_similarity_scan(repo_root, policy=policy, disabled_groups=disabled_groups)
+
+
+def _external_similarity_scan(
+    repo_root: Path,
+    *,
     policy: dict[str, Any],
     disabled_groups: set[str],
 ) -> dict[str, Any]:
@@ -130,7 +162,13 @@ def semantic_similarity_scan(
 
     tools = _select_tools(repo_root)
     if not tools:
-        return {"clusters": [], "findings": [], "scanner_status": []}
+        return _similarity_report(
+            backend="external",
+            status="not_applicable",
+            clusters=[],
+            findings=[],
+            scanner_status=[],
+        )
 
     threshold = float(policy["similarity_threshold"])
     min_lines = int(policy["similarity_min_lines"])
@@ -208,21 +246,87 @@ def semantic_similarity_scan(
         cluster["id"] = f"{SIMILARITY_CLUSTER_ID_PREFIX}-{index:03d}"
         findings.append(_cluster_finding(cluster, source=str(cluster.get("source", ""))))
 
+    return _similarity_report(
+        backend="external",
+        status=_scanner_result_status(scanner_status),
+        clusters=clusters,
+        findings=findings,
+        scanner_status=scanner_status,
+    )
+
+
+def _skipped_result(repo_root: Path, *, reason: str) -> dict[str, Any]:
+    tools = [tool for tool, _language in _select_tools(repo_root)]
+    status = "skipped" if reason == "disabled" else "missing"
+    return _similarity_report(
+        backend="external",
+        status=status,
+        clusters=[],
+        findings=[],
+        scanner_status=[_status_entry(tool=tool, status=status) for tool in tools],
+    )
+
+
+def _materialize_similarity_report(report: Mapping[str, object]) -> dict[str, Any]:
+    raw_clusters = report.get("clusters")
+    clusters = (
+        [item for item in raw_clusters if isinstance(item, dict)]
+        if isinstance(raw_clusters, list)
+        else []
+    )
+    for index, cluster in enumerate(clusters, start=1):
+        cluster["id"] = f"{SIMILARITY_CLUSTER_ID_PREFIX}-{index:03d}"
+    raw_findings = report.get("findings")
+    findings = (
+        [item for item in raw_findings if isinstance(item, dict)]
+        if isinstance(raw_findings, list)
+        else []
+    )
+    if not findings:
+        findings = [
+            _cluster_finding(cluster, source=str(cluster.get("source", "")))
+            for cluster in clusters
+        ]
+    scanner_status = report.get("scanner_status")
     return {
+        "schema": report.get("schema", NATIVE_SIMILARITY_SCHEMA),
+        "backend": report.get("backend", DEFAULT_SIMILARITY_BACKEND),
+        "status": report.get("status", "not_applicable"),
+        "clusters": clusters,
+        "findings": findings,
+        "scanner_status": scanner_status if isinstance(scanner_status, list) else [],
+    }
+
+
+def _similarity_report(
+    *,
+    backend: str,
+    status: str,
+    clusters: list[dict[str, Any]],
+    findings: list[dict[str, Any]],
+    scanner_status: list[dict[str, Any]],
+) -> dict[str, Any]:
+    return {
+        "schema": NATIVE_SIMILARITY_SCHEMA,
+        "backend": backend,
+        "status": status,
         "clusters": clusters,
         "findings": findings,
         "scanner_status": scanner_status,
     }
 
 
-def _skipped_result(repo_root: Path, *, reason: str) -> dict[str, Any]:
-    tools = [tool for tool, _ in _select_tools(repo_root)]
-    status = "skipped" if reason == "disabled" else "missing"
-    return {
-        "clusters": [],
-        "findings": [],
-        "scanner_status": [_status_entry(tool=tool, status=status) for tool in tools],
-    }
+def _scanner_result_status(scanner_status: list[dict[str, Any]]) -> str:
+    statuses = {str(entry.get("status")) for entry in scanner_status}
+    if "executed" in statuses:
+        return "executed"
+    if "failed" in statuses:
+        return "failed"
+    if "missing" in statuses:
+        return "missing"
+    if "skipped" in statuses:
+        return "skipped"
+    return "not_applicable"
 
 
 def _select_tools(repo_root: Path) -> list[tuple[str, str]]:
@@ -301,12 +405,7 @@ def _cluster_finding(cluster: dict[str, Any], *, source: str) -> dict[str, Any]:
         f"{score_text}: {pair_summary}"
     )
     severity = "warning" if similarity_pct >= 90.0 and avg_lines >= 8 else "observation"
-    if similarity_pct >= 95.0:
-        confidence = "high"
-    elif similarity_pct >= float(cluster.get("threshold", DEFAULT_SIMILARITY_THRESHOLD)) * 100:
-        confidence = "medium"
-    else:
-        confidence = "medium"
+    confidence = "high" if similarity_pct >= 95.0 else "medium"
     finding = _finding(
         category="deduplicate",
         severity=severity,
@@ -335,9 +434,7 @@ def _candidate_label(candidate: dict[str, Any]) -> str:
     line = int(candidate["line"])
     end_line = int(candidate.get("end_line", line))
     name = candidate.get("name")
-    if name:
-        return f"{file_path}:{line}-{end_line} {name}"
-    return f"{file_path}:{line}-{end_line}"
+    return f"{file_path}:{line}-{end_line} {name}" if name else f"{file_path}:{line}-{end_line}"
 
 
 def _stable_similarity_fingerprint(
@@ -380,6 +477,4 @@ def _tail(value: str | bytes | None, *, limit: int = 500) -> str:
     if value is None:
         return ""
     text = value.decode("utf-8", errors="replace") if isinstance(value, bytes) else value
-    if len(text) <= limit:
-        return text
-    return text[-limit:]
+    return text if len(text) <= limit else text[-limit:]
