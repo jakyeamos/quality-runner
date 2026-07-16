@@ -265,6 +265,41 @@ def test_structural_scan_defaults_to_native_backend(tmp_path: Path) -> None:
     assert result["summary"]["semantic_similarity_tools"] == {"qr-native": "not_applicable"}
 
 
+def test_native_backend_scans_python_without_external_tools(tmp_path: Path) -> None:
+    from quality_runner.code_quality_similarity import semantic_similarity_scan
+
+    source = "\n".join(
+        [
+            "def parse_alpha(value):",
+            "    cleaned = value.strip()",
+            "    if not cleaned:",
+            '        return "empty"',
+            "    return cleaned.upper()",
+            "",
+            "def parse_beta(other):",
+            "    normalized = other.strip()",
+            "    if not normalized:",
+            '        return "empty"',
+            "    return normalized.lower()",
+        ]
+    )
+
+    result = semantic_similarity_scan(
+        tmp_path,
+        scanned_files=[{"path": "src/parsers.py", "text": source}],
+        policy=_policy(
+            similarity_backend="native",
+            similarity_min_lines=4,
+            similarity_threshold=0.75,
+        ),
+        disabled_groups=set(),
+    )
+
+    assert result["backend"] == "native"
+    assert result["scanner_status"][0]["status"] == "executed"
+    assert result["clusters"]
+
+
 def test_scanner_timeout_records_failed_status_without_crashing(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
