@@ -61,7 +61,8 @@ audit/actionability boundary, rejects invalid regexes during skill ingest, and
 scans Astro, Vue, Svelte, SCSS, Sass, Less, and MDX surfaces. These packs remain
 opt-in observations with contextual review and rendered/copy verification.
 
-The QR-native similarity backend shipped in `a7b45ab`. Quality Runner now owns
+The QR-native similarity backend shipped in `a7b45ab`, with focused Python
+coverage added in `795c8f2`. Quality Runner now owns
 the default standard-library similarity scan for JavaScript/TypeScript, Python,
 and Rust, with a stable `quality-runner-similarity-v0.1` report schema and an
 explicit `similarity_backend` configuration choice. The upstream-compatible
@@ -94,6 +95,15 @@ cluster-oriented remediation; GSD remains optional and independent.
   signature mismatch. The similarity-focused slice is green.
 - The feature branch still contains unrelated user changes outside `a7b45ab`;
   no push or merge was attempted for this isolated commit.
+
+## Current Verification
+
+- 2026-07-16: Added QR-native similarity in `a7b45ab` and focused Python
+  coverage in `795c8f2`. Focused similarity tests passed (`15 passed`);
+  touched-source Ruff, basedpyright (`0 errors`), source-root Vulture, JSON
+  parsing, staged diff checks, and both commit hooks passed. The broader
+  code-quality and config slice reached `35 passed, 3 failed` on the unrelated
+  blockers above.
 
 _(6 older entries trimmed)_
 
