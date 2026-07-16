@@ -26,6 +26,20 @@ Returns:
 - package version
 - local Python/platform details
 
+## `quality-runner self-update`
+
+Updates the installed Quality Runner CLI through `uv` without changing the
+target repository being audited.
+
+```bash
+quality-runner self-update
+quality-runner self-update --source /path/to/quality-runner --json
+```
+
+The command detects editable installs and uses `uv tool install --editable ...
+--force`; other installs use `uv tool upgrade quality-runner`. It is explicit
+and opt-in, so normal Quality Runner commands remain network-free.
+
 ## `quality-runner inspect`
 
 Inspects repo shape, standards, and quality capability signals without producing
@@ -52,6 +66,18 @@ Writes:
 - `package-manager-preflight.json`
 - `standards.json`
 - `capability-matrix.json`
+
+The JSON result and `repo-scan.json` include `module_status`. Core similarity is
+QR-native and dependency-free. UI quality is enabled when UI files are
+detected, and is `not_applicable` for non-UI repositories; the optional UI token
+contract remains visible as `not_run` unless separately requested.
+
+`run` also consumes valid dispositions from `[[quality_runner.accepted_dispositions]]`
+and the latest prior run. The resulting `quality-audit.json` keeps the original
+findings for traceability, adds resolved/unresolved resolution metadata, and
+the remediation plan includes only unresolved findings. A separate
+`gate-respond record-disposition` response remains available for decisions made
+after a run; it is not required to reclassify the same finding on every rerun.
 
 ## `quality-runner init`
 
@@ -87,15 +113,39 @@ Unwired-work checks can also be configured. They run as structural category
 - `--intent`: short author goal for the run (what the user set out to accomplish)
 - `--intent-file`: path to intent JSON inside the target repo (must include `goal`)
 - `--ci-status-json`: local CI status export for capability evidence
+- `--readiness-evidence-file`: release-evidence JSON path inside the target repo
 - `--profile`: standards profile override
+- `--agent-review-mode`: agent skill-review policy: `off`, `auto`, `parallel`, or
+  `required`; defaults to `auto`, while the `release` profile always uses
+  `required`
 - `--run-id`: stable run id (refresh uses `--run-id-prefix` instead)
 - `--interactive`: prompt before excluding expensive default-ignored scan paths
 - `--checkout-most-advanced-branch`: switch to the local most-advanced branch first
 - `--skill-review-report`: merge a validated agent skill review report into findings
+- `--no-progress`: disable stderr phase and heartbeat diagnostics
 - `--json`: emit machine-readable CLI output
 
 Intent is optional. When supplied, QR writes `intent.json` and embeds the packet
 on `run-manifest.json`, `agent-handoff.json`, and `run-summary.json`.
+
+Use `--profile release` to enable release readiness. The selected evidence file
+must use schema `quality-runner-release-evidence-v0.1`; config fallback is
+`[quality_runner.readiness].evidence_file`. Release verification blocks on
+missing/stale current-HEAD CI provenance, version/digest mismatch, missing
+installed-package smoke, incomplete migration or owner/external evidence,
+publication review, opaque aggregate coverage, or unauthorized mutation.
+
+Agents should use the [command selection contract](agent-usage.md#command-selection-contract)
+to choose an entry point. In particular, `run` is audit/planning only,
+`refresh` is the implementation/remediation loop, and `release-smoke` is the
+Quality Runner package smoke rather than target release verification.
+
+Workflow commands emit progress diagnostics to stderr. Phase messages identify
+discovery, security, code quality, gate/readiness, planning, and artifact stages;
+long stages emit a heartbeat every 15 seconds with the active phase and elapsed
+time. With `--json`, stdout remains a single final JSON document, so agents can
+read progress from stderr without corrupting the machine-readable result. Use
+`--no-progress` when a caller supplies its own status channel.
 
 ## QR Gate Controller
 
@@ -166,6 +216,10 @@ Reports the normalized repo config and latest run metadata.
 quality-runner status /path/to/repo --json
 ```
 
+When the latest run has completed scan artifacts, `latest_run.module_status`
+reports every core and optional module with an explicit status rather than
+omitting inactive layers.
+
 ## Native QR planning
 
 QR can maintain its own evidence-backed phase workflow without importing GSD
@@ -177,9 +231,10 @@ controllers; the default form is a short human summary.
 ```bash
 quality-runner plan init /path/to/repo --json
 quality-runner plan status /path/to/repo --json
+quality-runner plan auto /path/to/repo --run-id qr-baseline-run --json
 quality-runner phase add /path/to/repo "Capability baseline" --json
 quality-runner phase plan /path/to/repo \
-  --phase 1 --run-id qr-baseline-run --json
+  --phase 1 --run-id qr-baseline-run --candidate phase-security --json
 quality-runner phase next /path/to/repo --phase 1 --json
 quality-runner phase record-batch /path/to/repo \
   --phase 1 --plan 1 --result-file batch-result.json --json
@@ -189,11 +244,18 @@ quality-runner phase verify /path/to/repo --phase 1 --run-id qr-after --json
 quality-runner phase close /path/to/repo --phase 1 --run-id qr-after --json
 ```
 
+`plan auto` is the seamless planning path. It initializes the QR planning
+namespace when needed, creates one native phase per domain candidate in
+security-first order, and links each phase to its forensic leaf slices. It is
+idempotent and writes only `.planning/quality-runner/`; it does not implement,
+commit, or push changes.
+
 `phase plan` accepts either a QR run containing `remediation-plan.json` or an
 existing `agent-handoff.json` with a resolvable remediation-plan artifact. QR
-creates one `PLAN.md` per remediation cluster, assigns deterministic waves and
-dependencies, and preserves existing plans. `phase next` emits the lowest
-incomplete ready wave only. `phase record-batch` consumes a structured result
+uses domain `phase_candidates` when present, creating one `PLAN.md` per domain;
+older artifacts fall back to their remediation clusters. It assigns
+deterministic waves and dependencies and preserves existing plans. `phase next`
+emits the lowest incomplete ready wave only. `phase record-batch` consumes a structured result
 and writes the matching `SUMMARY.md`; the external human or agent remains
 responsible for all implementation and git operations. `phase update` consumes
 the current run's `remediation-delta.json` when present, or builds that
@@ -323,9 +385,19 @@ through the detected package manager, and CI-only gates without a local executor
 are reported as skipped. File/evidence capabilities such as a truth file are
 kept in the capability matrix but do not block executable gate verification.
 
+Direct `verify-gates` uses the read-only gate policy by default. The
+`--read-only-gates` flag makes that policy explicit in copied recipes, while
+`--allow-mutating-gates` is an explicit override and should only be used when
+the user has approved source mutation. Release verification should use a
+disposable worktree so mutating gates remain isolated.
+
 ```bash
 quality-runner verify-gates /path/to/repo --run-id verify-001 --json
 quality-runner verify-gates /path/to/repo --timeout-seconds 300 --json
+quality-runner verify-gates /path/to/repo --run-id release-001 \
+  --profile release --ci-status-json ci-status.json \
+  --readiness-evidence-file .quality-runner/release-evidence.json \
+  --worktree-mode disposable --read-only-gates --json
 ```
 
 Repos can override individual gate timeouts in `.quality-runner.toml`:
@@ -391,8 +463,10 @@ Agent handoffs from refresh use `quality-runner-agent-handoff-v0.2` and route
 verified gate outcomes with `gates-clean`, `gates-blocked`, and `gates-failed`.
 Blocked and failed handoffs include `gate_verification.blocker_groups` and
 `next_slice.action_groups` so controllers can distinguish dependency setup,
-environment restrictions, read-only policy blockers, and executable gate
-failures before launching the next worker.
+environment restrictions, read-only policy blockers, provenance/evidence,
+review-required, coverage, isolation, and executable gate failures before
+launching the next worker. Release runs also include a readiness summary with
+required and unresolved gate IDs.
 
 If inspect, run, or verify times out before normal verification completes,
 refresh still writes a final `agent-handoff.json`/`.md` with a
@@ -455,7 +529,9 @@ quality-runner release-smoke --work-dir /tmp/quality-runner-release-smoke --json
 ```
 
 The JSON result uses `quality-runner-release-smoke-result-v0.1` and includes
-per-check statuses plus the generated handoff path. The handoff examples in
+per-check statuses, the locally built artifact path and SHA-256 digest, plus the
+generated handoff path. The installed consumer smoke exercises the public QR,
+MCP, certifier, and compatibility surfaces. The handoff examples in
 [`docs/examples`](examples/) show representative clean, blocked, and timeout
 outputs for manual release review. See
 [`slice-spec-structural-harden.md`](examples/slice-spec-structural-harden.md)

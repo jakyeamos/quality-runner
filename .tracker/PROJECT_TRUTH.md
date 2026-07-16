@@ -70,40 +70,152 @@ binary scanners remain an opt-in external adapter; QR never installs them, and
 missing external binaries remain report-only scanner status. The native path is
 covered by focused tests and does not vendor upstream source.
 
+The module-status contract is now wired through inspect, run, verify, refresh
+timeouts, manifests, summaries, status output, and human CLI output. Core
+similarity and detected UI quality are reported explicitly, while contextual
+layers such as UI token contracts, architecture contracts, Quality Skills,
+release readiness, intent, CI evidence, QR Gate, and QR phase planning retain
+visible `enabled`, `disabled`, `not_applicable`, `unavailable`, or `not_run`
+states. The status projection is versioned as
+`quality-runner-module-status-v0.1`, and the scan summary stays within the
+repository's 500-line source-file ceiling.
+
+Configured active Quality Skill packs now participate in every selected QR
+workflow automatically: deterministic rules run during the scan, while every
+active agent-review rubric is emitted as an automatic supervising-agent work
+item. The report contract requires explicit coverage of every rubric, including
+clean subjective outcomes, before the report can merge. The default review mode
+is `auto`; `release` still forces `required`, and `off`/`parallel` remain
+explicit opt-outs. The supervising agent submits the validated report with
+`--skill-review-report`, including when continuing through `refresh`.
+
+Read-only integrity snapshots now skip standard dependency, cache, build, and
+generated trees, honor configured scan exclusions, and use bounded fingerprints
+for large remaining files. A live Tenure snapshot completed in 0.20 seconds
+without recording `node_modules`; the full QR test suite passed (`472 passed`).
+
+Global compiled Quality Skill selection is now available for every repository
+without requiring a repository-local pack block. QR discovers the user-level
+configuration, derives repository signals, selects relevant compiled TOML packs
+with local precedence and explicit opt-out/pin controls, and records candidate
+scores, exclusions, corpus identity, and warnings in the code-quality artifact.
+Raw global Markdown skills remain ingest inputs rather than silently executable
+workflow instructions.
+
+The user-level corpus is now installed at
+`~/.config/quality-runner/corpus` with an explicit
+`~/.config/quality-runner/quality-runner.toml` selector. All 12 validated
+starter packs are eligible in `relevant` mode with a bounded maximum of 12;
+repository signals choose the active subset. Global selection preserves
+matched signal terms for artifact replay, and review-packet reconstruction
+uses the captured accountability paths so selected agent reviews remain
+actionable on large repositories.
+
+Remediation planning now defaults to a deterministic domain view. Each run
+emits `phase_candidates` for security, data integrity, quality gates, testing,
+release readiness, UI quality, performance, maintainability, and other detected
+workstreams while retaining the complete leaf `slices` list for forensic scope
+and cold-executor specs. QR-native `phase plan` consumes domain candidates when
+present and falls back to leaf slices for older artifacts; QR still does not
+write GSD-owned files or execute remediation.
+
+Long-running workflow commands now emit phase diagnostics and 15-second
+heartbeats to stderr while preserving a single machine-readable JSON document
+on stdout. The progress channel covers inspect, run, verify-gates, refresh, and
+release-smoke; callers with their own status channel can use `--no-progress`.
+
 ## Next Step
 
-Dogfood the QR-native similarity report against representative JavaScript,
-Python, and Rust repositories, then keep `similarity_backend = "external"` as
-the comparison path only where an upstream binary is intentionally available.
-Continue using `quality-runner plan init`, `phase add`, and `phase plan` for
-cluster-oriented remediation; GSD remains optional and independent.
+Dogfood the active Quality Skill handoff contract against representative UI,
+test, security, and release repositories so agents consume packets and
+complete the explicit report-and-rerun loop. Use
+`quality-runner plan auto <repo> --run-id <run-id> --json` as the default
+planning layer; it materializes domain phases in deterministic security-first
+order and retains linked leaf slices. GSD remains optional and independent.
 
 ## Blockers
 
-- Full-repo Ruff/format and basedpyright retain pre-existing findings outside
-  this change; touched-file checks pass. Vulture passes the source roots; its
+- Full-repo Ruff passes. Full format check reports 25 pre-existing files
+  outside this slice, and full basedpyright reports 14 pre-existing errors in
+  review files; touched-file checks pass. Vulture passes the source roots; its
   broad `vulture .` form needs `.quality-runner` excluded after local uv gate
   runs generate ignored dependency-cache code.
 - The packaged console-script smoke requires a writable UV cache and network
   access when the offline wheel build cannot reuse dependencies; it passed with
   a temporary cache. Full-repo Ruff and basedpyright remain blocked by the
   pre-existing findings listed above.
-- The broader `tests/test_code_quality.py tests/test_config.py` slice remains
-  affected by unrelated dirty-branch changes: the source-file line ceiling
-  currently sees `quality_runner/code_quality.py` above 500 lines, and two
-  workflow tests hit an existing `build_run_manifest(..., module_status=...)`
-  signature mismatch. The similarity-focused slice is green.
+- The full test suite currently passes (`500 passed`). Full-repo format and
+  basedpyright still need a separate clean-tree pass because the branch carries
+  unrelated user changes outside this slice.
 - The feature branch still contains unrelated user changes outside `a7b45ab`;
   no push or merge was attempted for this isolated commit.
 
 ## Current Verification
 
-- 2026-07-16: Added QR-native similarity in `a7b45ab` and focused Python
-  coverage in `795c8f2`. Focused similarity tests passed (`15 passed`);
-  touched-source Ruff, basedpyright (`0 errors`), source-root Vulture, JSON
-  parsing, staged diff checks, and both commit hooks passed. The broader
-  code-quality and config slice reached `35 passed, 3 failed` on the unrelated
-  blockers above.
+- 2026-07-16: Added seamless automatic skill-review coverage and native
+  security-first phase materialization. The default `auto` mode now requires
+  every active skill/review pair to be covered, including clean subjective
+  outcomes; `quality-runner plan auto` is idempotent and retains linked leaf
+  slices. Full suite passed (`500 passed`), full Ruff passed, touched-slice
+  format and BasedPyright passed (`0 errors`), and release-smoke passed with
+  installed artifact digest `ea438ad0fc5b904f56d5fb6eb3f8af8a21328a0681ac5230a4ee6581cbc4e2f3`.
+
+- 2026-07-16: Reran the default QR workflow against Tenure on
+  `codex/port-review-hardening` as `domain-default-20260716`. The run completed
+  in 240.4 seconds with 5,900 structural findings, 10 selected global packs,
+  956 total leaf slices, and 10 domain phase candidates. The handoff remains
+  `review-required` because the skill-review packet has unresolved reviews;
+  domain grouping and schema validation passed, while the existing handoff
+  quality lint still reports six skill-slice verification gaps.
+
+- 2026-07-16: Final repository verification after domain planning changes:
+  full suite passed (`500 passed`), touched-source Ruff, format, and
+  BasedPyright passed (`0 errors`), scoped Vulture passed, and
+  `quality-runner release-smoke --json` passed with installed artifact digest
+  `ea438ad0fc5b904f56d5fb6eb3f8af8a21328a0681ac5230a4ee6581cbc4e2f3`.
+
+- 2026-07-16: Added deterministic domain phase candidates to remediation plans
+  and handoffs while retaining leaf slices for forensic execution. Native QR
+  phase planning now prefers domain candidates and remains backward-compatible
+  with v0.1 leaf-only artifacts. Domain/schema/planning focused coverage passed
+  (`64 passed`), touched-source Ruff/format/BasedPyright passed, and Vulture
+  passed.
+
+- 2026-07-16: Added stderr-only phase and heartbeat progress for long-running
+  CLI workflows, with JSON stdout preserved and `--no-progress` suppression.
+  Focused progress/CLI coverage passed (`32 passed`), full suite passed
+  (`480 passed`), full Ruff check passed, targeted BasedPyright passed with
+  `0 errors`, and scoped Vulture passed.
+
+- 2026-07-16: Repository-aware global Quality Skill selection passed focused
+  contract coverage (`68 passed`), targeted BasedPyright (`0 errors`), Ruff,
+  and scoped Vulture. The full suite passed (`477 passed`); entrypoint and
+  release-smoke tests passed (`9 passed`); and `quality-runner release-smoke
+  --json` passed after installing and exercising the local wheel, recording
+  artifact digest `571c732e83d5dc49391650ab686df02e7490ab7289fb66ce8749eefa27a8ac12`.
+
+- 2026-07-16: Fixed read-only integrity scope so dependency, cache, and
+  generated trees such as `node_modules` and `.next` are pruned before
+  manifesting; configured scan exclusions are forwarded from gate verification,
+  and large files use bounded fingerprints. Integrity/gate tests passed (`23
+  passed`); full suite passed (`472 passed`), full Ruff passed, and a live Tenure
+  snapshot completed in `0.20s` with no `node_modules` paths.
+
+- 2026-07-16: Configured active skill packs now run deterministic rules
+  automatically and emit review packets; unresolved agent reviews produce
+  `review-required` handoffs and blocked lifecycle status, while validated
+  reports pass through refresh. Focused skill/config/refresh coverage passed
+  (`64 passed`), full suite passed (`471 passed`), touched-source Ruff and
+  format passed, targeted BasedPyright passed with `0 errors`, scoped Vulture
+  passed, schema parsing passed, and `release-smoke --json` passed with an
+  installed artifact consumer digest.
+
+- 2026-07-16: Extended the QR-native similarity contract with explicit core and
+  UI module statuses, artifact/manifest/summary/status wiring, timeout status
+  coverage, and human CLI summaries. Focused similarity/module tests passed;
+  touched-source Ruff, formatting, and basedpyright (`0 errors`) passed. Full
+  suite verification passed (`467 passed`), with `code_quality.py` held at the
+  500-line ceiling.
 
 _(6 older entries trimmed)_
 

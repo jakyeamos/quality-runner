@@ -6,6 +6,88 @@ agent or human still owns source edits, verification command execution, and
 git operations. For large or repo-wide remediation, use one coherent batch at
 a time.
 
+## Command Selection Contract
+
+Choose the command from the proof the task needs, not from the command that is
+most familiar. Use the most specific matching row; release readiness takes
+precedence over review, implementation, audit, and discovery:
+
+| Needed proof | Entry command | Do not treat it as |
+| --- | --- | --- |
+| Target release, publish, upgrade, version/tag, artifact, CI provenance, migration/cutover, staging, or publication readiness | `quality-runner verify-gates <repo> --profile release --ci-status-json <repo>/.quality-runner/ci-status.json --readiness-evidence-file <repo>/.quality-runner/release-evidence.json --worktree-mode disposable --read-only-gates --json` | A normal gate run or source-test result |
+| Implement or remediate a task and produce a handoff | `quality-runner refresh <repo> --run-id-prefix <task> --handoff-output <handoff>.md --json` | Release readiness |
+| Perform a second-pass task-aware review | `quality-runner review <repo> --task "<task>" --json` | A remediation command |
+| Review without task context | `quality-runner review <repo> --mode blind --json` | Task-scoped review |
+| Discover repository facts only | `quality-runner inspect <repo> --json` | A quality pass |
+| Produce audit findings and a plan without executing repo gates | `quality-runner run <repo> --run-id <run> --json` | Gate verification |
+| Verify Quality Runner's own installed/public package surfaces | `quality-runner release-smoke --json` | The target repository's release profile |
+
+The release row requires current-head CI evidence and a validated release
+evidence file. If the repository is dirty, do not add
+`--allow-dirty-worktree-verify` unless the user explicitly accepts verification
+against dirty source; use a clean disposable worktree otherwise.
+
+Do not substitute one command for another:
+
+- `inspect` is discovery only; it does not audit or verify gates.
+- `run` writes an audit and plan; it does not execute discovered gates.
+- `refresh` uses the selected profile, but its default profile is not release
+  readiness. Add `--profile release` when the release row applies.
+- `verify-gates` without `--profile release` does not prove target release
+  readiness.
+- `release-smoke` checks Quality Runner's own package and public surfaces; it
+  does not replace target-repository release evidence.
+
+For workflow commands, use `--json` and inspect `status`, `lifecycle_status`,
+`blockers`, `gate_verification`, and `readiness` before proceeding. A zero exit
+code means the command completed; it does not by itself mean the repository is
+merge-ready. Never continue from `gates-blocked`, `gates-failed`, unresolved
+readiness, stale provenance, or missing evidence.
+
+## Active Skill Pack Contract
+
+Quality Runner also discovers a user-level compiled corpus from
+`~/.config/quality-runner/quality-runner.toml` or `QUALITY_RUNNER_GLOBAL_CONFIG`.
+It selects relevant packs from repository signals and records every decision in
+`code-quality-scan.json`. Local packs remain compatible and take precedence over
+global packs with the same id. Deterministic rules are evaluated during the
+scan. When an active pack contains `agent_reviews`, QR writes
+`skill-review-packet.json` and `skill-review-packet.md` and adds a `skill_review`
+object to the handoff.
+
+Agent review execution is an asynchronous sidecar to QR. Select its policy with
+`--agent-review-mode`:
+
+- `auto` (the default): emit the packet and route it to the supervising agent
+  as an automatic work item. The agent should inspect every active rubric,
+  record evidence-backed outcomes, and rerun QR with the validated report;
+  users do not triage ordinary subjective observations.
+- `parallel`: explicit sidecar review. The handoff reports
+  `skill_review.status = review-pending`; this does not block deterministic QR
+  completion.
+- `required`: keep unresolved reviews as `review-required` blockers. The
+  `release` profile selects this mode automatically, even when `off` or
+  `parallel` was requested.
+- `off`: do not emit review packets and report `skill_review.status = not-run`.
+
+The agent owns the judgment step. When `skill_review.status` is
+`review-required`, `review-pending`, or `review-rejected` and a review is needed:
+
+1. Read the packet and inspect its scoped files against every rubric.
+2. Write a report using `quality-runner-skill-review-report-v0.1` with concrete
+   file, line, and evidence fields. Include `reviewed_review_ids` for every
+   active skill/review pair, even when the review has no finding.
+3. Rerun the same QR workflow with `--skill-review-report <report.json>`.
+4. Continue only when the handoff reports `skill_review.status = reviewed`.
+
+In `required` mode, do not report a clean, gates-clean, or merge-ready result
+while the review remains unresolved. In `auto` mode, treat `review-pending` as
+an automatic next action for the supervising agent. In `parallel` mode, treat
+`review-pending` as incomplete review work even though deterministic QR gates
+may continue.
+QR remains local-first and non-executable: it creates the packet and validates
+the report, while the supervising agent performs the repository review.
+
 ## Start With QR
 
 Run QR before editing:
@@ -31,6 +113,13 @@ Then read:
 - intent docs listed in the handoff (`PRODUCT.md`, `DESIGN.md`, ADRs, etc.)
 
 Do not edit source before reading the handoff and the relevant artifacts.
+
+The default remediation view is domain-oriented. Start with
+`remediation-plan.json.phase_candidates` or the matching section in
+`agent-handoff.md` to choose a coherent workstream. Follow each candidate's
+`slice_ids` to the leaf slices and `slice-specs/` before dispatching bounded
+work. The plan's `slices` list remains the forensic, per-file/per-finding view;
+use it when a candidate needs to be decomposed or investigated more narrowly.
 
 For a single slice, prefer the matching `slice-specs/*.md` file as the
 execution contract. Use `remediation-plan.json` for ordering across slices and
@@ -97,17 +186,16 @@ quality-runner review-worker /path/to/repo \
 Initialize the QR-owned namespace after the first useful run:
 
 ```bash
-quality-runner plan init /path/to/repo --json
-quality-runner phase add /path/to/repo "Capability baseline" --json
-quality-runner phase plan /path/to/repo \
-  --phase 1 --run-id qr-baseline-run --json
+quality-runner plan auto /path/to/repo --run-id qr-baseline-run --json
 quality-runner phase next /path/to/repo --phase 1 --json
 ```
 
-`phase plan` can consume a run or an existing `agent-handoff.json`. Each plan
-is one QR remediation cluster with source references, scope, tasks, stop
-conditions, verification gates, dependencies, and a deterministic wave. QR
-dispatches the next ready plan but does not execute it.
+`phase plan` can consume a run or an existing `agent-handoff.json`. When the run
+contains domain `phase_candidates`, QR plans one native phase plan per domain;
+older artifacts without that field continue to use their leaf slices. Each
+plan has source references, scope, tasks, stop conditions, verification gates,
+dependencies, and a deterministic wave. QR dispatches the next ready plan but
+does not execute it.
 
 After an external batch, write a result file using the
 `quality-runner-phase-batch-result-v0.1` schema and record it:

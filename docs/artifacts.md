@@ -48,20 +48,48 @@ candidate before deletion.
   surfaces, nested workspaces, active scan exclusions, ecosystems,
   generated-code markers, local CI checks, Pre-CR config, project truth file
   presence, and branch selection warnings when the checked-out branch is neither
-  `main` nor the local most-advanced branch.
+  `main` nor the local most-advanced branch. It also records captured HEAD,
+  branch/ref, QR version, timestamp, run identity, worktree mode, and aggregate
+  command coverage. CI checks preserve optional head/ref, workflow identity,
+  capture time, source URL, and artifact digest fields.
+  It also includes `module_status`, the explicit status contract for core and
+  contextual QR modules.
 - `code-quality-scan.json`: deterministic structural/code-quality findings,
   line accountability, duplicate clusters, skipped generated/vendor paths, and
-  non-blocking remediation buckets. When locally installed `similarity-ts`,
-  `similarity-py`, or `similarity-rs` binaries are available, QR also records
-  semantic similarity clusters (`SIM-###`) alongside regex-based duplicate
-  clusters (`DUP-###`). QR never installs these tools; missing binaries are
-  recorded as non-blocking skipped scanner status. Opt-in architecture-contract findings use
+  non-blocking remediation buckets. QR's in-process similarity engine is enabled
+  by default and records semantic similarity clusters (`SIM-###`) alongside
+  normalized duplicate clusters (`DUP-###`) without requiring external binaries.
+  The summary records the backend, engine, execution status, and candidate
+  scanner status. An explicitly selected external backend reports missing or
+  failed binaries as `unavailable`; QR never installs them. UI files add
+  `ui_file_count` and `ui_quality_status` to the summary, while existing UI
+  structural findings remain part of the core scan. Opt-in architecture-contract findings use
   category `architecture` when configured in `.quality-runner.toml`. Opt-in
   Quality Skill findings use category `skill:<skill-id>` when configured. The
-  scan also records active `quality_skills` identities and per-rule
-  `skill_coverage` with scoped/matched file counts and skip reasons.
+  scan also records active `quality_skills` identities, per-rule
+  `skill_coverage` with scoped/matched file counts and skip reasons, and
+  `skill_selection` with the user-level corpus identity, repository signals,
+  candidate scores, selection reasons, exclusions, and warnings. When an
+  active skill contains agent reviews, the run handoff also includes
+  `skill_review` with packet/report paths, review status, and unresolved review
+  IDs. Its `mode` is `off`, `auto`, `parallel`, or `required`; unresolved reviews are
+  `not-run`, `review-pending`, or `review-required` respectively. Only
+  `required` and rejected reviews block the handoff lifecycle. In `auto` mode,
+  the handoff marks the review packet as an automatic supervising-agent action;
+  the user is not asked to disposition each subjective observation. Automatic
+  reports must explicitly cover every active review through
+  `reviewed_review_ids`, including clean outcomes.
   Partially built or unwired work uses category `integrate`; see
   [Unwired Work Detection](unwired-work.md).
+  Findings may include `verification_mode=command` for executable proof or
+  `verification_mode=evidence` with `verification_requirements` for review,
+  owner, disposition, or external-artifact proof. Evidence-mode slices are
+  intentionally not represented as successful automated tests.
+- `module_status`: embedded in `repo-scan.json`, `run-manifest.json`, run
+  results, and `run-summary.json`. Each module has `kind` (`core` or
+  `optional`) and one explicit status: `enabled`, `disabled`,
+  `not_applicable`, `unavailable`, or `not_run`. The standalone contract is
+  `quality-runner-module-status-v0.1`.
 - `package-manager-preflight.json`: detected package-manager state, declared
   `packageManager`, lockfiles, and non-blocking warnings such as mixed lockfiles.
 - `standards.json`: compiled standards packet for the selected profile,
@@ -75,12 +103,17 @@ candidate before deletion.
   command execution evidence and pass/fail evidence. CI-only gates that have no
   local executor are marked with `local_execution: "ci-only"`. Capabilities also
   include `capability_kind` so local commands, CI-only gates, and file/evidence
-  capabilities can be handled independently.
+  capabilities can be handled independently. Release-profile matrices also
+  include a `readiness` policy summary with required and currently unresolved
+  readiness gate IDs; verification runs replace its pending status with the
+  evaluated readiness result.
 - `security-scan.json`: security capability discovery, including configured
   dependency-audit gates and their discovery/execution state.
-- `run-manifest.json`: run metadata, Quality Runner version, artifact paths, and
-  git HEAD/branch/dirty state when the target is a git repo. When author intent
-  is supplied, the manifest also embeds the resolved `intent` packet.
+- `run-manifest.json`: run metadata, Quality Runner version, artifact paths and
+  digests, and git HEAD/branch/dirty state when the target is a git repo. Its
+  provenance includes ref, capture time, workflow/run identity, and worktree
+  mode. When author intent is supplied, the manifest also embeds the resolved
+  `intent` packet and the same `module_status` contract used by the repo scan.
 
 ## Author Intent
 
@@ -169,8 +202,14 @@ an external agent or human applies changes and reruns Quality Runner.
   (`impact`, `effort`, `fix_risk`, `confidence`, `why_now`, `leverage`), and
   deterministic `actionability` routing (`fix-now`, `triage`, `accept-risk`,
   `defer`, `informational`) with `actionability_rationale`.
-- `remediation-plan.json`: adoption stage, stopping criteria, and ordered
-  remediation slices with priority, actions, findings, and verification gates.
+- `remediation-plan.json`: adoption stage, stopping criteria, and the default
+  domain-oriented `phase_candidates` view. Each candidate is a bounded planning
+  domain with priority, review status, linked leaf slice ids, finding ids,
+  representative paths, actions, and verification gates. The artifact also
+  keeps ordered leaf `slices` for forensic lookup and cold-executor specs; the
+  leaf view is not discarded or replaced by a one-off aggregate.
+  `planning_mode=domain`, `phase_candidate_count`, and `leaf_slice_count`
+  make the selected default and traceability explicit.
   Each slice may also include executor-facing metadata:
   - `impact`, `effort`, `fix_risk`, `confidence`, `why_now`
   - `leverage` with deterministic `rank` used for ordering after severity
@@ -179,6 +218,8 @@ an external agent or human applies changes and reruns Quality Runner.
     in-scope paths
   - `scope` with `in_scope` and `out_of_scope` boundaries
   - `stop_conditions` for when workers should stop and report instead of editing
+  - `verification_mode` (`command` or `evidence`) and, for evidence mode,
+    structured `verification_requirements`
   - per-finding `evidence_excerpt` with line context for structural rows
   Structural scan slices are advisory clusters by file so an external agent can
   choose one coherent batch without Quality Runner executing remediation.
@@ -189,7 +230,10 @@ an external agent or human applies changes and reruns Quality Runner.
   findings as superseded by the current scan unless an external actor records a
   more specific disposition. Optional `finding_dispositions` records audit
   finding ids accepted through `gate-respond record-disposition` and links
-  back to gate-run history.
+  back to gate-run history. Every normal `run` imports valid configured and
+  prior-run dispositions before planning; `quality-audit.json` annotates each
+  finding with its resolution status, and resolved findings do not produce new
+  remediation slices. Partially resolved groups remain actionable.
 - `resolution-ledger.md`: human-readable resolution ledger summary.
 - `security-scan.json`: opt-in security capability discovery, candidate
   findings, and agent-review gate metadata when
@@ -218,12 +262,22 @@ an external agent or human applies changes and reruns Quality Runner.
   `workflow-timeout`, `needs-triage`), missing repo-owned gates with suggested
   commands, gate verification status/classification for verified runs, gate
   blockers with setup guidance, primary blocker class, grouped blocker routing,
-  and runner-provided structural checks that produced findings.
-  `merge-ready` means local gates passed and every ingested CI check reports
-  `conclusion: success`; it is separate from handoff `status` values such as
-  `gates-clean`.
+  runner-provided structural checks that produced findings, and active
+  skill-review state. It also includes compact domain phase candidates and
+  `next_phase_candidate`; the full candidate evidence remains in the
+  remediation plan. `status=review-required` means the supervising agent must
+  read the emitted packet and rerun QR with a validated report before
+  completion. In `parallel` mode, `skill_review.status=review-pending` records
+  work that can proceed concurrently with QR while the deterministic run
+  completes.
+  `merge-ready` means local gates passed, every ingested CI check reports
+  `conclusion: success` with fresh current-HEAD/ref/workflow provenance, no
+  read-only mutation was detected, and every required release readiness gate is
+  passed. Legacy CI evidence without provenance remains readable but cannot
+  qualify for `merge-ready`.
 - `agent-handoff.md`: human-readable handoff for a coding agent. The Markdown
-  intentionally separates missing repo-owned gates such as `pnpm test` or
+  starts with domain phase candidates, then routes to the next bounded leaf
+  slice. It intentionally separates missing repo-owned gates such as `pnpm test` or
   `pnpm typecheck` from Quality Runner's built-in structural checks so readers
   do not mistake a runner heuristic for a repo-native test, build, or typecheck
   gate. For blocked or failed verification runs, it puts gate blockers before
@@ -249,17 +303,31 @@ file/evidence capabilities without blocking, and writes:
   `failed`.
 - `gate-verification.json`: per-gate command, source, exit code, duration,
   timeout, capability kind, bounded stdout/stderr tail fields, skipped reason,
-  failure type, recommended environment action, and status.
-- `quality-audit.json`
+  failure type, recommended environment action, status, and v0.2 provenance
+  (HEAD, branch/ref, QR version, timestamp, worktree mode, run identity, and
+  artifact digest when a gate emits one). Gate status `blocked` is reserved for
+  readiness, isolation, evidence, coverage, and policy blockers; v0.1 artifacts
+  remain readable by summary and handoff readers.
+- `quality-audit.json`: normalized findings plus a resolution summary and
+  per-finding resolution metadata. Resolved findings remain visible for
+  traceability; only unresolved findings flow into new remediation slices.
+  `resolution.by_status` counts normalized findings, while
+  `resolution.entry_by_status` retains the more granular ledger-row counts.
 - `remediation-plan.json`
 - `slice-specs/`
 - `agent-handoff.json`
 - `agent-handoff.md`
 - `run-manifest.json`
 
-When `read_only_gates` is active, QR snapshots the tracked git diff before each
-executed local command. If a safe-looking command mutates tracked files, QR
-restores the pre-gate tracked diff, marks the gate with
+When `read_only_gates` is active, QR snapshots the tracked git diff plus bounded
+hash manifests for relevant untracked and ignored files before each executed
+local command. Standard dependency, cache, build, and generated trees such as
+`node_modules`, `.next`, and QR's own artifact directory are excluded, and
+configured scan exclusions are honored. Large remaining files use bounded
+fingerprints rather than an unbounded read. If a safe-looking command mutates
+tracked, untracked, or ignored files, QR restores tracked changes when safe,
+never deletes or overwrites user files, records allowed QR artifact/worktree
+paths and scan exclusions, marks the gate with
 `failure_type=read-only-mutation`, and classifies the run as a
 `read-only-gate-blocker`.
 
@@ -275,6 +343,33 @@ Disposable mode refuses a dirty source worktree unless
 `--allow-dirty-worktree-verify` is set. In disposable mode, mutating gates may
 run inside the isolated worktree even when `read_only_gates` is active, because
 the user's working tree is not mutated.
+
+## Release Readiness
+
+`--profile release` adds a `readiness` object to `gate-verification.json`,
+`run-summary.json`, and the handoff gate summary. It contains the selected
+profile, evidence path, required gate IDs, unresolved gate IDs, verification
+context, and per-gate blocker classes. The built-in gate IDs are
+`evidence_provenance`, `read_only_integrity`,
+`release_manifest_coherence`, `package_consumer_smoke`, `migration_safety`,
+`release_acceptance_evidence`, `publication_visibility_review`, and
+`aggregate_coverage`; migration and publication are surface-triggered.
+
+`release-evidence.json` uses schema `quality-runner-release-evidence-v0.1` and
+records target HEAD/ref, release version, owner acceptance, artifact version/
+digest/source HEAD, and optional migration, publication, and external-check
+evidence. `package_consumer_smoke` is executable when a repository declares a
+`package-smoke`, `consumer-smoke`, `installed-smoke`, or `release-smoke`
+command. Migration evidence must prove forward, rollback, failure injection,
+and reconciliation unless a repository migration command proves those states.
+
+Aggregate scripts are recursively expanded with bounded depth and cycle
+detection. Default runs report opaque or uncovered aggregate commands; release
+runs block until required leaf coverage is proven. Missing owner or external
+staging evidence is a `review-required` blocker, not a successful automated
+test. Publication review is report-only by default and becomes a release
+blocker when reader, publish, draft, media, visibility, raw-content, or public/
+private-boundary surfaces are detected.
 
 This command is intentionally separate from `inspect` and `run` so capability
 discovery, command execution, and command pass/fail are distinguishable. For
@@ -304,7 +399,9 @@ rerunning QR gates.
 Blocked and failed gate handoffs include `primary_blocker_class`,
 `blocker_groups`, and next-slice `action_groups`. The flat `actions` list stays
 present for backward-compatible human reading, while `action_groups` gives
-controllers structured blocker-class routing and deduplicates repeated setup
+controllers structured blocker-class routing for dependency, environment,
+provenance, evidence, review-required, coverage, isolation, and read-only
+policy blockers, and deduplicates repeated setup
 commands across gates that share the same dependency setup blocker. The
 Markdown handoff renders these groups under the next slice's `Action Groups`
 section so human workers see the same grouping without inspecting JSON.
@@ -314,7 +411,8 @@ section so human workers see the same grouping without inspecting JSON.
 `quality-runner validate-handoff` checks schema validity plus executor-readiness
 rules that JSON Schema alone does not capture:
 
-- every slice has at least one machine-checkable verification command
+- every slice has at least one machine-checkable verification contract: an
+  executable command or structured evidence requirements
 - every slice has STOP conditions
 - every slice has `planned_at` git state when the target repo is a git checkout
 - structural slices anchor to file/line/fingerprint evidence
@@ -384,6 +482,11 @@ statuses plus structured `gate_verification.blocker_groups` and
 that only read the flat `actions` list, but controllers should key new routing
 logic off the `v0.2` schema id.
 
+`gate-verification.json` moved to `quality-runner-gate-verification-v0.2` when
+blocked readiness states and provenance were added. Readers must continue to
+accept v0.1 gate artifacts; only v0.2 artifacts can claim the new provenance
+and blocked-state contract.
+
 ## Local CI Status
 
 `quality-runner inspect` and `quality-runner run` accept
@@ -401,6 +504,12 @@ logic off the `v0.2` schema id.
   ]
 }
 ```
+
+The legacy `checks` shape remains readable, but a check cannot qualify for
+`merge-ready` or release readiness without `head_sha`, `ref`,
+`workflow_run_id`, `captured_at`, and a successful conclusion. Provenance may be
+provided once at the top level, under `provenance`, or per check; QR normalizes
+all three forms and preserves optional artifact digest/source URL fields.
 
 The file must live inside the target repo and is read as evidence only. Quality
 Runner does not call GitHub, fetch live check runs, or execute commands from CI

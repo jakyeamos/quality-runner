@@ -8,6 +8,33 @@ reached the PyPI publish step on 2026-06-28 and failed because the PyPI Trusted
 Publisher was not configured for the GitHub OIDC claims. `v0.2.0` was published
 on 2026-07-02. `v0.3.0` and `v0.3.1` are already published on PyPI.
 
+## Local Release Profile
+
+The release profile is explicit and remains local-first/read-only. Run it
+before any external release workflow:
+
+```bash
+quality-runner verify-gates . \
+  --profile release \
+  --ci-status-json .quality-runner/ci-status.json \
+  --readiness-evidence-file .quality-runner/release-evidence.json \
+  --worktree-mode disposable --read-only-gates --json
+```
+
+The evidence file uses `quality-runner-release-evidence-v0.1` and must agree on
+target HEAD/ref, `release_version`, package metadata, artifact source HEAD, and
+SHA-256 digest. It also records owner acceptance and any required migration,
+rollback/reconciliation, publication, or external staging evidence. A release
+profile run blocks on stale or mismatched CI provenance, missing installed
+consumer smoke, incomplete aggregate coverage, required publication review, or
+read-only mutation. QR never publishes, deploys, contacts registries, or edits
+source files.
+
+For Quality Runner itself, `quality-runner release-smoke --json` builds a local
+artifact, installs it into an isolated temporary consumer environment, records
+the artifact digest, and exercises the QR, MCP, certifier, and compatibility
+surfaces.
+
 ## PyPI
 
 1. Confirm the local ladder passes:

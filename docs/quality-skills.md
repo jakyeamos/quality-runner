@@ -4,8 +4,8 @@ Quality Skills let you attach standards you personally value to a codebase. Qual
 Runner evaluates whether the repository lives up to those standards and includes
 failures as normal findings in the audit and remediation plan.
 
-Skills are **opt-in**, **local-first**, and **non-executable**. Quality Runner
-does not call a model, run arbitrary skill code, or perform remediation.
+Skills are **opt-in**, **local-compatible**, and **non-executable**. Quality
+Runner does not call a model, run arbitrary skill code, or perform remediation.
 
 ## Why Quality Skills exist
 
@@ -17,7 +17,7 @@ expectations. Quality Skills answer a different question:
 Examples include UI polish, accessibility, API design, architecture boundaries,
 validation quality, test quality, product copy hygiene, and performance budgets.
 
-## Local design
+## Repository-local configuration
 
 Skills are stored as local TOML packs:
 
@@ -31,6 +31,7 @@ Enable them in `.quality-runner.toml`:
 [quality_runner.skills]
 enabled = true
 active = ["ui-polish", "architecture-boundaries"]
+agent_review_mode = "auto" # off, auto, parallel, or required
 
 [[quality_runner.skills.local]]
 id = "ui-polish"
@@ -45,12 +46,18 @@ applies_to = ["**/*.ts", "**/*.tsx"]
 
 Behavior:
 
-- If `[quality_runner.skills]` is absent, no skills run.
+- If `[quality_runner.skills]` is absent and no user-level corpus is configured,
+  no skills run.
 - If `enabled = false`, no skills run.
 - If `active` is present, only listed skill ids run.
 - If `active` is absent, all configured local skills may run.
+- Local packs always take precedence over a global pack with the same id.
+- A repository can opt out of the user-level corpus with
+  `global_enabled = false`.
 - Skill paths must stay inside the repo. Path traversal is rejected.
 - Missing or malformed skill files are skipped safely and surfaced as warnings.
+- `agent_review_mode` may be configured here; a CLI value overrides it except
+  that the `release` profile always requires completed reviews.
 - Skill scans cover frontend source and content extensions including `.astro`,
   `.less`, `.mdx`, `.sass`, `.scss`, `.svelte`, and `.vue` in addition to the
   existing JavaScript, CSS, HTML, Markdown, and configuration formats.
@@ -58,12 +65,53 @@ Behavior:
   expressions reject ingest with the rule, field, pattern index, and error
   column; manually configured invalid rules remain visible as skipped coverage.
 
+## User-level corpus and automatic selection
+
+An agent's personalized Quality Runner configuration can make a compiled corpus
+available to every repository. Quality Runner discovers this file at
+`~/.config/quality-runner/quality-runner.toml`, or through
+`QUALITY_RUNNER_GLOBAL_CONFIG`. `QUALITY_RUNNER_SKILL_CORPUS` can point directly
+to a corpus manifest for one process.
+
+The configuration is explicit and non-executable:
+
+```toml
+schema = "quality-runner-global-skill-config-v0.1"
+
+[quality_runner.skills]
+enabled = true
+corpus = "~/personal-quality-corpus"
+mode = "relevant"
+min_score = 0.15
+max_active = 12
+always = ["release-readiness"]
+exclude = ["motion-quality"]
+```
+
+The `active` list in the corpus is an eligibility set. In `relevant` mode,
+Quality Runner compares each eligible pack's focus, rules, and review scope with
+repository signals such as languages, manifests, directory names, and detected
+surfaces. Packs at or above `min_score` are selected, while `always` packs are
+selected explicitly. `mode = "all"` is available when a user intentionally
+wants every eligible pack. Selection is bounded by `max_active`.
+
+Every scan records the decision in `code-quality-scan.json` under
+`skill_selection`: the config and corpus identity, repository signals, every
+candidate's score and reason, selected ids, exclusions, and warnings. This
+makes an automatic selection auditable and lets an agent explain why a pack was
+or was not used.
+
+Only validated compiled TOML packs are loaded. Global `SKILL.md` files remain
+inputs to the ingest workflow and are never executed or treated as QR rules
+until compiled and admitted to the corpus.
+
 ## Personal corpus and pack assignment
 
 A personal corpus is a versioned directory of already-compiled TOML packs. It is
-the synchronization source for multiple repositories; raw `SKILL.md` files remain
-input to the ingest agent and are never copied into a repository as executable
-configuration.
+the automatic selection source for configured runs and remains the explicit
+synchronization source for repositories that want local copies. Raw `SKILL.md`
+files remain input to the ingest agent and are never copied into a repository as
+executable configuration.
 
 ```text
 personal-quality-corpus/
@@ -184,6 +232,8 @@ message = "Clickable divs should usually be semantic buttons or links."
 risk = "Non-semantic interactive elements hurt keyboard and assistive technology users."
 expected = "Use button/link semantics or provide keyboard and ARIA support."
 verification = "Rerun quality-runner and confirm this skill finding clears."
+# Use evidence mode when closure requires review or an owner decision.
+# verification_mode = "evidence"
 ```
 
 Skill findings use category `skill:<skill-id>` and flow through
@@ -193,21 +243,32 @@ The raw finding also preserves `rule_message` and `rule_category`. The scan
 records `skill_coverage` with scoped files, matched files, finding counts, and
 skip reasons. Deterministic rules default to `confidence = "medium"`; use
 `low`, `medium`, or `high` explicitly when the rule is heuristic or exact.
+If `verification_mode` is omitted, QR infers `command` from command-shaped
+verification text and `evidence` from review-oriented text. Evidence-mode
+findings receive structured requirements to review the cited evidence, record
+the owner decision, and attach a command, artifact, or external-review
+reference.
 Malformed rule entries remain inactive but are surfaced as configuration
 warnings during ingest and scanning instead of disappearing silently.
 
 ## Agent-assisted reviews
 
 Some standards require judgment. Skills can define `agent_reviews` rubrics. Quality
-Runner compiles them into review packet artifacts:
+Runner compiles them into review packet artifacts. Review work is controlled by
+`--agent-review-mode` (`auto` by default, `required` for the `release` profile,
+or explicit `off` or `parallel`):
 
 ```text
 .quality-runner/runs/<run-id>/skill-review-packet.json
 .quality-runner/runs/<run-id>/skill-review-packet.md
 ```
 
-Quality Runner does **not** call a model. A supervising agent reads the packet,
-inspects the repo, and produces a review report.
+Quality Runner does **not** call a model. In `auto` mode, the packet is an
+automatic supervising-agent work item: the agent reads every rubric, records
+evidence-backed outcomes, and reruns QR with the report. `parallel` is an
+explicit sidecar mode, `required` blocks readiness until the report is merged,
+and `off` disables packet emission. The report input remains explicit because
+the review is performed by the agent, not by QR.
 
 ### Review report schema
 
@@ -219,6 +280,7 @@ inspects the repo, and produces a review report.
     "type": "agent",
     "name": "coding-agent"
   },
+  "reviewed_review_ids": ["ui-polish/ui-polish-review"],
   "findings": [
     {
       "skill_id": "ui-polish",
@@ -240,6 +302,9 @@ inspects the repo, and produces a review report.
 
 Quality Runner validates agent-produced findings before merging them. Findings
 without file, line, or evidence are rejected or ignored.
+In automatic mode, `reviewed_review_ids` must cover every active skill/review
+pair, including reviews for which the agent found no issue. This makes a clean
+subjective review an explicit disposition rather than an omitted check.
 The review packet prefers high recall: agents may report plausible findings with
 `observation` severity and `low` confidence when concrete source evidence exists.
 
@@ -386,11 +451,16 @@ The pack follows a high-recall motion-review posture. Static matches are review
 prompts; final findings should cite the interaction trigger, component role, and
 source evidence rather than treating every animation as a defect.
 
-Merge a validated report during a run:
+Merge a validated report during a run or refresh:
 
 ```bash
 quality-runner run /path/to/repo \
   --run-id skill-audit-001-reviewed \
+  --skill-review-report /tmp/skill-review-report.json \
+  --json
+
+quality-runner refresh /path/to/repo \
+  --run-id-prefix skill-audit-001-reviewed \
   --skill-review-report /tmp/skill-review-report.json \
   --json
 ```
@@ -504,14 +574,14 @@ quality-runner skill ingest /tmp/ui-polish.toml \
   --write \
   --json
 
-# 5. Run with deterministic skill findings
-quality-runner run . --run-id skill-audit-001 --json
+# 5. Run with deterministic skill findings; parallel agent reviews emit a packet
+quality-runner run . --run-id skill-audit-001 --agent-review-mode parallel --json
 
-# 6. QR emits skill-review-packet.* when agent reviews are configured
+# 6. Read the skill_review object in agent-handoff.json and review the packet
 
 # 7. Agent produces /tmp/skill-review-report.json
 
-# 8. Validate and merge the review
+# 8. Validate and merge the review; required-mode handoffs remain blocked first
 quality-runner run . \
   --run-id skill-audit-001-reviewed \
   --skill-review-report /tmp/skill-review-report.json \

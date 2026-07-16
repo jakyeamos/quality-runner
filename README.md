@@ -63,6 +63,16 @@ quality-runner-mcp --version
 quality-runner doctor --json
 ```
 
+To refresh the installed CLI, run:
+
+```bash
+quality-runner self-update
+```
+
+This upgrades the published tool with `uv tool upgrade`. When the current tool
+is an editable checkout, it reinstalls from that checkout instead. Pass
+`--source /path/to/quality-runner` to explicitly follow a local checkout.
+
 Quality Runner also carries compatibility surfaces for the two smaller extracted
 packages it supersedes publicly:
 
@@ -94,7 +104,8 @@ quality-runner refresh /path/to/repo \
   --json
 ```
 
-For an audit-only pass without gate verification, use `run`:
+For an audit-only pass without gate verification, use `run`. This is not a
+release-readiness check:
 
 ```bash
 quality-runner run /path/to/repo --run-id baseline-001 --json
@@ -120,6 +131,12 @@ Quality Runner writes artifacts under the target repo:
   agent-handoff.md
 ```
 
+`remediation-plan.json` presents `phase_candidates` as the default planning
+view: findings are grouped into deterministic domains such as security,
+testing, release readiness, UI quality, and maintainability. Every candidate
+links back to its leaf `slice_ids`. The existing `slices` list and generated
+`slice-specs/` remain available for forensic, per-finding or per-file work.
+
 Sensitive projects can configure artifact redaction and bounded retention in
 `.quality-runner.toml`. Redaction applies before run JSON/Markdown is persisted;
 retention is previewed or applied explicitly:
@@ -139,17 +156,23 @@ quality-runner prune-artifacts /path/to/repo --apply
 The normal workflow is:
 
 1. Read `agent-handoff.md`.
-2. Read the queued slice spec under `slice-specs/` when one exists.
-3. Review `quality-audit.json` for evidence-backed findings.
-4. Review `code-quality-scan.json` for structural warnings and line evidence.
-5. Review `remediation-plan.json` for ordered actions and verification gates.
-6. Initialize QR's native phase plan and add a bounded phase for multi-slice work.
-7. Generate one plan per coherent QR cluster, then dispatch the next ready wave.
-8. Execute one coherent batch externally and record its result with QR.
-9. Rerun Quality Runner to confirm findings clear and refresh the phase evidence.
+2. If `agent-handoff.json` has `skill_review.status` of `review-required` or
+   `review-rejected`, read the skill-review packet, produce the agent report,
+   and rerun QR with `--skill-review-report` before treating the handoff as
+   complete.
+3. Read the queued slice spec under `slice-specs/` when one exists.
+4. Review `quality-audit.json` for evidence-backed findings.
+5. Review `code-quality-scan.json` for structural warnings and line evidence.
+6. Review `remediation-plan.json` for ordered actions and verification gates.
+7. Run `quality-runner plan auto` to materialize security-first domain phases
+   and linked bounded slices.
+8. Generate one plan per domain candidate; use linked leaf slices to bound the
+   actual implementation batch, then dispatch the next ready wave.
+9. Execute one coherent batch externally and record its result with QR.
+10. Rerun Quality Runner to confirm findings clear and refresh the phase evidence.
 
 See [Agent Usage](docs/agent-usage.md) for the copy-paste phase and batch
-templates agents should follow.
+templates agents should follow, including the command-selection contract.
 
 ## Commands
 
@@ -160,6 +183,10 @@ quality-runner status /path/to/repo --json
 quality-runner inspect /path/to/repo --json
 quality-runner run /path/to/repo --json
 quality-runner verify-gates /path/to/repo --json
+quality-runner verify-gates /path/to/repo --profile release \
+  --ci-status-json ci-status.json \
+  --readiness-evidence-file .quality-runner/release-evidence.json \
+  --worktree-mode disposable --read-only-gates --json
 quality-runner refresh /path/to/repo --run-id-prefix refresh-001 --handoff-output handoff.md --json
 quality-runner refresh /path/to/repo --run-id-prefix task-001-pass-1 \
   --intent "Implement the requested task" --review-cycle-id task-001 \
@@ -175,8 +202,7 @@ quality-runner export-slice-specs /path/to/repo --run-id run-001 --json
 quality-runner remediation-delta /path/to/repo --run-id current --baseline-run-id baseline --json
 quality-runner plan init /path/to/repo --json
 quality-runner plan status /path/to/repo --json
-quality-runner phase add /path/to/repo "Capability baseline" --json
-quality-runner phase plan /path/to/repo --phase 1 --run-id baseline-001-run --json
+quality-runner plan auto /path/to/repo --run-id baseline-001-run --json
 quality-runner phase next /path/to/repo --phase 1 --json
 quality-runner phase record-batch /path/to/repo --phase 1 --plan 1 --result-file batch.json --json
 quality-runner phase update /path/to/repo --phase 1 --baseline-run-id before --run-id after --json
@@ -222,7 +248,11 @@ findings are retained as `out_of_scope` without blocking the task.
 Before release, run `quality-runner release-smoke --json` to verify the public
 CLI happy path, installed handoff export behavior, report compatibility checks,
 and the packaged `quality_evidence_contract` / `repo_quality_certifier`
-compatibility surfaces in one command.
+compatibility surfaces in one command. For a target release, run the explicit
+`release` profile with current CI provenance and a validated
+`.quality-runner/release-evidence.json`; it blocks on unresolved package,
+migration, acceptance, publication, aggregate-coverage, manifest, or
+read-only-integrity requirements.
 
 ## MCP
 
@@ -249,12 +279,22 @@ Quality Runner writes versioned JSON and Markdown artifacts. See
 field-level guarantees.
 
 Semantic code similarity is a structural quality signal, not an automatic
-refactor. When `similarity-ts`, `similarity-py`, or `similarity-rs` are already
-installed locally, QR runs them read-only and normalizes high-confidence matches
-into `code-quality-scan.json` deduplicate findings and `SIM-###` clusters. QR
-does not install these tools. Disable or tune similarity under
+refactor. QR owns the default similarity engine, runs it in-process, and records
+high-confidence matches in `code-quality-scan.json` as deduplicate findings and
+`SIM-###` clusters. No similarity binary or external dependency is required.
+The legacy external backend is available only when explicitly selected with
+`similarity_backend = "external"`; its availability is reported rather than
+silently assumed. Disable or tune similarity under
 `[quality_runner.structural_scan]` (for example `similarity_enabled = false` or
 `disabled_rule_groups = ["deduplicate"]`).
+
+Every completed inspect, run, verify, and timeout workflow exposes
+`module_status`. Core
+modules include repository discovery, provenance, structural quality, native
+similarity, and UI quality. UI quality is `enabled` when QR detects user-facing
+UI files and `not_applicable` for backend, CLI, and library repositories. The
+report-only UI token contract and workflow-specific layers remain visible as
+`not_run`, `not_applicable`, `disabled`, or `unavailable` when they do not apply.
 
 ## DOI-Ready Research Release
 
