@@ -1,6 +1,6 @@
 # Quality Runner Project Truth
 
-Last updated: 2026-07-14
+Last updated: 2026-07-16
 
 ## Current State
 
@@ -61,12 +61,21 @@ audit/actionability boundary, rejects invalid regexes during skill ingest, and
 scans Astro, Vue, Svelte, SCSS, Sass, Less, and MDX surfaces. These packs remain
 opt-in observations with contextual review and rendered/copy verification.
 
+The QR-native similarity backend shipped in `a7b45ab`. Quality Runner now owns
+the default standard-library similarity scan for JavaScript/TypeScript, Python,
+and Rust, with a stable `quality-runner-similarity-v0.1` report schema and an
+explicit `similarity_backend` configuration choice. The upstream-compatible
+binary scanners remain an opt-in external adapter; QR never installs them, and
+missing external binaries remain report-only scanner status. The native path is
+covered by focused tests and does not vendor upstream source.
+
 ## Next Step
 
-Use `quality-runner plan init`, `phase add`, and `phase plan` to turn each QR
-remediation run into native cluster-oriented work. Dispatch one ready plan at a
-time, record the external batch result, refresh QR evidence with `phase update`,
-and close only after `phase verify` passes. GSD remains optional and independent.
+Dogfood the QR-native similarity report against representative JavaScript,
+Python, and Rust repositories, then keep `similarity_backend = "external"` as
+the comparison path only where an upstream binary is intentionally available.
+Continue using `quality-runner plan init`, `phase add`, and `phase plan` for
+cluster-oriented remediation; GSD remains optional and independent.
 
 ## Blockers
 
@@ -78,39 +87,15 @@ and close only after `phase verify` passes. GSD remains optional and independent
   access when the offline wheel build cannot reuse dependencies; it passed with
   a temporary cache. Full-repo Ruff and basedpyright remain blocked by the
   pre-existing findings listed above.
+- The broader `tests/test_code_quality.py tests/test_config.py` slice remains
+  affected by unrelated dirty-branch changes: the source-file line ceiling
+  currently sees `quality_runner/code_quality.py` above 500 lines, and two
+  workflow tests hit an existing `build_run_manifest(..., module_status=...)`
+  signature mismatch. The similarity-focused slice is green.
+- The feature branch still contains unrelated user changes outside `a7b45ab`;
+  no push or merge was attempted for this isolated commit.
 
-_(9 older entries trimmed)_
-
-Current verification:
-
-- 2026-07-14: Added native QR phase planning in `1f44c21`: nested plan/phase
-  CLI commands, QR-owned planning storage, deterministic cluster plans and
-  waves, batch summaries, remediation-delta lifecycle updates, verification,
-  schemas, docs, and focused tests. Focused planning/schema tests passed
-  (`25 passed`), the full suite passed (`436 passed`), touched-file Ruff and
-  basedpyright passed, the packaged entrypoint smoke passed with a temporary
-  UV cache, and the Pre-CR commit gate passed.
-- 2026-07-13: Mined the anti-template workflow in `b879c63`. Added clean-room
-  UI and copy specificity packs, frontend extension coverage, strict regex
-  ingest rejection, and skill category preservation. Focused tests, touched-file
-  Ruff/format/BasedPyright, source-root Vulture, and TOML parsing passed; the
-  suite passed with `426 passed, 1 deselected` after the network-blocked package
-  test was excluded.
-
-- 2026-07-13: Added personal corpus classification, pack append/provenance, and
-  additive multi-repo synchronization in `28905ca`. Full suite passes (`423
-  passed`); touched-file Ruff/format, BasedPyright, and Vulture pass. Full-repo
-  Ruff and BasedPyright retain unrelated baseline findings.
-
-- 2026-07-13: Aligned runtime, plugin, citation, and release-checklist
-  metadata on `0.5.0` in `6e93ee0`; focused packaging checks and the full suite
-  passed (`419 passed`). Touched-file Ruff/format and source-root Vulture pass;
-  repository-wide Ruff/format/basedpyright retain unrelated baseline findings.
-- 2026-07-13: Dogfooded the `0.5.0` runner against BBDSE, Portfolio, and Agent
-  Eval Contract. Audit totals were 55, 29, and 12 respectively; dependency
-  capability gaps cleared to zero after repo-local configuration. Agent Eval's
-  dependency gate passed, BBDSE's gate reported advisories, and Portfolio's
-  gate was blocked by pnpm build-script approval.
+_(6 older entries trimmed)_
 
 - 2026-07-12: Added and committed the `ui-foundations` starter pack as
   `ed16bb2`. Focused quality-skill tests passed (`24 passed`), pack ingest,
