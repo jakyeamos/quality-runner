@@ -6,7 +6,11 @@ from typing import Any
 
 
 def load_planning_source(
-    repo_root: Path, *, run_id: str | None, handoff_json: Path | None
+    repo_root: Path,
+    *,
+    run_id: str | None,
+    handoff_json: Path | None,
+    candidate_id: str | None = None,
 ) -> dict[str, Any]:
     if run_id is not None:
         run_dir = repo_root / ".quality-runner" / "runs" / run_id
@@ -20,6 +24,7 @@ def load_planning_source(
             run_id=run_id,
             handoff_path=handoff_path,
             plan_path=plan_path if plan else None,
+            candidate_id=candidate_id,
         )
     if handoff_json is None:
         raise ValueError("phase plan requires --run-id or --handoff-json")
@@ -48,6 +53,7 @@ def load_planning_source(
         run_id=handoff.get("run_id"),
         handoff_path=path,
         plan_path=plan_path,
+        candidate_id=candidate_id,
     )
 
 
@@ -71,21 +77,38 @@ def _source_payload(
     run_id: object,
     handoff_path: Path,
     plan_path: Path | None,
+    candidate_id: str | None,
 ) -> dict[str, Any]:
-    slices = plan.get("slices") if isinstance(plan.get("slices"), list) else []
+    phase_candidate_value = plan.get("phase_candidates")
+    phase_candidates: list[object] = (
+        phase_candidate_value if isinstance(phase_candidate_value, list) else []
+    )
+    domain_slices = [
+        item
+        for item in phase_candidates
+        if isinstance(item, dict) and isinstance(item.get("id"), str)
+    ]
+    if candidate_id is not None:
+        if not domain_slices:
+            raise ValueError(f"planning source has no domain phase candidate: {candidate_id}")
+        domain_slices = [item for item in domain_slices if item.get("id") == candidate_id]
+        if not domain_slices:
+            raise ValueError(f"planning source has no domain phase candidate: {candidate_id}")
+    legacy_slices = plan.get("slices") if isinstance(plan.get("slices"), list) else []
+    slices = domain_slices or legacy_slices
     if not slices and isinstance(handoff.get("next_slice"), dict):
         slices = [handoff["next_slice"]]
     if not slices:
         raise ValueError("planning source contains no remediation slices")
     return {
         "slices": [
-            item
-            for item in slices
-            if isinstance(item, dict) and isinstance(item.get("id"), str)
+            item for item in slices if isinstance(item, dict) and isinstance(item.get("id"), str)
         ],
+        "planning_mode": "domain" if domain_slices else "forensic",
         "source": {
             "run_id": run_id if isinstance(run_id, str) else None,
             "handoff_json": str(handoff_path),
             "remediation_plan_json": str(plan_path) if plan_path is not None else None,
+            **({"candidate_id": candidate_id} if candidate_id is not None else {}),
         },
     }

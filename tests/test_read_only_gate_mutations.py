@@ -68,10 +68,17 @@ def test_verify_gates_read_only_mode_restores_tracked_mutations(tmp_path: Path) 
     assert gate["status"] == "failed"
     assert gate["failure_type"] == "read-only-mutation"
     assert gate["exit_code"] == 0
-    assert gate["diagnostics"]["read_only_mutation"] == {
+    mutation_diagnostics = gate["diagnostics"]["read_only_mutation"]
+    assert {
+        key: value for key, value in mutation_diagnostics.items() if key != "scan_exclusions"
+    } == {
         "restored": True,
         "tracked_files": ["tracked.txt"],
+        "untracked_or_ignored_files": [],
+        "manifest_complete": True,
+        "allowed_paths": [".quality-runner", ".quality-runner/runs/", ".quality-runner/worktrees/"],
     }
+    assert mutation_diagnostics["scan_exclusions"]
     assert "mutated tracked files" in gate["recommended_action"]
     assert handoff["status"] == "gates-blocked"
     assert handoff["gate_verification"]["recommended_classification"] == "read-only-gate-blocker"

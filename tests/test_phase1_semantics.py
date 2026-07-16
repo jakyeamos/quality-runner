@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
@@ -100,8 +101,17 @@ def test_compute_lifecycle_status_merge_ready_with_ci(tmp_path: Path) -> None:
         audit={"status": "findings"},
         repo_scan={
             "ci_checks": [
-                {"name": "Quality / Lint", "status": "completed", "conclusion": "success"}
-            ]
+                {
+                    "name": "Quality / Lint",
+                    "status": "completed",
+                    "conclusion": "success",
+                    "head_sha": "abc123",
+                    "ref": "main",
+                    "workflow_run_id": "run-1",
+                    "captured_at": datetime.now(UTC).isoformat(),
+                }
+            ],
+            "git_provenance": {"head_sha": "abc123", "branch": "main"},
         },
     )
     assert status == "merge-ready"

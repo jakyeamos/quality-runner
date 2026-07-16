@@ -52,6 +52,19 @@ def matching_ci_status(
                 "status": _optional_string(check.get("status")),
                 "conclusion": _optional_string(check.get("conclusion")),
                 "url": _optional_string(check.get("url")),
+                **{
+                    key: check[key]
+                    for key in (
+                        "head_sha",
+                        "ref",
+                        "workflow_run_id",
+                        "captured_at",
+                        "artifact_digest",
+                        "source_url",
+                        "quality_runner_version",
+                    )
+                    if isinstance(check.get(key), str) and check[key]
+                },
             }
     return None
 

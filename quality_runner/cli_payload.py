@@ -28,10 +28,12 @@ from quality_runner.cli_review import review_command_payload
 from quality_runner.cli_rollout import rollout_command_payload
 from quality_runner.cli_skills import skill_command_payload
 from quality_runner.cli_status import export_handoff_payload, status_payload
+from quality_runner.cli_update import update_command_payload
 from quality_runner.code_quality import preview_ignored_paths
 from quality_runner.config import CONFIG_FILE_NAME, load_repo_config
 from quality_runner.controller_reports import validate_controller_report
 from quality_runner.intent import workflow_intent_from_cli_args
+from quality_runner.progress import ProgressCallback
 from quality_runner.release_smoke import release_smoke_payload
 from quality_runner.run_summary import build_run_summary
 from quality_runner.workflow import inspect_payload, run_payload, verify_gates_payload
@@ -44,9 +46,15 @@ EXPENSIVE_IGNORED_PATH_SECONDS_THRESHOLD = 5.0
 MAX_INTERACTIVE_IGNORED_PATHS = 10
 
 
-def payload_for_args(args: argparse.Namespace) -> dict[str, Any]:
+def payload_for_args(
+    args: argparse.Namespace,
+    *,
+    progress: ProgressCallback | None = None,
+) -> dict[str, Any]:
     if args.command == "doctor":
         return _doctor_payload()
+    if args.command == "self-update":
+        return update_command_payload(args.source)
     if args.command == "release-smoke":
         from quality_runner.cli import build_parser
 
@@ -96,10 +104,15 @@ def payload_for_args(args: argparse.Namespace) -> dict[str, Any]:
             run_id=args.run_id,
             profile=args.profile,
             ci_status_json=Path(args.ci_status_json) if args.ci_status_json else None,
+            readiness_evidence_file=Path(args.readiness_evidence_file)
+            if args.readiness_evidence_file
+            else None,
             include_ignored_paths=_interactive_include_ignored_paths(args, repo_root),
             checkout_most_advanced_branch=args.checkout_most_advanced_branch,
             skill_review_report=_optional_skill_review_report(args),
+            agent_review_mode=args.agent_review_mode,
             intent=workflow_intent_from_cli_args(args, repo_root=repo_root, run_id=args.run_id),
+            progress=progress,
         )
     if args.command == "inspect":
         repo_root = _validated_repo_path(args.repo_path)
@@ -108,10 +121,15 @@ def payload_for_args(args: argparse.Namespace) -> dict[str, Any]:
             run_id=args.run_id,
             profile=args.profile,
             ci_status_json=Path(args.ci_status_json) if args.ci_status_json else None,
+            readiness_evidence_file=Path(args.readiness_evidence_file)
+            if args.readiness_evidence_file
+            else None,
             include_ignored_paths=_interactive_include_ignored_paths(args, repo_root),
             checkout_most_advanced_branch=args.checkout_most_advanced_branch,
             skill_review_report=_optional_skill_review_report(args),
+            agent_review_mode=args.agent_review_mode,
             intent=workflow_intent_from_cli_args(args, repo_root=repo_root, run_id=args.run_id),
+            progress=progress,
         )
     if args.command == "verify-gates":
         repo_root = _validated_repo_path(args.repo_path)
@@ -120,6 +138,9 @@ def payload_for_args(args: argparse.Namespace) -> dict[str, Any]:
             run_id=args.run_id,
             profile=args.profile,
             ci_status_json=Path(args.ci_status_json) if args.ci_status_json else None,
+            readiness_evidence_file=Path(args.readiness_evidence_file)
+            if args.readiness_evidence_file
+            else None,
             timeout_seconds=args.timeout_seconds,
             checkout_most_advanced_branch=args.checkout_most_advanced_branch,
             read_only_gates=args.read_only_gates,
@@ -127,10 +148,17 @@ def payload_for_args(args: argparse.Namespace) -> dict[str, Any]:
             worktree_mode=args.worktree_mode,
             allow_dirty_worktree_verify=args.allow_dirty_worktree_verify,
             skill_review_report=_optional_skill_review_report(args),
+            agent_review_mode=args.agent_review_mode,
             intent=workflow_intent_from_cli_args(args, repo_root=repo_root, run_id=args.run_id),
+            progress=progress,
         )
     if args.command == "refresh":
-        return refresh_command_payload(args, _validated_repo_path(args.repo_path))
+        return refresh_command_payload(
+            args,
+            _validated_repo_path(args.repo_path),
+            skill_review_report=_optional_skill_review_report(args),
+            progress=progress,
+        )
     if args.command == "remediation-delta":
         return remediation_delta_command_payload(args, _validated_repo_path(args.repo_path))
     if args.command in {"plan", "phase"}:

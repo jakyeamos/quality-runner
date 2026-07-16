@@ -1,0 +1,50 @@
+{
+  "fixture_id": "defuddle-detector-trace",
+  "evidence": [
+    {
+      "id": "defuddle-selector-removal-stage",
+      "source": "kepano/defuddle",
+      "revision": "6c39f0959a2f566469a93a190b50e4b34bcf52c4",
+      "path": "src/removals/selectors.ts",
+      "locator": "L15-L194",
+      "knowledge_role": "detector",
+      "enforceability": "deterministic",
+      "normalization_status": "normalized",
+      "evidence": "Exact selectors run before partial selectors and each removal records a step, reason, and text preview.",
+      "evidence_preserved": true,
+      "mapping_status": "mapped",
+      "mapping_target": "detector_trace:selector-removal",
+      "loss_reason": null
+    },
+    {
+      "id": "defuddle-content-boundary-no-signal",
+      "source": "kepano/defuddle",
+      "revision": "6c39f0959a2f566469a93a190b50e4b34bcf52c4",
+      "path": "src/content-boundary.ts",
+      "locator": "L17-L143",
+      "knowledge_role": "detector",
+      "enforceability": "deterministic",
+      "normalization_status": "normalized",
+      "evidence": "Content-boundary detection can return no signal when a qualifying prose anchor is not found instead of treating absence as a removal match.",
+      "evidence_preserved": true,
+      "mapping_status": "mapped",
+      "mapping_target": "detector_result:no-signal",
+      "loss_reason": null
+    },
+    {
+      "id": "defuddle-golden-fixture-output",
+      "source": "kepano/defuddle",
+      "revision": "6c39f0959a2f566469a93a190b50e4b34bcf52c4",
+      "path": "tests/fixtures.test.ts",
+      "locator": "L7-L34, L82-L127",
+      "knowledge_role": "detector",
+      "enforceability": "agent_review",
+      "normalization_status": "normalized",
+      "evidence": "Fixture HTML is compared with expected Markdown and metadata, while debug removals provide explainable evidence for cleanup decisions.",
+      "evidence_preserved": true,
+      "mapping_status": "mapped",
+      "mapping_target": "evaluator_fixture:golden-output",
+      "loss_reason": null
+    }
+  ]
+}

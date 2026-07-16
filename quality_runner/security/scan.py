@@ -23,6 +23,16 @@ API_ROUTE_MARKERS = (
     "api/",
 )
 WEBHOOK_MARKERS = ("webhook", "webhooks")
+RAW_CONTENT_MARKERS = (
+    "dangerouslysetinnerhtml",
+    ".innerhtml",
+    "v-html",
+    "raw_html",
+    "rawhtml",
+    "render_raw_html",
+)
+RAW_CONTENT_SUFFIXES = {".html", ".js", ".jsx", ".svelte", ".ts", ".tsx", ".vue"}
+MAX_SURFACE_CONTENT_BYTES = 250_000
 
 
 def create_security_scan(
@@ -94,12 +104,37 @@ def merge_security_into_capability_map(
 ) -> dict[str, Any]:
     if security_scan.get("settings", {}).get("enabled") is False:
         return capability_map
-    return merge_security_capabilities(
+    merged = merge_security_capabilities(
         capability_map,
         available=security_scan.get("available_capabilities", []),
         missing=security_scan.get("missing_capabilities", []),
         agent_review_gates=security_scan.get("agent_review_gates", []),
     )
+    readiness = merged.get("readiness")
+    surfaces = security_scan.get("surfaces")
+    if (
+        isinstance(readiness, dict)
+        and readiness.get("profile") == "release"
+        and isinstance(surfaces, dict)
+        and surfaces.get("publication_visibility") is True
+    ):
+        required = [
+            item for item in readiness.get("required_gate_ids", []) if isinstance(item, str)
+        ]
+        unresolved = [
+            item for item in readiness.get("unresolved_gate_ids", []) if isinstance(item, str)
+        ]
+        if "publication_visibility_review" not in required:
+            required.append("publication_visibility_review")
+        if "publication_visibility_review" not in unresolved:
+            unresolved.append("publication_visibility_review")
+        merged["readiness"] = {
+            **readiness,
+            "status": "blocked",
+            "required_gate_ids": required,
+            "unresolved_gate_ids": sorted(unresolved),
+        }
+    return merged
 
 
 def detect_security_surfaces(repo_root: Path, *, scan: dict[str, Any]) -> dict[str, bool]:
@@ -109,6 +144,7 @@ def detect_security_surfaces(repo_root: Path, *, scan: dict[str, Any]) -> dict[s
         "dependency_manifest": False,
         "dangerous_sinks": False,
         "client_framework": False,
+        "publication_visibility": False,
     }
     for path in repo_root.rglob("*"):
         if not path.is_file():
@@ -124,11 +160,52 @@ def detect_security_surfaces(repo_root: Path, *, scan: dict[str, Any]) -> dict[s
             surfaces["webhooks"] = True
         if path.name in {"package.json", "pyproject.toml", "Cargo.toml", "go.mod"}:
             surfaces["dependency_manifest"] = True
+        lowered = relative.lower()
+        if any(
+            marker in lowered
+            for marker in (
+                "publish",
+                "publication",
+                "reader",
+                "draft",
+                "media",
+                "visibility",
+                "raw-html",
+                "raw_html",
+                "rawhtml",
+                "content",
+                "visibility-boundary",
+                "access-boundary",
+                "public_",
+                "public-",
+                "public/",
+                "private_",
+                "private-",
+                "private/",
+            )
+        ):
+            surfaces["publication_visibility"] = True
+        if _raw_content_surface(path, relative):
+            surfaces["publication_visibility"] = True
 
     languages = scan.get("languages")
     if isinstance(languages, list) and "javascript" in languages:
         surfaces["client_framework"] = True
     return surfaces
+
+
+def _raw_content_surface(path: Path, relative: str) -> bool:
+    if path.suffix.lower() not in RAW_CONTENT_SUFFIXES:
+        return False
+    if relative.startswith(("quality_runner/security/", ".quality-runner/")):
+        return False
+    try:
+        if path.stat().st_size > MAX_SURFACE_CONTENT_BYTES:
+            return False
+        text = path.read_text(encoding="utf-8", errors="replace").lower()
+    except OSError:
+        return False
+    return any(marker in text for marker in RAW_CONTENT_MARKERS)
 
 
 def _scan_files(

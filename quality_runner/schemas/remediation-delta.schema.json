@@ -68,9 +68,23 @@
         "priority": { "type": ["string", "null"] },
         "finding_ids": { "type": "array", "items": { "type": "string" } },
         "actions": { "type": "array", "items": { "type": "string" } },
-        "verification_gates": { "type": "array", "items": { "type": "string" } }
+        "verification_gates": { "type": "array", "items": { "type": "string" } },
+        "verification_mode": { "enum": ["command", "evidence"] },
+        "verification_requirements": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        }
       },
-      "additionalProperties": false
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "required": ["verification_mode"],
+            "properties": { "verification_mode": { "const": "evidence" } }
+          },
+          "then": { "required": ["verification_requirements"] }
+        }
+      ]
     },
     "sliceDelta": {
       "type": "object",

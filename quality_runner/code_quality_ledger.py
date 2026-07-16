@@ -5,8 +5,8 @@ from typing import Any
 
 from quality_runner.code_quality_findings import _counts
 from quality_runner.code_quality_paths import _string_or_none
-from quality_runner.schema_constants import RESOLUTION_LEDGER_SCHEMA
 from quality_runner.review_state import finalize_cycle_state
+from quality_runner.schema_constants import RESOLUTION_LEDGER_SCHEMA
 
 ACCEPTED_STATUSES = {"accepted-intentional", "accepted-false-positive", "blocked-with-prerequisite"}
 RESOLUTION_STATUSES = {
@@ -26,7 +26,9 @@ def build_resolution_ledger(
 ) -> dict[str, Any]:
     current_findings = _current_findings(code_quality_scan)
     current_fingerprints = set(current_findings)
-    previous_entries = _latest_previous_resolution_entries(repo_root, run_id)
+    previous_entries, previous_finding_dispositions = _latest_previous_resolution_context(
+        repo_root, run_id
+    )
     accepted_by_config = _accepted_dispositions(config)
     accepted_by_previous = {
         entry["fingerprint"]: entry
@@ -78,7 +80,7 @@ def build_resolution_ledger(
         )
 
     entries.sort(key=lambda item: (str(item["status"]), str(item["rule_id"]), str(item["file"])))
-    return {
+    ledger: dict[str, Any] = {
         "schema": RESOLUTION_LEDGER_SCHEMA,
         "run_id": run_id,
         "summary": {
@@ -87,6 +89,9 @@ def build_resolution_ledger(
         },
         "entries": entries,
     }
+    if previous_finding_dispositions:
+        ledger["finding_dispositions"] = previous_finding_dispositions
+    return ledger
 
 
 def render_resolution_ledger_markdown(ledger: dict[str, Any]) -> str:
@@ -168,9 +173,17 @@ def _ledger_entry(
 
 
 def _latest_previous_resolution_entries(repo_root: Path, run_id: str) -> list[dict[str, Any]]:
+    entries, _ = _latest_previous_resolution_context(repo_root, run_id)
+    return entries
+
+
+def _latest_previous_resolution_context(
+    repo_root: Path,
+    run_id: str,
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     runs_dir = repo_root.expanduser().resolve() / ".quality-runner" / "runs"
     if not runs_dir.is_dir():
-        return []
+        return [], []
     candidates = [
         path / "resolution-ledger.json"
         for path in sorted(runs_dir.iterdir(), key=lambda item: item.stat().st_mtime, reverse=True)
@@ -187,8 +200,14 @@ def _latest_previous_resolution_entries(repo_root: Path, run_id: str) -> list[di
             continue
         entries = payload.get("entries")
         if isinstance(entries, list):
-            return [entry for entry in entries if isinstance(entry, dict)]
-    return []
+            dispositions = payload.get("finding_dispositions")
+            return (
+                [entry for entry in entries if isinstance(entry, dict)],
+                [item for item in dispositions if isinstance(item, dict)]
+                if isinstance(dispositions, list)
+                else [],
+            )
+    return [], []
 
 
 def _accepted_dispositions(config: dict[str, Any]) -> dict[str, dict[str, str]]:

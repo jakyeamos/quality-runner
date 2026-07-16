@@ -165,6 +165,39 @@ def test_record_disposition_updates_resolution_ledger(tmp_path: Path) -> None:
     assert dispositions[0]["owner"] == "maintainer"
 
 
+def test_next_run_applies_gate_disposition_without_repeating_the_response(
+    tmp_path: Path,
+) -> None:
+    _minimal_repo(tmp_path)
+    run_payload(repo_root=tmp_path, run_id="disposition-prior")
+    created = create_gate_run(
+        repo_root=tmp_path,
+        run_id="disposition-prior",
+        gate_run_id="gate-disposition-prior-001",
+    )
+
+    record_gate_response(
+        repo_root=tmp_path,
+        gate_run_id=created["gate_run"]["gate_run_id"],
+        action="record-disposition",
+        finding_ids=["missing-tests"],
+        notes="Tests are owned by the host application.",
+        disposition="accepted-false-positive",
+        owner="maintainer",
+    )
+
+    next_payload = run_payload(repo_root=tmp_path, run_id="disposition-next")
+    audit = json.loads(
+        Path(next_payload["artifact_paths"]["quality_audit_json"]).read_text(encoding="utf-8")
+    )
+    missing_tests = next(
+        finding for finding in audit["findings"] if finding["id"] == "missing-tests"
+    )
+
+    assert missing_tests["resolution"]["status"] == "accepted-false-positive"
+    assert missing_tests["resolution"]["resolved"] is True
+
+
 def test_create_gate_run_attaches_intent_when_missing(tmp_path: Path) -> None:
     _minimal_repo(tmp_path)
     run_payload(repo_root=tmp_path, run_id="intent-source")

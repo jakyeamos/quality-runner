@@ -1,0 +1,50 @@
+{
+  "fixture_id": "cli-boundary-skill",
+  "evidence": [
+    {
+      "id": "cli-runtime-prerequisite",
+      "source": "kepano/obsidian-skills",
+      "revision": "a1dc48e68138490d522c04cbf5822214c6eb1202",
+      "path": "skills/obsidian-cli/SKILL.md",
+      "locator": "L6-L10",
+      "knowledge_role": "tool",
+      "enforceability": "context_only",
+      "normalization_status": "not_applicable",
+      "evidence": "The Obsidian CLI skill requires a running Obsidian instance before commands can be used.",
+      "evidence_preserved": true,
+      "mapping_status": "context_only",
+      "mapping_target": null,
+      "loss_reason": "QR must not execute or verify an external application runtime prerequisite."
+    },
+    {
+      "id": "cli-file-path-semantics",
+      "source": "kepano/obsidian-skills",
+      "revision": "a1dc48e68138490d522c04cbf5822214c6eb1202",
+      "path": "skills/obsidian-cli/SKILL.md",
+      "locator": "L24-L29",
+      "knowledge_role": "tool",
+      "enforceability": "deterministic",
+      "normalization_status": "not_applicable",
+      "evidence": "CLI commands distinguish file name resolution from exact vault path targeting and support an explicit vault target.",
+      "evidence_preserved": true,
+      "mapping_status": "mapped",
+      "mapping_target": "tool_contract:file-targeting",
+      "loss_reason": null
+    },
+    {
+      "id": "cli-developer-verification-loop",
+      "source": "kepano/obsidian-skills",
+      "revision": "a1dc48e68138490d522c04cbf5822214c6eb1202",
+      "path": "skills/obsidian-cli/SKILL.md",
+      "locator": "L71-L90",
+      "knowledge_role": "workflow",
+      "enforceability": "context_only",
+      "normalization_status": "not_applicable",
+      "evidence": "Plugin development guidance sequences reload, error inspection, screenshot or DOM verification, and console inspection.",
+      "evidence_preserved": true,
+      "mapping_status": "context_only",
+      "mapping_target": "workflow:tool-verification",
+      "loss_reason": "The workflow depends on the Obsidian runtime and is not a source-code detector."
+    }
+  ]
+}

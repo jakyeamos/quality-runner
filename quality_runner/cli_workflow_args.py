@@ -15,6 +15,11 @@ def add_workflow_arguments(parser: argparse.ArgumentParser) -> None:
         help="Local CI status JSON export to attach to capability evidence",
     )
     parser.add_argument(
+        "--readiness-evidence-file",
+        default=None,
+        help="Release/readiness evidence JSON path inside the target repository",
+    )
+    parser.add_argument(
         "--interactive",
         action="store_true",
         help="Prompt before excluding expensive default-ignored scan paths",
@@ -29,7 +34,21 @@ def add_workflow_arguments(parser: argparse.ArgumentParser) -> None:
         default=None,
         help="Validated agent skill review report JSON to merge into findings",
     )
+    parser.add_argument(
+        "--agent-review-mode",
+        choices=["off", "auto", "parallel", "required"],
+        default=None,
+        help=(
+            "Agent skill-review policy: auto-complete, parallel sidecar, off, or required; "
+            "release profile always uses required"
+        ),
+    )
     add_intent_cli_arguments(parser)
+    parser.add_argument(
+        "--no-progress",
+        action="store_true",
+        help="Disable stderr progress and heartbeat diagnostics",
+    )
     parser.add_argument("--json", action="store_true", help="Emit JSON output")
 
 

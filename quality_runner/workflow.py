@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-import json
 from pathlib import Path
 from typing import Any
 
+from quality_runner.agent_review_policy import resolve_agent_review_mode, review_blocks_readiness
 from quality_runner.artifacts import prepare_artifact_dir, write_json, write_text
 from quality_runner.audit import build_audit_report
 from quality_runner.code_quality import (
@@ -19,13 +19,17 @@ from quality_runner.gate_resolution_bridge import merge_gate_finding_disposition
 from quality_runner.git_branches import prepare_scan_branch
 from quality_runner.intent import attach_intent_artifacts, intent_for_run
 from quality_runner.manifest import build_run_manifest, git_state_for_repo
+from quality_runner.module_status import build_module_status
 from quality_runner.package_preflight import build_package_manager_preflight
 from quality_runner.planning import (
     build_agent_handoff,
     build_remediation_plan,
     render_handoff_markdown,
 )
+from quality_runner.progress import ProgressCallback, emit_progress
+from quality_runner.readiness import apply_readiness_evidence_override
 from quality_runner.refresh_workflow import run_refresh_payload
+from quality_runner.resolution import resolved_planning_inputs
 from quality_runner.review_delta import build_review_delta, persist_review_delta
 from quality_runner.run_summary import build_run_summary
 from quality_runner.security.ledger import merge_security_ledger_entries
@@ -36,10 +40,12 @@ from quality_runner.workflow_helpers import (
     config_with_include_overrides,
 )
 from quality_runner.workflow_internal import generated_run_id, inspect_repo_bundle, require_valid
+from quality_runner.workflow_review_metadata import attach_review_metadata
 from quality_runner.workflow_skills import (
     append_warnings,
     create_code_quality_scan_with_skills,
     quality_skill_identities,
+    skill_review_summary,
     write_skill_review_artifacts,
 )
 from quality_runner.workflow_verify import verify_gates_payload
@@ -50,20 +56,31 @@ def inspect_payload(
     run_id: str | None = None,
     profile: str | None = None,
     ci_status_json: Path | None = None,
+    readiness_evidence_file: Path | None = None,
     include_ignored_paths: list[str] | None = None,
     checkout_most_advanced_branch: bool = False,
     skill_review_report: dict[str, Any] | None = None,
+    agent_review_mode: str | None = None,
     intent: dict[str, Any] | None = None,
+    progress: ProgressCallback | None = None,
 ) -> dict[str, Any]:
     resolved_run_id = generated_run_id() if run_id is None else run_id
+    emit_progress(progress, "prepare", f"inspect run_id={resolved_run_id}")
     branch_warnings = prepare_scan_branch(
         repo_root, checkout_most_advanced_branch=checkout_most_advanced_branch
     )
     run_dir = prepare_artifact_dir(repo_root, resolved_run_id)
+    emit_progress(progress, "discovery", "repository facts, configuration, and standards")
     scan, standards_packet, capability_map, config = inspect_repo_bundle(
         repo_root, resolved_run_id, profile, ci_status_json, branch_warnings
     )
     config = config_with_include_overrides(config, include_ignored_paths)
+    resolved_agent_review_mode = resolve_agent_review_mode(
+        requested=agent_review_mode,
+        profile=str(standards_packet.get("profile") or profile or "default"),
+        config=config,
+    )
+    emit_progress(progress, "security", "security surface and dependency analysis")
     security_scan = create_security_scan(
         repo_root,
         scan=scan,
@@ -71,13 +88,35 @@ def inspect_payload(
         standards_packet=standards_packet,
     )
     capability_map = merge_security_into_capability_map(capability_map, security_scan)
+    capability_map = apply_readiness_evidence_override(
+        capability_map=capability_map,
+        standards_packet=standards_packet,
+        repo_root=repo_root,
+        evidence_file=readiness_evidence_file,
+    )
+    emit_progress(progress, "code-quality", "structural quality and selected skill packs")
     code_quality_scan, skill_warnings = create_code_quality_scan_with_skills(
         repo_root,
         scan=scan,
         config=config,
         skill_review_report=skill_review_report,
+        require_skill_review_coverage=resolved_agent_review_mode in {"auto", "required"},
     )
     scan = append_warnings(scan, skill_warnings)
+    emit_progress(progress, "artifacts", "writing inspection artifacts")
+    run_intent = intent_for_run(intent, resolved_run_id)
+    module_status = build_module_status(
+        mode="inspect",
+        profile=str(standards_packet.get("profile") or profile or "default"),
+        repo_scan=scan,
+        code_quality_scan=code_quality_scan,
+        capability_map=capability_map,
+        standards_packet=standards_packet,
+        security_scan=security_scan,
+        config=config,
+        intent=run_intent,
+    )
+    scan["module_status"] = module_status
     package_manager_preflight = build_package_manager_preflight(repo_root, scan)
 
     artifact_paths = {
@@ -103,9 +142,10 @@ def inspect_payload(
             config=config,
             code_quality_scan=code_quality_scan,
             skill_review_report=skill_review_report,
+            agent_review_mode=resolved_agent_review_mode,
+            require_skill_review_coverage=resolved_agent_review_mode in {"auto", "required"},
         )
     )
-    run_intent = intent_for_run(intent, resolved_run_id)
     artifact_paths = attach_intent_artifacts(
         run_dir=run_dir,
         intent=run_intent,
@@ -118,17 +158,21 @@ def inspect_payload(
         artifact_paths=artifact_paths,
         intent=run_intent,
         quality_skills=quality_skill_identities(code_quality_scan),
+        module_status=module_status,
     )
     artifact_paths["run_manifest_json"] = str(
         write_json(run_dir / "run-manifest.json", inspect_manifest)
     )
+    emit_progress(progress, "complete", f"status=inspected run_id={resolved_run_id}")
 
     return {
         "schema": "quality-runner-inspect-result-v0.1",
         "status": "inspected",
         "implementation_allowed": False,
         "run_id": resolved_run_id,
+        "agent_review_mode": resolved_agent_review_mode,
         "artifact_paths": artifact_paths,
+        "module_status": module_status,
         "warnings": combined_warnings(scan, capability_map),
     }
 
@@ -138,20 +182,31 @@ def run_payload(
     run_id: str | None = None,
     profile: str | None = None,
     ci_status_json: Path | None = None,
+    readiness_evidence_file: Path | None = None,
     include_ignored_paths: list[str] | None = None,
     checkout_most_advanced_branch: bool = False,
     skill_review_report: dict[str, Any] | None = None,
+    agent_review_mode: str | None = None,
     intent: dict[str, Any] | None = None,
+    progress: ProgressCallback | None = None,
 ) -> dict[str, Any]:
     resolved_run_id = generated_run_id() if run_id is None else run_id
+    emit_progress(progress, "prepare", f"run_id={resolved_run_id}")
     branch_warnings = prepare_scan_branch(
         repo_root, checkout_most_advanced_branch=checkout_most_advanced_branch
     )
     run_dir = prepare_artifact_dir(repo_root, resolved_run_id)
+    emit_progress(progress, "discovery", "repository facts, configuration, and standards")
     scan, standards_packet, capability_map, config = inspect_repo_bundle(
         repo_root, resolved_run_id, profile, ci_status_json, branch_warnings
     )
     config = config_with_include_overrides(config, include_ignored_paths)
+    resolved_agent_review_mode = resolve_agent_review_mode(
+        requested=agent_review_mode,
+        profile=str(standards_packet.get("profile") or profile or "default"),
+        config=config,
+    )
+    emit_progress(progress, "security", "security surface and dependency analysis")
     security_scan = create_security_scan(
         repo_root,
         scan=scan,
@@ -159,13 +214,45 @@ def run_payload(
         standards_packet=standards_packet,
     )
     capability_map = merge_security_into_capability_map(capability_map, security_scan)
+    capability_map = apply_readiness_evidence_override(
+        capability_map=capability_map,
+        standards_packet=standards_packet,
+        repo_root=repo_root,
+        evidence_file=readiness_evidence_file,
+    )
+    emit_progress(progress, "code-quality", "structural quality and selected skill packs")
     code_quality_scan, skill_warnings = create_code_quality_scan_with_skills(
         repo_root,
         scan=scan,
         config=config,
         skill_review_report=skill_review_report,
+        require_skill_review_coverage=resolved_agent_review_mode in {"auto", "required"},
     )
     scan = append_warnings(scan, skill_warnings)
+    skill_review_artifact_paths = write_skill_review_artifacts(
+        run_dir=run_dir,
+        run_id=resolved_run_id,
+        repo_root=repo_root,
+        config=config,
+        code_quality_scan=code_quality_scan,
+        skill_review_report=skill_review_report,
+        agent_review_mode=resolved_agent_review_mode,
+        require_skill_review_coverage=resolved_agent_review_mode in {"auto", "required"},
+    )
+    emit_progress(progress, "planning", "building audit, remediation plan, and handoff")
+    run_intent = intent_for_run(intent, resolved_run_id)
+    module_status = build_module_status(
+        mode="run",
+        profile=str(standards_packet.get("profile") or profile or "default"),
+        repo_scan=scan,
+        code_quality_scan=code_quality_scan,
+        capability_map=capability_map,
+        standards_packet=standards_packet,
+        security_scan=security_scan,
+        config=config,
+        intent=run_intent,
+    )
+    scan["module_status"] = module_status
     package_manager_preflight = build_package_manager_preflight(repo_root, scan)
     resolution_ledger = build_resolution_ledger(
         repo_root=repo_root,
@@ -192,13 +279,17 @@ def run_payload(
         capability_map=capability_map,
         code_quality_scan=code_quality_scan,
         security_scan=security_scan,
+        resolution_ledger=resolution_ledger,
     )
     require_valid("audit report", validate_audit_report(audit_report))
 
+    planning_audit_report, active_code_quality_scan = resolved_planning_inputs(
+        audit_report, code_quality_scan, resolution_ledger
+    )
     remediation_plan = build_remediation_plan(
-        audit_report=audit_report,
+        audit_report=planning_audit_report,
         capability_map=capability_map,
-        code_quality_scan=code_quality_scan,
+        code_quality_scan=active_code_quality_scan,
         repo_root=repo_root,
         git_state=git_state_for_repo(repo_root),
     )
@@ -220,24 +311,28 @@ def run_payload(
         "agent_handoff_json": str(run_dir / "agent-handoff.json"),
         "agent_handoff_md": str(run_dir / "agent-handoff.md"),
     }
-    artifact_paths.update(
-        write_skill_review_artifacts(
-            run_dir=run_dir,
-            run_id=resolved_run_id,
-            repo_root=repo_root,
-            config=config,
-            code_quality_scan=code_quality_scan,
-            skill_review_report=skill_review_report,
-        )
+    artifact_paths.update(skill_review_artifact_paths)
+    skill_review = skill_review_summary(
+        code_quality_scan=code_quality_scan,
+        artifact_paths=artifact_paths,
+        skill_review_report=skill_review_report,
+        agent_review_mode=resolved_agent_review_mode,
     )
+    if (
+        status in {"clean", "planned"}
+        and isinstance(skill_review, dict)
+        and review_blocks_readiness(skill_review)
+    ):
+        status = "review-required"
     handoff = build_agent_handoff(
-        audit_report=audit_report,
+        audit_report=planning_audit_report,
         remediation_plan=remediation_plan,
         artifact_paths=artifact_paths,
         capability_map=capability_map,
         security_scan=security_scan,
-        intent=intent_for_run(intent, resolved_run_id),
+        intent=run_intent,
         repo_scan=scan,
+        skill_review=skill_review,
     )
     require_valid("agent handoff", validate_agent_handoff(handoff))
 
@@ -255,7 +350,6 @@ def run_payload(
     artifact_paths["capability_matrix_json"] = str(
         write_json(run_dir / "capability-matrix.json", capability_map)
     )
-    run_intent = intent_for_run(intent, resolved_run_id)
     artifact_paths = attach_intent_artifacts(
         run_dir=run_dir,
         intent=run_intent,
@@ -268,6 +362,7 @@ def run_payload(
         artifact_paths=artifact_paths,
         intent=run_intent,
         quality_skills=quality_skill_identities(code_quality_scan),
+        module_status=module_status,
     )
     artifact_paths["run_manifest_json"] = str(
         write_json(run_dir / "run-manifest.json", run_manifest)
@@ -299,13 +394,17 @@ def run_payload(
     artifact_paths["agent_handoff_md"] = str(
         write_text(run_dir / "agent-handoff.md", render_handoff_markdown(handoff))
     )
+    emit_progress(progress, "complete", f"status={status} run_id={resolved_run_id}")
 
     return {
         "schema": "quality-runner-run-result-v0.1",
         "status": status,
         "implementation_allowed": False,
         "run_id": resolved_run_id,
+        "agent_review_mode": resolved_agent_review_mode,
         "artifact_paths": artifact_paths,
+        "module_status": module_status,
+        **({"skill_review": skill_review} if skill_review is not None else {}),
         "warnings": combined_warnings(scan, capability_map),
     }
 
@@ -316,6 +415,7 @@ def refresh_payload(
     baseline_run_id: str | None = None,
     profile: str | None = None,
     ci_status_json: Path | None = None,
+    readiness_evidence_file: Path | None = None,
     timeout_seconds: int = 120,
     workflow_timeout_seconds: int | None = None,
     verify_timeout_seconds: int | None = None,
@@ -327,8 +427,11 @@ def refresh_payload(
     worktree_mode: str = "in-place",
     allow_dirty_worktree_verify: bool = False,
     intent: dict[str, Any] | None = None,
+    skill_review_report: dict[str, Any] | None = None,
+    agent_review_mode: str | None = None,
     review_cycle_id: str | None = None,
     review_iteration: int | None = None,
+    progress: ProgressCallback | None = None,
 ) -> dict[str, Any]:
     review_enabled = review_cycle_id is not None or review_iteration is not None
     if review_enabled:
@@ -345,6 +448,7 @@ def refresh_payload(
         baseline_run_id=baseline_run_id,
         profile=profile,
         ci_status_json=ci_status_json,
+        readiness_evidence_file=readiness_evidence_file,
         timeout_seconds=timeout_seconds,
         workflow_timeout_seconds=workflow_timeout_seconds,
         verify_timeout_seconds=verify_timeout_seconds,
@@ -356,10 +460,13 @@ def refresh_payload(
         worktree_mode=worktree_mode,
         allow_dirty_worktree_verify=allow_dirty_worktree_verify,
         intent=intent,
+        skill_review_report=skill_review_report,
+        agent_review_mode=agent_review_mode,
         inspect_callback=inspect_payload,
         run_callback=run_payload,
         verify_callback=verify_gates_payload,
         summary_callback=build_run_summary,
+        progress=progress,
     )
     if not review_enabled:
         return payload
@@ -375,7 +482,7 @@ def refresh_payload(
         baseline_run_id=baseline_run_id,
     )
     delta_paths = persist_review_delta(repo_root=repo_root, run_id=verify_run_id, payload=delta)
-    _attach_review_metadata(
+    attach_review_metadata(
         repo_root=repo_root,
         run_id=verify_run_id,
         cycle_id=review_cycle_id,
@@ -386,26 +493,3 @@ def refresh_payload(
     payload["review_delta"] = delta
     payload["review_delta_paths"] = delta_paths
     return payload
-
-
-def _attach_review_metadata(
-    *,
-    repo_root: Path,
-    run_id: str,
-    cycle_id: str,
-    iteration: int,
-    baseline_run_id: str | None,
-    delta_paths: dict[str, str],
-) -> None:
-    run_dir = repo_root / ".quality-runner" / "runs" / run_id
-    manifest_path = run_dir / "run-manifest.json"
-    if not manifest_path.exists():
-        return
-    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    manifest["review_cycle"] = {
-        "cycle_id": cycle_id,
-        "iteration": iteration,
-        "baseline_run_id": baseline_run_id,
-        "artifact_paths": delta_paths,
-    }
-    write_json(manifest_path, manifest)

@@ -2,7 +2,22 @@ from __future__ import annotations
 
 
 def gate_severity(capability_id: str) -> str:
-    if capability_id in {"formatter", "lint", "typecheck", "tests", "dead_code", "truth_file"}:
+    if capability_id in {
+        "formatter",
+        "lint",
+        "typecheck",
+        "tests",
+        "dead_code",
+        "truth_file",
+        "evidence_provenance",
+        "release_manifest_coherence",
+        "package_consumer_smoke",
+        "migration_safety",
+        "release_acceptance_evidence",
+        "aggregate_coverage",
+        "read_only_integrity",
+        "publication_visibility_review",
+    }:
         return "blocker"
     return "warning"
 
@@ -19,6 +34,14 @@ def suggested_gate_command(capability_id: str, language: object) -> str:
         "pre_pr": "quality-runner run . --json",
         "pre_cr": "pre-cr run --workspace . --json",
         "truth_file": "maintain .tracker/PROJECT_TRUTH.md",
+        "package_consumer_smoke": "add package-smoke or consumer-smoke and install the built artifact in isolation",
+        "migration_safety": "provide forward, rollback, failure-injection, and reconciliation evidence",
+        "release_acceptance_evidence": "provide the release-evidence.json owner acceptance record",
+        "evidence_provenance": "provide current-HEAD-matched CI provenance",
+        "release_manifest_coherence": "align package metadata, artifact version, source HEAD, and digest",
+        "aggregate_coverage": "expand aggregate scripts and prove all required leaf gates are covered",
+        "read_only_integrity": "rerun mutating or unknown-risk gates in a disposable worktree and inspect mutation diagnostics",
+        "publication_visibility_review": "complete authorization, sanitization, publication-versioning, and media-access review evidence",
     }
     javascript_commands = {
         "formatter": "pnpm format",

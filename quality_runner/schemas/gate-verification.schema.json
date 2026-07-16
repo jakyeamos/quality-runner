@@ -3,9 +3,9 @@
   "$id": "https://quality-runner.dev/schemas/gate-verification.schema.json",
   "title": "Quality Runner Gate Verification",
   "type": "object",
-  "required": ["schema", "status", "timeout_seconds", "gates"],
+  "required": ["schema", "status", "timeout_seconds", "provenance", "gates"],
   "properties": {
-    "schema": { "const": "quality-runner-gate-verification-v0.1" },
+    "schema": { "const": "quality-runner-gate-verification-v0.2" },
     "run_id": { "type": "string", "minLength": 1 },
     "status": { "enum": ["passed", "failed", "blocked", "skipped-nonlocal"] },
     "timeout_seconds": { "type": "integer", "minimum": 1 },
@@ -24,6 +24,8 @@
       "type": "object",
       "additionalProperties": { "type": ["string", "boolean", "null"] }
     },
+    "provenance": { "$ref": "#/$defs/provenance" },
+    "module_status": { "$ref": "module-status.schema.json" },
     "execution_plan": {
       "type": "array",
       "items": { "$ref": "#/$defs/executionPlanItem" }
@@ -39,6 +41,7 @@
       },
       "additionalProperties": false
     },
+    "readiness": { "type": "object" },
     "gates": {
       "type": "array",
       "items": { "$ref": "#/$defs/gate" }
@@ -50,8 +53,8 @@
       "required": ["id", "status"],
       "properties": {
         "id": { "type": "string", "minLength": 1 },
-        "status": { "enum": ["passed", "failed", "skipped"] },
-        "capability_kind": { "enum": ["local_command", "ci_only", "evidence_file"] },
+        "status": { "enum": ["passed", "failed", "blocked", "skipped"] },
+        "capability_kind": { "enum": ["local_command", "ci_only", "evidence_file", "evidence", "agent_review", "integrity"] },
         "command": { "type": "string", "minLength": 1 },
         "source": { "type": ["string", "null"] },
         "cwd": { "type": "string", "minLength": 1 },
@@ -63,7 +66,9 @@
         "stderr": { "type": "string" },
         "stdout_tail": { "type": "string" },
         "stderr_tail": { "type": "string" },
+        "artifact_digest": { "type": ["string", "null"], "pattern": "^(sha256:)?[0-9a-fA-F]{64}$" },
         "reason": { "type": "string", "minLength": 1 },
+        "blocker_class": { "type": "string", "minLength": 1 },
         "blocked_by": { "type": "string", "minLength": 1 },
         "failure_type": {
           "enum": [
@@ -99,7 +104,7 @@
         "command": { "type": ["string", "null"] },
         "cwd": { "type": "string", "minLength": 1 },
         "source": { "type": ["string", "null"] },
-        "capability_kind": { "enum": ["local_command", "ci_only", "evidence_file"] },
+        "capability_kind": { "enum": ["local_command", "ci_only", "evidence_file", "evidence", "agent_review", "integrity"] },
         "package_manager": { "type": ["string", "null"] },
         "mutating_risk": { "enum": ["safe", "unknown", "mutating"] },
         "local_execution_status": {
@@ -112,6 +117,21 @@
           ]
         },
         "timeout_seconds": { "type": "integer", "minimum": 1 }
+      },
+      "additionalProperties": false
+    },
+    "provenance": {
+      "type": "object",
+      "required": ["head_sha", "branch", "ref", "quality_runner_version", "captured_at", "worktree_mode", "workflow_run_id"],
+      "properties": {
+        "head_sha": { "type": ["string", "null"] },
+        "branch": { "type": ["string", "null"] },
+        "ref": { "type": ["string", "null"] },
+        "quality_runner_version": { "type": "string", "minLength": 1 },
+        "captured_at": { "type": "string", "format": "date-time" },
+        "worktree_mode": { "enum": ["in-place", "disposable"] },
+        "workflow_run_id": { "type": ["string", "null"] },
+        "artifact_digest": { "type": ["string", "null"], "pattern": "^(sha256:)?[0-9a-fA-F]{64}$" }
       },
       "additionalProperties": false
     }

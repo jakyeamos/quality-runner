@@ -7,6 +7,7 @@ from quality_runner.handoff_gate_summary import action_group_markdown, gate_veri
 from quality_runner.intent import intent_markdown_lines
 from quality_runner.intent_docs import intent_docs_markdown_lines
 from quality_runner.security.handoff import security_review_markdown
+from quality_runner.workflow_skills import skill_review_markdown
 
 
 def render_handoff_markdown(handoff: dict[str, Any]) -> str:
@@ -24,6 +25,7 @@ def render_handoff_markdown(handoff: dict[str, Any]) -> str:
 
     lines.extend(intent_markdown_lines(handoff.get("intent")))
     lines.extend(intent_docs_markdown_lines(handoff.get("intent_docs")))
+    lines.extend(skill_review_markdown(handoff.get("skill_review")))
     lines.extend(
         [
             *(gate_verification_markdown(handoff.get("gate_verification"))),
@@ -101,6 +103,39 @@ def render_handoff_markdown(handoff: dict[str, Any]) -> str:
     lines.extend(["", "## Stopping Criteria", ""])
     lines.extend(_markdown_items(handoff.get("stopping_criteria")))
 
+    lines.extend(["", "## Domain Phase Candidates", ""])
+    phase_candidates = handoff.get("phase_candidates")
+    if isinstance(phase_candidates, list) and phase_candidates:
+        for candidate in phase_candidates:
+            if not isinstance(candidate, dict):
+                continue
+            lines.extend(
+                [
+                    f"### {candidate.get('id')}",
+                    "",
+                    f"- Domain: {candidate.get('domain')}",
+                    f"- Title: {candidate.get('title')}",
+                    f"- Priority: {candidate.get('priority')}",
+                    f"- Status: {candidate.get('status')}",
+                    f"- Leaf slices: {candidate.get('slice_count')}",
+                    f"- Findings: {candidate.get('finding_count')}",
+                    f"- Requires review: {str(candidate.get('requires_review')).lower()}",
+                    "- Workstreams:",
+                    *_markdown_items(candidate.get("workstreams")),
+                    "- Representative leaf slices:",
+                    *_markdown_items(candidate.get("representative_slice_ids")),
+                    "- Representative paths:",
+                    *_markdown_items(candidate.get("representative_paths")),
+                    "- Actions:",
+                    *_markdown_items(candidate.get("actions")),
+                    "- Verification:",
+                    *_markdown_items(candidate.get("verification_gates")),
+                    "",
+                ]
+            )
+    else:
+        lines.append("No domain phase candidates are required.")
+
     lines.extend(["", "## Next Slice", ""])
 
     next_slice = handoff.get("next_slice")
@@ -110,11 +145,13 @@ def render_handoff_markdown(handoff: dict[str, Any]) -> str:
                 f"- ID: {next_slice.get('id')}",
                 f"- Title: {next_slice.get('title')}",
                 f"- Priority: {next_slice.get('priority')}",
+                f"- Verification mode: {next_slice.get('verification_mode', 'command')}",
                 "- Findings:",
                 *_finding_markdown_items(next_slice.get("findings")),
                 "- Actions:",
                 *_markdown_items(next_slice.get("actions")),
                 *action_group_markdown(next_slice.get("action_groups")),
+                *_verification_requirements(next_slice),
             ]
         )
     else:
@@ -162,3 +199,12 @@ def _finding_markdown_items(value: object) -> list[str]:
     if not items:
         return ["- unavailable"]
     return items
+
+
+def _verification_requirements(slice_item: dict[str, Any]) -> list[str]:
+    if slice_item.get("verification_mode") != "evidence":
+        return []
+    return [
+        "- Verification requirements:",
+        *_markdown_items(slice_item.get("verification_requirements")),
+    ]

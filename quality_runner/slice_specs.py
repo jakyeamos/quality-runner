@@ -28,8 +28,13 @@ def render_slice_spec_markdown(
         "",
     ]
     lines.extend(_evidence_sections(slice_item.get("findings")))
-    lines.extend(["", "## Commands needed", ""])
-    lines.extend(_markdown_items(slice_item.get("verification_gates"), prefix="command"))
+    verification_mode = slice_item.get("verification_mode")
+    verification_prefix = "evidence" if verification_mode == "evidence" else "command"
+    lines.extend(["", "## Commands and evidence needed", ""])
+    lines.extend(_markdown_items(slice_item.get("verification_gates"), prefix=verification_prefix))
+    if verification_mode == "evidence":
+        lines.extend(["", "### Evidence requirements", ""])
+        lines.extend(_markdown_items(slice_item.get("verification_requirements")))
     lines.extend(["", "## In scope", ""])
     lines.extend(_scope_items(slice_item.get("scope"), field="in_scope"))
     lines.extend(["", "## Out of scope", ""])
@@ -39,7 +44,10 @@ def render_slice_spec_markdown(
     lines.extend(["", "## Per-step verification", ""])
     lines.extend(_numbered_items(slice_item.get("verification_gates")))
     lines.extend(["", "## Done criteria", ""])
-    lines.append("- Listed verification gates pass.")
+    if verification_mode == "evidence":
+        lines.append("- Required review evidence and disposition are recorded.")
+    else:
+        lines.append("- Listed verification gates pass.")
     lines.append("- Linked finding fingerprints are cleared or dispositioned with evidence.")
     lines.append("- `quality-runner refresh` no longer reports the targeted finding family.")
     lines.extend(["", "## STOP conditions", ""])

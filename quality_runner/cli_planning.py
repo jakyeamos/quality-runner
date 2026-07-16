@@ -4,6 +4,7 @@ import argparse
 from pathlib import Path
 from typing import Any
 
+from quality_runner.phase_automation import auto_plan
 from quality_runner.phase_planning import (
     add_phase,
     close_phase,
@@ -20,24 +21,28 @@ from quality_runner.phase_planning import (
 def add_planning_commands(
     subparsers: argparse._SubParsersAction[argparse.ArgumentParser],
 ) -> None:
-    plan_parser = subparsers.add_parser(
-        "plan", help="Manage the QR-owned planning namespace"
-    )
+    plan_parser = subparsers.add_parser("plan", help="Manage the QR-owned planning namespace")
     plan_subparsers = plan_parser.add_subparsers(dest="plan_action", required=True)
 
     plan_init = plan_subparsers.add_parser("init", help="Initialize QR planning files")
     plan_init.add_argument("repo_path", help="Target repository path")
     plan_init.add_argument("--json", action="store_true", help="Emit JSON output")
 
-    plan_status_parser = plan_subparsers.add_parser(
-        "status", help="Show QR planning status"
-    )
+    plan_status_parser = plan_subparsers.add_parser("status", help="Show QR planning status")
     plan_status_parser.add_argument("repo_path", help="Target repository path")
     plan_status_parser.add_argument("--json", action="store_true", help="Emit JSON output")
 
-    phase_parser = subparsers.add_parser(
-        "phase", help="Manage QR-owned remediation phases"
+    plan_auto = plan_subparsers.add_parser(
+        "auto",
+        help="Automatically materialize security-first domain phases from a QR run",
     )
+    plan_auto.add_argument("repo_path", help="Target repository path")
+    source_group = plan_auto.add_mutually_exclusive_group(required=True)
+    source_group.add_argument("--run-id", help="QR run id containing a remediation plan")
+    source_group.add_argument("--handoff-json", help="Agent handoff JSON path")
+    plan_auto.add_argument("--json", action="store_true", help="Emit JSON output")
+
+    phase_parser = subparsers.add_parser("phase", help="Manage QR-owned remediation phases")
     phase_subparsers = phase_parser.add_subparsers(dest="phase_action", required=True)
 
     phase_add = phase_subparsers.add_parser("add", help="Add a phase to the QR roadmap")
@@ -53,11 +58,15 @@ def add_planning_commands(
     source_group = phase_plan.add_mutually_exclusive_group(required=True)
     source_group.add_argument("--run-id", help="QR run id containing a remediation plan")
     source_group.add_argument("--handoff-json", help="Agent handoff JSON path")
+    phase_plan.add_argument(
+        "--candidate",
+        default=None,
+        dest="candidate_id",
+        help="Plan one domain candidate instead of the full planning source",
+    )
     phase_plan.add_argument("--json", action="store_true", help="Emit JSON output")
 
-    phase_next = phase_subparsers.add_parser(
-        "next", help="Emit the next ready QR plan or wave"
-    )
+    phase_next = phase_subparsers.add_parser("next", help="Emit the next ready QR plan or wave")
     phase_next.add_argument("repo_path", help="Target repository path")
     phase_next.add_argument("--phase", type=int, default=None, dest="phase_number")
     phase_next.add_argument("--json", action="store_true", help="Emit JSON output")
@@ -88,24 +97,28 @@ def add_planning_commands(
     phase_verify.add_argument("--run-id", required=True)
     phase_verify.add_argument("--json", action="store_true", help="Emit JSON output")
 
-    phase_close = phase_subparsers.add_parser(
-        "close", help="Close a verified QR-owned phase"
-    )
+    phase_close = phase_subparsers.add_parser("close", help="Close a verified QR-owned phase")
     phase_close.add_argument("repo_path", help="Target repository path")
     phase_close.add_argument("--phase", type=int, required=True, dest="phase_number")
     phase_close.add_argument("--run-id", required=True)
     phase_close.add_argument("--json", action="store_true", help="Emit JSON output")
 
 
-def planning_command_payload(
-    args: argparse.Namespace, validated_repo_path: Any
-) -> dict[str, Any]:
+def planning_command_payload(args: argparse.Namespace, validated_repo_path: Any) -> dict[str, Any]:
     repo_root = validated_repo_path(args.repo_path)
     if args.command == "plan":
         if args.plan_action == "init":
             return initialize_plan(repo_root)
         if args.plan_action == "status":
             return plan_status(repo_root)
+        if args.plan_action == "auto":
+            return auto_plan(
+                repo_root,
+                run_id=args.run_id,
+                handoff_json=(
+                    Path(args.handoff_json).expanduser().resolve() if args.handoff_json else None
+                ),
+            )
     if args.command != "phase":
         raise ValueError(f"unsupported planning command: {args.command}")
     if args.phase_action == "add":
@@ -116,10 +129,9 @@ def planning_command_payload(
             phase_number=args.phase_number,
             run_id=args.run_id,
             handoff_json=(
-                Path(args.handoff_json).expanduser().resolve()
-                if args.handoff_json
-                else None
+                Path(args.handoff_json).expanduser().resolve() if args.handoff_json else None
             ),
+            candidate_id=args.candidate_id,
         )
     if args.phase_action == "next":
         return next_plan(repo_root, phase_number=args.phase_number)

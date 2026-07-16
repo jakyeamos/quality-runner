@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import subprocess
-import sys
 import time
 from pathlib import Path
 from typing import Any
@@ -20,6 +19,12 @@ from quality_runner.gate_execution_policy import (
     ordered_capabilities,
     recommended_action,
     valid_gate_timeouts,
+)
+from quality_runner.gate_provenance import artifact_digest, verification_provenance
+from quality_runner.gate_verification_helpers import (
+    environment,
+    int_result,
+    timeout_output_diagnostics,
 )
 from quality_runner.process_runner import run_shell_command
 from quality_runner.read_only_git import restore_if_changed, tracked_snapshot
@@ -44,6 +49,7 @@ def verify_discovered_gates(
     mutations_isolated: bool = False,
     verification_context: dict[str, Any] | None = None,
     on_partial_result: Any | None = None,
+    scan_exclusions: list[str] | None = None,
 ) -> dict[str, Any]:
     gates: list[dict[str, Any]] = []
     passed_leaf_ids: set[str] = set()
@@ -74,6 +80,7 @@ def verify_discovered_gates(
                 read_only_gates=read_only_gates,
                 allow_mutating_gates=allow_mutating_gates,
                 mutations_isolated=mutations_isolated,
+                scan_exclusions=scan_exclusions,
             )
         else:
             gate = dependency_setup_skipped_gate(
@@ -95,6 +102,7 @@ def verify_discovered_gates(
         if on_partial_result is not None:
             on_partial_result(
                 _verification_payload(
+                    repo_root=repo_root,
                     run_id=run_id,
                     gates=gates,
                     timeout_seconds=timeout_seconds,
@@ -106,6 +114,7 @@ def verify_discovered_gates(
                 )
             )
     return _verification_payload(
+        repo_root=repo_root,
         run_id=run_id,
         gates=gates,
         timeout_seconds=timeout_seconds,
@@ -119,6 +128,7 @@ def verify_discovered_gates(
 
 def _verification_payload(
     *,
+    repo_root: Path,
     run_id: str | None,
     gates: list[dict[str, Any]],
     timeout_seconds: int,
@@ -136,7 +146,13 @@ def _verification_payload(
         "gate_timeouts": gate_timeouts,
         "read_only_gates": read_only_gates,
         "allow_mutating_gates": allow_mutating_gates,
-        "environment": _environment(),
+        "environment": environment(),
+        "provenance": verification_provenance(
+            repo_root=repo_root,
+            run_id=run_id,
+            gates=gates,
+            verification_context=verification_context,
+        ),
         "execution_plan": execution_plan,
         "gates": gates,
         **_optional_field("verification_context", verification_context),
@@ -157,7 +173,7 @@ def apply_gate_verification(
     for capability in _available_capabilities(capability_map):
         copied = dict(capability)
         gate = results.get(str(copied.get("id")))
-        if gate is not None and gate.get("status") in {"passed", "failed"}:
+        if gate is not None and gate.get("status") in {"passed", "failed", "blocked"}:
             previous = copied.get("verification_state")
             discovery = (
                 previous.get("discovery")
@@ -174,6 +190,10 @@ def apply_gate_verification(
     return updated
 
 
+def verification_status(gates: list[dict[str, Any]]) -> str:
+    return _status(gates)
+
+
 def _verify_gate(
     *,
     repo_root: Path,
@@ -183,6 +203,7 @@ def _verify_gate(
     read_only_gates: bool,
     allow_mutating_gates: bool,
     mutations_isolated: bool = False,
+    scan_exclusions: list[str] | None = None,
 ) -> dict[str, Any]:
     command = capability.get("command")
     capability_id = str(capability.get("id") or "unknown")
@@ -251,7 +272,7 @@ def _verify_gate(
 
     started = time.monotonic()
     readonly_snapshot = (
-        tracked_snapshot(repo_root)
+        tracked_snapshot(repo_root, scan_exclusions=scan_exclusions)
         if read_only_gates and not allow_mutating_gates and not mutations_isolated
         else None
     )
@@ -267,7 +288,11 @@ def _verify_gate(
         gate_failure_type = failure_type(
             command=command, stdout=stdout, stderr=stderr, timed_out=True
         )
-        mutation = restore_if_changed(repo_root, readonly_snapshot)
+        mutation = restore_if_changed(
+            repo_root,
+            readonly_snapshot,
+            scan_exclusions=scan_exclusions,
+        )
         if mutation is not None:
             gate_failure_type = "read-only-mutation"
         environment_restricted = gate_failure_type == "environment-restricted"
@@ -281,7 +306,7 @@ def _verify_gate(
                 timed_out=True,
                 dependency_setup=dependency_setup,
             )
-            | _timeout_output_diagnostics(stdout=stdout, stderr=stderr)
+            | timeout_output_diagnostics(stdout=stdout, stderr=stderr)
             | _read_only_mutation_diagnostics(mutation)
         )
         return {
@@ -297,6 +322,7 @@ def _verify_gate(
             "stderr": stderr,
             "stdout_tail": stdout,
             "stderr_tail": stderr,
+            **_optional_field("artifact_digest", artifact_digest(stdout, stderr)),
             "failure_type": gate_failure_type,
             "reason": "gate timed out",
             "diagnostics": diagnostics,
@@ -313,8 +339,12 @@ def _verify_gate(
     stdout = _truncate(result["stdout"])
     stderr = _truncate(result["stderr"])
     gate_failure_type = failure_type(command=command, stdout=stdout, stderr=stderr, timed_out=False)
-    returncode = _int_result(result["returncode"])
-    mutation = restore_if_changed(repo_root, readonly_snapshot)
+    returncode = int_result(result["returncode"])
+    mutation = restore_if_changed(
+        repo_root,
+        readonly_snapshot,
+        scan_exclusions=scan_exclusions,
+    )
     if mutation is not None:
         gate_failure_type = "read-only-mutation"
     failed = returncode != 0 or mutation is not None
@@ -348,6 +378,7 @@ def _verify_gate(
         "stderr": stderr,
         "stdout_tail": stdout,
         "stderr_tail": stderr,
+        **_optional_field("artifact_digest", artifact_digest(stdout, stderr)),
         **_optional_field("failure_type", gate_failure_type if failed else None),
         **_optional_field("diagnostics", diagnostics),
         **recommended_action(
@@ -370,6 +401,8 @@ def _available_capabilities(capability_map: dict[str, Any]) -> list[dict[str, An
 
 
 def _status(gates: list[dict[str, Any]]) -> str:
+    if any(gate.get("status") == "blocked" for gate in gates):
+        return "blocked"
     if any(
         gate.get("failure_type")
         in {"environment-restricted", "dependency-setup-blocker", "read-only-mutation"}
@@ -446,14 +479,6 @@ def _command_mentions_gate(command: str, gate_id: str) -> bool:
     return any(alias in normalized for alias in aliases)
 
 
-def _environment() -> dict[str, str | bool | None]:
-    return {
-        "python_executable": sys.executable,
-        "python_version": sys.version.split()[0],
-        "sandbox": None,
-    }
-
-
 def _optional_field(key: str, value: object) -> dict[str, Any]:
     if value is None:
         return {}
@@ -470,15 +495,5 @@ def _read_only_mutation_action(mutation: dict[str, Any] | None) -> str | None:
     if mutation is None:
         return None
     if mutation.get("restored") is True:
-        return "gate mutated tracked files during read-only verification; QR restored the pre-gate tracked diff, rerun directly only when source changes are allowed"
-    return "gate mutated tracked files during read-only verification and QR could not fully restore them; inspect the tracked diff before continuing"
-
-
-def _timeout_output_diagnostics(*, stdout: str, stderr: str) -> dict[str, Any]:
-    if stdout or stderr:
-        return {"timeout_output_status": "captured-partial-output"}
-    return {"timeout_output_status": "timeout-with-no-output"}
-
-
-def _int_result(value: object) -> int:
-    return value if isinstance(value, int) else 1
+        return "gate mutated tracked files during read-only verification (including possible untracked/ignored paths); QR restored tracked changes and preserved user files, rerun directly only when source changes are allowed"
+    return "gate mutated tracked files during read-only verification (including possible untracked/ignored paths) and QR could not fully restore tracked changes; inspect mutation diagnostics before continuing"

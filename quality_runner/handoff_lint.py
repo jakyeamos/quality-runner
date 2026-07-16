@@ -3,6 +3,11 @@ from __future__ import annotations
 import re
 from typing import Any
 
+from quality_runner.verification_contract import (
+    has_machine_checkable_verification,
+    verification_contract_is_valid,
+)
+
 SECRET_PATTERNS = (
     re.compile(r"(?i)(api[_-]?key|secret|password|token)\s*[:=]\s*['\"][^'\"]{8,}"),
     re.compile(r"(?i)-----BEGIN (?:RSA |EC )?PRIVATE KEY-----"),
@@ -31,8 +36,9 @@ def validate_handoff_quality(
             if not isinstance(slice_item, dict):
                 continue
             slice_id = str(slice_item.get("id") or "unknown")
-            verification = slice_item.get("verification_gates")
-            if not _has_machine_checkable_verification(verification):
+            if not verification_contract_is_valid(slice_item):
+                errors.append(f"slice {slice_id} has an invalid verification contract")
+            if not has_machine_checkable_verification(slice_item):
                 errors.append(f"slice {slice_id} lacks machine-checkable verification")
             if not _non_empty_string_list(slice_item.get("stop_conditions")):
                 errors.append(f"slice {slice_id} lacks STOP conditions")
@@ -78,7 +84,9 @@ def lint_slice_item(slice_item: dict[str, Any]) -> dict[str, Any]:
 
 def _lint_slice_dict(slice_item: dict[str, Any], *, label: str) -> list[str]:
     errors: list[str] = []
-    if not _has_machine_checkable_verification(slice_item.get("verification_gates")):
+    if not verification_contract_is_valid(slice_item):
+        errors.append(f"{label} has an invalid verification contract")
+    if not has_machine_checkable_verification(slice_item):
         errors.append(f"{label} lacks machine-checkable verification")
     if not _non_empty_string_list(slice_item.get("stop_conditions")):
         errors.append(f"{label} lacks STOP conditions")
@@ -90,23 +98,6 @@ def _lint_slice_dict(slice_item: dict[str, Any], *, label: str) -> list[str]:
     if not isinstance(scope, dict) or not _non_empty_string_list(scope.get("in_scope")):
         errors.append(f"{label} lacks in-scope boundaries")
     return errors
-
-
-def _has_machine_checkable_verification(value: object) -> bool:
-    if not isinstance(value, list) or not value:
-        return False
-    for item in value:
-        if not isinstance(item, str) or not item:
-            continue
-        lowered = item.lower()
-        if any(
-            token in lowered
-            for token in ("rerun quality-runner", "pytest", "ruff", "pnpm", "git diff")
-        ):
-            return True
-        if "`" in item or " run " in f" {lowered} ":
-            return True
-    return False
 
 
 def _is_structural_slice(slice_item: dict[str, Any]) -> bool:

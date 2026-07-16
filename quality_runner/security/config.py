@@ -14,6 +14,7 @@ DEFAULT_AGENT_REVIEW_GATES: tuple[str, ...] = (
     "security_dependency_risk_review",
     "security_rate_limit_review",
     "security_cross_tenant_access_review",
+    "security_publication_visibility_review",
 )
 
 

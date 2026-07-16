@@ -60,7 +60,7 @@ def _latest_run(repo_root: Path) -> dict[str, Any] | None:
         return None
     run_dir = repo_root / ".quality-runner" / "runs" / run_id
     gate_verification_status = _gate_verification_status(run_dir)
-    return {
+    payload: dict[str, Any] = {
         "run_id": run_id,
         "path": str(run_dir),
         "has_handoff": (run_dir / "agent-handoff.md").exists(),
@@ -68,6 +68,10 @@ def _latest_run(repo_root: Path) -> dict[str, Any] | None:
         "has_gate_verification": gate_verification_status is not None,
         "gate_verification_status": gate_verification_status,
     }
+    module_status = _module_status(run_dir)
+    if module_status is not None:
+        payload["module_status"] = module_status
+    return payload
 
 
 def _repo_status(latest_run: dict[str, Any] | None) -> str:
@@ -89,6 +93,18 @@ def _gate_verification_status(run_dir: Path) -> str | None:
         return "blocked"
     status = payload.get("status")
     return status if isinstance(status, str) and status else "blocked"
+
+
+def _module_status(run_dir: Path) -> dict[str, Any] | None:
+    path = run_dir / "repo-scan.json"
+    if not path.exists():
+        return None
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return None
+    status = payload.get("module_status")
+    return status if isinstance(status, dict) else None
 
 
 def _latest_run_id(repo_root: Path) -> str | None:

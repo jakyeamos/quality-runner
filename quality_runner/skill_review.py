@@ -6,6 +6,7 @@ from typing import Any
 from quality_runner.code_quality_architecture import _path_matches_any
 from quality_runner.code_quality_findings import _finding
 from quality_runner.schema_constants import SKILL_REVIEW_PACKET_SCHEMA, SKILL_REVIEW_REPORT_SCHEMA
+from quality_runner.verification_contract import verification_contract_fields
 
 ACCEPTED_SEVERITIES = frozenset({"warning", "observation"})
 ACCEPTED_CONFIDENCE = frozenset({"high", "medium", "low"})
@@ -37,6 +38,8 @@ def build_skill_review_packet(
             "allow_low_confidence": True,
             "require_file_line_evidence": True,
             "do_not_invent_evidence": True,
+            "execution_mode": "automatic",
+            "required_review_count": len(reviews),
         },
         "safety": {
             "do_not_edit_source": True,
@@ -113,6 +116,7 @@ def validate_skill_review_report(
     skills: list[dict[str, Any]] | None = None,
     repo_root: Path | None = None,
     run_id: str | None = None,
+    require_review_coverage: bool = False,
 ) -> dict[str, Any]:
     errors: list[str] = []
     rejected: list[dict[str, Any]] = []
@@ -127,6 +131,12 @@ def validate_skill_review_report(
             errors.append(f"run_id mismatch: expected {run_id}, got {report_run_id}")
 
     active_reviews = _review_index(skills or [])
+    if require_review_coverage:
+        _validate_review_coverage(
+            report.get("reviewed_review_ids"),
+            active_reviews=active_reviews,
+            errors=errors,
+        )
     findings = report.get("findings")
     if not isinstance(findings, list):
         errors.append("findings must be a list")
@@ -193,6 +203,7 @@ def review_report_findings(
             remediation_bucket=f"Skill: {skill_name}",
             rule_category=review_categories.get((skill_id, str(item["review_id"])), ""),
         )
+        finding.update(verification_contract_fields(finding, explicit_mode="evidence"))
         finding["skill_id"] = skill_id
         finding["review_id"] = str(item["review_id"])
         findings.append(finding)
@@ -364,5 +375,26 @@ def _packet_instructions() -> str:
         "Review the listed files against each rubric. Prefer high recall: report every "
         "plausible issue that has concrete file/line evidence, using observation severity "
         "and low confidence when appropriate. Do not invent evidence, edit source files, "
-        "or execute remediation. Return JSON using the required output schema."
+        "or execute remediation. Include every active skill/review pair in "
+        "reviewed_review_ids, even when the review produces no finding. Return JSON "
+        "using the required output schema."
     )
+
+
+def _validate_review_coverage(
+    value: object,
+    *,
+    active_reviews: set[tuple[str, str]],
+    errors: list[str],
+) -> None:
+    if not isinstance(value, list) or not all(isinstance(item, str) and item for item in value):
+        errors.append("reviewed_review_ids must be a list of active skill/review ids")
+        return
+    expected = {f"{skill_id}/{review_id}" for skill_id, review_id in active_reviews}
+    received = set(value)
+    missing = sorted(expected - received)
+    unknown = sorted(received - expected)
+    if missing:
+        errors.append(f"review report is missing review coverage: {', '.join(missing)}")
+    if unknown:
+        errors.append(f"review report contains unknown review coverage: {', '.join(unknown)}")

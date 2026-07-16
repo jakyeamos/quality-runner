@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+from typing import Any
 
 from quality_runner import __version__
 from quality_runner.cli_artifacts import add_artifact_commands
@@ -21,8 +22,12 @@ from quality_runner.cli_remediation import add_remediation_commands
 from quality_runner.cli_review import add_review_command
 from quality_runner.cli_rollout import add_rollout_command
 from quality_runner.cli_skills import add_skill_commands
+from quality_runner.cli_update import add_update_command
 from quality_runner.cli_workflow_args import add_workflow_arguments, add_worktree_verify_arguments
+from quality_runner.progress import ProgressReporter
 from quality_runner.standards import DEFAULT_PROFILE
+
+_PROGRESS_COMMANDS = {"run", "inspect", "verify-gates", "refresh", "release-smoke"}
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -39,7 +44,10 @@ def build_parser() -> argparse.ArgumentParser:
     inspect_parser = subparsers.add_parser("inspect", help="Inspect a repo without audit planning")
     add_workflow_arguments(inspect_parser)
 
-    verify_parser = subparsers.add_parser("verify-gates", help="Execute discovered repo gates")
+    verify_parser = subparsers.add_parser(
+        "verify-gates",
+        help="Execute discovered repo gates with read-only policy by default",
+    )
     add_workflow_arguments(verify_parser)
     verify_parser.add_argument(
         "--timeout-seconds",
@@ -50,13 +58,14 @@ def build_parser() -> argparse.ArgumentParser:
     verify_parser.add_argument(
         "--read-only-gates",
         action="store_true",
-        help="Skip gates that are known or likely to mutate source files",
+        help="Keep the default read-only gate policy explicit",
     )
     verify_parser.add_argument(
         "--allow-mutating-gates",
         action="store_true",
-        help="Allow known or suspected mutating gates to execute",
+        help="Explicitly override the default read-only policy for mutating gates",
     )
+    verify_parser.set_defaults(read_only_gates=True)
     add_worktree_verify_arguments(verify_parser)
 
     refresh_parser = subparsers.add_parser(
@@ -204,6 +213,8 @@ def build_parser() -> argparse.ArgumentParser:
     doctor_parser = subparsers.add_parser("doctor", help="Check Quality Runner readiness")
     doctor_parser.add_argument("--json", action="store_true", help="Emit JSON output")
 
+    add_update_command(subparsers)
+
     release_smoke_parser = subparsers.add_parser(
         "release-smoke",
         help="Run pre-release CLI, refresh, handoff, and schema smoke checks",
@@ -212,6 +223,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--work-dir",
         default=None,
         help="Directory for temporary release-smoke repo and handoff outputs",
+    )
+    release_smoke_parser.add_argument(
+        "--no-progress",
+        action="store_true",
+        help="Disable stderr progress and heartbeat diagnostics",
     )
     release_smoke_parser.add_argument("--json", action="store_true", help="Emit JSON output")
 
@@ -226,6 +242,7 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     parser = build_parser()
+    payload: dict[str, Any] = {}
     try:
         parsed = parser.parse_args(args)
     except SystemExit as error:
@@ -233,7 +250,12 @@ def main(argv: list[str] | None = None) -> int:
         return code if isinstance(code, int) else 2
 
     try:
-        payload = payload_for_args(parsed)
+        if parsed.command in _PROGRESS_COMMANDS and not getattr(parsed, "no_progress", False):
+            with ProgressReporter(parsed.command, stream=sys.stderr) as progress:
+                payload = payload_for_args(parsed, progress=progress.phase)
+                progress.finish(str(payload.get("status", "completed")))
+        else:
+            payload = payload_for_args(parsed)
     except (FileNotFoundError, NotADirectoryError, ValueError, OSError) as error:
         print(f"quality-runner: error: {error}", file=sys.stderr)
         return 1
@@ -268,6 +290,8 @@ def main(argv: list[str] | None = None) -> int:
     if parsed.command == "phase" and payload.get("status") in {"failed", "blocked"}:
         return 1
     if parsed.command == "summarize-run" and has_rejected_self_check(payload):
+        return 1
+    if parsed.command == "self-update" and payload.get("status") in {"blocked", "failed"}:
         return 1
     return 0
 

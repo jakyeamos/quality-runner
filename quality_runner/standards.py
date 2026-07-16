@@ -7,14 +7,30 @@ from quality_runner.config import load_repo_config
 from quality_runner.schema_constants import STANDARDS_PACKET_SCHEMA
 
 DEFAULT_PROFILE = "default"
-SUPPORTED_PROFILES = {DEFAULT_PROFILE}
+RELEASE_PROFILE = "release"
+SUPPORTED_PROFILES = {DEFAULT_PROFILE, RELEASE_PROFILE}
+BUILTIN_PROFILE_CONFIGS: dict[str, dict[str, Any]] = {
+    RELEASE_PROFILE: {
+        "extends": DEFAULT_PROFILE,
+        "required_capabilities_configured": True,
+        "required_capabilities": [
+            "evidence_provenance",
+            "release_manifest_coherence",
+            "package_consumer_smoke",
+            "migration_safety",
+            "release_acceptance_evidence",
+            "aggregate_coverage",
+        ],
+        "allowed_package_managers": [],
+    }
+}
 
 
 # fmt: off
 def compile_standards(repo_root: Path, scan: dict[str, Any], profile: str, config: dict[str, Any] | None = None) -> dict[str, Any]:
 # fmt: on
     resolved_config = load_repo_config(repo_root) if config is None else config
-    profile_config = _profile_config(resolved_config, profile)
+    profile_config = _profile_config(resolved_config, profile) or BUILTIN_PROFILE_CONFIGS.get(profile)
     if profile not in SUPPORTED_PROFILES and profile_config is None:
         raise ValueError(f"unsupported standards profile: {profile}")
 

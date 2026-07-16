@@ -20,6 +20,7 @@
       "items": { "$ref": "#/$defs/acceptedException" },
       "default": []
     },
+    "readiness": { "$ref": "#/$defs/readiness" },
     "warnings": { "$ref": "#/$defs/warnings" },
     "security_summary": { "type": "object" }
   },
@@ -30,7 +31,7 @@
       "properties": {
         "id": { "type": "string", "minLength": 1 },
         "type": { "type": "string", "minLength": 1 },
-        "capability_kind": { "enum": ["local_command", "ci_only", "evidence_file", "evidence", "agent_review"] },
+        "capability_kind": { "enum": ["local_command", "ci_only", "evidence_file", "evidence", "agent_review", "integrity"] },
         "status": { "type": "string" },
         "source": { "type": "string", "minLength": 1 },
         "command": { "type": "string", "minLength": 1 },
@@ -82,7 +83,14 @@
         "name": { "type": "string", "minLength": 1 },
         "status": { "type": ["string", "null"] },
         "conclusion": { "type": ["string", "null"] },
-        "url": { "type": ["string", "null"] }
+        "url": { "type": ["string", "null"] },
+        "head_sha": { "type": ["string", "null"] },
+        "ref": { "type": ["string", "null"] },
+        "workflow_run_id": { "type": ["string", "null"] },
+        "captured_at": { "type": ["string", "null"] },
+        "artifact_digest": { "type": ["string", "null"] },
+        "source_url": { "type": ["string", "null"] },
+        "quality_runner_version": { "type": ["string", "null"] }
       },
       "additionalProperties": false
     },
@@ -100,8 +108,22 @@
         },
         "result": {
           "type": "string",
-          "enum": ["unknown", "passed", "failed"]
+          "enum": ["unknown", "passed", "failed", "blocked"]
         }
+      },
+      "additionalProperties": false
+    },
+    "readiness": {
+      "type": "object",
+      "required": ["profile", "status", "required_gate_ids", "unresolved_gate_ids"],
+      "properties": {
+        "profile": { "type": ["string", "null"] },
+        "status": { "enum": ["not-applicable", "pending", "blocked", "passed"] },
+        "required_gate_ids": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "unresolved_gate_ids": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "missing_required_capability_ids": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "evidence_file": { "type": "string", "minLength": 1 },
+        "verification": { "type": "string", "minLength": 1 }
       },
       "additionalProperties": false
     },

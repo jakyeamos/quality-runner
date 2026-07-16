@@ -21,7 +21,8 @@
     "duplicate_clusters": { "type": "array", "items": { "type": "object" } },
     "skipped_files": { "type": "array", "items": { "type": "object" } },
     "quality_skills": { "type": "array", "items": { "$ref": "#/$defs/quality_skill" } },
-    "skill_coverage": { "type": "array", "items": { "$ref": "#/$defs/skill_coverage" } }
+    "skill_coverage": { "type": "array", "items": { "$ref": "#/$defs/skill_coverage" } },
+    "skill_selection": { "$ref": "skill-selection.schema.json" }
   },
   "$defs": {
     "finding": {
@@ -56,13 +57,27 @@
         "expected_improvement": { "type": "string", "minLength": 1 },
         "risk": { "type": "string", "minLength": 1 },
         "verification": { "type": "string", "minLength": 1 },
+        "verification_mode": { "enum": ["command", "evidence"] },
+        "verification_requirements": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
         "remediation_bucket": { "type": "string", "minLength": 1 },
         "rule_message": { "type": "string", "minLength": 1 },
         "rule_category": { "type": "string", "minLength": 1 },
         "skill_id": { "type": "string", "minLength": 1 },
         "review_id": { "type": "string", "minLength": 1 }
       },
-      "additionalProperties": false
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "required": ["verification_mode"],
+            "properties": { "verification_mode": { "const": "evidence" } }
+          },
+          "then": { "required": ["verification_requirements"] }
+        }
+      ]
     },
     "quality_skill": {
       "type": "object",

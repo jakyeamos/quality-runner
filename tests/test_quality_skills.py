@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 from quality_runner.schema_constants import SKILL_REVIEW_REPORT_SCHEMA
@@ -1420,7 +1421,205 @@ def test_skill_review_packet_contains_active_review_rubrics(tmp_path: Path) -> N
         "allow_low_confidence": True,
         "require_file_line_evidence": True,
         "do_not_invent_evidence": True,
+        "execution_mode": "automatic",
+        "required_review_count": 1,
     }
+
+
+def test_active_skill_review_blocks_handoff_until_agent_report_is_merged(tmp_path: Path) -> None:
+    from quality_runner.run_summary import build_run_summary
+    from quality_runner.workflow import run_payload
+    from test_support.quality_runner_fixtures import write_js_fixture
+
+    write_js_fixture(tmp_path)
+    skill_path = _install_skill(tmp_path, "ui-polish", _agent_review_skill_toml())
+    _write(tmp_path / "apps/web/page.tsx", "export const Page = () => null;\n")
+    _write(
+        tmp_path / ".quality-runner.toml",
+        "\n".join(
+            [
+                "[quality_runner.skills]",
+                "enabled = true",
+                "",
+                "[[quality_runner.skills.local]]",
+                'id = "ui-polish"',
+                f'path = "{skill_path}"',
+                "",
+            ]
+        ),
+    )
+
+    payload = run_payload(
+        repo_root=tmp_path,
+        run_id="skill-review-required",
+        agent_review_mode="required",
+    )
+    handoff_path = Path(payload["artifact_paths"]["agent_handoff_json"])
+    handoff = json.loads(handoff_path.read_text(encoding="utf-8"))
+
+    assert payload["status"] == "review-required"
+    assert handoff["status"] == "review-required"
+    assert handoff["lifecycle_status"] == "blocked"
+    assert handoff["skill_review"]["status"] == "review-required"
+    assert handoff["skill_review"]["unresolved_review_ids"] == ["ui-polish/ui-polish-review"]
+    assert Path(handoff["skill_review"]["packet_json"]).exists()
+    markdown = handoff_path.with_name("agent-handoff.md").read_text(encoding="utf-8")
+    assert "Action required: read the review packet" in markdown
+
+    summary = build_run_summary(repo_root=tmp_path, run_id="skill-review-required")
+    assert summary["status"] == "blocked"
+    assert summary["recommended_classification"] == "review-required-blocker"
+    assert "review-required" in summary["blocker_classes"]
+
+
+def test_parallel_skill_review_is_pending_without_blocking_qr(tmp_path: Path) -> None:
+    from quality_runner.workflow import run_payload
+    from test_support.quality_runner_fixtures import write_js_fixture
+
+    write_js_fixture(tmp_path)
+    skill_path = _install_skill(tmp_path, "ui-polish", _agent_review_skill_toml())
+    _write(tmp_path / "apps/web/page.tsx", "export const Page = () => null;\n")
+    _write(
+        tmp_path / ".quality-runner.toml",
+        "\n".join(
+            [
+                "[quality_runner.skills]",
+                "enabled = true",
+                'agent_review_mode = "parallel"',
+                "",
+                "[[quality_runner.skills.local]]",
+                'id = "ui-polish"',
+                f'path = "{skill_path}"',
+                "",
+            ]
+        ),
+    )
+
+    payload = run_payload(repo_root=tmp_path, run_id="skill-review-parallel")
+
+    handoff = json.loads(
+        Path(payload["artifact_paths"]["agent_handoff_json"]).read_text(encoding="utf-8")
+    )
+    skill_review = handoff["skill_review"]
+    assert payload["status"] in {"clean", "planned"}
+    assert handoff["status"] != "review-required"
+    assert skill_review["mode"] == "parallel"
+    assert skill_review["status"] == "review-pending"
+    assert skill_review["unresolved_review_ids"] == ["ui-polish/ui-polish-review"]
+    assert Path(skill_review["packet_json"]).exists()
+
+
+def test_agent_reviews_can_be_disabled_without_emitting_a_packet(tmp_path: Path) -> None:
+    from quality_runner.workflow import run_payload
+    from test_support.quality_runner_fixtures import write_js_fixture
+
+    write_js_fixture(tmp_path)
+    skill_path = _install_skill(tmp_path, "ui-polish", _agent_review_skill_toml())
+    _write(tmp_path / "apps/web/page.tsx", "export const Page = () => null;\n")
+    _write(
+        tmp_path / ".quality-runner.toml",
+        "\n".join(
+            [
+                "[quality_runner.skills]",
+                "enabled = true",
+                'agent_review_mode = "off"',
+                "",
+                "[[quality_runner.skills.local]]",
+                'id = "ui-polish"',
+                f'path = "{skill_path}"',
+                "",
+            ]
+        ),
+    )
+
+    payload = run_payload(repo_root=tmp_path, run_id="skill-review-off")
+
+    handoff = json.loads(
+        Path(payload["artifact_paths"]["agent_handoff_json"]).read_text(encoding="utf-8")
+    )
+    skill_review = handoff["skill_review"]
+    assert payload["status"] in {"clean", "planned"}
+    assert skill_review["mode"] == "off"
+    assert skill_review["status"] == "not-run"
+    assert "packet_json" not in skill_review
+    assert not (
+        tmp_path / ".quality-runner/runs/skill-review-off/skill-review-packet.json"
+    ).exists()
+
+
+def test_skill_review_report_merges_across_runs(tmp_path: Path) -> None:
+    from quality_runner.workflow import run_payload
+    from test_support.quality_runner_fixtures import write_js_fixture
+
+    write_js_fixture(tmp_path)
+    skill_path = _install_skill(tmp_path, "ui-polish", _agent_review_skill_toml())
+    _write(tmp_path / "apps/web/page.tsx", "export const Page = () => null;\n")
+    _write(
+        tmp_path / ".quality-runner.toml",
+        "\n".join(
+            [
+                "[quality_runner.skills]",
+                "enabled = true",
+                "",
+                "[[quality_runner.skills.local]]",
+                'id = "ui-polish"',
+                f'path = "{skill_path}"',
+                "",
+            ]
+        ),
+    )
+
+    first = run_payload(repo_root=tmp_path, run_id="skill-review-packet")
+    packet = json.loads(
+        Path(first["artifact_paths"]["skill_review_packet_json"]).read_text(encoding="utf-8")
+    )
+    report = {
+        "schema": SKILL_REVIEW_REPORT_SCHEMA,
+        "run_id": packet["run_id"],
+        "findings": [],
+        "reviewed_review_ids": ["ui-polish/ui-polish-review"],
+    }
+
+    second = run_payload(
+        repo_root=tmp_path,
+        run_id="skill-review-merged",
+        skill_review_report=report,
+    )
+    handoff = json.loads(
+        Path(second["artifact_paths"]["agent_handoff_json"]).read_text(encoding="utf-8")
+    )
+
+    assert second["status"] in {"clean", "planned"}
+    assert handoff["status"] != "review-required"
+    assert handoff["skill_review"]["status"] == "reviewed"
+    assert handoff["skill_review"]["report_source_run_id"] == "skill-review-packet"
+    assert Path(handoff["skill_review"]["report_json"]).exists()
+
+
+def test_auto_skill_review_requires_every_active_review_to_be_covered(tmp_path: Path) -> None:
+    from quality_runner.skill_config import load_active_skills
+    from quality_runner.skill_review import validate_skill_review_report
+
+    skill_path = _install_skill(tmp_path, "ui-polish", _agent_review_skill_toml())
+    config = _skills_enabled_config(
+        active=["ui-polish"],
+        local=[{"id": "ui-polish", "path": skill_path}],
+    )
+    skills, _warnings = load_active_skills(tmp_path, config)
+
+    result = validate_skill_review_report(
+        {
+            "schema": SKILL_REVIEW_REPORT_SCHEMA,
+            "run_id": "run-001",
+            "findings": [],
+        },
+        skills=skills,
+        repo_root=tmp_path,
+        require_review_coverage=True,
+    )
+
+    assert result["status"] == "rejected"
+    assert "reviewed_review_ids" in result["errors"][0]
 
 
 def test_skill_review_report_validation_rejects_missing_evidence(tmp_path: Path) -> None:

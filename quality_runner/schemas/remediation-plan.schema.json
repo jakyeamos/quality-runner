@@ -15,6 +15,13 @@
       "items": { "type": "string", "minLength": 1 },
       "default": []
     },
+    "planning_mode": { "enum": ["domain", "forensic"] },
+    "phase_candidate_count": { "type": "integer", "minimum": 0 },
+    "leaf_slice_count": { "type": "integer", "minimum": 0 },
+    "phase_candidates": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/phaseCandidate" }
+    },
     "slices": {
       "type": "array",
       "items": { "$ref": "#/$defs/slice" }
@@ -57,6 +64,11 @@
           "type": "array",
           "items": { "type": "string", "minLength": 1 }
         },
+        "verification_mode": { "enum": ["command", "evidence"] },
+        "verification_requirements": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
         "source_run_id": { "type": "string", "minLength": 1 },
         "findings": { "type": "array", "items": { "type": "object" } },
         "actions": { "type": "array", "items": { "type": "string" } },
@@ -65,6 +77,87 @@
           "items": { "$ref": "#/$defs/actionGroup" }
         },
         "verification_gates": { "type": "array", "items": { "type": "string" } }
+      },
+      "additionalProperties": true,
+      "allOf": [
+        {
+          "if": {
+            "required": ["verification_mode"],
+            "properties": { "verification_mode": { "const": "evidence" } }
+          },
+          "then": { "required": ["verification_requirements"] }
+        }
+      ]
+    },
+    "phaseCandidate": {
+      "type": "object",
+      "required": [
+        "id",
+        "domain",
+        "title",
+        "priority",
+        "status",
+        "slice_count",
+        "finding_count",
+        "slice_ids",
+        "finding_ids",
+        "actions",
+        "verification_gates"
+      ],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "domain": { "type": "string", "minLength": 1 },
+        "title": { "type": "string", "minLength": 1 },
+        "priority": { "enum": ["high", "medium", "low"] },
+        "status": { "enum": ["planned", "review-required"] },
+        "requires_review": { "type": "boolean" },
+        "review_slice_count": { "type": "integer", "minimum": 0 },
+        "slice_count": { "type": "integer", "minimum": 0 },
+        "finding_count": { "type": "integer", "minimum": 0 },
+        "score": { "type": "integer", "minimum": 0 },
+        "slice_ids": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "minItems": 1
+        },
+        "finding_ids": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "minItems": 1
+        },
+        "findings": { "type": "array", "items": { "type": "object" }, "minItems": 1 },
+        "finding_fingerprints": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "workstreams": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "workstream_counts": {
+          "type": "object",
+          "additionalProperties": { "type": "integer", "minimum": 0 }
+        },
+        "representative_slice_ids": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "representative_paths": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "actions": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "minItems": 1
+        },
+        "verification_gates": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "minItems": 1
+        },
+        "verification_gate_count": { "type": "integer", "minimum": 0 },
+        "verification_gate_truncated": { "type": "boolean" }
       },
       "additionalProperties": true
     },

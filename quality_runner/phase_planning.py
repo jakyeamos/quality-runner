@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import re
-from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -12,8 +10,21 @@ from quality_runner.phase_documents import (
     render_summary,
     render_verification,
 )
+from quality_runner.phase_planning_helpers import (
+    finding_records,
+    finding_refs,
+    gate_state,
+    load_or_build_delta,
+    nested_object,
+    now,
+    plan_ready,
+    result_plan_status,
+    slug,
+    unique_finding_refs,
+    update_phase_tracking,
+    verification_blocked,
+)
 from quality_runner.phase_sources import (
-    load_json_artifact,
     load_optional_json,
     load_planning_source,
 )
@@ -34,7 +45,6 @@ from quality_runner.phase_store import (
     write_summary_file,
     write_verification_file,
 )
-from quality_runner.remediation_delta import build_remediation_delta
 from quality_runner.schema_constants import (
     PHASE_RESULT_SCHEMA,
     PHASE_VERIFICATION_SCHEMA,
@@ -82,7 +92,13 @@ def plan_status(repo_root: Path) -> dict[str, Any]:
     }
 
 
-def add_phase(repo_root: Path, description: str) -> dict[str, Any]:
+def add_phase(
+    repo_root: Path,
+    description: str,
+    *,
+    source_candidate_id: str | None = None,
+    automatic: bool = False,
+) -> dict[str, Any]:
     require_plan_root(repo_root)
     title = description.strip()
     if not title:
@@ -91,17 +107,27 @@ def add_phase(repo_root: Path, description: str) -> dict[str, Any]:
     phases = roadmap.get("phases")
     if not isinstance(phases, list):
         raise ValueError("QR roadmap phases must be a list")
-    number = max((int(item.get("number", 0)) for item in phases if isinstance(item, dict)), default=0) + 1
-    slug = _slug(title)
+    number = (
+        max(
+            (int(item.get("number", 0)) for item in phases if isinstance(item, dict)),
+            default=0,
+        )
+        + 1
+    )
+    phase_slug = slug(title)
     phase = {
         "number": number,
-        "slug": slug,
+        "slug": phase_slug,
         "title": title,
         "goal": title,
         "status": "planned",
         "plan_ids": [],
-        "updated_at": _now(),
+        "updated_at": now(),
     }
+    if source_candidate_id is not None:
+        phase["source_candidate_id"] = source_candidate_id
+    if automatic:
+        phase["planning_mode"] = "automatic"
     phases.append(phase)
     roadmap["phases"] = phases
     save_roadmap(repo_root, roadmap)
@@ -120,7 +146,7 @@ def add_phase(repo_root: Path, description: str) -> dict[str, Any]:
             "status": "in_progress",
             "current_phase": number,
             "last_action": "phase-add",
-            "updated_at": _now(),
+            "updated_at": now(),
         }
     )
     save_state(repo_root, state)
@@ -140,6 +166,7 @@ def plan_phase(
     phase_number: int,
     run_id: str | None = None,
     handoff_json: Path | None = None,
+    candidate_id: str | None = None,
 ) -> dict[str, Any]:
     roadmap = load_roadmap(repo_root)
     phase = phase_by_number(roadmap, phase_number)
@@ -152,7 +179,12 @@ def plan_phase(
             "phase": phase,
             "plans": existing,
         }
-    source = load_planning_source(repo_root, run_id=run_id, handoff_json=handoff_json)
+    source = load_planning_source(
+        repo_root,
+        run_id=run_id,
+        handoff_json=handoff_json,
+        candidate_id=candidate_id,
+    )
     slices = ordered_slices(source["slices"])
     if not slices:
         raise ValueError("planning source contains no remediation slices")
@@ -175,8 +207,10 @@ def plan_phase(
         plans.append({**plan, "path": str(path)})
     phase["plan_ids"] = [plan["id"] for plan in plans]
     phase["source"] = source["source"]
+    if candidate_id is not None:
+        phase["source_candidate_id"] = candidate_id
     phase["status"] = "planned"
-    phase["updated_at"] = _now()
+    phase["updated_at"] = now()
     save_roadmap(repo_root, roadmap)
     state = load_state(repo_root)
     state.update(
@@ -184,7 +218,7 @@ def plan_phase(
             "status": "in_progress",
             "current_phase": phase_number,
             "last_action": "phase-plan",
-            "updated_at": _now(),
+            "updated_at": now(),
         }
     )
     save_state(repo_root, state)
@@ -210,7 +244,7 @@ def next_plan(repo_root: Path, phase_number: int | None = None) -> dict[str, Any
         if phase_number is not None and phase.get("number") != phase_number:
             continue
         selected.extend(load_phase_plans(repo_root, int(phase["number"])))
-    ready = [plan for plan in selected if _plan_ready(plan, selected)]
+    ready = [plan for plan in selected if plan_ready(plan, selected)]
     if not ready:
         return {
             "schema": PHASE_RESULT_SCHEMA,
@@ -235,13 +269,13 @@ def record_batch(
     plan_path = plan_file(repo_root, phase_number, plan_number)
     plan = load_plan_file(plan_path)
     result = load_batch_result(result_file)
-    plan["status"] = _result_plan_status(result["status"])
+    plan["status"] = result_plan_status(result["status"])
     plan["last_result"] = result
-    plan["updated_at"] = _now()
+    plan["updated_at"] = now()
     update_plan_file(plan_path, plan)
     summary_path = summary_file(repo_root, phase_number, plan_number)
     write_summary_file(summary_path, result, render_summary(plan, result))
-    _update_phase_tracking(repo_root, phase_number, "phase-record-batch")
+    update_phase_tracking(repo_root, phase_number, "phase-record-batch")
     return {
         "schema": PHASE_RESULT_SCHEMA,
         "status": "recorded",
@@ -255,12 +289,12 @@ def update_phase(
     repo_root: Path, *, phase_number: int, baseline_run_id: str, run_id: str
 ) -> dict[str, Any]:
     plans = load_phase_plans(repo_root, phase_number)
-    delta = _load_or_build_delta(repo_root, baseline_run_id=baseline_run_id, run_id=run_id)
-    resolved = _finding_refs(delta.get("findings", {}).get("resolved"))
-    persisted = _finding_refs(delta.get("findings", {}).get("persisted"))
-    new_records = _finding_records(delta.get("findings", {}).get("new"))
-    current_verification = _nested_object(delta, "verification", "current")
-    blocked = _verification_blocked(current_verification)
+    delta = load_or_build_delta(repo_root, baseline_run_id=baseline_run_id, run_id=run_id)
+    resolved = finding_refs(delta.get("findings", {}).get("resolved"))
+    persisted = finding_refs(delta.get("findings", {}).get("persisted"))
+    new_records = finding_records(delta.get("findings", {}).get("new"))
+    current_verification = nested_object(delta, "verification", "current")
+    blocked = verification_blocked(current_verification)
     updated: list[dict[str, Any]] = []
     for plan in plans:
         required = set(str(item) for item in plan.get("finding_fingerprints", []))
@@ -279,9 +313,9 @@ def update_phase(
             "resolved": sorted(required & resolved),
             "persisted": sorted(required & persisted),
             "blocked": blocked,
-            "updated_at": _now(),
+            "updated_at": now(),
         }
-        plan["updated_at"] = _now()
+        plan["updated_at"] = now()
         update_plan_file(Path(plan["path"]), plan)
         updated.append(plan)
     state = load_state(repo_root)
@@ -291,10 +325,12 @@ def update_phase(
         if isinstance(previous_value, list)
         else []
     )
-    state["unplanned_findings"] = _unique_finding_refs([*previous, *new_records])
-    state.update({"current_phase": phase_number, "last_action": "phase-update", "updated_at": _now()})
+    state["unplanned_findings"] = unique_finding_refs([*previous, *new_records])
+    state.update(
+        {"current_phase": phase_number, "last_action": "phase-update", "updated_at": now()}
+    )
     save_state(repo_root, state)
-    _update_phase_tracking(repo_root, phase_number, "phase-update")
+    update_phase_tracking(repo_root, phase_number, "phase-update")
     return {
         "schema": PHASE_RESULT_SCHEMA,
         "status": "blocked" if blocked else "updated",
@@ -324,10 +360,10 @@ def verify_phase(repo_root: Path, *, phase_number: int, run_id: str) -> dict[str
             unresolved.append(str(plan["id"]))
     delta = load_optional_json(run_dir / "remediation-delta.json")
     gate = load_optional_json(run_dir / "gate-verification.json")
-    delta_verification = _nested_object(delta, "verification", "current")
-    if delta_verification and _verification_blocked(delta_verification):
+    delta_verification = nested_object(delta, "verification", "current")
+    if delta_verification and verification_blocked(delta_verification):
         failed.append("remediation-delta-verification")
-    if _verification_blocked(_gate_state(gate)):
+    if verification_blocked(gate_state(gate)):
         failed.append("gate-verification")
     status = "passed" if not unresolved and not failed else "failed"
     payload = {
@@ -337,12 +373,14 @@ def verify_phase(repo_root: Path, *, phase_number: int, run_id: str) -> dict[str
         "run_id": run_id,
         "plan_ids": [str(plan["id"]) for plan in plans],
         "verified_plan_ids": [
-            str(plan["id"]) for plan in plans if plan.get("status") in {"verified", "complete", "skipped"}
+            str(plan["id"])
+            for plan in plans
+            if plan.get("status") in {"verified", "complete", "skipped"}
         ],
         "unresolved_plan_ids": unresolved,
         "failed_checks": failed,
         "implementation_allowed": False,
-        "updated_at": _now(),
+        "updated_at": now(),
     }
     path = verification_file(repo_root, phase_number)
     write_verification_file(path, payload, render_verification(payload))
@@ -362,7 +400,7 @@ def close_phase(repo_root: Path, *, phase_number: int, run_id: str) -> dict[str,
     phase = phase_by_number(roadmap, phase_number)
     phase["status"] = "complete"
     phase["completed_run_id"] = run_id
-    phase["updated_at"] = _now()
+    phase["updated_at"] = now()
     save_roadmap(repo_root, roadmap)
     state = load_state(repo_root)
     state.update(
@@ -370,7 +408,7 @@ def close_phase(repo_root: Path, *, phase_number: int, run_id: str) -> dict[str,
             "status": "complete",
             "current_phase": phase_number,
             "last_action": "phase-close",
-            "updated_at": _now(),
+            "updated_at": now(),
         }
     )
     save_state(repo_root, state)
@@ -381,108 +419,3 @@ def close_phase(repo_root: Path, *, phase_number: int, run_id: str) -> dict[str,
         "phase": phase,
         "verification": verification,
     }
-
-
-def _load_or_build_delta(repo_root: Path, *, baseline_run_id: str, run_id: str) -> dict[str, Any]:
-    path = repo_root / ".quality-runner" / "runs" / run_id / "remediation-delta.json"
-    if path.exists():
-        return load_json_artifact(path)
-    return build_remediation_delta(
-        repo_root=repo_root, baseline_run_id=baseline_run_id, current_run_id=run_id
-    )
-
-
-def _nested_object(payload: dict[str, Any], *keys: str) -> dict[str, Any]:
-    current: object = payload
-    for key in keys:
-        if not isinstance(current, dict):
-            return {}
-        current = current.get(key)
-    return current if isinstance(current, dict) else {}
-
-
-def _plan_ready(plan: dict[str, Any], all_plans: list[dict[str, Any]]) -> bool:
-    if plan.get("status") not in {"planned", "in_progress"}:
-        return False
-    by_id = {str(item["id"]): item for item in all_plans}
-    return all(by_id.get(str(dep), {}).get("status") in {"verified", "complete", "skipped"} for dep in plan.get("depends_on", []))
-
-
-def _result_plan_status(status: str) -> str:
-    return {"complete": "complete", "blocked": "blocked", "failed": "blocked", "skipped": "skipped", "in_progress": "in_progress"}[status]
-
-
-def _verification_blocked(payload: object) -> bool:
-    if not isinstance(payload, dict):
-        return True
-    status = payload.get("status")
-    return status in {"failed", "blocked", "error"} or bool(payload.get("blockers")) or bool(payload.get("failure_type"))
-
-
-def _gate_state(payload: dict[str, Any]) -> dict[str, Any]:
-    return {"status": payload.get("status", "unavailable"), "blockers": payload.get("blockers", []), "failure_type": payload.get("failure_type")}
-
-
-def _finding_refs(value: object) -> set[str]:
-    if not isinstance(value, list):
-        return set()
-    return {str(item.get("fingerprint")) for item in value if isinstance(item, dict) and item.get("fingerprint")}
-
-
-def _finding_records(value: object) -> list[dict[str, Any]]:
-    if not isinstance(value, list):
-        return []
-    return [
-        item
-        for item in value
-        if isinstance(item, dict) and isinstance(item.get("fingerprint"), str)
-    ]
-
-
-def _unique_finding_refs(values: list[object]) -> list[dict[str, Any]]:
-    seen: set[str] = set()
-    result: list[dict[str, Any]] = []
-    for value in values:
-        if not isinstance(value, dict) or not value.get("fingerprint"):
-            continue
-        fingerprint = str(value["fingerprint"])
-        if fingerprint not in seen:
-            seen.add(fingerprint)
-            result.append(value)
-    return result
-
-
-def _update_phase_tracking(repo_root: Path, phase_number: int, action: str) -> None:
-    roadmap = load_roadmap(repo_root)
-    phase = phase_by_number(roadmap, phase_number)
-    plans = load_phase_plans(repo_root, phase_number)
-    statuses = {str(plan.get("status")) for plan in plans}
-    phase["status"] = (
-        "blocked"
-        if "blocked" in statuses
-        else "complete"
-        if plans and statuses <= {"complete", "verified", "skipped"}
-        else "in_progress"
-    )
-    phase["plan_ids"] = [str(plan["id"]) for plan in plans]
-    phase["updated_at"] = _now()
-    save_roadmap(repo_root, roadmap)
-    state = load_state(repo_root)
-    state.update(
-        {
-            "status": phase["status"] if phase["status"] in {"blocked", "complete"} else "in_progress",
-            "current_phase": phase_number,
-            "last_action": action,
-            "updated_at": _now(),
-        }
-    )
-    save_state(repo_root, state)
-
-
-def _slug(value: str) -> str:
-    slug = re.sub(r"[^a-z0-9]+", "-", value.lower()).strip("-")
-    return slug or "phase"
-
-
-def _now() -> str:
-    return datetime.now(UTC).isoformat()

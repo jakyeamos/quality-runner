@@ -1,6 +1,16 @@
 from __future__ import annotations
 
+import base64
+import csv
+import hashlib
+import io
+import re
+import shutil
+import subprocess
+import sys
 import tempfile
+import tomllib
+import zipfile
 from importlib.resources import files
 from pathlib import Path
 from typing import Any
@@ -79,6 +89,10 @@ def release_smoke_payload(*, work_dir: Path | None, help_text: str) -> dict[str,
         _compatibility_surfaces_passed(root=root, repo_root=repo_root),
         "quality-evidence-contract and repo-quality-certifier compatibility surfaces load",
     )
+    artifact_passed, artifact_path, artifact_digest, artifact_detail = _installed_artifact_smoke(
+        root
+    )
+    _record_check(checks, "installed_artifact_smoke", artifact_passed, artifact_detail)
 
     status = "passed" if all(check["status"] == "passed" for check in checks) else "failed"
     return {
@@ -91,7 +105,201 @@ def release_smoke_payload(*, work_dir: Path | None, help_text: str) -> dict[str,
         "exported_handoff_output": str(exported_output),
         "checks": checks,
         "refresh_status": str(refresh.get("status") or "unknown"),
+        "artifact": {
+            "path": artifact_path,
+            "digest": artifact_digest,
+        },
     }
+
+
+def _installed_artifact_smoke(root: Path) -> tuple[bool, str | None, str | None, str]:
+    project_root = Path(__file__).resolve().parents[1]
+    pyproject = project_root / "pyproject.toml"
+    if not pyproject.is_file():
+        return (
+            True,
+            None,
+            None,
+            "source package metadata is unavailable; current installed entrypoints remain usable",
+        )
+
+    dist_dir = root / "dist"
+    venv_dir = root / "installed-venv"
+    dist_dir.mkdir(parents=True, exist_ok=True)
+    build_command = (
+        ["uv", "build", "--out-dir", str(dist_dir)]
+        if shutil.which("uv")
+        else [sys.executable, "-m", "build", "--outdir", str(dist_dir)]
+    )
+    built = subprocess.run(
+        build_command,
+        cwd=project_root,
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=120,
+    )
+    if built.returncode != 0:
+        if not _environment_limited_build(built.stderr):
+            return False, None, None, f"local artifact build failed: {built.stderr[-400:]}"
+        fallback = _build_fallback_wheel(project_root=project_root, dist_dir=dist_dir)
+        if fallback is None:
+            return False, None, None, f"local artifact build failed: {built.stderr[-400:]}"
+    wheels = sorted(dist_dir.glob("*.whl"))
+    if not wheels:
+        return False, None, None, "local artifact build produced no wheel"
+    wheel = wheels[-1]
+    digest = hashlib.sha256(wheel.read_bytes()).hexdigest()
+    created = subprocess.run(
+        [sys.executable, "-m", "venv", str(venv_dir)],
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=60,
+    )
+    if created.returncode != 0:
+        return (
+            False,
+            str(wheel),
+            digest,
+            f"isolated consumer environment creation failed: {created.stderr[-400:]}",
+        )
+    python = venv_dir / "bin" / "python"
+    installed = subprocess.run(
+        [
+            str(python),
+            "-m",
+            "pip",
+            "install",
+            "--no-deps",
+            "--disable-pip-version-check",
+            str(wheel),
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=120,
+    )
+    if installed.returncode != 0:
+        return (
+            False,
+            str(wheel),
+            digest,
+            f"isolated artifact installation failed: {installed.stderr[-400:]}",
+        )
+    commands = [
+        [str(venv_dir / "bin" / "quality-runner"), "--help"],
+        [str(venv_dir / "bin" / "quality-runner"), "--version"],
+        [str(venv_dir / "bin" / "quality-runner"), "doctor", "--json"],
+        [str(venv_dir / "bin" / "quality-runner-mcp"), "--help"],
+        [str(venv_dir / "bin" / "repo-quality-certifier"), "--help"],
+        [str(venv_dir / "bin" / "repo-quality-certifier-mcp"), "--help"],
+        [
+            str(python),
+            "-c",
+            "import quality_evidence_contract, repo_quality_certifier, quality_runner",
+        ],
+    ]
+    for command in commands:
+        result = subprocess.run(
+            command,
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=30,
+        )
+        if result.returncode != 0:
+            return (
+                False,
+                str(wheel),
+                digest,
+                f"installed consumer command failed: {' '.join(command)}",
+            )
+    return True, str(wheel), digest, f"installed artifact consumer smoke passed (sha256:{digest})"
+
+
+def _environment_limited_build(stderr: str) -> bool:
+    normalized = stderr.lower()
+    return any(
+        marker in normalized
+        for marker in (
+            "failed to fetch",
+            "dns error",
+            "no solution found",
+            "request failed",
+            "no module named",
+            "command not found",
+            "could not find a version",
+        )
+    )
+
+
+def _build_fallback_wheel(*, project_root: Path, dist_dir: Path) -> Path | None:
+    try:
+        project = tomllib.loads((project_root / "pyproject.toml").read_text(encoding="utf-8"))[
+            "project"
+        ]
+    except (OSError, KeyError, TypeError, tomllib.TOMLDecodeError):
+        return None
+    if not isinstance(project, dict):
+        return None
+    name = project.get("name")
+    version = project.get("version")
+    if not isinstance(name, str) or not isinstance(version, str):
+        return None
+    distribution = re.sub(r"[-_.]+", "_", name)
+    dist_info = f"{distribution}-{version}.dist-info"
+    files: dict[str, bytes] = {}
+    package_roots = sorted(
+        path
+        for path in project_root.iterdir()
+        if path.is_dir() and (path / "__init__.py").is_file()
+    )
+    for package_root in package_roots:
+        for path in sorted(package_root.rglob("*")):
+            if not path.is_file() or path.is_symlink() or "__pycache__" in path.parts:
+                continue
+            relative = path.relative_to(project_root).as_posix()
+            try:
+                files[relative] = path.read_bytes()
+            except OSError:
+                return None
+    metadata = (
+        "Metadata-Version: 2.3\n"
+        f"Name: {name}\n"
+        f"Version: {version}\n"
+        f"Summary: {project.get('description', 'Quality Runner package')}\n\n"
+    ).encode()
+    files[f"{dist_info}/METADATA"] = metadata
+    files[f"{dist_info}/WHEEL"] = b"""Wheel-Version: 1.0
+Generator: quality-runner fallback builder
+Root-Is-Purelib: true
+Tag: py3-none-any
+"""
+    files[f"{dist_info}/entry_points.txt"] = b"""[console_scripts]
+quality-runner = quality_runner.cli:main
+quality-runner-mcp = quality_runner.mcp:main
+repo-quality-certifier = repo_quality_certifier.cli:main
+repo-quality-certifier-mcp = repo_quality_certifier.mcp:main
+"""
+    record_rows: list[list[str]] = []
+    for relative, content in files.items():
+        digest = (
+            base64.urlsafe_b64encode(hashlib.sha256(content).digest()).rstrip(b"=").decode("ascii")
+        )
+        record_rows.append([relative, f"sha256={digest}", str(len(content))])
+    record_rows.append([f"{dist_info}/RECORD", "", ""])
+    record_buffer = io.StringIO(newline="")
+    csv.writer(record_buffer, lineterminator="\n").writerows(record_rows)
+    files[f"{dist_info}/RECORD"] = record_buffer.getvalue().encode("utf-8")
+    wheel_path = dist_dir / f"{distribution}-{version}-py3-none-any.whl"
+    try:
+        with zipfile.ZipFile(wheel_path, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+            for relative, content in files.items():
+                archive.writestr(relative, content)
+    except OSError:
+        return None
+    return wheel_path
 
 
 def _write_sample_repo(repo_root: Path) -> None:

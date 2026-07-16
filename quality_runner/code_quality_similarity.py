@@ -284,8 +284,7 @@ def _materialize_similarity_report(report: Mapping[str, object]) -> dict[str, An
     )
     if not findings:
         findings = [
-            _cluster_finding(cluster, source=str(cluster.get("source", "")))
-            for cluster in clusters
+            _cluster_finding(cluster, source=str(cluster.get("source", ""))) for cluster in clusters
         ]
     scanner_status = report.get("scanner_status")
     return {
@@ -420,8 +419,8 @@ def _cluster_finding(cluster: dict[str, Any], *, source: str) -> dict[str, Any]:
         ),
         risk="Similar logic can drift across bug fixes and create inconsistent behavior.",
         verification=(
-            "Rerun Quality Runner and the relevant similarity scanner; confirm this cluster "
-            "is fixed, accepted, or intentionally duplicated."
+            "Rerun Quality Runner and confirm this cluster is fixed, accepted, or "
+            "intentionally duplicated."
         ),
         remediation_bucket="duplicate consolidation and helper extraction",
     )

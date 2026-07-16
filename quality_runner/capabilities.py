@@ -1,9 +1,22 @@
 from __future__ import annotations
 
-from datetime import date
 from typing import Any
 
+from quality_runner.capability_exceptions import active_exception as _active_exception
 from quality_runner.capability_state import matching_ci_status, verification_state
+from quality_runner.readiness import (
+    add_readiness_capabilities,
+    canonical_readiness_command_id,
+)
+from quality_runner.release_capability_policy import (
+    _truth_file_required,
+)
+from quality_runner.release_capability_policy import (
+    required_by as release_required_by,
+)
+from quality_runner.release_capability_policy import (
+    required_capabilities as release_required_capabilities,
+)
 from quality_runner.schema_constants import CAPABILITY_MAP_SCHEMA
 
 SCRIPT_CAPABILITIES = {
@@ -84,6 +97,14 @@ def detect_capabilities(
         _record_file_capability(available=available, missing=missing, accepted_exceptions=accepted_exceptions, standards_packet=standards_packet, scan=scan, scripts=scripts, quality_commands=quality_commands, capability_id="truth_file", script_names=(), path=scan.get("truth_file"), reason="no project truth file found", language=_primary_language(scan), required_by=required_by.get("truth_file", "profile"))
     # fmt: on
 
+    readiness = add_readiness_capabilities(
+        scan=scan,
+        standards_packet=standards_packet,
+        quality_commands=quality_commands,
+        available=available,
+        missing=missing,
+    )
+
     profile = standards_packet.get("profile")
     return {
         "schema": CAPABILITY_MAP_SCHEMA,
@@ -92,6 +113,7 @@ def detect_capabilities(
         "missing": missing,
         "accepted_exceptions": accepted_exceptions,
         "warnings": _combined_warnings(scan, standards_packet),
+        "readiness": readiness,
     }
 
 
@@ -181,7 +203,7 @@ def _configured_quality_commands(standards_packet: dict[str, Any]) -> list[dict[
             continue
         commands.append(
             {
-                "id": capability_id,
+                "id": canonical_readiness_command_id(capability_id),
                 "command": command,
                 "source": f".quality-runner.toml:quality_runner.gates[{index}]",
                 "language": ecosystem,
@@ -292,6 +314,15 @@ def _record_missing(*, missing: list[dict[str, Any]], accepted_exceptions: list[
 
 
 def _required_capabilities(scan: dict[str, Any], standards_packet: dict[str, Any]) -> set[str]:
+    release_required = release_required_capabilities(
+        scan=scan,
+        standards_packet=standards_packet,
+        script_capabilities=SCRIPT_CAPABILITIES,
+        file_capabilities=FILE_CAPABILITIES,
+    )
+    if release_required is not None:
+        return release_required
+
     config = standards_packet.get("config")
     if isinstance(config, dict):
         required_capabilities = config.get("required_capabilities")
@@ -335,6 +366,13 @@ def _required_capabilities(scan: dict[str, Any], standards_packet: dict[str, Any
 
 
 def _required_by(standards_packet: dict[str, Any]) -> dict[str, str]:
+    release_by = release_required_by(
+        script_capabilities=SCRIPT_CAPABILITIES,
+        profile=standards_packet.get("profile"),
+    )
+    if release_by is not None:
+        return release_by
+
     config = standards_packet.get("config")
     if not isinstance(config, dict):
         return {}
@@ -365,21 +403,6 @@ def _required_by(standards_packet: dict[str, Any]) -> dict[str, str]:
     }
 
 
-def _truth_file_required(scan: dict[str, Any]) -> bool:
-    if isinstance(scan.get("truth_file"), str) and scan["truth_file"]:
-        return True
-    instruction_files = scan.get("agent_instruction_files")
-    if not isinstance(instruction_files, list):
-        return False
-    quality_contract = scan.get("quality_contract")
-    if not isinstance(quality_contract, dict):
-        return False
-    required_terms = quality_contract.get("required_terms")
-    if not isinstance(required_terms, dict):
-        return False
-    return required_terms.get("truth_file") is True
-
-
 def _primary_language(scan: dict[str, Any]) -> str:
     languages = scan.get("languages")
     if isinstance(languages, list):
@@ -387,42 +410,6 @@ def _primary_language(scan: dict[str, Any]) -> str:
             if isinstance(language, str) and language:
                 return language
     return "unknown"
-
-
-def _active_exception(standards_packet: dict[str, Any], capability_id: str) -> dict[str, str] | None:
-    config = standards_packet.get("config")
-    if not isinstance(config, dict):
-        return None
-    accepted_exceptions = config.get("accepted_exceptions")
-    if not isinstance(accepted_exceptions, list):
-        return None
-
-    today = date.today()
-    for item in accepted_exceptions:
-        if not isinstance(item, dict):
-            continue
-        capability = item.get("capability")
-        reason = item.get("reason")
-        owner = item.get("owner")
-        expires = item.get("expires")
-        if not (
-            isinstance(capability, str)
-            and capability == capability_id
-            and isinstance(reason, str)
-            and reason
-            and isinstance(owner, str)
-            and owner
-            and isinstance(expires, str)
-            and expires
-        ):
-            continue
-        try:
-            expires_on = date.fromisoformat(expires)
-        except ValueError:
-            continue
-        if expires_on >= today:
-            return {"capability": capability, "reason": reason, "owner": owner, "expires": expires}
-    return None
 
 
 def _available_command(

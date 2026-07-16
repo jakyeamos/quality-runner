@@ -214,6 +214,9 @@ def test_resolution_ledger_marks_missing_prior_findings_superseded_and_preserves
             [
                 "[quality_runner]",
                 "",
+                "[quality_runner.security]",
+                "enabled = false",
+                "",
                 "[[quality_runner.accepted_dispositions]]",
                 f'fingerprint = "{explicit_any["fingerprint"]}"',
                 'status = "accepted-intentional"',
@@ -237,6 +240,32 @@ def test_resolution_ledger_marks_missing_prior_findings_superseded_and_preserves
     )
     assert accepted_row["status"] == "accepted-intentional"
     assert accepted_row["reason"] == "Fixture intentionally keeps one type escape hatch."
+    accepted_audit = json.loads(
+        Path(accepted_payload["artifact_paths"]["quality_audit_json"]).read_text()
+    )
+    accepted_finding = next(
+        finding
+        for finding in accepted_audit["findings"]
+        if finding["id"] == "structural-harden-explicit-any"
+    )
+    assert accepted_audit["status"] == "clean"
+    assert accepted_audit["resolution"] == {
+        "status": "resolved",
+        "total_findings": 1,
+        "resolved_findings": 1,
+        "unresolved_findings": 0,
+        "by_status": {"accepted-intentional": 1},
+        "entry_by_status": {"accepted-intentional": 1},
+    }
+    assert accepted_finding["resolution"]["resolved"] is True
+    accepted_plan = json.loads(
+        Path(accepted_payload["artifact_paths"]["remediation_plan_json"]).read_text()
+    )
+    assert accepted_plan["slices"] == []
+    accepted_handoff = json.loads(
+        Path(accepted_payload["artifact_paths"]["agent_handoff_json"]).read_text()
+    )
+    assert "structural-harden-explicit-any" not in accepted_handoff["finding_ids"]
 
     source.write_text("const first: unknown = {};\n", encoding="utf-8")
     superseded_payload = run_payload(

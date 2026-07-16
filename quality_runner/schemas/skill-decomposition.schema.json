@@ -1,0 +1,105 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://quality-runner.dev/schemas/skill-decomposition.schema.json",
+  "title": "Quality Runner Skill Decomposition Report",
+  "type": "object",
+  "required": [
+    "schema",
+    "status",
+    "implementation_allowed",
+    "run_id",
+    "units",
+    "summary"
+  ],
+  "properties": {
+    "schema": { "const": "quality-runner-skill-decomposition-v0.1" },
+    "status": { "const": "report-only" },
+    "implementation_allowed": { "const": false },
+    "run_id": { "type": "string", "minLength": 1 },
+    "fixture_ids": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "uniqueItems": true
+    },
+    "units": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/unit" }
+    },
+    "summary": { "$ref": "#/$defs/summary" }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "unit": {
+      "type": "object",
+      "required": [
+        "id",
+        "source",
+        "revision",
+        "path",
+        "locator",
+        "knowledge_role",
+        "enforceability",
+        "normalization_status",
+        "evidence",
+        "evidence_preserved",
+        "mapping_status",
+        "mapping_target",
+        "loss_reason"
+      ],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "source": { "type": "string", "minLength": 1 },
+        "revision": { "type": "string", "minLength": 1 },
+        "path": { "type": "string", "minLength": 1 },
+        "locator": { "type": "string", "minLength": 1 },
+        "knowledge_role": {
+          "enum": ["format", "tool", "workflow", "adapter", "detector"]
+        },
+        "enforceability": {
+          "enum": ["deterministic", "agent_review", "context_only"]
+        },
+        "normalization_status": {
+          "enum": ["not_applicable", "normalized", "partially_normalized", "unavailable"]
+        },
+        "evidence": { "type": "string", "minLength": 1 },
+        "evidence_preserved": { "type": "boolean" },
+        "mapping_status": {
+          "enum": ["mapped", "context_only", "unmapped", "ambiguous"]
+        },
+        "mapping_target": { "type": ["string", "null"] },
+        "loss_reason": { "type": ["string", "null"] }
+      },
+      "additionalProperties": false
+    },
+    "summary": {
+      "type": "object",
+      "required": [
+        "source_units",
+        "mapped_units",
+        "context_only_units",
+        "unmapped_units",
+        "ambiguous_units",
+        "loss_units",
+        "evidence_preserved_units",
+        "evidence_not_preserved_units",
+        "deterministic_units",
+        "agent_review_units",
+        "context_only_enforceability_units"
+      ],
+      "properties": {
+        "source_units": { "type": "integer", "minimum": 0 },
+        "mapped_units": { "type": "integer", "minimum": 0 },
+        "context_only_units": { "type": "integer", "minimum": 0 },
+        "unmapped_units": { "type": "integer", "minimum": 0 },
+        "ambiguous_units": { "type": "integer", "minimum": 0 },
+        "loss_units": { "type": "integer", "minimum": 0 },
+        "evidence_preserved_units": { "type": "integer", "minimum": 0 },
+        "evidence_not_preserved_units": { "type": "integer", "minimum": 0 },
+        "deterministic_units": { "type": "integer", "minimum": 0 },
+        "agent_review_units": { "type": "integer", "minimum": 0 },
+        "context_only_enforceability_units": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": false
+    }
+  }
+}

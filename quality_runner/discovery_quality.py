@@ -38,9 +38,59 @@ def _quality_commands(
         *(_workspace_quality_commands(root, workspaces)),
         *(_pre_cr_quality_commands(root, pre_cr_config)),
         *(quality_commands_from_surfaces(root, scan_exclusions=scan_exclusions)),
+        *(
+            _readiness_quality_commands(
+                scripts, manifest_path="package.json", package_manager=package_manager
+            )
+        ),
     ]
     existing_ids = {command["id"] for command in commands}
     commands.extend(_ci_quality_commands(root=root, ci_files=ci_files, existing_ids=existing_ids))
+    return commands
+
+
+def _readiness_quality_commands(
+    scripts: dict[str, str],
+    *,
+    manifest_path: str,
+    package_manager: str | None,
+) -> list[dict[str, str]]:
+    readiness_scripts = {
+        "package_consumer_smoke": (
+            "package-smoke",
+            "consumer-smoke",
+            "installed-smoke",
+            "release-smoke",
+        ),
+        "migration_safety": (
+            "migration-safety",
+            "migration-smoke",
+            "migration-rollback",
+            "db-migration",
+        ),
+    }
+    commands: list[dict[str, str]] = []
+    workspace_path = _workspace_path_from_manifest(manifest_path)
+    for capability_id, names in readiness_scripts.items():
+        for script_name in names:
+            script_command = scripts.get(script_name)
+            if not script_command:
+                continue
+            commands.append(
+                _quality_command(
+                    capability_id=capability_id,
+                    command=_javascript_command(
+                        workspace_path=workspace_path,
+                        script_name=script_name,
+                        script_command=script_command,
+                        package_manager=package_manager,
+                    ),
+                    source_type="package_script",
+                    source=f"{manifest_path}:scripts.{script_name}",
+                    language="javascript",
+                )
+            )
+            break
     return commands
 
 
@@ -177,6 +227,17 @@ def _python_pyproject_quality_commands(
                 command=_workspace_command(workspace_path, "uv build"),
                 source_type="pyproject",
                 source=f"{manifest_path}:build-system",
+                language="python",
+            )
+        )
+    project = pyproject.get("project")
+    if isinstance(project, dict) and project.get("name") == "quality-runner":
+        commands.append(
+            _quality_command(
+                capability_id="package_consumer_smoke",
+                command="uv run quality-runner release-smoke --json",
+                source_type="pyproject",
+                source=f"{manifest_path}:project.scripts",
                 language="python",
             )
         )

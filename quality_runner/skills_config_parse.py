@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from quality_runner.agent_review_policy import AGENT_REVIEW_MODES
+
 CONFIG_FILE_NAME = ".quality-runner.toml"
 
 
@@ -19,6 +21,46 @@ def parse_skills_section(value: object, warnings: list[dict[str, str]]) -> dict[
             result["enabled"] = enabled
         else:
             warnings.append(_warning("quality_runner.skills.enabled must be a boolean"))
+
+    global_enabled = value.get("global_enabled")
+    if global_enabled is not None:
+        if isinstance(global_enabled, bool):
+            result["global_enabled"] = global_enabled
+        else:
+            warnings.append(_warning("quality_runner.skills.global_enabled must be a boolean"))
+
+    global_exclude = value.get("global_exclude")
+    if global_exclude is not None:
+        if isinstance(global_exclude, list) and all(
+            isinstance(item, str) and item for item in global_exclude
+        ):
+            result["global_exclude"] = global_exclude
+        else:
+            warnings.append(
+                _warning("quality_runner.skills.global_exclude must be a list of strings")
+            )
+
+    global_always = value.get("global_always")
+    if global_always is not None:
+        if isinstance(global_always, list) and all(
+            isinstance(item, str) and item for item in global_always
+        ):
+            result["global_always"] = global_always
+        else:
+            warnings.append(
+                _warning("quality_runner.skills.global_always must be a list of strings")
+            )
+
+    agent_review_mode = value.get("agent_review_mode")
+    if agent_review_mode is not None:
+        if isinstance(agent_review_mode, str) and agent_review_mode in AGENT_REVIEW_MODES:
+            result["agent_review_mode"] = agent_review_mode
+        else:
+            warnings.append(
+                _warning(
+                    "quality_runner.skills.agent_review_mode must be one of: off, auto, parallel, required"
+                )
+            )
 
     active = _string_list(value.get("active"))
     if active:

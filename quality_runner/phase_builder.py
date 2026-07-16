@@ -64,21 +64,24 @@ def build_phase_plan(
         [item for item in finding_value] if isinstance(finding_value, list) else []
     )
     finding_ids = [
-        str(item["id"])
-        for item in finding_items
-        if isinstance(item, dict) and item.get("id")
+        str(item["id"]) for item in finding_items if isinstance(item, dict) and item.get("id")
     ]
+    if not finding_ids:
+        finding_ids = _string_list(slice_item.get("finding_ids"))
     fingerprints = [
         str(item["fingerprint"])
         for item in finding_items
         if isinstance(item, dict) and item.get("fingerprint")
     ]
+    if not fingerprints:
+        fingerprints = _string_list(slice_item.get("finding_fingerprints"))
     depends_on = [
         f"{int(phase['number']):02d}-{plan_ids_by_slice[item]:02d}"
         for item in _string_list(slice_item.get("depends_on"))
         if item in plan_ids_by_slice
     ]
     source_info = source["source"] if isinstance(source.get("source"), dict) else {}
+    source_slice_ids = _string_list(slice_item.get("slice_ids"))
     return {
         "schema": PHASE_PLAN_SCHEMA,
         "phase": int(phase["number"]),
@@ -86,12 +89,13 @@ def build_phase_plan(
         "id": f"{int(phase['number']):02d}-{plan_number:02d}",
         "title": str(slice_item.get("title") or slice_item.get("id")),
         "status": "planned",
-        "wave": wave_by_slice.get(
-            str(slice_item["id"]), WAVE_BY_PRIORITY.get(priority, 2)
-        ),
+        "wave": wave_by_slice.get(str(slice_item["id"]), WAVE_BY_PRIORITY.get(priority, 2)),
         "depends_on": depends_on,
         "source": source_info,
         "source_slice_id": str(slice_item["id"]),
+        "source_slice_ids": source_slice_ids or [str(slice_item["id"])],
+        "domain": slice_item.get("domain"),
+        "workstreams": _string_list(slice_item.get("workstreams")),
         "priority": priority,
         "finding_ids": finding_ids,
         "finding_fingerprints": fingerprints,

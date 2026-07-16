@@ -35,6 +35,7 @@ def detect_surfaces(
     _detect_docker(root, surfaces, commands)
     _detect_terraform(root, surfaces, commands, resolved_exclusions)
     _detect_db_migrations(root, surfaces)
+    _detect_stateful_cutover(root, surfaces, resolved_exclusions)
     _detect_contracts(root, surfaces, resolved_exclusions)
     _detect_generated(root, surfaces, generated_code, resolved_exclusions)
     _detect_monorepo(root, surfaces)
@@ -207,6 +208,29 @@ def _detect_db_migrations(root: Path, surfaces: list[dict[str, str]]) -> None:
                     "ecosystem": "database",
                     "path": candidate,
                     "evidence": "migration directory",
+                }
+            )
+            return
+
+
+def _detect_stateful_cutover(
+    root: Path,
+    surfaces: list[dict[str, str]],
+    scan_exclusions: list[str],
+) -> None:
+    markers = ("cutover", "backfill", "reconcile", "one-writer")
+    for path in iter_allowed_paths(root, scan_exclusions):
+        if not path.is_file() or path.is_symlink():
+            continue
+        relative = _relative(root, path).lower()
+        if any(marker in relative for marker in markers):
+            surfaces.append(
+                {
+                    "id": "stateful_cutover",
+                    "kind": "stateful-operation",
+                    "ecosystem": "database",
+                    "path": _relative(root, path),
+                    "evidence": "cutover/backfill/reconciliation path",
                 }
             )
             return

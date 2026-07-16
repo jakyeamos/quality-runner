@@ -68,6 +68,55 @@ def test_verify_gates_read_only_mode_skips_pre_cr_workspace_command(tmp_path: Pa
     assert plan[0]["local_execution_status"] == "mutating-skipped"
 
 
+def test_refresh_forwards_skill_review_report_to_each_phase(tmp_path: Path) -> None:
+    from quality_runner.refresh_workflow import run_refresh_payload
+
+    report: dict[str, object] = {
+        "schema": "quality-runner-skill-review-report-v0.1",
+        "run_id": "skill-review-packet",
+        "findings": [],
+    }
+    received: dict[str, object] = {}
+
+    def inspect_callback(**kwargs: object) -> dict[str, object]:
+        received["inspect"] = kwargs["skill_review_report"]
+        return {"status": "inspected"}
+
+    def run_callback(**kwargs: object) -> dict[str, object]:
+        received["run"] = kwargs["skill_review_report"]
+        return {"status": "clean"}
+
+    def verify_callback(**kwargs: object) -> dict[str, object]:
+        received["verify"] = kwargs["skill_review_report"]
+        return {"status": "clean"}
+
+    payload = run_refresh_payload(
+        repo_root=tmp_path,
+        run_id_prefix="skill-review-refresh",
+        baseline_run_id=None,
+        profile=None,
+        ci_status_json=None,
+        readiness_evidence_file=None,
+        timeout_seconds=1,
+        workflow_timeout_seconds=None,
+        verify_timeout_seconds=None,
+        workflow_timeout_reason=None,
+        total_timeout_seconds=None,
+        total_timeout_reason=None,
+        checkout_most_advanced_branch=False,
+        allow_mutating_gates=False,
+        intent=None,
+        skill_review_report=report,
+        inspect_callback=inspect_callback,
+        run_callback=run_callback,
+        verify_callback=verify_callback,
+        summary_callback=lambda **_: {"status": "clean"},
+    )
+
+    assert payload["status"] == "clean"
+    assert received == {"inspect": report, "run": report, "verify": report}
+
+
 def test_refresh_payload_finalizes_partial_verify_artifacts_when_verify_times_out(
     tmp_path: Path, monkeypatch: object
 ) -> None:

@@ -1,0 +1,62 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://quality-runner.dev/schemas/module-status.schema.json",
+  "title": "Quality Runner Module Status",
+  "type": "object",
+  "required": ["schema", "mode", "profile", "modules", "summary"],
+  "properties": {
+    "schema": { "const": "quality-runner-module-status-v0.1" },
+    "mode": { "type": "string", "minLength": 1 },
+    "profile": { "type": "string", "minLength": 1 },
+    "modules": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/module" }
+    },
+    "summary": { "$ref": "#/$defs/summary" }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "module": {
+      "type": "object",
+      "required": ["id", "kind", "status", "summary"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "kind": { "enum": ["core", "optional"] },
+        "status": {
+          "enum": ["enabled", "disabled", "not_applicable", "unavailable", "not_run"]
+        },
+        "summary": { "type": "string", "minLength": 1 },
+        "finding_count": { "type": "integer", "minimum": 0 },
+        "reason": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": false
+    },
+    "summary": {
+      "type": "object",
+      "required": ["module_count", "by_status", "by_kind"],
+      "properties": {
+        "module_count": { "type": "integer", "minimum": 0 },
+        "by_status": {
+          "type": "object",
+          "additionalProperties": { "type": "integer", "minimum": 0 }
+        },
+        "by_kind": {
+          "type": "object",
+          "properties": {
+            "core": {
+              "type": "object",
+              "additionalProperties": { "type": "integer", "minimum": 0 }
+            },
+            "optional": {
+              "type": "object",
+              "additionalProperties": { "type": "integer", "minimum": 0 }
+            }
+          },
+          "required": ["core", "optional"],
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

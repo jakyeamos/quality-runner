@@ -5,7 +5,6 @@ from pathlib import Path
 from typing import Any
 
 from quality_runner.config import load_repo_config
-from quality_runner.skill_config import load_active_skills
 from quality_runner.skill_corpus import (
     append_skill_to_corpus,
     classify_skill_pack,
@@ -13,6 +12,7 @@ from quality_runner.skill_corpus import (
 )
 from quality_runner.skill_ingest import ingest_skill_pack
 from quality_runner.skill_review import validate_skill_review_report
+from quality_runner.skill_selection import load_selected_skills
 from quality_runner.workflow_skills import load_skill_review_report_json
 
 
@@ -103,8 +103,15 @@ def skill_command_payload(
         repo_root = (
             validated_repo_path(args.repo_path) if getattr(args, "repo_path", None) else None
         )
-        skills = load_active_skills(repo_root, load_repo_config(repo_root))[0] if repo_root else []
-        return validate_skill_review_report(report, skills=skills, repo_root=repo_root)
+        skills = (
+            load_selected_skills(repo_root, load_repo_config(repo_root))[0] if repo_root else []
+        )
+        return validate_skill_review_report(
+            report,
+            skills=skills,
+            repo_root=repo_root,
+            require_review_coverage=True,
+        )
     if args.command == "skill" and args.skill_command == "ingest":
         return ingest_skill_pack(
             Path(args.candidate_toml).expanduser().resolve(),

@@ -15,6 +15,7 @@ from quality_runner.schema_constants import (
 
 DOCTOR_RESULT_SCHEMA = "quality-runner-doctor-result-v0.1"
 INIT_RESULT_SCHEMA = "quality-runner-init-result-v0.1"
+SELF_UPDATE_SCHEMA = "quality-runner-self-update-result-v0.1"
 
 
 def human_summary(payload: dict[str, Any]) -> str:
@@ -24,6 +25,18 @@ def human_summary(payload: dict[str, Any]) -> str:
         return f"Quality Runner {version}: {status}"
     if payload.get("schema") == INIT_RESULT_SCHEMA:
         return f"config: {payload.get('config_path')}"
+    if payload.get("schema") == SELF_UPDATE_SCHEMA:
+        lines = [f"status: {status}", f"package: {payload.get('package')}"]
+        source = payload.get("source")
+        if isinstance(source, str):
+            lines.append(f"source: {source}")
+        command = payload.get("command")
+        if isinstance(command, list):
+            lines.append(f"command: {' '.join(str(item) for item in command)}")
+        error = payload.get("error")
+        if isinstance(error, str):
+            lines.append(f"error: {error}")
+        return "\n".join(lines)
     if payload.get("schema") == "quality-runner-review-result-v0.1":
         lines = [
             f"status: {status}",
@@ -42,7 +55,10 @@ def human_summary(payload: dict[str, Any]) -> str:
     if payload.get("schema") == STATUS_RESULT_SCHEMA:
         latest = payload.get("latest_run")
         run_id = latest.get("run_id") if isinstance(latest, dict) else "none"
-        return f"status: {status}\nlatest run: {run_id}"
+        lines = [f"status: {status}", f"latest run: {run_id}"]
+        if isinstance(latest, dict):
+            _append_module_status_line(lines, latest)
+        return "\n".join(lines)
     if payload.get("schema") == EXPORT_HANDOFF_RESULT_SCHEMA:
         output_path = payload.get("output_path")
         if isinstance(output_path, str):
@@ -53,6 +69,7 @@ def human_summary(payload: dict[str, Any]) -> str:
         lines = [f"status: {status}", f"run id: {payload.get('run_id')}"]
         if isinstance(lifecycle, str) and lifecycle:
             lines.append(f"lifecycle: {lifecycle}")
+        _append_module_status_line(lines, payload)
         return "\n".join(lines)
     if payload.get("schema") == REMEDIATION_DELTA_SCHEMA:
         lines = [
@@ -131,7 +148,11 @@ def _phase_result_summary(payload: dict[str, Any], status: object) -> str:
 
 def _phase_verification_summary(payload: dict[str, Any]) -> str:
     status = payload.get("status", "unknown")
-    lines = [f"status: {status}", f"phase: {payload.get('phase')}", f"run id: {payload.get('run_id')}"]
+    lines = [
+        f"status: {status}",
+        f"phase: {payload.get('phase')}",
+        f"run id: {payload.get('run_id')}",
+    ]
     lines.append(f"verified plans: {len(payload.get('verified_plan_ids', []))}")
     lines.append(f"unresolved plans: {len(payload.get('unresolved_plan_ids', []))}")
     lines.append(f"failed checks: {len(payload.get('failed_checks', []))}")
@@ -142,6 +163,8 @@ def _refresh_summary(payload: dict[str, Any], status: object) -> str:
     summary = payload.get("summary")
     run_id = summary.get("run_id") if isinstance(summary, dict) else payload.get("run_id_prefix")
     lines = [f"status: {status}", f"run id: {run_id}"]
+    if isinstance(summary, dict):
+        _append_module_status_line(lines, summary)
     handoff_export = payload.get("handoff_export")
     if isinstance(handoff_export, dict):
         output_path = handoff_export.get("output_path")
@@ -185,11 +208,27 @@ def _default_summary(payload: dict[str, Any], status: object) -> str:
     run_id = payload.get("run_id")
     if isinstance(run_id, str):
         lines.append(f"run id: {run_id}")
+    _append_module_status_line(lines, payload)
 
     artifact_paths = payload.get("artifact_paths")
     if isinstance(artifact_paths, dict):
         _append_artifact_lines(lines, artifact_paths)
     return "\n".join(lines)
+
+
+def _append_module_status_line(lines: list[str], payload: dict[str, Any]) -> None:
+    module_status = payload.get("module_status")
+    if not isinstance(module_status, dict):
+        return
+    summary = module_status.get("summary")
+    by_status = summary.get("by_status") if isinstance(summary, dict) else None
+    if not isinstance(by_status, dict):
+        return
+    status_counts = ", ".join(
+        f"{key}={by_status[key]}" for key in sorted(by_status) if isinstance(by_status[key], int)
+    )
+    if status_counts:
+        lines.append(f"modules: {status_counts}")
 
 
 def _append_artifact_lines(lines: list[str], artifact_paths: dict[str, Any]) -> None:

@@ -45,15 +45,16 @@ def _run_summary(*, repo_root: Path, run_id: str) -> dict[str, Any]:
     gate_results = _gate_results(gate_verification)
     missing_capabilities = _missing_capabilities(capability_map)
     finding_counts = _finding_counts(audit)
-    status = _summary_status(gate_verification, audit)
+    handoff_status = _string_or_none(handoff.get("status"))
+    status = _summary_status(gate_verification, audit, handoff)
     failure_type = _string_or_none(gate_verification.get("failure_type"))
     blocker_classes = _blocker_classes(
         failure_type=failure_type,
         gate_results=gate_results,
         missing_capabilities=missing_capabilities,
         finding_counts=finding_counts,
+        handoff_status=handoff_status,
     )
-    handoff_status = _string_or_none(handoff.get("status"))
     lifecycle_status = handoff.get("lifecycle_status")
     if not isinstance(lifecycle_status, str) or not lifecycle_status:
         lifecycle_status = compute_lifecycle_status(
@@ -80,10 +81,16 @@ def _run_summary(*, repo_root: Path, run_id: str) -> dict[str, Any]:
         **_optional_field("handoff_status", handoff_status),
         "blocker_classes": blocker_classes,
         "gate_results": gate_results,
+        **_optional_field("readiness", gate_verification.get("readiness")),
         "missing_capabilities": missing_capabilities,
         "finding_counts": finding_counts,
+        **_optional_field(
+            "module_status",
+            repo_scan.get("module_status") or gate_verification.get("module_status"),
+        ),
         "audit_status": _string_or_none(audit.get("status")),
         "gate_verification_status": _string_or_none(gate_verification.get("status")),
+        **_optional_field("skill_review", handoff.get("skill_review")),
         **_optional_field(
             "timeout_diagnostics",
             _timeout_diagnostics(gate_verification, failure_type=failure_type),
@@ -114,6 +121,7 @@ def _gate_results(gate_verification: dict[str, Any]) -> list[dict[str, Any]]:
             "status": gate.get("status"),
             "failure_type": gate.get("failure_type"),
             "skip_type": gate.get("skip_type"),
+            "blocker_class": gate.get("blocker_class"),
             "duration_seconds": gate.get("duration_seconds"),
         }
         results.append({key: value for key, value in result.items() if value is not None})
@@ -147,9 +155,15 @@ def _finding_counts(audit: dict[str, Any]) -> dict[str, Any]:
     return {"total": len(findings), "by_category": by_category, "by_confidence": by_confidence}
 
 
-def _summary_status(gate_verification: dict[str, Any], audit: dict[str, Any]) -> str:
+def _summary_status(
+    gate_verification: dict[str, Any],
+    audit: dict[str, Any],
+    handoff: dict[str, Any],
+) -> str:
     gate_status = gate_verification.get("status")
     audit_status = audit.get("status")
+    if handoff.get("status") == "review-required":
+        return "blocked"
     if gate_status == "passed" and audit_status == "findings":
         return "passed-with-findings"
     if isinstance(gate_status, str) and gate_status:
@@ -187,6 +201,17 @@ def _recommended_classification(
         for gate in gate_results
     ):
         return "read-only-gate-blocker"
+    if "review-required" in blocker_classes:
+        return "review-required-blocker"
+    readiness_classes = {
+        str(gate.get("blocker_class"))
+        for gate in gate_results
+        if gate.get("status") == "blocked"
+        and gate.get("blocker_class")
+        in {"provenance", "evidence", "review-required", "coverage", "isolation"}
+    }
+    if readiness_classes:
+        return f"{sorted(readiness_classes)[0]}-blocker"
     if status == "failed":
         return "failing-executable-gates"
     if missing_capabilities:
@@ -204,6 +229,7 @@ def _blocker_classes(
     gate_results: list[dict[str, Any]],
     missing_capabilities: list[str],
     finding_counts: dict[str, Any],
+    handoff_status: str | None,
 ) -> list[str]:
     classes: list[str] = []
     if failure_type == "workflow-timeout":
@@ -219,10 +245,14 @@ def _blocker_classes(
             or gate.get("skip_type") == "mutating-gate-not-run"
         ):
             _append_unique(classes, "read-only-policy")
+        elif gate.get("status") == "blocked" and isinstance(gate.get("blocker_class"), str):
+            _append_unique(classes, gate["blocker_class"])
         elif gate.get("status") == "failed":
             _append_unique(classes, "command-failure")
     if missing_capabilities:
         _append_unique(classes, "missing-capabilities")
+    if handoff_status == "review-required":
+        _append_unique(classes, "review-required")
     if int(finding_counts.get("total") or 0) > 0:
         _append_unique(classes, "structural-findings")
     return classes

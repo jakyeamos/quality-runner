@@ -6,6 +6,8 @@ import tomllib
 from pathlib import Path
 from typing import Any
 
+from quality_runner.verification_contract import VERIFICATION_MODE_VALUES
+
 SKILL_ID_RE = re.compile(r"^[a-z0-9][a-z0-9-]*$")
 SKILL_CONFIDENCE_VALUES = frozenset({"high", "medium", "low"})
 SKILL_SEVERITY_VALUES = frozenset({"warning", "observation"})
@@ -233,6 +235,20 @@ def _parse_deterministic_rules(
             if isinstance(item.get("verification"), str)
             else f"Rerun quality-runner and confirm skill:{skill_id}/{rule_id} clears.",
         }
+        verification_mode = item.get("verification_mode")
+        if verification_mode is not None:
+            if (
+                not isinstance(verification_mode, str)
+                or verification_mode not in VERIFICATION_MODE_VALUES
+            ):
+                warnings.append(
+                    _skill_warning(
+                        skill_id,
+                        f"deterministic_rules[{index}] {rule_id} has invalid verification_mode",
+                    )
+                )
+                continue
+            rule["verification_mode"] = verification_mode
         category = item.get("category")
         if isinstance(category, str) and category:
             rule["category"] = category

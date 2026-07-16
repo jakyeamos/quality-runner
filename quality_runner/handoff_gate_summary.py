@@ -2,6 +2,16 @@ from __future__ import annotations
 
 from typing import Any
 
+from quality_runner.handoff_readiness import (
+    READINESS_BLOCKER_CLASSES,
+    optional_string,
+    optional_value,
+    readiness_blocker_classification,
+    readiness_markdown,
+    readiness_summary,
+    string_or_none,
+    timeout_diagnostics,
+)
 from quality_runner.timeout_diagnostics import timeout_diagnostics_markdown
 
 
@@ -42,10 +52,10 @@ def build_gate_verification_summary(
 ) -> dict[str, Any] | None:
     if not isinstance(gate_verification, dict):
         return None
-    status = _string_or_none(gate_verification.get("status"))
+    status = string_or_none(gate_verification.get("status"))
     if status is None:
         return None
-    failure_type = _string_or_none(gate_verification.get("failure_type"))
+    failure_type = string_or_none(gate_verification.get("failure_type"))
     gates = _gate_summaries(gate_verification)
     blockers = _gate_blockers(gates)
     primary_blocker_class = _primary_blocker_class(blockers)
@@ -58,10 +68,11 @@ def build_gate_verification_summary(
             missing_capability_count=missing_capability_count,
             finding_count=finding_count,
         ),
-        **_optional_string("failure_type", failure_type),
-        **_optional_string("primary_blocker_class", primary_blocker_class),
+        **optional_string("failure_type", failure_type),
+        **optional_string("primary_blocker_class", primary_blocker_class),
         "blocker_groups": _blocker_groups(blockers),
         "blockers": blockers,
+        **optional_value("readiness", readiness_summary(gate_verification.get("readiness"))),
     }
 
 
@@ -84,7 +95,7 @@ def gate_blocker_slice(gate_summary: dict[str, Any] | None) -> dict[str, Any] | 
     blockers = gate_summary.get("blockers")
     if not isinstance(blockers, list) or not blockers:
         return None
-    primary_blocker_class = _string_or_none(gate_summary.get("primary_blocker_class"))
+    primary_blocker_class = string_or_none(gate_summary.get("primary_blocker_class"))
     return {
         "id": "resolve-gate-verification-blockers",
         "title": _gate_blocker_title(primary_blocker_class),
@@ -111,6 +122,7 @@ def gate_verification_markdown(value: object) -> list[str]:
     primary = value.get("primary_blocker_class")
     if isinstance(primary, str):
         lines.append(f"- Primary blocker class: {primary}")
+    lines.extend(readiness_markdown(value.get("readiness")))
     failure_type = value.get("failure_type")
     if isinstance(failure_type, str):
         lines.append(f"- Failure type: {failure_type}")
@@ -162,21 +174,21 @@ def _gate_summaries(gate_verification: dict[str, Any]) -> list[dict[str, Any]]:
     for gate in gates:
         if not isinstance(gate, dict):
             continue
-        gate_id = _string_or_none(gate.get("id"))
-        status = _string_or_none(gate.get("status"))
+        gate_id = string_or_none(gate.get("id"))
+        status = string_or_none(gate.get("status"))
         if gate_id is None or status is None:
             continue
         summaries.append(
             {
                 "id": gate_id,
                 "status": status,
-                **_optional_string("failure_type", gate.get("failure_type")),
-                **_optional_string("skip_type", gate.get("skip_type")),
-                **_optional_string("blocked_by", gate.get("blocked_by")),
-                **_optional_string("command", gate.get("command")),
-                **_optional_string("recommended_action", gate.get("recommended_action")),
-                **_optional_value("dependency_setup", _dependency_setup(gate)),
-                **_optional_value("timeout_diagnostics", _timeout_diagnostics(gate)),
+                **optional_string("failure_type", gate.get("failure_type")),
+                **optional_string("skip_type", gate.get("skip_type")),
+                **optional_string("blocked_by", gate.get("blocked_by")),
+                **optional_string("command", gate.get("command")),
+                **optional_string("recommended_action", gate.get("recommended_action")),
+                **optional_value("dependency_setup", _dependency_setup(gate)),
+                **optional_value("timeout_diagnostics", timeout_diagnostics(gate)),
                 "blocker_class": _blocker_class(gate),
             }
         )
@@ -200,11 +212,6 @@ def _dependency_setup(gate: dict[str, Any]) -> dict[str, str] | None:
     return normalized or None
 
 
-def _timeout_diagnostics(gate: dict[str, Any]) -> dict[str, Any] | None:
-    diagnostics = gate.get("timeout_diagnostics")
-    return diagnostics if isinstance(diagnostics, dict) else None
-
-
 def _gate_blockers(gates: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return [gate for gate in gates if _is_gate_blocker(gate)]
 
@@ -214,7 +221,7 @@ def _is_gate_blocker(gate: dict[str, Any]) -> bool:
     failure_type = gate.get("failure_type")
     skip_type = gate.get("skip_type")
     return (
-        status == "failed"
+        status in {"failed", "blocked"}
         or failure_type
         in {
             "command-failed",
@@ -251,6 +258,9 @@ def _recommended_gate_classification(
         for gate in gates
     ):
         return "read-only-gate-blocker"
+    readiness_classification = readiness_blocker_classification(gates)
+    if readiness_classification:
+        return readiness_classification
     if status == "failed":
         return "failing-executable-gates"
     if missing_capability_count > 0:
@@ -264,8 +274,8 @@ def _recommended_gate_classification(
 
 def _gate_blocker_finding(gate: dict[str, Any]) -> dict[str, str]:
     gate_id = str(gate.get("id"))
-    failure_type = _string_or_none(gate.get("failure_type"))
-    skip_type = _string_or_none(gate.get("skip_type"))
+    failure_type = string_or_none(gate.get("failure_type"))
+    skip_type = string_or_none(gate.get("skip_type"))
     return {
         "id": f"gate-{gate_id}",
         "severity": "blocker",
@@ -302,6 +312,9 @@ def _gate_blocker_actions(blockers: list[dict[str, Any]]) -> list[str]:
 def _blocker_class(gate: dict[str, Any]) -> str:
     failure_type = gate.get("failure_type")
     skip_type = gate.get("skip_type")
+    explicit = gate.get("blocker_class")
+    if isinstance(explicit, str) and explicit:
+        return explicit
     if failure_type == "dependency-setup-blocker" or skip_type == "dependency-setup-blocked":
         return "dependency-setup"
     if failure_type == "environment-restricted":
@@ -323,6 +336,7 @@ def _primary_blocker_class(blockers: list[dict[str, Any]]) -> str | None:
         "read-only-policy",
         "workflow-timeout",
         "command-failure",
+        *READINESS_BLOCKER_CLASSES,
         "other",
     ):
         if blocker_class in classes:
@@ -338,6 +352,7 @@ def _blocker_groups(blockers: list[dict[str, Any]]) -> list[dict[str, Any]]:
         "read-only-policy",
         "workflow-timeout",
         "command-failure",
+        *READINESS_BLOCKER_CLASSES,
         "other",
     ):
         group = [gate for gate in blockers if _blocker_class(gate) == blocker_class]
@@ -363,6 +378,11 @@ def _gate_blocker_title(primary_blocker_class: str | None) -> str:
         "read-only-policy": "Resolve read-only gate policy blockers",
         "workflow-timeout": "Resolve workflow timeout blockers",
         "command-failure": "Resolve failing executable gates",
+        "provenance": "Resolve stale or mismatched evidence",
+        "evidence": "Provide the required release evidence",
+        "review-required": "Complete required owner or agent review",
+        "coverage": "Resolve aggregate gate coverage gaps",
+        "isolation": "Rerun gates in an isolated worktree",
     }
     return titles.get(primary_blocker_class or "", "Resolve gate verification blockers")
 
@@ -473,19 +493,3 @@ def _display_group_action(*, action: object, gate_ids: object) -> str:
 
 def _gate_ids(blockers: list[dict[str, Any]]) -> list[str]:
     return [str(gate["id"]) for gate in blockers if isinstance(gate.get("id"), str) and gate["id"]]
-
-
-def _string_or_none(value: object) -> str | None:
-    return value if isinstance(value, str) and value else None
-
-
-def _optional_string(key: str, value: object) -> dict[str, str]:
-    if isinstance(value, str) and value:
-        return {key: value}
-    return {}
-
-
-def _optional_value(key: str, value: object) -> dict[str, object]:
-    if value is None:
-        return {}
-    return {key: value}

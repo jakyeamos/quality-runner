@@ -127,7 +127,14 @@ def update_repo_skills_config(
         if skill_id not in active_ids:
             active_ids.append(skill_id)
 
-    block = _render_skills_config_block(enabled=True, active=active_ids, local=updated_local)
+    block = _render_skills_config_block(
+        enabled=True,
+        active=active_ids,
+        local=updated_local,
+        global_enabled=skills_section.get("global_enabled"),
+        global_exclude=skills_section.get("global_exclude"),
+        global_always=skills_section.get("global_always"),
+    )
     if "[quality_runner.skills]" in existing:
         existing = _replace_skills_block(existing, block)
     else:
@@ -140,8 +147,27 @@ def _render_skills_config_block(
     enabled: bool,
     active: list[str],
     local: list[dict[str, Any]],
+    global_enabled: object = None,
+    global_exclude: object = None,
+    global_always: object = None,
 ) -> str:
     lines = ["[quality_runner.skills]", f"enabled = {'true' if enabled else 'false'}"]
+    if isinstance(global_enabled, bool):
+        lines.append(f"global_enabled = {'true' if global_enabled else 'false'}")
+    if (
+        isinstance(global_exclude, list)
+        and global_exclude
+        and all(isinstance(item, str) for item in global_exclude)
+    ):
+        quoted = ", ".join(f'"{item}"' for item in sorted(global_exclude))
+        lines.append(f"global_exclude = [{quoted}]")
+    if (
+        isinstance(global_always, list)
+        and global_always
+        and all(isinstance(item, str) for item in global_always)
+    ):
+        quoted = ", ".join(f'"{item}"' for item in sorted(global_always))
+        lines.append(f"global_always = [{quoted}]")
     if active:
         quoted = ", ".join(f'"{item}"' for item in sorted(active))
         lines.append(f"active = [{quoted}]")

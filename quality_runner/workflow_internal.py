@@ -60,8 +60,15 @@ def string_or_default(value: object, default: str) -> str:
 def verify_payload_status(
     gate_verification: dict[str, Any],
     remediation_plan: dict[str, Any],
+    *,
+    skill_review: dict[str, Any] | None = None,
 ) -> str:
     gate_status = gate_verification.get("status")
+    if isinstance(skill_review, dict) and skill_review.get("status") in {
+        "review-required",
+        "review-rejected",
+    }:
+        return "blocked"
     if gate_status == "passed" and remediation_plan.get("slices"):
         return "passed-with-findings"
     return gate_status if isinstance(gate_status, str) else "blocked"

@@ -5,12 +5,15 @@ import signal
 import time
 from collections.abc import Iterator
 from contextlib import contextmanager
+from datetime import UTC, datetime
 from pathlib import Path
 from types import FrameType
 from typing import Any
 
+from quality_runner import __version__
 from quality_runner.artifacts import prepare_artifact_dir, write_json, write_text
-from quality_runner.manifest import build_run_manifest
+from quality_runner.manifest import build_run_manifest, git_state_for_repo
+from quality_runner.module_status import build_timeout_module_status
 from quality_runner.planning import build_agent_handoff, render_handoff_markdown
 from quality_runner.run_summary import build_run_summary
 from quality_runner.scan_exclusions import scan_progress_snapshot
@@ -150,6 +153,7 @@ def build_timeout_verify_artifacts(
     timeout_seconds: int,
     elapsed_seconds: float,
     baseline_run_id: str | None,
+    profile: str | None = None,
     timeout_scope: str = "verify-phase",
     phase_elapsed_seconds: float | None = None,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
@@ -159,6 +163,14 @@ def build_timeout_verify_artifacts(
     existing_plan = _existing_plan(plan_path)
     existing_verification = _existing_verification(verification_path)
     diagnostics = _timeout_diagnostics()
+    module_status = build_timeout_module_status(
+        mode="verify-gates",
+        profile=profile or "default",
+        reason=reason,
+    )
+    git = git_state_for_repo(repo_root)
+    branch = git.get("branch")
+    captured_at = datetime.now(UTC).isoformat()
     timeout_payload = {
         "schema": WORKFLOW_TIMEOUT_ARTIFACT_SCHEMA,
         "status": "blocked",
@@ -171,6 +183,7 @@ def build_timeout_verify_artifacts(
         "elapsed_seconds": round(elapsed_seconds, 3),
         **_optional_seconds("phase_elapsed_seconds", phase_elapsed_seconds),
         "diagnostics": diagnostics,
+        "module_status": module_status,
     }
     gate_verification = {
         **existing_verification,
@@ -185,6 +198,21 @@ def build_timeout_verify_artifacts(
         **_optional_seconds("phase_elapsed_seconds", phase_elapsed_seconds),
         "timeout_scope": timeout_scope,
         "diagnostics": diagnostics,
+        "provenance": {
+            "head_sha": git.get("head_sha"),
+            "branch": branch,
+            "ref": (
+                branch
+                if isinstance(branch, str) and branch.startswith("refs/")
+                else f"refs/heads/{branch}"
+                if isinstance(branch, str) and branch
+                else None
+            ),
+            "quality_runner_version": __version__,
+            "captured_at": captured_at,
+            "worktree_mode": "in-place",
+            "workflow_run_id": run_id,
+        },
         "gates": _existing_gates(existing_verification)
         or [
             _workflow_timeout_gate(
@@ -194,6 +222,7 @@ def build_timeout_verify_artifacts(
                 timeout_payload=timeout_payload,
             )
         ],
+        "module_status": module_status,
     }
     artifact_paths = {
         "gate_execution_plan_json": str(run_dir / "gate-execution-plan.json"),
@@ -214,6 +243,7 @@ def build_timeout_verify_artifacts(
             run_id=run_id,
             mode="verify-gates",
             artifact_paths=artifact_paths,
+            module_status=module_status,
         ),
     )
     summary = build_run_summary(
@@ -236,6 +266,7 @@ def build_timeout_verify_artifacts(
         "implementation_allowed": False,
         "run_id": run_id,
         "artifact_paths": artifact_paths,
+        "module_status": module_status,
         "timeout": timeout_payload,
         "warnings": [],
     }

@@ -6,10 +6,16 @@ from typing import Any
 
 from quality_runner.cli_status import export_handoff_payload
 from quality_runner.intent import resolve_workflow_intent
+from quality_runner.progress import ProgressCallback
 from quality_runner.workflow import refresh_payload
 
 
-def refresh_command_payload(args: argparse.Namespace, repo_root: Path) -> dict[str, Any]:
+def refresh_command_payload(
+    args: argparse.Namespace,
+    repo_root: Path,
+    skill_review_report: dict[str, Any] | None = None,
+    progress: ProgressCallback | None = None,
+) -> dict[str, Any]:
     workflow_intent = resolve_workflow_intent(
         repo_root=repo_root,
         run_id=f"{args.run_id_prefix}-verify",
@@ -22,6 +28,9 @@ def refresh_command_payload(args: argparse.Namespace, repo_root: Path) -> dict[s
         baseline_run_id=args.baseline_run_id,
         profile=args.profile,
         ci_status_json=Path(args.ci_status_json) if args.ci_status_json else None,
+        readiness_evidence_file=Path(args.readiness_evidence_file)
+        if args.readiness_evidence_file
+        else None,
         timeout_seconds=args.timeout_seconds,
         workflow_timeout_seconds=args.workflow_timeout_seconds,
         verify_timeout_seconds=args.verify_timeout_seconds,
@@ -33,8 +42,11 @@ def refresh_command_payload(args: argparse.Namespace, repo_root: Path) -> dict[s
         worktree_mode=args.worktree_mode,
         allow_dirty_worktree_verify=args.allow_dirty_worktree_verify,
         intent=workflow_intent,
+        skill_review_report=skill_review_report,
+        agent_review_mode=args.agent_review_mode,
         review_cycle_id=args.review_cycle_id,
         review_iteration=args.review_iteration,
+        progress=progress,
     )
     if args.handoff_output:
         payload["handoff_export"] = export_handoff_payload(

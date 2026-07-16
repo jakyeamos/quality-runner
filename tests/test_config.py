@@ -4,6 +4,34 @@ import json
 from importlib import resources
 
 
+def test_agent_review_mode_config_and_release_profile_precedence(tmp_path) -> None:
+    from quality_runner.agent_review_policy import resolve_agent_review_mode
+    from quality_runner.config import load_repo_config
+
+    (tmp_path / ".quality-runner.toml").write_text(
+        "\n".join(
+            [
+                "[quality_runner.skills]",
+                'agent_review_mode = "off"',
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    config = load_repo_config(tmp_path)
+
+    assert config["skills"] == {"agent_review_mode": "off"}
+    assert resolve_agent_review_mode(requested=None, profile="default", config=config) == "off"
+    assert resolve_agent_review_mode(requested=None, profile="default", config={}) == "auto"
+    assert (
+        resolve_agent_review_mode(requested="parallel", profile="default", config=config)
+        == "parallel"
+    )
+    assert (
+        resolve_agent_review_mode(requested="off", profile="release", config=config) == "required"
+    )
+
+
 def test_load_repo_config_reads_default_profile_required_capabilities_and_exceptions(
     tmp_path,
 ) -> None:
@@ -748,6 +776,7 @@ def test_packaged_schema_files_are_parseable() -> None:
         "agent-handoff.schema.json",
         "controller-report-validation.schema.json",
         "run-manifest.schema.json",
+        "module-status.schema.json",
         "run-result.schema.json",
         "run-summary.schema.json",
         "intent.schema.json",
@@ -764,6 +793,7 @@ def test_packaged_schema_files_are_parseable() -> None:
         "phase-plan.schema.json",
         "phase-batch-result.schema.json",
         "phase-verification.schema.json",
+        "skill-selection.schema.json",
     }
 
     loaded = {}
@@ -823,6 +853,12 @@ def test_artifact_schema_additions_remain_optional_and_agent_handoff_versioned()
     assert "gates-blocked" in agent_handoff["properties"]["status"]["enum"]
     assert "gates-failed" in agent_handoff["properties"]["status"]["enum"]
     assert "gates-clean" in agent_handoff["properties"]["status"]["enum"]
+    assert "review-required" in agent_handoff["properties"]["status"]["enum"]
+    assert "skill_review" in agent_handoff["properties"]
+    assert agent_handoff["$defs"]["remediationSlice"]["properties"]["verification_mode"][
+        "enum"
+    ] == ["command", "evidence"]
+    assert "verification_requirements" in remediation_plan["$defs"]["slice"]["properties"]
     assert agent_handoff["properties"]["next_slice"]["oneOf"] == [
         {"type": "null"},
         {"$ref": "#/$defs/remediationSlice"},

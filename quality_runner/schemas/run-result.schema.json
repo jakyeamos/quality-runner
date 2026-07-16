@@ -6,13 +6,15 @@
   "required": ["schema", "status", "implementation_allowed", "run_id", "artifact_paths", "warnings"],
   "properties": {
     "schema": { "const": "quality-runner-run-result-v0.1" },
-    "status": { "enum": ["clean", "planned"] },
+    "status": { "enum": ["clean", "planned", "review-required"] },
     "implementation_allowed": { "const": false },
     "run_id": { "type": "string", "minLength": 1 },
     "artifact_paths": {
       "type": "object",
       "additionalProperties": { "type": "string" }
     },
+    "module_status": { "$ref": "module-status.schema.json" },
+    "skill_review": { "$ref": "agent-handoff.schema.json#/$defs/skillReviewSummary" },
     "warnings": { "$ref": "#/$defs/warnings" }
   },
   "$defs": {

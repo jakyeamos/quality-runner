@@ -18,23 +18,47 @@ def build_run_manifest(
     artifact_paths: dict[str, str],
     intent: dict[str, Any] | None = None,
     quality_skills: list[dict[str, Any]] | None = None,
+    module_status: dict[str, Any] | None = None,
+    worktree_mode: str = "in-place",
 ) -> dict[str, Any]:
 # fmt: on
+    created_at = datetime.now(UTC).isoformat()
+    git = _git_state(repo_root)
+    artifact_digests = _artifact_digests(artifact_paths)
+    branch = git.get("branch")
     manifest: dict[str, Any] = {
         "schema": RUN_MANIFEST_SCHEMA,
         "run_id": run_id,
         "mode": mode,
         "repo_root": str(repo_root.expanduser().resolve()),
-        "created_at": datetime.now(UTC).isoformat(),
+        "created_at": created_at,
         "quality_runner_version": __version__,
         "implementation_allowed": False,
-        "git": _git_state(repo_root),
+        "git": git,
+        "provenance": {
+            "head_sha": git.get("head_sha"),
+            "branch": git.get("branch"),
+            "ref": (
+                branch
+                if isinstance(branch, str) and branch.startswith("refs/")
+                else f"refs/heads/{branch}" if isinstance(branch, str) and branch and branch != "HEAD" else None
+            ),
+            "dirty": git.get("dirty"),
+            "captured_at": created_at,
+            "quality_runner_version": __version__,
+            "worktree_mode": worktree_mode,
+            "workflow_run_id": run_id,
+        },
         "artifact_paths": artifact_paths,
     }
+    if artifact_digests:
+        manifest["artifact_digests"] = artifact_digests
     if intent is not None:
         manifest["intent"] = intent
     if quality_skills:
         manifest["quality_skills"] = quality_skills
+    if module_status is not None:
+        manifest["module_status"] = module_status
     return manifest
 
 
@@ -75,3 +99,18 @@ def _git_output(repo_root: Path, *args: str) -> str | None:
         return None
     output = result.stdout.strip()
     return output or None
+
+
+def _artifact_digests(artifact_paths: dict[str, str]) -> dict[str, str]:
+    import hashlib
+
+    digests: dict[str, str] = {}
+    for key, value in artifact_paths.items():
+        path = Path(value)
+        if not path.is_file() or path.is_symlink():
+            continue
+        try:
+            digests[key] = f"sha256:{hashlib.sha256(path.read_bytes()).hexdigest()}"
+        except OSError:
+            continue
+    return digests

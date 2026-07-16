@@ -268,7 +268,24 @@ def test_cli_verify_gates_json_executes_discovered_gates(tmp_path: Path) -> None
 
     assert payload["schema"] == "quality-runner-verify-gates-result-v0.1"
     assert payload["status"] == "passed"
+    assert verification["read_only_gates"] is True
     assert verification["gates"][0]["status"] == "passed"
+
+
+def test_cli_verify_gates_defaults_to_read_only_and_requires_explicit_override() -> None:
+    from quality_runner.cli import build_parser
+
+    parser = build_parser()
+    default_args = parser.parse_args(["verify-gates", "."])
+    override_args = parser.parse_args(["verify-gates", ".", "--allow-mutating-gates"])
+    parallel_args = parser.parse_args(["run", ".", "--agent-review-mode", "parallel"])
+
+    assert default_args.read_only_gates is True
+    assert default_args.agent_review_mode is None
+    assert default_args.allow_mutating_gates is False
+    assert override_args.read_only_gates is True
+    assert override_args.allow_mutating_gates is True
+    assert parallel_args.agent_review_mode == "parallel"
 
 
 def test_cli_refresh_help_names_statuses_action_groups_and_timeout_reasons() -> None:

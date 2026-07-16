@@ -65,7 +65,7 @@ def test_verify_gates_runs_package_scripts_through_detected_package_manager(
     assert "package-bin-ok\n" in verification["gates"][0]["stdout_tail"]
 
 
-def test_verify_gates_read_only_mode_skips_mutating_formatter(
+def test_verify_gates_defaults_to_read_only_for_mutating_formatter(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     from quality_runner.workflow import verify_gates_payload
@@ -93,7 +93,6 @@ def test_verify_gates_read_only_mode_skips_mutating_formatter(
     payload = verify_gates_payload(
         repo_root=tmp_path,
         run_id="read-only-mutating",
-        read_only_gates=True,
     )
     verification = json.loads(Path(payload["artifact_paths"]["gate_verification_json"]).read_text())
     plan = json.loads(Path(payload["artifact_paths"]["gate_execution_plan_json"]).read_text())

@@ -294,6 +294,11 @@ def _slices(plan: dict[str, Any]) -> dict[str, dict[str, Any]]:
                 if isinstance(item.get("verification_gates"), list)
                 else []
             ),
+            **{
+                key: item[key]
+                for key in ("verification_mode", "verification_requirements")
+                if key in item
+            },
         }
     return result
 
@@ -306,11 +311,9 @@ def _capability_delta(
     return {
         "removed": sorted(set(baseline) - set(current)),
         "added": sorted(set(current) - set(baseline)),
-        "changed": [
-            {"id": capability_id, "baseline": baseline[capability_id], "current": current[capability_id]}
-            for capability_id in sorted(set(current) & set(baseline))
-            if current[capability_id] != baseline[capability_id]
-        ],
+        "changed": [{"id": capability_id, "baseline": baseline[capability_id], "current": current[capability_id]}
+                    for capability_id in sorted(set(current) & set(baseline))
+                    if current[capability_id] != baseline[capability_id]],
         "baseline_total": len(baseline),
         "current_total": len(current),
     }

@@ -23,10 +23,32 @@
       },
       "additionalProperties": false
     },
+    "provenance": {
+      "type": "object",
+      "properties": {
+        "head_sha": { "type": ["string", "null"] },
+        "branch": { "type": ["string", "null"] },
+        "ref": { "type": ["string", "null"] },
+        "dirty": { "type": ["boolean", "null"] },
+        "captured_at": { "type": "string", "format": "date-time" },
+        "quality_runner_version": { "type": "string", "minLength": 1 },
+        "worktree_mode": { "enum": ["in-place", "disposable"] },
+        "workflow_run_id": { "type": ["string", "null"] }
+      },
+      "additionalProperties": false
+    },
+    "artifact_digests": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string",
+        "pattern": "^sha256:[0-9a-f]{64}$"
+      }
+    },
     "artifact_paths": {
       "type": "object",
       "additionalProperties": { "type": "string" }
     },
+    "module_status": { "$ref": "module-status.schema.json" },
     "quality_skills": {
       "type": "array",
       "items": {

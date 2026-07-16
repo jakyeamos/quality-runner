@@ -12,6 +12,7 @@ from quality_runner.code_quality_findings import _finding
 from quality_runner.code_quality_paths import _verification_for_path
 from quality_runner.skill_config import load_active_skills
 from quality_runner.skill_review import review_report_findings, validate_skill_review_report
+from quality_runner.verification_contract import verification_contract_fields
 
 
 def scan_quality_skills(
@@ -20,8 +21,12 @@ def scan_quality_skills(
     scanned_files: list[dict[str, Any]],
     config: dict[str, Any],
     skill_review_report: dict[str, Any] | None = None,
+    selected_skills: list[dict[str, Any]] | None = None,
+    require_review_coverage: bool = False,
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]]]:
-    skills, _warnings = load_active_skills(repo_root, config)
+    skills = selected_skills
+    if skills is None:
+        skills, _warnings = load_active_skills(repo_root, config)
     if not skills:
         return [], [], []
 
@@ -85,6 +90,7 @@ def scan_quality_skills(
             skill_review_report,
             skills=skills,
             repo_root=repo_root,
+            require_review_coverage=require_review_coverage,
         )
         rejected_review_findings = int(validation.get("rejected_count") or 0)
         if validation.get("errors"):
@@ -148,13 +154,12 @@ def skill_findings(
     config: dict[str, Any],
     skill_review_report: dict[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
-    findings, _coverage, _quality_skills = scan_quality_skills(
+    return scan_quality_skills(
         repo_root=repo_root,
         scanned_files=scanned_files,
         config=config,
         skill_review_report=skill_review_report,
-    )
-    return findings
+    )[0]
 
 
 def _skill_category(skill_id: str) -> str:
@@ -193,7 +198,7 @@ def _skill_finding(
     evidence: str,
 ) -> dict[str, Any]:
     rule_id = str(rule["id"])
-    return _finding(
+    finding = _finding(
         category=_skill_category(skill_id),
         severity=_rule_severity(rule),
         confidence=_rule_confidence(rule),
@@ -208,6 +213,13 @@ def _skill_finding(
         rule_message=str(rule.get("message", "")),
         rule_category=str(rule.get("category", "")),
     )
+    finding.update(
+        verification_contract_fields(
+            finding,
+            explicit_mode=rule.get("verification_mode"),
+        )
+    )
+    return finding
 
 
 def _rule_confidence(rule: dict[str, Any]) -> str:
