@@ -60,7 +60,8 @@ tag, release workflow, and published-artifact smoke checks have completed.
 - Target: a typed v2 core behind CLI, MCP, and compatibility adapters.
 - Next implementation slice: continue the additive port with release/review
   hardening and the remaining quality-pack behavior; scan-exclusion preflight
-  is now represented in the canonical dev port.
+  and the remediation-context contract are now represented in the canonical
+  dev port.
 - `dev` is the canonical integration branch. The preserved source branch is
   `quality-skill-corpus-workflow` at `53dc9c8` and remains until its unique
   behavior is fully represented in `dev`.
@@ -124,6 +125,11 @@ tag, release workflow, and published-artifact smoke checks have completed.
   scoped exclusion overlays, security-coverage preservation, CLI/artifact/
   manifest wiring, and persistent config support. The full 604-test suite,
   Ruff, formatting, and BasedPyright pass.
+- `287fe95` adds the source-read-only remediation-context contract: bounded
+  slice context records, risk-aware evidence requirements, plan/handoff
+  readiness references, `remediation-context.json` artifact wiring for run and
+  verify workflows, and the `validate-remediation-context` CLI. The full
+  609-test suite, Ruff, formatting, and BasedPyright pass.
 - `546122e` keeps the remediation-delta module under QR's default 500-line
   source threshold without changing its evidence contract; the focused delta
   and source-size checks pass.
@@ -140,9 +146,15 @@ tag, release workflow, and published-artifact smoke checks have completed.
   `"None"` until a published compatibility cutover can change that projection.
 - Persistent scan exclusions require review evidence and explicit `--apply`;
   run-only overlays are intentionally recorded as non-mutating evidence.
+- Fresh remediation contexts intentionally begin as `needs-understanding` and
+  block handoff validation until the external worker records the required
+  evidence for its selected slice.
 
 ## Recent Progress
 
+- 2026-07-17: `287fe95` adds remediation-context packets and readiness
+  validation to run/verify artifacts while keeping source changes external and
+  preserving the v0.5.1 application/compatibility seams.
 - 2026-07-17: `74e368a` adds scan-exclusion preflight and module-aware run-only
   overlays while preserving security coverage for structural/code-quality
   exclusions and retaining the current application/compatibility façades.
