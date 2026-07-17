@@ -69,12 +69,17 @@ The short `qr` console command is now part of the canonical dev CLI surface. It
 maps to the same `quality_runner.cli:main` entrypoint as `quality-runner`, keeps
 the v0.5.1-compatible package version, and is covered by packaged entrypoint
 tests.
+The isolated `codex/release-0.6.0` branch is now at `23da809`, preparing the
+0.6.0 package, citation, changelog, upgrade, and release-checklist metadata;
+the full pre-tag ladder, self-audit, merge, tag, and publication remain pending.
 
 ## Current Position
 
 - Target: a typed v2 core behind CLI, MCP, and compatibility adapters.
-- Next implementation slice: review release readiness for a future version
-  bump; this integration remains v0.5.1-compatible and did not create a tag.
+- Next slice: complete the v0.6.0 pre-tag ladder and self-audit, then merge the
+  verified release branch to `main`, tag it, and verify PyPI publication.
+- `codex/release-0.6.0` is the isolated release branch from canonical `dev`;
+  `main` remains the published v0.5.1 baseline until promotion succeeds.
 - `dev` is the canonical integration branch and is published to `origin/dev`.
   The temporary `codex/dev-feature-port` worktree/ref and the superseded
   `quality-skill-corpus-workflow` branch were pruned after the behavioral port
@@ -151,6 +156,10 @@ tests.
   retaining the current application and compatibility architecture; the full
   650-test suite, Ruff, formatting, BasedPyright, and release smoke pass.
 
+`23da809` prepares the v0.6.0 package and public release metadata; the focused
+release-doc contract passes, while the full pre-tag ladder and publication
+evidence are still pending.
+
 ## Risks
 
 - Generated evidence can contain target-repository output; it remains local and
@@ -172,6 +181,8 @@ tests.
 
 ## Recent Progress
 
+- 2026-07-17: `23da809` prepares the isolated v0.6.0 release branch from
+  canonical `dev`; no merge, tag, or publication has occurred.
 - 2026-07-17: Folded the short `qr` console command into the canonical `dev`
   line from `codex/qr-command-surface-main`; focused entrypoint tests, Ruff,
   formatting, and diff checks pass. No version bump or release tag was made.

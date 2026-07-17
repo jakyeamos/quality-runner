@@ -22,12 +22,14 @@ See `.planning/PROJECT.md` for the established product boundary and
 **Core value:** Give developers and agents trustworthy local evidence before
 they authorize repository changes.
 
-**Current focus:** v0.5.1 released; no active implementation phase.
+**Current focus:** v0.6.0 release preparation from canonical `dev`.
 
 ## Current Position
 
-- Branch: `main`
+- Branch: `codex/release-0.6.0`
 - Baseline: `main` at 0.5.1 / commit `a101bd4`
+- Release metadata: prepared in `23da809`; full pre-tag validation and
+  publication remain pending.
 - Audit and planning: complete
 - M0 — restore trust at the boundary: complete in `f36dcf4`
 - M1 — establish typed review contracts: complete in `cb12746`
@@ -46,11 +48,11 @@ they authorize repository changes.
 
 ## Active Phase
 
-- **Phase:** M7
-- **Slug:** release-hardening
-- **Status:** Complete
-- **Completion gate:** Met: v0.5.1 pre-tag validation, reviewed PR merge, tag
-  on `main`, successful PyPI publication, and GitHub Release creation.
+- **Phase:** release-follow-up
+- **Slug:** release-0.6.0
+- **Status:** In progress
+- **Completion gate:** Full pre-tag validation, reviewed promotion to `main`,
+  `v0.6.0` tag, successful PyPI publication, and GitHub Release verification.
 
 ## Key Decisions
 
@@ -72,10 +74,13 @@ they authorize repository changes.
 
 ## Next Step
 
-Start any future work from `main` as a new scoped follow-up.
+Run the full v0.6.0 pre-tag ladder and self-audit, then promote the verified
+release branch through `main` and verify the published artifact.
 
 ## Recent Progress
 
+- 2026-07-17: `23da809` prepares v0.6.0 release metadata on the isolated
+  release branch; full validation and publication remain pending.
 - 2026-07-13: v0.5.1 released: PR #2 merged at `a101bd4`, GitHub CI and tag
   release workflow pass, PyPI publishes both artifacts, GitHub Release is
   public, and a disposable PyPI install passes CLI, doctor, smoke, and MCP.
