@@ -58,14 +58,20 @@ tag, release workflow, and published-artifact smoke checks have completed.
 provenance, repo-local release evidence validation, aggregate command coverage,
 artifact-manifest/read-only gates, publication-boundary review triggers, CLI and
 refresh evidence overrides, and compatibility-preserving v0.5.1 wiring.
+`67bd698` completes the remaining quality workflow port: local-first self-update,
+stderr progress reporting, resolution-aware planning, domain phase candidates,
+read-only filesystem integrity, structured verification contracts, skill
+decomposition, UI quality fixtures, and starter-pack examples.
 
 ## Current Position
 
 - Target: a typed v2 core behind CLI, MCP, and compatibility adapters.
-- Next implementation slice: continue the additive port with the remaining
-  quality-pack behavior and examples; release/readiness, scan-exclusion
-  preflight, and remediation-context contracts are now represented in the
-  canonical dev port.
+- Next implementation slice: verify the isolated port against canonical `dev`,
+  merge it without replacing the v0.5.1 application/compatibility seams, then
+  audit ancestry and patch-equivalence before pruning the superseded source
+  branch.
+- `codex/dev-feature-port` is complete at `67bd698`; the isolated branch passes
+  650 tests, Ruff, formatting, BasedPyright, and release smoke.
 - `dev` is the canonical integration branch. The preserved source branch is
   `quality-skill-corpus-workflow` at `53dc9c8` and remains until its unique
   behavior is fully represented in `dev`.
@@ -137,6 +143,9 @@ refresh evidence overrides, and compatibility-preserving v0.5.1 wiring.
 - `546122e` keeps the remediation-delta module under QR's default 500-line
   source threshold without changing its evidence contract; the focused delta
   and source-size checks pass.
+- `67bd698` completes the remaining source-branch quality surfaces while
+  retaining the current application and compatibility architecture; the full
+  650-test suite, Ruff, formatting, BasedPyright, and release smoke pass.
 
 ## Risks
 
@@ -159,6 +168,10 @@ refresh evidence overrides, and compatibility-preserving v0.5.1 wiring.
 
 ## Recent Progress
 
+- 2026-07-17: `67bd698` completes the remaining quality workflow port with
+  local self-update, progress, resolution-aware planning, phase candidates,
+  read-only integrity, verification contracts, skill decomposition, UI quality,
+  starter packs, and 650 passing tests.
 - 2026-07-17: `b193900` ports release-profile readiness with provenance,
   repo-local evidence validation, aggregate coverage, artifact/read-only gates,
   publication review triggers, CLI/refresh propagation, and 621 passing tests.
@@ -200,6 +213,3 @@ refresh evidence overrides, and compatibility-preserving v0.5.1 wiring.
 - 2026-07-13: `948107f` prepares v0.5.1 metadata and the main README release
   guidance; final pre-tag checks, PR merge, tag, PyPI publication, and GitHub
   Release creation remain in sequence.
-- 2026-07-13: `141635e` closes the focused source-evidence follow-up with
-  lexer-backed private-field, malformed-syntax, computed-log, and tokenless
-  value protection; 554 tests and two independent reviews are clean.
