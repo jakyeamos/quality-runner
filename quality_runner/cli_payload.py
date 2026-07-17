@@ -15,6 +15,7 @@ from quality_runner.application.journey_outcomes import (
 )
 from quality_runner.application.outcome_projection import LegacyPayload
 from quality_runner.application.verification_workflows import verify_gates_payload
+from quality_runner.cli_artifacts import prune_artifacts_payload
 from quality_runner.cli_controller_reports import (
     controller_report_command_payload,
     controller_report_from_summary_payload,
@@ -214,6 +215,11 @@ def payload_for_args(args: argparse.Namespace) -> dict[str, Any]:
         return handoff_command_payload(args)
     if args.command == "propose-fix":
         return propose_fix_command_payload(args, repo_root=_validated_repo_path(args.repo_path))
+    if args.command == "prune-artifacts":
+        return prune_artifacts_payload(
+            repo_root=_validated_repo_path(args.repo_path),
+            apply=args.apply,
+        )
     raise ValueError(f"unsupported command: {args.command}")
 
 

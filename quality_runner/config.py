@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any
 
 from quality_runner.architecture_config_parse import parse_architecture_section
+from quality_runner.artifact_config_parse import parse_artifacts_section
 from quality_runner.integrate_config_parse import parse_integrate_section
 from quality_runner.security.config_parse import parse_security_section
 from quality_runner.skills_config_parse import parse_skills_section
@@ -67,6 +68,7 @@ def load_repo_config(repo_root: Path) -> dict[str, Any]:
     severity_overrides = _string_mapping(
         section.get("severity_overrides"), "quality_runner.severity_overrides", warnings
     )
+    artifacts = parse_artifacts_section(section.get("artifacts"), warnings)
     structural_scan = parse_structural_scan_section(section.get("structural_scan"), warnings)
     integrate = parse_integrate_section(section.get("integrate"), warnings)
     architecture = parse_architecture_section(section.get("architecture"), warnings)
@@ -96,6 +98,8 @@ def load_repo_config(repo_root: Path) -> dict[str, Any]:
         payload["security"] = security
     if skills:
         payload["skills"] = skills
+    if artifacts:
+        payload["artifacts"] = artifacts
     return payload
 
 

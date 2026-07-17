@@ -7,6 +7,7 @@ from typing import Any
 from uuid import uuid4
 
 from quality_runner.artifacts import (
+    append_json_line,
     artifact_text_file,
     existing_artifact_dir,
     safe_child_file,
@@ -385,9 +386,7 @@ def _append_gate_response(
 ) -> Path:
     gate_dir = _prepare_gate_run_dir(repo_root, gate_run_id)
     path = safe_child_file(gate_dir, "gate-responses.jsonl")
-    with path.open("a", encoding="utf-8") as handle:
-        handle.write(json.dumps(response, sort_keys=True) + "\n")
-    return path
+    return append_json_line(path, response)
 
 
 def _prepare_gate_run_dir(repo_root: Path, gate_run_id: str) -> Path:

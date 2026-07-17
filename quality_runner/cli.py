@@ -6,6 +6,7 @@ import sys
 from typing import cast
 
 from quality_runner import __version__
+from quality_runner.cli_artifacts import add_artifact_commands
 from quality_runner.cli_controller_reports import (
     add_controller_report_command,
     add_controller_report_summary_arguments,
@@ -223,6 +224,8 @@ def build_parser() -> argparse.ArgumentParser:
     add_gate_commands(subparsers)
 
     add_fix_proposal_command(subparsers)
+
+    add_artifact_commands(subparsers)
 
     add_handoff_commands(subparsers)
 

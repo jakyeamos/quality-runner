@@ -123,6 +123,32 @@ def test_load_repo_config_reads_gates_and_severity_overrides(tmp_path) -> None:
     assert not (tmp_path / "should-not-exist").exists()
 
 
+def test_load_repo_config_reads_artifact_privacy_and_retention_policy(tmp_path) -> None:
+    from quality_runner.config import load_repo_config
+
+    (tmp_path / ".quality-runner.toml").write_text(
+        "\n".join(
+            [
+                "[quality_runner.artifacts]",
+                'redact_patterns = ["(?i)secret-[0-9]+"]',
+                'redact_replacement = "[hidden]"',
+                "retention_runs = 5",
+                "retention_days = 14",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    config = load_repo_config(tmp_path)
+
+    assert config["artifacts"] == {
+        "redact_patterns": ["(?i)secret-[0-9]+"],
+        "redact_replacement": "[hidden]",
+        "retention_runs": 5,
+        "retention_days": 14,
+    }
+
+
 def test_load_repo_config_reads_custom_profiles(tmp_path) -> None:
     from quality_runner.config import load_repo_config
 
