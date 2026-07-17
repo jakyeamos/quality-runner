@@ -28,8 +28,8 @@ they authorize repository changes.
 
 - Branch: `codex/release-0.6.0`
 - Baseline: `main` at 0.5.1 / commit `a101bd4`
-- Release metadata: prepared in `23da809`; full pre-tag validation and
-  publication remain pending.
+- Release metadata and readiness discovery fix: `a3777b1`; full pre-tag
+  validation and publication remain pending for this new head.
 - Audit and planning: complete
 - M0 — restore trust at the boundary: complete in `f36dcf4`
 - M1 — establish typed review contracts: complete in `cb12746`
@@ -79,6 +79,8 @@ release branch through `main` and verify the published artifact.
 
 ## Recent Progress
 
+- 2026-07-17: `a3777b1` fixes release-profile discovery for dynamic version
+  metadata and installed-wheel release smoke; full validation must rerun.
 - 2026-07-17: `23da809` prepares v0.6.0 release metadata on the isolated
   release branch; full validation and publication remain pending.
 - 2026-07-13: v0.5.1 released: PR #2 merged at `a101bd4`, GitHub CI and tag

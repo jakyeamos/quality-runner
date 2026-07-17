@@ -69,9 +69,11 @@ The short `qr` console command is now part of the canonical dev CLI surface. It
 maps to the same `quality_runner.cli:main` entrypoint as `quality-runner`, keeps
 the v0.5.1-compatible package version, and is covered by packaged entrypoint
 tests.
-The isolated `codex/release-0.6.0` branch is now at `23da809`, preparing the
-0.6.0 package, citation, changelog, upgrade, and release-checklist metadata;
-the full pre-tag ladder, self-audit, merge, tag, and publication remain pending.
+The isolated `codex/release-0.6.0` branch is now at `a3777b1`, preparing the
+0.6.0 package, citation, changelog, upgrade, and release-checklist metadata.
+The release-readiness contract now recognizes dynamic `_version.py` metadata
+and the installed-wheel `release-smoke` CI command; the full pre-tag ladder,
+self-audit, merge, tag, and publication remain pending for this new head.
 
 ## Current Position
 
@@ -156,9 +158,9 @@ the full pre-tag ladder, self-audit, merge, tag, and publication remain pending.
   retaining the current application and compatibility architecture; the full
   650-test suite, Ruff, formatting, BasedPyright, and release smoke pass.
 
-`23da809` prepares the v0.6.0 package and public release metadata; the focused
-release-doc contract passes, while the full pre-tag ladder and publication
-evidence are still pending.
+`a3777b1` completes the release-readiness discovery fix with 49 focused tests;
+  the full pre-tag ladder and exact-head CI evidence must be rerun for this
+  changed head.
 
 ## Risks
 
@@ -181,6 +183,8 @@ evidence are still pending.
 
 ## Recent Progress
 
+- 2026-07-17: `a3777b1` fixes release-profile discovery for dynamic package
+  versions and installed-wheel release smoke, with 49 focused tests passing.
 - 2026-07-17: `23da809` prepares the isolated v0.6.0 release branch from
   canonical `dev`; no merge, tag, or publication has occurred.
 - 2026-07-17: Folded the short `qr` console command into the canonical `dev`
