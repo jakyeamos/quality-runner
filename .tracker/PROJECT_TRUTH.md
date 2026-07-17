@@ -58,9 +58,8 @@ tag, release workflow, and published-artifact smoke checks have completed.
 ## Current Position
 
 - Target: a typed v2 core behind CLI, MCP, and compatibility adapters.
-- Next implementation slice: continue the additive port with artifact security,
-  repository skill packs, remediation/phase planning, consumer tooling, and
-  scan-exclusion preflight behavior.
+- Next implementation slice: continue the additive port with scan-exclusion
+  preflight, release/review hardening, and the remaining quality-pack behavior.
 - `dev` is the canonical integration branch. The preserved source branch is
   `quality-skill-corpus-workflow` at `53dc9c8` and remains until its unique
   behavior is fully represented in `dev`.
@@ -114,6 +113,11 @@ tag, release workflow, and published-artifact smoke checks have completed.
   surface, persisting current/baseline evidence without modifying GSD or QR
   planning files. The focused remediation/delta/CLI slice passes 52 tests,
   Ruff, formatting, and BasedPyright.
+- `960d094` adds QR-owned native phase planning: security-first domain
+  candidates, deterministic waves and dependencies, batch summaries, delta
+  updates, verification/close state, and a complete CLI/schema contract while
+  preserving the root GSD planning namespace. The focused phase/config/delta/
+  CLI slice passes 60 tests, Ruff, formatting, and BasedPyright.
 
 ## Risks
 
@@ -128,6 +132,9 @@ tag, release workflow, and published-artifact smoke checks have completed.
 
 ## Recent Progress
 
+- 2026-07-17: `960d094` adds the native QR phase lifecycle and domain-aware
+  `plan auto` workflow under `.planning/quality-runner/`; it remains advisory,
+  idempotent, and separate from source changes, commits, pushes, and root GSD.
 - 2026-07-17: `87d81f8` adds remediation delta evidence and the explicit
   `remediation-delta` command, preserving the boundary between QR evidence and
   project planning systems.
