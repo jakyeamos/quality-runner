@@ -4,6 +4,14 @@ Quality Runner gives agents evidence and a handoff. The agent still owns the
 work plan. For large or repo-wide remediation, agents should convert the QR
 handoff into GSD-style phases and execute one coherent batch at a time.
 
+## Invocation
+
+The examples below use `quality-runner` for readability. Consumer repositories
+should use the source-first contract in [Consumer Tooling](consumer-tooling.md):
+`uvx --refresh --from git+https://github.com/jakyeamos/quality-runner.git
+quality-runner ...` for latest QR, or `uv run --project /path/to/quality-runner
+quality-runner ...` for a specific checkout.
+
 ## Start With QR
 
 Run QR before editing:
