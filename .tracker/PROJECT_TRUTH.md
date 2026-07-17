@@ -62,19 +62,19 @@ refresh evidence overrides, and compatibility-preserving v0.5.1 wiring.
 stderr progress reporting, resolution-aware planning, domain phase candidates,
 read-only filesystem integrity, structured verification contracts, skill
 decomposition, UI quality fixtures, and starter-pack examples.
+The architecture-preserving port is now integrated and published on canonical
+`dev`; its 650-test/static-analysis/release-smoke evidence remains attached to
+the port commits, and no package version bump or release tag was created.
 
 ## Current Position
 
 - Target: a typed v2 core behind CLI, MCP, and compatibility adapters.
-- Next implementation slice: verify the isolated port against canonical `dev`,
-  merge it without replacing the v0.5.1 application/compatibility seams, then
-  audit ancestry and patch-equivalence before pruning the superseded source
-  branch.
-- `codex/dev-feature-port` is complete at `67bd698`; the isolated branch passes
-  650 tests, Ruff, formatting, BasedPyright, and release smoke.
-- `dev` is the canonical integration branch. The preserved source branch is
-  `quality-skill-corpus-workflow` at `53dc9c8` and remains until its unique
-  behavior is fully represented in `dev`.
+- Next implementation slice: review release readiness for a future version
+  bump; this integration remains v0.5.1-compatible and did not create a tag.
+- `dev` is the canonical integration branch and is published to `origin/dev`.
+  The temporary `codex/dev-feature-port` worktree/ref and the superseded
+  `quality-skill-corpus-workflow` branch were pruned after the behavioral port
+  audit; unrelated active branches remain separate.
 - Canonical planning documents: `docs/modernization/`.
 - Public compatibility: retain `quality_evidence_contract` and
   `repo_quality_certifier` during a published transition window.
@@ -172,6 +172,9 @@ decomposition, UI quality fixtures, and starter-pack examples.
   local self-update, progress, resolution-aware planning, phase candidates,
   read-only integrity, verification contracts, skill decomposition, UI quality,
   starter packs, and 650 passing tests.
+- 2026-07-17: canonical `dev` receives the architecture-preserving port and is
+  published to `origin/dev`; the completed port branch and superseded source
+  branch are pruned, while unrelated active branches remain untouched.
 - 2026-07-17: `b193900` ports release-profile readiness with provenance,
   repo-local evidence validation, aggregate coverage, artifact/read-only gates,
   publication review triggers, CLI/refresh propagation, and 621 passing tests.
