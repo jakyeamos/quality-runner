@@ -58,8 +58,9 @@ tag, release workflow, and published-artifact smoke checks have completed.
 ## Current Position
 
 - Target: a typed v2 core behind CLI, MCP, and compatibility adapters.
-- Next implementation slice: continue the additive port with scan-exclusion
-  preflight, release/review hardening, and the remaining quality-pack behavior.
+- Next implementation slice: continue the additive port with release/review
+  hardening and the remaining quality-pack behavior; scan-exclusion preflight
+  is now represented in the canonical dev port.
 - `dev` is the canonical integration branch. The preserved source branch is
   `quality-skill-corpus-workflow` at `53dc9c8` and remains until its unique
   behavior is fully represented in `dev`.
@@ -118,6 +119,11 @@ tag, release workflow, and published-artifact smoke checks have completed.
   updates, verification/close state, and a complete CLI/schema contract while
   preserving the root GSD planning namespace. The focused phase/config/delta/
   CLI slice passes 60 tests, Ruff, formatting, and BasedPyright.
+- `74e368a` ports scan-exclusion preflight with deterministic candidate packets,
+  review/validate/apply staging, protected-path and symlink checks, module-
+  scoped exclusion overlays, security-coverage preservation, CLI/artifact/
+  manifest wiring, and persistent config support. The full 604-test suite,
+  Ruff, formatting, and BasedPyright pass.
 - `546122e` keeps the remediation-delta module under QR's default 500-line
   source threshold without changing its evidence contract; the focused delta
   and source-size checks pass.
@@ -132,9 +138,14 @@ tag, release workflow, and published-artifact smoke checks have completed.
   consent and a disposable checkout but does not sandbox those commands.
 - Combined file-adapter task provenance remains the baseline-compatible string
   `"None"` until a published compatibility cutover can change that projection.
+- Persistent scan exclusions require review evidence and explicit `--apply`;
+  run-only overlays are intentionally recorded as non-mutating evidence.
 
 ## Recent Progress
 
+- 2026-07-17: `74e368a` adds scan-exclusion preflight and module-aware run-only
+  overlays while preserving security coverage for structural/code-quality
+  exclusions and retaining the current application/compatibility façades.
 - 2026-07-17: `546122e` reduces remediation-delta implementation noise while
   preserving its fingerprints, package evidence, and recommendation payload.
 - 2026-07-17: `960d094` adds the native QR phase lifecycle and domain-aware
