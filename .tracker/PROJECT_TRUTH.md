@@ -106,6 +106,10 @@ tag, release workflow, and published-artifact smoke checks have completed.
   Python command builder, an executable latest/local launcher, and rollout
   provenance/rerun commands that identify the QR source and version. The
   focused rollout/tooling slice passes 9 tests plus launcher smoke checks.
+- `831d9a4` exposes corpus classification, append, and synchronization through
+  the skill CLI, keeping sync dry-run by default and validating review reports
+  against the selected local/global skill set. The focused skill/corpus/CLI
+  slice passes 62 tests, Ruff, formatting, and BasedPyright.
 
 ## Risks
 
@@ -120,6 +124,8 @@ tag, release workflow, and published-artifact smoke checks have completed.
 
 ## Recent Progress
 
+- 2026-07-17: `831d9a4` completes the skill corpus command surface for
+  classify/append/sync and makes selected-skill review coverage explicit.
 - 2026-07-17: `f292a1e` routes rollout provenance and consumer invocation
   through a checkout-aware source-first runner, with local and refreshed
   latest modes documented for downstream repositories.
