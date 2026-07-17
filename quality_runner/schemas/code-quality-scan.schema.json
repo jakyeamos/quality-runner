@@ -19,7 +19,9 @@
     "accountability": { "type": "array", "items": { "type": "object" } },
     "findings": { "type": "array", "items": { "$ref": "#/$defs/finding" } },
     "duplicate_clusters": { "type": "array", "items": { "type": "object" } },
-    "skipped_files": { "type": "array", "items": { "type": "object" } }
+    "skipped_files": { "type": "array", "items": { "type": "object" } },
+    "quality_skills": { "type": "array", "items": { "$ref": "#/$defs/quality_skill" } },
+    "skill_coverage": { "type": "array", "items": { "$ref": "#/$defs/skill_coverage" } }
   },
   "$defs": {
     "finding": {
@@ -54,7 +56,73 @@
         "expected_improvement": { "type": "string", "minLength": 1 },
         "risk": { "type": "string", "minLength": 1 },
         "verification": { "type": "string", "minLength": 1 },
-        "remediation_bucket": { "type": "string", "minLength": 1 }
+        "remediation_bucket": { "type": "string", "minLength": 1 },
+        "verification_mode": { "enum": ["command", "evidence"] },
+        "verification_requirements": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "rule_message": { "type": "string", "minLength": 1 },
+        "rule_category": { "type": "string", "minLength": 1 },
+        "skill_id": { "type": "string", "minLength": 1 },
+        "review_id": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "required": ["verification_mode"],
+            "properties": { "verification_mode": { "const": "evidence" } }
+          },
+          "then": { "required": ["verification_requirements"] }
+        }
+      ]
+    },
+    "quality_skill": {
+      "type": "object",
+      "required": ["id", "name", "version", "content_sha256"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "name": { "type": "string", "minLength": 1 },
+        "version": { "type": "string", "minLength": 1 },
+        "content_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+      },
+      "additionalProperties": false
+    },
+    "skill_coverage": {
+      "type": "object",
+      "required": [
+        "skill_id",
+        "skill_name",
+        "skill_version",
+        "rule_id",
+        "rule_type",
+        "rule_category",
+        "severity",
+        "paths",
+        "scoped_files",
+        "matched_files",
+        "finding_count",
+        "status"
+      ],
+      "properties": {
+        "skill_id": { "type": "string", "minLength": 1 },
+        "skill_name": { "type": "string", "minLength": 1 },
+        "skill_version": { "type": "string", "minLength": 1 },
+        "rule_id": { "type": "string", "minLength": 1 },
+        "rule_type": { "type": "string", "minLength": 1 },
+        "rule_category": { "type": "string" },
+        "severity": { "enum": ["warning", "observation"] },
+        "confidence": { "enum": ["high", "medium", "low"] },
+        "paths": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "scoped_files": { "type": "integer", "minimum": 0 },
+        "matched_files": { "type": "integer", "minimum": 0 },
+        "finding_count": { "type": "integer", "minimum": 0 },
+        "rejected_finding_count": { "type": "integer", "minimum": 0 },
+        "status": {
+          "enum": ["evaluated", "matched", "no_matching_files", "skipped", "review_required", "reviewed", "review_rejected"]
+        },
+        "skipped_reason": { "type": "string", "minLength": 1 }
       },
       "additionalProperties": false
     }

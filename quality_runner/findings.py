@@ -9,6 +9,7 @@ from quality_runner.schema_constants import (
     AUDIT_REPORT_SCHEMA,
     REMEDIATION_PLAN_SCHEMA,
 )
+from quality_runner.verification_contract import verification_contract_is_valid
 
 ValidationResult = dict[str, Any]
 ALLOWED_SEVERITIES = {"critical", "blocker", "warning", "observation"}
@@ -67,6 +68,8 @@ def validate_audit_report(report: dict[str, Any]) -> ValidationResult:
         verification = finding.get("verification")
         if not _non_empty_string_list(verification):
             errors.append(f"finding {finding_id} has no verification")
+        if not verification_contract_is_valid(finding):
+            errors.append(f"finding {finding_id} has an invalid verification contract")
     return {"passed": not errors, "errors": errors}
 
 
@@ -97,6 +100,8 @@ def validate_remediation_plan(plan: dict[str, Any]) -> ValidationResult:
             errors.append(f"slice {slice_id} has no actions")
         if not _non_empty_string_list(slice_item.get("verification_gates")):
             errors.append(f"slice {slice_id} has no verification gates")
+        if not verification_contract_is_valid(slice_item):
+            errors.append(f"slice {slice_id} has an invalid verification contract")
         if slice_item.get("action_groups") is not None and not _optional_action_group_list(
             slice_item.get("action_groups")
         ):
@@ -208,6 +213,7 @@ def _slice_item(value: object) -> bool:
         and _non_empty_string_list(value.get("actions"))
         and _optional_action_group_list(value.get("action_groups"))
         and _non_empty_string_list(value.get("verification_gates"))
+        and verification_contract_is_valid(value)
     )
 
 

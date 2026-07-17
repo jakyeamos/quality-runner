@@ -21,6 +21,7 @@ def create_code_quality_scan_with_skills(
     scan: dict[str, Any],
     config: dict[str, Any],
     skill_review_report: dict[str, Any] | None,
+    require_skill_review_coverage: bool = False,
     text_scan_scope: TextScanScope | None = None,
 ) -> tuple[dict[str, Any], list[dict[str, str]]]:
     _, skill_warnings = load_active_skills(repo_root, config)
@@ -29,6 +30,7 @@ def create_code_quality_scan_with_skills(
         scan=scan,
         config=config,
         skill_review_report=skill_review_report,
+        require_skill_review_coverage=require_skill_review_coverage,
         text_scan_scope=text_scan_scope,
     )
     return code_quality_scan, skill_warnings
@@ -55,6 +57,7 @@ def write_skill_review_artifacts(
     config: dict[str, Any],
     code_quality_scan: dict[str, Any],
     skill_review_report: dict[str, Any] | None,
+    require_skill_review_coverage: bool = False,
 ) -> dict[str, str]:
     skills, _warnings = load_active_skills(repo_root, config)
     if not skills:
@@ -95,6 +98,7 @@ def write_skill_review_artifacts(
             skills=skills,
             repo_root=repo_root,
             run_id=run_id,
+            require_review_coverage=require_skill_review_coverage,
         )
         if validation.get("passed") is True:
             artifact_paths["skill_review_report_json"] = str(
@@ -108,3 +112,18 @@ def load_skill_review_report_json(path: Path) -> dict[str, Any]:
     if not isinstance(payload, dict):
         raise ValueError("skill review report must be a JSON object")
     return payload
+
+
+def quality_skill_identities(code_quality_scan: dict[str, Any]) -> list[dict[str, Any]]:
+    skills = code_quality_scan.get("quality_skills")
+    if not isinstance(skills, list):
+        return []
+    return [
+        item
+        for item in skills
+        if isinstance(item, dict)
+        and all(
+            isinstance(item.get(field), str) and item.get(field)
+            for field in ("id", "name", "version", "content_sha256")
+        )
+    ]

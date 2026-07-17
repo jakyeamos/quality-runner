@@ -16,7 +16,7 @@ from quality_runner.intent import attach_intent_artifacts, intent_for_run
 from quality_runner.manifest import build_run_manifest
 from quality_runner.planning import render_handoff_markdown
 from quality_runner.slice_specs import write_slice_specs
-from quality_runner.workflow_skills import write_skill_review_artifacts
+from quality_runner.workflow_skills import quality_skill_identities, write_skill_review_artifacts
 
 
 def write_inspect_v1_artifacts(
@@ -74,6 +74,7 @@ def write_inspect_v1_artifacts(
         mode="inspect",
         artifact_paths=artifact_paths,
         intent=run_intent,
+        quality_skills=quality_skill_identities(code_quality_scan),
     )
     artifact_paths["run_manifest_json"] = str(write_json(run_dir / "run-manifest.json", manifest))
     return artifact_paths
@@ -134,6 +135,7 @@ def plan_and_write_run_v1_artifacts(
         mode="run",
         artifact_paths=artifact_paths,
         intent=run_intent,
+        quality_skills=quality_skill_identities(code_quality_scan),
     )
     artifact_paths["run_manifest_json"] = str(write_json(run_dir / "run-manifest.json", manifest))
     artifact_paths["quality_audit_json"] = str(

@@ -144,6 +144,50 @@ def test_quality_skill_disallowed_pattern_detects_line(tmp_path: Path) -> None:
     assert "button/link" in finding["expected_improvement"]
 
 
+def test_quality_skill_metadata_and_coverage_are_reported(tmp_path: Path) -> None:
+    from quality_runner.code_quality import create_code_quality_scan
+
+    skill_path = _install_skill(tmp_path, "ui-polish", _clickable_div_skill_toml())
+    _write(tmp_path / "apps/web/page.tsx", "<div onClick={onOpen}>Open</div>\n")
+    config = _skills_enabled_config(
+        active=["ui-polish"],
+        local=[{"id": "ui-polish", "path": skill_path}],
+    )
+
+    result = create_code_quality_scan(tmp_path, scan={"run_id": "coverage-001"}, config=config)
+
+    assert result["quality_skills"][0]["id"] == "ui-polish"
+    coverage = result["skill_coverage"]
+    assert coverage[0]["rule_id"] == "ui-clickable-div"
+    assert coverage[0]["status"] == "matched"
+    finding = next(item for item in result["findings"] if item["category"] == "skill:ui-polish")
+    assert finding["rule_message"] == "Clickable divs should usually be semantic buttons or links."
+    assert finding["rule_category"] == "accessibility"
+
+
+def test_quality_skill_invalid_regex_is_skipped_with_warning(tmp_path: Path) -> None:
+    from quality_runner.code_quality import create_code_quality_scan
+    from quality_runner.skill_config import load_active_skills
+
+    skill = _clickable_div_skill_toml().replace(
+        'disallowed_patterns = ["<div[^>]+onClick="]',
+        'disallowed_patterns = ["("]',
+    )
+    skill_path = _install_skill(tmp_path, "ui-polish", skill)
+    _write(tmp_path / "apps/web/page.tsx", "<div onClick={onOpen}>Open</div>\n")
+    config = _skills_enabled_config(
+        active=["ui-polish"],
+        local=[{"id": "ui-polish", "path": skill_path}],
+    )
+
+    result = create_code_quality_scan(tmp_path, scan={"run_id": "regex-001"}, config=config)
+
+    assert not any(item["category"] == "skill:ui-polish" for item in result["findings"])
+    assert result["skill_coverage"][0]["status"] == "skipped"
+    _skills, warnings = load_active_skills(tmp_path, config)
+    assert any(item["code"] == "invalid_quality_skill_regex" for item in warnings)
+
+
 def test_quality_skill_trigger_without_required_detects_missing_empty_state(
     tmp_path: Path,
 ) -> None:
