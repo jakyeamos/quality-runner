@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+from pathlib import Path
 from typing import cast
 
 from quality_runner import __version__
@@ -29,19 +30,25 @@ from quality_runner.cli_workflow_args import (
 from quality_runner.core.outcome_contracts import JourneyOutcome
 from quality_runner.standards import DEFAULT_PROFILE
 
-ROOT_HELP = """usage: quality-runner <journey> [options]
+CANONICAL_PROGRAM = "qr"
+COMPATIBILITY_PROGRAM = "quality-runner"
+
+
+def _root_help(program_name: str) -> str:
+    return f"""usage: {program_name} <journey> [options]
 
 Quality Runner records local evidence and the safest next action for a repository.
+The canonical command is 'qr'; 'quality-runner' remains a compatibility alias.
 
-Start with a journey:
+Stable journeys:
   audit REPO            inspect a repository and prepare remediation evidence
   review REPO           prepare or run a fresh, read-only review (v2 outcome)
   verify REPO           record gate evidence; execution requires explicit consent
   runs REPO             read recent evidence without creating new artifacts
-
-Common setup:
-  init REPO             create a starter Quality Runner configuration
   doctor                confirm local installation readiness
+
+Configuration:
+  init REPO             create a starter Quality Runner configuration
 
 Compatibility commands remain available:
   inspect, run, verify-gates, status, summarize-run, export-handoff
@@ -50,10 +57,13 @@ Advanced operations:
   refresh, rollout, gate, controller-report, skill, proposal, validation,
   release-smoke, and worker handoff tools
 
-Run 'quality-runner <command> --help' for options. Audit, review, verify, and
+Run '{program_name} <command> --help' for options. Audit, review, verify, and
 runs emit a compact outcome card by default and v2 JSON with --json. Use
 review --legacy-output only for the supported v1 compatibility projection.
 """
+
+
+ROOT_HELP = _root_help(CANONICAL_PROGRAM)
 
 _LEGACY_COMMAND_REPLACEMENTS = {
     "inspect": "audit --inspect-only",
@@ -62,12 +72,16 @@ _LEGACY_COMMAND_REPLACEMENTS = {
 }
 
 
-def build_parser() -> argparse.ArgumentParser:
+def build_parser(prog: str = CANONICAL_PROGRAM) -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        prog="quality-runner",
+        prog=prog,
         description="Audit a repo and produce an evidence-backed remediation plan.",
     )
-    parser.format_help = lambda: ROOT_HELP
+
+    def format_root_help() -> str:
+        return ROOT_HELP if prog == CANONICAL_PROGRAM else _root_help(prog)
+
+    parser.format_help = format_root_help
     parser.add_argument("--version", action="version", version=__version__)
     subparsers = parser.add_subparsers(dest="command")
 
@@ -245,12 +259,13 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv: list[str] | None = None) -> int:
     args = sys.argv[1:] if argv is None else argv
+    program_name = _program_for_invocation()
     if not args:
         print(f"Quality Runner {__version__}")
-        print("Run 'quality-runner --help' for usage.")
+        print(f"Run '{program_name} --help' for usage.")
         return 0
 
-    parser = build_parser()
+    parser = build_parser(program_name)
     try:
         parsed = parser.parse_args(args)
     except SystemExit as error:
@@ -260,10 +275,10 @@ def main(argv: list[str] | None = None) -> int:
     try:
         payload = payload_for_args(parsed)
     except (FileNotFoundError, NotADirectoryError, ValueError, OSError) as error:
-        print(f"quality-runner: error: {error}", file=sys.stderr)
+        print(f"{program_name}: error: {error}", file=sys.stderr)
         return 1
 
-    notice = _compatibility_notice(parsed)
+    notice = _compatibility_notice(parsed, program_name=program_name)
     if notice:
         print(notice, file=sys.stderr)
 
@@ -301,20 +316,29 @@ def main(argv: list[str] | None = None) -> int:
     return 0
 
 
-def _compatibility_notice(parsed: argparse.Namespace) -> str | None:
+def _program_for_invocation(argv0: str | None = None) -> str:
+    invoked_name = Path(argv0 or sys.argv[0]).name.removesuffix(".exe")
+    if invoked_name == COMPATIBILITY_PROGRAM:
+        return COMPATIBILITY_PROGRAM
+    return CANONICAL_PROGRAM
+
+
+def _compatibility_notice(
+    parsed: argparse.Namespace, *, program_name: str = CANONICAL_PROGRAM
+) -> str | None:
     command = parsed.command
     if not isinstance(command, str):
         return None
     if command == "review" and bool(getattr(parsed, "legacy_output", False)):
         return (
-            "quality-runner: warning: --legacy-output emits the v1 review projection, "
+            f"{program_name}: warning: --legacy-output emits the v1 review projection, "
             "supported through 0.7.x; omit it for the v2 outcome."
         )
     replacement = _LEGACY_COMMAND_REPLACEMENTS.get(command)
     if replacement is None:
         return None
     return (
-        f"quality-runner: warning: {command} is a v1 compatibility command, "
+        f"{program_name}: warning: {command} is a v1 compatibility command, "
         f"supported through 0.7.x; use {replacement}."
     )
 

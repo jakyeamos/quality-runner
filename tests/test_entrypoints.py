@@ -41,6 +41,7 @@ def test_module_entrypoint_exits_successfully() -> None:
     )
 
     assert "Quality Runner" in result.stdout
+    assert "Run 'qr --help' for usage." in result.stdout
 
 
 def test_module_entrypoint_runs_in_process(capsys, monkeypatch) -> None:
@@ -53,7 +54,9 @@ def test_module_entrypoint_runs_in_process(capsys, monkeypatch) -> None:
     else:
         raise AssertionError("__main__ did not raise SystemExit")
 
-    assert "Quality Runner" in capsys.readouterr().out
+    output = capsys.readouterr().out
+    assert "Quality Runner" in output
+    assert "Run 'quality-runner --help' for usage." in output
 
 
 def test_module_entrypoint_version_exits_successfully() -> None:
@@ -144,6 +147,7 @@ def test_packaged_console_script_invokes_cli(tmp_path: Path) -> None:
     assert metadata["Version"] == __version__
     assert plugin_manifest["version"] == __version__
     assert "quality-runner = quality_runner.cli:main" in entry_points
+    assert "qr = quality_runner.cli:main" in entry_points
     assert "quality-runner-mcp = quality_runner.mcp:main" in entry_points
     assert "repo-quality-certifier = repo_quality_certifier.cli:main" in entry_points
     assert "repo-quality-certifier-mcp = repo_quality_certifier.mcp:main" in entry_points
@@ -188,12 +192,37 @@ def test_packaged_console_script_invokes_cli(tmp_path: Path) -> None:
     )
 
     quality_runner = venv_dir / "bin" / "quality-runner"
+    qr = venv_dir / "bin" / "qr"
     version_result = subprocess.run(
         [str(quality_runner), "--version"],
         check=True,
         capture_output=True,
         text=True,
     )
+    qr_version_result = subprocess.run(
+        [str(qr), "--version"],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    for executable, expected_program in (
+        (quality_runner, "quality-runner"),
+        (qr, "qr"),
+    ):
+        help_result = subprocess.run(
+            [str(executable), "--help"],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        assert f"usage: {expected_program} <journey> [options]" in help_result.stdout
+        assert "audit REPO" in help_result.stdout
+        assert "review REPO" in help_result.stdout
+        assert "verify REPO" in help_result.stdout
+        assert "runs REPO" in help_result.stdout
+        assert "doctor" in help_result.stdout
+        assert "verify-gates" in help_result.stdout
+        assert "release-smoke" in help_result.stdout
     metadata_version_result = subprocess.run(
         [
             str(venv_python),
@@ -206,6 +235,12 @@ def test_packaged_console_script_invokes_cli(tmp_path: Path) -> None:
     )
     doctor_result = subprocess.run(
         [str(quality_runner), "doctor", "--json"],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    qr_doctor_result = subprocess.run(
+        [str(qr), "doctor", "--json"],
         check=True,
         capture_output=True,
         text=True,
@@ -223,9 +258,11 @@ def test_packaged_console_script_invokes_cli(tmp_path: Path) -> None:
         text=True,
     )
     installed_review_root = tmp_path / "installed-review-smoke"
+    installed_qr_review_root = tmp_path / "installed-qr-review-smoke"
     installed_legacy_review_root = tmp_path / "installed-legacy-review-smoke"
     installed_mcp_review_root = tmp_path / "installed-mcp-review-smoke"
     installed_review_root.mkdir()
+    installed_qr_review_root.mkdir()
     installed_legacy_review_root.mkdir()
     installed_mcp_review_root.mkdir()
     review_result = subprocess.run(
@@ -237,6 +274,21 @@ def test_packaged_console_script_invokes_cli(tmp_path: Path) -> None:
             "blind",
             "--run-id",
             "installed-review-default",
+            "--json",
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    qr_review_result = subprocess.run(
+        [
+            str(qr),
+            "review",
+            str(installed_qr_review_root),
+            "--mode",
+            "blind",
+            "--run-id",
+            "installed-qr-review-default",
             "--json",
         ],
         check=True,
@@ -349,13 +401,19 @@ def test_packaged_console_script_invokes_cli(tmp_path: Path) -> None:
     )
 
     assert version_result.stdout.strip() == __version__
+    assert qr_version_result.stdout.strip() == __version__
     doctor_payload = json.loads(doctor_result.stdout)
+    qr_doctor_payload = json.loads(qr_doctor_result.stdout)
     assert doctor_payload["schema"] == "quality-runner-doctor-result-v0.1"
     assert doctor_payload["status"] == "ready"
     assert doctor_payload["version"] == __version__
+    assert qr_doctor_payload["schema"] == doctor_payload["schema"]
+    assert qr_doctor_payload["status"] == doctor_payload["status"]
+    assert qr_doctor_payload["version"] == doctor_payload["version"]
     assert metadata_version_result.stdout.strip() == __version__
     smoke_payload = json.loads(smoke_result.stdout)
     review_payload = json.loads(review_result.stdout)
+    qr_review_payload = json.loads(qr_review_result.stdout)
     legacy_review_payload = json.loads(legacy_review_result.stdout)
     mcp_review_response = json.loads(mcp_review_result.stdout)
     assert smoke_payload["schema"] == "quality-runner-release-smoke-result-v0.1"
@@ -368,6 +426,9 @@ def test_packaged_console_script_invokes_cli(tmp_path: Path) -> None:
     assert review_payload["schema"] == "quality-runner-outcome-v0.2"
     assert review_payload["journey"] == "review"
     assert review_payload["assessment"] == "packet-ready"
+    assert qr_review_payload["schema"] == review_payload["schema"]
+    assert qr_review_payload["journey"] == review_payload["journey"]
+    assert qr_review_payload["assessment"] == review_payload["assessment"]
     assert legacy_review_payload["schema"] == "quality-runner-review-result-v0.1"
     assert "outcome" not in legacy_review_payload
     assert "next_action" not in legacy_review_payload

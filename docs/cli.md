@@ -1,8 +1,10 @@
 # CLI Reference
 
-Quality Runner provides two primary console scripts:
+Quality Runner provides a canonical short console script and a compatibility
+alias:
 
-- `quality-runner`
+- `qr` (canonical human-facing command)
+- `quality-runner` (compatibility alias)
 - `quality-runner-mcp`
 
 It also packages compatibility console scripts for existing Repo Quality
@@ -13,17 +15,21 @@ Certifier callers:
 
 ## Outcome-first journeys
 
-New users and integrations should start with `audit`, `review`, `verify`, and
-`runs`. All four render a compact outcome card by default. Their v2 JSON uses
-`quality-runner-outcome-v0.2` and leads with state, assessment, evidence
-confidence, writes, safety, and the safest next action.
+New users and integrations should start with `audit`, `review`, `verify`, `runs`,
+and `doctor` through `qr`. The first four render a compact outcome card by
+default. Their v2 JSON uses `quality-runner-outcome-v0.2` and leads with state,
+assessment, evidence confidence, writes, safety, and the safest next action.
 
 ```bash
-quality-runner audit /path/to/repo --json
-quality-runner review /path/to/repo --mode blind --json
-quality-runner verify /path/to/repo --json
-quality-runner runs /path/to/repo --json
+qr audit /path/to/repo --json
+qr review /path/to/repo --mode blind --json
+qr verify /path/to/repo --json
+qr runs /path/to/repo --json
+qr doctor --json
 ```
+
+Existing callers can use `quality-runner` in place of `qr` with the same help,
+version, and JSON behavior.
 
 `inspect`, `run`, and `verify-gates` remain supported v1 compatibility commands.
 `review --legacy-output` provides the established v1 review JSON field shape
