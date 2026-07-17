@@ -239,7 +239,10 @@ def _normalize_finding(finding: dict[str, Any]) -> dict[str, Any]:
         if finding.get(key) is not None
     }
     normalized = dict(finding)
-    normalized["fingerprint"] = str(finding.get("fingerprint") or _hash_payload(stable))
+    encoded = json.dumps(stable, sort_keys=True, separators=(",", ":"), default=str).encode()
+    normalized["fingerprint"] = str(
+        finding.get("fingerprint") or hashlib.sha256(encoded).hexdigest()
+    )
     return normalized
 
 
@@ -436,8 +439,7 @@ def _run_head_sha(run_dir: Path) -> str | None:
 
 
 def _is_package_path(path: str) -> bool:
-    name = Path(path).name
-    return name in {
+    return Path(path).name in {
         "package.json",
         "pnpm-lock.yaml",
         "package-lock.json",
@@ -455,17 +457,15 @@ def _is_package_path(path: str) -> bool:
         "Gemfile.lock",
         "composer.json",
         "composer.lock",
-    } or name.startswith("requirements-")
+    } or Path(path).name.startswith("requirements-")
 
 
 def _gate_state(payload: dict[str, Any]) -> dict[str, Any]:
-    return {
-        "status": payload.get("status", "unavailable"),
-        "failure_type": payload.get("failure_type"),
-        "blockers": payload.get("blockers", [])
-        if isinstance(payload.get("blockers", []), list)
-        else [],
-    }
+    return dict(
+        status=payload.get("status", "unavailable"),
+        failure_type=payload.get("failure_type"),
+        blockers=payload.get("blockers") if isinstance(payload.get("blockers"), list) else [],
+    )
 
 
 def _recommendations(
@@ -496,8 +496,3 @@ def _recommendations(
         "Keep the consumer plan's structure and ownership decisions; update only the affected work items."
     )
     return recommendations
-
-
-def _hash_payload(payload: object) -> str:
-    encoded = json.dumps(payload, sort_keys=True, separators=(",", ":"), default=str).encode()
-    return hashlib.sha256(encoded).hexdigest()
