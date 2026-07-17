@@ -110,6 +110,10 @@ tag, release workflow, and published-artifact smoke checks have completed.
   the skill CLI, keeping sync dry-run by default and validating review reports
   against the selected local/global skill set. The focused skill/corpus/CLI
   slice passes 62 tests, Ruff, formatting, and BasedPyright.
+- `87d81f8` adds the tool-neutral `remediation-delta` comparison and CLI
+  surface, persisting current/baseline evidence without modifying GSD or QR
+  planning files. The focused remediation/delta/CLI slice passes 52 tests,
+  Ruff, formatting, and BasedPyright.
 
 ## Risks
 
@@ -124,6 +128,9 @@ tag, release workflow, and published-artifact smoke checks have completed.
 
 ## Recent Progress
 
+- 2026-07-17: `87d81f8` adds remediation delta evidence and the explicit
+  `remediation-delta` command, preserving the boundary between QR evidence and
+  project planning systems.
 - 2026-07-17: `831d9a4` completes the skill corpus command surface for
   classify/append/sync and makes selected-skill review coverage explicit.
 - 2026-07-17: `f292a1e` routes rollout provenance and consumer invocation
