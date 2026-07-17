@@ -4,6 +4,7 @@ import re
 from typing import Any
 
 from quality_runner.evidence_redaction import REDACTED_LITERAL
+from quality_runner.remediation_context import validate_remediation_context
 
 SECRET_PATTERNS = (
     re.compile(
@@ -18,8 +19,10 @@ def validate_handoff_quality(
     handoff: dict[str, Any],
     *,
     remediation_plan: dict[str, Any] | None = None,
+    remediation_context: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     errors: list[str] = []
+    context_result: dict[str, Any] | None = None
     if handoff.get("implementation_allowed") is not False:
         errors.append("handoff must keep implementation_allowed=false")
 
@@ -46,11 +49,37 @@ def validate_handoff_quality(
             if _is_structural_slice(slice_item) and not _has_structural_anchor(slice_item):
                 errors.append(f"slice {slice_id} lacks file/line/fingerprint anchor")
 
+    plan_has_context = isinstance(plan, dict) and isinstance(plan.get("remediation_context"), dict)
+    handoff_has_context = isinstance(handoff.get("remediation_context"), dict)
+    if plan_has_context or handoff_has_context:
+        context = remediation_context
+        if context is None:
+            artifact_paths = handoff.get("artifact_paths")
+            context_path = (
+                artifact_paths.get("remediation_context_json")
+                if isinstance(artifact_paths, dict)
+                else None
+            )
+            if isinstance(context_path, str):
+                context = _load_json(context_path)
+        if context is None:
+            errors.append("remediation context artifact is required before source changes")
+        else:
+            context_result = validate_remediation_context(
+                context,
+                remediation_plan=plan,
+                require_ready=True,
+            )
+            errors.extend(context_result.get("errors", []))
+
     next_slice = handoff.get("next_slice")
     if isinstance(next_slice, dict):
         errors.extend(_lint_slice_dict(next_slice, label="next_slice"))
 
-    return {"passed": not errors, "errors": errors}
+    result: dict[str, Any] = {"passed": not errors, "errors": errors}
+    if context_result is not None:
+        result["remediation_context"] = context_result
+    return result
 
 
 def validate_slice_spec_content(content: str) -> dict[str, Any]:

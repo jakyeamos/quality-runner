@@ -29,6 +29,12 @@ from quality_runner.intent import intent_for_run
 from quality_runner.manifest import git_state_for_repo
 from quality_runner.package_preflight import build_package_manager_preflight
 from quality_runner.planning import build_agent_handoff, build_remediation_plan
+from quality_runner.remediation_context import (
+    attach_context_refs,
+    build_remediation_context_for_plan,
+    remediation_context_summary,
+    validate_remediation_context,
+)
 from quality_runner.scan_scope import create_text_scan_scope
 from quality_runner.security.ledger import merge_security_ledger_entries
 from quality_runner.security.scan import create_security_scan, merge_security_into_capability_map
@@ -153,6 +159,18 @@ def plan_read_only_audit(
         run_id=analysis.request.run_id,
     )
     plan = build_audit_plan(analysis, artifact_paths=artifact_paths)
+    remediation_plan = _legacy_payload(plan.remediation_plan)
+    remediation_context = build_remediation_context_for_plan(
+        remediation_plan=remediation_plan,
+        run_id=analysis.request.run_id,
+        repo_root=repo_root,
+        repo_scan=_legacy_payload(analysis.scan),
+        git_state=git_state_for_repo(repo_root),
+    )
+    require_valid(
+        "remediation context",
+        validate_remediation_context(remediation_context, remediation_plan=remediation_plan),
+    )
     return PlannedAudit(
         analysis=plan.analysis,
         audit_report=plan.audit_report,
@@ -160,6 +178,7 @@ def plan_read_only_audit(
         handoff=plan.handoff,
         status=plan.status,
         resolution_ledger=_audit_payload(resolution_ledger),
+        remediation_context=_audit_payload(remediation_context),
     )
 
 
@@ -188,6 +207,32 @@ def build_audit_plan(
         git_state=git_state_for_repo(repo_root),
     )
     require_valid("remediation plan", validate_remediation_plan(remediation_plan))
+    remediation_context = build_remediation_context_for_plan(
+        remediation_plan=remediation_plan,
+        run_id=analysis.request.run_id,
+        repo_root=repo_root,
+        repo_scan=_legacy_payload(analysis.scan),
+        git_state=git_state_for_repo(repo_root),
+    )
+    require_valid(
+        "remediation context",
+        validate_remediation_context(remediation_context, remediation_plan=remediation_plan),
+    )
+    remediation_context_ref = remediation_context_summary(
+        remediation_context,
+        artifact_path=artifact_paths.get("remediation_context_json"),
+    )
+    if remediation_context_ref is not None:
+        remediation_plan = dict(remediation_plan)
+        for collection_name in ("slices", "security_review_slices"):
+            collection = remediation_plan.get(collection_name)
+            if isinstance(collection, list):
+                remediation_plan[collection_name] = attach_context_refs(
+                    [item for item in collection if isinstance(item, dict)],
+                    remediation_context,
+                )
+        remediation_plan["remediation_context"] = remediation_context_ref
+        require_valid("remediation plan", validate_remediation_plan(remediation_plan))
     handoff = build_agent_handoff(
         audit_report=audit_report,
         remediation_plan=remediation_plan,
@@ -201,6 +246,8 @@ def build_audit_plan(
         ),
         repo_scan=_legacy_payload(analysis.scan),
     )
+    if remediation_context_ref is not None:
+        handoff = {**handoff, "remediation_context": remediation_context_ref}
     require_valid("agent handoff", validate_agent_handoff(handoff))
     status: Literal["clean", "planned"] = (
         "clean" if not remediation_plan.get("slices") else "planned"

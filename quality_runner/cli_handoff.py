@@ -7,6 +7,7 @@ from typing import Any
 
 from quality_runner.findings import validate_agent_handoff
 from quality_runner.handoff_lint import validate_handoff_quality, validate_slice_spec_content
+from quality_runner.remediation_context import validate_remediation_context
 from quality_runner.review_worker import review_worker_payload
 from quality_runner.slice_specs import export_slice_specs_payload
 
@@ -30,7 +31,24 @@ def add_handoff_commands(subparsers: argparse._SubParsersAction[argparse.Argumen
         default=None,
         help="Optional remediation plan JSON for slice-level lint",
     )
+    validate_handoff.add_argument(
+        "--remediation-context",
+        default=None,
+        help="Completed remediation context JSON to use for understanding validation",
+    )
     validate_handoff.add_argument("--json", action="store_true", help="Emit JSON output")
+
+    validate_context = subparsers.add_parser(
+        "validate-remediation-context",
+        help="Validate a compact remediation context packet before source changes",
+    )
+    validate_context.add_argument("context_json", help="Remediation context JSON path")
+    validate_context.add_argument(
+        "--remediation-plan",
+        default=None,
+        help="Optional remediation plan JSON for slice coverage validation",
+    )
+    validate_context.add_argument("--json", action="store_true", help="Emit JSON output")
 
     validate_slice_spec = subparsers.add_parser(
         "validate-slice-spec",
@@ -62,6 +80,8 @@ def handoff_command_payload(args: argparse.Namespace) -> dict[str, Any]:
         )
     if args.command == "validate-handoff":
         return validate_handoff_command_payload(args)
+    if args.command == "validate-remediation-context":
+        return validate_remediation_context_command_payload(args)
     if args.command == "validate-slice-spec":
         return validate_slice_spec_command_payload(args)
     if args.command == "review-worker":
@@ -81,7 +101,14 @@ def validate_handoff_command_payload(args: argparse.Namespace) -> dict[str, Any]
     plan = None
     if args.remediation_plan:
         plan = _load_json(Path(args.remediation_plan).expanduser().resolve())
-    quality_result = validate_handoff_quality(handoff, remediation_plan=plan)
+    context = None
+    if args.remediation_context:
+        context = _load_json(Path(args.remediation_context).expanduser().resolve())
+    quality_result = validate_handoff_quality(
+        handoff,
+        remediation_plan=plan,
+        remediation_context=context,
+    )
     errors = [*schema_result.get("errors", []), *quality_result.get("errors", [])]
     return {
         "schema": "quality-runner-validate-handoff-result-v0.1",
@@ -90,6 +117,20 @@ def validate_handoff_command_payload(args: argparse.Namespace) -> dict[str, Any]
         "schema_validation": schema_result,
         "quality_validation": quality_result,
         "errors": errors,
+    }
+
+
+def validate_remediation_context_command_payload(args: argparse.Namespace) -> dict[str, Any]:
+    context = _load_json(Path(args.context_json).expanduser().resolve())
+    plan = None
+    if args.remediation_plan:
+        plan = _load_json(Path(args.remediation_plan).expanduser().resolve())
+    result = validate_remediation_context(context, remediation_plan=plan, require_ready=True)
+    return {
+        "schema": "quality-runner-validate-remediation-context-result-v0.1",
+        "status": "passed" if result.get("passed") else "rejected",
+        "implementation_allowed": False,
+        **result,
     }
 
 

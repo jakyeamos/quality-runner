@@ -71,3 +71,4 @@ class AuditPlan:
 @dataclass(frozen=True)
 class PlannedAudit(AuditPlan):
     resolution_ledger: AuditPayload
+    remediation_context: AuditPayload | None = None

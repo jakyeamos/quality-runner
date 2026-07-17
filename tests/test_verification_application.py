@@ -44,10 +44,13 @@ def test_verification_service_preserves_v1_intent_artifact_projection(tmp_path: 
 
     handoff = _json(result.artifact_paths["agent_handoff_json"])
     manifest = _json(result.artifact_paths["run_manifest_json"])
+    context = _json(result.artifact_paths["remediation_context_json"])
     handoff_artifact_paths = _object(handoff["artifact_paths"])
     manifest_artifact_paths = _object(manifest["artifact_paths"])
 
     assert "intent_json" in result.artifact_paths
+    assert context["schema"] == "quality-runner-remediation-context-v0.1"
+    assert handoff["remediation_context"]["artifact_path"].endswith("remediation-context.json")
     assert "intent_json" in manifest_artifact_paths
     assert "intent_json" not in handoff_artifact_paths
 

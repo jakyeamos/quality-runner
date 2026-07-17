@@ -73,6 +73,7 @@ def test_run_payload_writes_audit_plan_and_handoff(tmp_path: Path) -> None:
         "run_manifest_json",
         "quality_audit_json",
         "remediation_plan_json",
+        "remediation_context_json",
         "slice_specs_dir",
         "resolution_ledger_json",
         "resolution_ledger_md",
@@ -97,6 +98,7 @@ def test_run_payload_writes_audit_plan_and_handoff(tmp_path: Path) -> None:
     assert Path(artifact_paths["resolution_ledger_json"]).exists()
     assert Path(artifact_paths["resolution_ledger_md"]).exists()
     assert Path(artifact_paths["remediation_plan_json"]).exists()
+    assert Path(artifact_paths["remediation_context_json"]).exists()
     assert Path(artifact_paths["agent_handoff_md"]).exists()
     run_dir = Path(artifact_paths["repo_scan_json"]).parent
     legacy_names = {

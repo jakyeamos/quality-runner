@@ -331,6 +331,7 @@ def main(argv: list[str] | None = None) -> int:
             "controller-report",
             "validate-skill-review",
             "validate-handoff",
+            "validate-remediation-context",
             "validate-slice-spec",
             "review-worker",
             "exclusions",

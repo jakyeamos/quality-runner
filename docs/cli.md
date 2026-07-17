@@ -612,6 +612,22 @@ additionally checks that:
 Returns `quality-runner-validate-handoff-result-v0.1` with `status`:
 `passed` or `rejected`.
 
+## `quality-runner validate-remediation-context`
+
+Validates the bounded remediation context packet before an external worker
+starts source changes. Fresh QR packets are intentionally rejected until each
+selected slice has the required behavior, scope, uncertainty, characterization,
+and risk-appropriate verification evidence.
+
+```bash
+quality-runner validate-remediation-context remediation-context.json \
+  --remediation-plan remediation-plan.json \
+  --json
+```
+
+Returns `quality-runner-validate-remediation-context-result-v0.1` with
+`status: passed` or `status: rejected` and the computed readiness summary.
+
 ## `quality-runner validate-slice-spec`
 
 Validates a generated slice-spec Markdown file for required sections and basic

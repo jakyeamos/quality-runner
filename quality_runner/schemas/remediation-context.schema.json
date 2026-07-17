@@ -1,0 +1,177 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://quality-runner.dev/schemas/remediation-context.schema.json",
+  "title": "Quality Runner Remediation Context",
+  "type": "object",
+  "required": ["schema", "run_id", "repo_root", "policy", "repo_context", "records", "summary"],
+  "properties": {
+    "schema": { "const": "quality-runner-remediation-context-v0.1" },
+    "run_id": { "type": ["string", "null"] },
+    "repo_root": { "type": ["string", "null"] },
+    "policy": { "$ref": "#/$defs/policy" },
+    "repo_context": { "type": "object", "additionalProperties": true },
+    "records": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/record" }
+    },
+    "summary": { "$ref": "#/$defs/summary" }
+  },
+  "$defs": {
+    "policy": {
+      "type": "object",
+      "required": [
+        "scope_unit",
+        "raw_findings_are_grouped",
+        "per_finding_documentation_required",
+        "agent_completion_requires",
+        "high_risk_additions"
+      ],
+      "properties": {
+        "scope_unit": { "type": "string", "minLength": 1 },
+        "raw_findings_are_grouped": { "type": "boolean" },
+        "per_finding_documentation_required": { "type": "boolean" },
+        "agent_completion_requires": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "high_risk_additions": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        }
+      },
+      "additionalProperties": false
+    },
+    "record": {
+      "type": "object",
+      "required": [
+        "context_id",
+        "slice_id",
+        "status",
+        "risk_tier",
+        "domain",
+        "workstream",
+        "finding_ids",
+        "files",
+        "categories",
+        "rule_ids",
+        "boundaries",
+        "required_agent_fields",
+        "agent_evidence",
+        "machine_evidence",
+        "verification"
+      ],
+      "properties": {
+        "context_id": { "type": "string", "minLength": 1 },
+        "slice_id": { "type": "string", "minLength": 1 },
+        "status": { "enum": ["needs-understanding", "ready"] },
+        "risk_tier": { "enum": ["local", "cross-layer", "high-risk"] },
+        "domain": { "type": "string", "minLength": 1 },
+        "workstream": { "type": "string", "minLength": 1 },
+        "finding_ids": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "files": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "categories": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "rule_ids": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "boundaries": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "required_agent_fields": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "agent_evidence": { "$ref": "#/$defs/agentEvidence" },
+        "machine_evidence": { "$ref": "#/$defs/machineEvidence" },
+        "verification": { "$ref": "#/$defs/verification" }
+      },
+      "additionalProperties": false
+    },
+    "agentEvidence": {
+      "type": "object",
+      "required": [
+        "behavior_invariants",
+        "non_goals",
+        "known_unknowns",
+        "characterization_evidence",
+        "impact_map",
+        "affected_boundaries",
+        "verification_baseline"
+      ],
+      "properties": {
+        "behavior_invariants": { "$ref": "#/$defs/stringList" },
+        "non_goals": { "$ref": "#/$defs/stringList" },
+        "known_unknowns": { "$ref": "#/$defs/stringList" },
+        "characterization_evidence": { "$ref": "#/$defs/stringList" },
+        "impact_map": { "$ref": "#/$defs/stringList" },
+        "affected_boundaries": { "$ref": "#/$defs/stringList" },
+        "verification_baseline": { "$ref": "#/$defs/stringList" }
+      },
+      "additionalProperties": false
+    },
+    "machineEvidence": {
+      "type": "object",
+      "required": ["scope_paths", "finding_anchors", "intent_docs"],
+      "properties": {
+        "scope_paths": { "$ref": "#/$defs/stringList" },
+        "finding_anchors": {
+          "type": "array",
+          "items": { "type": "object", "additionalProperties": true }
+        },
+        "intent_docs": { "$ref": "#/$defs/stringList" },
+        "planned_git": { "type": "object", "additionalProperties": true },
+        "drift_check": { "type": "object", "additionalProperties": true }
+      },
+      "additionalProperties": false
+    },
+    "verification": {
+      "type": "object",
+      "required": ["mode", "commands"],
+      "properties": {
+        "mode": { "type": "string", "minLength": 1 },
+        "commands": { "$ref": "#/$defs/stringList" },
+        "requirements": { "$ref": "#/$defs/stringList" }
+      },
+      "additionalProperties": false
+    },
+    "summary": {
+      "type": "object",
+      "required": [
+        "status",
+        "blocking",
+        "record_count",
+        "finding_count",
+        "ready_count",
+        "pending_count",
+        "by_risk_tier"
+      ],
+      "properties": {
+        "status": { "enum": ["needs-understanding", "ready"] },
+        "blocking": { "type": "boolean" },
+        "record_count": { "type": "integer", "minimum": 0 },
+        "finding_count": { "type": "integer", "minimum": 0 },
+        "ready_count": { "type": "integer", "minimum": 0 },
+        "pending_count": { "type": "integer", "minimum": 0 },
+        "by_risk_tier": {
+          "type": "object",
+          "additionalProperties": { "type": "integer", "minimum": 0 }
+        }
+      },
+      "additionalProperties": false
+    },
+    "stringList": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    }
+  }
+}

@@ -15,6 +15,7 @@ from quality_runner.core.verification_contracts import GateExecutionPlan, GateVe
 from quality_runner.intent import attach_intent_artifacts, intent_for_run
 from quality_runner.manifest import build_run_manifest
 from quality_runner.planning import render_handoff_markdown
+from quality_runner.remediation_context import build_remediation_context_for_plan
 from quality_runner.slice_specs import write_slice_specs
 from quality_runner.workflow_helpers import add_scan_exclusion_artifact
 from quality_runner.workflow_skills import quality_skill_identities, write_skill_review_artifacts
@@ -103,6 +104,17 @@ def write_completed_verification_v1_artifacts(
         write_json(run_dir / "quality-audit.json", _legacy_payload(planned_audit.audit_report))
     )
     remediation_plan = _legacy_payload(planned_audit.remediation_plan)
+    artifact_paths["remediation_context_json"] = str(
+        write_json(
+            run_dir / "remediation-context.json",
+            build_remediation_context_for_plan(
+                remediation_plan=remediation_plan,
+                run_id=analysis.request.run_id,
+                repo_root=analysis.request.repo_root,
+                repo_scan=_legacy_payload(analysis.scan),
+            ),
+        )
+    )
     artifact_paths["remediation_plan_json"] = str(
         write_json(run_dir / "remediation-plan.json", remediation_plan)
     )
@@ -152,6 +164,7 @@ def _artifact_paths(run_dir: Path) -> AuditArtifactPaths:
         "gate_verification_json": str(run_dir / "gate-verification.json"),
         "quality_audit_json": str(run_dir / "quality-audit.json"),
         "remediation_plan_json": str(run_dir / "remediation-plan.json"),
+        "remediation_context_json": str(run_dir / "remediation-context.json"),
         "agent_handoff_json": str(run_dir / "agent-handoff.json"),
         "agent_handoff_md": str(run_dir / "agent-handoff.md"),
         "run_manifest_json": str(run_dir / "run-manifest.json"),

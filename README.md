@@ -126,6 +126,7 @@ Quality Runner writes artifacts under the target repo:
   run-manifest.json
   quality-audit.json
   remediation-plan.json
+  remediation-context.json
   resolution-ledger.json
   resolution-ledger.md
   slice-specs/
@@ -145,11 +146,13 @@ The normal workflow is:
 3. Review `quality-audit.json` for evidence-backed findings.
 4. Review `code-quality-scan.json` for structural warnings and line evidence.
 5. Review `remediation-plan.json` for ordered actions and verification gates.
-6. For multi-slice work, run `quality-runner plan auto` to create QR-owned
+6. Review `remediation-context.json` before source changes; it groups findings
+   by bounded slice and records the evidence fields required for agent work.
+7. For multi-slice work, run `quality-runner plan auto` to create QR-owned
    security-first domain phases and linked bounded plans.
-7. Dispatch the next ready plan, execute one coherent batch externally, and
+8. Dispatch the next ready plan, execute one coherent batch externally, and
    record its structured result with `phase record-batch`.
-8. Rerun Quality Runner, then use `phase update`, `phase verify`, and `phase
+9. Rerun Quality Runner, then use `phase update`, `phase verify`, and `phase
    close` to refresh the evidence and phase state.
 
 See [Agent Usage](docs/agent-usage.md) for the copy-paste phase and batch
@@ -186,6 +189,7 @@ quality-runner refresh /path/to/repo --run-id-prefix task-001-pass-1 \
 quality-runner release-smoke --json
 quality-runner validate-report worker-report.json --json
 quality-runner validate-handoff handoff.json --json
+quality-runner validate-remediation-context remediation-context.json --remediation-plan remediation-plan.json --json
 quality-runner validate-slice-spec slice-spec.md --json
 quality-runner review-worker /path/to/repo --baseline-run-id before --final-run-id after --worker-report worker-report.json --json
 quality-runner controller-report lint worker-report.json --strict --json

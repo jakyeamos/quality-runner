@@ -36,12 +36,23 @@ Then read:
   evidence excerpts)
 - `.quality-runner/runs/<run-id>/quality-audit.json`
 - `.quality-runner/runs/<run-id>/remediation-plan.json`
+- `.quality-runner/runs/<run-id>/remediation-context.json` before editing; this
+  is the bounded-slice context and evidence contract for the worker
 - `.quality-runner/runs/<run-id>/gate-verification.json`, when present
 - `.quality-runner/runs/<run-id>/code-quality-scan.json`, when structural
   findings drive the work
 - intent docs listed in the handoff (`PRODUCT.md`, `DESIGN.md`, ADRs, etc.)
 
-Do not edit source before reading the handoff and the relevant artifacts.
+Do not edit source before reading the handoff and the relevant artifacts. A
+fresh remediation context starts as `needs-understanding`; complete the
+required agent evidence for the selected slice and validate it before editing:
+
+```bash
+quality-runner validate-remediation-context \
+  .quality-runner/runs/<run-id>/remediation-context.json \
+  --remediation-plan .quality-runner/runs/<run-id>/remediation-plan.json \
+  --json
+```
 
 When a repository contains a large generated, cache, or external directory,
 review it before adding a persistent exclusion:
@@ -85,6 +96,8 @@ Validate artifacts before dispatch or after regeneration:
 
 ```bash
 quality-runner validate-handoff .quality-runner/runs/<run-id>/agent-handoff.json --json
+quality-runner validate-remediation-context .quality-runner/runs/<run-id>/remediation-context.json \
+  --remediation-plan .quality-runner/runs/<run-id>/remediation-plan.json --json
 quality-runner validate-slice-spec .quality-runner/runs/<run-id>/slice-specs/<slice-id>.md --json
 ```
 

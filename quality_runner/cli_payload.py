@@ -241,6 +241,7 @@ def payload_for_args(args: argparse.Namespace) -> dict[str, Any]:
     if args.command in {
         "export-slice-specs",
         "validate-handoff",
+        "validate-remediation-context",
         "validate-slice-spec",
         "review-worker",
     }:

@@ -124,6 +124,14 @@ def plan_and_write_run_v1_artifacts(
     )
     planned = plan_read_only_audit(analysis, artifact_paths=artifact_paths)
 
+    if planned.remediation_context is not None:
+        artifact_paths["remediation_context_json"] = str(
+            write_json(
+                run_dir / "remediation-context.json",
+                _legacy_payload(planned.remediation_context),
+            )
+        )
+
     artifact_paths["repo_scan_json"] = str(write_json(run_dir / "repo-scan.json", repo_scan))
     artifact_paths["code_quality_scan_json"] = str(
         write_json(run_dir / "code-quality-scan.json", code_quality_scan)
@@ -223,6 +231,7 @@ def _run_artifact_paths(run_dir: Path) -> AuditArtifactPaths:
         "run_manifest_json": str(run_dir / "run-manifest.json"),
         "quality_audit_json": str(run_dir / "quality-audit.json"),
         "remediation_plan_json": str(run_dir / "remediation-plan.json"),
+        "remediation_context_json": str(run_dir / "remediation-context.json"),
         "resolution_ledger_json": str(run_dir / "resolution-ledger.json"),
         "resolution_ledger_md": str(run_dir / "resolution-ledger.md"),
         "agent_handoff_json": str(run_dir / "agent-handoff.json"),

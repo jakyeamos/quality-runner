@@ -151,6 +151,12 @@ an external agent or human applies changes and reruns Quality Runner.
   choose one coherent batch without Quality Runner executing remediation.
   `integrate` findings produce decision slices that ask whether to wire, finish,
   descope, or accept WIP rather than defaulting to cleanup.
+- `remediation-context.json`: a source-read-only context packet with one record
+  per remediation slice. It groups finding anchors, scope paths, repository
+  context, risk tier, verification commands, and the evidence fields an agent
+  must complete before source changes. Newly generated packets are
+  `needs-understanding` and therefore block handoff validation until the
+  required evidence is recorded and the packet is revalidated.
 - `resolution-ledger.json`: current finding lifecycle state by stable
   fingerprint, preserving accepted dispositions and marking disappeared
   findings as superseded by the current scan unless an external actor records a
