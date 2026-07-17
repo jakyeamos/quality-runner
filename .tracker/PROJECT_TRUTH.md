@@ -55,6 +55,12 @@ README. `c71b130` adds a pinned Python dependency audit and validates untrusted
 baseline Git revisions before review-delta comparisons. Its reviewed merge,
 tag, release workflow, and published-artifact smoke checks have completed.
 
+The short `qr` console command shipped in `fe48b25`. It points to the same CLI
+entrypoint as `quality-runner`, so a one-time editable install from this
+checkout gives local consumers a stable command surface that follows the
+checkout's current code without repeated `--project` invocations or GitHub
+fetches.
+
 ## Current Position
 
 - Target: a typed v2 core behind CLI, MCP, and compatibility adapters.
@@ -97,6 +103,11 @@ tag, release workflow, and published-artifact smoke checks have completed.
   `"None"` until a published compatibility cutover can change that projection.
 
 ## Recent Progress
+
+- 2026-07-16: Added and committed the `qr` console alias in `fe48b25`.
+  Focused entrypoint and release-documentation coverage passed (`12 passed`),
+  touched-file Ruff and diff checks passed, and the normal commit hook's full
+  Pre-CR changed-line coverage completed successfully.
 
 - 2026-07-13: v0.5.1 released: PR #2 merged at `a101bd4`, tag workflow and
   six-job CI passed, PyPI publishes wheel/sdist, GitHub Release is public, and
