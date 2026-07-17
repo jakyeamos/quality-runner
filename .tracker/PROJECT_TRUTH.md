@@ -97,6 +97,11 @@ tag, release workflow, and published-artifact smoke checks have completed.
   scoring, QR-native similarity, module-status reporting, and workflow/run
   summary exposure while retaining the v0.5.1 application seams. The focused
   port slice passes 78 tests, Ruff, formatting, compilation, and Basedpyright.
+- `f75c431` adds repository-configured artifact redaction and retention,
+  redacts append-only gate responses at write time, and exposes a
+  dry-run-by-default `prune-artifacts` command while retaining symlink-safe
+  artifact path handling. The focused artifact/CLI slice passes 77 tests,
+  Ruff, formatting, and Basedpyright.
 
 ## Risks
 
@@ -111,6 +116,9 @@ tag, release workflow, and published-artifact smoke checks have completed.
 
 ## Recent Progress
 
+- 2026-07-17: `f75c431` ports artifact privacy/retention and gate-response
+  redaction into the current application architecture, with an explicit
+  `prune-artifacts` command that never deletes unless `--apply` is supplied.
 - 2026-07-17: `94b2d42` ports the canonical skill corpus and selection layer,
   QR-native similarity, and module-status observability into the isolated
   canonical-dev port branch; the application façade remains intact.
