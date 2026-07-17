@@ -65,6 +65,10 @@ decomposition, UI quality fixtures, and starter-pack examples.
 The architecture-preserving port is now integrated and published on canonical
 `dev`; its 650-test/static-analysis/release-smoke evidence remains attached to
 the port commits, and no package version bump or release tag was created.
+The short `qr` console command is now part of the canonical dev CLI surface. It
+maps to the same `quality_runner.cli:main` entrypoint as `quality-runner`, keeps
+the v0.5.1-compatible package version, and is covered by packaged entrypoint
+tests.
 
 ## Current Position
 
@@ -168,6 +172,9 @@ the port commits, and no package version bump or release tag was created.
 
 ## Recent Progress
 
+- 2026-07-17: Folded the short `qr` console command into the canonical `dev`
+  line from `codex/qr-command-surface-main`; focused entrypoint tests, Ruff,
+  formatting, and diff checks pass. No version bump or release tag was made.
 - 2026-07-17: `67bd698` completes the remaining quality workflow port with
   local self-update, progress, resolution-aware planning, phase candidates,
   read-only integrity, verification contracts, skill decomposition, UI quality,
