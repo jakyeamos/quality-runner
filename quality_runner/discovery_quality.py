@@ -277,6 +277,12 @@ def _ci_quality_commands(
         ("tests", "pytest", "uv run --with pytest pytest -q", "python"),
         ("dead_code", "vulture", "uv run --with vulture vulture . --min-confidence 70", "python"),
         ("build", "uv build", "uv build", "python"),
+        (
+            "package_consumer_smoke",
+            "quality-runner release-smoke",
+            "quality-runner release-smoke --json",
+            "python",
+        ),
         ("runtime_smoke", "quality-runner doctor --json", "quality-runner doctor --json", "python"),
         ("lint", "pnpm lint", "pnpm lint", "javascript"),
         ("lint", "ultracite check", "pnpm check", "javascript"),

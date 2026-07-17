@@ -15,6 +15,7 @@ from quality_runner.readiness import (
     _provenance_gate,
     validate_release_evidence,
 )
+from quality_runner.readiness_evidence import detected_versions
 from quality_runner.security.agent_gates import build_agent_review_gates
 from quality_runner.security.scan import detect_security_surfaces
 
@@ -150,6 +151,14 @@ def test_release_evidence_validation_requires_decisions_and_external_proof() -> 
     assert any(
         "migration.rollback" in error for error in validate_release_evidence(invalid_migration)
     )
+
+
+def test_detected_versions_reads_dynamic_quality_runner_source(tmp_path: Path) -> None:
+    package = tmp_path / "quality_runner"
+    package.mkdir()
+    (package / "_version.py").write_text('__version__ = "0.6.0"\n', encoding="utf-8")
+
+    assert detected_versions(tmp_path) == {"quality_runner/_version.py:__version__": "0.6.0"}
 
 
 def test_manifest_gate_rejects_version_and_artifact_digest_mismatch(tmp_path: Path) -> None:

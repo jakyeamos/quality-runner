@@ -194,6 +194,15 @@ def detected_versions(repo_root: Path) -> dict[str, str]:
         match = re.search(r"__version__\s*=\s*[\"']([^\"']+)[\"']", text)
         if match:
             versions["quality_runner/__init__.py:__version__"] = match.group(1)
+    version_file = repo_root / "quality_runner" / "_version.py"
+    if version_file.is_file():
+        try:
+            text = version_file.read_text(encoding="utf-8")
+        except OSError:
+            text = ""
+        match = re.search(r"__version__\s*=\s*[\"']([^\"']+)[\"']", text)
+        if match:
+            versions["quality_runner/_version.py:__version__"] = match.group(1)
     return versions
 
 
