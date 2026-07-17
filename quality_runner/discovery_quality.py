@@ -298,7 +298,7 @@ def _ci_quality_commands(
         commands.append(
             _quality_command(
                 capability_id=capability_id,
-                command=command,
+                command=_workflow_run_command(text, needle=needle, fallback=command),
                 source_type="github_workflow",
                 source=".github/workflows",
                 language=language,
@@ -316,6 +316,20 @@ def _ci_quality_commands(
             )
         )
     return commands
+
+
+def _workflow_run_command(text: str, *, needle: str, fallback: str) -> str:
+    for line in text.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("- run:"):
+            candidate = stripped.removeprefix("- run:").strip()
+        elif stripped.startswith("run:"):
+            candidate = stripped.removeprefix("run:").strip()
+        else:
+            continue
+        if candidate and candidate != "|" and needle in candidate:
+            return candidate
+    return fallback
 
 
 def _quality_command(
