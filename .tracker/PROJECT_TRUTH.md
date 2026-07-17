@@ -4,6 +4,14 @@ Last updated: 2026-07-16
 
 ## Current State
 
+The source-first consumer tool contract shipped in `bae783c`. The tracked
+`scripts/quality-runner` launcher defaults to refreshed latest-main QR, supports
+`QUALITY_RUNNER_MODE=local` for an explicit checkout, and rollout results and
+ledgers now record the QR version, source, and command. Generated controller
+rerun commands invoke the checkout that produced the report instead of a bare
+PATH binary, so consumer repos and branches do not silently remain on v0.3.0.
+Consumer usage is documented in `docs/consumer-tooling.md`.
+
 The native QR phase-planning contract shipped in `1f44c21`. Quality Runner now
 owns evidence-backed phase and plan documents under `.planning/quality-runner/`,
 including deterministic waves, dependency metadata, next-plan dispatch, batch
