@@ -219,6 +219,52 @@ Reports the normalized repo config and latest run metadata.
 quality-runner status /path/to/repo --json
 ```
 
+## Native QR planning
+
+QR can maintain an evidence-backed phase workflow without importing GSD runtime
+behavior. These commands write only `.planning/quality-runner/`; they never
+edit source files, run remediation, create commits, or push branches. The
+`--json` form is intended for agents and controllers.
+
+```bash
+quality-runner plan init /path/to/repo --json
+quality-runner plan status /path/to/repo --json
+quality-runner plan auto /path/to/repo --run-id qr-baseline-run --json
+quality-runner phase next /path/to/repo --phase 1 --json
+quality-runner phase record-batch /path/to/repo \
+  --phase 1 --plan 1 --result-file batch-result.json --json
+quality-runner phase update /path/to/repo \
+  --phase 1 --baseline-run-id qr-before --run-id qr-after --json
+quality-runner phase verify /path/to/repo --phase 1 --run-id qr-after --json
+quality-runner phase close /path/to/repo --phase 1 --run-id qr-after --json
+```
+
+`plan auto` initializes the namespace when needed, creates one native phase per
+domain candidate in security-first order, and links each phase to its forensic
+leaf slices. It is idempotent and advisory-only. `phase plan` can consume a QR
+run or an existing handoff; it uses domain `phase_candidates` when present and
+falls back to older remediation clusters. QR assigns deterministic waves and
+dependencies, preserves existing plan text, and leaves implementation and git
+operations to the external agent or human.
+
+Native files live under:
+
+```text
+.planning/quality-runner/
+  ROADMAP.md
+  STATE.md
+  config.json
+  phases/<nn>-<slug>/
+    <nn>-CONTEXT.md
+    <nn>-<nn>-PLAN.md
+    <nn>-<nn>-SUMMARY.md
+    <nn>-VERIFICATION.md
+```
+
+Existing `.planning/ROADMAP.md`, `.planning/STATE.md`, and GSD phase
+directories are untouched. GSD and other planning systems remain optional
+consumers of the canonical QR artifacts.
+
 ## `quality-runner run`
 
 Runs the full audit-and-plan workflow.

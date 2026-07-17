@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://quality-runner.dev/schemas/planning-state.schema.json",
+  "title": "Quality Runner Native Planning State",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "status", "current_phase", "last_action", "updated_at", "unplanned_findings"],
+  "properties": {
+    "schema": { "const": "quality-runner-planning-state-v0.1" },
+    "status": { "enum": ["ready", "in_progress", "blocked", "complete"] },
+    "current_phase": { "type": ["integer", "null"], "minimum": 1 },
+    "last_action": { "type": "string", "minLength": 1 },
+    "updated_at": { "type": "string" },
+    "unplanned_findings": { "type": "array", "items": { "type": "object" } }
+  }
+}

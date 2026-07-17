@@ -763,6 +763,12 @@ def test_packaged_schema_files_are_parseable() -> None:
         "review-adapter-response.schema.json",
         "review-manifest.schema.json",
         "review-delta.schema.json",
+        "plan-config.schema.json",
+        "roadmap.schema.json",
+        "planning-state.schema.json",
+        "phase-plan.schema.json",
+        "phase-batch-result.schema.json",
+        "phase-verification.schema.json",
         "outcome.schema.json",
     }
 

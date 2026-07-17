@@ -19,6 +19,7 @@ from quality_runner.cli_human_summary import human_summary
 from quality_runner.cli_journeys import add_journey_commands
 from quality_runner.cli_outcome import OUTCOME_SCHEMA, render_outcome
 from quality_runner.cli_payload import payload_for_args
+from quality_runner.cli_planning import add_planning_commands
 from quality_runner.cli_remediation import add_remediation_commands
 from quality_runner.cli_review import add_review_command
 from quality_runner.cli_rollout import add_rollout_command
@@ -49,8 +50,8 @@ Compatibility commands remain available:
   inspect, run, verify-gates, status, summarize-run, export-handoff
 
 Advanced operations:
-  refresh, rollout, gate, controller-report, skill, proposal, validation,
-  release-smoke, and worker handoff tools
+  refresh, rollout, gate, controller-report, skill, proposal, remediation,
+  plan, phase, release-smoke, and worker handoff tools
 
 Run 'quality-runner <command> --help' for options. Audit, review, verify, and
 runs emit a compact outcome card by default and v2 JSON with --json. Use
@@ -231,6 +232,8 @@ def build_parser() -> argparse.ArgumentParser:
     add_handoff_commands(subparsers)
 
     add_remediation_commands(subparsers)
+
+    add_planning_commands(subparsers)
 
     doctor_parser = subparsers.add_parser("doctor", help="Check Quality Runner readiness")
     doctor_parser.add_argument("--json", action="store_true", help="Emit JSON output")

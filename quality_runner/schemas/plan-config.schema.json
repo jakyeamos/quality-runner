@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://quality-runner.dev/schemas/plan-config.schema.json",
+  "title": "Quality Runner Native Planning Configuration",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "format", "commit_docs"],
+  "properties": {
+    "schema": { "const": "quality-runner-plan-config-v0.1" },
+    "format": { "const": "quality-runner-planning-v0.1" },
+    "commit_docs": { "type": "boolean" }
+  }
+}

@@ -134,6 +134,10 @@ Quality Runner writes artifacts under the target repo:
   agent-handoff.md
 ```
 
+`remediation-plan.json` includes deterministic domain `phase_candidates` when
+available. Each candidate retains links to its forensic leaf `slice_ids`, so
+the domain view can organize work without losing the original evidence.
+
 The normal workflow is:
 
 1. Read `agent-handoff.md`.
@@ -141,10 +145,12 @@ The normal workflow is:
 3. Review `quality-audit.json` for evidence-backed findings.
 4. Review `code-quality-scan.json` for structural warnings and line evidence.
 5. Review `remediation-plan.json` for ordered actions and verification gates.
-6. For multi-slice work, convert the QR handoff into GSD-style phases, plans,
-   ledgers, and batch summaries before editing.
-7. Execute one coherent batch at a time.
-8. Rerun Quality Runner to confirm findings clear and update the resolution ledger.
+6. For multi-slice work, run `quality-runner plan auto` to create QR-owned
+   security-first domain phases and linked bounded plans.
+7. Dispatch the next ready plan, execute one coherent batch externally, and
+   record its structured result with `phase record-batch`.
+8. Rerun Quality Runner, then use `phase update`, `phase verify`, and `phase
+   close` to refresh the evidence and phase state.
 
 See [Agent Usage](docs/agent-usage.md) for the copy-paste phase and batch
 templates agents should follow.
@@ -184,6 +190,15 @@ quality-runner review-worker /path/to/repo --baseline-run-id before --final-run-
 quality-runner controller-report lint worker-report.json --strict --json
 quality-runner export-handoff /path/to/repo
 quality-runner export-slice-specs /path/to/repo --run-id run-001 --json
+quality-runner remediation-delta /path/to/repo --run-id current --baseline-run-id baseline --json
+quality-runner plan init /path/to/repo --json
+quality-runner plan status /path/to/repo --json
+quality-runner plan auto /path/to/repo --run-id baseline-001-run --json
+quality-runner phase next /path/to/repo --phase 1 --json
+quality-runner phase record-batch /path/to/repo --phase 1 --plan 1 --result-file batch.json --json
+quality-runner phase update /path/to/repo --phase 1 --baseline-run-id before --run-id after --json
+quality-runner phase verify /path/to/repo --phase 1 --run-id after --json
+quality-runner phase close /path/to/repo --phase 1 --run-id after --json
 quality-runner-mcp
 repo-quality-certifier plan --repo-root /path/to/repo --json
 repo-quality-certifier-mcp
@@ -207,10 +222,10 @@ constraints from executed command failures. Blocked or failed handoffs include `
 you want the scan and the human remediation plan from one command; use
 `export-handoff` later to regenerate or copy a handoff from an existing run.
 `export-slice-specs` regenerates per-slice cold-executor plans under
-`slice-specs/`. For large remediations, agents should use QR output as evidence
-for a GSD-style phase plan rather than editing directly from the handoff. For a
-single queued slice, start from the matching `slice-specs/<slice-id>.md` when
-present.
+`slice-specs/`. For large remediations, use the QR-owned phase workflow to
+organize domain candidates and dispatch bounded leaf-slice work. GSD remains an
+optional external planning consumer. For a single queued slice, start from the
+matching `slice-specs/<slice-id>.md` when present.
 
 For an agent-driven implement-review loop, pass the task through the existing
 `--intent` or `--intent-file` input and add `--review-cycle-id` plus a

@@ -1,8 +1,8 @@
 # Agent Usage
 
-Quality Runner gives agents evidence and a handoff. The agent still owns the
-work plan. For large or repo-wide remediation, agents should convert the QR
-handoff into GSD-style phases and execute one coherent batch at a time.
+Quality Runner gives agents evidence and a handoff. QR can also maintain an
+advisory native phase plan; the external agent or human still owns source
+changes, commits, pushes, and execution decisions.
 
 ## Invocation
 
@@ -45,8 +45,7 @@ Do not edit source before reading the handoff and the relevant artifacts.
 
 For a single slice, prefer the matching `slice-specs/*.md` file as the
 execution contract. Use `remediation-plan.json` for ordering across slices and
-`agent-handoff.md` for controller routing. Convert to GSD-style phase plans only
-when the remediation spans multiple slices or needs repo-local planning history.
+`agent-handoff.md` for controller routing.
 
 ## QR Slice Spec Contract
 
@@ -83,6 +82,36 @@ quality-runner review-worker /path/to/repo \
   --worker-report worker-report.json \
   --json
 ```
+
+## Native QR Phase Workflow
+
+Initialize the QR-owned namespace after the first useful run:
+
+```bash
+quality-runner plan auto /path/to/repo --run-id qr-baseline-run --json
+quality-runner phase next /path/to/repo --phase 1 --json
+```
+
+`plan auto` creates one native phase per domain candidate in security-first
+order and links each phase to its forensic leaf slices. It is idempotent. Older
+remediation plans without domain candidates continue to work through leaf
+slices. Each plan records source references, scope, tasks, stop conditions,
+verification gates, dependencies, and a deterministic wave; QR dispatches the
+next ready plan but does not execute it.
+
+After an external batch, record and verify it:
+
+```bash
+quality-runner phase record-batch /path/to/repo \
+  --phase 1 --plan 1 --result-file batch-result.json --json
+quality-runner phase update /path/to/repo \
+  --phase 1 --baseline-run-id qr-before --run-id qr-after --json
+quality-runner phase verify /path/to/repo --phase 1 --run-id qr-after --json
+```
+
+Native planning files live only under `.planning/quality-runner/`. QR does not
+modify root GSD files, execute source changes, commit, or push. GSD remains a
+valid optional external planning consumer when a repository needs it.
 
 ## Required Agent Protocol
 

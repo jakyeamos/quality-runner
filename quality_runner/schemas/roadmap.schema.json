@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://quality-runner.dev/schemas/roadmap.schema.json",
+  "title": "Quality Runner Native Roadmap",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "status", "phases"],
+  "properties": {
+    "schema": { "const": "quality-runner-roadmap-v0.1" },
+    "status": { "enum": ["active", "complete", "blocked"] },
+    "phases": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": ["number", "slug", "title", "goal", "status", "plan_ids", "updated_at"],
+        "properties": {
+          "number": { "type": "integer", "minimum": 1 },
+          "slug": { "type": "string", "minLength": 1 },
+          "title": { "type": "string", "minLength": 1 },
+          "goal": { "type": "string", "minLength": 1 },
+          "status": { "enum": ["planned", "in_progress", "blocked", "complete"] },
+          "plan_ids": { "type": "array", "items": { "type": "string" } },
+          "updated_at": { "type": "string" },
+          "source": { "type": "object" },
+          "completed_run_id": { "type": "string" }
+        }
+      }
+    }
+  }
+}

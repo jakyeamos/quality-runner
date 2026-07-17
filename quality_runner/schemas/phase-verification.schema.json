@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://quality-runner.dev/schemas/phase-verification.schema.json",
+  "title": "Quality Runner Native Phase Verification",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "status", "phase", "run_id", "plan_ids", "verified_plan_ids", "unresolved_plan_ids", "failed_checks", "implementation_allowed", "updated_at"],
+  "properties": {
+    "schema": { "const": "quality-runner-phase-verification-v0.1" },
+    "status": { "enum": ["passed", "failed"] },
+    "phase": { "type": "integer", "minimum": 1 },
+    "run_id": { "type": "string", "minLength": 1 },
+    "plan_ids": { "type": "array", "items": { "type": "string" } },
+    "verified_plan_ids": { "type": "array", "items": { "type": "string" } },
+    "unresolved_plan_ids": { "type": "array", "items": { "type": "string" } },
+    "failed_checks": { "type": "array", "items": { "type": "string" } },
+    "implementation_allowed": { "const": false },
+    "updated_at": { "type": "string" }
+  }
+}
