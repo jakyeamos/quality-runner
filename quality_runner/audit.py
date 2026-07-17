@@ -6,7 +6,9 @@ from quality_runner.actionability import enrich_audit_findings
 from quality_runner.code_quality_findings import CATEGORY_ORDER
 from quality_runner.finding_quality import compute_finding_quality, compute_leverage
 from quality_runner.findings import AUDIT_REPORT_SCHEMA
+from quality_runner.resolution import apply_audit_resolutions
 from quality_runner.security.audit import security_audit_findings
+from quality_runner.verification_contract import verification_contract_fields
 
 
 def build_audit_report(
@@ -16,6 +18,7 @@ def build_audit_report(
     capability_map: dict[str, Any],
     code_quality_scan: dict[str, Any] | None = None,
     security_scan: dict[str, Any] | None = None,
+    resolution_ledger: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     config = standards_packet.get("config")
     security_config = config.get("security") if isinstance(config, dict) else None
@@ -27,7 +30,7 @@ def build_audit_report(
         *_warning_findings(capability_map),
     ]
 
-    return {
+    report = {
         "schema": AUDIT_REPORT_SCHEMA,
         "run_id": _string_or_none(scan.get("run_id")),
         "repo_root": _string_or_none(scan.get("repo_root")),
@@ -37,6 +40,12 @@ def build_audit_report(
         "findings": enrich_audit_findings(findings),
         "warnings": _warnings(capability_map),
     }
+    return apply_audit_resolutions(
+        report,
+        code_quality_scan=code_quality_scan,
+        security_scan=security_scan,
+        resolution_ledger=resolution_ledger,
+    )
 
 
 def render_audit_markdown(report: dict[str, Any]) -> str:
@@ -47,6 +56,7 @@ def render_audit_markdown(report: dict[str, Any]) -> str:
         f"- Status: {report.get('status')}",
         f"- Implementation allowed: {str(report.get('implementation_allowed')).lower()}",
         "",
+        *_resolution_markdown(report.get("resolution")),
         "## Findings",
         "",
     ]
@@ -62,7 +72,14 @@ def render_audit_markdown(report: dict[str, Any]) -> str:
                     "",
                     f"- Severity: {finding.get('severity')}",
                     f"- Category: {finding.get('category')}",
+                    *(
+                        [f"- Rule category: {finding.get('rule_category')}"]
+                        if isinstance(finding.get("rule_category"), str)
+                        and finding.get("rule_category")
+                        else []
+                    ),
                     f"- Summary: {finding.get('summary')}",
+                    *_finding_resolution_markdown(finding.get("resolution")),
                     f"- Recommended fix: {finding.get('recommended_fix')}",
                     "- Evidence:",
                     *_markdown_items(finding.get("evidence")),
@@ -75,6 +92,35 @@ def render_audit_markdown(report: dict[str, Any]) -> str:
         lines.extend(["No findings.", ""])
 
     return "\n".join(lines).rstrip() + "\n"
+
+
+def _resolution_markdown(value: object) -> list[str]:
+    if not isinstance(value, dict):
+        return []
+    return [
+        "## Resolution",
+        "",
+        f"- Status: {value.get('status')}",
+        f"- Findings: {value.get('total_findings')}",
+        f"- Resolved: {value.get('resolved_findings')}",
+        f"- Unresolved: {value.get('unresolved_findings')}",
+        "",
+    ]
+
+
+def _finding_resolution_markdown(value: object) -> list[str]:
+    if not isinstance(value, dict):
+        return []
+    lines = [
+        f"- Resolution: {value.get('status')} ({'resolved' if value.get('resolved') else 'unresolved'})"
+    ]
+    reason = value.get("reason")
+    owner = value.get("owner")
+    if isinstance(reason, str) and reason:
+        lines.append(f"- Resolution reason: {reason}")
+    if isinstance(owner, str) and owner:
+        lines.append(f"- Resolution owner: {owner}")
+    return lines
 
 
 def _missing_capability_findings(
@@ -213,11 +259,12 @@ def _code_quality_findings(code_quality_scan: dict[str, Any] | None) -> list[dic
         count = len(group)
         score = _structural_score(group)
         integrate = category == "integrate"
+        audit_category = category if category.startswith("skill:") else f"structural:{category}"
         quality = compute_finding_quality(
             {
                 "id": f"structural-{category}-{rule_id}",
                 "severity": _structural_severity(group),
-                "category": f"structural:{category}",
+                "category": audit_category,
                 "score": score,
             },
             raw_findings=group,
@@ -226,7 +273,7 @@ def _code_quality_findings(code_quality_scan: dict[str, Any] | None) -> list[dic
             {
                 "id": f"structural-{category}-{rule_id}",
                 "severity": _structural_severity(group),
-                "category": f"structural:{category}",
+                "category": audit_category,
                 "summary": _structural_summary(
                     count=count,
                     rule_id=rule_id,
@@ -252,6 +299,11 @@ def _code_quality_findings(code_quality_scan: dict[str, Any] | None) -> list[dic
                 "score": score,
                 **quality,
                 "leverage": compute_leverage(quality),
+                **_structural_rule_metadata(representative),
+                **verification_contract_fields(
+                    representative,
+                    explicit_mode=representative.get("verification_mode"),
+                ),
             }
         )
     return audit_findings
@@ -264,6 +316,10 @@ def _structural_summary(
     representative: dict[str, Any],
     integrate: bool,
 ) -> str:
+    rule_message = _string_or_none(representative.get("rule_message"))
+    if rule_message:
+        prefix = f"{count} occurrences: " if count != 1 else ""
+        return f"{prefix}{rule_message}"
     if integrate:
         return (
             f"{count} {rule_id} partial or unwired work finding"
@@ -273,6 +329,15 @@ def _structural_summary(
         f"{count} {rule_id} structural finding{'s' if count != 1 else ''} "
         f"in {_string_or_default(representative.get('remediation_bucket'), 'structural quality')}."
     )
+
+
+def _structural_rule_metadata(representative: dict[str, Any]) -> dict[str, str]:
+    metadata: dict[str, str] = {}
+    for field in ("rule_message", "rule_category"):
+        value = representative.get(field)
+        if isinstance(value, str) and value:
+            metadata[field] = value
+    return metadata
 
 
 def _structural_recommended_fix(

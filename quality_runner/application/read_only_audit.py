@@ -1,7 +1,13 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from typing import Any, Literal, cast
 
+from quality_runner.agent_review_policy import (
+    AGENT_REVIEW_MODES,
+    AgentReviewMode,
+    resolve_agent_review_mode,
+)
 from quality_runner.audit import build_audit_report
 from quality_runner.capabilities import detect_capabilities
 from quality_runner.ci_status import load_ci_status
@@ -27,54 +33,118 @@ from quality_runner.intent import intent_for_run
 from quality_runner.manifest import git_state_for_repo
 from quality_runner.package_preflight import build_package_manager_preflight
 from quality_runner.planning import build_agent_handoff, build_remediation_plan
+from quality_runner.progress import ProgressCallback, emit_progress
+from quality_runner.readiness import apply_readiness_evidence_override
+from quality_runner.remediation_context import (
+    attach_context_refs,
+    build_remediation_context_for_plan,
+    remediation_context_summary,
+    validate_remediation_context,
+)
+from quality_runner.resolution import resolved_planning_inputs
 from quality_runner.scan_scope import create_text_scan_scope
 from quality_runner.security.ledger import merge_security_ledger_entries
 from quality_runner.security.scan import create_security_scan, merge_security_into_capability_map
 from quality_runner.standards import DEFAULT_PROFILE, compile_standards
-from quality_runner.workflow_helpers import config_with_include_overrides
-from quality_runner.workflow_skills import append_warnings, create_code_quality_scan_with_skills
+from quality_runner.workflow_helpers import (
+    apply_run_only_scan_exclusion,
+    config_with_include_overrides,
+    config_with_scan_exclusion_overrides,
+)
+from quality_runner.workflow_skills import (
+    append_warnings,
+    create_code_quality_scan_with_skills,
+    skill_review_summary,
+)
 
 
-def analyze_read_only_audit(request: AuditRequest) -> AuditAnalysis:
+def analyze_read_only_audit(
+    request: AuditRequest,
+    *,
+    progress: ProgressCallback | None = None,
+) -> AuditAnalysis:
     repo_root = request.repo_root.expanduser().resolve()
     ci_checks, ci_warnings = load_ci_status(repo_root, request.ci_status_json)
     base_config = load_repo_config(repo_root)
+    config = config_with_scan_exclusion_overrides(
+        base_config,
+        request.scan_exclusion_overlay,
+    )
+    emit_progress(progress, "discovery", "repository facts and scan scope")
     scan = inspect_repo(
         repo_root,
         run_id=request.run_id,
         ci_checks=ci_checks,
         extra_warnings=[*_branch_warnings(request), *ci_warnings],
-        config=base_config,
+        config=config,
     )
-    profile = request.profile or _default_profile(base_config)
+    profile = request.profile or _default_profile(config)
+    emit_progress(progress, "standards", f"profile={profile}")
     standards_packet = compile_standards(
         repo_root=repo_root,
         scan=scan,
         profile=profile,
-        config=base_config,
+        config=config,
     )
     capability_map = detect_capabilities(scan=scan, standards_packet=standards_packet)
-    config = config_with_include_overrides(base_config, list(request.include_ignored_paths))
-    text_scan_scope = create_text_scan_scope(repo_root, scan=scan, config=config)
+    capability_map = apply_readiness_evidence_override(
+        capability_map=capability_map,
+        standards_packet=standards_packet,
+        repo_root=repo_root,
+        evidence_file=request.readiness_evidence_file,
+    )
+    config = config_with_include_overrides(config, list(request.include_ignored_paths))
+    apply_run_only_scan_exclusion(
+        repo_root,
+        request.scan_exclusion_overlay,
+        config=config,
+        scan=scan,
+    )
+    resolved_agent_review_mode = resolve_agent_review_mode(
+        requested=request.agent_review_mode,
+        profile=profile,
+        config=config,
+    )
+    if request.scan_exclusion_overlay is None:
+        text_scan_scope = create_text_scan_scope(repo_root, scan=scan, config=config)
+        security_scan_scope = text_scan_scope
+        code_quality_scan_scope = text_scan_scope
+    else:
+        text_scan_scope = create_text_scan_scope(
+            repo_root,
+            scan=scan,
+            config=config,
+            module="code_quality",
+        )
+        code_quality_scan_scope = text_scan_scope
+        security_scan_scope = create_text_scan_scope(
+            repo_root,
+            scan=scan,
+            config=config,
+            module="security",
+        )
+    emit_progress(progress, "security", "security surface and dependency analysis")
     security_scan = create_security_scan(
         repo_root,
         scan=scan,
         config=config,
         standards_packet=standards_packet,
-        text_scan_scope=text_scan_scope,
+        text_scan_scope=security_scan_scope,
     )
     capability_map = merge_security_into_capability_map(capability_map, security_scan)
+    emit_progress(progress, "code-quality", "structural scan and selected skill packs")
     code_quality_scan, skill_warnings = create_code_quality_scan_with_skills(
         repo_root,
         scan=scan,
         config=config,
         skill_review_report=_legacy_optional_payload(request.skill_review_report),
-        text_scan_scope=text_scan_scope,
+        require_skill_review_coverage=resolved_agent_review_mode in {"auto", "required"},
+        text_scan_scope=code_quality_scan_scope,
     )
     scan = append_warnings(scan, skill_warnings)
     package_manager_preflight = build_package_manager_preflight(repo_root, scan)
     return AuditAnalysis(
-        request=request,
+        request=replace(request, agent_review_mode=resolved_agent_review_mode),
         config=_audit_payload(config),
         scan=_audit_payload(scan),
         standards_packet=_audit_payload(standards_packet),
@@ -113,7 +183,23 @@ def plan_read_only_audit(
         repo_root=repo_root,
         run_id=analysis.request.run_id,
     )
-    plan = build_audit_plan(analysis, artifact_paths=artifact_paths)
+    plan = build_audit_plan(
+        analysis,
+        artifact_paths=artifact_paths,
+        resolution_ledger=_audit_payload(resolution_ledger),
+    )
+    remediation_plan = _legacy_payload(plan.remediation_plan)
+    remediation_context = build_remediation_context_for_plan(
+        remediation_plan=remediation_plan,
+        run_id=analysis.request.run_id,
+        repo_root=repo_root,
+        repo_scan=_legacy_payload(analysis.scan),
+        git_state=git_state_for_repo(repo_root),
+    )
+    require_valid(
+        "remediation context",
+        validate_remediation_context(remediation_context, remediation_plan=remediation_plan),
+    )
     return PlannedAudit(
         analysis=plan.analysis,
         audit_report=plan.audit_report,
@@ -121,6 +207,7 @@ def plan_read_only_audit(
         handoff=plan.handoff,
         status=plan.status,
         resolution_ledger=_audit_payload(resolution_ledger),
+        remediation_context=_audit_payload(remediation_context),
     )
 
 
@@ -129,6 +216,7 @@ def build_audit_plan(
     *,
     artifact_paths: AuditArtifactPaths,
     gate_verification: AuditPayload | None = None,
+    resolution_ledger: AuditPayload | None = None,
 ) -> AuditPlan:
     repo_root = analysis.request.repo_root.expanduser().resolve()
     code_quality_scan = _legacy_payload(analysis.code_quality_scan)
@@ -139,18 +227,56 @@ def build_audit_plan(
         capability_map=_legacy_payload(analysis.capability_map),
         code_quality_scan=code_quality_scan,
         security_scan=security_scan,
+        resolution_ledger=_legacy_optional_payload(resolution_ledger),
     )
     require_valid("audit report", validate_audit_report(audit_report))
+    planning_audit_report, active_code_quality_scan = resolved_planning_inputs(
+        audit_report,
+        code_quality_scan,
+        _legacy_optional_payload(resolution_ledger),
+    )
     remediation_plan = build_remediation_plan(
-        audit_report=audit_report,
+        audit_report=planning_audit_report,
         capability_map=_legacy_payload(analysis.capability_map),
-        code_quality_scan=code_quality_scan,
+        code_quality_scan=active_code_quality_scan,
         repo_root=repo_root,
         git_state=git_state_for_repo(repo_root),
     )
     require_valid("remediation plan", validate_remediation_plan(remediation_plan))
+    remediation_context = build_remediation_context_for_plan(
+        remediation_plan=remediation_plan,
+        run_id=analysis.request.run_id,
+        repo_root=repo_root,
+        repo_scan=_legacy_payload(analysis.scan),
+        git_state=git_state_for_repo(repo_root),
+    )
+    require_valid(
+        "remediation context",
+        validate_remediation_context(remediation_context, remediation_plan=remediation_plan),
+    )
+    remediation_context_ref = remediation_context_summary(
+        remediation_context,
+        artifact_path=artifact_paths.get("remediation_context_json"),
+    )
+    if remediation_context_ref is not None:
+        remediation_plan = dict(remediation_plan)
+        for collection_name in ("slices", "security_review_slices"):
+            collection = remediation_plan.get(collection_name)
+            if isinstance(collection, list):
+                remediation_plan[collection_name] = attach_context_refs(
+                    [item for item in collection if isinstance(item, dict)],
+                    remediation_context,
+                )
+        remediation_plan["remediation_context"] = remediation_context_ref
+        require_valid("remediation plan", validate_remediation_plan(remediation_plan))
+    skill_review = skill_review_summary(
+        code_quality_scan=code_quality_scan,
+        artifact_paths=artifact_paths,
+        skill_review_report=_legacy_optional_payload(analysis.request.skill_review_report),
+        agent_review_mode=_agent_review_mode(analysis),
+    )
     handoff = build_agent_handoff(
-        audit_report=audit_report,
+        audit_report=planning_audit_report,
         remediation_plan=remediation_plan,
         artifact_paths=artifact_paths,
         capability_map=_legacy_payload(analysis.capability_map),
@@ -161,7 +287,10 @@ def build_audit_plan(
             analysis.request.run_id,
         ),
         repo_scan=_legacy_payload(analysis.scan),
+        skill_review=skill_review,
     )
+    if remediation_context_ref is not None:
+        handoff = {**handoff, "remediation_context": remediation_context_ref}
     require_valid("agent handoff", validate_agent_handoff(handoff))
     status: Literal["clean", "planned"] = (
         "clean" if not remediation_plan.get("slices") else "planned"
@@ -203,3 +332,8 @@ def _legacy_optional_payload(payload: AuditPayload | None) -> dict[str, Any] | N
     if payload is None:
         return None
     return _legacy_payload(payload)
+
+
+def _agent_review_mode(analysis: AuditAnalysis) -> AgentReviewMode:
+    mode = analysis.request.agent_review_mode
+    return cast(AgentReviewMode, mode) if mode in AGENT_REVIEW_MODES else "auto"

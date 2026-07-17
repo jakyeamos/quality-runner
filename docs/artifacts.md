@@ -17,8 +17,9 @@ Artifacts are written under:
   instruction files, discovered intent docs (`PRODUCT.md`, `DESIGN.md`,
   `CONTEXT.md`, `docs/adr/*.md`), language-aware quality commands, mature repo
   surfaces, nested workspaces, active scan exclusions, ecosystems,
-  generated-code markers, local CI checks, Pre-CR config, project truth file
-  presence, and branch selection warnings when the checked-out branch is neither
+  generated-code markers, local CI checks, aggregate command coverage, git/CI
+  provenance, Pre-CR config, project truth file presence, and branch selection
+  warnings when the checked-out branch is neither
   `main` nor the local most-advanced branch.
 - `code-quality-scan.json`: deterministic structural/code-quality findings,
   line accountability, duplicate clusters, skipped generated/vendor paths, and
@@ -44,7 +45,12 @@ Artifacts are written under:
   command execution evidence and pass/fail evidence. CI-only gates that have no
   local executor are marked with `local_execution: "ci-only"`. Capabilities also
   include `capability_kind` so local commands, CI-only gates, and file/evidence
-  capabilities can be handled independently.
+  capabilities can be handled independently. Release-profile artifacts also
+  include a `readiness` summary with required and unresolved release gates and
+  the repo-local evidence path.
+- `gate-verification.json`: executed or intentionally skipped gate results. It
+  includes verification provenance and, for release-profile runs, the evaluated
+  readiness gates.
 - `run-manifest.json`: run metadata, Quality Runner version, artifact paths, and
   git HEAD/branch/dirty state when the target is a git repo. When author intent
   is supplied, the manifest also embeds the resolved `intent` packet.
@@ -151,6 +157,12 @@ an external agent or human applies changes and reruns Quality Runner.
   choose one coherent batch without Quality Runner executing remediation.
   `integrate` findings produce decision slices that ask whether to wire, finish,
   descope, or accept WIP rather than defaulting to cleanup.
+- `remediation-context.json`: a source-read-only context packet with one record
+  per remediation slice. It groups finding anchors, scope paths, repository
+  context, risk tier, verification commands, and the evidence fields an agent
+  must complete before source changes. Newly generated packets are
+  `needs-understanding` and therefore block handoff validation until the
+  required evidence is recorded and the packet is revalidated.
 - `resolution-ledger.json`: current finding lifecycle state by stable
   fingerprint, preserving accepted dispositions and marking disappeared
   findings as superseded by the current scan unless an external actor records a
@@ -398,6 +410,12 @@ The file must live inside the target repo and is read as evidence only. Quality
 Runner does not call GitHub, fetch live check runs, or execute commands from CI
 configuration.
 
+Release-profile CI checks must carry current `head_sha`, branch/ref,
+`workflow_run_id`, `captured_at`, and a successful conclusion. Release evidence
+uses schema `quality-runner-release-evidence-v0.1` and records the target commit,
+release version, artifact digest, owner acceptance, and conditional migration or
+publication proof.
+
 ## Scan Exclusions
 
 Discovery skips common non-product trees by default: `docs`, `fixtures`,
@@ -414,9 +432,20 @@ Repos can add more patterns in `.quality-runner.toml`:
 ```toml
 [quality_runner]
 scan_exclusions = ["samples", "generated-reports/**"]
+
+[quality_runner.scan_exclusions_by_module]
+code_quality = ["generated-output/**"]
 ```
 
-The active list is written to `repo-scan.json` as `scan_exclusions`.
+The active all-module list is written to `repo-scan.json` as
+`scan_exclusions`; module-specific effective lists are written as
+`scan_exclusions_by_module`. A run-only overlay adds
+`scan_exclusion_preflight` to `repo-scan.json` and `run-manifest.json`, and
+writes `scan-exclusion-overlay.json` without changing `.quality-runner.toml`.
+
+The `exclusions suggest`, `validate`, and `apply` stages write their packet,
+report, result, and manifest under the selected run directory. The apply result
+also records the configuration hashes and unified diff.
 ## Fresh Review artifacts
 
 `quality-runner review` writes these files under

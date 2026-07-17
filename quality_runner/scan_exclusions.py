@@ -72,6 +72,11 @@ DEFAULT_SCAN_EXCLUSIONS = [
     *sorted(ARTIFACT_DIRECTORY_NAMES),
     *[f"{name}/**" for name in sorted(TOP_LEVEL_ARTIFACT_DIRECTORY_NAMES)],
 ]
+SCAN_EXCLUSION_MODULES = ("structural", "code_quality", "security")
+SCAN_EXCLUSION_SCOPE_ALL = "all-modules"
+SCAN_EXCLUSION_SCOPE_MODULE = "module-scoped"
+
+type ScanExclusionOverlay = list[str] | dict[str, list[str]]
 MAX_SCAN_PROGRESS_PATHS = 20
 _SCAN_PROGRESS: dict[str, Any] = {
     "last_directory": None,
@@ -84,11 +89,91 @@ _SCAN_PROGRESS: dict[str, Any] = {
 }
 
 
-def resolve_scan_exclusions(config: dict[str, Any] | None) -> list[str]:
+def resolve_scan_exclusions(
+    config: dict[str, Any] | None,
+    *,
+    module: str | None = None,
+) -> list[str]:
     configured = config.get("scan_exclusions") if isinstance(config, dict) else None
-    if not isinstance(configured, list):
-        return list(DEFAULT_SCAN_EXCLUSIONS)
-    return _unique([*DEFAULT_SCAN_EXCLUSIONS, *configured])
+    exclusions = (
+        [*DEFAULT_SCAN_EXCLUSIONS, *configured]
+        if isinstance(configured, list)
+        else list(DEFAULT_SCAN_EXCLUSIONS)
+    )
+    if module is None:
+        return _unique(exclusions)
+    normalized_module = normalize_scan_exclusion_module(module)
+    module_config = config.get("scan_exclusions_by_module") if isinstance(config, dict) else None
+    module_exclusions = (
+        module_config.get(normalized_module) if isinstance(module_config, dict) else None
+    )
+    if isinstance(module_exclusions, list):
+        exclusions.extend(module_exclusions)
+    return _unique(exclusions)
+
+
+def resolve_scan_exclusions_by_module(config: dict[str, Any] | None) -> dict[str, list[str]]:
+    return {
+        SCAN_EXCLUSION_SCOPE_ALL: resolve_scan_exclusions(config),
+        **{
+            module: resolve_scan_exclusions(config, module=module)
+            for module in SCAN_EXCLUSION_MODULES
+        },
+    }
+
+
+def effective_scan_exclusions(
+    root: Path,
+    config: dict[str, Any] | None,
+    *,
+    module: str | None = None,
+) -> list[str]:
+    return _unique(
+        [
+            *resolve_scan_exclusions(config, module=module),
+            *gitignore_scan_exclusions(root),
+        ]
+    )
+
+
+def effective_scan_exclusions_by_module(
+    root: Path,
+    config: dict[str, Any] | None,
+) -> dict[str, list[str]]:
+    return {
+        scope: effective_scan_exclusions(
+            root,
+            config,
+            module=None if scope == SCAN_EXCLUSION_SCOPE_ALL else scope,
+        )
+        for scope in (SCAN_EXCLUSION_SCOPE_ALL, *SCAN_EXCLUSION_MODULES)
+    }
+
+
+def normalize_scan_exclusion_module(value: str) -> str:
+    normalized = value.strip().lower().replace("-", "_")
+    if normalized not in SCAN_EXCLUSION_MODULES:
+        allowed = ", ".join(SCAN_EXCLUSION_MODULES)
+        raise ValueError(f"unknown scan-exclusion module {value!r}; expected one of: {allowed}")
+    return normalized
+
+
+def scan_exclusion_overlay_parts(
+    overlay: ScanExclusionOverlay | None,
+) -> tuple[list[str], dict[str, list[str]]]:
+    if overlay is None:
+        return [], {}
+    if isinstance(overlay, list):
+        return list(overlay), {}
+    global_paths: list[str] = []
+    module_paths: dict[str, list[str]] = {}
+    for raw_scope, paths in overlay.items():
+        if raw_scope in {SCAN_EXCLUSION_SCOPE_ALL, "all_modules"}:
+            global_paths.extend(paths)
+            continue
+        scope = normalize_scan_exclusion_module(raw_scope)
+        module_paths.setdefault(scope, []).extend(paths)
+    return global_paths, module_paths
 
 
 def is_scan_path_allowed(root: Path, path: Path, scan_exclusions: list[str]) -> bool:

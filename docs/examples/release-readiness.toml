@@ -1,0 +1,120 @@
+id = "release-readiness"
+name = "Release Readiness"
+version = "0.1.0"
+description = "Source-level release evidence signals and high-recall review criteria for ship blockers, compatibility, rollback, and handoff."
+
+[[deterministic_rules]]
+id = "verification-bypass"
+type = "disallowed_pattern"
+category = "release-verification"
+severity = "observation"
+confidence = "medium"
+paths = ["**/*.sh", "**/*.bash", "**/*.yml", "**/*.yaml", "**/*.toml", "**/*.json", "**/*.md", "**/*.py", "**/*.js", "**/*.jsx", "**/*.ts", "**/*.tsx"]
+disallowed_patterns = ['(?i)--no-verify\b', '(?i)--no-gpg-sign\b', '(?i)continue-on-error\s*:\s*true\b', '(?i)\|\|\s*true\b', '(?i)--skip-tests?\b', '(?i)\bSKIP_(?:TESTS|LINT|CHECKS)\s*=']
+message = "A release or verification path appears to bypass a quality check and requires explicit review."
+risk = "A release may proceed without the evidence or integrity check that normally protects the repository."
+expected = "Remove the bypass, narrow it to a documented exception, or record the reason, owner, and replacement verification."
+verification = "Review the release path and rerun the repository's release-quality commands after resolving or accepting the exception."
+
+[[deterministic_rules]]
+id = "release-job-without-quality-command"
+type = "trigger_without_required"
+category = "release-verification"
+severity = "observation"
+confidence = "low"
+paths = ["**/.github/**/*.yml", "**/.github/**/*.yaml", "**/release*.yml", "**/release*.yaml", "**/ci*.yml", "**/ci*.yaml"]
+trigger_patterns = ['(?i)\b(?:release|publish|deploy|ship)\b']
+required_patterns = ['(?i)\b(?:test|lint|build|check|verify|smoke)\b']
+message = "A release-oriented workflow may not show a test, build, lint, or verification command."
+risk = "The workflow may publish or deploy without proving that the release artifact is healthy."
+expected = "Add or cite the quality command that gates release, or document why the workflow delegates verification elsewhere."
+verification = "Review related workflow jobs and rerun the release path's verification commands after resolving or accepting the observation."
+
+[[agent_reviews]]
+id = "release-evidence"
+category = "release-verification"
+severity = "observation"
+paths = ["**/*.py", "**/*.js", "**/*.jsx", "**/*.ts", "**/*.tsx", "**/*.go", "**/*.rs", "**/*.java", "**/package.json", "**/pyproject.toml", "**/Cargo.toml", "**/Makefile", "**/Taskfile.yml", "**/*.yml", "**/*.yaml", "**/*.md"]
+focus = ["version identity", "build artifact", "test evidence", "quality gates", "release notes", "package contents"]
+rubric = """
+Review repository source and release artifacts for ship evidence.
+
+Map the release path from version identity through build, test, packaging, and
+publication or deployment. Report plausible gaps where an important step is
+missing, ambiguous, disconnected from CI, or documented without an enforceable
+command. Treat missing evidence as a finding rather than assuming readiness.
+Cite the exact script, workflow, configuration, or release document. Prefer
+high recall and use low confidence when release behavior depends on external
+platform settings that are not present in the repository.
+"""
+
+[[agent_reviews]]
+id = "ship-blockers-and-quality-ladder"
+category = "release-risk"
+severity = "observation"
+paths = ["**/*.py", "**/*.js", "**/*.jsx", "**/*.ts", "**/*.tsx", "**/*.go", "**/*.rs", "**/*.java", "**/package.json", "**/pyproject.toml", "**/Cargo.toml", "**/*.yml", "**/*.yaml", "**/*.md"]
+focus = ["blocking evidence", "quality ladder", "known failures", "accepted risks", "verification state", "scope control"]
+rubric = """
+Review release readiness for explicit ship blockers and evidence state.
+
+Report plausible blockers where tests, lint, type checks, security checks, build
+artifacts, migration checks, or required approvals are failing, absent, stale,
+or marked as accepted without an owner or verification path. Distinguish
+blockers, warnings, and observations using repository evidence. Cite the exact
+failure, gate, exception, or documented decision. Prefer high recall and use
+low confidence when the current execution result is unavailable; do not claim
+that a command passes merely because it is configured.
+"""
+
+[[agent_reviews]]
+id = "compatibility-and-change-surface"
+category = "release-compatibility"
+severity = "observation"
+paths = ["**/*.py", "**/*.js", "**/*.jsx", "**/*.ts", "**/*.tsx", "**/*.go", "**/*.rs", "**/*.java", "**/*.sql", "**/migrations/**", "**/package.json", "**/pyproject.toml", "**/Cargo.toml", "**/*.yml", "**/*.yaml", "**/*.md"]
+focus = ["public APIs", "schema changes", "dependency changes", "breaking changes", "upgrade instructions", "compatibility evidence"]
+rubric = """
+Review the release change surface for compatibility risk.
+
+Report plausible public-contract, schema, migration, dependency, configuration,
+or CLI changes that lack compatibility notes, upgrade instructions, migration
+ordering, deprecation handling, or an appropriate regression check. Cite the
+changed contract or release documentation. Prefer high recall and use low
+confidence when the target consumers or deployment topology are not visible.
+Do not invent a breaking change from a private implementation detail.
+"""
+
+[[agent_reviews]]
+id = "rollback-and-operations"
+category = "release-operations"
+severity = "observation"
+paths = ["**/*.py", "**/*.js", "**/*.jsx", "**/*.ts", "**/*.tsx", "**/*.go", "**/*.rs", "**/*.java", "**/*.sql", "**/migrations/**", "**/*.yml", "**/*.yaml", "**/*.md"]
+focus = ["rollback path", "migration reversal", "backup and restore", "health checks", "observability", "ownership"]
+rubric = """
+Review release operations for safe cutover and rollback evidence.
+
+Report plausible releases that change data, traffic, permissions, dependencies,
+or runtime behavior without a visible rollback or forward-fix path, backup or
+restore expectation, health signal, ownership, or stop condition. Cite the
+exact migration, deployment workflow, runbook, or operational configuration.
+Prefer high recall and use low confidence when the rollback is managed outside
+the repository. Do not require rollback for an explicitly documented
+non-mutating release without explaining the evidence.
+"""
+
+[[agent_reviews]]
+id = "handoff-and-communication"
+category = "release-handoff"
+severity = "observation"
+paths = ["**/CHANGELOG*", "**/RELEASE*", "**/docs/**/*.md", "**/*.md", "**/package.json", "**/pyproject.toml", "**/*.yml", "**/*.yaml"]
+focus = ["release notes", "known limitations", "operator instructions", "support handoff", "breaking changes", "verification evidence"]
+rubric = """
+Review release communication and handoff readiness.
+
+Report plausible gaps where release notes, known limitations, breaking changes,
+operator steps, support ownership, verification evidence, or rollback
+instructions are missing or inconsistent with the source and automation. Cite
+the exact documentation or release configuration. Prefer high recall and use
+low confidence when the repository is not the sole source of operational truth.
+Do not require a particular document filename if an equivalent maintained
+artifact is clearly present.
+"""

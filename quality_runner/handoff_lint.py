@@ -4,6 +4,11 @@ import re
 from typing import Any
 
 from quality_runner.evidence_redaction import REDACTED_LITERAL
+from quality_runner.remediation_context import validate_remediation_context
+from quality_runner.verification_contract import (
+    has_machine_checkable_verification,
+    verification_contract_is_valid,
+)
 
 SECRET_PATTERNS = (
     re.compile(
@@ -18,8 +23,10 @@ def validate_handoff_quality(
     handoff: dict[str, Any],
     *,
     remediation_plan: dict[str, Any] | None = None,
+    remediation_context: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     errors: list[str] = []
+    context_result: dict[str, Any] | None = None
     if handoff.get("implementation_allowed") is not False:
         errors.append("handoff must keep implementation_allowed=false")
 
@@ -36,8 +43,9 @@ def validate_handoff_quality(
             if not isinstance(slice_item, dict):
                 continue
             slice_id = str(slice_item.get("id") or "unknown")
-            verification = slice_item.get("verification_gates")
-            if not _has_machine_checkable_verification(verification):
+            if not verification_contract_is_valid(slice_item):
+                errors.append(f"slice {slice_id} has an invalid verification contract")
+            if not has_machine_checkable_verification(slice_item):
                 errors.append(f"slice {slice_id} lacks machine-checkable verification")
             if not _non_empty_string_list(slice_item.get("stop_conditions")):
                 errors.append(f"slice {slice_id} lacks STOP conditions")
@@ -46,11 +54,37 @@ def validate_handoff_quality(
             if _is_structural_slice(slice_item) and not _has_structural_anchor(slice_item):
                 errors.append(f"slice {slice_id} lacks file/line/fingerprint anchor")
 
+    plan_has_context = isinstance(plan, dict) and isinstance(plan.get("remediation_context"), dict)
+    handoff_has_context = isinstance(handoff.get("remediation_context"), dict)
+    if plan_has_context or handoff_has_context:
+        context = remediation_context
+        if context is None:
+            artifact_paths = handoff.get("artifact_paths")
+            context_path = (
+                artifact_paths.get("remediation_context_json")
+                if isinstance(artifact_paths, dict)
+                else None
+            )
+            if isinstance(context_path, str):
+                context = _load_json(context_path)
+        if context is None:
+            errors.append("remediation context artifact is required before source changes")
+        else:
+            context_result = validate_remediation_context(
+                context,
+                remediation_plan=plan,
+                require_ready=True,
+            )
+            errors.extend(context_result.get("errors", []))
+
     next_slice = handoff.get("next_slice")
     if isinstance(next_slice, dict):
         errors.extend(_lint_slice_dict(next_slice, label="next_slice"))
 
-    return {"passed": not errors, "errors": errors}
+    result: dict[str, Any] = {"passed": not errors, "errors": errors}
+    if context_result is not None:
+        result["remediation_context"] = context_result
+    return result
 
 
 def validate_slice_spec_content(content: str) -> dict[str, Any]:
@@ -83,7 +117,9 @@ def lint_slice_item(slice_item: dict[str, Any]) -> dict[str, Any]:
 
 def _lint_slice_dict(slice_item: dict[str, Any], *, label: str) -> list[str]:
     errors: list[str] = []
-    if not _has_machine_checkable_verification(slice_item.get("verification_gates")):
+    if not verification_contract_is_valid(slice_item):
+        errors.append(f"{label} has an invalid verification contract")
+    if not has_machine_checkable_verification(slice_item):
         errors.append(f"{label} lacks machine-checkable verification")
     if not _non_empty_string_list(slice_item.get("stop_conditions")):
         errors.append(f"{label} lacks STOP conditions")
@@ -95,23 +131,6 @@ def _lint_slice_dict(slice_item: dict[str, Any], *, label: str) -> list[str]:
     if not isinstance(scope, dict) or not _non_empty_string_list(scope.get("in_scope")):
         errors.append(f"{label} lacks in-scope boundaries")
     return errors
-
-
-def _has_machine_checkable_verification(value: object) -> bool:
-    if not isinstance(value, list) or not value:
-        return False
-    for item in value:
-        if not isinstance(item, str) or not item:
-            continue
-        lowered = item.lower()
-        if any(
-            token in lowered
-            for token in ("rerun quality-runner", "pytest", "ruff", "pnpm", "git diff")
-        ):
-            return True
-        if "`" in item or " run " in f" {lowered} ":
-            return True
-    return False
 
 
 def _is_structural_slice(slice_item: dict[str, Any]) -> bool:

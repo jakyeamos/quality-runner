@@ -10,6 +10,7 @@ import pytest
 def _policy(**overrides: object) -> dict[str, object]:
     base = {
         "similarity_enabled": True,
+        "similarity_backend": "external",
         "similarity_threshold": 0.87,
         "similarity_min_lines": 8,
         "similarity_max_pairs": 25,
@@ -50,7 +51,11 @@ def test_missing_similarity_tools_do_not_fail_scan(
     (tmp_path / "src" / "index.ts").write_text("export const value = 1;\n", encoding="utf-8")
     monkeypatch.setattr("quality_runner.code_quality_similarity.shutil.which", lambda _: None)
 
-    result = create_code_quality_scan(tmp_path, scan={"run_id": "scan-001"}, config={})
+    result = create_code_quality_scan(
+        tmp_path,
+        scan={"run_id": "scan-001"},
+        config={"structural_scan": {"similarity_backend": "external"}},
+    )
 
     assert result["summary"]["semantic_similarity_clusters"] == 0
     assert result["summary"]["semantic_similarity_tools"] == {"similarity-ts": "missing"}
@@ -191,6 +196,7 @@ def test_invalid_config_values_warn_and_fallback(tmp_path: Path) -> None:
                 "similarity_max_pairs = -1",
                 "similarity_timeout_seconds = 0",
                 "similarity_enabled = true",
+                'similarity_backend = "unsupported"',
             ]
         ),
         encoding="utf-8",
@@ -200,6 +206,98 @@ def test_invalid_config_values_warn_and_fallback(tmp_path: Path) -> None:
 
     assert len(config["warnings"]) >= 3
     assert "similarity_threshold" not in config["structural_scan"]
+    assert "similarity_backend" not in config["structural_scan"]
+
+
+def test_native_backend_is_owned_and_returns_stable_report(tmp_path: Path) -> None:
+    from quality_runner.code_quality_similarity import semantic_similarity_scan
+
+    source = "\n".join(
+        [
+            "export function parseAlpha(input: string) {",
+            "  const normalized = input.trim();",
+            "  if (normalized.length === 0) {",
+            '    return "empty";',
+            "  }",
+            "  return normalized.toUpperCase();",
+            "}",
+            "",
+            "export function parseBeta(value: string) {",
+            "  const cleaned = value.trim();",
+            "  if (cleaned.length === 0) {",
+            '    return "empty";',
+            "  }",
+            "  return cleaned.toLowerCase();",
+            "}",
+        ]
+    )
+    (tmp_path / "src").mkdir()
+    (tmp_path / "src" / "parsers.ts").write_text(source + "\n", encoding="utf-8")
+
+    result = semantic_similarity_scan(
+        tmp_path,
+        scanned_files=[{"path": "src/parsers.ts", "text": source}],
+        policy=_policy(
+            similarity_backend="native",
+            similarity_min_lines=6,
+            similarity_threshold=0.75,
+        ),
+        disabled_groups=set(),
+    )
+
+    assert result["schema"] == "quality-runner-similarity-v0.1"
+    assert result["backend"] == "native"
+    assert result["scanner_status"][0]["tool"] == "qr-native"
+    assert result["clusters"]
+    assert result["clusters"][0]["id"] == "SIM-001"
+    assert result["findings"][0]["rule_id"] == "semantic-similarity-pair"
+
+
+def test_structural_scan_defaults_to_native_backend(tmp_path: Path) -> None:
+    from quality_runner.code_quality import create_code_quality_scan
+
+    (tmp_path / "src").mkdir()
+    (tmp_path / "src" / "index.ts").write_text("export const value = 1;\n", encoding="utf-8")
+
+    result = create_code_quality_scan(tmp_path, scan={"run_id": "scan-001"}, config={})
+
+    assert result["summary"]["semantic_similarity_backend"] == "native"
+    assert result["summary"]["semantic_similarity_tools"] == {"qr-native": "not_applicable"}
+
+
+def test_native_backend_scans_python_without_external_tools(tmp_path: Path) -> None:
+    from quality_runner.code_quality_similarity import semantic_similarity_scan
+
+    source = "\n".join(
+        [
+            "def parse_alpha(value):",
+            "    cleaned = value.strip()",
+            "    if not cleaned:",
+            '        return "empty"',
+            "    return cleaned.upper()",
+            "",
+            "def parse_beta(other):",
+            "    normalized = other.strip()",
+            "    if not normalized:",
+            '        return "empty"',
+            "    return normalized.lower()",
+        ]
+    )
+
+    result = semantic_similarity_scan(
+        tmp_path,
+        scanned_files=[{"path": "src/parsers.py", "text": source}],
+        policy=_policy(
+            similarity_backend="native",
+            similarity_min_lines=4,
+            similarity_threshold=0.75,
+        ),
+        disabled_groups=set(),
+    )
+
+    assert result["backend"] == "native"
+    assert result["scanner_status"][0]["status"] == "executed"
+    assert result["clusters"]
 
 
 def test_scanner_timeout_records_failed_status_without_crashing(

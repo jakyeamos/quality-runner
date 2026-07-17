@@ -8,6 +8,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from quality_runner import __version__
 from quality_runner.artifacts import prepare_safe_directory, write_json
 from quality_runner.compatibility.legacy_workflow import refresh_payload
 from quality_runner.controller_reports import (
@@ -15,6 +16,7 @@ from quality_runner.controller_reports import (
     validate_controller_report,
 )
 from quality_runner.fleet_documents import write_fleet_documents
+from quality_runner.tooling import command_text, current_runner_command, current_runner_source
 
 ROLLOUT_RESULT_SCHEMA = "quality-runner-rollout-result-v0.1"
 ROLLOUT_LEDGER_SCHEMA = "quality-runner-rollout-ledger-v0.1"
@@ -84,11 +86,16 @@ def rollout_payload(
         )
 
     fleet_documents = write_fleet_documents(output_dir=resolved_output_dir, results=results)
+    runner_command = command_text(current_runner_command())
+    runner_source = current_runner_source()
     ledger = {
         "schema": ROLLOUT_LEDGER_SCHEMA,
         "status": _rollout_status(results),
         "run_id_prefix": resolved_run_id_prefix,
         "output_dir": str(resolved_output_dir),
+        "quality_runner_version": __version__,
+        "quality_runner_source": runner_source,
+        "quality_runner_command": runner_command,
         "repo_count": len(entries),
         "fleet_documents": fleet_documents,
         "results": results,
@@ -102,6 +109,9 @@ def rollout_payload(
         "run_id_prefix": resolved_run_id_prefix,
         "output_dir": str(resolved_output_dir),
         "ledger_path": str(ledger_path),
+        "quality_runner_version": __version__,
+        "quality_runner_source": runner_source,
+        "quality_runner_command": runner_command,
         "fleet_documents": fleet_documents,
         "repo_count": len(entries),
         "accepted_reports": sum(
@@ -405,8 +415,7 @@ def _refresh_generation_command(
     allow_mutating_gates: bool,
     allow_dirty_worktree_verify: bool,
 ) -> str:
-    command = [
-        "quality-runner",
+    arguments = [
         "refresh",
         str(repo_root),
         "--run-id-prefix",
@@ -414,14 +423,14 @@ def _refresh_generation_command(
         "--json",
     ]
     if baseline_run_id:
-        command.extend(["--baseline-run-id", baseline_run_id])
+        arguments.extend(["--baseline-run-id", baseline_run_id])
     if execute_discovered_gates:
-        command.extend(["--execute-gates", "--worktree-mode", worktree_mode])
+        arguments.extend(["--execute-gates", "--worktree-mode", worktree_mode])
     if allow_mutating_gates:
-        command.append("--allow-mutating-gates")
+        arguments.append("--allow-mutating-gates")
     if allow_dirty_worktree_verify:
-        command.append("--allow-dirty-worktree-verify")
-    return shlex.join(command)
+        arguments.append("--allow-dirty-worktree-verify")
+    return command_text(current_runner_command(arguments))
 
 
 def _string_value(value: object) -> str:

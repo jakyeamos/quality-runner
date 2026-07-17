@@ -15,6 +15,7 @@ from quality_runner.application.outcome_projection import (
 from quality_runner.application.run_history import DEFAULT_HISTORY_LIMIT, load_run_history
 from quality_runner.application.verification_workflows import verify_gates_payload
 from quality_runner.artifacts import artifact_text_file
+from quality_runner.core.audit_contracts import ScanExclusionOverlay
 from quality_runner.core.outcome_contracts import JourneyOutcome
 from quality_runner.git_branches import checked_out_branch
 
@@ -30,6 +31,9 @@ def audit_journey_outcome(
     skill_review_report: LegacyPayload | None,
     intent: LegacyPayload | None,
     inspect_only: bool,
+    agent_review_mode: str | None = None,
+    scan_exclusion_overlay: ScanExclusionOverlay | None = None,
+    readiness_evidence_file: Path | None = None,
 ) -> JourneyOutcome:
     branch_before = checked_out_branch(repo_root)
     payload = (
@@ -38,9 +42,12 @@ def audit_journey_outcome(
             run_id=run_id,
             profile=profile,
             ci_status_json=ci_status_json,
+            readiness_evidence_file=readiness_evidence_file,
             include_ignored_paths=include_ignored_paths,
             checkout_most_advanced_branch=checkout_most_advanced_branch,
             skill_review_report=skill_review_report,
+            agent_review_mode=agent_review_mode,
+            scan_exclusion_overlay=scan_exclusion_overlay,
             intent=intent,
         )
         if inspect_only
@@ -49,9 +56,12 @@ def audit_journey_outcome(
             run_id=run_id,
             profile=profile,
             ci_status_json=ci_status_json,
+            readiness_evidence_file=readiness_evidence_file,
             include_ignored_paths=include_ignored_paths,
             checkout_most_advanced_branch=checkout_most_advanced_branch,
             skill_review_report=skill_review_report,
+            agent_review_mode=agent_review_mode,
+            scan_exclusion_overlay=scan_exclusion_overlay,
             intent=intent,
         )
     )
@@ -78,6 +88,9 @@ def verify_journey_outcome(
     allow_dirty_worktree_verify: bool,
     skill_review_report: LegacyPayload | None,
     intent: LegacyPayload | None,
+    agent_review_mode: str | None = None,
+    scan_exclusion_overlay: ScanExclusionOverlay | None = None,
+    readiness_evidence_file: Path | None = None,
 ) -> JourneyOutcome:
     branch_before = checked_out_branch(repo_root)
     payload = verify_gates_payload(
@@ -85,6 +98,7 @@ def verify_journey_outcome(
         run_id=run_id,
         profile=profile,
         ci_status_json=ci_status_json,
+        readiness_evidence_file=readiness_evidence_file,
         timeout_seconds=timeout_seconds,
         checkout_most_advanced_branch=checkout_most_advanced_branch,
         execute_discovered_gates=execute_discovered_gates,
@@ -94,6 +108,8 @@ def verify_journey_outcome(
         allow_dirty_worktree_verify=allow_dirty_worktree_verify,
         skill_review_report=skill_review_report,
         intent=intent,
+        agent_review_mode=agent_review_mode,
+        scan_exclusion_overlay=scan_exclusion_overlay,
     )
     legacy_payload = _payload_mapping(payload)
     return project_verify_outcome(

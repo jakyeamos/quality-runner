@@ -18,6 +18,8 @@
     "schema": { "const": "quality-runner-security-scan-v0.1" },
     "run_id": { "type": ["string", "null"] },
     "repo_root": { "type": "string", "minLength": 1 },
+    "scan_exclusion_scope": { "const": "security" },
+    "scan_exclusions": { "type": "array", "items": { "type": "string", "minLength": 1 } },
     "summary": { "type": "object" },
     "taxonomy": { "type": "object" },
     "candidates": { "type": "array" },

@@ -8,6 +8,8 @@ building audit findings.
 The current built-in profile is:
 
 - `default`
+- `release`, which adds provenance, artifact-manifest, package-consumer,
+  migration, acceptance, read-only-integrity, and aggregate-coverage gates
 
 It expects:
 
@@ -15,6 +17,11 @@ It expects:
 - lint, typecheck, tests, and dead-code checks before completion
 - `.tracker/PROJECT_TRUTH.md` maintenance when a repo has a truth file
 - audit-and-plan-only behavior from Quality Runner itself
+
+The `release` profile is selected with `--profile release` or by setting
+`default_profile = "release"`. It is evidence-first: local CI status and
+release evidence are read from files inside the target repository, and
+executable gates require explicit disposable-worktree authorization.
 
 ## Repo Policy
 
@@ -38,6 +45,9 @@ similarity_enabled = true
 similarity_threshold = 0.9
 similarity_min_lines = 10
 similarity_max_pairs = 20
+
+[quality_runner.readiness]
+evidence_file = ".quality-runner/release-evidence.json"
 
 [[quality_runner.gates]]
 id = "lint"

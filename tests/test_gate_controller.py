@@ -98,6 +98,34 @@ def test_gate_status_and_respond_append_history(tmp_path: Path) -> None:
         )
 
 
+def test_gate_response_artifact_uses_configured_redaction(tmp_path: Path) -> None:
+    _minimal_repo(tmp_path)
+    (tmp_path / ".quality-runner.toml").write_text(
+        '[quality_runner.artifacts]\nredact_patterns = ["TOKEN-[0-9]+"]\n',
+        encoding="utf-8",
+    )
+    run_payload(repo_root=tmp_path, run_id="redacted-response-source")
+    created = create_gate_run(
+        repo_root=tmp_path,
+        run_id="redacted-response-source",
+        gate_run_id="gate-redacted-001",
+    )
+
+    record_gate_response(
+        repo_root=tmp_path,
+        gate_run_id=created["gate_run"]["gate_run_id"],
+        action="route-next-slice",
+        notes="Investigate TOKEN-123 before re-verify.",
+    )
+
+    response_path = (
+        tmp_path / ".quality-runner" / "gate-runs" / "gate-redacted-001" / "gate-responses.jsonl"
+    )
+    content = response_path.read_text(encoding="utf-8")
+    assert "TOKEN-123" not in content
+    assert "[REDACTED]" in content
+
+
 def test_create_gate_run_rejects_second_active_run_for_same_run_id(tmp_path: Path) -> None:
     _minimal_repo(tmp_path)
     run_payload(repo_root=tmp_path, run_id="duplicate-gate")

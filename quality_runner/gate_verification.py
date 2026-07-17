@@ -14,6 +14,7 @@ from quality_runner.gate_execution_policy import (
     ordered_capabilities,
     valid_gate_timeouts,
 )
+from quality_runner.gate_provenance import verification_provenance
 from quality_runner.schema_constants import GATE_VERIFICATION_SCHEMA
 
 DEFAULT_TIMEOUT_SECONDS = 120
@@ -94,6 +95,7 @@ def verify_discovered_gates(
         if on_partial_result is not None:
             on_partial_result(
                 _verification_payload(
+                    repo_root=repo_root,
                     run_id=run_id,
                     gates=gates,
                     timeout_seconds=timeout_seconds,
@@ -106,6 +108,7 @@ def verify_discovered_gates(
                 )
             )
     return _verification_payload(
+        repo_root=repo_root,
         run_id=run_id,
         gates=gates,
         timeout_seconds=timeout_seconds,
@@ -131,7 +134,7 @@ def apply_gate_verification(
     for capability in _available_capabilities(capability_map):
         copied = dict(capability)
         gate = results.get(str(copied.get("id")))
-        if gate is not None and gate.get("status") in {"passed", "failed"}:
+        if gate is not None and gate.get("status") in {"passed", "failed", "blocked"}:
             previous = copied.get("verification_state")
             discovery = (
                 previous.get("discovery")
@@ -150,6 +153,7 @@ def apply_gate_verification(
 
 def _verification_payload(
     *,
+    repo_root: Path,
     run_id: str | None,
     gates: list[dict[str, Any]],
     timeout_seconds: int,
@@ -170,10 +174,20 @@ def _verification_payload(
         "read_only_gates": read_only_gates,
         "allow_mutating_gates": allow_mutating_gates,
         "environment": _environment(),
+        "provenance": verification_provenance(
+            repo_root=repo_root,
+            run_id=run_id,
+            gates=gates,
+            verification_context=verification_context,
+        ),
         "execution_plan": execution_plan,
         "gates": gates,
         **_optional_field("verification_context", verification_context),
     }
+
+
+def verification_status(gates: list[dict[str, Any]]) -> str:
+    return _status(gates)
 
 
 def _available_capabilities(capability_map: dict[str, Any]) -> list[dict[str, Any]]:

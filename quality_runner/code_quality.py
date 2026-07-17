@@ -1,16 +1,15 @@
 from __future__ import annotations
 
-import gzip
 import hashlib
 from pathlib import Path
 from typing import Any
 
 from quality_runner.code_quality_architecture import architecture_findings
+from quality_runner.code_quality_bundles import bundle_budget_findings
 from quality_runner.code_quality_duplicates import _extract_functions
 from quality_runner.code_quality_findings import (
     CATEGORY_ORDER,
     _counts,
-    _finding,
     _finding_sort_key,
 )
 from quality_runner.code_quality_ledger import (
@@ -21,7 +20,8 @@ from quality_runner.code_quality_paths import _check_coverage, _string_or_none
 from quality_runner.code_quality_ponytail import ponytail_findings
 from quality_runner.code_quality_rules import _scan_file
 from quality_runner.code_quality_similarity import collect_deduplicate_scan
-from quality_runner.code_quality_skills import skill_findings
+from quality_runner.code_quality_skill_selection import scan_quality_skills_with_selection
+from quality_runner.code_quality_summary import quality_summary_fields
 from quality_runner.code_quality_unwired import unwired_findings
 from quality_runner.core.audit_contracts import AuditPayload, TextScanScope
 from quality_runner.evidence_redaction import redact_secret_like_source_lines
@@ -49,15 +49,8 @@ __all__ = [
     "render_resolution_ledger_markdown",
 ]
 
-DEFAULT_GZIPPED_JS_BUNDLE_BYTES = 200_000
 DEFAULT_LARGE_FILE_LINES = _DEFAULT_LARGE_FILE_LINES
 DEFAULT_FAT_ROUTER_LINES = _DEFAULT_FAT_ROUTER_LINES
-JS_BUNDLE_DIRS = (
-    ".next/static/chunks",
-    "build/static/js",
-    "dist/assets",
-    "out/_next/static/chunks",
-)
 
 
 def create_code_quality_scan(
@@ -66,12 +59,18 @@ def create_code_quality_scan(
     scan: dict[str, Any],
     config: dict[str, Any],
     skill_review_report: dict[str, Any] | None = None,
+    require_skill_review_coverage: bool = False,
     text_scan_scope: TextScanScope | None = None,
 ) -> dict[str, Any]:
     root = repo_root.expanduser().resolve()
     policy = structural_scan_policy(config)
     disabled_groups = set(policy["disabled_rule_groups"])
-    scope = text_scan_scope or create_text_scan_scope(root, scan=scan, config=config)
+    scope = text_scan_scope or create_text_scan_scope(
+        root,
+        scan=scan,
+        config=config,
+        module="code_quality",
+    )
     skipped_files = list(scope.skipped_files)
     findings: list[dict[str, Any]] = []
     extracted_functions: list[dict[str, Any]] = []
@@ -116,6 +115,7 @@ def create_code_quality_scan(
     ) = collect_deduplicate_scan(
         root,
         extracted_functions=extracted_functions,
+        scanned_files=scanned_files,
         policy=policy,
         disabled_groups=disabled_groups,
     )
@@ -125,20 +125,22 @@ def create_code_quality_scan(
         findings.extend(ponytail_findings(scanned_files))
 
     if "speed" not in disabled_groups:
-        findings.extend(_bundle_budget_findings(root))
+        findings.extend(bundle_budget_findings(root))
 
     if "integrate" not in disabled_groups:
         findings.extend(unwired_findings(scanned_files, config))
 
     findings.extend(architecture_findings(scanned_files, config))
-    findings.extend(
-        skill_findings(
-            repo_root=root,
-            scanned_files=scanned_files,
-            config=config,
-            skill_review_report=skill_review_report,
+    skill_findings, skill_coverage, quality_skills, skill_selection = (
+        scan_quality_skills_with_selection(
+            root,
+            scanned_files,
+            config,
+            skill_review_report,
+            require_review_coverage=require_skill_review_coverage,
         )
     )
+    findings.extend(skill_findings)
 
     sorted_findings = sorted(findings, key=_finding_sort_key)
     for index, finding in enumerate(sorted_findings, start=1):
@@ -148,6 +150,8 @@ def create_code_quality_scan(
         "schema": CODE_QUALITY_SCAN_SCHEMA,
         "run_id": _string_or_none(scan.get("run_id")),
         "repo_root": str(root),
+        "scan_exclusion_scope": "code_quality",
+        "scan_exclusions": list(scope.scan_exclusions),
         "summary": {
             "total_files": len(accountability),
             "total_lines": sum(item["line_count"] for item in accountability),
@@ -158,7 +162,15 @@ def create_code_quality_scan(
             ),
             "duplicate_clusters": len(duplicate_clusters),
             "semantic_similarity_clusters": semantic_similarity_clusters,
+            "semantic_similarity_backend": policy["similarity_backend"],
             "semantic_similarity_tools": semantic_similarity_tools,
+            **quality_summary_fields(
+                backend=policy["similarity_backend"],
+                enabled=policy["similarity_enabled"],
+                disabled_groups=disabled_groups,
+                semantic_similarity_tools=semantic_similarity_tools,
+                accountability=accountability,
+            ),
             "scan_budget": scan_budget_summary(
                 scanned_files=len(accountability),
                 max_text_files=scope.max_text_files,
@@ -170,6 +182,9 @@ def create_code_quality_scan(
         "findings": sorted_findings,
         "duplicate_clusters": duplicate_clusters,
         "skipped_files": sorted(skipped_files, key=_skipped_file_path),
+        "quality_skills": quality_skills,
+        "skill_coverage": skill_coverage,
+        "skill_selection": skill_selection,
     }
 
 
@@ -187,7 +202,7 @@ def preview_ignored_paths(
         skipped_files=skipped_files,
         generated_paths=generated_paths(scan or {}),
         include_ignored_paths=set(policy["include_ignored_paths"]),
-        scan_exclusions=effective_scan_exclusions(root, config),
+        scan_exclusions=effective_scan_exclusions(root, config, module="code_quality"),
         max_text_files=policy["max_text_files"],
     )
     return [
@@ -200,37 +215,3 @@ def preview_ignored_paths(
 def _skipped_file_path(item: AuditPayload) -> str:
     path = item.get("path")
     return path if isinstance(path, str) else ""
-
-
-def _bundle_budget_findings(root: Path) -> list[dict[str, Any]]:
-    findings: list[dict[str, Any]] = []
-    for bundle_dir in JS_BUNDLE_DIRS:
-        path = root / bundle_dir
-        if not path.is_dir():
-            continue
-        for bundle in sorted(path.rglob("*.js")):
-            if bundle.name.endswith(".map") or not bundle.is_file():
-                continue
-            raw = bundle.read_bytes()
-            gzipped_size = len(gzip.compress(raw))
-            if gzipped_size <= DEFAULT_GZIPPED_JS_BUNDLE_BYTES:
-                continue
-            relative_path = bundle.relative_to(root).as_posix()
-            findings.append(
-                _finding(
-                    category="speed",
-                    severity="observation",
-                    confidence="medium",
-                    file=relative_path,
-                    line=1,
-                    rule_id="large-js-bundle-artifact",
-                    evidence=f"{gzipped_size} gzipped bytes",
-                    expected_improvement=(
-                        "Split initial routes, lazy-load heavy features, or remove unused dependencies."
-                    ),
-                    risk="Large initial JavaScript bundles delay load and interaction readiness.",
-                    verification="Run bundle analysis and the relevant frontend build.",
-                    remediation_bucket="frontend performance and bundle budget",
-                )
-            )
-    return findings

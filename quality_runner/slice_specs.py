@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import hashlib
+import re
 from pathlib import Path
 from typing import Any
 
@@ -96,8 +98,7 @@ def write_slice_specs(
         slice_id = slice_item.get("id")
         if not isinstance(slice_id, str) or not slice_id:
             continue
-        validate_path_segment(slice_id, label="slice_id")
-        filename = f"{slice_id}.md"
+        filename = _slice_spec_filename(slice_id)
         target = safe_child_file(specs_dir, filename)
         content = render_slice_spec_markdown(
             slice_item,
@@ -106,6 +107,16 @@ def write_slice_specs(
         )
         paths[slice_id] = str(write_text(target, content))
     return paths
+
+
+def _slice_spec_filename(slice_id: str) -> str:
+    try:
+        validate_path_segment(slice_id, label="slice_id")
+    except ValueError:
+        slug = re.sub(r"[^A-Za-z0-9._-]+", "-", slice_id).strip(".-") or "slice"
+        digest = hashlib.sha256(slice_id.encode("utf-8")).hexdigest()[:10]
+        return f"{slug[:180]}-{digest}.md"
+    return f"{slice_id}.md"
 
 
 def export_slice_specs_payload(
@@ -124,6 +135,12 @@ def export_slice_specs_payload(
     slices = plan.get("slices")
     if not isinstance(slices, list):
         raise ValueError("remediation plan slices must be a list")
+    for slice_item in slices:
+        if not isinstance(slice_item, dict):
+            continue
+        slice_id = slice_item.get("id")
+        if isinstance(slice_id, str) and slice_id:
+            validate_path_segment(slice_id, label="slice_id")
     scan_path = safe_child_file(run_dir, "repo-scan.json")
     intent_docs = None
     if scan_path.exists():

@@ -3,9 +3,10 @@ from __future__ import annotations
 import argparse
 import json
 import sys
-from typing import cast
+from typing import Any, cast
 
 from quality_runner import __version__
+from quality_runner.cli_artifacts import add_artifact_commands
 from quality_runner.cli_controller_reports import (
     add_controller_report_command,
     add_controller_report_summary_arguments,
@@ -18,15 +19,19 @@ from quality_runner.cli_human_summary import human_summary
 from quality_runner.cli_journeys import add_journey_commands
 from quality_runner.cli_outcome import OUTCOME_SCHEMA, render_outcome
 from quality_runner.cli_payload import payload_for_args
+from quality_runner.cli_planning import add_planning_commands
+from quality_runner.cli_remediation import add_remediation_commands
 from quality_runner.cli_review import add_review_command
 from quality_runner.cli_rollout import add_rollout_command
 from quality_runner.cli_skills import add_skill_commands
+from quality_runner.cli_update import add_update_command
 from quality_runner.cli_workflow_args import (
     add_verify_arguments,
     add_workflow_arguments,
     add_worktree_verify_arguments,
 )
 from quality_runner.core.outcome_contracts import JourneyOutcome
+from quality_runner.progress import ProgressReporter
 from quality_runner.standards import DEFAULT_PROFILE
 
 ROOT_HELP = """usage: quality-runner <journey> [options]
@@ -47,8 +52,8 @@ Compatibility commands remain available:
   inspect, run, verify-gates, status, summarize-run, export-handoff
 
 Advanced operations:
-  refresh, rollout, gate, controller-report, skill, proposal, validation,
-  release-smoke, and worker handoff tools
+  refresh, rollout, gate, controller-report, skill, proposal, remediation,
+  plan, phase, release-smoke, and worker handoff tools
 
 Run 'quality-runner <command> --help' for options. Audit, review, verify, and
 runs emit a compact outcome card by default and v2 JSON with --json. Use
@@ -60,6 +65,7 @@ _LEGACY_COMMAND_REPLACEMENTS = {
     "run": "audit",
     "verify-gates": "verify",
 }
+_PROGRESS_COMMANDS = {"run", "inspect", "verify-gates", "refresh", "release-smoke"}
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -177,6 +183,42 @@ def build_parser() -> argparse.ArgumentParser:
     add_rollout_command(subparsers)
     add_review_command(subparsers)
 
+    exclusions_parser = subparsers.add_parser(
+        "exclusions",
+        help="Inventory and review repository scan-exclusion candidates",
+    )
+    exclusion_actions = exclusions_parser.add_subparsers(
+        dest="exclusions_action",
+        required=True,
+    )
+    suggest_exclusions_parser = exclusion_actions.add_parser(
+        "suggest",
+        help="Write a deterministic review packet without changing repo config",
+    )
+    suggest_exclusions_parser.add_argument("repo_path", help="Target repository path")
+    suggest_exclusions_parser.add_argument("--run-id", default=None, help="Stable run id")
+    suggest_exclusions_parser.add_argument("--json", action="store_true", help="Emit JSON output")
+    suggest_exclusions_parser.set_defaults(apply=False)
+
+    for action_name, action_help in (
+        ("validate", "Validate a supervising-agent report without changing repo config"),
+        ("apply", "Apply validated exclude decisions to repo config"),
+    ):
+        action_parser = exclusion_actions.add_parser(action_name, help=action_help)
+        action_parser.add_argument("repo_path", help="Target repository path")
+        action_parser.add_argument("--packet", required=True, help="Preflight packet JSON path")
+        action_parser.add_argument("--report", required=True, help="Agent report JSON path")
+        action_parser.add_argument("--run-id", default=None, help="Stable run id")
+        if action_name == "apply":
+            action_parser.add_argument(
+                "--apply",
+                action="store_true",
+                help="Explicitly authorize the .quality-runner.toml mutation",
+            )
+        else:
+            action_parser.set_defaults(apply=False)
+        action_parser.add_argument("--json", action="store_true", help="Emit JSON output")
+
     init_parser = subparsers.add_parser("init", help="Write a starter .quality-runner.toml")
     init_parser.add_argument("repo_path", help="Target repository path")
     init_parser.add_argument("--profile", default=DEFAULT_PROFILE, help="Default standards profile")
@@ -224,10 +266,18 @@ def build_parser() -> argparse.ArgumentParser:
 
     add_fix_proposal_command(subparsers)
 
+    add_artifact_commands(subparsers)
+
     add_handoff_commands(subparsers)
+
+    add_remediation_commands(subparsers)
+
+    add_planning_commands(subparsers)
 
     doctor_parser = subparsers.add_parser("doctor", help="Check Quality Runner readiness")
     doctor_parser.add_argument("--json", action="store_true", help="Emit JSON output")
+
+    add_update_command(subparsers)
 
     release_smoke_parser = subparsers.add_parser(
         "release-smoke",
@@ -237,6 +287,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--work-dir",
         default=None,
         help="Directory for temporary release-smoke repo and handoff outputs",
+    )
+    release_smoke_parser.add_argument(
+        "--no-progress",
+        action="store_true",
+        help="Disable stderr progress and heartbeat diagnostics",
     )
     release_smoke_parser.add_argument("--json", action="store_true", help="Emit JSON output")
 
@@ -251,6 +306,7 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     parser = build_parser()
+    payload: dict[str, Any] = {}
     try:
         parsed = parser.parse_args(args)
     except SystemExit as error:
@@ -258,7 +314,12 @@ def main(argv: list[str] | None = None) -> int:
         return code if isinstance(code, int) else 2
 
     try:
-        payload = payload_for_args(parsed)
+        if parsed.command in _PROGRESS_COMMANDS and not getattr(parsed, "no_progress", False):
+            with ProgressReporter(parsed.command, stream=sys.stderr) as progress:
+                payload = payload_for_args(parsed, progress=progress.phase)
+                progress.finish(str(payload.get("status", "completed")))
+        else:
+            payload = payload_for_args(parsed)
     except (FileNotFoundError, NotADirectoryError, ValueError, OSError) as error:
         print(f"quality-runner: error: {error}", file=sys.stderr)
         return 1
@@ -286,8 +347,10 @@ def main(argv: list[str] | None = None) -> int:
             "controller-report",
             "validate-skill-review",
             "validate-handoff",
+            "validate-remediation-context",
             "validate-slice-spec",
             "review-worker",
+            "exclusions",
         }
         and payload.get("status") == "rejected"
     ):
@@ -297,6 +360,8 @@ def main(argv: list[str] | None = None) -> int:
     if parsed.command == "release-smoke" and payload.get("status") != "passed":
         return 1
     if parsed.command == "summarize-run" and has_rejected_self_check(payload):
+        return 1
+    if parsed.command == "self-update" and payload.get("status") in {"blocked", "failed"}:
         return 1
     return 0
 

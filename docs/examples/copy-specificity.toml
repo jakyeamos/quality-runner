@@ -1,0 +1,52 @@
+id = "copy-specificity"
+name = "Copy Specificity"
+version = "0.1.0"
+description = "Opt-in observations for generic product-copy structures in explicitly scoped content surfaces."
+
+[[sources]]
+id = "kill-ai-slop-clean-room"
+ref = "https://github.com/yetone/kill-ai-slop"
+version = "inspected-2026-07-13"
+
+[[deterministic_rules]]
+id = "contrastive-slogan"
+type = "disallowed_pattern"
+category = "copy-intent"
+severity = "observation"
+confidence = "low"
+paths = ["apps/web/content/**", "content/marketing/**"]
+disallowed_patterns = ["(?i)\\bnot just\\b.{0,100}\\b(?:it's|it is)\\b"]
+message = "A contrastive slogan structure should be reviewed for product-specific wording."
+risk = "Repeated contrastive slogans can make distinct products sound interchangeable and hide the concrete benefit."
+expected = "Replace the structure with the specific audience, action, outcome, or constraint that matters here."
+verification = "Read the copy in its product context, then rerun quality-runner after resolving or accepting the observation."
+
+[[deterministic_rules]]
+id = "generic-benefit-language"
+type = "disallowed_pattern"
+category = "copy-intent"
+severity = "observation"
+confidence = "low"
+paths = ["apps/web/content/**", "content/marketing/**"]
+disallowed_patterns = ['(?i)\b(?:unlock|empower|elevate|effortless|seamless)\b']
+message = "Generic benefit language should be reviewed against the actual product claim."
+risk = "Vague benefit words can overstate value while giving readers no measurable or observable reason to trust the claim."
+expected = "Name the concrete capability, user, workflow, or measured outcome, and provide supporting evidence when the claim is quantitative."
+verification = "Review the claim with product context and supporting evidence, then rerun quality-runner after resolving or accepting the observation."
+
+[[agent_reviews]]
+id = "copy-specificity-and-claims"
+category = "copy-intent"
+severity = "observation"
+paths = ["apps/web/content/**", "content/marketing/**"]
+focus = ["specific audience", "concrete capability", "measurable claims", "product voice", "quoted copy"]
+rubric = """
+Review product-facing copy candidates for specificity and evidence.
+
+Report only when the source text and its scope support the observation. Prefer
+the concrete audience, action, capability, limitation, or outcome over a generic
+slogan. Distinguish marketing claims from documentation, examples, quoted text,
+and editorial voice. Treat a deliberate brand line as an intentional choice when
+the repository provides evidence for it. Do not infer authorship or call a claim
+false without identifying the missing source or measurement.
+"""

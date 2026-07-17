@@ -6,6 +6,7 @@ from typing import Any
 from quality_runner.code_quality_architecture import _path_matches_any
 from quality_runner.code_quality_findings import _finding
 from quality_runner.schema_constants import SKILL_REVIEW_PACKET_SCHEMA, SKILL_REVIEW_REPORT_SCHEMA
+from quality_runner.verification_contract import verification_contract_fields
 
 ACCEPTED_SEVERITIES = frozenset({"warning", "observation"})
 ACCEPTED_CONFIDENCE = frozenset({"high", "medium", "low"})
@@ -32,6 +33,14 @@ def build_skill_review_packet(
         "included_files": included_files,
         "output_schema": SKILL_REVIEW_REPORT_SCHEMA,
         "instructions": _packet_instructions(),
+        "review_policy": {
+            "recall_preference": "high",
+            "allow_low_confidence": True,
+            "require_file_line_evidence": True,
+            "do_not_invent_evidence": True,
+            "execution_mode": "automatic",
+            "required_review_count": len(reviews),
+        },
         "safety": {
             "do_not_edit_source": True,
             "do_not_execute_remediation": True,
@@ -53,6 +62,12 @@ def render_skill_review_packet_markdown(packet: dict[str, Any]) -> str:
         "- Do not edit source files.",
         "- Do not execute remediation.",
         "- Produce evidence-backed findings only.",
+        "",
+        "## Review policy",
+        "",
+        "- Prefer high recall and report plausible evidence-backed issues.",
+        "- Use low confidence when certainty is limited.",
+        "- Never invent file or line evidence.",
         "",
         "## Reviews",
         "",
@@ -101,6 +116,7 @@ def validate_skill_review_report(
     skills: list[dict[str, Any]] | None = None,
     repo_root: Path | None = None,
     run_id: str | None = None,
+    require_review_coverage: bool = False,
 ) -> dict[str, Any]:
     errors: list[str] = []
     rejected: list[dict[str, Any]] = []
@@ -115,6 +131,12 @@ def validate_skill_review_report(
             errors.append(f"run_id mismatch: expected {run_id}, got {report_run_id}")
 
     active_reviews = _review_index(skills or [])
+    if require_review_coverage:
+        _validate_review_coverage(
+            report.get("reviewed_review_ids"),
+            active_reviews=active_reviews,
+            errors=errors,
+        )
     findings = report.get("findings")
     if not isinstance(findings, list):
         errors.append("findings must be a list")
@@ -154,6 +176,12 @@ def review_report_findings(
         return []
 
     skill_names = {str(skill["id"]): str(skill["name"]) for skill in skills}
+    review_categories = {
+        (str(skill["id"]), str(review["id"])): str(review.get("category", ""))
+        for skill in skills
+        for review in skill.get("agent_reviews", [])
+        if isinstance(review, dict) and isinstance(review.get("id"), str)
+    }
     findings: list[dict[str, Any]] = []
     for item in accepted:
         skill_id = str(item["skill_id"])
@@ -161,21 +189,24 @@ def review_report_findings(
         severity = str(item["severity"])
         confidence = str(item["confidence"])
         file = str(item["file"])
-        findings.append(
-            _finding(
-                category=f"skill:{skill_id}",
-                severity=severity,
-                confidence=confidence,
-                file=file,
-                line=int(item["line"]),
-                rule_id=str(item["rule_id"]),
-                evidence=str(item["evidence"]),
-                expected_improvement=str(item["expected_improvement"]),
-                risk=str(item["risk"]),
-                verification=str(item["verification"]),
-                remediation_bucket=f"Skill: {skill_name}",
-            )
+        finding = _finding(
+            category=f"skill:{skill_id}",
+            severity=severity,
+            confidence=confidence,
+            file=file,
+            line=int(item["line"]),
+            rule_id=str(item["rule_id"]),
+            evidence=str(item["evidence"]),
+            expected_improvement=str(item["expected_improvement"]),
+            risk=str(item["risk"]),
+            verification=str(item["verification"]),
+            remediation_bucket=f"Skill: {skill_name}",
+            rule_category=review_categories.get((skill_id, str(item["review_id"])), ""),
         )
+        finding.update(verification_contract_fields(finding, explicit_mode="evidence"))
+        finding["skill_id"] = skill_id
+        finding["review_id"] = str(item["review_id"])
+        findings.append(finding)
     return findings
 
 
@@ -341,7 +372,29 @@ def _validation_result(
 
 def _packet_instructions() -> str:
     return (
-        "Review the listed files against each rubric. Only create findings when there is "
-        "concrete file/line evidence. Do not edit source files or execute remediation. "
-        "Return JSON using the required output schema."
+        "Review the listed files against each rubric. Prefer high recall: report every "
+        "plausible issue that has concrete file/line evidence, using observation severity "
+        "and low confidence when appropriate. Do not invent evidence, edit source files, "
+        "or execute remediation. Include every active skill/review pair in "
+        "reviewed_review_ids, even when the review produces no finding. Return JSON "
+        "using the required output schema."
     )
+
+
+def _validate_review_coverage(
+    value: object,
+    *,
+    active_reviews: set[tuple[str, str]],
+    errors: list[str],
+) -> None:
+    if not isinstance(value, list) or not all(isinstance(item, str) and item for item in value):
+        errors.append("reviewed_review_ids must be a list of active skill/review ids")
+        return
+    expected = {f"{skill_id}/{review_id}" for skill_id, review_id in active_reviews}
+    received = set(value)
+    missing = sorted(expected - received)
+    unknown = sorted(received - expected)
+    if missing:
+        errors.append(f"review report is missing review coverage: {', '.join(missing)}")
+    if unknown:
+        errors.append(f"review report contains unknown review coverage: {', '.join(unknown)}")

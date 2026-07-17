@@ -51,6 +51,109 @@ Behavior:
 - If `active` is absent, all configured local skills may run.
 - Skill paths must stay inside the repo. Path traversal is rejected.
 - Missing or malformed skill files are skipped safely and surfaced as warnings.
+- Skill scans cover frontend source and content extensions including `.astro`,
+  `.less`, `.mdx`, `.sass`, `.scss`, `.svelte`, and `.vue` in addition to the
+  existing JavaScript, CSS, HTML, Markdown, and configuration formats.
+- Skill ingest compiles every regex-bearing rule before registration. Invalid
+  expressions reject ingest with the rule, field, pattern index, and error
+  column; manually configured invalid rules remain visible as skipped coverage.
+
+## Personal corpus and pack assignment
+
+A personal corpus is a versioned directory of already-compiled TOML packs. It is
+the synchronization source for multiple repositories; raw `SKILL.md` files remain
+input to the ingest agent and are never copied into a repository as executable
+configuration.
+
+```text
+personal-quality-corpus/
+├── quality-runner-corpus.toml
+└── packs/
+    ├── ui-foundations.toml
+    └── security-privacy.toml
+```
+
+The manifest is explicit about pack identity, source location, classification
+hints, and which packs should be active after synchronization:
+
+```toml
+schema = "quality-runner-skill-corpus-v0.1"
+id = "personal"
+version = "0.1.0"
+active = ["ui-foundations"]
+
+[[packs]]
+id = "ui-foundations"
+path = "packs/ui-foundations.toml"
+focus = ["ui", "visual", "accessibility", "components"]
+```
+
+The normal workflow for a new skill is:
+
+```text
+raw SKILL.md → ingest candidate TOML → classify against existing packs
+             → user/agent selects pack → append or create pack → sync targets
+```
+
+Classification is advisory lexical evidence, not an automatic merge. Assign a
+candidate to an existing pack when it fits; create a new pack only when it has a
+meaningfully different domain or adoption boundary.
+
+```bash
+# Recommend existing packs.
+quality-runner skill classify /tmp/new-skill.toml \
+  --corpus-path ~/personal-quality-corpus \
+  --id new-skill \
+  --json
+
+# Preview an explicit append. Rule and review ids are namespaced and provenance
+# is recorded in [[sources]] so the contribution remains traceable.
+quality-runner skill append /tmp/new-skill.toml \
+  --corpus-path ~/personal-quality-corpus \
+  --id new-skill \
+  --pack-id ui-foundations \
+  --source-ref personal/.codex/skills/new-skill \
+  --json
+
+# Apply the append only after review.
+quality-runner skill append /tmp/new-skill.toml \
+  --corpus-path ~/personal-quality-corpus \
+  --id new-skill \
+  --pack-id ui-foundations \
+  --source-ref personal/.codex/skills/new-skill \
+  --write --json
+```
+
+If no existing pack is a fit, use the existing `skill ingest --write` flow to
+create a standalone pack, then copy that reviewed pack into the corpus and add
+its `[[packs]]` entry to the corpus manifest.
+
+Corpus synchronization is dry-run by default and additive: it registers or
+updates corpus packs, preserves target-only packs and non-skill configuration,
+and activates only the ids listed by the corpus while retaining existing active
+ids. It writes only `.quality-runner/skills/` and the skill section of
+`.quality-runner.toml`.
+
+```bash
+# Preview across multiple repositories.
+quality-runner skill sync \
+  --corpus-path ~/personal-quality-corpus \
+  --repo-path /path/to/project-a \
+  --repo-path /path/to/project-b \
+  --json
+
+# Apply after reviewing the plan.
+quality-runner skill sync \
+  --corpus-path ~/personal-quality-corpus \
+  --repo-path /path/to/project-a \
+  --repo-path /path/to/project-b \
+  --write --json
+```
+
+`--replace-active` is an explicit opt-in when a repository should adopt the
+corpus active set instead of retaining its existing active ids. Corpus paths and
+all target skill paths are containment-checked; traversal and malformed packs
+are rejected before a write begins.
 
 ## Deterministic rules
 
@@ -74,6 +177,7 @@ id = "ui-clickable-div"
 type = "disallowed_pattern"
 category = "accessibility"
 severity = "warning"
+confidence = "medium"
 paths = ["**/*.tsx", "**/*.jsx"]
 disallowed_patterns = ["<div[^>]+onClick="]
 message = "Clickable divs should usually be semantic buttons or links."
@@ -85,6 +189,12 @@ verification = "Rerun quality-runner and confirm this skill finding clears."
 Skill findings use category `skill:<skill-id>` and flow through
 `code-quality-scan.json`, `quality-audit.json`, `remediation-plan.json`,
 `slice-specs/`, and `agent-handoff.md` like other structural findings.
+The raw finding also preserves `rule_message` and `rule_category`. The scan
+records `skill_coverage` with scoped files, matched files, finding counts, and
+skip reasons. Deterministic rules default to `confidence = "medium"`; use
+`low`, `medium`, or `high` explicitly when the rule is heuristic or exact.
+Malformed rule entries remain inactive but are surfaced as configuration
+warnings during ingest and scanning instead of disappearing silently.
 
 ## Agent-assisted reviews
 
@@ -130,6 +240,151 @@ inspects the repo, and produces a review report.
 
 Quality Runner validates agent-produced findings before merging them. Findings
 without file, line, or evidence are rejected or ignored.
+The review packet prefers high recall: agents may report plausible findings with
+`observation` severity and `low` confidence when concrete source evidence exists.
+
+### Starter pack: UI Foundations
+
+The [UI Foundations starter pack](examples/ui-foundations.toml) consolidates the
+source-auditable parts of the UI skill corpus into one pack. It keeps exact or
+high-signal patterns deterministic, including decorative gradient treatments and
+likely missing loading or empty states. It sends hierarchy, interaction
+completeness, accessibility, and visual restraint to agent review because those
+standards need context.
+
+The pack is intentionally high-recall. Its low-confidence observations are
+review prompts, not automatic proof that a design choice is wrong. Copy it into
+`.quality-runner/skills/`, add it to `[quality_runner.skills.local]`, and scope it
+to the repository's UI source paths before activating it.
+
+### Starter packs: UI Specificity and Copy Specificity
+
+The [UI Specificity starter pack](examples/ui-specificity.toml) and [Copy
+Specificity starter pack](examples/copy-specificity.toml) are clean-room,
+opt-in translations of a mined anti-template workflow. They retain only the
+useful Quality Runner behavior: deterministic signals, contextual review,
+evidence-backed findings, and explicit verification. They do not assert that a
+pattern proves AI authorship, and they do not vendor an upstream scanner,
+taxonomy prose, demos, or remediation code.
+
+The UI pack is scoped to frontend source and treats gradients, colored glows,
+blurred translucent surfaces, and full rounding as design-intent candidates.
+The copy pack is deliberately scoped to product-facing content paths rather than
+generic documentation, fixtures, or examples. Both packs are observations by
+default and should be activated only after a maintainer reviews the false-positive
+profile for the target repository.
+
+The upstream repository and inspected revision are recorded in each pack's
+`[[sources]]` metadata for provenance. The inspected checkout did not include a
+license notice, so future additions must remain independently authored unless the
+upstream maintainer grants permission for reuse.
+
+### Starter pack: Test Strategy and Regression
+
+The [Test Strategy and Regression starter pack](examples/test-strategy.toml)
+converts the test-strategy corpus into source-level signals for skipped or
+focused tests and test files without visible assertions. Its agent reviews cover
+behavior and contract coverage, regression value, isolation and determinism, and
+quality-gate evidence.
+
+The deterministic checks are intentionally low-confidence observations because
+test frameworks use different assertion and marker conventions. The agent
+review must use repository evidence to distinguish a real coverage gap from an
+intentional integration test, snapshot, fixture, or exception.
+
+### Starter pack: Security and Privacy
+
+The [Security and Privacy starter pack](examples/security-privacy.toml) adds
+redaction-safe transport and cross-origin observations plus agent reviews for
+secrets, authorization, privacy-sensitive data flows, input boundaries, and
+security evidence gates.
+
+This pack complements Quality Runner's existing security candidate scanner. It
+does not reproduce secret values, attempt exploit development, or treat a
+source-only signal as a confirmed vulnerability. Agent findings must redact
+sensitive evidence and identify the evidence gap or boundary that requires
+confirmation.
+
+### Starter pack: Release Readiness
+
+The [Release Readiness starter pack](examples/release-readiness.toml) adds
+observations for verification bypasses and release workflows without visible
+quality commands. Its agent reviews cover ship evidence, blockers, compatibility
+risk, rollback and operations, and release handoff communication.
+
+The pack treats missing evidence as a finding, but does not assume that a
+configured command passed or that a repository-local workflow contains the full
+deployment environment. Those conclusions remain evidence-backed agent review
+questions.
+
+### Starter pack: PR Risk and Merge Readiness
+
+The [PR Risk starter pack](examples/pr-risk.toml) adds a high-confidence merge
+conflict-marker check and agent reviews for changed-surface mapping, contract and
+regression risk, scope cohesion, merge evidence, and review handoff.
+
+The pack requires diff or PR metadata for claims about what changed. When that
+metadata is unavailable, the review must report the evidence gap instead of
+guessing the change surface.
+
+### Starter pack: Data Integrity and Migration Safety
+
+The [Data Integrity starter pack](examples/data-integrity.toml) adds observations
+for destructive schema operations and migration deletes. Its agent reviews cover
+invariants, migration and backfill safety, pipeline reconciliation, data-loss and
+duplication risk, and verification fixtures.
+
+The deterministic checks are signals for review, not proof that a migration is
+unsafe. The agent must consider ordering, database constraints, transaction
+behavior, representative data, recovery, and the repository's actual writers
+before elevating a finding.
+
+### Starter pack: Developer Experience and Onboarding
+
+The [Developer Experience starter pack](examples/developer-experience.toml)
+adds observations for documentation placeholders and machine-specific setup
+paths. Its agent reviews cover onboarding, command discoverability,
+contribution and CI clarity, repository wayfinding, and maintainer handoff.
+
+The pack treats missing or contradictory setup evidence as a finding, but does
+not require one universal toolchain or document filename. Reviewers should use
+the repository's actual scripts, metadata, and maintained guides as the source
+of truth.
+
+### Starter pack: Architecture and Maintainability
+
+The [Architecture and Maintainability starter pack](examples/architecture-maintainability.toml)
+adds a low-confidence observation for compatibility seams without visible
+removal boundaries. Its agent reviews cover ownership and dependency direction,
+duplicated concepts, architecture tradeoffs, complexity, and migration seams.
+
+Architecture rules are intentionally repository-specific. The pack asks the
+reviewer to establish the repository's actual owners, consumers, constraints,
+and external compatibility requirements before recommending consolidation or a
+boundary change.
+
+### Starter pack: Performance Readiness
+
+The [Performance Readiness starter pack](examples/performance-readiness.toml)
+adds low-confidence observations for broad projections and recognizable
+blocking calls. Its agent reviews cover measurement, hot paths, scaling, I/O and
+concurrency, bundle/runtime behavior, and load verification.
+
+The pack does not declare code slow from static shape alone. Performance
+findings should identify the workload, runtime path, and missing measurement or
+verification evidence needed to confirm the risk.
+
+### Starter pack: Motion Quality
+
+The [Motion Quality starter pack](examples/motion-quality.toml) adds observations
+for unbounded transitions, layout-property animation, scale-zero entrances,
+ease-in UI motion, and missing reduced-motion handling. Its agent reviews cover
+motion purpose and frequency, physical timing, interruptibility, performance,
+accessibility, pointer gating, and product cohesion.
+
+The pack follows a high-recall motion-review posture. Static matches are review
+prompts; final findings should cite the interaction trigger, component role, and
+source evidence rather than treating every animation as a defect.
 
 Merge a validated report during a run:
 
@@ -174,6 +429,10 @@ quality-runner skill ingest /tmp/ui-polish.toml \
   --json
 ```
 
+For a compiled personal corpus, prefer the classify/append/sync workflow above.
+`skill ingest` remains the compatibility path for registering one standalone
+pack into one repository.
+
 Register and activate:
 
 ```bash
@@ -189,6 +448,10 @@ Skill ingest may write QR-owned files only:
 
 - `.quality-runner/skills/<skill-id>.toml`
 - `.quality-runner.toml`
+
+Each run records active skill identity (`id`, `version`, and content hash) in
+`code-quality-scan.json` and `run-manifest.json` so later audits can be compared
+against the exact skill definitions that produced them.
 
 It must not edit application source files.
 

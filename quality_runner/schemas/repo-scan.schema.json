@@ -8,6 +8,8 @@
     "schema": { "const": "quality-runner-repo-scan-v0.1" },
     "run_id": { "type": "string", "minLength": 1 },
     "repo_root": { "type": "string", "minLength": 1 },
+    "git_provenance": { "$ref": "#/$defs/gitProvenance" },
+    "provenance": { "$ref": "#/$defs/provenance" },
     "is_git_repo": { "type": "boolean" },
     "package_manager": { "type": ["string", "null"] },
     "languages": { "type": "array", "items": { "type": "string" } },
@@ -20,6 +22,37 @@
       "type": "array",
       "items": { "type": "string", "minLength": 1 },
       "default": []
+    },
+    "scan_exclusions_by_module": {
+      "type": "object",
+      "required": ["all-modules", "structural", "code_quality", "security"],
+      "properties": {
+        "all-modules": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "structural": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "code_quality": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "security": { "type": "array", "items": { "type": "string", "minLength": 1 } }
+      },
+      "additionalProperties": false
+    },
+    "scan_exclusion_preflight": {
+      "type": "object",
+      "required": ["source", "scope", "requested_paths", "effective_exclusion_patterns"],
+      "properties": {
+        "source": { "const": "cli-run-only-overlay" },
+        "scope": { "enum": ["all-modules", "module-scoped"] },
+        "security_coverage": { "type": "string", "minLength": 1 },
+        "requested_paths": { "type": "array", "items": { "type": "string" } },
+        "requested_paths_by_module": { "type": "object", "additionalProperties": { "type": "array", "items": { "type": "string" } } },
+        "effective_exclusion_patterns": { "type": "array", "items": { "type": "string" } },
+        "effective_exclusion_patterns_by_module": { "type": "object", "additionalProperties": { "type": "array", "items": { "type": "string" } } },
+        "effective_scan_exclusions": { "type": "array", "items": { "type": "string" } },
+        "effective_scan_exclusions_by_module": { "type": "object", "additionalProperties": { "type": "array", "items": { "type": "string" } } },
+        "config_sha256": { "type": ["string", "null"] },
+        "config_mutated": { "const": false },
+        "configured_scan_exclusions": { "type": "array", "items": { "type": "string" } },
+        "configured_scan_exclusions_by_module": { "type": "object", "additionalProperties": { "type": "array", "items": { "type": "string" } } }
+      },
+      "additionalProperties": false
     },
     "ecosystems": { "type": "array", "items": { "type": "string" } },
     "repo_surfaces": {
@@ -39,6 +72,11 @@
     "ci_checks": {
       "type": "array",
       "items": { "$ref": "#/$defs/ciCheck" },
+      "default": []
+    },
+    "aggregate_coverage": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/aggregateCoverage" },
       "default": []
     },
     "generated_code": {
@@ -99,7 +137,14 @@
         "status": { "type": ["string", "null"] },
         "conclusion": { "type": ["string", "null"] },
         "url": { "type": ["string", "null"] },
-        "source": { "type": "string", "minLength": 1 }
+        "source": { "type": "string", "minLength": 1 },
+        "head_sha": { "type": ["string", "null"] },
+        "ref": { "type": ["string", "null"] },
+        "workflow_run_id": { "type": ["string", "null"] },
+        "captured_at": { "type": ["string", "null"] },
+        "artifact_digest": { "type": ["string", "null"] },
+        "source_url": { "type": ["string", "null"] },
+        "quality_runner_version": { "type": ["string", "null"] }
       },
       "additionalProperties": false
     },
@@ -109,6 +154,48 @@
       "properties": {
         "path": { "type": "string", "minLength": 1 },
         "evidence": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": false
+    },
+    "gitProvenance": {
+      "type": "object",
+      "properties": {
+        "is_repo": { "type": "boolean" },
+        "head_sha": { "type": ["string", "null"] },
+        "branch": { "type": ["string", "null"] },
+        "dirty": { "type": ["boolean", "null"] },
+        "ref": { "type": ["string", "null"] },
+        "quality_runner_version": { "type": "string", "minLength": 1 },
+        "captured_at": { "type": "string", "format": "date-time" },
+        "worktree_mode": { "enum": ["in-place", "disposable"] },
+        "workflow_run_id": { "type": ["string", "null"] }
+      },
+      "additionalProperties": false
+    },
+    "provenance": {
+      "type": "object",
+      "required": ["head_sha", "branch", "ref", "quality_runner_version", "captured_at", "worktree_mode", "workflow_run_id"],
+      "properties": {
+        "head_sha": { "type": ["string", "null"] },
+        "branch": { "type": ["string", "null"] },
+        "ref": { "type": ["string", "null"] },
+        "quality_runner_version": { "type": "string", "minLength": 1 },
+        "captured_at": { "type": "string", "format": "date-time" },
+        "worktree_mode": { "enum": ["in-place", "disposable"] },
+        "workflow_run_id": { "type": ["string", "null"] }
+      },
+      "additionalProperties": false
+    },
+    "aggregateCoverage": {
+      "type": "object",
+      "required": ["script", "command", "covered_gate_ids", "uncovered_gate_ids", "opaque"],
+      "properties": {
+        "script": { "type": "string", "minLength": 1 },
+        "command": { "type": "string", "minLength": 1 },
+        "covered_gate_ids": { "type": "array", "items": { "type": "string" } },
+        "uncovered_gate_ids": { "type": "array", "items": { "type": "string" } },
+        "opaque": { "type": "boolean" },
+        "reason": { "type": "string" }
       },
       "additionalProperties": false
     },

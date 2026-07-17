@@ -1,23 +1,26 @@
 # Release Checklist
 
-Quality Runner publishes Python distributions from the `Release` GitHub Actions
-workflow when a `v*.*.*` tag is pushed. The next release tag is `v0.5.1`.
-For tag-triggered publication, the workflow verifies that the tagged commit is
-an ancestor of `main` before it can publish.
+Quality Runner publishes Python distributions from the `Release` GitHub
+Actions workflow when a `v*.*.*` tag is pushed. For the current release cut,
+the selected version is `0.6.0`; future releases must choose a new version
+instead of reusing an existing tag or package release. For tag-triggered
+publication, the workflow verifies that the tagged commit is an ancestor of
+`main` before it can publish.
 
 The package version has one source of truth in `quality_runner/_version.py` and
 is read dynamically by package metadata. The release workflow installs the
 built wheel before publishing and checks its CLI doctor contract, release smoke,
 and MCP outcome-tool discovery alongside tag, plugin, and citation parity.
 
-`0.5.1` is an unreleased candidate until the tag workflow has completed and
-PyPI verification succeeds. Its committed `CITATION.cff` metadata must match
-the tag; neither is evidence of publication by itself. The checked-in Homebrew
-formula is an older `0.2.0` template, not current published-release metadata;
-update it only after the `0.5.1` source distribution is live.
+The selected version remains an unreleased candidate until the tag workflow has
+completed and PyPI verification succeeds. Its committed `CITATION.cff`
+metadata must match the tag; neither is evidence of publication by itself. The
+checked-in Homebrew formula is an older `0.2.0` template, not current
+published-release metadata; update it only after the selected source
+distribution is live.
 
 Release tags are permanent. Check the existing Git tags and PyPI releases before
-choosing a new version; never reuse a tag, including `v0.5.0`.
+choosing a new version; never reuse a tag, including `v0.5.0` or `v0.5.1`.
 
 ## Pre-tag validation
 
@@ -42,15 +45,16 @@ choosing a new version; never reuse a tag, including `v0.5.0`.
    pass/fail verdicts; record the code-context review and do not tag with a
    confirmed vulnerability or unresolved structural defect.
 3. Confirm the PyPI Trusted Publisher settings before tagging.
-4. Review the [Upgrade and Compatibility Guide](upgrade.md), then update
-   `CITATION.cff` to `0.5.1`, commit the release metadata, and merge the
-   verified release branch to `main`.
-5. Push `v0.5.1` from that release commit.
+4. Review the [Upgrade and Compatibility Guide](upgrade.md), update
+   `quality_runner/_version.py`, `quality_runner/plugin/manifest.json`, and
+   `CITATION.cff` to the selected version, commit the release metadata, and
+   merge the verified release branch to `main`.
+5. Push the matching `v<version>` tag from that release commit.
 6. Confirm the GitHub Actions release workflow publishes the package.
 7. Verify the published artifact:
 
    ```bash
-   uv tool install 'quality-runner==0.5.1' --force
+   uv tool install 'quality-runner==0.6.0' --force
    quality-runner --version
    quality-runner doctor --json
    quality-runner release-smoke --json
@@ -83,13 +87,13 @@ Before tagging, confirm PyPI has a pending or active trusted publisher with:
 - Environment name: `pypi`
 
 If that publisher is missing, create it from the PyPI account publishing page
-before pushing `v0.5.1`. The release must not be tagged until these claims match
-the GitHub workflow.
+before pushing the selected version tag. The release must not be tagged until
+these claims match the GitHub workflow.
 
 ## Homebrew
 
 `packaging/homebrew/quality-runner.rb` is currently an older `0.2.0` template.
-Use it only after the PyPI source distribution for `0.5.1` is live. Recompute
-the `sha256` from the published source artifact, update the formula URL/version,
-run the formula install/audit checks, and commit the formula update after PyPI
-verification.
+Use it only after the PyPI source distribution for the selected version is live.
+Recompute the `sha256` from the published source artifact, update the formula
+URL/version, run the formula install/audit checks, and commit the formula update
+after PyPI verification.

@@ -49,13 +49,33 @@ cd quality-runner
 uv tool install --editable . --force
 ```
 
+The editable install exposes both `quality-runner` and the shorter `qr`
+command. After the one-time install, run QR against a local repository without
+passing `--project`:
+
+```bash
+qr refresh /path/to/repo --json
+```
+
 Verify the installed commands:
 
 ```bash
 quality-runner --version
+qr --version
 quality-runner-mcp --version
 quality-runner doctor --json
 ```
+
+When Quality Runner is installed from this checkout in editable mode, refresh
+the installed command surface after local changes with:
+
+```bash
+quality-runner self-update --json
+```
+
+For an explicit local checkout, pass `--source /path/to/quality-runner`.
+Without an editable checkout, the command falls back to `uv tool upgrade
+quality-runner`.
 
 Quality Runner also carries compatibility surfaces for the two smaller extracted
 packages it supersedes publicly:
@@ -126,6 +146,7 @@ Quality Runner writes artifacts under the target repo:
   run-manifest.json
   quality-audit.json
   remediation-plan.json
+  remediation-context.json
   resolution-ledger.json
   resolution-ledger.md
   slice-specs/
@@ -134,6 +155,10 @@ Quality Runner writes artifacts under the target repo:
   agent-handoff.md
 ```
 
+`remediation-plan.json` includes deterministic domain `phase_candidates` when
+available. Each candidate retains links to its forensic leaf `slice_ids`, so
+the domain view can organize work without losing the original evidence.
+
 The normal workflow is:
 
 1. Read `agent-handoff.md`.
@@ -141,10 +166,14 @@ The normal workflow is:
 3. Review `quality-audit.json` for evidence-backed findings.
 4. Review `code-quality-scan.json` for structural warnings and line evidence.
 5. Review `remediation-plan.json` for ordered actions and verification gates.
-6. For multi-slice work, convert the QR handoff into GSD-style phases, plans,
-   ledgers, and batch summaries before editing.
-7. Execute one coherent batch at a time.
-8. Rerun Quality Runner to confirm findings clear and update the resolution ledger.
+6. Review `remediation-context.json` before source changes; it groups findings
+   by bounded slice and records the evidence fields required for agent work.
+7. For multi-slice work, run `quality-runner plan auto` to create QR-owned
+   security-first domain phases and linked bounded plans.
+8. Dispatch the next ready plan, execute one coherent batch externally, and
+   record its structured result with `phase record-batch`.
+9. Rerun Quality Runner, then use `phase update`, `phase verify`, and `phase
+   close` to refresh the evidence and phase state.
 
 See [Agent Usage](docs/agent-usage.md) for the copy-paste phase and batch
 templates agents should follow.
@@ -172,6 +201,7 @@ quality-runner status /path/to/repo --json
 quality-runner inspect /path/to/repo --json
 quality-runner run /path/to/repo --json
 quality-runner verify-gates /path/to/repo --json
+quality-runner exclusions suggest /path/to/repo --json
 quality-runner refresh /path/to/repo --run-id-prefix refresh-001 --handoff-output handoff.md --json
 quality-runner refresh /path/to/repo --run-id-prefix task-001-pass-1 \
   --intent "Implement the requested task" --review-cycle-id task-001 \
@@ -179,11 +209,21 @@ quality-runner refresh /path/to/repo --run-id-prefix task-001-pass-1 \
 quality-runner release-smoke --json
 quality-runner validate-report worker-report.json --json
 quality-runner validate-handoff handoff.json --json
+quality-runner validate-remediation-context remediation-context.json --remediation-plan remediation-plan.json --json
 quality-runner validate-slice-spec slice-spec.md --json
 quality-runner review-worker /path/to/repo --baseline-run-id before --final-run-id after --worker-report worker-report.json --json
 quality-runner controller-report lint worker-report.json --strict --json
 quality-runner export-handoff /path/to/repo
 quality-runner export-slice-specs /path/to/repo --run-id run-001 --json
+quality-runner remediation-delta /path/to/repo --run-id current --baseline-run-id baseline --json
+quality-runner plan init /path/to/repo --json
+quality-runner plan status /path/to/repo --json
+quality-runner plan auto /path/to/repo --run-id baseline-001-run --json
+quality-runner phase next /path/to/repo --phase 1 --json
+quality-runner phase record-batch /path/to/repo --phase 1 --plan 1 --result-file batch.json --json
+quality-runner phase update /path/to/repo --phase 1 --baseline-run-id before --run-id after --json
+quality-runner phase verify /path/to/repo --phase 1 --run-id after --json
+quality-runner phase close /path/to/repo --phase 1 --run-id after --json
 quality-runner-mcp
 repo-quality-certifier plan --repo-root /path/to/repo --json
 repo-quality-certifier-mcp
@@ -207,10 +247,10 @@ constraints from executed command failures. Blocked or failed handoffs include `
 you want the scan and the human remediation plan from one command; use
 `export-handoff` later to regenerate or copy a handoff from an existing run.
 `export-slice-specs` regenerates per-slice cold-executor plans under
-`slice-specs/`. For large remediations, agents should use QR output as evidence
-for a GSD-style phase plan rather than editing directly from the handoff. For a
-single queued slice, start from the matching `slice-specs/<slice-id>.md` when
-present.
+`slice-specs/`. For large remediations, use the QR-owned phase workflow to
+organize domain candidates and dispatch bounded leaf-slice work. GSD remains an
+optional external planning consumer. For a single queued slice, start from the
+matching `slice-specs/<slice-id>.md` when present.
 
 For an agent-driven implement-review loop, pass the task through the existing
 `--intent` or `--intent-file` input and add `--review-cycle-id` plus a
@@ -277,7 +317,7 @@ limits.
 
 ## Standards Profiles
 
-The built-in profile is `default`. Repos can also save custom profiles in
+The built-in profiles are `default` and `release`. Repos can also save custom profiles in
 `.quality-runner.toml`:
 
 ```bash
@@ -315,7 +355,17 @@ product workspaces. Add repo-specific exclusions in `.quality-runner.toml`:
 ```toml
 [quality_runner]
 scan_exclusions = ["samples", "generated-reports/**"]
+
+[quality_runner.scan_exclusions_by_module]
+code_quality = ["generated-output/**"]
 ```
+
+The legacy `scan_exclusions` list applies to all QR-owned scan modules. The
+optional module table supports `structural`, `code_quality`, and `security`
+scopes; a structural or code-quality exclusion preserves security coverage.
+Use `quality-runner exclusions suggest` to produce a deterministic review
+packet before changing configuration. Only `exclusions apply --apply` can
+mutate `.quality-runner.toml`.
 
 ## Safety Boundary
 

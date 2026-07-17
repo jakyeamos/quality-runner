@@ -4,8 +4,9 @@ from pathlib import Path
 from typing import Any
 
 from quality_runner.application.gate_verification import run_gate_verification
-from quality_runner.core.audit_contracts import AuditPayload
+from quality_runner.core.audit_contracts import AuditPayload, ScanExclusionOverlay
 from quality_runner.core.verification_contracts import GateExecutionPolicy, VerificationRequest
+from quality_runner.progress import ProgressCallback
 from quality_runner.workflow_internal import generated_run_id
 
 
@@ -14,6 +15,7 @@ def verify_gates_payload(
     run_id: str | None = None,
     profile: str | None = None,
     ci_status_json: Path | None = None,
+    readiness_evidence_file: Path | None = None,
     timeout_seconds: int = 120,
     checkout_most_advanced_branch: bool = False,
     read_only_gates: bool = False,
@@ -23,6 +25,9 @@ def verify_gates_payload(
     skill_review_report: AuditPayload | None = None,
     intent: AuditPayload | None = None,
     execute_discovered_gates: bool = False,
+    agent_review_mode: str | None = None,
+    scan_exclusion_overlay: ScanExclusionOverlay | None = None,
+    progress: ProgressCallback | None = None,
 ) -> dict[str, Any]:
     result = run_gate_verification(
         VerificationRequest(
@@ -30,6 +35,7 @@ def verify_gates_payload(
             run_id=generated_run_id() if run_id is None else run_id,
             profile=profile,
             ci_status_json=ci_status_json,
+            readiness_evidence_file=readiness_evidence_file,
             checkout_most_advanced_branch=checkout_most_advanced_branch,
             policy=GateExecutionPolicy(
                 timeout_seconds=timeout_seconds,
@@ -41,7 +47,10 @@ def verify_gates_payload(
             ),
             skill_review_report=skill_review_report,
             intent=intent,
-        )
+            scan_exclusion_overlay=scan_exclusion_overlay,
+            agent_review_mode=agent_review_mode,
+        ),
+        progress=progress,
     )
     return {
         "schema": "quality-runner-verify-gates-result-v0.1",

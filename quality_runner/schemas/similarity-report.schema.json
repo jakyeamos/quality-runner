@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://quality-runner.local/schemas/similarity-report.schema.json",
+  "title": "Quality Runner similarity report",
+  "type": "object",
+  "required": [
+    "schema",
+    "backend",
+    "status",
+    "clusters",
+    "findings",
+    "scanner_status"
+  ],
+  "properties": {
+    "schema": {
+      "const": "quality-runner-similarity-v0.1"
+    },
+    "backend": {
+      "enum": ["native", "external"]
+    },
+    "status": {
+      "enum": ["executed", "failed", "missing", "not_applicable", "skipped"]
+    },
+    "clusters": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "kind", "similarity", "threshold", "candidates"],
+        "properties": {
+          "id": {"type": "string", "pattern": "^SIM-[0-9]{3,}$"},
+          "source": {"type": "string"},
+          "kind": {"type": "string"},
+          "reason": {"type": "string"},
+          "similarity": {"type": "number", "minimum": 0, "maximum": 1},
+          "score": {},
+          "threshold": {"type": "number", "minimum": 0, "maximum": 1},
+          "candidates": {
+            "type": "array",
+            "minItems": 2,
+            "items": {
+              "type": "object",
+              "required": ["file", "line", "end_line", "name", "line_count"],
+              "properties": {
+                "file": {"type": "string"},
+                "line": {"type": "integer", "minimum": 1},
+                "end_line": {"type": "integer", "minimum": 1},
+                "name": {"type": "string"},
+                "line_count": {"type": "integer", "minimum": 1}
+              }
+            }
+          }
+        }
+      }
+    },
+    "findings": {
+      "type": "array",
+      "items": {"type": "object"}
+    },
+    "scanner_status": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["tool", "status"],
+        "properties": {
+          "tool": {"type": "string"},
+          "status": {"type": "string"}
+        }
+      }
+    }
+  }
+}

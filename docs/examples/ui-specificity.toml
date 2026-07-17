@@ -1,0 +1,79 @@
+id = "ui-specificity"
+name = "UI Specificity"
+version = "0.1.0"
+description = "Opt-in observations for generic visual defaults that deserve a design-intent review."
+
+[[sources]]
+id = "kill-ai-slop-clean-room"
+ref = "https://github.com/yetone/kill-ai-slop"
+version = "inspected-2026-07-13"
+
+[[deterministic_rules]]
+id = "multi-hue-accent-gradient"
+type = "disallowed_pattern"
+category = "visual-intent"
+severity = "observation"
+confidence = "low"
+paths = ["**/*.astro", "**/*.css", "**/*.html", "**/*.jsx", "**/*.less", "**/*.mdx", "**/*.sass", "**/*.scss", "**/*.svelte", "**/*.tsx", "**/*.vue"]
+disallowed_patterns = ['(?i)(?:linear-gradient|bg-gradient-to-[a-z]+)[^;\n]*(?:indigo|violet|purple|fuchsia)[^;\n]*(?:purple|violet|fuchsia|pink)']
+message = "A multi-hue accent gradient is a design-intent candidate, not an automatic defect."
+risk = "A familiar accent treatment can become visual decoration without a product-specific reason."
+expected = "Confirm the gradient has a deliberate role, or prefer a chosen solid accent and document the exception when it remains."
+verification = "Review the rendered element in context, then rerun quality-runner after resolving or accepting the observation."
+
+[[deterministic_rules]]
+id = "accent-colored-glow"
+type = "disallowed_pattern"
+category = "visual-intent"
+severity = "observation"
+confidence = "low"
+paths = ["**/*.astro", "**/*.css", "**/*.html", "**/*.jsx", "**/*.less", "**/*.mdx", "**/*.sass", "**/*.scss", "**/*.svelte", "**/*.tsx", "**/*.vue"]
+disallowed_patterns = ['(?i)\bshadow-(?:indigo|violet|purple|fuchsia|pink)-\d+(?:/\d+)?\b']
+message = "A hue-matched glow shadow needs a contextual visual review."
+risk = "Colored glow can compete with the content or repeat a decorative treatment across unrelated surfaces."
+expected = "Keep the glow only when it communicates focus, state, or a documented brand treatment; otherwise use a tighter neutral elevation."
+verification = "Inspect the shadow at normal and compact viewport sizes, then rerun quality-runner after resolving or accepting the observation."
+
+[[deterministic_rules]]
+id = "translucent-blur-surface"
+type = "disallowed_pattern"
+category = "visual-intent"
+severity = "observation"
+confidence = "low"
+paths = ["**/*.astro", "**/*.css", "**/*.html", "**/*.jsx", "**/*.less", "**/*.mdx", "**/*.sass", "**/*.scss", "**/*.svelte", "**/*.tsx", "**/*.vue"]
+disallowed_patterns = ['(?i)(?:backdrop-filter\s*:\s*blur|backdrop-blur(?:-[a-z0-9]+)?)']
+message = "A translucent blur surface needs a reason beyond atmospheric decoration."
+risk = "Blurred translucent surfaces can reduce contrast and create layered chrome that obscures grouping."
+expected = "Confirm the surface supports hierarchy or state, then verify contrast and fallback behavior; otherwise use a solid surface."
+verification = "Review contrast and the rendered surface without blur, then rerun quality-runner after resolving or accepting the observation."
+
+[[deterministic_rules]]
+id = "pill-shaped-surface"
+type = "disallowed_pattern"
+category = "visual-intent"
+severity = "observation"
+confidence = "low"
+paths = ["**/*.astro", "**/*.css", "**/*.html", "**/*.jsx", "**/*.less", "**/*.mdx", "**/*.sass", "**/*.scss", "**/*.svelte", "**/*.tsx", "**/*.vue"]
+disallowed_patterns = ['(?i)\brounded-full\b', '(?i)\bborder-radius\s*:\s*(?:9999px|50%)']
+message = "A fully rounded surface should be reviewed for component-specific intent."
+risk = "Pill-like geometry can make controls, cards, and status elements lose their role distinction when reused broadly."
+expected = "Reserve full rounding for controls or statuses that benefit from it, and use the product's smaller radius scale for ordinary surfaces."
+verification = "Review the component role and neighboring geometry, then rerun quality-runner after resolving or accepting the observation."
+
+[[agent_reviews]]
+id = "visual-intent-and-system-fit"
+category = "visual-intent"
+severity = "observation"
+paths = ["**/*.astro", "**/*.css", "**/*.html", "**/*.jsx", "**/*.less", "**/*.mdx", "**/*.sass", "**/*.scss", "**/*.svelte", "**/*.tsx", "**/*.vue"]
+focus = ["design intent", "shared tokens", "visual hierarchy", "contrast", "surface roles", "false positives"]
+rubric = """
+Review deterministic visual-style candidates as leads, not verdicts.
+
+For each candidate, inspect the component role, nearby shared tokens, product
+brand, accessibility consequences, repetition across the surface, and whether
+the treatment communicates state or hierarchy. Report only evidence-backed
+observations with exact file, line, and source evidence. Treat documented brand
+colors, logos, status indicators, intentional focus treatments, and a single
+deliberate hero treatment as possible intentional choices. Do not claim that a
+choice is AI-generated or require visual conformity without repository evidence.
+"""

@@ -1,6 +1,6 @@
 # Quality Runner Project Truth
 
-Last updated: 2026-07-13
+Last updated: 2026-07-17
 
 ## Current State
 
@@ -54,12 +54,40 @@ for private fields, malformed syntax, computed logging, and tokenless values.
 README. `c71b130` adds a pinned Python dependency audit and validates untrusted
 baseline Git revisions before review-delta comparisons. Its reviewed merge,
 tag, release workflow, and published-artifact smoke checks have completed.
+`b193900` adds the release-profile readiness contract: repository and CI
+provenance, repo-local release evidence validation, aggregate command coverage,
+artifact-manifest/read-only gates, publication-boundary review triggers, CLI and
+refresh evidence overrides, and compatibility-preserving v0.5.1 wiring.
+`67bd698` completes the remaining quality workflow port: local-first self-update,
+stderr progress reporting, resolution-aware planning, domain phase candidates,
+read-only filesystem integrity, structured verification contracts, skill
+decomposition, UI quality fixtures, and starter-pack examples.
+The architecture-preserving port is now integrated and published on canonical
+`dev`; its 650-test/static-analysis/release-smoke evidence remains attached to
+the port commits, and no package version bump or release tag was created.
+The short `qr` console command is now part of the canonical dev CLI surface. It
+maps to the same `quality_runner.cli:main` entrypoint as `quality-runner`, keeps
+the v0.5.1-compatible package version, and is covered by packaged entrypoint
+tests.
+The isolated `codex/release-0.6.0` branch is now at `b5a610e`, preparing the
+0.6.0 package, citation, changelog, upgrade, and release-checklist metadata.
+The release-readiness contract recognizes dynamic `_version.py` metadata and
+the installed-wheel `release-smoke` CI command. Workflow discovery now keeps
+the exact commands declared by CI, with 49 focused regression tests and green
+exact-head GitHub CI; the final release profile, merge, tag, and publication
+remain pending for this new head.
 
 ## Current Position
 
 - Target: a typed v2 core behind CLI, MCP, and compatibility adapters.
-- Next implementation slice: no active release work; start a new scoped
-  follow-up from `main` when product feedback or a new requirement arrives.
+- Next slice: rerun the v0.6.0 release profile at `b5a610e`, then merge the
+  verified release branch to `main`, tag it, and verify PyPI publication.
+- `codex/release-0.6.0` is the isolated release branch from canonical `dev`;
+  `main` remains the published v0.5.1 baseline until promotion succeeds.
+- `dev` is the canonical integration branch and is published to `origin/dev`.
+  The temporary `codex/dev-feature-port` worktree/ref and the superseded
+  `quality-skill-corpus-workflow` branch were pruned after the behavioral port
+  audit; unrelated active branches remain separate.
 - Canonical planning documents: `docs/modernization/`.
 - Public compatibility: retain `quality_evidence_contract` and
   `repo_quality_certifier` during a published transition window.
@@ -84,6 +112,57 @@ tag, release workflow, and published-artifact smoke checks have completed.
   have a versioned v2 outcome contract behind preserved v1 projections.
 - Release smoke now checks package/runtime/plugin parity and the release
   workflow enforces tag, wheel, manifest, citation, and MCP outcome contracts.
+- `da79745` ports the first Quality Skills contract batch into the v0.5.1
+  application architecture: deterministic coverage, review verification
+  contracts, redacted finding metadata, skill identities, and manifest/schema
+  support. The touched-module slice passes 63 tests, Ruff, formatting,
+  compilation, and Basedpyright.
+- `94b2d42` ports canonical global skill-corpus selection, repository signal
+  scoring, QR-native similarity, module-status reporting, and workflow/run
+  summary exposure while retaining the v0.5.1 application seams. The focused
+  port slice passes 78 tests, Ruff, formatting, compilation, and Basedpyright.
+- `f75c431` adds repository-configured artifact redaction and retention,
+  redacts append-only gate responses at write time, and exposes a
+  dry-run-by-default `prune-artifacts` command while retaining symlink-safe
+  artifact path handling. The focused artifact/CLI slice passes 77 tests,
+  Ruff, formatting, and Basedpyright.
+- `f292a1e` adds the source-first consumer runner surface: a checkout-aware
+  Python command builder, an executable latest/local launcher, and rollout
+  provenance/rerun commands that identify the QR source and version. The
+  focused rollout/tooling slice passes 9 tests plus launcher smoke checks.
+- `831d9a4` exposes corpus classification, append, and synchronization through
+  the skill CLI, keeping sync dry-run by default and validating review reports
+  against the selected local/global skill set. The focused skill/corpus/CLI
+  slice passes 62 tests, Ruff, formatting, and BasedPyright.
+- `87d81f8` adds the tool-neutral `remediation-delta` comparison and CLI
+  surface, persisting current/baseline evidence without modifying GSD or QR
+  planning files. The focused remediation/delta/CLI slice passes 52 tests,
+  Ruff, formatting, and BasedPyright.
+- `960d094` adds QR-owned native phase planning: security-first domain
+  candidates, deterministic waves and dependencies, batch summaries, delta
+  updates, verification/close state, and a complete CLI/schema contract while
+  preserving the root GSD planning namespace. The focused phase/config/delta/
+  CLI slice passes 60 tests, Ruff, formatting, and BasedPyright.
+- `74e368a` ports scan-exclusion preflight with deterministic candidate packets,
+  review/validate/apply staging, protected-path and symlink checks, module-
+  scoped exclusion overlays, security-coverage preservation, CLI/artifact/
+  manifest wiring, and persistent config support. The full 604-test suite,
+  Ruff, formatting, and BasedPyright pass.
+- `287fe95` adds the source-read-only remediation-context contract: bounded
+  slice context records, risk-aware evidence requirements, plan/handoff
+  readiness references, `remediation-context.json` artifact wiring for run and
+  verify workflows, and the `validate-remediation-context` CLI. The full
+  609-test suite, Ruff, formatting, and BasedPyright pass.
+- `546122e` keeps the remediation-delta module under QR's default 500-line
+  source threshold without changing its evidence contract; the focused delta
+  and source-size checks pass.
+- `67bd698` completes the remaining source-branch quality surfaces while
+  retaining the current application and compatibility architecture; the full
+  650-test suite, Ruff, formatting, BasedPyright, and release smoke pass.
+
+`b5a610e` keeps exact CI workflow commands during release-gate discovery;
+  focused regression tests pass, exact-head GitHub CI is green, and the release
+  profile must be rerun for this changed head.
 
 ## Risks
 
@@ -95,8 +174,65 @@ tag, release workflow, and published-artifact smoke checks have completed.
   consent and a disposable checkout but does not sandbox those commands.
 - Combined file-adapter task provenance remains the baseline-compatible string
   `"None"` until a published compatibility cutover can change that projection.
+- Persistent scan exclusions require review evidence and explicit `--apply`;
+  run-only overlays are intentionally recorded as non-mutating evidence.
+- Fresh remediation contexts intentionally begin as `needs-understanding` and
+  block handoff validation until the external worker records the required
+  evidence for its selected slice.
+- The release profile intentionally blocks without current CI provenance,
+  repo-local release evidence, disposable execution where required, and owner
+  acceptance; it does not infer release readiness from configured commands.
 
 ## Recent Progress
+
+- 2026-07-17: `a3777b1` fixes release-profile discovery for dynamic package
+  versions and installed-wheel release smoke, with 49 focused tests passing.
+- 2026-07-17: `b5a610e` makes release-gate discovery execute the exact commands
+  declared by CI, including scoped Vulture coverage; focused tests pass and
+  exact-head GitHub CI is green.
+- 2026-07-17: `23da809` prepares the isolated v0.6.0 release branch from
+  canonical `dev`; no merge, tag, or publication has occurred.
+- 2026-07-17: Folded the short `qr` console command into the canonical `dev`
+  line from `codex/qr-command-surface-main`; focused entrypoint tests, Ruff,
+  formatting, and diff checks pass. No version bump or release tag was made.
+- 2026-07-17: `67bd698` completes the remaining quality workflow port with
+  local self-update, progress, resolution-aware planning, phase candidates,
+  read-only integrity, verification contracts, skill decomposition, UI quality,
+  starter packs, and 650 passing tests.
+- 2026-07-17: canonical `dev` receives the architecture-preserving port and is
+  published to `origin/dev`; the completed port branch and superseded source
+  branch are pruned, while unrelated active branches remain untouched.
+- 2026-07-17: `b193900` ports release-profile readiness with provenance,
+  repo-local evidence validation, aggregate coverage, artifact/read-only gates,
+  publication review triggers, CLI/refresh propagation, and 621 passing tests.
+- 2026-07-17: `287fe95` adds remediation-context packets and readiness
+  validation to run/verify artifacts while keeping source changes external and
+  preserving the v0.5.1 application/compatibility seams.
+- 2026-07-17: `74e368a` adds scan-exclusion preflight and module-aware run-only
+  overlays while preserving security coverage for structural/code-quality
+  exclusions and retaining the current application/compatibility façades.
+- 2026-07-17: `546122e` reduces remediation-delta implementation noise while
+  preserving its fingerprints, package evidence, and recommendation payload.
+- 2026-07-17: `960d094` adds the native QR phase lifecycle and domain-aware
+  `plan auto` workflow under `.planning/quality-runner/`; it remains advisory,
+  idempotent, and separate from source changes, commits, pushes, and root GSD.
+- 2026-07-17: `87d81f8` adds remediation delta evidence and the explicit
+  `remediation-delta` command, preserving the boundary between QR evidence and
+  project planning systems.
+- 2026-07-17: `831d9a4` completes the skill corpus command surface for
+  classify/append/sync and makes selected-skill review coverage explicit.
+- 2026-07-17: `f292a1e` routes rollout provenance and consumer invocation
+  through a checkout-aware source-first runner, with local and refreshed
+  latest modes documented for downstream repositories.
+- 2026-07-17: `f75c431` ports artifact privacy/retention and gate-response
+  redaction into the current application architecture, with an explicit
+  `prune-artifacts` command that never deletes unless `--apply` is supplied.
+- 2026-07-17: `94b2d42` ports the canonical skill corpus and selection layer,
+  QR-native similarity, and module-status observability into the isolated
+  canonical-dev port branch; the application façade remains intact.
+- 2026-07-17: `da79745` ports the first Quality Skills contract batch into
+  canonical `dev` while retaining the application workflow façades and
+  evidence-redaction boundary.
 
 - 2026-07-13: v0.5.1 released: PR #2 merged at `a101bd4`, tag workflow and
   six-job CI passed, PyPI publishes wheel/sdist, GitHub Release is public, and
@@ -107,33 +243,3 @@ tag, release workflow, and published-artifact smoke checks have completed.
 - 2026-07-13: `948107f` prepares v0.5.1 metadata and the main README release
   guidance; final pre-tag checks, PR merge, tag, PyPI publication, and GitHub
   Release creation remain in sequence.
-- 2026-07-13: `141635e` closes the focused source-evidence follow-up with
-  lexer-backed private-field, malformed-syntax, computed-log, and tokenless
-  value protection; 554 tests and two independent reviews are clean.
-- 2026-07-13: Independent merge review found four P2s. `bf6c9e7` closes
-  typed/commented/expression source-evidence gaps; `b4b5e6e` preserves v0.1,
-  emits v0.2 consent-aware gates, and corrects skill/release instructions.
-- 2026-07-13: M7 completed in `279cc8a`: context-aware redaction covers
-  multiline source evidence and security candidates; built wheels smoke the MCP
-  Review outcome as well as default v2 and frozen v1 CLI output.
-- 2026-07-13: `cd30948` adds `main`-ancestry release gating, built-wheel Review
-  projection checks, and accurate historical rollback/Homebrew documentation.
-- 2026-07-13: `4dee5af` closes the source-evidence redaction bypass across
-  code-quality, slice-enrichment, and security candidate artifacts; `27deaa4`
-  resolves its package-cycle regression.
-- 2026-07-13: `9fcea7d` restored positional workflow compatibility, the frozen
-  Review v1 field shape, and the `ReviewFinding` facade without weakening the
-  default v2 packet-ready outcome.
-- 2026-07-13: M7 compatibility regression in `dc09ec0`: default Review
-  outcomes retain v1-readable persisted artifacts for downgrade safety.
-- 2026-07-13: M7 guidance in `633b96e`: canonical upgrade/rollback policy,
-  release evidence, and artifact-sensitivity guidance now match the cutover.
-- 2026-07-13: M7 cutover in `32e7b26`: CLI Review defaults to v2, retains
-  `--legacy-output` v1 JSON through 0.7.x, and documents legacy MCP discovery.
-- 2026-07-13: Began M7 in `113f143`: security candidates redact secret-like
-  literals before fingerprints and persisted scan/audit/handoff evidence.
-- 2026-07-13: M7 release evidence in `66ce3ef`: pinned development tools and
-  installed-wheel doctor, release-smoke, and MCP outcome discovery checks.
-- 2026-07-13: Completed M6 on `codex/gpt56-modernization` (`0b5ac2e`,
-  `56c94d4`): application-owned workflow/outcome/packet/report paths, typed
-  root façades, built-wheel compatibility, 520 passing tests, and clean reviews.

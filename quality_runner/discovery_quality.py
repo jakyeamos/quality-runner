@@ -277,6 +277,12 @@ def _ci_quality_commands(
         ("tests", "pytest", "uv run --with pytest pytest -q", "python"),
         ("dead_code", "vulture", "uv run --with vulture vulture . --min-confidence 70", "python"),
         ("build", "uv build", "uv build", "python"),
+        (
+            "package_consumer_smoke",
+            "quality-runner release-smoke",
+            "quality-runner release-smoke --json",
+            "python",
+        ),
         ("runtime_smoke", "quality-runner doctor --json", "quality-runner doctor --json", "python"),
         ("lint", "pnpm lint", "pnpm lint", "javascript"),
         ("lint", "ultracite check", "pnpm check", "javascript"),
@@ -292,7 +298,7 @@ def _ci_quality_commands(
         commands.append(
             _quality_command(
                 capability_id=capability_id,
-                command=command,
+                command=_workflow_run_command(text, needle=needle, fallback=command),
                 source_type="github_workflow",
                 source=".github/workflows",
                 language=language,
@@ -310,6 +316,20 @@ def _ci_quality_commands(
             )
         )
     return commands
+
+
+def _workflow_run_command(text: str, *, needle: str, fallback: str) -> str:
+    for line in text.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("- run:"):
+            candidate = stripped.removeprefix("- run:").strip()
+        elif stripped.startswith("run:"):
+            candidate = stripped.removeprefix("run:").strip()
+        else:
+            continue
+        if candidate and candidate != "|" and needle in candidate:
+            return candidate
+    return fallback
 
 
 def _quality_command(

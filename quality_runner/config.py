@@ -5,7 +5,9 @@ from pathlib import Path
 from typing import Any
 
 from quality_runner.architecture_config_parse import parse_architecture_section
+from quality_runner.artifact_config_parse import parse_artifacts_section
 from quality_runner.integrate_config_parse import parse_integrate_section
+from quality_runner.scan_exclusions_config import parse_scan_exclusions_by_module
 from quality_runner.security.config_parse import parse_security_section
 from quality_runner.skills_config_parse import parse_skills_section
 from quality_runner.structural_scan_config_parse import parse_structural_scan_section
@@ -58,6 +60,10 @@ def load_repo_config(repo_root: Path) -> dict[str, Any]:
     scan_exclusions = _string_list(
         section.get("scan_exclusions"), "quality_runner.scan_exclusions", warnings
     )
+    scan_exclusions_by_module, module_warnings = parse_scan_exclusions_by_module(
+        section.get("scan_exclusions_by_module")
+    )
+    warnings.extend(module_warnings)
     gates = _gates(section.get("gates"), warnings)
     exceptions = _accepted_exceptions(section.get("accepted_exceptions"), warnings)
     accepted_dispositions = _accepted_dispositions(section.get("accepted_dispositions"), warnings)
@@ -67,11 +73,13 @@ def load_repo_config(repo_root: Path) -> dict[str, Any]:
     severity_overrides = _string_mapping(
         section.get("severity_overrides"), "quality_runner.severity_overrides", warnings
     )
+    artifacts = parse_artifacts_section(section.get("artifacts"), warnings)
     structural_scan = parse_structural_scan_section(section.get("structural_scan"), warnings)
     integrate = parse_integrate_section(section.get("integrate"), warnings)
     architecture = parse_architecture_section(section.get("architecture"), warnings)
     security = parse_security_section(section.get("security"), warnings)
     skills = parse_skills_section(section.get("skills"), warnings)
+    readiness = _readiness(section.get("readiness"), warnings)
     payload = _config(
         path=CONFIG_FILE_NAME,
         default_profile=default_profile,
@@ -80,12 +88,14 @@ def load_repo_config(repo_root: Path) -> dict[str, Any]:
         required_capabilities_configured="required_capabilities" in section,
         allowed_package_managers=allowed_package_managers,
         scan_exclusions=scan_exclusions,
+        scan_exclusions_by_module=scan_exclusions_by_module,
         accepted_exceptions=exceptions,
         accepted_dispositions=accepted_dispositions,
         gates=gates,
         gate_timeouts=gate_timeouts,
         severity_overrides=severity_overrides,
         structural_scan=structural_scan,
+        readiness=readiness,
         warnings=warnings,
     )
     if integrate:
@@ -96,21 +106,44 @@ def load_repo_config(repo_root: Path) -> dict[str, Any]:
         payload["security"] = security
     if skills:
         payload["skills"] = skills
+    if artifacts:
+        payload["artifacts"] = artifacts
+    if readiness:
+        payload["readiness"] = readiness
     return payload
 
 
 # fmt: off
 def _config(
-    *, path: str | None, default_profile: str | None, profiles: dict[str, dict[str, Any]], required_capabilities: list[str], required_capabilities_configured: bool, allowed_package_managers: list[str], scan_exclusions: list[str], accepted_exceptions: list[dict[str, str]], accepted_dispositions: list[dict[str, str]], gates: list[dict[str, Any]], gate_timeouts: dict[str, int], severity_overrides: dict[str, str], structural_scan: dict[str, Any], warnings: list[dict[str, str]],
+    *, path: str | None, default_profile: str | None, profiles: dict[str, dict[str, Any]], required_capabilities: list[str], required_capabilities_configured: bool, allowed_package_managers: list[str], scan_exclusions: list[str], scan_exclusions_by_module: dict[str, list[str]], accepted_exceptions: list[dict[str, str]], accepted_dispositions: list[dict[str, str]], gates: list[dict[str, Any]], gate_timeouts: dict[str, int], severity_overrides: dict[str, str], structural_scan: dict[str, Any], readiness: dict[str, Any], warnings: list[dict[str, str]],
 ) -> dict[str, Any]:
-    return dict(
-        schema=CONFIG_SCHEMA, path=path, default_profile=default_profile, profiles=profiles, required_capabilities=required_capabilities, required_capabilities_configured=required_capabilities_configured, allowed_package_managers=allowed_package_managers, scan_exclusions=scan_exclusions, accepted_exceptions=accepted_exceptions, accepted_dispositions=accepted_dispositions, gates=gates, gate_timeouts=gate_timeouts, severity_overrides=severity_overrides, structural_scan=structural_scan, warnings=warnings,
+    payload: dict[str, Any] = dict(
+        schema=CONFIG_SCHEMA,
+        path=path,
+        default_profile=default_profile,
+        profiles=profiles,
+        required_capabilities=required_capabilities,
+        required_capabilities_configured=required_capabilities_configured,
+        allowed_package_managers=allowed_package_managers,
+        scan_exclusions=scan_exclusions,
+        accepted_exceptions=accepted_exceptions,
+        accepted_dispositions=accepted_dispositions,
+        gates=gates,
+        gate_timeouts=gate_timeouts,
+        severity_overrides=severity_overrides,
+        structural_scan=structural_scan,
+        warnings=warnings,
     )
+    if scan_exclusions_by_module:
+        payload["scan_exclusions_by_module"] = scan_exclusions_by_module
+    if readiness:
+        payload["readiness"] = readiness
+    return payload
 # fmt: on
 
 
 def _empty_config(*, path: str | None, warnings: list[dict[str, str]]) -> dict[str, Any]:
-    return _config(
+    payload = _config(
         path=path,
         default_profile=None,
         profiles={},
@@ -118,14 +151,40 @@ def _empty_config(*, path: str | None, warnings: list[dict[str, str]]) -> dict[s
         required_capabilities_configured=False,
         allowed_package_managers=[],
         scan_exclusions=[],
+        scan_exclusions_by_module={},
         accepted_exceptions=[],
         accepted_dispositions=[],
         gates=[],
         gate_timeouts={},
         severity_overrides={},
         structural_scan={},
+        readiness={},
         warnings=warnings,
     )
+    return payload
+
+
+def _readiness(value: object, warnings: list[dict[str, str]]) -> dict[str, Any]:
+    if value is None:
+        return {}
+    if not isinstance(value, dict):
+        warnings.append(
+            _warning(
+                "invalid_quality_runner_config_field",
+                "quality_runner.readiness must be a table",
+            )
+        )
+        return {}
+    evidence_file = value.get("evidence_file")
+    if evidence_file is not None and (not isinstance(evidence_file, str) or not evidence_file):
+        warnings.append(
+            _warning(
+                "invalid_quality_runner_config_field",
+                "quality_runner.readiness.evidence_file must be a non-empty string",
+            )
+        )
+        return {}
+    return {"evidence_file": evidence_file} if isinstance(evidence_file, str) else {}
 
 
 def _string_value(value: object, field: str, warnings: list[dict[str, str]]) -> str | None:

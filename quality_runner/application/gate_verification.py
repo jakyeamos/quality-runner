@@ -30,13 +30,19 @@ from quality_runner.gate_verification import (
     verify_discovered_gates,
 )
 from quality_runner.git_branches import prepare_scan_branch
+from quality_runner.progress import ProgressCallback, emit_progress
+from quality_runner.readiness import evaluate_readiness
 from quality_runner.unwired_from_dead_code import merge_dead_code_unwired_findings
 from quality_runner.workflow_helpers import combined_warnings, gate_timeouts
 from quality_runner.workflow_internal import verify_payload_status
 from quality_runner.worktree_verify import gate_worktree_session, resolve_worktree_mode
 
 
-def run_gate_verification(request: VerificationRequest) -> VerificationResult:
+def run_gate_verification(
+    request: VerificationRequest,
+    *,
+    progress: ProgressCallback | None = None,
+) -> VerificationResult:
     resolved_worktree_mode = resolve_worktree_mode(request.policy.worktree_mode)
     if request.policy.execute_discovered_gates and resolved_worktree_mode != "disposable":
         raise ValueError(
@@ -47,7 +53,12 @@ def run_gate_verification(request: VerificationRequest) -> VerificationResult:
         checkout_most_advanced_branch=request.checkout_most_advanced_branch,
     )
     run_dir = prepare_artifact_dir(request.repo_root, request.run_id)
-    analysis = analyze_read_only_audit(_audit_request(request, branch_warnings))
+    emit_progress(progress, "discovery", "repository facts and scan scope")
+    analysis = analyze_read_only_audit(
+        _audit_request(request, branch_warnings),
+        progress=progress,
+    )
+    emit_progress(progress, "verify-gates", "discovered repository gates")
     artifact_paths = prepare_verification_v1_artifacts(analysis, run_dir=run_dir)
     gate_execution_plan, gate_verification = _execute_discovered_gates(
         analysis=analysis,
@@ -66,6 +77,36 @@ def run_gate_verification(request: VerificationRequest) -> VerificationResult:
             _legacy_payload(gate_verification),
             _legacy_payload(analysis.config),
         )
+    )
+    readiness = evaluate_readiness(
+        repo_root=request.repo_root,
+        scan=_legacy_payload(analysis.scan),
+        standards_packet=_legacy_payload(analysis.standards_packet),
+        capability_map=verified_capability_map,
+        gate_verification=_legacy_payload(gate_verification),
+        verification_context=_legacy_payload(gate_verification).get("verification_context")
+        if isinstance(_legacy_payload(gate_verification).get("verification_context"), dict)
+        else None,
+        evidence_file=request.readiness_evidence_file,
+    )
+    gate_verification = _audit_payload(
+        {
+            **_legacy_payload(gate_verification),
+            "readiness": readiness,
+            "status": (
+                "blocked"
+                if readiness.get("status") == "blocked"
+                else _legacy_payload(gate_verification).get("status", "blocked")
+            ),
+        }
+    )
+    verified_capability_map = _audit_payload(
+        {
+            **apply_gate_verification(
+                _legacy_payload(analysis.capability_map), _legacy_payload(gate_verification)
+            ),
+            "readiness": readiness,
+        }
     )
     verified_analysis = replace(
         analysis,
@@ -176,6 +217,9 @@ def _audit_request(
         branch_warnings=tuple(_audit_warning(warning) for warning in branch_warnings),
         skill_review_report=request.skill_review_report,
         intent=request.intent,
+        scan_exclusion_overlay=request.scan_exclusion_overlay,
+        agent_review_mode=request.agent_review_mode,
+        readiness_evidence_file=request.readiness_evidence_file,
     )
 
 

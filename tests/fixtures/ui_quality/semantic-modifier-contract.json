@@ -1,0 +1,163 @@
+{
+  "fixture_id": "semantic-modifier-contract",
+  "tokens": {
+    "primitives": {
+      "canvas-light": "#F7F4ED",
+      "canvas-dark": "#20272E",
+      "ink-light": "#20272E",
+      "ink-dark": "#F7F4ED",
+      "action": "#2C628F",
+      "on-action": "#FFFFFF",
+      "border-light": "#2C628F",
+      "border-dark": "#74A7C4"
+    },
+    "semantic_roles": {
+      "surface.canvas": {
+        "light": "primitive.canvas-light",
+        "dark": "primitive.canvas-dark"
+      },
+      "text.default": {
+        "light": "primitive.ink-light",
+        "dark": "primitive.ink-dark"
+      },
+      "surface.action": {
+        "light": "primitive.action",
+        "dark": "primitive.action"
+      },
+      "text.on-action": {
+        "light": "primitive.on-action",
+        "dark": "primitive.on-action"
+      },
+      "border.action": {
+        "light": "primitive.border-light",
+        "dark": "primitive.border-dark"
+      },
+      "outline.focus": {
+        "light": "semantic.border.action",
+        "dark": "semantic.border.action"
+      }
+    }
+  },
+  "components": {
+    "card": {
+      "role_refs": [
+        "semantic.surface.canvas",
+        "semantic.text.default"
+      ]
+    },
+    "button.primary": {
+      "role_refs": [
+        "semantic.surface.action",
+        "semantic.text.on-action",
+        "semantic.outline.focus"
+      ]
+    }
+  },
+  "contrast_pairs": [
+    {
+      "id": "body-text",
+      "foreground": "semantic.text.default",
+      "background": "semantic.surface.canvas",
+      "kind": "text",
+      "size": "normal"
+    },
+    {
+      "id": "primary-control",
+      "foreground": "semantic.text.on-action",
+      "background": "semantic.surface.action",
+      "kind": "ui"
+    }
+  ],
+  "modifiers": {
+    "cards": {
+      "requires": [],
+      "properties": {
+        "layout": "grid"
+      }
+    },
+    "cards-cover": {
+      "requires": [
+        "cards"
+      ],
+      "properties": {
+        "media": "cover"
+      }
+    },
+    "cards-3-col": {
+      "requires": [
+        "cards"
+      ],
+      "properties": {
+        "columns": 3
+      }
+    },
+    "table-compact": {
+      "requires": [],
+      "properties": {
+        "density": "compact"
+      }
+    }
+  },
+  "compositions": [
+    {
+      "id": "cards-cover-3-col",
+      "modifiers": [
+        "cards",
+        "cards-cover",
+        "cards-3-col"
+      ],
+      "expected_properties": {
+        "layout": "grid",
+        "media": "cover",
+        "columns": 3
+      }
+    }
+  ],
+  "states": {
+    "selected": {
+      "cues": [
+        "color",
+        {
+          "type": "icon",
+          "value": "check"
+        },
+        {
+          "type": "aria",
+          "value": "aria-pressed"
+        }
+      ]
+    },
+    "disabled": {
+      "cues": [
+        "color",
+        "text"
+      ]
+    },
+    "error": {
+      "cues": [
+        "color",
+        {
+          "type": "icon",
+          "value": "alert"
+        },
+        {
+          "type": "text",
+          "value": "Error"
+        }
+      ]
+    },
+    "loading": {
+      "cues": [
+        "color",
+        {
+          "type": "aria",
+          "value": "aria-busy"
+        },
+        {
+          "type": "shape",
+          "value": "skeleton"
+        }
+      ]
+    }
+  }
+}

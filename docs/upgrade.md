@@ -2,8 +2,8 @@
 
 ## Release state
 
-This guide covers `0.5.1`. `v0.5.0` is the prior published compatibility
-baseline. The cutover policy applies when `0.5.1` is installed; until its PyPI
+This guide covers `0.6.0`. `v0.5.1` is the prior published compatibility
+baseline. The cutover policy applies when `0.6.0` is installed; until its PyPI
 artifact is available, install from source or wait for publication.
 
 ## Upgrade and rollback
@@ -15,10 +15,21 @@ uv tool upgrade quality-runner
 quality-runner doctor --json
 ```
 
+When working from a local editable checkout, use QR's command surface to keep
+the installed tool aligned with that checkout:
+
+```bash
+quality-runner self-update --json
+```
+
+Use `quality-runner self-update --source /path/to/quality-runner --json` when
+the checkout is not the one recorded by the editable installation. QR falls
+back to `uv tool upgrade quality-runner` when no editable source is available.
+
 To select the release version explicitly:
 
 ```bash
-uv tool upgrade 'quality-runner==0.5.1'
+uv tool upgrade 'quality-runner==0.6.0'
 ```
 
 No artifact conversion is required. Existing `.quality-runner/` runs remain
@@ -32,11 +43,11 @@ that were previously persisted as raw evidence are now redacted and can receive
 new fingerprints. Re-triage only those migrated resolution-ledger entries;
 established simple quoted-literal fingerprints remain stable.
 
-If a published `0.5.1` needs to be rolled back, preserve the run directory and
+If a published `0.6.0` needs to be rolled back, preserve the run directory and
 reinstall the prior package:
 
 ```bash
-uv tool install 'quality-runner==0.5.0' --force
+uv tool install 'quality-runner==0.5.1' --force
 uv tool list
 "$(uv tool dir)/quality-runner/bin/python" -c 'from importlib.metadata import version; print(version("quality-runner"))'
 ```
@@ -71,7 +82,7 @@ next-action guidance.
 
 ## Support window
 
-Once `0.5.1` is published, v1 CLI paths that have a direct outcome replacement
+Once `0.6.0` is published, v1 CLI paths that have a direct outcome replacement
 (`inspect`, `run`, `verify-gates`, and `review --legacy-output`) are supported
 through `0.7.x`. They will not be removed before `0.8.0`, except for a
 security-critical change that cannot safely retain a legacy behavior.

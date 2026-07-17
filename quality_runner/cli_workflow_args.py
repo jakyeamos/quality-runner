@@ -15,9 +15,34 @@ def add_workflow_arguments(parser: argparse.ArgumentParser) -> None:
         help="Local CI status JSON export to attach to capability evidence",
     )
     parser.add_argument(
+        "--readiness-evidence-file",
+        default=None,
+        help="Release-profile evidence JSON path inside the target repo",
+    )
+    parser.add_argument(
         "--interactive",
         action="store_true",
         help="Prompt before excluding expensive default-ignored scan paths",
+    )
+    parser.add_argument(
+        "--scan-exclusion",
+        action="append",
+        default=None,
+        metavar="DIR",
+        help=(
+            "Exclude this repo-relative directory for this run only; repeat for multiple "
+            "directories. This also changes security scan coverage."
+        ),
+    )
+    parser.add_argument(
+        "--scan-exclusion-module",
+        action="append",
+        default=None,
+        metavar="MODULE=DIR",
+        help=(
+            "Exclude this repo-relative directory for one QR module only; use structural, "
+            "code_quality, or security as MODULE and repeat the option as needed."
+        ),
     )
     parser.add_argument(
         "--checkout-most-advanced-branch",
@@ -29,7 +54,18 @@ def add_workflow_arguments(parser: argparse.ArgumentParser) -> None:
         default=None,
         help="Validated agent skill review report JSON to merge into findings",
     )
+    parser.add_argument(
+        "--agent-review-mode",
+        choices=["off", "auto", "parallel", "required"],
+        default=None,
+        help="Agent skill-review policy for this run",
+    )
     add_intent_cli_arguments(parser)
+    parser.add_argument(
+        "--no-progress",
+        action="store_true",
+        help="Disable stderr progress and heartbeat diagnostics",
+    )
     parser.add_argument("--json", action="store_true", help="Emit JSON output")
 
 

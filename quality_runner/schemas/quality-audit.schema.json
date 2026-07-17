@@ -10,11 +10,13 @@
     "repo_root": { "type": ["string", "null"] },
     "profile": { "type": ["string", "null"] },
     "status": { "enum": ["clean", "findings"] },
+    "raw_status": { "enum": ["clean", "findings"] },
     "implementation_allowed": { "const": false },
     "findings": {
       "type": "array",
       "items": { "$ref": "#/$defs/finding" }
     },
+    "resolution": { "$ref": "#/$defs/resolutionSummary" },
     "warnings": { "$ref": "#/$defs/warnings" }
   },
   "$defs": {
@@ -30,6 +32,11 @@
         "evidence": { "type": "array", "items": { "type": "string" } },
         "recommended_fix": { "type": "string", "minLength": 1 },
         "verification": { "type": "array", "items": { "type": "string" } },
+        "verification_mode": { "enum": ["command", "evidence"] },
+        "verification_requirements": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
         "score": { "type": "integer", "minimum": 0 },
         "actionability": {
           "enum": [
@@ -50,7 +57,63 @@
         "fix_risk": { "enum": ["LOW", "MED", "HIGH"] },
         "confidence": { "enum": ["Low", "Medium", "High", "low", "medium", "high"] },
         "why_now": { "type": "string", "minLength": 1 },
-        "leverage": { "type": "object" }
+        "leverage": { "type": "object" },
+        "resolution": { "$ref": "#/$defs/resolution" }
+      },
+      "additionalProperties": true,
+      "allOf": [
+        {
+          "if": {
+            "required": ["verification_mode"],
+            "properties": { "verification_mode": { "const": "evidence" } }
+          },
+          "then": { "required": ["verification_requirements"] }
+        }
+      ]
+    },
+    "resolution": {
+      "type": "object",
+      "required": ["status", "resolved", "matched_entry_count", "unresolved_entry_count"],
+      "properties": {
+        "status": { "type": "string", "minLength": 1 },
+        "resolved": { "type": "boolean" },
+        "matched_entry_count": { "type": "integer", "minimum": 0 },
+        "unresolved_entry_count": { "type": "integer", "minimum": 0 },
+        "total_findings": { "type": "integer", "minimum": 0 },
+        "resolved_findings": { "type": "integer", "minimum": 0 },
+        "unresolved_findings": { "type": "integer", "minimum": 0 },
+        "reason": { "type": "string" },
+        "owner": { "type": "string" },
+        "expires": { "type": "string" },
+        "source": { "type": "string" },
+        "gate_run_id": { "type": "string" },
+        "by_status": {
+          "type": "object",
+          "additionalProperties": { "type": "integer", "minimum": 0 }
+        },
+        "entry_by_status": {
+          "type": "object",
+          "additionalProperties": { "type": "integer", "minimum": 0 }
+        }
+      },
+      "additionalProperties": true
+    },
+    "resolutionSummary": {
+      "type": "object",
+      "required": ["status", "total_findings", "resolved_findings", "unresolved_findings", "by_status"],
+      "properties": {
+        "status": { "enum": ["resolved", "unresolved"] },
+        "total_findings": { "type": "integer", "minimum": 0 },
+        "resolved_findings": { "type": "integer", "minimum": 0 },
+        "unresolved_findings": { "type": "integer", "minimum": 0 },
+        "by_status": {
+          "type": "object",
+          "additionalProperties": { "type": "integer", "minimum": 0 }
+        },
+        "entry_by_status": {
+          "type": "object",
+          "additionalProperties": { "type": "integer", "minimum": 0 }
+        }
       },
       "additionalProperties": true
     },

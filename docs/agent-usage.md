@@ -1,8 +1,16 @@
 # Agent Usage
 
-Quality Runner gives agents evidence and a handoff. The agent still owns the
-work plan. For large or repo-wide remediation, agents should convert the QR
-handoff into GSD-style phases and execute one coherent batch at a time.
+Quality Runner gives agents evidence and a handoff. QR can also maintain an
+advisory native phase plan; the external agent or human still owns source
+changes, commits, pushes, and execution decisions.
+
+## Invocation
+
+The examples below use `quality-runner` for readability. Consumer repositories
+should use the source-first contract in [Consumer Tooling](consumer-tooling.md):
+`uvx --refresh --from git+https://github.com/jakyeamos/quality-runner.git
+quality-runner ...` for latest QR, or `uv run --project /path/to/quality-runner
+quality-runner ...` for a specific checkout.
 
 ## Start With QR
 
@@ -28,17 +36,42 @@ Then read:
   evidence excerpts)
 - `.quality-runner/runs/<run-id>/quality-audit.json`
 - `.quality-runner/runs/<run-id>/remediation-plan.json`
+- `.quality-runner/runs/<run-id>/remediation-context.json` before editing; this
+  is the bounded-slice context and evidence contract for the worker
 - `.quality-runner/runs/<run-id>/gate-verification.json`, when present
 - `.quality-runner/runs/<run-id>/code-quality-scan.json`, when structural
   findings drive the work
 - intent docs listed in the handoff (`PRODUCT.md`, `DESIGN.md`, ADRs, etc.)
 
-Do not edit source before reading the handoff and the relevant artifacts.
+Do not edit source before reading the handoff and the relevant artifacts. A
+fresh remediation context starts as `needs-understanding`; complete the
+required agent evidence for the selected slice and validate it before editing:
+
+```bash
+quality-runner validate-remediation-context \
+  .quality-runner/runs/<run-id>/remediation-context.json \
+  --remediation-plan .quality-runner/runs/<run-id>/remediation-plan.json \
+  --json
+```
+
+When a repository contains a large generated, cache, or external directory,
+review it before adding a persistent exclusion:
+
+```bash
+quality-runner exclusions suggest /path/to/repo --json
+quality-runner exclusions validate /path/to/repo \
+  --packet .quality-runner/runs/<run-id>/scan-exclusion-preflight-packet.json \
+  --report /path/to/review.json --json
+```
+
+Use a module-scoped decision when only code-quality or structural scanning
+should omit the directory. That preserves QR security coverage. Apply a
+validated report only with explicit `exclusions apply --apply`; otherwise use
+`--scan-exclusion` or `--scan-exclusion-module` for a run-only overlay.
 
 For a single slice, prefer the matching `slice-specs/*.md` file as the
 execution contract. Use `remediation-plan.json` for ordering across slices and
-`agent-handoff.md` for controller routing. Convert to GSD-style phase plans only
-when the remediation spans multiple slices or needs repo-local planning history.
+`agent-handoff.md` for controller routing.
 
 ## QR Slice Spec Contract
 
@@ -63,6 +96,8 @@ Validate artifacts before dispatch or after regeneration:
 
 ```bash
 quality-runner validate-handoff .quality-runner/runs/<run-id>/agent-handoff.json --json
+quality-runner validate-remediation-context .quality-runner/runs/<run-id>/remediation-context.json \
+  --remediation-plan .quality-runner/runs/<run-id>/remediation-plan.json --json
 quality-runner validate-slice-spec .quality-runner/runs/<run-id>/slice-specs/<slice-id>.md --json
 ```
 
@@ -75,6 +110,36 @@ quality-runner review-worker /path/to/repo \
   --worker-report worker-report.json \
   --json
 ```
+
+## Native QR Phase Workflow
+
+Initialize the QR-owned namespace after the first useful run:
+
+```bash
+quality-runner plan auto /path/to/repo --run-id qr-baseline-run --json
+quality-runner phase next /path/to/repo --phase 1 --json
+```
+
+`plan auto` creates one native phase per domain candidate in security-first
+order and links each phase to its forensic leaf slices. It is idempotent. Older
+remediation plans without domain candidates continue to work through leaf
+slices. Each plan records source references, scope, tasks, stop conditions,
+verification gates, dependencies, and a deterministic wave; QR dispatches the
+next ready plan but does not execute it.
+
+After an external batch, record and verify it:
+
+```bash
+quality-runner phase record-batch /path/to/repo \
+  --phase 1 --plan 1 --result-file batch-result.json --json
+quality-runner phase update /path/to/repo \
+  --phase 1 --baseline-run-id qr-before --run-id qr-after --json
+quality-runner phase verify /path/to/repo --phase 1 --run-id qr-after --json
+```
+
+Native planning files live only under `.planning/quality-runner/`. QR does not
+modify root GSD files, execute source changes, commit, or push. GSD remains a
+valid optional external planning consumer when a repository needs it.
 
 ## Required Agent Protocol
 

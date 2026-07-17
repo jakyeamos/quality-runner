@@ -1,0 +1,120 @@
+id = "developer-experience"
+name = "Developer Experience and Onboarding"
+version = "0.1.0"
+description = "Source-level documentation signals and high-recall review criteria for setup, command discoverability, contribution flow, wayfinding, and maintainer handoff."
+
+[[deterministic_rules]]
+id = "placeholder-documentation"
+type = "disallowed_pattern"
+category = "dx-documentation"
+severity = "observation"
+confidence = "medium"
+paths = ["*.md", "**/*.md", "README*", "**/README*", "CONTRIBUTING*", "**/CONTRIBUTING*"]
+disallowed_patterns = ['(?i)\b(?:TODO|TBD|FIXME|coming soon|fill in|replace me)\b']
+message = "Documentation contains a placeholder that may leave an onboarding or maintenance path incomplete."
+risk = "New contributors or maintainers may follow incomplete instructions or miss an important repository decision."
+expected = "Replace the placeholder with verified guidance, or remove it and record the work as a tracked issue."
+verification = "Review the surrounding documentation and rerun quality-runner after resolving or accepting the observation."
+
+[[deterministic_rules]]
+id = "machine-specific-setup-path"
+type = "disallowed_pattern"
+category = "dx-onboarding"
+severity = "observation"
+confidence = "medium"
+paths = ["*.md", "**/*.md", "README*", "**/README*", "CONTRIBUTING*", "**/CONTRIBUTING*", "**/*.sh", "**/*.bash", "**/*.yml", "**/*.yaml", "**/*.toml", "**/*.json"]
+disallowed_patterns = ['(?i)(?:/Users/|/home/|[A-Z]:\\Users\\)']
+message = "Setup or repository guidance contains a machine-specific filesystem path."
+risk = "The documented command may fail for other contributors or disclose a local machine layout."
+expected = "Use a repository-relative path, environment variable, or platform-neutral placeholder."
+verification = "Review the path in context and rerun quality-runner after resolving or accepting the observation."
+
+[[agent_reviews]]
+id = "onboarding-and-setup"
+category = "dx-onboarding"
+severity = "observation"
+paths = ["*.md", "**/*.md", "README*", "**/README*", "CONTRIBUTING*", "**/CONTRIBUTING*", "**/package.json", "**/pyproject.toml", "**/Cargo.toml", "**/Makefile", "**/Taskfile.yml", "**/*.sh", "**/*.bash", "**/*.yml", "**/*.yaml", "**/*.toml", "**/*.json"]
+focus = ["prerequisites", "install flow", "environment variables", "first successful run", "test command", "failure recovery"]
+rubric = """
+Review the repository's onboarding path from checkout to first verified result.
+
+Report plausible gaps where prerequisites, dependency installation, required
+environment, development startup, test or quality commands, expected output,
+or failure recovery are missing, contradictory, stale, or dependent on local
+machine state. Cite the exact documentation, script, or configuration line.
+Prefer high recall and use low confidence when setup depends on external
+services or secrets that are not visible. Do not require a single package
+manager or hosting platform without repository evidence.
+"""
+
+[[agent_reviews]]
+id = "command-discoverability"
+category = "dx-commands"
+severity = "observation"
+paths = ["*.md", "**/*.md", "README*", "**/README*", "CONTRIBUTING*", "**/CONTRIBUTING*", "**/package.json", "**/pyproject.toml", "**/Cargo.toml", "**/Makefile", "**/Taskfile.yml", "**/*.sh", "**/*.bash", "**/*.yml", "**/*.yaml", "**/*.toml"]
+focus = ["script names", "CLI help", "arguments", "examples", "error messages", "command consistency"]
+rubric = """
+Review whether important development and maintenance commands are discoverable.
+
+Report plausible gaps where scripts, CLI commands, flags, environment inputs,
+quality gates, or expected outputs are undocumented, contradictory, hidden
+behind unexplained aliases, or difficult to find from the README and project
+metadata. Cite the exact command definition and documentation evidence. Prefer
+high recall and use low confidence when command behavior is generated or
+provided by an external tool. Do not require documentation for private helper
+scripts with no contributor-facing use.
+"""
+
+[[agent_reviews]]
+id = "contribution-and-ci"
+category = "dx-contribution"
+severity = "observation"
+paths = ["*.md", "**/*.md", "README*", "**/README*", "CONTRIBUTING*", "**/CONTRIBUTING*", "**/.github/**/*.yml", "**/.github/**/*.yaml", "**/*.yml", "**/*.yaml", "**/Makefile", "**/Taskfile.yml", "**/package.json", "**/pyproject.toml", "**/Cargo.toml"]
+focus = ["contribution flow", "CI checks", "local parity", "branch expectations", "review requirements", "quality gates"]
+rubric = """
+Review the contribution path and its relationship to CI.
+
+Report plausible gaps where local verification does not match CI, required
+checks or review steps are unclear, contribution rules are missing, branch or
+commit expectations conflict with automation, or failures do not explain how
+to recover. Cite the exact workflow, project instruction, script, or document.
+Prefer high recall and use low confidence when organization policy is external
+to the repository. Do not infer that a missing document is a defect if an
+equivalent maintained contribution guide is present.
+"""
+
+[[agent_reviews]]
+id = "repository-wayfinding"
+category = "dx-wayfinding"
+severity = "observation"
+paths = ["*.md", "**/*.md", "README*", "**/README*", "CONTRIBUTING*", "**/CONTRIBUTING*", "AGENTS.md", "**/AGENTS.md", "CLAUDE.md", "**/CLAUDE.md", "**/*.yml", "**/*.yaml", "**/*.toml", "**/package.json", "**/pyproject.toml"]
+focus = ["directory map", "source ownership", "generated files", "configuration locations", "related documentation", "stale links"]
+rubric = """
+Review repository wayfinding for contributors and maintainers.
+
+Report plausible gaps where the source layout, ownership boundaries, generated
+artifacts, configuration locations, related packages, or required instruction
+files are difficult to identify or contradicted by documentation. Look for
+stale relative links and instructions that point at files or directories that
+do not exist in the repository evidence. Cite the exact path or link. Prefer
+high recall and use low confidence when symlinks or external repositories are
+part of the layout.
+"""
+
+[[agent_reviews]]
+id = "maintainer-handoff"
+category = "dx-handoff"
+severity = "observation"
+paths = ["*.md", "**/*.md", "README*", "**/README*", "CONTRIBUTING*", "**/CONTRIBUTING*", "SECURITY*", "**/SECURITY*", "CHANGELOG*", "**/CHANGELOG*", "RELEASE*", "**/RELEASE*", "**/package.json", "**/pyproject.toml", "**/Cargo.toml", "**/*.yml", "**/*.yaml", "**/Makefile", "**/Taskfile.yml"]
+focus = ["known limitations", "troubleshooting", "release process", "security reporting", "operational ownership", "quality evidence"]
+rubric = """
+Review whether a new maintainer can safely understand and operate the project.
+
+Report plausible gaps in troubleshooting, known limitations, release steps,
+security reporting, operational ownership, quality evidence, or handoff notes.
+Flag documentation that promises behavior the scripts or configuration do not
+support. Cite the exact document and source evidence. Prefer high recall and
+use low confidence when operational truth lives outside the repository. Do not
+require a particular document name when the handoff content is clearly covered
+elsewhere.
+"""

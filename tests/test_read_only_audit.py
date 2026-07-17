@@ -52,6 +52,14 @@ def test_read_only_planning_validates_before_the_artifact_renderer_runs(tmp_path
     assert planned.status == "planned"
     assert planned.audit_report["schema"] == "quality-runner-audit-report-v0.1"
     assert planned.remediation_plan["schema"] == "quality-runner-remediation-plan-v0.1"
+    assert planned.remediation_context is not None
+    assert planned.remediation_context["schema"] == "quality-runner-remediation-context-v0.1"
+    assert planned.remediation_plan["remediation_context"]["status"] == "needs-understanding"
+    assert planned.handoff["remediation_context"]["blocking"] is True
+    assert all(
+        isinstance(slice_item.get("context_id"), str)
+        for slice_item in planned.remediation_plan["slices"]
+    )
     assert not (tmp_path / ".quality-runner").exists()
 
 

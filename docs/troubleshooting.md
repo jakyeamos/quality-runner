@@ -2,7 +2,9 @@
 
 ## `quality-runner` is not found
 
-Install as a uv tool:
+Use the source-first invocation documented in
+[Consumer Tooling](consumer-tooling.md) when the repository needs the current
+QR. If a persistent standalone tool is required, install the repository source:
 
 ```bash
 uv tool install git+https://github.com/jakyeamos/quality-runner.git

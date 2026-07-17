@@ -3,7 +3,7 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: GPT-5.6 modernization
 status: complete
-last_updated: "2026-07-13T17:41:03Z"
+last_updated: "2026-07-17T14:54:00Z"
 progress:
   total_phases: 8
   completed_phases: 8
@@ -22,12 +22,14 @@ See `.planning/PROJECT.md` for the established product boundary and
 **Core value:** Give developers and agents trustworthy local evidence before
 they authorize repository changes.
 
-**Current focus:** v0.5.1 released; no active implementation phase.
+**Current focus:** v0.6.0 release preparation from canonical `dev`.
 
 ## Current Position
 
-- Branch: `main`
+- Branch: `codex/release-0.6.0`
 - Baseline: `main` at 0.5.1 / commit `a101bd4`
+- Release metadata and readiness discovery fixes: `b5a610e`; exact-head
+  GitHub CI is green and the release profile must be rerun before promotion.
 - Audit and planning: complete
 - M0 — restore trust at the boundary: complete in `f36dcf4`
 - M1 — establish typed review contracts: complete in `cb12746`
@@ -46,11 +48,11 @@ they authorize repository changes.
 
 ## Active Phase
 
-- **Phase:** M7
-- **Slug:** release-hardening
-- **Status:** Complete
-- **Completion gate:** Met: v0.5.1 pre-tag validation, reviewed PR merge, tag
-  on `main`, successful PyPI publication, and GitHub Release creation.
+- **Phase:** release-follow-up
+- **Slug:** release-0.6.0
+- **Status:** In progress
+- **Completion gate:** Full pre-tag validation, reviewed promotion to `main`,
+  `v0.6.0` tag, successful PyPI publication, and GitHub Release verification.
 
 ## Key Decisions
 
@@ -72,10 +74,17 @@ they authorize repository changes.
 
 ## Next Step
 
-Start any future work from `main` as a new scoped follow-up.
+Rerun the v0.6.0 release profile at `b5a610e`, then promote the verified
+release branch through `main` and verify the published artifact.
 
 ## Recent Progress
 
+- 2026-07-17: `b5a610e` makes release-gate discovery preserve exact CI
+  workflow commands; focused tests pass and exact-head GitHub CI is green.
+- 2026-07-17: `a3777b1` fixes release-profile discovery for dynamic version
+  metadata and installed-wheel release smoke; the release profile must rerun.
+- 2026-07-17: `23da809` prepares v0.6.0 release metadata on the isolated
+  release branch; full validation and publication remain pending.
 - 2026-07-13: v0.5.1 released: PR #2 merged at `a101bd4`, GitHub CI and tag
   release workflow pass, PyPI publishes both artifacts, GitHub Release is
   public, and a disposable PyPI install passes CLI, doctor, smoke, and MCP.

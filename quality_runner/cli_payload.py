@@ -15,6 +15,7 @@ from quality_runner.application.journey_outcomes import (
 )
 from quality_runner.application.outcome_projection import LegacyPayload
 from quality_runner.application.verification_workflows import verify_gates_payload
+from quality_runner.cli_artifacts import prune_artifacts_payload
 from quality_runner.cli_controller_reports import (
     controller_report_command_payload,
     controller_report_from_summary_payload,
@@ -27,16 +28,25 @@ from quality_runner.cli_gate import (
     gate_status_command_payload,
 )
 from quality_runner.cli_handoff import handoff_command_payload
+from quality_runner.cli_planning import planning_command_payload
 from quality_runner.cli_refresh import refresh_command_payload
+from quality_runner.cli_remediation import remediation_delta_command_payload
 from quality_runner.cli_review import review_command_payload
 from quality_runner.cli_rollout import rollout_command_payload
 from quality_runner.cli_skills import skill_command_payload
 from quality_runner.cli_status import export_handoff_payload, status_payload
+from quality_runner.cli_update import update_command_payload
 from quality_runner.code_quality import preview_ignored_paths
 from quality_runner.config import CONFIG_FILE_NAME, load_repo_config
 from quality_runner.controller_reports import validate_controller_report
+from quality_runner.core.audit_contracts import ScanExclusionOverlay
 from quality_runner.doctor_contract import doctor_payload
+from quality_runner.exclusion_preflight import (
+    normalize_run_only_exclusion_overlay,
+    run_exclusion_preflight_command,
+)
 from quality_runner.intent import workflow_intent_from_cli_args
+from quality_runner.progress import ProgressCallback
 from quality_runner.release_smoke import release_smoke_payload
 from quality_runner.run_summary import build_run_summary
 from quality_runner.workflow_skills import load_skill_review_report_json
@@ -47,9 +57,15 @@ EXPENSIVE_IGNORED_PATH_SECONDS_THRESHOLD = 5.0
 MAX_INTERACTIVE_IGNORED_PATHS = 10
 
 
-def payload_for_args(args: argparse.Namespace) -> dict[str, Any]:
+def payload_for_args(
+    args: argparse.Namespace,
+    *,
+    progress: ProgressCallback | None = None,
+) -> dict[str, Any]:
     if args.command == "doctor":
         return doctor_payload(include_environment=True)
+    if args.command == "self-update":
+        return update_command_payload(args.source)
     if args.command == "release-smoke":
         from quality_runner.cli import build_parser
 
@@ -100,6 +116,17 @@ def payload_for_args(args: argparse.Namespace) -> dict[str, Any]:
         return skill_command_payload(args, validated_repo_path=_validated_repo_path)
     if args.command == "validate-report":
         return validate_controller_report(load_controller_report_json(Path(args.report_json)))
+    if args.command == "exclusions":
+        packet_arg = getattr(args, "packet", None)
+        report_arg = getattr(args, "report", None)
+        return run_exclusion_preflight_command(
+            _validated_repo_path(args.repo_path),
+            action=args.exclusions_action,
+            run_id=args.run_id,
+            packet_path=Path(packet_arg).expanduser().resolve() if packet_arg else None,
+            report_path=Path(report_arg).expanduser().resolve() if report_arg else None,
+            apply=getattr(args, "apply", False),
+        )
     if args.command == "run":
         repo_root = _validated_repo_path(args.repo_path)
         return run_payload(
@@ -107,9 +134,17 @@ def payload_for_args(args: argparse.Namespace) -> dict[str, Any]:
             run_id=args.run_id,
             profile=args.profile,
             ci_status_json=Path(args.ci_status_json) if args.ci_status_json else None,
+            readiness_evidence_file=(
+                Path(args.readiness_evidence_file).expanduser().resolve()
+                if args.readiness_evidence_file
+                else None
+            ),
             include_ignored_paths=_interactive_include_ignored_paths(args, repo_root),
+            scan_exclusion_overlay=_scan_exclusion_overlay(args, repo_root),
             checkout_most_advanced_branch=args.checkout_most_advanced_branch,
             skill_review_report=_optional_skill_review_report(args),
+            agent_review_mode=args.agent_review_mode,
+            progress=progress,
             intent=workflow_intent_from_cli_args(args, repo_root=repo_root, run_id=args.run_id),
         )
     if args.command == "audit":
@@ -120,9 +155,16 @@ def payload_for_args(args: argparse.Namespace) -> dict[str, Any]:
                 run_id=args.run_id,
                 profile=args.profile,
                 ci_status_json=Path(args.ci_status_json) if args.ci_status_json else None,
+                readiness_evidence_file=(
+                    Path(args.readiness_evidence_file).expanduser().resolve()
+                    if args.readiness_evidence_file
+                    else None
+                ),
                 include_ignored_paths=_interactive_include_ignored_paths(args, repo_root),
                 checkout_most_advanced_branch=args.checkout_most_advanced_branch,
                 skill_review_report=_legacy_payload(_optional_skill_review_report(args)),
+                agent_review_mode=args.agent_review_mode,
+                scan_exclusion_overlay=_scan_exclusion_overlay(args, repo_root),
                 intent=_legacy_payload(
                     workflow_intent_from_cli_args(args, repo_root=repo_root, run_id=args.run_id)
                 ),
@@ -136,9 +178,17 @@ def payload_for_args(args: argparse.Namespace) -> dict[str, Any]:
             run_id=args.run_id,
             profile=args.profile,
             ci_status_json=Path(args.ci_status_json) if args.ci_status_json else None,
+            readiness_evidence_file=(
+                Path(args.readiness_evidence_file).expanduser().resolve()
+                if args.readiness_evidence_file
+                else None
+            ),
             include_ignored_paths=_interactive_include_ignored_paths(args, repo_root),
+            scan_exclusion_overlay=_scan_exclusion_overlay(args, repo_root),
             checkout_most_advanced_branch=args.checkout_most_advanced_branch,
             skill_review_report=_optional_skill_review_report(args),
+            agent_review_mode=args.agent_review_mode,
+            progress=progress,
             intent=workflow_intent_from_cli_args(args, repo_root=repo_root, run_id=args.run_id),
         )
     if args.command == "verify-gates":
@@ -148,6 +198,11 @@ def payload_for_args(args: argparse.Namespace) -> dict[str, Any]:
             run_id=args.run_id,
             profile=args.profile,
             ci_status_json=Path(args.ci_status_json) if args.ci_status_json else None,
+            readiness_evidence_file=(
+                Path(args.readiness_evidence_file).expanduser().resolve()
+                if args.readiness_evidence_file
+                else None
+            ),
             timeout_seconds=args.timeout_seconds,
             checkout_most_advanced_branch=args.checkout_most_advanced_branch,
             execute_discovered_gates=getattr(args, "execute_gates", False),
@@ -156,6 +211,9 @@ def payload_for_args(args: argparse.Namespace) -> dict[str, Any]:
             worktree_mode=args.worktree_mode,
             allow_dirty_worktree_verify=args.allow_dirty_worktree_verify,
             skill_review_report=_optional_skill_review_report(args),
+            agent_review_mode=args.agent_review_mode,
+            scan_exclusion_overlay=_scan_exclusion_overlay(args, repo_root),
+            progress=progress,
             intent=workflow_intent_from_cli_args(args, repo_root=repo_root, run_id=args.run_id),
         )
     if args.command == "verify":
@@ -166,6 +224,11 @@ def payload_for_args(args: argparse.Namespace) -> dict[str, Any]:
                 run_id=args.run_id,
                 profile=args.profile,
                 ci_status_json=Path(args.ci_status_json) if args.ci_status_json else None,
+                readiness_evidence_file=(
+                    Path(args.readiness_evidence_file).expanduser().resolve()
+                    if args.readiness_evidence_file
+                    else None
+                ),
                 timeout_seconds=args.timeout_seconds,
                 checkout_most_advanced_branch=args.checkout_most_advanced_branch,
                 execute_discovered_gates=args.execute_gates,
@@ -174,13 +237,23 @@ def payload_for_args(args: argparse.Namespace) -> dict[str, Any]:
                 worktree_mode=args.worktree_mode,
                 allow_dirty_worktree_verify=args.allow_dirty_worktree_verify,
                 skill_review_report=_legacy_payload(_optional_skill_review_report(args)),
+                agent_review_mode=args.agent_review_mode,
+                scan_exclusion_overlay=_scan_exclusion_overlay(args, repo_root),
                 intent=_legacy_payload(
                     workflow_intent_from_cli_args(args, repo_root=repo_root, run_id=args.run_id)
                 ),
             )
         )
     if args.command == "refresh":
-        return refresh_command_payload(args, _validated_repo_path(args.repo_path))
+        return refresh_command_payload(
+            args,
+            _validated_repo_path(args.repo_path),
+            progress=progress,
+        )
+    if args.command == "remediation-delta":
+        return remediation_delta_command_payload(args, _validated_repo_path(args.repo_path))
+    if args.command in {"plan", "phase"}:
+        return planning_command_payload(args, _validated_repo_path)
     if args.command == "rollout":
         return rollout_command_payload(args)
     if args.command == "review":
@@ -208,12 +281,18 @@ def payload_for_args(args: argparse.Namespace) -> dict[str, Any]:
     if args.command in {
         "export-slice-specs",
         "validate-handoff",
+        "validate-remediation-context",
         "validate-slice-spec",
         "review-worker",
     }:
         return handoff_command_payload(args)
     if args.command == "propose-fix":
         return propose_fix_command_payload(args, repo_root=_validated_repo_path(args.repo_path))
+    if args.command == "prune-artifacts":
+        return prune_artifacts_payload(
+            repo_root=_validated_repo_path(args.repo_path),
+            apply=args.apply,
+        )
     raise ValueError(f"unsupported command: {args.command}")
 
 
@@ -249,6 +328,15 @@ def _optional_skill_review_report(args: argparse.Namespace) -> dict[str, Any] | 
     if not report_path:
         return None
     return load_skill_review_report_json(Path(report_path).expanduser().resolve())
+
+
+def _scan_exclusion_overlay(
+    args: argparse.Namespace,
+    repo_root: Path,
+) -> ScanExclusionOverlay | None:
+    requested = getattr(args, "scan_exclusion", None)
+    module_requested = getattr(args, "scan_exclusion_module", None)
+    return normalize_run_only_exclusion_overlay(repo_root, requested, module_requested)
 
 
 def _legacy_payload(payload: dict[str, Any] | None) -> LegacyPayload | None:

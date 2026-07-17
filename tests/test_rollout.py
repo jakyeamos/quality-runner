@@ -7,6 +7,7 @@ from typing import Any
 
 import pytest
 
+from quality_runner import __version__
 from quality_runner.cli_human_summary import human_summary
 from quality_runner.rollout import rollout_payload
 
@@ -154,6 +155,9 @@ def test_rollout_runs_repo_list_and_writes_controller_report(tmp_path: Path) -> 
     assert payload["schema"] == "quality-runner-rollout-result-v0.1"
     assert payload["status"] == "completed"
     assert payload["accepted_reports"] == 1
+    assert payload["quality_runner_version"] == __version__
+    assert payload["quality_runner_source"] == str(Path(__file__).resolve().parents[1])
+    assert payload["quality_runner_command"].startswith("uv run --project")
     assert calls[0]["repo_root"] == repo_root.resolve()
     assert calls[0]["run_id_prefix"] == "stress-pass-target-repo"
     assert calls[0]["baseline_run_id"] == "baseline-001"
@@ -176,9 +180,14 @@ def test_rollout_runs_repo_list_and_writes_controller_report(tmp_path: Path) -> 
     assert report["baseline_artifact_path"].endswith("/.quality-runner/runs/baseline-001")
     assert report["final_qr"]["run_id"] == "stress-pass-target-repo-verify"
     generation_command = report["verification"][0]["command"]
+    assert "uv run --project" in generation_command
+    assert "quality-runner refresh" in generation_command
     assert "--execute-gates --worktree-mode disposable" in generation_command
     assert "--allow-dirty-worktree-verify" in generation_command
     assert validation["status"] == "accepted"
+
+    assert ledger["quality_runner_version"] == __version__
+    assert ledger["quality_runner_source"] == str(Path(__file__).resolve().parents[1])
 
     fleet_documents = payload["fleet_documents"]
     index_path = Path(fleet_documents["index_md"])

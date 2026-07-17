@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+mode="${QUALITY_RUNNER_MODE:-latest}"
+git_url="${QUALITY_RUNNER_GIT_URL:-git+https://github.com/jakyeamos/quality-runner.git}"
+script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
+local_repo="${QUALITY_RUNNER_REPO:-$(cd -- "${script_dir}/.." && pwd -P)}"
+
+case "$mode" in
+  latest|remote)
+    if ! command -v uvx >/dev/null 2>&1; then
+      echo "Quality Runner latest mode requires uvx on PATH." >&2
+      exit 127
+    fi
+    exec uvx --refresh --from "$git_url" quality-runner "$@"
+    ;;
+  local)
+    if ! command -v uv >/dev/null 2>&1; then
+      echo "Quality Runner local mode requires uv on PATH." >&2
+      exit 127
+    fi
+    if [[ ! -f "$local_repo/pyproject.toml" ]]; then
+      echo "QUALITY_RUNNER_REPO is not a Quality Runner checkout: $local_repo" >&2
+      exit 2
+    fi
+    exec uv run --project "$local_repo" quality-runner "$@"
+    ;;
+  *)
+    echo "QUALITY_RUNNER_MODE must be latest, remote, or local; got: $mode" >&2
+    exit 2
+    ;;
+esac

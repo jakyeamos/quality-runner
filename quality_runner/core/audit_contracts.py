@@ -6,6 +6,7 @@ from typing import Literal, TypedDict
 
 type AuditPayload = dict[str, object]
 type AuditArtifactPaths = dict[str, str]
+type ScanExclusionOverlay = list[str] | dict[str, list[str]]
 
 
 class AuditWarning(TypedDict):
@@ -24,6 +25,9 @@ class AuditRequest:
     branch_warnings: tuple[AuditWarning, ...]
     skill_review_report: AuditPayload | None
     intent: AuditPayload | None
+    scan_exclusion_overlay: ScanExclusionOverlay | None = None
+    agent_review_mode: str | None = None
+    readiness_evidence_file: Path | None = None
 
 
 @dataclass(frozen=True)
@@ -68,3 +72,4 @@ class AuditPlan:
 @dataclass(frozen=True)
 class PlannedAudit(AuditPlan):
     resolution_ledger: AuditPayload
+    remediation_context: AuditPayload | None = None

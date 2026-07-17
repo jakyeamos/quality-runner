@@ -1,0 +1,50 @@
+{
+  "fixture_id": "product-clipper",
+  "evidence": [
+    {
+      "id": "product-schema-trigger",
+      "source": "kepano/clipper-templates",
+      "revision": "b8c7df190d6daada5d07a95b072853e64f020cb3",
+      "path": "templates/product-clipper.json",
+      "locator": "$.triggers",
+      "knowledge_role": "adapter",
+      "enforceability": "deterministic",
+      "normalization_status": "partially_normalized",
+      "evidence": "The generic product template is selected by a schema:@Product trigger.",
+      "evidence_preserved": true,
+      "mapping_status": "mapped",
+      "mapping_target": "adapter_trigger:schema:@Product",
+      "loss_reason": null
+    },
+    {
+      "id": "product-typed-property-mapping",
+      "source": "kepano/clipper-templates",
+      "revision": "b8c7df190d6daada5d07a95b072853e64f020cb3",
+      "path": "templates/product-clipper.json",
+      "locator": "$.properties[*]",
+      "knowledge_role": "adapter",
+      "enforceability": "deterministic",
+      "normalization_status": "normalized",
+      "evidence": "Product fields use typed property records with schema, metadata, and global expressions for title, price, source, description, and image.",
+      "evidence_preserved": true,
+      "mapping_status": "mapped",
+      "mapping_target": "adapter_schema:typed-properties",
+      "loss_reason": null
+    },
+    {
+      "id": "product-identity-gap",
+      "source": "kepano/clipper-templates",
+      "revision": "b8c7df190d6daada5d07a95b072853e64f020cb3",
+      "path": "templates/product-clipper.json",
+      "locator": "$.behavior, $.noteNameFormat, $.properties[name=source]",
+      "knowledge_role": "adapter",
+      "enforceability": "context_only",
+      "normalization_status": "partially_normalized",
+      "evidence": "The template creates a note and preserves the source URL but does not declare an identity, upsert, or duplicate policy.",
+      "evidence_preserved": true,
+      "mapping_status": "context_only",
+      "mapping_target": null,
+      "loss_reason": "The source leaves identity and replay semantics unspecified; QR must not invent them."
+    }
+  ]
+}

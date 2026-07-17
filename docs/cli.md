@@ -1,8 +1,9 @@
 # CLI Reference
 
-Quality Runner provides two primary console scripts:
+Quality Runner provides a primary console script and its short local command:
 
 - `quality-runner`
+- `qr` (short alias for `quality-runner`)
 - `quality-runner-mcp`
 
 It also packages compatibility console scripts for existing Repo Quality
@@ -75,6 +76,18 @@ Returns:
 - package version
 - local Python/platform details
 
+## `quality-runner self-update`
+
+Refreshes the installed Quality Runner tool. An editable installation is
+detected automatically and reinstalled from its local checkout; use `--source`
+to select a different local checkout explicitly. If no editable checkout is
+available, QR uses `uv tool upgrade quality-runner`.
+
+```bash
+quality-runner self-update --json
+quality-runner self-update --source /path/to/quality-runner --json
+```
+
 ## `quality-runner inspect`
 
 Inspects repo shape, standards, and quality capability signals without producing
@@ -120,10 +133,39 @@ The same config file can add repo-specific scan exclusions:
 ```toml
 [quality_runner]
 scan_exclusions = ["samples", "generated-reports/**"]
+
+[quality_runner.scan_exclusions_by_module]
+code_quality = ["generated-output/**"]
+# security remains enabled for generated-output/**
 ```
 
 These augment the default exclusions for fixtures, corpora, docs, vendored
-trees, and tool output directories.
+trees, and tool output directories. `scan_exclusions` is the backward-compatible
+all-module list. The module table supports `structural`, `code_quality`, and
+`security`; module-specific entries add exclusions only to that QR-owned
+scanner.
+
+## `quality-runner exclusions`
+
+Builds and reviews a deterministic scan-exclusion candidate packet. Suggestion
+is review-only and does not edit repository configuration:
+
+```bash
+quality-runner exclusions suggest /path/to/repo --run-id exclusions-001 --json
+quality-runner exclusions validate /path/to/repo \
+  --packet /path/to/repo/.quality-runner/runs/exclusions-001/scan-exclusion-preflight-packet.json \
+  --report /path/to/review.json --json
+quality-runner exclusions apply /path/to/repo \
+  --packet /path/to/repo/.quality-runner/runs/exclusions-001/scan-exclusion-preflight-packet.json \
+  --report /path/to/review.json --apply --json
+```
+
+Packets include tracked/ignored status, file counts, generated/artifact
+markers, estimated scan cost, and configuration/timeout signals. Reports are
+bound to the packet and repository fingerprint, require one decision per
+candidate, and reject traversal, globs, stale fingerprints, and protected
+source/security/config roots. `apply` is the only mutating stage and requires
+the explicit `--apply` flag.
 
 Unwired-work checks can also be configured. They run as structural category
 `integrate` and produce decision-based remediation slices; see
@@ -137,15 +179,28 @@ arguments where they apply:
 - `--intent`: short author goal for the run (what the user set out to accomplish)
 - `--intent-file`: path to intent JSON inside the target repo (must include `goal`)
 - `--ci-status-json`: local CI status export for capability evidence
+- `--readiness-evidence-file`: release evidence JSON override inside the target repo
 - `--profile`: standards profile override
 - `--run-id`: stable run id (refresh uses `--run-id-prefix` instead)
 - `--interactive`: prompt before excluding expensive default-ignored scan paths
+- `--scan-exclusion DIR`: exclude this repo-relative directory for this run
+  only; repeat for multiple directories. This is a global overlay and changes
+  security scan coverage without editing repository configuration.
+- `--scan-exclusion-module MODULE=DIR`: exclude this repo-relative directory
+  for one QR-owned module only; use `structural`, `code_quality`, or `security`.
+  Structural and code-quality overlays preserve security coverage.
 - `--checkout-most-advanced-branch`: switch to the local most-advanced branch first
 - `--skill-review-report`: merge a validated agent skill review report into findings
 - `--json`: emit machine-readable CLI output
 
 Intent is optional. When supplied, QR writes `intent.json` and embeds the packet
 on `run-manifest.json`, `agent-handoff.json`, and `run-summary.json`.
+
+For the built-in release profile, use `--profile release` and provide current CI
+evidence with `--ci-status-json`. Release evidence defaults to
+`.quality-runner/release-evidence.json`; use `--readiness-evidence-file` for a
+different repo-local path. To prove executable release gates, authorize them in
+a disposable checkout with `--execute-gates --worktree-mode disposable`.
 
 ## QR Gate Controller
 
@@ -218,6 +273,52 @@ Reports the normalized repo config and latest run metadata.
 ```bash
 quality-runner status /path/to/repo --json
 ```
+
+## Native QR planning
+
+QR can maintain an evidence-backed phase workflow without importing GSD runtime
+behavior. These commands write only `.planning/quality-runner/`; they never
+edit source files, run remediation, create commits, or push branches. The
+`--json` form is intended for agents and controllers.
+
+```bash
+quality-runner plan init /path/to/repo --json
+quality-runner plan status /path/to/repo --json
+quality-runner plan auto /path/to/repo --run-id qr-baseline-run --json
+quality-runner phase next /path/to/repo --phase 1 --json
+quality-runner phase record-batch /path/to/repo \
+  --phase 1 --plan 1 --result-file batch-result.json --json
+quality-runner phase update /path/to/repo \
+  --phase 1 --baseline-run-id qr-before --run-id qr-after --json
+quality-runner phase verify /path/to/repo --phase 1 --run-id qr-after --json
+quality-runner phase close /path/to/repo --phase 1 --run-id qr-after --json
+```
+
+`plan auto` initializes the namespace when needed, creates one native phase per
+domain candidate in security-first order, and links each phase to its forensic
+leaf slices. It is idempotent and advisory-only. `phase plan` can consume a QR
+run or an existing handoff; it uses domain `phase_candidates` when present and
+falls back to older remediation clusters. QR assigns deterministic waves and
+dependencies, preserves existing plan text, and leaves implementation and git
+operations to the external agent or human.
+
+Native files live under:
+
+```text
+.planning/quality-runner/
+  ROADMAP.md
+  STATE.md
+  config.json
+  phases/<nn>-<slug>/
+    <nn>-CONTEXT.md
+    <nn>-<nn>-PLAN.md
+    <nn>-<nn>-SUMMARY.md
+    <nn>-VERIFICATION.md
+```
+
+Existing `.planning/ROADMAP.md`, `.planning/STATE.md`, and GSD phase
+directories are untouched. GSD and other planning systems remain optional
+consumers of the canonical QR artifacts.
 
 ## `quality-runner run`
 
@@ -530,6 +631,22 @@ additionally checks that:
 
 Returns `quality-runner-validate-handoff-result-v0.1` with `status`:
 `passed` or `rejected`.
+
+## `quality-runner validate-remediation-context`
+
+Validates the bounded remediation context packet before an external worker
+starts source changes. Fresh QR packets are intentionally rejected until each
+selected slice has the required behavior, scope, uncertainty, characterization,
+and risk-appropriate verification evidence.
+
+```bash
+quality-runner validate-remediation-context remediation-context.json \
+  --remediation-plan remediation-plan.json \
+  --json
+```
+
+Returns `quality-runner-validate-remediation-context-result-v0.1` with
+`status: passed` or `status: rejected` and the computed readiness summary.
 
 ## `quality-runner validate-slice-spec`
 

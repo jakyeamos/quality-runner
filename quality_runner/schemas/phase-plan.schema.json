@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://quality-runner.dev/schemas/phase-plan.schema.json",
+  "title": "Quality Runner Native Phase Plan",
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["schema", "phase", "plan", "id", "title", "status", "wave", "depends_on", "source", "source_slice_id", "priority", "finding_ids", "finding_fingerprints", "scope", "tasks", "verification_gates", "stop_conditions", "updated_at"],
+  "properties": {
+    "schema": { "const": "quality-runner-phase-plan-v0.1" },
+    "phase": { "type": "integer", "minimum": 1 },
+    "plan": { "type": "integer", "minimum": 1 },
+    "id": { "type": "string", "pattern": "^[0-9]+-[0-9]+$" },
+    "title": { "type": "string", "minLength": 1 },
+    "status": { "enum": ["planned", "in_progress", "blocked", "verified", "complete", "skipped"] },
+    "wave": { "type": "integer", "minimum": 1 },
+    "depends_on": { "type": "array", "items": { "type": "string" } },
+    "source": { "type": "object" },
+    "source_slice_id": { "type": "string", "minLength": 1 },
+    "priority": { "enum": ["high", "medium", "low"] },
+    "finding_ids": { "type": "array", "items": { "type": "string" } },
+    "finding_fingerprints": { "type": "array", "items": { "type": "string" } },
+    "scope": { "type": "object" },
+    "tasks": { "type": "array", "items": { "type": "string" } },
+    "verification_gates": { "type": "array", "items": { "type": "string" } },
+    "stop_conditions": { "type": "array", "items": { "type": "string" } },
+    "updated_at": { "type": "string" },
+    "evidence_status": { "type": "string" },
+    "evidence_update": { "type": "object" },
+    "last_result": { "type": "object" }
+  }
+}

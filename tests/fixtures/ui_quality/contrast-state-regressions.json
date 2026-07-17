@@ -1,0 +1,98 @@
+{
+  "fixture_id": "contrast-state-regressions",
+  "tokens": {
+    "primitives": {
+      "canvas-light": "#F7F4ED",
+      "canvas-dark": "#20272E",
+      "ink-light": "#20272E",
+      "ink-dark": "#F7F4ED",
+      "low-contrast-light": "#B6B6B6",
+      "low-contrast-dark": "#4A5258",
+      "action": "#D5D5D5",
+      "on-action": "#FFFFFF"
+    },
+    "semantic_roles": {
+      "surface.canvas": {
+        "light": "primitive.canvas-light",
+        "dark": "primitive.canvas-dark"
+      },
+      "text.default": {
+        "light": "#B6B6B6"
+      },
+      "text.muted": {
+        "light": "primitive.low-contrast-light",
+        "dark": "primitive.low-contrast-dark"
+      },
+      "surface.action": {
+        "light": "primitive.action",
+        "dark": "primitive.action"
+      },
+      "text.on-action": {
+        "light": "primitive.on-action",
+        "dark": "primitive.on-action"
+      }
+    }
+  },
+  "components": {
+    "card": {
+      "role_refs": [
+        "primitive.canvas-light"
+      ]
+    }
+  },
+  "contrast_pairs": [
+    {
+      "id": "body-text",
+      "foreground": "semantic.text.muted",
+      "background": "semantic.surface.canvas",
+      "kind": "text",
+      "size": "normal"
+    },
+    {
+      "id": "focus-control",
+      "foreground": "semantic.text.on-action",
+      "background": "semantic.surface.action",
+      "kind": "ui"
+    }
+  ],
+  "modifiers": {
+    "cards": {
+      "requires": [],
+      "properties": {
+        "layout": "grid"
+      }
+    },
+    "cards-cover": {
+      "requires": [
+        "cards"
+      ],
+      "properties": {
+        "media": "cover"
+      }
+    }
+  },
+  "compositions": [
+    {
+      "id": "cover-without-base",
+      "modifiers": [
+        "cards-cover"
+      ],
+      "expected_properties": {
+        "media": "cover"
+      }
+    }
+  ],
+  "states": {
+    "selected": {
+      "cues": [
+        "color"
+      ]
+    },
+    "error": {
+      "cues": [
+        "color",
+        "icon"
+      ]
+    }
+  }
+}
