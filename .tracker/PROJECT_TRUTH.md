@@ -102,6 +102,10 @@ tag, release workflow, and published-artifact smoke checks have completed.
   dry-run-by-default `prune-artifacts` command while retaining symlink-safe
   artifact path handling. The focused artifact/CLI slice passes 77 tests,
   Ruff, formatting, and Basedpyright.
+- `f292a1e` adds the source-first consumer runner surface: a checkout-aware
+  Python command builder, an executable latest/local launcher, and rollout
+  provenance/rerun commands that identify the QR source and version. The
+  focused rollout/tooling slice passes 9 tests plus launcher smoke checks.
 
 ## Risks
 
@@ -116,6 +120,9 @@ tag, release workflow, and published-artifact smoke checks have completed.
 
 ## Recent Progress
 
+- 2026-07-17: `f292a1e` routes rollout provenance and consumer invocation
+  through a checkout-aware source-first runner, with local and refreshed
+  latest modes documented for downstream repositories.
 - 2026-07-17: `f75c431` ports artifact privacy/retention and gate-response
   redaction into the current application architecture, with an explicit
   `prune-artifacts` command that never deletes unless `--apply` is supplied.
