@@ -54,14 +54,18 @@ for private fields, malformed syntax, computed logging, and tokenless values.
 README. `c71b130` adds a pinned Python dependency audit and validates untrusted
 baseline Git revisions before review-delta comparisons. Its reviewed merge,
 tag, release workflow, and published-artifact smoke checks have completed.
+`b193900` adds the release-profile readiness contract: repository and CI
+provenance, repo-local release evidence validation, aggregate command coverage,
+artifact-manifest/read-only gates, publication-boundary review triggers, CLI and
+refresh evidence overrides, and compatibility-preserving v0.5.1 wiring.
 
 ## Current Position
 
 - Target: a typed v2 core behind CLI, MCP, and compatibility adapters.
-- Next implementation slice: continue the additive port with release/review
-  hardening and the remaining quality-pack behavior; scan-exclusion preflight
-  and the remediation-context contract are now represented in the canonical
-  dev port.
+- Next implementation slice: continue the additive port with the remaining
+  quality-pack behavior and examples; release/readiness, scan-exclusion
+  preflight, and remediation-context contracts are now represented in the
+  canonical dev port.
 - `dev` is the canonical integration branch. The preserved source branch is
   `quality-skill-corpus-workflow` at `53dc9c8` and remains until its unique
   behavior is fully represented in `dev`.
@@ -149,9 +153,15 @@ tag, release workflow, and published-artifact smoke checks have completed.
 - Fresh remediation contexts intentionally begin as `needs-understanding` and
   block handoff validation until the external worker records the required
   evidence for its selected slice.
+- The release profile intentionally blocks without current CI provenance,
+  repo-local release evidence, disposable execution where required, and owner
+  acceptance; it does not infer release readiness from configured commands.
 
 ## Recent Progress
 
+- 2026-07-17: `b193900` ports release-profile readiness with provenance,
+  repo-local evidence validation, aggregate coverage, artifact/read-only gates,
+  publication review triggers, CLI/refresh propagation, and 621 passing tests.
 - 2026-07-17: `287fe95` adds remediation-context packets and readiness
   validation to run/verify artifacts while keeping source changes external and
   preserving the v0.5.1 application/compatibility seams.
@@ -193,30 +203,3 @@ tag, release workflow, and published-artifact smoke checks have completed.
 - 2026-07-13: `141635e` closes the focused source-evidence follow-up with
   lexer-backed private-field, malformed-syntax, computed-log, and tokenless
   value protection; 554 tests and two independent reviews are clean.
-- 2026-07-13: Independent merge review found four P2s. `bf6c9e7` closes
-  typed/commented/expression source-evidence gaps; `b4b5e6e` preserves v0.1,
-  emits v0.2 consent-aware gates, and corrects skill/release instructions.
-- 2026-07-13: M7 completed in `279cc8a`: context-aware redaction covers
-  multiline source evidence and security candidates; built wheels smoke the MCP
-  Review outcome as well as default v2 and frozen v1 CLI output.
-- 2026-07-13: `cd30948` adds `main`-ancestry release gating, built-wheel Review
-  projection checks, and accurate historical rollback/Homebrew documentation.
-- 2026-07-13: `4dee5af` closes the source-evidence redaction bypass across
-  code-quality, slice-enrichment, and security candidate artifacts; `27deaa4`
-  resolves its package-cycle regression.
-- 2026-07-13: `9fcea7d` restored positional workflow compatibility, the frozen
-  Review v1 field shape, and the `ReviewFinding` facade without weakening the
-  default v2 packet-ready outcome.
-- 2026-07-13: M7 compatibility regression in `dc09ec0`: default Review
-  outcomes retain v1-readable persisted artifacts for downgrade safety.
-- 2026-07-13: M7 guidance in `633b96e`: canonical upgrade/rollback policy,
-  release evidence, and artifact-sensitivity guidance now match the cutover.
-- 2026-07-13: M7 cutover in `32e7b26`: CLI Review defaults to v2, retains
-  `--legacy-output` v1 JSON through 0.7.x, and documents legacy MCP discovery.
-- 2026-07-13: Began M7 in `113f143`: security candidates redact secret-like
-  literals before fingerprints and persisted scan/audit/handoff evidence.
-- 2026-07-13: M7 release evidence in `66ce3ef`: pinned development tools and
-  installed-wheel doctor, release-smoke, and MCP outcome discovery checks.
-- 2026-07-13: Completed M6 on `codex/gpt56-modernization` (`0b5ac2e`,
-  `56c94d4`): application-owned workflow/outcome/packet/report paths, typed
-  root façades, built-wheel compatibility, 520 passing tests, and clean reviews.
