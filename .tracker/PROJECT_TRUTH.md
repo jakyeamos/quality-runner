@@ -118,6 +118,9 @@ tag, release workflow, and published-artifact smoke checks have completed.
   updates, verification/close state, and a complete CLI/schema contract while
   preserving the root GSD planning namespace. The focused phase/config/delta/
   CLI slice passes 60 tests, Ruff, formatting, and BasedPyright.
+- `546122e` keeps the remediation-delta module under QR's default 500-line
+  source threshold without changing its evidence contract; the focused delta
+  and source-size checks pass.
 
 ## Risks
 
@@ -132,6 +135,8 @@ tag, release workflow, and published-artifact smoke checks have completed.
 
 ## Recent Progress
 
+- 2026-07-17: `546122e` reduces remediation-delta implementation noise while
+  preserving its fingerprints, package evidence, and recommendation payload.
 - 2026-07-17: `960d094` adds the native QR phase lifecycle and domain-aware
   `plan auto` workflow under `.planning/quality-runner/`; it remains advisory,
   idempotent, and separate from source changes, commits, pushes, and root GSD.
