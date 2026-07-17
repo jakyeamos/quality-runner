@@ -71,6 +71,10 @@ def load_ci_status(
 
     checks: list[dict[str, str | None]] = []
     warnings: list[dict[str, str]] = []
+    provenance = {
+        **_provenance(payload),
+        **_provenance(payload.get("provenance")),
+    }
     for index, item in enumerate(payload["checks"]):
         if not isinstance(item, dict):
             warnings.append(
@@ -91,6 +95,11 @@ def load_ci_status(
                 }
             )
             continue
+        check_provenance = {
+            **provenance,
+            **_provenance(item.get("provenance")),
+            **_provenance(item),
+        }
         checks.append(
             {
                 "name": name,
@@ -98,6 +107,7 @@ def load_ci_status(
                 "conclusion": _optional_string(item.get("conclusion")),
                 "url": _optional_string(item.get("url")),
                 "source": relative_path,
+                **check_provenance,
             }
         )
     return checks, warnings
@@ -111,6 +121,29 @@ def _read_limited(path: Path, max_bytes: int) -> str | None:
 
 def _optional_string(value: object) -> str | None:
     return value if isinstance(value, str) and value else None
+
+
+def _provenance(value: object) -> dict[str, str | None]:
+    if not isinstance(value, dict):
+        return {}
+    result = {
+        key: _optional_string(value.get(key))
+        for key in (
+            "head_sha",
+            "ref",
+            "captured_at",
+            "artifact_digest",
+            "source_url",
+            "quality_runner_version",
+        )
+        if _optional_string(value.get(key)) is not None
+    }
+    for key in ("workflow_run_id", "run_id", "workflow_id"):
+        workflow_run_id = _optional_string(value.get(key))
+        if workflow_run_id is not None:
+            result["workflow_run_id"] = workflow_run_id
+            break
+    return result
 
 
 def _display_path(root: Path, path: Path) -> str:

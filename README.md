@@ -297,7 +297,7 @@ limits.
 
 ## Standards Profiles
 
-The built-in profile is `default`. Repos can also save custom profiles in
+The built-in profiles are `default` and `release`. Repos can also save custom profiles in
 `.quality-runner.toml`:
 
 ```bash

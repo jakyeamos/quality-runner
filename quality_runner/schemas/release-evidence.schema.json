@@ -1,0 +1,110 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://quality-runner.dev/schemas/release-evidence.schema.json",
+  "title": "Quality Runner Release Evidence",
+  "type": "object",
+  "required": ["schema", "target", "release_version", "owner", "acceptance", "artifact"],
+  "properties": {
+    "schema": { "const": "quality-runner-release-evidence-v0.1" },
+    "release_version": { "type": "string", "minLength": 1 },
+    "target": {
+      "type": "object",
+      "required": ["head_sha", "ref"],
+      "properties": {
+        "head_sha": { "type": "string", "minLength": 1 },
+        "ref": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": false
+    },
+    "owner": {
+      "type": "object",
+      "required": ["name", "role"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "role": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": false
+    },
+    "acceptance": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["id", "status", "evidence"],
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "status": { "enum": ["accepted", "blocked", "pending"] },
+          "evidence": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 } }
+        },
+        "additionalProperties": false
+      }
+    },
+    "artifact": {
+      "type": "object",
+      "required": ["version", "digest", "source_head"],
+      "properties": {
+        "version": { "type": "string", "minLength": 1 },
+        "digest": { "type": "string", "pattern": "^(sha256:)?[0-9a-fA-F]{64}$" },
+        "source_head": { "type": "string", "minLength": 1 },
+        "path": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": false
+    },
+    "migration": {
+      "type": "object",
+      "required": ["forward", "rollback", "failure_injection", "reconciliation"],
+      "properties": {
+        "forward": { "$ref": "#/$defs/proof" },
+        "rollback": { "$ref": "#/$defs/proof" },
+        "failure_injection": { "$ref": "#/$defs/proof" },
+        "reconciliation": { "$ref": "#/$defs/proof" }
+      },
+      "additionalProperties": false
+    },
+    "publication": {
+      "type": "object",
+      "required": ["authorization", "sanitization", "immutability", "media_access"],
+      "properties": {
+        "authorization": { "$ref": "#/$defs/proof" },
+        "sanitization": { "$ref": "#/$defs/proof" },
+        "immutability": { "$ref": "#/$defs/proof" },
+        "media_access": { "$ref": "#/$defs/proof" }
+      },
+      "additionalProperties": false
+    },
+    "external_checks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "status", "evidence"],
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "status": { "enum": ["passed", "blocked", "pending"] },
+          "evidence": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 } }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "$defs": {
+    "proof": {
+      "oneOf": [
+        { "type": "string", "enum": ["passed", "blocked", "pending"] },
+        {
+          "type": "object",
+          "required": ["status", "evidence"],
+          "properties": {
+            "status": { "enum": ["passed", "blocked", "pending"] },
+            "evidence": {
+              "type": "array",
+              "minItems": 1,
+              "items": { "type": "string", "minLength": 1 }
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
+    }
+  },
+  "additionalProperties": false
+}

@@ -33,6 +33,7 @@ def audit_journey_outcome(
     inspect_only: bool,
     agent_review_mode: str | None = None,
     scan_exclusion_overlay: ScanExclusionOverlay | None = None,
+    readiness_evidence_file: Path | None = None,
 ) -> JourneyOutcome:
     branch_before = checked_out_branch(repo_root)
     payload = (
@@ -41,6 +42,7 @@ def audit_journey_outcome(
             run_id=run_id,
             profile=profile,
             ci_status_json=ci_status_json,
+            readiness_evidence_file=readiness_evidence_file,
             include_ignored_paths=include_ignored_paths,
             checkout_most_advanced_branch=checkout_most_advanced_branch,
             skill_review_report=skill_review_report,
@@ -54,6 +56,7 @@ def audit_journey_outcome(
             run_id=run_id,
             profile=profile,
             ci_status_json=ci_status_json,
+            readiness_evidence_file=readiness_evidence_file,
             include_ignored_paths=include_ignored_paths,
             checkout_most_advanced_branch=checkout_most_advanced_branch,
             skill_review_report=skill_review_report,
@@ -87,6 +90,7 @@ def verify_journey_outcome(
     intent: LegacyPayload | None,
     agent_review_mode: str | None = None,
     scan_exclusion_overlay: ScanExclusionOverlay | None = None,
+    readiness_evidence_file: Path | None = None,
 ) -> JourneyOutcome:
     branch_before = checked_out_branch(repo_root)
     payload = verify_gates_payload(
@@ -94,6 +98,7 @@ def verify_journey_outcome(
         run_id=run_id,
         profile=profile,
         ci_status_json=ci_status_json,
+        readiness_evidence_file=readiness_evidence_file,
         timeout_seconds=timeout_seconds,
         checkout_most_advanced_branch=checkout_most_advanced_branch,
         execute_discovered_gates=execute_discovered_gates,

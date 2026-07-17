@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 import re
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from quality_runner import __version__
+from quality_runner.aggregate_coverage import analyze_aggregate_coverage
 from quality_runner.discovery_inputs import (
     _package_scripts,
     _read_package_json,
@@ -13,6 +16,7 @@ from quality_runner.discovery_inputs import (
 )
 from quality_runner.discovery_quality import _quality_commands
 from quality_runner.intent_docs import discover_intent_docs
+from quality_runner.manifest import git_state_for_repo
 from quality_runner.scan_exclusions import (
     effective_scan_exclusions,
     effective_scan_exclusions_by_module,
@@ -51,11 +55,40 @@ def inspect_repo(
         [".pre-cr.json", ".pre-cr.yaml", ".pre-cr.yml", "pre-cr.config.json"],
     )
     intent_docs = discover_intent_docs(root)
+    git = git_state_for_repo(root)
+    captured_at = datetime.now(UTC).isoformat()
+    branch = git.get("branch")
+    provenance = {
+        **git,
+        "ref": (
+            branch
+            if isinstance(branch, str) and branch.startswith("refs/")
+            else f"refs/heads/{branch}"
+            if isinstance(branch, str) and branch and branch != "HEAD"
+            else None
+        ),
+        "quality_runner_version": __version__,
+        "captured_at": captured_at,
+        "worktree_mode": "in-place",
+        "workflow_run_id": run_id,
+    }
+    quality_commands = _quality_commands(
+        root=root,
+        package_json=package_json,
+        scripts=scripts,
+        pyproject=pyproject,
+        pre_cr_config=pre_cr_config,
+        ci_files=ci_files,
+        workspaces=workspaces,
+        scan_exclusions=structural_scan_exclusions,
+    )
 
     return {
         "schema": REPO_SCAN_SCHEMA,
         "run_id": run_id,
         "repo_root": str(root),
+        "git_provenance": provenance,
+        "provenance": provenance,
         "is_git_repo": (root / ".git").exists(),
         "package_manager": _detect_package_manager(root, package_json),
         "languages": _detect_languages(root, package_json, workspaces),
@@ -65,15 +98,10 @@ def inspect_repo(
         "scan_exclusions_by_module": scan_exclusions_by_module,
         "repo_surfaces": repo_surfaces,
         "scripts": scripts,
-        "quality_commands": _quality_commands(
-            root=root,
-            package_json=package_json,
+        "quality_commands": quality_commands,
+        "aggregate_coverage": analyze_aggregate_coverage(
             scripts=scripts,
-            pyproject=pyproject,
-            pre_cr_config=pre_cr_config,
-            ci_files=ci_files,
-            workspaces=workspaces,
-            scan_exclusions=structural_scan_exclusions,
+            quality_commands=quality_commands,
         ),
         "generated_code": generated_code,
         "intent_docs": intent_docs,
@@ -137,6 +165,8 @@ def _detect_languages(
         languages.add("swift")
     if (root / "go.mod").exists():
         languages.add("go")
+    if (root / "Cargo.toml").exists():
+        languages.add("rust")
     for workspace in workspaces:
         kind = workspace.get("kind")
         if kind == "javascript":

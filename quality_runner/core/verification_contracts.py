@@ -37,6 +37,7 @@ class VerificationRequest:
     intent: AuditPayload | None
     scan_exclusion_overlay: ScanExclusionOverlay | None = None
     agent_review_mode: str | None = None
+    readiness_evidence_file: Path | None = None
 
 
 @dataclass(frozen=True)

@@ -15,6 +15,11 @@ def add_workflow_arguments(parser: argparse.ArgumentParser) -> None:
         help="Local CI status JSON export to attach to capability evidence",
     )
     parser.add_argument(
+        "--readiness-evidence-file",
+        default=None,
+        help="Release-profile evidence JSON path inside the target repo",
+    )
+    parser.add_argument(
         "--interactive",
         action="store_true",
         help="Prompt before excluding expensive default-ignored scan paths",

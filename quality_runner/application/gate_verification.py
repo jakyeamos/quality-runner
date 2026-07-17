@@ -30,6 +30,7 @@ from quality_runner.gate_verification import (
     verify_discovered_gates,
 )
 from quality_runner.git_branches import prepare_scan_branch
+from quality_runner.readiness import evaluate_readiness
 from quality_runner.unwired_from_dead_code import merge_dead_code_unwired_findings
 from quality_runner.workflow_helpers import combined_warnings, gate_timeouts
 from quality_runner.workflow_internal import verify_payload_status
@@ -66,6 +67,36 @@ def run_gate_verification(request: VerificationRequest) -> VerificationResult:
             _legacy_payload(gate_verification),
             _legacy_payload(analysis.config),
         )
+    )
+    readiness = evaluate_readiness(
+        repo_root=request.repo_root,
+        scan=_legacy_payload(analysis.scan),
+        standards_packet=_legacy_payload(analysis.standards_packet),
+        capability_map=verified_capability_map,
+        gate_verification=_legacy_payload(gate_verification),
+        verification_context=_legacy_payload(gate_verification).get("verification_context")
+        if isinstance(_legacy_payload(gate_verification).get("verification_context"), dict)
+        else None,
+        evidence_file=request.readiness_evidence_file,
+    )
+    gate_verification = _audit_payload(
+        {
+            **_legacy_payload(gate_verification),
+            "readiness": readiness,
+            "status": (
+                "blocked"
+                if readiness.get("status") == "blocked"
+                else _legacy_payload(gate_verification).get("status", "blocked")
+            ),
+        }
+    )
+    verified_capability_map = _audit_payload(
+        {
+            **apply_gate_verification(
+                _legacy_payload(analysis.capability_map), _legacy_payload(gate_verification)
+            ),
+            "readiness": readiness,
+        }
     )
     verified_analysis = replace(
         analysis,
@@ -178,6 +209,7 @@ def _audit_request(
         intent=request.intent,
         scan_exclusion_overlay=request.scan_exclusion_overlay,
         agent_review_mode=request.agent_review_mode,
+        readiness_evidence_file=request.readiness_evidence_file,
     )
 
 

@@ -166,6 +166,7 @@ arguments where they apply:
 - `--intent`: short author goal for the run (what the user set out to accomplish)
 - `--intent-file`: path to intent JSON inside the target repo (must include `goal`)
 - `--ci-status-json`: local CI status export for capability evidence
+- `--readiness-evidence-file`: release evidence JSON override inside the target repo
 - `--profile`: standards profile override
 - `--run-id`: stable run id (refresh uses `--run-id-prefix` instead)
 - `--interactive`: prompt before excluding expensive default-ignored scan paths
@@ -181,6 +182,12 @@ arguments where they apply:
 
 Intent is optional. When supplied, QR writes `intent.json` and embeds the packet
 on `run-manifest.json`, `agent-handoff.json`, and `run-summary.json`.
+
+For the built-in release profile, use `--profile release` and provide current CI
+evidence with `--ci-status-json`. Release evidence defaults to
+`.quality-runner/release-evidence.json`; use `--readiness-evidence-file` for a
+different repo-local path. To prove executable release gates, authorize them in
+a disposable checkout with `--execute-gates --worktree-mode disposable`.
 
 ## QR Gate Controller
 

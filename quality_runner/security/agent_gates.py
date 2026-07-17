@@ -126,6 +126,25 @@ AGENT_REVIEW_GATE_DEFINITIONS: dict[str, dict[str, Any]] = {
         ],
         "trigger": "expensive_api",
     },
+    "security_publication_visibility_review": {
+        "scope": {
+            "paths": ["app/**", "src/**", "pages/**", "content/**", "media/**"],
+            "categories": ["publication-boundary", "visibility-boundary", "dangerous-html"],
+        },
+        "review_instructions": [
+            "Map public, private, draft, and published content boundaries.",
+            "Confirm authorization and visibility invariants for readers, media, and APIs.",
+            "Trace raw HTML/content provenance and confirm sanitization before rendering.",
+            "Confirm publication immutability, versioning, and rollback behavior.",
+        ],
+        "completion_criteria": [
+            "Every publication and visibility path has an authorization or explicit public-access decision.",
+            "Raw content provenance and sanitization evidence are recorded or have an accepted-risk disposition.",
+            "Published content has immutability, versioning, or rollback evidence.",
+            "Public and private media access paths have explicit authorization and visibility evidence.",
+        ],
+        "trigger": "publication_visibility",
+    },
     "security_cross_tenant_access_review": {
         "scope": {
             "paths": ["app/api/**", "src/**", "services/**"],
@@ -204,6 +223,8 @@ def _active_triggers(
         triggers.add("secrets")
     if "expensive-api-abuse" in categories:
         triggers.add("expensive_api")
+    if surfaces.get("publication_visibility"):
+        triggers.add("publication_visibility")
     return triggers
 
 
@@ -216,6 +237,7 @@ def _meets_minimum_severity(
         "security_dependency_risk_review",
         "security_auth_surface_review",
         "security_api_route_auth_review",
+        "security_publication_visibility_review",
     }:
         return True
     order = {"critical": 0, "high": 1, "medium": 2, "low": 3, "info": 4}

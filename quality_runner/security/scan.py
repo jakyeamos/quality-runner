@@ -17,6 +17,17 @@ from quality_runner.security.capabilities import (
 from quality_runner.security.config import security_settings
 from quality_runner.security_surface_paths import is_api_route_path, is_webhook_path
 
+RAW_CONTENT_MARKERS = (
+    "dangerouslysetinnerhtml",
+    ".innerhtml",
+    "v-html",
+    "raw_html",
+    "rawhtml",
+    "render_raw_html",
+)
+RAW_CONTENT_SUFFIXES = {".html", ".js", ".jsx", ".svelte", ".ts", ".tsx", ".vue"}
+MAX_SURFACE_CONTENT_BYTES = 250_000
+
 
 def create_security_scan(
     repo_root: Path,
@@ -106,12 +117,37 @@ def merge_security_into_capability_map(
 ) -> dict[str, Any]:
     if security_scan.get("settings", {}).get("enabled") is False:
         return capability_map
-    return merge_security_capabilities(
+    merged = merge_security_capabilities(
         capability_map,
         available=security_scan.get("available_capabilities", []),
         missing=security_scan.get("missing_capabilities", []),
         agent_review_gates=security_scan.get("agent_review_gates", []),
     )
+    readiness = merged.get("readiness")
+    surfaces = security_scan.get("surfaces")
+    if (
+        isinstance(readiness, dict)
+        and readiness.get("profile") == "release"
+        and isinstance(surfaces, dict)
+        and surfaces.get("publication_visibility") is True
+    ):
+        required = [
+            item for item in readiness.get("required_gate_ids", []) if isinstance(item, str)
+        ]
+        unresolved = [
+            item for item in readiness.get("unresolved_gate_ids", []) if isinstance(item, str)
+        ]
+        if "publication_visibility_review" not in required:
+            required.append("publication_visibility_review")
+        if "publication_visibility_review" not in unresolved:
+            unresolved.append("publication_visibility_review")
+        merged["readiness"] = {
+            **readiness,
+            "status": "blocked",
+            "required_gate_ids": required,
+            "unresolved_gate_ids": sorted(unresolved),
+        }
+    return merged
 
 
 def detect_security_surfaces(
@@ -127,10 +163,14 @@ def detect_security_surfaces(
         "dependency_manifest": False,
         "dangerous_sinks": False,
         "client_framework": False,
+        "publication_visibility": False,
     }
     if text_scan_scope is not None:
+        files_by_path = {file_info.path: file_info.text for file_info in text_scan_scope.files}
         for relative_path in text_scan_scope.security_surface_paths:
             _record_security_surface(surfaces, relative_path, Path(relative_path).name)
+            if _raw_content_surface_text(relative_path, files_by_path.get(relative_path, "")):
+                surfaces["publication_visibility"] = True
     else:
         for path in repo_root.rglob("*"):
             if not path.is_file():
@@ -143,6 +183,8 @@ def detect_security_surfaces(
             ):
                 continue
             _record_security_surface(surfaces, relative, path.name)
+            if _raw_content_surface(path, relative):
+                surfaces["publication_visibility"] = True
 
     languages = scan.get("languages")
     if isinstance(languages, list) and "javascript" in languages:
@@ -219,6 +261,52 @@ def _record_security_surface(
         surfaces["webhooks"] = True
     if file_name in {"package.json", "pyproject.toml", "Cargo.toml", "go.mod"}:
         surfaces["dependency_manifest"] = True
+    lowered = relative_path.lower()
+    if any(
+        marker in lowered
+        for marker in (
+            "publish",
+            "publication",
+            "reader",
+            "draft",
+            "media",
+            "visibility",
+            "raw-html",
+            "raw_html",
+            "rawhtml",
+            "content",
+            "visibility-boundary",
+            "access-boundary",
+            "public_",
+            "public-",
+            "public/",
+            "private_",
+            "private-",
+            "private/",
+        )
+    ):
+        surfaces["publication_visibility"] = True
+
+
+def _raw_content_surface(path: Path, relative: str) -> bool:
+    if path.suffix.lower() not in RAW_CONTENT_SUFFIXES:
+        return False
+    if relative.startswith(("quality_runner/security/", ".quality-runner/")):
+        return False
+    try:
+        if path.stat().st_size > MAX_SURFACE_CONTENT_BYTES:
+            return False
+        text = path.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return False
+    return _raw_content_surface_text(relative, text)
+
+
+def _raw_content_surface_text(relative: str, text: str) -> bool:
+    if Path(relative).suffix.lower() not in RAW_CONTENT_SUFFIXES:
+        return False
+    lowered = text.lower()
+    return any(marker in lowered for marker in RAW_CONTENT_MARKERS)
 
 
 def _disabled_security_scan(

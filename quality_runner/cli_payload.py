@@ -126,6 +126,11 @@ def payload_for_args(args: argparse.Namespace) -> dict[str, Any]:
             run_id=args.run_id,
             profile=args.profile,
             ci_status_json=Path(args.ci_status_json) if args.ci_status_json else None,
+            readiness_evidence_file=(
+                Path(args.readiness_evidence_file).expanduser().resolve()
+                if args.readiness_evidence_file
+                else None
+            ),
             include_ignored_paths=_interactive_include_ignored_paths(args, repo_root),
             scan_exclusion_overlay=_scan_exclusion_overlay(args, repo_root),
             checkout_most_advanced_branch=args.checkout_most_advanced_branch,
@@ -141,6 +146,11 @@ def payload_for_args(args: argparse.Namespace) -> dict[str, Any]:
                 run_id=args.run_id,
                 profile=args.profile,
                 ci_status_json=Path(args.ci_status_json) if args.ci_status_json else None,
+                readiness_evidence_file=(
+                    Path(args.readiness_evidence_file).expanduser().resolve()
+                    if args.readiness_evidence_file
+                    else None
+                ),
                 include_ignored_paths=_interactive_include_ignored_paths(args, repo_root),
                 checkout_most_advanced_branch=args.checkout_most_advanced_branch,
                 skill_review_report=_legacy_payload(_optional_skill_review_report(args)),
@@ -159,6 +169,11 @@ def payload_for_args(args: argparse.Namespace) -> dict[str, Any]:
             run_id=args.run_id,
             profile=args.profile,
             ci_status_json=Path(args.ci_status_json) if args.ci_status_json else None,
+            readiness_evidence_file=(
+                Path(args.readiness_evidence_file).expanduser().resolve()
+                if args.readiness_evidence_file
+                else None
+            ),
             include_ignored_paths=_interactive_include_ignored_paths(args, repo_root),
             scan_exclusion_overlay=_scan_exclusion_overlay(args, repo_root),
             checkout_most_advanced_branch=args.checkout_most_advanced_branch,
@@ -173,6 +188,11 @@ def payload_for_args(args: argparse.Namespace) -> dict[str, Any]:
             run_id=args.run_id,
             profile=args.profile,
             ci_status_json=Path(args.ci_status_json) if args.ci_status_json else None,
+            readiness_evidence_file=(
+                Path(args.readiness_evidence_file).expanduser().resolve()
+                if args.readiness_evidence_file
+                else None
+            ),
             timeout_seconds=args.timeout_seconds,
             checkout_most_advanced_branch=args.checkout_most_advanced_branch,
             execute_discovered_gates=getattr(args, "execute_gates", False),
@@ -193,6 +213,11 @@ def payload_for_args(args: argparse.Namespace) -> dict[str, Any]:
                 run_id=args.run_id,
                 profile=args.profile,
                 ci_status_json=Path(args.ci_status_json) if args.ci_status_json else None,
+                readiness_evidence_file=(
+                    Path(args.readiness_evidence_file).expanduser().resolve()
+                    if args.readiness_evidence_file
+                    else None
+                ),
                 timeout_seconds=args.timeout_seconds,
                 checkout_most_advanced_branch=args.checkout_most_advanced_branch,
                 execute_discovered_gates=args.execute_gates,

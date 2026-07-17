@@ -29,6 +29,7 @@ from quality_runner.intent import intent_for_run
 from quality_runner.manifest import git_state_for_repo
 from quality_runner.package_preflight import build_package_manager_preflight
 from quality_runner.planning import build_agent_handoff, build_remediation_plan
+from quality_runner.readiness import apply_readiness_evidence_override
 from quality_runner.remediation_context import (
     attach_context_refs,
     build_remediation_context_for_plan,
@@ -70,6 +71,12 @@ def analyze_read_only_audit(request: AuditRequest) -> AuditAnalysis:
         config=config,
     )
     capability_map = detect_capabilities(scan=scan, standards_packet=standards_packet)
+    capability_map = apply_readiness_evidence_override(
+        capability_map=capability_map,
+        standards_packet=standards_packet,
+        repo_root=repo_root,
+        evidence_file=request.readiness_evidence_file,
+    )
     config = config_with_include_overrides(config, list(request.include_ignored_paths))
     apply_run_only_scan_exclusion(
         repo_root,

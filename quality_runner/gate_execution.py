@@ -12,6 +12,7 @@ from quality_runner.gate_execution_policy import (
     mutating_risk,
     recommended_action,
 )
+from quality_runner.gate_provenance import artifact_digest
 from quality_runner.process_runner import run_shell_command
 from quality_runner.read_only_git import TrackedSnapshot, restore_if_changed, tracked_snapshot
 
@@ -255,6 +256,7 @@ def _timeout_result(
         "stderr": stderr,
         "stdout_tail": stdout,
         "stderr_tail": stderr,
+        **_optional_field("artifact_digest", artifact_digest(stdout, stderr)),
         "failure_type": gate_failure_type,
         "reason": "gate timed out",
         "diagnostics": diagnostics,
@@ -319,6 +321,7 @@ def _completed_result(
         "stderr": stderr,
         "stdout_tail": stdout,
         "stderr_tail": stderr,
+        **_optional_field("artifact_digest", artifact_digest(stdout, stderr)),
         **_optional_field("failure_type", gate_failure_type if failed else None),
         **_optional_field("diagnostics", diagnostics),
         **recommended_action(

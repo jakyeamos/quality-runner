@@ -44,6 +44,7 @@ def run_refresh_payload(
     summary_callback: PayloadCallback,
     agent_review_mode: str | None = None,
     scan_exclusion_overlay: ScanExclusionOverlay | None = None,
+    readiness_evidence_file: Path | None = None,
 ) -> dict[str, Any]:
     inspect_run_id = f"{run_id_prefix}-inspect"
     run_run_id = f"{run_id_prefix}-run"
@@ -122,6 +123,7 @@ def run_refresh_payload(
                 run_id=inspect_run_id,
                 profile=profile,
                 ci_status_json=ci_status_json,
+                readiness_evidence_file=readiness_evidence_file,
                 checkout_most_advanced_branch=checkout_most_advanced_branch,
                 agent_review_mode=agent_review_mode,
                 scan_exclusion_overlay=scan_exclusion_overlay,
@@ -136,6 +138,7 @@ def run_refresh_payload(
                 run_id=run_run_id,
                 profile=profile,
                 ci_status_json=ci_status_json,
+                readiness_evidence_file=readiness_evidence_file,
                 checkout_most_advanced_branch=checkout_most_advanced_branch,
                 agent_review_mode=agent_review_mode,
                 scan_exclusion_overlay=scan_exclusion_overlay,
@@ -164,6 +167,7 @@ def run_refresh_payload(
             intent=intent,
             agent_review_mode=agent_review_mode,
             scan_exclusion_overlay=scan_exclusion_overlay,
+            readiness_evidence_file=readiness_evidence_file,
         )
         summary = summary_callback(
             repo_root=repo_root,
@@ -265,6 +269,7 @@ def _run_verify_phase(
     intent: dict[str, Any] | None,
     agent_review_mode: str | None,
     scan_exclusion_overlay: ScanExclusionOverlay | None,
+    readiness_evidence_file: Path | None,
 ) -> dict[str, Any]:
     current.phase = "verify-gates"
     current.phase_key = "verify"
@@ -287,6 +292,7 @@ def _run_verify_phase(
             run_id=run_id,
             profile=profile,
             ci_status_json=ci_status_json,
+            readiness_evidence_file=readiness_evidence_file,
             timeout_seconds=timeout_seconds,
             checkout_most_advanced_branch=checkout_most_advanced_branch,
             execute_discovered_gates=execute_discovered_gates,

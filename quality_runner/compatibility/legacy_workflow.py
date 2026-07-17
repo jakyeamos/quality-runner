@@ -43,6 +43,7 @@ def refresh_payload(
     execute_discovered_gates: bool = False,
     agent_review_mode: str | None = None,
     scan_exclusion_overlay: ScanExclusionOverlay | None = None,
+    readiness_evidence_file: Path | None = None,
 ) -> dict[str, Any]:
     review_enabled = review_cycle_id is not None or review_iteration is not None
     if review_enabled:
@@ -73,6 +74,7 @@ def refresh_payload(
         intent=intent,
         agent_review_mode=agent_review_mode,
         scan_exclusion_overlay=scan_exclusion_overlay,
+        readiness_evidence_file=readiness_evidence_file,
         inspect_callback=inspect_callback,
         run_callback=run_callback,
         verify_callback=verify_callback,

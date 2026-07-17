@@ -17,8 +17,9 @@ Artifacts are written under:
   instruction files, discovered intent docs (`PRODUCT.md`, `DESIGN.md`,
   `CONTEXT.md`, `docs/adr/*.md`), language-aware quality commands, mature repo
   surfaces, nested workspaces, active scan exclusions, ecosystems,
-  generated-code markers, local CI checks, Pre-CR config, project truth file
-  presence, and branch selection warnings when the checked-out branch is neither
+  generated-code markers, local CI checks, aggregate command coverage, git/CI
+  provenance, Pre-CR config, project truth file presence, and branch selection
+  warnings when the checked-out branch is neither
   `main` nor the local most-advanced branch.
 - `code-quality-scan.json`: deterministic structural/code-quality findings,
   line accountability, duplicate clusters, skipped generated/vendor paths, and
@@ -44,7 +45,12 @@ Artifacts are written under:
   command execution evidence and pass/fail evidence. CI-only gates that have no
   local executor are marked with `local_execution: "ci-only"`. Capabilities also
   include `capability_kind` so local commands, CI-only gates, and file/evidence
-  capabilities can be handled independently.
+  capabilities can be handled independently. Release-profile artifacts also
+  include a `readiness` summary with required and unresolved release gates and
+  the repo-local evidence path.
+- `gate-verification.json`: executed or intentionally skipped gate results. It
+  includes verification provenance and, for release-profile runs, the evaluated
+  readiness gates.
 - `run-manifest.json`: run metadata, Quality Runner version, artifact paths, and
   git HEAD/branch/dirty state when the target is a git repo. When author intent
   is supplied, the manifest also embeds the resolved `intent` packet.
@@ -403,6 +409,12 @@ logic off the `v0.2` schema id.
 The file must live inside the target repo and is read as evidence only. Quality
 Runner does not call GitHub, fetch live check runs, or execute commands from CI
 configuration.
+
+Release-profile CI checks must carry current `head_sha`, branch/ref,
+`workflow_run_id`, `captured_at`, and a successful conclusion. Release evidence
+uses schema `quality-runner-release-evidence-v0.1` and records the target commit,
+release version, artifact digest, owner acceptance, and conditional migration or
+publication proof.
 
 ## Scan Exclusions
 
