@@ -9,8 +9,14 @@ inspects repositories, records evidence, plans remediation, and hands execution
 to separately authorized humans or agents. It does not own autonomous source
 changes or remote review execution.
 
-`main` is the published 0.5.1 release at `a101bd4`, tagged `v0.5.1`, with a
-verified PyPI distribution and public GitHub Release. The protected
+`main` is the published 0.6.0 release at `c6e92cc`, tagged `v0.6.0`, with
+successful post-merge CI run 32, a successful tag workflow run 13, and a
+verified PyPI distribution. The public
+wheel digest is `34c96cedfbe555033cfbde863e4144c13fd91510d512f1b482428d5181a3c1d9`
+and the source archive digest is
+`99445e86ea7fe686380f3e291d67ffbf20420f500fe6b3fb9562b5d72bdf277e`. A fresh
+PyPI install passes version, doctor, release-smoke, and MCP discovery. The
+protected
 `codex/gpt56-modernization` branch contains M0 trust-boundary work in
 `f36dcf4`, M1 typed Fresh Review contracts in `cb12746`, M2 typed read-only
 audit orchestration in `3f23204`, and M3 typed verification orchestration in
@@ -63,28 +69,27 @@ stderr progress reporting, resolution-aware planning, domain phase candidates,
 read-only filesystem integrity, structured verification contracts, skill
 decomposition, UI quality fixtures, and starter-pack examples.
 The architecture-preserving port is now integrated and published on canonical
-`dev`; its 650-test/static-analysis/release-smoke evidence remains attached to
-the port commits, and no package version bump or release tag was created.
+`dev` as v0.6.0; its 650-test/static-analysis/release-smoke evidence remains
+attached to the port commits and the release promotion.
 The short `qr` console command is now part of the canonical dev CLI surface. It
-maps to the same `quality_runner.cli:main` entrypoint as `quality-runner`, keeps
-the v0.5.1-compatible package version, and is covered by packaged entrypoint
-tests.
-The isolated `codex/release-0.6.0` branch is now at `b5a610e`, preparing the
-0.6.0 package, citation, changelog, upgrade, and release-checklist metadata.
-The release-readiness contract recognizes dynamic `_version.py` metadata and
-the installed-wheel `release-smoke` CI command. Workflow discovery now keeps
-the exact commands declared by CI, with 49 focused regression tests and green
-exact-head GitHub CI; the final release profile, merge, tag, and publication
-remain pending for this new head.
+maps to the same `quality_runner.cli:main` entrypoint as `quality-runner`, is
+included in the v0.6.0 package, and is covered by packaged entrypoint tests.
+The isolated `codex/release-0.6.0` branch completed at `e3f5f5f`; PR #5 merged
+it into `main` at `c6e92cc`. The release-readiness contract recognizes dynamic
+`_version.py` metadata and the installed-wheel `release-smoke` CI command.
+Workflow discovery keeps the exact commands declared by CI, with 49 focused
+regression tests, green exact-head GitHub CI, a passing release profile, and
+verified PyPI publication.
 
 ## Current Position
 
 - Target: a typed v2 core behind CLI, MCP, and compatibility adapters.
-- Next slice: rerun the v0.6.0 release profile at `b5a610e`, then merge the
-  verified release branch to `main`, tag it, and verify PyPI publication.
-- `codex/release-0.6.0` is the isolated release branch from canonical `dev`;
-  `main` remains the published v0.5.1 baseline until promotion succeeds.
-- `dev` is the canonical integration branch and is published to `origin/dev`.
+- Next slice: start the next scoped follow-up from the released `main`/`dev`
+  baseline.
+- `codex/release-0.6.0` was merged by PR #5 into `main` at `c6e92cc`; `main`
+  and the `v0.6.0` tag are published.
+- `dev` is the canonical integration branch, is published to `origin/dev`, and
+  is synchronized to `c6e92cc`.
   The temporary `codex/dev-feature-port` worktree/ref and the superseded
   `quality-skill-corpus-workflow` branch were pruned after the behavioral port
   audit; unrelated active branches remain separate.
@@ -104,6 +109,10 @@ remain pending for this new head.
 
 ## Baseline Quality
 
+- `c6e92cc` is the released v0.6.0 promotion commit. GitHub PR-head CI and
+  the tag release workflow pass; the public PyPI wheel and source archive are
+  verified by digest, and an isolated PyPI install passes CLI, doctor,
+  release-smoke, and MCP checks.
 - `c71b130` passes the full 556-test pytest suite, Ruff lint/format,
   Basedpyright, Vulture, lock validation, pip-audit, release smoke, build, and
   installed-wheel smoke checks. GitHub CI and the tag release workflow pass;
@@ -162,7 +171,7 @@ remain pending for this new head.
 
 `b5a610e` keeps exact CI workflow commands during release-gate discovery;
   focused regression tests pass, exact-head GitHub CI is green, and the release
-  profile must be rerun for this changed head.
+  profile passes on the promoted release candidate.
 
 ## Risks
 
@@ -185,13 +194,14 @@ remain pending for this new head.
 
 ## Recent Progress
 
-- 2026-07-17: `a3777b1` fixes release-profile discovery for dynamic package
-  versions and installed-wheel release smoke, with 49 focused tests passing.
 - 2026-07-17: `b5a610e` makes release-gate discovery execute the exact commands
   declared by CI, including scoped Vulture coverage; focused tests pass and
   exact-head GitHub CI is green.
-- 2026-07-17: `23da809` prepares the isolated v0.6.0 release branch from
-  canonical `dev`; no merge, tag, or publication has occurred.
+- 2026-07-17: `a3777b1` fixes release-profile discovery for dynamic package
+  versions and installed-wheel release smoke, with 49 focused tests passing.
+- 2026-07-17: PR #5 merged the validated v0.6.0 branch at `c6e92cc`; tag
+  `v0.6.0` and release workflow run 13 succeeded, PyPI 0.6.0 is published,
+  and a fresh public-install smoke passed.
 - 2026-07-17: Folded the short `qr` console command into the canonical `dev`
   line from `codex/qr-command-surface-main`; focused entrypoint tests, Ruff,
   formatting, and diff checks pass. No version bump or release tag was made.
