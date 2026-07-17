@@ -138,6 +138,7 @@ def test_packaged_console_script_invokes_cli(tmp_path: Path) -> None:
             f"quality_runner-{__version__}.dist-info/entry_points.txt"
         ).decode()
     assert "quality-runner = quality_runner.cli:main" in entry_points
+    assert "qr = quality_runner.cli:main" in entry_points
     assert "quality-runner-mcp = quality_runner.mcp:main" in entry_points
     assert "repo-quality-certifier = repo_quality_certifier.cli:main" in entry_points
     assert "repo-quality-certifier-mcp = repo_quality_certifier.mcp:main" in entry_points
@@ -158,12 +159,20 @@ def test_packaged_console_script_invokes_cli(tmp_path: Path) -> None:
     )
 
     quality_runner = venv_dir / "bin" / "quality-runner"
+    qr = venv_dir / "bin" / "qr"
     version_result = subprocess.run(
         [str(quality_runner), "--version"],
         check=True,
         capture_output=True,
         text=True,
     )
+    qr_version_result = subprocess.run(
+        [str(qr), "--version"],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    assert qr_version_result.stdout.strip() == __version__
     doctor_result = subprocess.run(
         [str(quality_runner), "doctor", "--json"],
         check=True,

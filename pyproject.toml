@@ -30,6 +30,7 @@ build-backend = "setuptools.build_meta"
 
 [project.scripts]
 quality-runner = "quality_runner.cli:main"
+qr = "quality_runner.cli:main"
 quality-runner-mcp = "quality_runner.mcp:main"
 repo-quality-certifier = "repo_quality_certifier.cli:main"
 repo-quality-certifier-mcp = "repo_quality_certifier.mcp:main"
