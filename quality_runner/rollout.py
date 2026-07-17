@@ -8,11 +8,13 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from quality_runner import __version__
 from quality_runner.controller_reports import (
     build_controller_report_from_summary,
     validate_controller_report,
 )
 from quality_runner.fleet_documents import write_fleet_documents
+from quality_runner.tooling import command_text, current_runner_command, current_runner_source
 from quality_runner.workflow import refresh_payload
 
 ROLLOUT_RESULT_SCHEMA = "quality-runner-rollout-result-v0.1"
@@ -74,11 +76,16 @@ def rollout_payload(
         )
 
     fleet_documents = write_fleet_documents(output_dir=resolved_output_dir, results=results)
+    runner_command = command_text(current_runner_command())
+    runner_source = current_runner_source()
     ledger = {
         "schema": ROLLOUT_LEDGER_SCHEMA,
         "status": _rollout_status(results),
         "run_id_prefix": resolved_run_id_prefix,
         "output_dir": str(resolved_output_dir),
+        "quality_runner_version": __version__,
+        "quality_runner_source": runner_source,
+        "quality_runner_command": runner_command,
         "repo_count": len(entries),
         "fleet_documents": fleet_documents,
         "results": results,
@@ -92,6 +99,9 @@ def rollout_payload(
         "run_id_prefix": resolved_run_id_prefix,
         "output_dir": str(resolved_output_dir),
         "ledger_path": str(ledger_path),
+        "quality_runner_version": __version__,
+        "quality_runner_source": runner_source,
+        "quality_runner_command": runner_command,
         "fleet_documents": fleet_documents,
         "repo_count": len(entries),
         "accepted_reports": sum(
@@ -377,10 +387,16 @@ def _refresh_generation_command(
     repo_run_id_prefix: str,
     baseline_run_id: str | None,
 ) -> str:
-    command = f"quality-runner refresh {repo_root} --run-id-prefix {repo_run_id_prefix} --json"
+    arguments = [
+        "refresh",
+        str(repo_root),
+        "--run-id-prefix",
+        repo_run_id_prefix,
+        "--json",
+    ]
     if baseline_run_id:
-        command += f" --baseline-run-id {baseline_run_id}"
-    return command
+        arguments.extend(["--baseline-run-id", baseline_run_id])
+    return command_text(current_runner_command(arguments))
 
 
 def _string_value(value: object) -> str:

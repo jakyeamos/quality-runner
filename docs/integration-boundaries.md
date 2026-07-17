@@ -14,6 +14,10 @@ QR never imports or updates existing GSD files. `.planning/ROADMAP.md`,
 `.planning/STATE.md`, and GSD phase directories remain independent. GSD and
 other planning systems can consume the canonical QR artifacts directly.
 
+Consumers should invoke QR through the source-first contract in
+[Consumer Tooling](consumer-tooling.md), not through a copied package or an
+unverified global binary.
+
 The stable handoff for any consumer is the artifact set in
 `.quality-runner/runs/<run-id>/`:
 

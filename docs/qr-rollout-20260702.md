@@ -7,7 +7,7 @@ Source report: `/private/tmp/quality-runner-readable-report-20260702.md`
 - Wave size: 5
 - Scope: 44 repos from the report
 - Excluded: `soundscape-app`
-- Restarted wave 1 runner: `/Users/jakyeamos/projects/quality-runner/.venv/bin/quality-runner`
+- Current source-first runner: `/Users/jakyeamos/projects/quality-runner/scripts/quality-runner`
 
 ## Controller Protocol
 
@@ -30,6 +30,34 @@ domain decision that requires owner input, dependency or network impossibility,
 a QR scanner limitation that cannot be configured around without disabling the
 relevant signal wholesale, or test/build failures outside touched scope after
 reasonable targeted remediation.
+
+## Current Source-First Runner Contract
+
+The historical wave instructions below contain old runner paths and version
+requirements. For any current run, use the QR checkout as the tool surface and
+do not require v0.3.0:
+
+```bash
+/Users/jakyeamos/projects/quality-runner/scripts/quality-runner \
+  --version
+
+/Users/jakyeamos/projects/quality-runner/scripts/quality-runner rollout \
+  /private/tmp/qr-repos.txt --run-id-prefix current-wave --json
+```
+
+That launcher defaults to a refreshed latest-main QR invocation. For a
+branch-local controller or worker run, use:
+
+```bash
+QUALITY_RUNNER_MODE=local \
+QUALITY_RUNNER_REPO=/Users/jakyeamos/projects/quality-runner \
+/Users/jakyeamos/projects/quality-runner/scripts/quality-runner \
+  refresh /path/to/repo --run-id-prefix current --json
+```
+
+Rollout ledgers record the QR version, source, and command. Generated
+controller reports also carry a source-aware rerun command, so a worker does
+not silently fall back to an old `quality-runner` binary on PATH.
 
 Required thread report fields:
 
@@ -90,8 +118,8 @@ Triage worker objective:
 - Classify the repo outcome as `clean`, `missing-gates-only`,
   `scanner-product-issue`, `broad-repo-debt`, `env-or-dependency-blocker`, or
   `mixed-blocker`.
-- Use `/Users/jakyeamos/projects/quality-runner/.venv/bin/quality-runner` and
-  verify version `0.3.0` before running QR.
+- Use the [current source-first runner contract](#current-source-first-runner-contract)
+  and record the version it reports before running QR.
 - Remediate only missing repo-owned gates, obvious path/scope configuration
   issues, and at most 1-3 high-signal findings that are clearly safe.
 - Stop early when QR shows broad structural debt rather than attempting a
@@ -174,9 +202,10 @@ Wave 1 is being restarted after Quality Runner product fixes on branch
 
 Worker requirements for the restart:
 
-- Use `/Users/jakyeamos/projects/quality-runner/.venv/bin/quality-runner` for
-  every final QR run, not a globally installed `quality-runner` binary.
-- Run `quality-runner --version` first and require version `0.3.0`.
+- Use the [current source-first runner contract](#current-source-first-runner-contract)
+  for every final QR run, not a globally installed `quality-runner` binary.
+- Run the launcher with `--version` first and record the current version; do
+  not pin this workflow to the historical `0.3.0` requirement.
 - Preserve existing repo branch commits and unrelated dirty work.
 - Continue from the existing QR branch when present.
 - Do not disable whole structural rule groups merely to make QR green unless
@@ -314,8 +343,8 @@ remediation.
 
 Refresh worker rules:
 
-- Use `/Users/jakyeamos/projects/quality-runner/.venv/bin/quality-runner` from
-  controller commit `a585f9b`.
+- Use the [current source-first runner contract](#current-source-first-runner-contract)
+  rather than the historical controller checkout path.
 - Do not edit, stage, commit, push, or remediate repo files.
 - Generated `.quality-runner/` artifacts are allowed and must remain
   uncommitted.
@@ -343,7 +372,7 @@ Prepare a repo list as text, CSV-style text, or JSON:
 Run the all-projects stress pass from the Quality Runner checkout:
 
 ```bash
-/Users/jakyeamos/projects/quality-runner/.venv/bin/quality-runner rollout \
+/Users/jakyeamos/projects/quality-runner/scripts/quality-runner rollout \
   /private/tmp/qr-all-projects-repos.txt \
   --run-id-prefix all-projects-20260704 \
   --output-dir /private/tmp/qr-all-projects-20260704 \

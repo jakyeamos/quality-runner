@@ -6,6 +6,14 @@ agent or human still owns source edits, verification command execution, and
 git operations. For large or repo-wide remediation, use one coherent batch at
 a time.
 
+## Invocation
+
+The examples below use `quality-runner` for readability. Consumer repositories
+should use the source-first contract in [Consumer Tooling](consumer-tooling.md):
+`uvx --refresh --from git+https://github.com/jakyeamos/quality-runner.git
+quality-runner ...` for latest QR, or `uv run --project /path/to/quality-runner
+quality-runner ...` for a specific checkout.
+
 ## Command Selection Contract
 
 Choose the command from the proof the task needs, not from the command that is
