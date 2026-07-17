@@ -54,7 +54,7 @@ def test_release_docs_describe_current_release_plan_and_release_history() -> Non
     assert "uv run --locked pip-audit" in release_docs
     assert "quality-runner release-smoke --json" in release_docs
     assert "quality-runner-mcp" in release_docs
-    assert "uv tool install 'quality-runner==0.5.1' --force" in release_docs
+    assert "uv tool install 'quality-runner==0.6.0' --force" in release_docs
     assert "--execute-gates --worktree-mode disposable" in release_docs
     assert "Upgrade and Compatibility Guide" in release_docs
     assert "review --legacy-output" in cli_docs

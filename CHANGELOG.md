@@ -2,6 +2,24 @@
 
 All notable changes to Quality Runner are documented here.
 
+## 0.6.0 - 2026-07-17
+
+- Added Quality Skills corpus classification, canonical selection, append and
+  synchronization commands, with selected-skill review coverage and QR-native
+  similarity/status evidence.
+- Added artifact redaction and retention controls, a dry-run-by-default
+  `prune-artifacts` command, and source-first rollout/consumer invocation with
+  local provenance.
+- Added tool-neutral remediation deltas, native QR phase planning, scan-
+  exclusion preflight, and source-read-only remediation-context packets with
+  validation and handoff readiness evidence.
+- Added release-profile readiness contracts covering provenance, repository
+  evidence, aggregate command coverage, artifact/read-only gates, and
+  publication-boundary review triggers.
+- Added local self-update, resolution-aware planning, progress reporting,
+  verification contracts, skill decomposition, UI quality fixtures, starter
+  packs, and the short `qr` console command.
+
 ## 0.5.1 - 2026-07-13
 
 - Hardened artifact path resolution and made discovered-command execution an
