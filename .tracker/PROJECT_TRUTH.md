@@ -58,9 +58,9 @@ tag, release workflow, and published-artifact smoke checks have completed.
 ## Current Position
 
 - Target: a typed v2 core behind CLI, MCP, and compatibility adapters.
-- Next implementation slice: port the Quality Skills corpus and selection
-  layer into canonical `dev`, then continue with remediation, phase planning,
-  similarity, consumer tooling, and preflight behavior.
+- Next implementation slice: continue the additive port with artifact security,
+  repository skill packs, remediation/phase planning, consumer tooling, and
+  scan-exclusion preflight behavior.
 - `dev` is the canonical integration branch. The preserved source branch is
   `quality-skill-corpus-workflow` at `53dc9c8` and remains until its unique
   behavior is fully represented in `dev`.
@@ -93,6 +93,10 @@ tag, release workflow, and published-artifact smoke checks have completed.
   contracts, redacted finding metadata, skill identities, and manifest/schema
   support. The touched-module slice passes 63 tests, Ruff, formatting,
   compilation, and Basedpyright.
+- `94b2d42` ports canonical global skill-corpus selection, repository signal
+  scoring, QR-native similarity, module-status reporting, and workflow/run
+  summary exposure while retaining the v0.5.1 application seams. The focused
+  port slice passes 78 tests, Ruff, formatting, compilation, and Basedpyright.
 
 ## Risks
 
@@ -107,6 +111,9 @@ tag, release workflow, and published-artifact smoke checks have completed.
 
 ## Recent Progress
 
+- 2026-07-17: `94b2d42` ports the canonical skill corpus and selection layer,
+  QR-native similarity, and module-status observability into the isolated
+  canonical-dev port branch; the application façade remains intact.
 - 2026-07-17: `da79745` ports the first Quality Skills contract batch into
   canonical `dev` while retaining the application workflow façades and
   evidence-redaction boundary.
