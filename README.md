@@ -178,6 +178,7 @@ quality-runner status /path/to/repo --json
 quality-runner inspect /path/to/repo --json
 quality-runner run /path/to/repo --json
 quality-runner verify-gates /path/to/repo --json
+quality-runner exclusions suggest /path/to/repo --json
 quality-runner refresh /path/to/repo --run-id-prefix refresh-001 --handoff-output handoff.md --json
 quality-runner refresh /path/to/repo --run-id-prefix task-001-pass-1 \
   --intent "Implement the requested task" --review-cycle-id task-001 \
@@ -330,7 +331,17 @@ product workspaces. Add repo-specific exclusions in `.quality-runner.toml`:
 ```toml
 [quality_runner]
 scan_exclusions = ["samples", "generated-reports/**"]
+
+[quality_runner.scan_exclusions_by_module]
+code_quality = ["generated-output/**"]
 ```
+
+The legacy `scan_exclusions` list applies to all QR-owned scan modules. The
+optional module table supports `structural`, `code_quality`, and `security`
+scopes; a structural or code-quality exclusion preserves security coverage.
+Use `quality-runner exclusions suggest` to produce a deterministic review
+packet before changing configuration. Only `exclusions apply --apply` can
+mutate `.quality-runner.toml`.
 
 ## Safety Boundary
 

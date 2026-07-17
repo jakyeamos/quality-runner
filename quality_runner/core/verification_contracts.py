@@ -4,7 +4,11 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
-from quality_runner.core.audit_contracts import AuditArtifactPaths, AuditPayload
+from quality_runner.core.audit_contracts import (
+    AuditArtifactPaths,
+    AuditPayload,
+    ScanExclusionOverlay,
+)
 
 type GateExecutionPlan = list[dict[str, object]]
 type GateVerificationPayload = dict[str, object]
@@ -31,6 +35,8 @@ class VerificationRequest:
     policy: GateExecutionPolicy
     skill_review_report: AuditPayload | None
     intent: AuditPayload | None
+    scan_exclusion_overlay: ScanExclusionOverlay | None = None
+    agent_review_mode: str | None = None
 
 
 @dataclass(frozen=True)

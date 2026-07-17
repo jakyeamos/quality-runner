@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://quality-runner.dev/schemas/scan-exclusion-preflight-report.schema.json",
+  "title": "Quality Runner Scan-Exclusion Preflight Agent Report",
+  "type": "object",
+  "required": ["schema", "packet_sha256", "repo_root", "repo_fingerprint", "reviewer", "scope", "security_coverage_acknowledged", "decisions"],
+  "properties": {
+    "schema": { "const": "quality-runner-scan-exclusion-report-v0.1" },
+    "packet_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "repo_root": { "type": "string", "minLength": 1 },
+    "repo_fingerprint": { "type": "object" },
+    "reviewer": {
+      "type": "object",
+      "required": ["id", "kind"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "kind": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": false
+    },
+    "scope": { "enum": ["all-modules", "module-scoped"] },
+    "security_coverage_acknowledged": { "type": "boolean" },
+    "decisions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["candidate_id", "decision", "rationale", "evidence", "confidence"],
+        "properties": {
+          "candidate_id": { "type": "string", "pattern": "^EXC-[0-9a-f]{12}$" },
+          "decision": { "enum": ["exclude", "include", "defer"] },
+          "rationale": { "type": "string", "minLength": 1 },
+          "evidence": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 } },
+          "confidence": { "enum": ["high", "medium", "low"] },
+          "module_scope": { "enum": ["all-modules", "structural", "code_quality", "security"] }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

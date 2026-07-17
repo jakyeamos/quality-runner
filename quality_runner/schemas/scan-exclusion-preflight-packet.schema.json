@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://quality-runner.dev/schemas/scan-exclusion-preflight-packet.schema.json",
+  "title": "Quality Runner Scan-Exclusion Preflight Packet",
+  "type": "object",
+  "required": ["schema", "run_id", "repo_root", "created_at", "repo_fingerprint", "config", "preflight_policy", "traversal", "candidates"],
+  "properties": {
+    "schema": { "const": "quality-runner-scan-exclusion-packet-v0.1" },
+    "run_id": { "type": "string", "minLength": 1 },
+    "repo_root": { "type": "string", "minLength": 1 },
+    "created_at": { "type": "string", "format": "date-time" },
+    "repo_fingerprint": { "type": "object" },
+    "config": { "type": "object" },
+    "preflight_policy": { "type": "object" },
+    "traversal": { "type": "object" },
+    "candidates": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["candidate_id", "path", "proposed_scope", "evidence", "protected", "protected_reasons", "suggested_decision", "confidence"],
+        "properties": {
+          "candidate_id": { "type": "string", "pattern": "^EXC-[0-9a-f]{12}$" },
+          "path": { "type": "string", "minLength": 1 },
+          "proposed_scope": {
+            "type": "object",
+            "required": ["path", "pattern", "module_scope"],
+            "properties": {
+              "path": { "type": "string", "minLength": 1 },
+              "pattern": { "type": "string", "minLength": 1 },
+              "module_scope": { "enum": ["all-modules", "structural", "code_quality", "security"] },
+              "available_module_scopes": {
+                "type": "array",
+                "items": { "enum": ["all-modules", "structural", "code_quality", "security"] }
+              }
+            },
+            "additionalProperties": false
+          },
+          "evidence": { "type": "object" },
+          "protected": { "type": "boolean" },
+          "protected_reasons": { "type": "array", "items": { "type": "string" } },
+          "suggested_decision": { "enum": ["exclude", "include", "defer"] },
+          "confidence": { "enum": ["high", "medium", "low"] }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

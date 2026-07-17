@@ -7,7 +7,7 @@
   "properties": {
     "schema": { "const": "quality-runner-run-manifest-v0.1" },
     "run_id": { "type": "string", "minLength": 1 },
-    "mode": { "enum": ["inspect", "run", "verify-gates", "refresh"] },
+    "mode": { "enum": ["inspect", "run", "verify-gates", "refresh", "exclusion-preflight"] },
     "repo_root": { "type": "string", "minLength": 1 },
     "created_at": { "type": "string", "format": "date-time" },
     "quality_runner_version": { "type": "string", "minLength": 1 },
@@ -28,6 +28,40 @@
       "additionalProperties": { "type": "string" }
     },
     "module_status": { "$ref": "module-status.schema.json" },
+    "scan_exclusion_preflight": {
+      "type": "object",
+      "required": ["scope", "effective_scan_exclusions"],
+      "anyOf": [
+        { "required": ["stage"] },
+        { "required": ["source"] }
+      ],
+      "properties": {
+        "stage": { "enum": ["suggest", "validate", "apply"] },
+        "source": { "const": "cli-run-only-overlay" },
+        "scope": { "enum": ["all-modules", "module-scoped"] },
+        "security_coverage": { "type": "string", "minLength": 1 },
+        "packet_json": { "type": ["string", "null"] },
+        "report_json": { "type": ["string", "null"] },
+        "result_json": { "type": "string", "minLength": 1 },
+        "requested_paths": { "type": "array", "items": { "type": "string" } },
+        "requested_paths_by_module": { "type": "object", "additionalProperties": { "type": "array", "items": { "type": "string" } } },
+        "effective_exclusion_patterns": { "type": "array", "items": { "type": "string" } },
+        "effective_exclusion_patterns_by_module": { "type": "object", "additionalProperties": { "type": "array", "items": { "type": "string" } } },
+        "config_sha256": { "type": ["string", "null"] },
+        "config_mutated": { "const": false },
+        "configured_scan_exclusions": { "type": "array", "items": { "type": "string" } },
+        "configured_scan_exclusions_by_module": { "type": "object", "additionalProperties": { "type": "array", "items": { "type": "string" } } },
+        "packet_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "report_sha256": { "type": ["string", "null"], "pattern": "^[0-9a-f]{64}$" },
+        "approved_exclusions": { "type": "array", "items": { "type": "string" } },
+        "approved_exclusions_by_module": { "type": "object", "additionalProperties": { "type": "array", "items": { "type": "string" } } },
+        "rejected_decisions": { "type": "array", "items": { "type": "object" } },
+        "effective_scan_exclusions": { "type": "array", "items": { "type": "string" } },
+        "effective_scan_exclusions_by_module": { "type": "object", "additionalProperties": { "type": "array", "items": { "type": "string" } } },
+        "config": { "type": "object" }
+      },
+      "additionalProperties": false
+    },
     "quality_skills": {
       "type": "array",
       "items": {

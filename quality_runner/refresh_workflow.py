@@ -5,6 +5,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
+from quality_runner.core.audit_contracts import ScanExclusionOverlay
 from quality_runner.refresh_timeout import (
     build_timeout_verify_artifacts,
     not_started_refresh_phase,
@@ -41,6 +42,8 @@ def run_refresh_payload(
     run_callback: PayloadCallback,
     verify_callback: PayloadCallback,
     summary_callback: PayloadCallback,
+    agent_review_mode: str | None = None,
+    scan_exclusion_overlay: ScanExclusionOverlay | None = None,
 ) -> dict[str, Any]:
     inspect_run_id = f"{run_id_prefix}-inspect"
     run_run_id = f"{run_id_prefix}-run"
@@ -120,6 +123,8 @@ def run_refresh_payload(
                 profile=profile,
                 ci_status_json=ci_status_json,
                 checkout_most_advanced_branch=checkout_most_advanced_branch,
+                agent_review_mode=agent_review_mode,
+                scan_exclusion_overlay=scan_exclusion_overlay,
                 intent=intent,
             ),
         )
@@ -132,6 +137,8 @@ def run_refresh_payload(
                 profile=profile,
                 ci_status_json=ci_status_json,
                 checkout_most_advanced_branch=checkout_most_advanced_branch,
+                agent_review_mode=agent_review_mode,
+                scan_exclusion_overlay=scan_exclusion_overlay,
                 intent=intent,
             ),
         )
@@ -155,6 +162,8 @@ def run_refresh_payload(
             current=current,
             verify_callback=verify_callback,
             intent=intent,
+            agent_review_mode=agent_review_mode,
+            scan_exclusion_overlay=scan_exclusion_overlay,
         )
         summary = summary_callback(
             repo_root=repo_root,
@@ -254,6 +263,8 @@ def _run_verify_phase(
     current: _RefreshTimeoutState,
     verify_callback: PayloadCallback,
     intent: dict[str, Any] | None,
+    agent_review_mode: str | None,
+    scan_exclusion_overlay: ScanExclusionOverlay | None,
 ) -> dict[str, Any]:
     current.phase = "verify-gates"
     current.phase_key = "verify"
@@ -283,6 +294,8 @@ def _run_verify_phase(
             allow_mutating_gates=allow_mutating_gates,
             worktree_mode=worktree_mode,
             allow_dirty_worktree_verify=allow_dirty_worktree_verify,
+            agent_review_mode=agent_review_mode,
+            scan_exclusion_overlay=scan_exclusion_overlay,
             intent=intent,
         )
     phase_timings["verify"] = phase_timing(

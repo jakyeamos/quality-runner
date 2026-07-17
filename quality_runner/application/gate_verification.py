@@ -176,6 +176,8 @@ def _audit_request(
         branch_warnings=tuple(_audit_warning(warning) for warning in branch_warnings),
         skill_review_report=request.skill_review_report,
         intent=request.intent,
+        scan_exclusion_overlay=request.scan_exclusion_overlay,
+        agent_review_mode=request.agent_review_mode,
     )
 
 

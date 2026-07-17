@@ -4,13 +4,19 @@ import json
 from pathlib import Path
 from typing import Any, cast
 
+from quality_runner.agent_review_policy import AGENT_REVIEW_MODES, AgentReviewMode
 from quality_runner.application.audit_v1_artifacts import (
     plan_and_write_run_v1_artifacts,
     write_inspect_v1_artifacts,
 )
 from quality_runner.application.read_only_audit import analyze_read_only_audit
 from quality_runner.artifacts import prepare_artifact_dir
-from quality_runner.core.audit_contracts import AuditPayload, AuditRequest, AuditWarning
+from quality_runner.core.audit_contracts import (
+    AuditPayload,
+    AuditRequest,
+    AuditWarning,
+    ScanExclusionOverlay,
+)
 from quality_runner.git_branches import prepare_scan_branch
 from quality_runner.workflow_helpers import combined_warnings
 from quality_runner.workflow_internal import generated_run_id
@@ -26,6 +32,8 @@ def inspect_payload(
     checkout_most_advanced_branch: bool = False,
     skill_review_report: AuditPayload | None = None,
     intent: AuditPayload | None = None,
+    agent_review_mode: str | None = None,
+    scan_exclusion_overlay: ScanExclusionOverlay | None = None,
 ) -> dict[str, Any]:
     resolved_run_id = generated_run_id() if run_id is None else run_id
     branch_warnings = prepare_scan_branch(
@@ -41,6 +49,8 @@ def inspect_payload(
             include_ignored_paths=include_ignored_paths,
             branch_warnings=branch_warnings,
             skill_review_report=skill_review_report,
+            agent_review_mode=agent_review_mode,
+            scan_exclusion_overlay=scan_exclusion_overlay,
             intent=intent,
         )
     )
@@ -70,6 +80,8 @@ def run_payload(
     checkout_most_advanced_branch: bool = False,
     skill_review_report: AuditPayload | None = None,
     intent: AuditPayload | None = None,
+    agent_review_mode: str | None = None,
+    scan_exclusion_overlay: ScanExclusionOverlay | None = None,
 ) -> dict[str, Any]:
     resolved_run_id = generated_run_id() if run_id is None else run_id
     branch_warnings = prepare_scan_branch(
@@ -85,6 +97,8 @@ def run_payload(
             include_ignored_paths=include_ignored_paths,
             branch_warnings=branch_warnings,
             skill_review_report=skill_review_report,
+            agent_review_mode=agent_review_mode,
+            scan_exclusion_overlay=scan_exclusion_overlay,
             intent=intent,
         )
     )
@@ -114,6 +128,8 @@ def _audit_request(
     include_ignored_paths: list[str] | None,
     branch_warnings: list[dict[str, str]],
     skill_review_report: AuditPayload | None,
+    agent_review_mode: str | None,
+    scan_exclusion_overlay: ScanExclusionOverlay | None,
     intent: AuditPayload | None,
 ) -> AuditRequest:
     return AuditRequest(
@@ -125,6 +141,8 @@ def _audit_request(
         branch_warnings=tuple(_audit_warning(warning) for warning in branch_warnings),
         skill_review_report=skill_review_report,
         intent=intent,
+        scan_exclusion_overlay=scan_exclusion_overlay,
+        agent_review_mode=agent_review_mode,
     )
 
 
@@ -164,8 +182,14 @@ def _skill_review_from_analysis(
             if analysis.request.skill_review_report is not None
             else None
         ),
+        agent_review_mode=_agent_review_mode(analysis),
     )
 
 
 def _optional_field(key: str, value: object) -> dict[str, Any]:
     return {key: value} if value is not None else {}
+
+
+def _agent_review_mode(analysis: Any) -> AgentReviewMode:
+    mode = getattr(getattr(analysis, "request", None), "agent_review_mode", None)
+    return cast(AgentReviewMode, mode) if mode in AGENT_REVIEW_MODES else "auto"

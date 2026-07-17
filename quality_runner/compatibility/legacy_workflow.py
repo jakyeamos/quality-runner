@@ -8,6 +8,7 @@ from typing import Any
 from quality_runner.application.audit_workflows import inspect_payload, run_payload
 from quality_runner.application.verification_workflows import verify_gates_payload
 from quality_runner.artifacts import existing_artifact_dir, safe_child_file, write_json
+from quality_runner.core.audit_contracts import ScanExclusionOverlay
 from quality_runner.refresh_workflow import run_refresh_payload
 from quality_runner.review_delta import build_review_delta, persist_review_delta
 from quality_runner.run_summary import build_run_summary
@@ -40,6 +41,8 @@ def refresh_payload(
     summary_callback: PayloadCallback = build_run_summary,
     refresh_runner: Callable[..., dict[str, Any]] = run_refresh_payload,
     execute_discovered_gates: bool = False,
+    agent_review_mode: str | None = None,
+    scan_exclusion_overlay: ScanExclusionOverlay | None = None,
 ) -> dict[str, Any]:
     review_enabled = review_cycle_id is not None or review_iteration is not None
     if review_enabled:
@@ -68,6 +71,8 @@ def refresh_payload(
         worktree_mode=worktree_mode,
         allow_dirty_worktree_verify=allow_dirty_worktree_verify,
         intent=intent,
+        agent_review_mode=agent_review_mode,
+        scan_exclusion_overlay=scan_exclusion_overlay,
         inspect_callback=inspect_callback,
         run_callback=run_callback,
         verify_callback=verify_callback,

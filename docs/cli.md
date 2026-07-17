@@ -120,10 +120,39 @@ The same config file can add repo-specific scan exclusions:
 ```toml
 [quality_runner]
 scan_exclusions = ["samples", "generated-reports/**"]
+
+[quality_runner.scan_exclusions_by_module]
+code_quality = ["generated-output/**"]
+# security remains enabled for generated-output/**
 ```
 
 These augment the default exclusions for fixtures, corpora, docs, vendored
-trees, and tool output directories.
+trees, and tool output directories. `scan_exclusions` is the backward-compatible
+all-module list. The module table supports `structural`, `code_quality`, and
+`security`; module-specific entries add exclusions only to that QR-owned
+scanner.
+
+## `quality-runner exclusions`
+
+Builds and reviews a deterministic scan-exclusion candidate packet. Suggestion
+is review-only and does not edit repository configuration:
+
+```bash
+quality-runner exclusions suggest /path/to/repo --run-id exclusions-001 --json
+quality-runner exclusions validate /path/to/repo \
+  --packet /path/to/repo/.quality-runner/runs/exclusions-001/scan-exclusion-preflight-packet.json \
+  --report /path/to/review.json --json
+quality-runner exclusions apply /path/to/repo \
+  --packet /path/to/repo/.quality-runner/runs/exclusions-001/scan-exclusion-preflight-packet.json \
+  --report /path/to/review.json --apply --json
+```
+
+Packets include tracked/ignored status, file counts, generated/artifact
+markers, estimated scan cost, and configuration/timeout signals. Reports are
+bound to the packet and repository fingerprint, require one decision per
+candidate, and reject traversal, globs, stale fingerprints, and protected
+source/security/config roots. `apply` is the only mutating stage and requires
+the explicit `--apply` flag.
 
 Unwired-work checks can also be configured. They run as structural category
 `integrate` and produce decision-based remediation slices; see
@@ -140,6 +169,12 @@ arguments where they apply:
 - `--profile`: standards profile override
 - `--run-id`: stable run id (refresh uses `--run-id-prefix` instead)
 - `--interactive`: prompt before excluding expensive default-ignored scan paths
+- `--scan-exclusion DIR`: exclude this repo-relative directory for this run
+  only; repeat for multiple directories. This is a global overlay and changes
+  security scan coverage without editing repository configuration.
+- `--scan-exclusion-module MODULE=DIR`: exclude this repo-relative directory
+  for one QR-owned module only; use `structural`, `code_quality`, or `security`.
+  Structural and code-quality overlays preserve security coverage.
 - `--checkout-most-advanced-branch`: switch to the local most-advanced branch first
 - `--skill-review-report`: merge a validated agent skill review report into findings
 - `--json`: emit machine-readable CLI output

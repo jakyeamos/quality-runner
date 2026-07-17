@@ -18,9 +18,10 @@ from quality_runner.code_quality_paths import (
 from quality_runner.code_quality_similarity import similarity_policy_defaults
 from quality_runner.core.audit_contracts import AuditPayload, ScannedTextFile, TextScanScope
 from quality_runner.scan_exclusions import (
-    gitignore_scan_exclusions,
+    effective_scan_exclusions as configured_effective_scan_exclusions,
+)
+from quality_runner.scan_exclusions import (
     matches_scan_exclusion,
-    resolve_scan_exclusions,
 )
 from quality_runner.security_surface_paths import is_security_surface_path
 
@@ -79,11 +80,12 @@ def create_text_scan_scope(
     *,
     scan: dict[str, Any],
     config: dict[str, Any],
+    module: str | None = None,
 ) -> TextScanScope:
     root = repo_root.expanduser().resolve()
     policy = structural_scan_policy(config)
     skipped_files: list[AuditPayload] = []
-    scan_exclusions = effective_scan_exclusions(root, config)
+    scan_exclusions = effective_scan_exclusions(root, config, module=module)
     paths = discover_text_files(
         root,
         skipped_files=skipped_files,
@@ -275,8 +277,13 @@ def is_security_surface_file(path: Path, relative_path: str) -> bool:
     return path.name in SECURITY_SURFACE_FILE_NAMES or is_security_surface_path(relative_path)
 
 
-def effective_scan_exclusions(root: Path, config: dict[str, Any]) -> list[str]:
-    return [*resolve_scan_exclusions(config), *gitignore_scan_exclusions(root)]
+def effective_scan_exclusions(
+    root: Path,
+    config: dict[str, Any],
+    *,
+    module: str | None = None,
+) -> list[str]:
+    return configured_effective_scan_exclusions(root, config, module=module)
 
 
 def skipped_directory_entry(root: Path, path: Path, reason: str) -> AuditPayload:

@@ -19,6 +19,7 @@ def build_run_manifest(
     intent: dict[str, Any] | None = None,
     quality_skills: list[dict[str, Any]] | None = None,
     module_status: dict[str, Any] | None = None,
+    scan_exclusion_preflight: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
 # fmt: on
     manifest: dict[str, Any] = {
@@ -38,6 +39,8 @@ def build_run_manifest(
         manifest["quality_skills"] = quality_skills
     if module_status is not None:
         manifest["module_status"] = module_status
+    if scan_exclusion_preflight is not None:
+        manifest["scan_exclusion_preflight"] = scan_exclusion_preflight
     return manifest
 
 

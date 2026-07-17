@@ -5,7 +5,7 @@ from typing import Any
 
 from quality_runner.code_quality_paths import _split_lines
 from quality_runner.core.audit_contracts import AuditPayload, TextScanScope
-from quality_runner.scan_exclusions import gitignore_scan_exclusions, resolve_scan_exclusions
+from quality_runner.scan_exclusions import effective_scan_exclusions, matches_scan_exclusion
 from quality_runner.scan_scope import discover_text_files
 from quality_runner.schema_constants import SECURITY_SCAN_SCHEMA
 from quality_runner.security.agent_gates import build_agent_review_gates
@@ -29,15 +29,26 @@ def create_security_scan(
     root = repo_root.expanduser().resolve()
     settings = security_settings(config)
     if not settings["enabled"]:
-        return _disabled_security_scan(scan=scan, repo_root=root)
+        return _disabled_security_scan(
+            scan=scan,
+            repo_root=root,
+            scan_exclusions=effective_scan_exclusions(root, config, module="security"),
+        )
 
     standards = standards_packet or {}
-    surfaces = detect_security_surfaces(root, scan=scan, text_scan_scope=text_scan_scope)
+    scan_exclusions = effective_scan_exclusions(root, config, module="security")
+    surfaces = detect_security_surfaces(
+        root,
+        scan=scan,
+        scan_exclusions=scan_exclusions,
+        text_scan_scope=text_scan_scope,
+    )
     scanned_files = _scan_files(
         root,
         scan=scan,
         config=config,
         text_scan_scope=text_scan_scope,
+        scan_exclusions=scan_exclusions,
     )
     disabled_groups = settings["disabled_rule_groups"]
     candidates = scan_security_candidates(
@@ -66,6 +77,8 @@ def create_security_scan(
         "schema": SECURITY_SCAN_SCHEMA,
         "run_id": _string_or_none(scan.get("run_id")),
         "repo_root": str(root),
+        "scan_exclusion_scope": "security",
+        "scan_exclusions": scan_exclusions,
         "summary": {
             "total_candidates": len(candidates),
             "candidates_by_category": by_category,
@@ -105,6 +118,7 @@ def detect_security_surfaces(
     repo_root: Path,
     *,
     scan: dict[str, Any],
+    scan_exclusions: list[str] | None = None,
     text_scan_scope: TextScanScope | None = None,
 ) -> dict[str, bool]:
     surfaces = {
@@ -122,6 +136,8 @@ def detect_security_surfaces(
             if not path.is_file():
                 continue
             relative = path.relative_to(repo_root).as_posix()
+            if scan_exclusions and matches_scan_exclusion(relative, scan_exclusions):
+                continue
             if any(part.startswith(".") for part in path.parts) and (
                 ".quality-runner" in path.parts or ".git" in path.parts
             ):
@@ -139,7 +155,8 @@ def _scan_files(
     *,
     scan: dict[str, Any],
     config: dict[str, Any],
-    text_scan_scope: TextScanScope | None,
+    scan_exclusions: list[str] | None = None,
+    text_scan_scope: TextScanScope | None = None,
 ) -> list[dict[str, Any]]:
     if text_scan_scope is not None:
         return [
@@ -147,10 +164,11 @@ def _scan_files(
             for file_info in text_scan_scope.files
         ]
 
-    scan_exclusions = [
-        *resolve_scan_exclusions(config),
-        *gitignore_scan_exclusions(repo_root),
-    ]
+    effective_exclusions = scan_exclusions or effective_scan_exclusions(
+        repo_root,
+        config,
+        module="security",
+    )
     include_ignored_paths: set[str] = set()
     structural = config.get("structural_scan")
     if isinstance(structural, dict):
@@ -172,7 +190,7 @@ def _scan_files(
         skipped_files=skipped_files,
         generated_paths=generated_paths,
         include_ignored_paths=include_ignored_paths,
-        scan_exclusions=scan_exclusions,
+        scan_exclusions=effective_exclusions,
         max_text_files=max_text_files,
     ):
         relative_path = path.relative_to(repo_root).as_posix()
@@ -203,11 +221,18 @@ def _record_security_surface(
         surfaces["dependency_manifest"] = True
 
 
-def _disabled_security_scan(*, scan: dict[str, Any], repo_root: Path) -> dict[str, Any]:
+def _disabled_security_scan(
+    *,
+    scan: dict[str, Any],
+    repo_root: Path,
+    scan_exclusions: list[str],
+) -> dict[str, Any]:
     return {
         "schema": SECURITY_SCAN_SCHEMA,
         "run_id": _string_or_none(scan.get("run_id")),
         "repo_root": str(repo_root),
+        "scan_exclusion_scope": "security",
+        "scan_exclusions": scan_exclusions,
         "summary": {
             "total_candidates": 0,
             "candidates_by_category": {},

@@ -180,6 +180,42 @@ def build_parser() -> argparse.ArgumentParser:
     add_rollout_command(subparsers)
     add_review_command(subparsers)
 
+    exclusions_parser = subparsers.add_parser(
+        "exclusions",
+        help="Inventory and review repository scan-exclusion candidates",
+    )
+    exclusion_actions = exclusions_parser.add_subparsers(
+        dest="exclusions_action",
+        required=True,
+    )
+    suggest_exclusions_parser = exclusion_actions.add_parser(
+        "suggest",
+        help="Write a deterministic review packet without changing repo config",
+    )
+    suggest_exclusions_parser.add_argument("repo_path", help="Target repository path")
+    suggest_exclusions_parser.add_argument("--run-id", default=None, help="Stable run id")
+    suggest_exclusions_parser.add_argument("--json", action="store_true", help="Emit JSON output")
+    suggest_exclusions_parser.set_defaults(apply=False)
+
+    for action_name, action_help in (
+        ("validate", "Validate a supervising-agent report without changing repo config"),
+        ("apply", "Apply validated exclude decisions to repo config"),
+    ):
+        action_parser = exclusion_actions.add_parser(action_name, help=action_help)
+        action_parser.add_argument("repo_path", help="Target repository path")
+        action_parser.add_argument("--packet", required=True, help="Preflight packet JSON path")
+        action_parser.add_argument("--report", required=True, help="Agent report JSON path")
+        action_parser.add_argument("--run-id", default=None, help="Stable run id")
+        if action_name == "apply":
+            action_parser.add_argument(
+                "--apply",
+                action="store_true",
+                help="Explicitly authorize the .quality-runner.toml mutation",
+            )
+        else:
+            action_parser.set_defaults(apply=False)
+        action_parser.add_argument("--json", action="store_true", help="Emit JSON output")
+
     init_parser = subparsers.add_parser("init", help="Write a starter .quality-runner.toml")
     init_parser.add_argument("repo_path", help="Target repository path")
     init_parser.add_argument("--profile", default=DEFAULT_PROFILE, help="Default standards profile")
@@ -297,6 +333,7 @@ def main(argv: list[str] | None = None) -> int:
             "validate-handoff",
             "validate-slice-spec",
             "review-worker",
+            "exclusions",
         }
         and payload.get("status") == "rejected"
     ):

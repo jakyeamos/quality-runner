@@ -13,7 +13,10 @@ from quality_runner.discovery_inputs import (
 )
 from quality_runner.discovery_quality import _quality_commands
 from quality_runner.intent_docs import discover_intent_docs
-from quality_runner.scan_exclusions import resolve_scan_exclusions
+from quality_runner.scan_exclusions import (
+    effective_scan_exclusions,
+    effective_scan_exclusions_by_module,
+)
 from quality_runner.schema_constants import REPO_SCAN_SCHEMA
 from quality_runner.surfaces import detect_surfaces
 
@@ -26,11 +29,13 @@ def inspect_repo(
     config: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     root = _validated_repo_root(repo_root)
-    scan_exclusions = resolve_scan_exclusions(config)
+    scan_exclusions = effective_scan_exclusions(root, config)
+    structural_scan_exclusions = effective_scan_exclusions(root, config, module="structural")
+    scan_exclusions_by_module = effective_scan_exclusions_by_module(root, config)
     package_json, warnings = _read_package_json(root)
     pyproject, pyproject_warnings = _read_pyproject(root)
     warnings.extend(pyproject_warnings)
-    workspaces, workspace_warnings = _workspace_manifests(root, scan_exclusions)
+    workspaces, workspace_warnings = _workspace_manifests(root, structural_scan_exclusions)
     warnings.extend(workspace_warnings)
     scripts = _package_scripts(package_json)
     agent_instruction_files = _agent_instruction_files(root)
@@ -39,7 +44,7 @@ def inspect_repo(
     if extra_warnings:
         warnings.extend(extra_warnings)
     repo_surfaces, ecosystems, generated_code = detect_surfaces(
-        root, scan_exclusions=scan_exclusions
+        root, scan_exclusions=structural_scan_exclusions
     )
     pre_cr_config = _first_existing(
         root,
@@ -57,6 +62,7 @@ def inspect_repo(
         "ecosystems": ecosystems,
         "workspaces": workspaces,
         "scan_exclusions": scan_exclusions,
+        "scan_exclusions_by_module": scan_exclusions_by_module,
         "repo_surfaces": repo_surfaces,
         "scripts": scripts,
         "quality_commands": _quality_commands(
@@ -67,7 +73,7 @@ def inspect_repo(
             pre_cr_config=pre_cr_config,
             ci_files=ci_files,
             workspaces=workspaces,
-            scan_exclusions=scan_exclusions,
+            scan_exclusions=structural_scan_exclusions,
         ),
         "generated_code": generated_code,
         "intent_docs": intent_docs,

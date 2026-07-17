@@ -43,6 +43,21 @@ Then read:
 
 Do not edit source before reading the handoff and the relevant artifacts.
 
+When a repository contains a large generated, cache, or external directory,
+review it before adding a persistent exclusion:
+
+```bash
+quality-runner exclusions suggest /path/to/repo --json
+quality-runner exclusions validate /path/to/repo \
+  --packet .quality-runner/runs/<run-id>/scan-exclusion-preflight-packet.json \
+  --report /path/to/review.json --json
+```
+
+Use a module-scoped decision when only code-quality or structural scanning
+should omit the directory. That preserves QR security coverage. Apply a
+validated report only with explicit `exclusions apply --apply`; otherwise use
+`--scan-exclusion` or `--scan-exclusion-module` for a run-only overlay.
+
 For a single slice, prefer the matching `slice-specs/*.md` file as the
 execution contract. Use `remediation-plan.json` for ordering across slices and
 `agent-handoff.md` for controller routing.

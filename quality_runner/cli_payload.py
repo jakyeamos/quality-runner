@@ -38,7 +38,12 @@ from quality_runner.cli_status import export_handoff_payload, status_payload
 from quality_runner.code_quality import preview_ignored_paths
 from quality_runner.config import CONFIG_FILE_NAME, load_repo_config
 from quality_runner.controller_reports import validate_controller_report
+from quality_runner.core.audit_contracts import ScanExclusionOverlay
 from quality_runner.doctor_contract import doctor_payload
+from quality_runner.exclusion_preflight import (
+    normalize_run_only_exclusion_overlay,
+    run_exclusion_preflight_command,
+)
 from quality_runner.intent import workflow_intent_from_cli_args
 from quality_runner.release_smoke import release_smoke_payload
 from quality_runner.run_summary import build_run_summary
@@ -103,6 +108,17 @@ def payload_for_args(args: argparse.Namespace) -> dict[str, Any]:
         return skill_command_payload(args, validated_repo_path=_validated_repo_path)
     if args.command == "validate-report":
         return validate_controller_report(load_controller_report_json(Path(args.report_json)))
+    if args.command == "exclusions":
+        packet_arg = getattr(args, "packet", None)
+        report_arg = getattr(args, "report", None)
+        return run_exclusion_preflight_command(
+            _validated_repo_path(args.repo_path),
+            action=args.exclusions_action,
+            run_id=args.run_id,
+            packet_path=Path(packet_arg).expanduser().resolve() if packet_arg else None,
+            report_path=Path(report_arg).expanduser().resolve() if report_arg else None,
+            apply=getattr(args, "apply", False),
+        )
     if args.command == "run":
         repo_root = _validated_repo_path(args.repo_path)
         return run_payload(
@@ -111,8 +127,10 @@ def payload_for_args(args: argparse.Namespace) -> dict[str, Any]:
             profile=args.profile,
             ci_status_json=Path(args.ci_status_json) if args.ci_status_json else None,
             include_ignored_paths=_interactive_include_ignored_paths(args, repo_root),
+            scan_exclusion_overlay=_scan_exclusion_overlay(args, repo_root),
             checkout_most_advanced_branch=args.checkout_most_advanced_branch,
             skill_review_report=_optional_skill_review_report(args),
+            agent_review_mode=args.agent_review_mode,
             intent=workflow_intent_from_cli_args(args, repo_root=repo_root, run_id=args.run_id),
         )
     if args.command == "audit":
@@ -126,6 +144,8 @@ def payload_for_args(args: argparse.Namespace) -> dict[str, Any]:
                 include_ignored_paths=_interactive_include_ignored_paths(args, repo_root),
                 checkout_most_advanced_branch=args.checkout_most_advanced_branch,
                 skill_review_report=_legacy_payload(_optional_skill_review_report(args)),
+                agent_review_mode=args.agent_review_mode,
+                scan_exclusion_overlay=_scan_exclusion_overlay(args, repo_root),
                 intent=_legacy_payload(
                     workflow_intent_from_cli_args(args, repo_root=repo_root, run_id=args.run_id)
                 ),
@@ -140,8 +160,10 @@ def payload_for_args(args: argparse.Namespace) -> dict[str, Any]:
             profile=args.profile,
             ci_status_json=Path(args.ci_status_json) if args.ci_status_json else None,
             include_ignored_paths=_interactive_include_ignored_paths(args, repo_root),
+            scan_exclusion_overlay=_scan_exclusion_overlay(args, repo_root),
             checkout_most_advanced_branch=args.checkout_most_advanced_branch,
             skill_review_report=_optional_skill_review_report(args),
+            agent_review_mode=args.agent_review_mode,
             intent=workflow_intent_from_cli_args(args, repo_root=repo_root, run_id=args.run_id),
         )
     if args.command == "verify-gates":
@@ -159,6 +181,8 @@ def payload_for_args(args: argparse.Namespace) -> dict[str, Any]:
             worktree_mode=args.worktree_mode,
             allow_dirty_worktree_verify=args.allow_dirty_worktree_verify,
             skill_review_report=_optional_skill_review_report(args),
+            agent_review_mode=args.agent_review_mode,
+            scan_exclusion_overlay=_scan_exclusion_overlay(args, repo_root),
             intent=workflow_intent_from_cli_args(args, repo_root=repo_root, run_id=args.run_id),
         )
     if args.command == "verify":
@@ -177,6 +201,8 @@ def payload_for_args(args: argparse.Namespace) -> dict[str, Any]:
                 worktree_mode=args.worktree_mode,
                 allow_dirty_worktree_verify=args.allow_dirty_worktree_verify,
                 skill_review_report=_legacy_payload(_optional_skill_review_report(args)),
+                agent_review_mode=args.agent_review_mode,
+                scan_exclusion_overlay=_scan_exclusion_overlay(args, repo_root),
                 intent=_legacy_payload(
                     workflow_intent_from_cli_args(args, repo_root=repo_root, run_id=args.run_id)
                 ),
@@ -261,6 +287,15 @@ def _optional_skill_review_report(args: argparse.Namespace) -> dict[str, Any] | 
     if not report_path:
         return None
     return load_skill_review_report_json(Path(report_path).expanduser().resolve())
+
+
+def _scan_exclusion_overlay(
+    args: argparse.Namespace,
+    repo_root: Path,
+) -> ScanExclusionOverlay | None:
+    requested = getattr(args, "scan_exclusion", None)
+    module_requested = getattr(args, "scan_exclusion_module", None)
+    return normalize_run_only_exclusion_overlay(repo_root, requested, module_requested)
 
 
 def _legacy_payload(payload: dict[str, Any] | None) -> LegacyPayload | None:

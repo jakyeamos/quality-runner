@@ -414,9 +414,20 @@ Repos can add more patterns in `.quality-runner.toml`:
 ```toml
 [quality_runner]
 scan_exclusions = ["samples", "generated-reports/**"]
+
+[quality_runner.scan_exclusions_by_module]
+code_quality = ["generated-output/**"]
 ```
 
-The active list is written to `repo-scan.json` as `scan_exclusions`.
+The active all-module list is written to `repo-scan.json` as
+`scan_exclusions`; module-specific effective lists are written as
+`scan_exclusions_by_module`. A run-only overlay adds
+`scan_exclusion_preflight` to `repo-scan.json` and `run-manifest.json`, and
+writes `scan-exclusion-overlay.json` without changing `.quality-runner.toml`.
+
+The `exclusions suggest`, `validate`, and `apply` stages write their packet,
+report, result, and manifest under the selected run directory. The apply result
+also records the configuration hashes and unified diff.
 ## Fresh Review artifacts
 
 `quality-runner review` writes these files under

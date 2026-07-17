@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, cast
 
+from quality_runner.agent_review_policy import AGENT_REVIEW_MODES, AgentReviewMode
 from quality_runner.application.read_only_audit import plan_read_only_audit
 from quality_runner.artifacts import write_json, write_text
 from quality_runner.code_quality import render_resolution_ledger_markdown
@@ -17,6 +18,7 @@ from quality_runner.manifest import build_run_manifest
 from quality_runner.module_status import build_module_status
 from quality_runner.planning import render_handoff_markdown
 from quality_runner.slice_specs import write_slice_specs
+from quality_runner.workflow_helpers import add_scan_exclusion_artifact
 from quality_runner.workflow_skills import quality_skill_identities, write_skill_review_artifacts
 
 
@@ -36,6 +38,7 @@ def write_inspect_v1_artifacts(
         intent=run_intent,
     )
     repo_scan = {**_legacy_payload(analysis.scan), "module_status": module_status}
+    scan_exclusion_metadata = _scan_exclusion_metadata(repo_scan)
     artifact_paths: AuditArtifactPaths = {
         "repo_scan_json": str(write_json(run_dir / "repo-scan.json", repo_scan)),
         "code_quality_scan_json": str(
@@ -58,6 +61,7 @@ def write_inspect_v1_artifacts(
         ),
         "run_manifest_json": str(run_dir / "run-manifest.json"),
     }
+    add_scan_exclusion_artifact(artifact_paths, run_dir, scan_exclusion_metadata)
     artifact_paths.update(
         write_skill_review_artifacts(
             run_dir=run_dir,
@@ -66,6 +70,7 @@ def write_inspect_v1_artifacts(
             config=config,
             code_quality_scan=code_quality_scan,
             skill_review_report=_legacy_optional_payload(analysis.request.skill_review_report),
+            agent_review_mode=_agent_review_mode(analysis),
         )
     )
     artifact_paths = attach_intent_artifacts(
@@ -81,6 +86,7 @@ def write_inspect_v1_artifacts(
         intent=run_intent,
         quality_skills=quality_skill_identities(code_quality_scan),
         module_status=module_status,
+        scan_exclusion_preflight=scan_exclusion_metadata,
     )
     artifact_paths["run_manifest_json"] = str(write_json(run_dir / "run-manifest.json", manifest))
     return artifact_paths
@@ -102,7 +108,9 @@ def plan_and_write_run_v1_artifacts(
         intent=run_intent,
     )
     repo_scan = {**_legacy_payload(analysis.scan), "module_status": module_status}
+    scan_exclusion_metadata = _scan_exclusion_metadata(repo_scan)
     artifact_paths = _run_artifact_paths(run_dir)
+    add_scan_exclusion_artifact(artifact_paths, run_dir, scan_exclusion_metadata)
     artifact_paths.update(
         write_skill_review_artifacts(
             run_dir=run_dir,
@@ -111,6 +119,7 @@ def plan_and_write_run_v1_artifacts(
             config=config,
             code_quality_scan=code_quality_scan,
             skill_review_report=_legacy_optional_payload(analysis.request.skill_review_report),
+            agent_review_mode=_agent_review_mode(analysis),
         )
     )
     planned = plan_read_only_audit(analysis, artifact_paths=artifact_paths)
@@ -147,6 +156,7 @@ def plan_and_write_run_v1_artifacts(
         intent=run_intent,
         quality_skills=quality_skill_identities(code_quality_scan),
         module_status=module_status,
+        scan_exclusion_preflight=scan_exclusion_metadata,
     )
     artifact_paths["run_manifest_json"] = str(write_json(run_dir / "run-manifest.json", manifest))
     artifact_paths["quality_audit_json"] = str(
@@ -240,3 +250,13 @@ def _legacy_optional_payload(payload: AuditPayload | None) -> dict[str, Any] | N
     if payload is None:
         return None
     return _legacy_payload(payload)
+
+
+def _scan_exclusion_metadata(scan: dict[str, Any]) -> dict[str, Any] | None:
+    metadata = scan.get("scan_exclusion_preflight")
+    return metadata if isinstance(metadata, dict) else None
+
+
+def _agent_review_mode(analysis: AuditAnalysis) -> AgentReviewMode:
+    mode = analysis.request.agent_review_mode
+    return cast(AgentReviewMode, mode) if mode in AGENT_REVIEW_MODES else "auto"

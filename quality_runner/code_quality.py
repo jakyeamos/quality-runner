@@ -73,7 +73,12 @@ def create_code_quality_scan(
     root = repo_root.expanduser().resolve()
     policy = structural_scan_policy(config)
     disabled_groups = set(policy["disabled_rule_groups"])
-    scope = text_scan_scope or create_text_scan_scope(root, scan=scan, config=config)
+    scope = text_scan_scope or create_text_scan_scope(
+        root,
+        scan=scan,
+        config=config,
+        module="code_quality",
+    )
     skipped_files = list(scope.skipped_files)
     findings: list[dict[str, Any]] = []
     extracted_functions: list[dict[str, Any]] = []
@@ -153,6 +158,8 @@ def create_code_quality_scan(
         "schema": CODE_QUALITY_SCAN_SCHEMA,
         "run_id": _string_or_none(scan.get("run_id")),
         "repo_root": str(root),
+        "scan_exclusion_scope": "code_quality",
+        "scan_exclusions": list(scope.scan_exclusions),
         "summary": {
             "total_files": len(accountability),
             "total_lines": sum(item["line_count"] for item in accountability),
@@ -203,7 +210,7 @@ def preview_ignored_paths(
         skipped_files=skipped_files,
         generated_paths=generated_paths(scan or {}),
         include_ignored_paths=set(policy["include_ignored_paths"]),
-        scan_exclusions=effective_scan_exclusions(root, config),
+        scan_exclusions=effective_scan_exclusions(root, config, module="code_quality"),
         max_text_files=policy["max_text_files"],
     )
     return [

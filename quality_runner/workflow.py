@@ -6,6 +6,7 @@ from typing import Any
 from quality_runner.application.audit_workflows import inspect_payload, run_payload
 from quality_runner.application.verification_workflows import verify_gates_payload
 from quality_runner.compatibility.legacy_workflow import refresh_payload as _refresh_payload
+from quality_runner.core.audit_contracts import ScanExclusionOverlay
 from quality_runner.refresh_workflow import run_refresh_payload
 from quality_runner.run_summary import build_run_summary
 from quality_runner.workflow_internal import generated_run_id
@@ -39,6 +40,8 @@ def refresh_payload(
     review_cycle_id: str | None = None,
     review_iteration: int | None = None,
     execute_discovered_gates: bool = False,
+    agent_review_mode: str | None = None,
+    scan_exclusion_overlay: ScanExclusionOverlay | None = None,
 ) -> dict[str, Any]:
     return _refresh_payload(
         repo_root=repo_root,
@@ -54,6 +57,8 @@ def refresh_payload(
         total_timeout_reason=total_timeout_reason,
         checkout_most_advanced_branch=checkout_most_advanced_branch,
         execute_discovered_gates=execute_discovered_gates,
+        agent_review_mode=agent_review_mode,
+        scan_exclusion_overlay=scan_exclusion_overlay,
         allow_mutating_gates=allow_mutating_gates,
         worktree_mode=worktree_mode,
         allow_dirty_worktree_verify=allow_dirty_worktree_verify,

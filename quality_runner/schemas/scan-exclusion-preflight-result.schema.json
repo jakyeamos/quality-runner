@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://quality-runner.dev/schemas/scan-exclusion-preflight-result.schema.json",
+  "title": "Quality Runner Scan-Exclusion Preflight Result",
+  "type": "object",
+  "required": ["schema", "status", "implementation_allowed", "stage", "run_id", "repo_root", "packet_sha256", "approved_exclusions", "rejected_decisions", "config", "effective_scan_exclusions", "artifact_paths"],
+  "properties": {
+    "schema": { "const": "quality-runner-scan-exclusion-result-v0.1" },
+    "status": { "enum": ["suggested", "validated", "applied", "rejected"] },
+    "implementation_allowed": { "const": false },
+    "config_mutation_requested": { "type": "boolean" },
+    "config_mutation_applied": { "type": "boolean" },
+    "stage": { "enum": ["suggest", "validate", "apply"] },
+    "run_id": { "type": "string", "minLength": 1 },
+    "repo_root": { "type": "string", "minLength": 1 },
+    "packet_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "report_sha256": { "type": ["string", "null"], "pattern": "^[0-9a-f]{64}$" },
+    "decision_summary": { "type": "object" },
+    "validation": { "type": "object" },
+    "approved_exclusions": { "type": "array", "items": { "type": "string" } },
+    "approved_exclusions_by_module": { "type": "object", "additionalProperties": { "type": "array", "items": { "type": "string" } } },
+    "rejected_decisions": { "type": "array", "items": { "type": "object" } },
+    "config": { "type": "object" },
+    "effective_scan_exclusions": { "type": "array", "items": { "type": "string" } },
+    "effective_scan_exclusions_by_module": { "type": "object", "additionalProperties": { "type": "array", "items": { "type": "string" } } },
+    "artifact_paths": { "type": "object", "additionalProperties": { "type": "string" } }
+  },
+  "additionalProperties": false
+}

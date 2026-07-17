@@ -7,6 +7,7 @@ from typing import Any
 from quality_runner.architecture_config_parse import parse_architecture_section
 from quality_runner.artifact_config_parse import parse_artifacts_section
 from quality_runner.integrate_config_parse import parse_integrate_section
+from quality_runner.scan_exclusions_config import parse_scan_exclusions_by_module
 from quality_runner.security.config_parse import parse_security_section
 from quality_runner.skills_config_parse import parse_skills_section
 from quality_runner.structural_scan_config_parse import parse_structural_scan_section
@@ -59,6 +60,10 @@ def load_repo_config(repo_root: Path) -> dict[str, Any]:
     scan_exclusions = _string_list(
         section.get("scan_exclusions"), "quality_runner.scan_exclusions", warnings
     )
+    scan_exclusions_by_module, module_warnings = parse_scan_exclusions_by_module(
+        section.get("scan_exclusions_by_module")
+    )
+    warnings.extend(module_warnings)
     gates = _gates(section.get("gates"), warnings)
     exceptions = _accepted_exceptions(section.get("accepted_exceptions"), warnings)
     accepted_dispositions = _accepted_dispositions(section.get("accepted_dispositions"), warnings)
@@ -82,6 +87,7 @@ def load_repo_config(repo_root: Path) -> dict[str, Any]:
         required_capabilities_configured="required_capabilities" in section,
         allowed_package_managers=allowed_package_managers,
         scan_exclusions=scan_exclusions,
+        scan_exclusions_by_module=scan_exclusions_by_module,
         accepted_exceptions=exceptions,
         accepted_dispositions=accepted_dispositions,
         gates=gates,
@@ -105,11 +111,28 @@ def load_repo_config(repo_root: Path) -> dict[str, Any]:
 
 # fmt: off
 def _config(
-    *, path: str | None, default_profile: str | None, profiles: dict[str, dict[str, Any]], required_capabilities: list[str], required_capabilities_configured: bool, allowed_package_managers: list[str], scan_exclusions: list[str], accepted_exceptions: list[dict[str, str]], accepted_dispositions: list[dict[str, str]], gates: list[dict[str, Any]], gate_timeouts: dict[str, int], severity_overrides: dict[str, str], structural_scan: dict[str, Any], warnings: list[dict[str, str]],
+    *, path: str | None, default_profile: str | None, profiles: dict[str, dict[str, Any]], required_capabilities: list[str], required_capabilities_configured: bool, allowed_package_managers: list[str], scan_exclusions: list[str], scan_exclusions_by_module: dict[str, list[str]], accepted_exceptions: list[dict[str, str]], accepted_dispositions: list[dict[str, str]], gates: list[dict[str, Any]], gate_timeouts: dict[str, int], severity_overrides: dict[str, str], structural_scan: dict[str, Any], warnings: list[dict[str, str]],
 ) -> dict[str, Any]:
-    return dict(
-        schema=CONFIG_SCHEMA, path=path, default_profile=default_profile, profiles=profiles, required_capabilities=required_capabilities, required_capabilities_configured=required_capabilities_configured, allowed_package_managers=allowed_package_managers, scan_exclusions=scan_exclusions, accepted_exceptions=accepted_exceptions, accepted_dispositions=accepted_dispositions, gates=gates, gate_timeouts=gate_timeouts, severity_overrides=severity_overrides, structural_scan=structural_scan, warnings=warnings,
+    payload: dict[str, Any] = dict(
+        schema=CONFIG_SCHEMA,
+        path=path,
+        default_profile=default_profile,
+        profiles=profiles,
+        required_capabilities=required_capabilities,
+        required_capabilities_configured=required_capabilities_configured,
+        allowed_package_managers=allowed_package_managers,
+        scan_exclusions=scan_exclusions,
+        accepted_exceptions=accepted_exceptions,
+        accepted_dispositions=accepted_dispositions,
+        gates=gates,
+        gate_timeouts=gate_timeouts,
+        severity_overrides=severity_overrides,
+        structural_scan=structural_scan,
+        warnings=warnings,
     )
+    if scan_exclusions_by_module:
+        payload["scan_exclusions_by_module"] = scan_exclusions_by_module
+    return payload
 # fmt: on
 
 
@@ -122,6 +145,7 @@ def _empty_config(*, path: str | None, warnings: list[dict[str, str]]) -> dict[s
         required_capabilities_configured=False,
         allowed_package_managers=[],
         scan_exclusions=[],
+        scan_exclusions_by_module={},
         accepted_exceptions=[],
         accepted_dispositions=[],
         gates=[],

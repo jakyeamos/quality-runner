@@ -21,6 +21,37 @@
       "items": { "type": "string", "minLength": 1 },
       "default": []
     },
+    "scan_exclusions_by_module": {
+      "type": "object",
+      "required": ["all-modules", "structural", "code_quality", "security"],
+      "properties": {
+        "all-modules": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "structural": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "code_quality": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "security": { "type": "array", "items": { "type": "string", "minLength": 1 } }
+      },
+      "additionalProperties": false
+    },
+    "scan_exclusion_preflight": {
+      "type": "object",
+      "required": ["source", "scope", "requested_paths", "effective_exclusion_patterns"],
+      "properties": {
+        "source": { "const": "cli-run-only-overlay" },
+        "scope": { "enum": ["all-modules", "module-scoped"] },
+        "security_coverage": { "type": "string", "minLength": 1 },
+        "requested_paths": { "type": "array", "items": { "type": "string" } },
+        "requested_paths_by_module": { "type": "object", "additionalProperties": { "type": "array", "items": { "type": "string" } } },
+        "effective_exclusion_patterns": { "type": "array", "items": { "type": "string" } },
+        "effective_exclusion_patterns_by_module": { "type": "object", "additionalProperties": { "type": "array", "items": { "type": "string" } } },
+        "effective_scan_exclusions": { "type": "array", "items": { "type": "string" } },
+        "effective_scan_exclusions_by_module": { "type": "object", "additionalProperties": { "type": "array", "items": { "type": "string" } } },
+        "config_sha256": { "type": ["string", "null"] },
+        "config_mutated": { "const": false },
+        "configured_scan_exclusions": { "type": "array", "items": { "type": "string" } },
+        "configured_scan_exclusions_by_module": { "type": "object", "additionalProperties": { "type": "array", "items": { "type": "string" } } }
+      },
+      "additionalProperties": false
+    },
     "ecosystems": { "type": "array", "items": { "type": "string" } },
     "repo_surfaces": {
       "type": "array",

@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from typing import Any, Literal, cast
 
+from quality_runner.agent_review_policy import resolve_agent_review_mode
 from quality_runner.audit import build_audit_report
 from quality_runner.capabilities import detect_capabilities
 from quality_runner.ci_status import load_ci_status
@@ -31,7 +33,11 @@ from quality_runner.scan_scope import create_text_scan_scope
 from quality_runner.security.ledger import merge_security_ledger_entries
 from quality_runner.security.scan import create_security_scan, merge_security_into_capability_map
 from quality_runner.standards import DEFAULT_PROFILE, compile_standards
-from quality_runner.workflow_helpers import config_with_include_overrides
+from quality_runner.workflow_helpers import (
+    apply_run_only_scan_exclusion,
+    config_with_include_overrides,
+    config_with_scan_exclusion_overrides,
+)
 from quality_runner.workflow_skills import append_warnings, create_code_quality_scan_with_skills
 
 
@@ -39,29 +45,61 @@ def analyze_read_only_audit(request: AuditRequest) -> AuditAnalysis:
     repo_root = request.repo_root.expanduser().resolve()
     ci_checks, ci_warnings = load_ci_status(repo_root, request.ci_status_json)
     base_config = load_repo_config(repo_root)
+    config = config_with_scan_exclusion_overrides(
+        base_config,
+        request.scan_exclusion_overlay,
+    )
     scan = inspect_repo(
         repo_root,
         run_id=request.run_id,
         ci_checks=ci_checks,
         extra_warnings=[*_branch_warnings(request), *ci_warnings],
-        config=base_config,
+        config=config,
     )
-    profile = request.profile or _default_profile(base_config)
+    profile = request.profile or _default_profile(config)
     standards_packet = compile_standards(
         repo_root=repo_root,
         scan=scan,
         profile=profile,
-        config=base_config,
+        config=config,
     )
     capability_map = detect_capabilities(scan=scan, standards_packet=standards_packet)
-    config = config_with_include_overrides(base_config, list(request.include_ignored_paths))
-    text_scan_scope = create_text_scan_scope(repo_root, scan=scan, config=config)
+    config = config_with_include_overrides(config, list(request.include_ignored_paths))
+    apply_run_only_scan_exclusion(
+        repo_root,
+        request.scan_exclusion_overlay,
+        config=config,
+        scan=scan,
+    )
+    resolved_agent_review_mode = resolve_agent_review_mode(
+        requested=request.agent_review_mode,
+        profile=profile,
+        config=config,
+    )
+    if request.scan_exclusion_overlay is None:
+        text_scan_scope = create_text_scan_scope(repo_root, scan=scan, config=config)
+        security_scan_scope = text_scan_scope
+        code_quality_scan_scope = text_scan_scope
+    else:
+        text_scan_scope = create_text_scan_scope(
+            repo_root,
+            scan=scan,
+            config=config,
+            module="code_quality",
+        )
+        code_quality_scan_scope = text_scan_scope
+        security_scan_scope = create_text_scan_scope(
+            repo_root,
+            scan=scan,
+            config=config,
+            module="security",
+        )
     security_scan = create_security_scan(
         repo_root,
         scan=scan,
         config=config,
         standards_packet=standards_packet,
-        text_scan_scope=text_scan_scope,
+        text_scan_scope=security_scan_scope,
     )
     capability_map = merge_security_into_capability_map(capability_map, security_scan)
     code_quality_scan, skill_warnings = create_code_quality_scan_with_skills(
@@ -69,12 +107,13 @@ def analyze_read_only_audit(request: AuditRequest) -> AuditAnalysis:
         scan=scan,
         config=config,
         skill_review_report=_legacy_optional_payload(request.skill_review_report),
-        text_scan_scope=text_scan_scope,
+        require_skill_review_coverage=resolved_agent_review_mode in {"auto", "required"},
+        text_scan_scope=code_quality_scan_scope,
     )
     scan = append_warnings(scan, skill_warnings)
     package_manager_preflight = build_package_manager_preflight(repo_root, scan)
     return AuditAnalysis(
-        request=request,
+        request=replace(request, agent_review_mode=resolved_agent_review_mode),
         config=_audit_payload(config),
         scan=_audit_payload(scan),
         standards_packet=_audit_payload(standards_packet),
