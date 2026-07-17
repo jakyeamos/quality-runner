@@ -1,6 +1,6 @@
 # Quality Runner Project Truth
 
-Last updated: 2026-07-13
+Last updated: 2026-07-17
 
 ## Current State
 
@@ -55,11 +55,22 @@ README. `c71b130` adds a pinned Python dependency audit and validates untrusted
 baseline Git revisions before review-delta comparisons. Its reviewed merge,
 tag, release workflow, and published-artifact smoke checks have completed.
 
+The follow-up branch `codex/qr-command-surface-quality-runner` at `9107285`
+makes `qr` the canonical human-facing console command while retaining
+`quality-runner` as a compatibility alias. Root help, README quickstart, and
+CLI reference lead with audit, review, verify, runs, and doctor; both scripts
+render their invocation name for help/no-argument guidance and preserve the
+existing version and JSON contracts. No tags, registries, or published
+artifacts were changed.
+
 ## Current Position
 
 - Target: a typed v2 core behind CLI, MCP, and compatibility adapters.
-- Next implementation slice: no active release work; start a new scoped
-  follow-up from `main` when product feedback or a new requirement arrives.
+- Current follow-up: `codex/qr-command-surface-quality-runner` at `9107285`
+  contains the canonical `qr` command-surface cleanup; its truth-file follow-up
+  is the only remaining local change.
+- Next implementation slice: review/merge the committed follow-up when ready;
+  no release or publishing action was requested or performed.
 - Canonical planning documents: `docs/modernization/`.
 - Public compatibility: retain `quality_evidence_contract` and
   `repo_quality_certifier` during a published transition window.
@@ -76,6 +87,18 @@ tag, release workflow, and published-artifact smoke checks have completed.
 
 ## Baseline Quality
 
+- `9107285` passes focused CLI/docs/release-smoke tests (17 tests), the
+  built-wheel entrypoint smoke (7 tests), Ruff lint/format, Basedpyright,
+  Vulture, pip-audit, direct `qr` and `quality-runner` version/help smoke, and
+  both entrypoints' release-smoke commands. The commit hook's user quality
+  gate passed after its configured changed-line check completed.
+- The full pytest run reached 556 passing tests and one unrelated timing
+  failure in `tests/test_cli.py::test_cli_refresh_workflow_timeout_records_reason`;
+  the isolated test passed in 1.90s. The LCOV wrapper reached 556 passing tests
+  and one unrelated `<1s` timing assertion in
+  `tests/test_security_source_evidence.py::test_malformed_log_contexts_do_not_rescan_the_remaining_source`;
+  its isolated test passed in 1.48s. Staged pre-CR was bounded and classified
+  as the same repository-wide timing noise.
 - `c71b130` passes the full 556-test pytest suite, Ruff lint/format,
   Basedpyright, Vulture, lock validation, pip-audit, release smoke, build, and
   installed-wheel smoke checks. GitHub CI and the tag release workflow pass;
@@ -98,6 +121,9 @@ tag, release workflow, and published-artifact smoke checks have completed.
 
 ## Recent Progress
 
+- 2026-07-17: `9107285` makes `qr` canonical in the packaged entrypoints,
+  root help, README quickstart, CLI reference, and focused compatibility
+  tests; `quality-runner` remains a working alias and no publication occurred.
 - 2026-07-13: v0.5.1 released: PR #2 merged at `a101bd4`, tag workflow and
   six-job CI passed, PyPI publishes wheel/sdist, GitHub Release is public, and
   a disposable PyPI install passes CLI, doctor, release-smoke, and MCP checks.

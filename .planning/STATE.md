@@ -3,7 +3,7 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: GPT-5.6 modernization
 status: complete
-last_updated: "2026-07-13T17:41:03Z"
+last_updated: "2026-07-17T14:45:16Z"
 progress:
   total_phases: 8
   completed_phases: 8
@@ -22,12 +22,13 @@ See `.planning/PROJECT.md` for the established product boundary and
 **Core value:** Give developers and agents trustworthy local evidence before
 they authorize repository changes.
 
-**Current focus:** v0.5.1 released; no active implementation phase.
+**Current focus:** v0.5.1 remains released; the scoped post-release command
+surface follow-up is complete in `9107285` and awaits review/merge.
 
 ## Current Position
 
-- Branch: `main`
-- Baseline: `main` at 0.5.1 / commit `a101bd4`
+- Branch: `codex/qr-command-surface-quality-runner`
+- Baseline: `main` at 0.5.1 / commit `a101bd4`; follow-up at `9107285`
 - Audit and planning: complete
 - M0 — restore trust at the boundary: complete in `f36dcf4`
 - M1 — establish typed review contracts: complete in `cb12746`
@@ -43,6 +44,9 @@ they authorize repository changes.
   guidance; `c71b130` completes the pre-tag gate with dependency-audit and
   untrusted-baseline Git-argument hardening. PR #2 merged, `v0.5.1` is
   published to PyPI, and the GitHub Release is public.
+- Post-release command surface: complete in `9107285`; `qr` is canonical for
+  human-facing help, README quickstart, and packaged entrypoints while
+  `quality-runner` remains a compatible alias with preserved JSON behavior.
 
 ## Active Phase
 
@@ -69,13 +73,20 @@ they authorize repository changes.
   explicit compatibility projection through the published support window.
 - Derive outcome safety claims from observed branch and execution evidence, not
   from requested flags or planned behavior.
+- Lead new CLI usage with `qr` while retaining `quality-runner` as a visible
+  compatibility alias; keep legacy and advanced commands discoverable in root
+  help without making them the first-run path.
 
 ## Next Step
 
-Start any future work from `main` as a new scoped follow-up.
+Review/merge `9107285` as the scoped post-release follow-up. No tags,
+registries, or publishing actions were performed.
 
 ## Recent Progress
 
+- 2026-07-17: `9107285` completes the `qr` command-surface cleanup: packaged
+  alias parity, curated root help, README/CLI quickstart guidance, and focused
+  help/version/JSON contract tests pass; the commit hook quality gate passed.
 - 2026-07-13: v0.5.1 released: PR #2 merged at `a101bd4`, GitHub CI and tag
   release workflow pass, PyPI publishes both artifacts, GitHub Release is
   public, and a disposable PyPI install passes CLI, doctor, smoke, and MCP.
