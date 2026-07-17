@@ -1,6 +1,6 @@
 # Quality Runner Project Truth
 
-Last updated: 2026-07-13
+Last updated: 2026-07-17
 
 ## Current State
 
@@ -58,8 +58,12 @@ tag, release workflow, and published-artifact smoke checks have completed.
 ## Current Position
 
 - Target: a typed v2 core behind CLI, MCP, and compatibility adapters.
-- Next implementation slice: no active release work; start a new scoped
-  follow-up from `main` when product feedback or a new requirement arrives.
+- Next implementation slice: port the Quality Skills corpus and selection
+  layer into canonical `dev`, then continue with remediation, phase planning,
+  similarity, consumer tooling, and preflight behavior.
+- `dev` is the canonical integration branch. The preserved source branch is
+  `quality-skill-corpus-workflow` at `53dc9c8` and remains until its unique
+  behavior is fully represented in `dev`.
 - Canonical planning documents: `docs/modernization/`.
 - Public compatibility: retain `quality_evidence_contract` and
   `repo_quality_certifier` during a published transition window.
@@ -84,6 +88,11 @@ tag, release workflow, and published-artifact smoke checks have completed.
   have a versioned v2 outcome contract behind preserved v1 projections.
 - Release smoke now checks package/runtime/plugin parity and the release
   workflow enforces tag, wheel, manifest, citation, and MCP outcome contracts.
+- `da79745` ports the first Quality Skills contract batch into the v0.5.1
+  application architecture: deterministic coverage, review verification
+  contracts, redacted finding metadata, skill identities, and manifest/schema
+  support. The touched-module slice passes 63 tests, Ruff, formatting,
+  compilation, and Basedpyright.
 
 ## Risks
 
@@ -97,6 +106,10 @@ tag, release workflow, and published-artifact smoke checks have completed.
   `"None"` until a published compatibility cutover can change that projection.
 
 ## Recent Progress
+
+- 2026-07-17: `da79745` ports the first Quality Skills contract batch into
+  canonical `dev` while retaining the application workflow façades and
+  evidence-redaction boundary.
 
 - 2026-07-13: v0.5.1 released: PR #2 merged at `a101bd4`, tag workflow and
   six-job CI passed, PyPI publishes wheel/sdist, GitHub Release is public, and
