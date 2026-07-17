@@ -43,6 +43,7 @@ def structural_scan_policy(config: dict[str, Any]) -> dict[str, Any]:
     fat_router_lines = policy.get("fat_router_lines")
     max_text_files = policy.get("max_text_files")
     similarity_enabled = policy.get("similarity_enabled")
+    similarity_backend = policy.get("similarity_backend")
     similarity_threshold = policy.get("similarity_threshold")
     similarity_min_lines = policy.get("similarity_min_lines")
     similarity_max_pairs = policy.get("similarity_max_pairs")
@@ -63,6 +64,7 @@ def structural_scan_policy(config: dict[str, Any]) -> dict[str, Any]:
         if isinstance(max_text_files, int) and max_text_files > 0
         else DEFAULT_MAX_TEXT_FILES,
         "similarity_enabled": similarity_enabled,
+        "similarity_backend": similarity_backend,
         "similarity_threshold": similarity_threshold,
         "similarity_min_lines": similarity_min_lines,
         "similarity_max_pairs": similarity_max_pairs,

@@ -36,6 +36,7 @@
       "items": { "type": "string", "minLength": 1 }
     },
     "finding_counts": { "type": "object" },
+    "module_status": { "$ref": "module-status.schema.json" },
     "audit_status": { "type": ["string", "null"] },
     "gate_verification_status": { "type": ["string", "null"] },
     "lifecycle_status": {

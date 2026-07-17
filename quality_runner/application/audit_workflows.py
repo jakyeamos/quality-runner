@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from typing import Any, cast
 
@@ -13,6 +14,7 @@ from quality_runner.core.audit_contracts import AuditPayload, AuditRequest, Audi
 from quality_runner.git_branches import prepare_scan_branch
 from quality_runner.workflow_helpers import combined_warnings
 from quality_runner.workflow_internal import generated_run_id
+from quality_runner.workflow_skills import skill_review_summary
 
 
 def inspect_payload(
@@ -43,6 +45,7 @@ def inspect_payload(
         )
     )
     artifact_paths = write_inspect_v1_artifacts(analysis, run_dir=run_dir)
+    skill_review = _skill_review_from_analysis(analysis, artifact_paths)
 
     return {
         "schema": "quality-runner-inspect-result-v0.1",
@@ -50,6 +53,8 @@ def inspect_payload(
         "implementation_allowed": False,
         "run_id": resolved_run_id,
         "artifact_paths": artifact_paths,
+        "module_status": _module_status_from_artifacts(artifact_paths),
+        **_optional_field("skill_review", skill_review),
         "warnings": combined_warnings(
             _legacy_payload(analysis.scan), _legacy_payload(analysis.capability_map)
         ),
@@ -84,6 +89,7 @@ def run_payload(
         )
     )
     planned, artifact_paths = plan_and_write_run_v1_artifacts(analysis, run_dir=run_dir)
+    skill_review = _skill_review_from_analysis(analysis, artifact_paths)
 
     return {
         "schema": "quality-runner-run-result-v0.1",
@@ -91,6 +97,8 @@ def run_payload(
         "implementation_allowed": False,
         "run_id": resolved_run_id,
         "artifact_paths": artifact_paths,
+        "module_status": _module_status_from_artifacts(artifact_paths),
+        **_optional_field("skill_review", skill_review),
         "warnings": combined_warnings(
             _legacy_payload(analysis.scan), _legacy_payload(analysis.capability_map)
         ),
@@ -130,3 +138,34 @@ def _audit_warning(warning: dict[str, str]) -> AuditWarning:
 
 def _legacy_payload(payload: AuditPayload) -> dict[str, Any]:
     return cast(dict[str, Any], payload)
+
+
+def _module_status_from_artifacts(artifact_paths: dict[str, str]) -> dict[str, Any]:
+    path = artifact_paths.get("run_manifest_json")
+    if not isinstance(path, str) or not path:
+        return {}
+    try:
+        payload = json.loads(Path(path).read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+    module_status = payload.get("module_status") if isinstance(payload, dict) else None
+    return module_status if isinstance(module_status, dict) else {}
+
+
+def _skill_review_from_analysis(
+    analysis: Any,
+    artifact_paths: dict[str, str],
+) -> dict[str, Any] | None:
+    return skill_review_summary(
+        code_quality_scan=_legacy_payload(analysis.code_quality_scan),
+        artifact_paths=artifact_paths,
+        skill_review_report=(
+            _legacy_payload(analysis.request.skill_review_report)
+            if analysis.request.skill_review_report is not None
+            else None
+        ),
+    )
+
+
+def _optional_field(key: str, value: object) -> dict[str, Any]:
+    return {key: value} if value is not None else {}

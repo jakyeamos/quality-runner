@@ -21,7 +21,8 @@
     "duplicate_clusters": { "type": "array", "items": { "type": "object" } },
     "skipped_files": { "type": "array", "items": { "type": "object" } },
     "quality_skills": { "type": "array", "items": { "$ref": "#/$defs/quality_skill" } },
-    "skill_coverage": { "type": "array", "items": { "$ref": "#/$defs/skill_coverage" } }
+    "skill_coverage": { "type": "array", "items": { "$ref": "#/$defs/skill_coverage" } },
+    "skill_selection": { "$ref": "skill-selection.schema.json" }
   },
   "$defs": {
     "finding": {

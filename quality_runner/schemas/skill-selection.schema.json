@@ -1,0 +1,61 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://quality-runner.dev/schemas/skill-selection.schema.json",
+  "title": "Quality Runner Skill Selection",
+  "type": "object",
+  "required": [
+    "schema",
+    "status",
+    "source",
+    "selected_local_skill_ids",
+    "selected_global_skill_ids",
+    "selected_skill_ids",
+    "candidates",
+    "warnings"
+  ],
+  "properties": {
+    "schema": { "const": "quality-runner-skill-selection-v0.1" },
+    "status": {
+      "enum": ["not_configured", "local-only", "enabled", "disabled", "unavailable"]
+    },
+    "source": { "enum": ["none", "repository", "local", "global", "local+global"] },
+    "global_config_path": { "type": ["string", "null"] },
+    "corpus_path": { "type": ["string", "null"] },
+    "corpus_id": { "type": ["string", "null"] },
+    "corpus_version": { "type": ["string", "null"] },
+    "mode": { "enum": ["relevant", "all"] },
+    "min_score": { "type": "number", "minimum": 0, "maximum": 1 },
+    "max_active": { "type": "integer", "minimum": 1 },
+    "eligible_global_skill_ids": { "type": "array", "items": { "type": "string" } },
+    "selected_local_skill_ids": { "type": "array", "items": { "type": "string" } },
+    "selected_global_skill_ids": { "type": "array", "items": { "type": "string" } },
+    "selected_skill_ids": { "type": "array", "items": { "type": "string" } },
+    "repo_signals": { "type": "array", "items": { "type": "string" } },
+    "candidates": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "score", "matched_terms", "status", "reason"],
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "score": { "type": "number", "minimum": 0, "maximum": 1 },
+          "matched_terms": { "type": "array", "items": { "type": "string" } },
+          "status": {
+            "enum": [
+              "selected",
+              "not-eligible",
+              "excluded",
+              "local-override",
+              "not-relevant",
+              "limited"
+            ]
+          },
+          "reason": { "type": "string", "minLength": 1 }
+        },
+        "additionalProperties": false
+      }
+    },
+    "warnings": { "type": "array", "items": { "type": "object" } }
+  },
+  "additionalProperties": false
+}

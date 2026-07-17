@@ -14,6 +14,7 @@ from quality_runner.core.audit_contracts import (
 )
 from quality_runner.intent import attach_intent_artifacts, intent_for_run
 from quality_runner.manifest import build_run_manifest
+from quality_runner.module_status import build_module_status
 from quality_runner.planning import render_handoff_markdown
 from quality_runner.slice_specs import write_slice_specs
 from quality_runner.workflow_skills import quality_skill_identities, write_skill_review_artifacts
@@ -28,10 +29,15 @@ def write_inspect_v1_artifacts(
     repo_root = analysis.request.repo_root
     config = _legacy_payload(analysis.config)
     code_quality_scan = _legacy_payload(analysis.code_quality_scan)
+    run_intent = intent_for_run(_legacy_optional_payload(analysis.request.intent), run_id)
+    module_status = _build_module_status(
+        analysis,
+        mode="inspect",
+        intent=run_intent,
+    )
+    repo_scan = {**_legacy_payload(analysis.scan), "module_status": module_status}
     artifact_paths: AuditArtifactPaths = {
-        "repo_scan_json": str(
-            write_json(run_dir / "repo-scan.json", _legacy_payload(analysis.scan))
-        ),
+        "repo_scan_json": str(write_json(run_dir / "repo-scan.json", repo_scan)),
         "code_quality_scan_json": str(
             write_json(run_dir / "code-quality-scan.json", code_quality_scan)
         ),
@@ -62,7 +68,6 @@ def write_inspect_v1_artifacts(
             skill_review_report=_legacy_optional_payload(analysis.request.skill_review_report),
         )
     )
-    run_intent = intent_for_run(_legacy_optional_payload(analysis.request.intent), run_id)
     artifact_paths = attach_intent_artifacts(
         run_dir=run_dir,
         intent=run_intent,
@@ -75,6 +80,7 @@ def write_inspect_v1_artifacts(
         artifact_paths=artifact_paths,
         intent=run_intent,
         quality_skills=quality_skill_identities(code_quality_scan),
+        module_status=module_status,
     )
     artifact_paths["run_manifest_json"] = str(write_json(run_dir / "run-manifest.json", manifest))
     return artifact_paths
@@ -89,6 +95,13 @@ def plan_and_write_run_v1_artifacts(
     repo_root = analysis.request.repo_root
     config = _legacy_payload(analysis.config)
     code_quality_scan = _legacy_payload(analysis.code_quality_scan)
+    run_intent = intent_for_run(_legacy_optional_payload(analysis.request.intent), run_id)
+    module_status = _build_module_status(
+        analysis,
+        mode="run",
+        intent=run_intent,
+    )
+    repo_scan = {**_legacy_payload(analysis.scan), "module_status": module_status}
     artifact_paths = _run_artifact_paths(run_dir)
     artifact_paths.update(
         write_skill_review_artifacts(
@@ -102,9 +115,7 @@ def plan_and_write_run_v1_artifacts(
     )
     planned = plan_read_only_audit(analysis, artifact_paths=artifact_paths)
 
-    artifact_paths["repo_scan_json"] = str(
-        write_json(run_dir / "repo-scan.json", _legacy_payload(analysis.scan))
-    )
+    artifact_paths["repo_scan_json"] = str(write_json(run_dir / "repo-scan.json", repo_scan))
     artifact_paths["code_quality_scan_json"] = str(
         write_json(run_dir / "code-quality-scan.json", code_quality_scan)
     )
@@ -123,7 +134,6 @@ def plan_and_write_run_v1_artifacts(
     artifact_paths["capability_matrix_json"] = str(
         write_json(run_dir / "capability-matrix.json", _legacy_payload(analysis.capability_map))
     )
-    run_intent = intent_for_run(_legacy_optional_payload(analysis.request.intent), run_id)
     artifact_paths = attach_intent_artifacts(
         run_dir=run_dir,
         intent=run_intent,
@@ -136,6 +146,7 @@ def plan_and_write_run_v1_artifacts(
         artifact_paths=artifact_paths,
         intent=run_intent,
         quality_skills=quality_skill_identities(code_quality_scan),
+        module_status=module_status,
     )
     artifact_paths["run_manifest_json"] = str(write_json(run_dir / "run-manifest.json", manifest))
     artifact_paths["quality_audit_json"] = str(
@@ -169,6 +180,26 @@ def plan_and_write_run_v1_artifacts(
         write_text(run_dir / "agent-handoff.md", render_handoff_markdown(handoff))
     )
     return planned, artifact_paths
+
+
+def _build_module_status(
+    analysis: AuditAnalysis,
+    *,
+    mode: str,
+    intent: dict[str, Any] | None,
+) -> dict[str, Any]:
+    standards_packet = _legacy_payload(analysis.standards_packet)
+    return build_module_status(
+        mode=mode,
+        profile=str(standards_packet.get("profile") or "default"),
+        repo_scan=_legacy_payload(analysis.scan),
+        code_quality_scan=_legacy_payload(analysis.code_quality_scan),
+        capability_map=_legacy_payload(analysis.capability_map),
+        standards_packet=standards_packet,
+        security_scan=_legacy_payload(analysis.security_scan),
+        config=_legacy_payload(analysis.config),
+        intent=intent,
+    )
 
 
 def _run_artifact_paths(run_dir: Path) -> AuditArtifactPaths:

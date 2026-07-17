@@ -27,6 +27,7 @@
       "type": "object",
       "additionalProperties": { "type": "string" }
     },
+    "module_status": { "$ref": "module-status.schema.json" },
     "quality_skills": {
       "type": "array",
       "items": {

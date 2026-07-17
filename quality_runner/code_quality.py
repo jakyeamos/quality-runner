@@ -21,7 +21,8 @@ from quality_runner.code_quality_paths import _check_coverage, _string_or_none
 from quality_runner.code_quality_ponytail import ponytail_findings
 from quality_runner.code_quality_rules import _scan_file
 from quality_runner.code_quality_similarity import collect_deduplicate_scan
-from quality_runner.code_quality_skills import scan_quality_skills
+from quality_runner.code_quality_skill_selection import scan_quality_skills_with_selection
+from quality_runner.code_quality_summary import quality_summary_fields
 from quality_runner.code_quality_unwired import unwired_findings
 from quality_runner.core.audit_contracts import AuditPayload, TextScanScope
 from quality_runner.evidence_redaction import redact_secret_like_source_lines
@@ -117,6 +118,7 @@ def create_code_quality_scan(
     ) = collect_deduplicate_scan(
         root,
         extracted_functions=extracted_functions,
+        scanned_files=scanned_files,
         policy=policy,
         disabled_groups=disabled_groups,
     )
@@ -132,12 +134,14 @@ def create_code_quality_scan(
         findings.extend(unwired_findings(scanned_files, config))
 
     findings.extend(architecture_findings(scanned_files, config))
-    skill_findings, skill_coverage, quality_skills = scan_quality_skills(
-        repo_root=root,
-        scanned_files=scanned_files,
-        config=config,
-        skill_review_report=skill_review_report,
-        require_review_coverage=require_skill_review_coverage,
+    skill_findings, skill_coverage, quality_skills, skill_selection = (
+        scan_quality_skills_with_selection(
+            root,
+            scanned_files,
+            config,
+            skill_review_report,
+            require_review_coverage=require_skill_review_coverage,
+        )
     )
     findings.extend(skill_findings)
 
@@ -159,7 +163,15 @@ def create_code_quality_scan(
             ),
             "duplicate_clusters": len(duplicate_clusters),
             "semantic_similarity_clusters": semantic_similarity_clusters,
+            "semantic_similarity_backend": policy["similarity_backend"],
             "semantic_similarity_tools": semantic_similarity_tools,
+            **quality_summary_fields(
+                backend=policy["similarity_backend"],
+                enabled=policy["similarity_enabled"],
+                disabled_groups=disabled_groups,
+                semantic_similarity_tools=semantic_similarity_tools,
+                accountability=accountability,
+            ),
             "scan_budget": scan_budget_summary(
                 scanned_files=len(accountability),
                 max_text_files=scope.max_text_files,
@@ -173,6 +185,7 @@ def create_code_quality_scan(
         "skipped_files": sorted(skipped_files, key=_skipped_file_path),
         "quality_skills": quality_skills,
         "skill_coverage": skill_coverage,
+        "skill_selection": skill_selection,
     }
 
 

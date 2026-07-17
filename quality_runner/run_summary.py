@@ -84,6 +84,7 @@ def _run_summary(*, repo_root: Path, run_id: str) -> dict[str, Any]:
         "gate_results": gate_results,
         "missing_capabilities": missing_capabilities,
         "finding_counts": finding_counts,
+        **_optional_field("module_status", repo_scan.get("module_status")),
         "audit_status": _string_or_none(audit.get("status")),
         "gate_verification_status": _string_or_none(gate_verification.get("status")),
         **_optional_field(
