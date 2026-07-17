@@ -69,16 +69,18 @@ The short `qr` console command is now part of the canonical dev CLI surface. It
 maps to the same `quality_runner.cli:main` entrypoint as `quality-runner`, keeps
 the v0.5.1-compatible package version, and is covered by packaged entrypoint
 tests.
-The isolated `codex/release-0.6.0` branch is now at `a3777b1`, preparing the
+The isolated `codex/release-0.6.0` branch is now at `b5a610e`, preparing the
 0.6.0 package, citation, changelog, upgrade, and release-checklist metadata.
-The release-readiness contract now recognizes dynamic `_version.py` metadata
-and the installed-wheel `release-smoke` CI command; the full pre-tag ladder,
-self-audit, merge, tag, and publication remain pending for this new head.
+The release-readiness contract recognizes dynamic `_version.py` metadata and
+the installed-wheel `release-smoke` CI command. Workflow discovery now keeps
+the exact commands declared by CI, with 49 focused regression tests and green
+exact-head GitHub CI; the final release profile, merge, tag, and publication
+remain pending for this new head.
 
 ## Current Position
 
 - Target: a typed v2 core behind CLI, MCP, and compatibility adapters.
-- Next slice: complete the v0.6.0 pre-tag ladder and self-audit, then merge the
+- Next slice: rerun the v0.6.0 release profile at `b5a610e`, then merge the
   verified release branch to `main`, tag it, and verify PyPI publication.
 - `codex/release-0.6.0` is the isolated release branch from canonical `dev`;
   `main` remains the published v0.5.1 baseline until promotion succeeds.
@@ -158,9 +160,9 @@ self-audit, merge, tag, and publication remain pending for this new head.
   retaining the current application and compatibility architecture; the full
   650-test suite, Ruff, formatting, BasedPyright, and release smoke pass.
 
-`a3777b1` completes the release-readiness discovery fix with 49 focused tests;
-  the full pre-tag ladder and exact-head CI evidence must be rerun for this
-  changed head.
+`b5a610e` keeps exact CI workflow commands during release-gate discovery;
+  focused regression tests pass, exact-head GitHub CI is green, and the release
+  profile must be rerun for this changed head.
 
 ## Risks
 
@@ -185,6 +187,9 @@ self-audit, merge, tag, and publication remain pending for this new head.
 
 - 2026-07-17: `a3777b1` fixes release-profile discovery for dynamic package
   versions and installed-wheel release smoke, with 49 focused tests passing.
+- 2026-07-17: `b5a610e` makes release-gate discovery execute the exact commands
+  declared by CI, including scoped Vulture coverage; focused tests pass and
+  exact-head GitHub CI is green.
 - 2026-07-17: `23da809` prepares the isolated v0.6.0 release branch from
   canonical `dev`; no merge, tag, or publication has occurred.
 - 2026-07-17: Folded the short `qr` console command into the canonical `dev`

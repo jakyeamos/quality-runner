@@ -3,7 +3,7 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: GPT-5.6 modernization
 status: complete
-last_updated: "2026-07-13T17:41:03Z"
+last_updated: "2026-07-17T14:54:00Z"
 progress:
   total_phases: 8
   completed_phases: 8
@@ -28,8 +28,8 @@ they authorize repository changes.
 
 - Branch: `codex/release-0.6.0`
 - Baseline: `main` at 0.5.1 / commit `a101bd4`
-- Release metadata and readiness discovery fix: `a3777b1`; full pre-tag
-  validation and publication remain pending for this new head.
+- Release metadata and readiness discovery fixes: `b5a610e`; exact-head
+  GitHub CI is green and the release profile must be rerun before promotion.
 - Audit and planning: complete
 - M0 — restore trust at the boundary: complete in `f36dcf4`
 - M1 — establish typed review contracts: complete in `cb12746`
@@ -74,13 +74,15 @@ they authorize repository changes.
 
 ## Next Step
 
-Run the full v0.6.0 pre-tag ladder and self-audit, then promote the verified
+Rerun the v0.6.0 release profile at `b5a610e`, then promote the verified
 release branch through `main` and verify the published artifact.
 
 ## Recent Progress
 
+- 2026-07-17: `b5a610e` makes release-gate discovery preserve exact CI
+  workflow commands; focused tests pass and exact-head GitHub CI is green.
 - 2026-07-17: `a3777b1` fixes release-profile discovery for dynamic version
-  metadata and installed-wheel release smoke; full validation must rerun.
+  metadata and installed-wheel release smoke; the release profile must rerun.
 - 2026-07-17: `23da809` prepares v0.6.0 release metadata on the isolated
   release branch; full validation and publication remain pending.
 - 2026-07-13: v0.5.1 released: PR #2 merged at `a101bd4`, GitHub CI and tag
