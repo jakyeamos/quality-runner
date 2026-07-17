@@ -49,10 +49,19 @@ cd quality-runner
 uv tool install --editable . --force
 ```
 
+The editable install exposes both `quality-runner` and the shorter `qr`
+command. After the one-time install, run QR against a local repository without
+passing `--project`:
+
+```bash
+qr refresh /path/to/repo --json
+```
+
 Verify the installed commands:
 
 ```bash
 quality-runner --version
+qr --version
 quality-runner-mcp --version
 quality-runner doctor --json
 ```

@@ -1,8 +1,9 @@
 # CLI Reference
 
-Quality Runner provides two primary console scripts:
+Quality Runner provides a primary console script and its short local command:
 
 - `quality-runner`
+- `qr` (short alias for `quality-runner`)
 - `quality-runner-mcp`
 
 It also packages compatibility console scripts for existing Repo Quality
