@@ -1,0 +1,147 @@
+id = "ui-foundations"
+name = "UI Foundations"
+version = "0.1.0"
+description = "Source-level checks and high-recall review criteria for hierarchy, states, accessibility, and visual restraint."
+
+[[deterministic_rules]]
+id = "gradient-text"
+type = "disallowed_pattern"
+category = "visual-style"
+severity = "observation"
+confidence = "medium"
+paths = ["**/*.css", "**/*.scss", "**/*.tsx", "**/*.jsx"]
+disallowed_patterns = ['background-clip\s*:\s*text', '-webkit-background-clip\s*:\s*text']
+message = "Gradient text should be treated as an intentional exception, not a default text treatment."
+risk = "Gradient text can weaken hierarchy and readability when used as decorative styling without a clear product reason."
+expected = "Prefer a solid text color, or document why gradient text is necessary for this specific interface element."
+verification = "Review the flagged text treatment in context, then rerun quality-runner after resolving or accepting the exception."
+
+[[deterministic_rules]]
+id = "decorative-gradient-stripes"
+type = "disallowed_pattern"
+category = "visual-style"
+severity = "observation"
+confidence = "low"
+paths = ["**/*.css", "**/*.scss", "**/*.tsx", "**/*.jsx"]
+disallowed_patterns = ['repeating-linear-gradient\s*\(']
+message = "Repeating gradient stripes should be treated as an intentional exception."
+risk = "Decorative stripe treatments can add visual noise and compete with the interface content."
+expected = "Remove the decorative stripe or document the specific information-design reason it is needed."
+verification = "Review the flagged background in context, then rerun quality-runner after resolving or accepting the exception."
+
+[[deterministic_rules]]
+id = "oversized-corner-radius"
+type = "disallowed_pattern"
+category = "visual-style"
+severity = "observation"
+confidence = "low"
+paths = ["**/*.css", "**/*.scss"]
+disallowed_patterns = ['border-radius\s*:\s*(?:3[2-9]|[4-9][0-9]|[1-9][0-9]{2,})px']
+message = "Corner radii of 32px or more should be reviewed for unintended pill-like styling."
+risk = "Oversized radii can make cards, sections, and inputs feel inflated or visually disconnected from the product hierarchy."
+expected = "Use the smallest radius that communicates the intended component shape, or document the intentional exception."
+verification = "Review the component role before changing the radius, then rerun quality-runner after resolving or accepting the exception."
+
+[[deterministic_rules]]
+id = "collection-empty-state"
+type = "trigger_without_required"
+category = "ui-state"
+severity = "observation"
+confidence = "low"
+paths = ["**/*.tsx", "**/*.jsx"]
+trigger_patterns = ['\b(?:data|items|rows|results|records|options|posts|tags|sections|projects|seasons|entries|children|[a-z][A-Za-z0-9]*(?:Items|Rows|Results|Records|Options|Posts|Tags|Sections|Projects|Seasons|Entries|Children))\s*\.\s*map\s*\(', 'useQuery\s*\(', '\bfetch\s*\(']
+required_patterns = ['(?i:emptystate|empty state|no results|no items|isempty|noresults)']
+message = "Collection or data-driven UI may need an explicit empty state."
+risk = "A zero-result or unavailable-data path can otherwise render as a blank or confusing interface."
+expected = "Add a clear empty-state branch when the component can render an empty collection or no-result response."
+verification = "Review the data states in context, then rerun quality-runner after resolving or accepting the finding."
+
+[[deterministic_rules]]
+id = "async-loading-state"
+type = "trigger_without_required"
+category = "ui-state"
+severity = "observation"
+confidence = "low"
+paths = ["**/*.tsx", "**/*.jsx"]
+trigger_patterns = ['\b(fetch|useQuery|useMutation|useSWR)\s*\(']
+required_patterns = ['(?i:loading|pending|skeleton|spinner|suspense|aria-busy|isloading)']
+message = "Async UI may need an explicit loading or pending state."
+risk = "Users may receive no feedback while work is in progress, causing uncertainty or layout instability."
+expected = "Expose a visible loading, skeleton, pending, or equivalent state when the async operation can take time."
+verification = "Review the async state flow in context, then rerun quality-runner after resolving or accepting the finding."
+
+[[agent_reviews]]
+id = "visual-hierarchy"
+category = "ui-hierarchy"
+severity = "observation"
+paths = ["**/*.tsx", "**/*.jsx", "**/*.vue", "**/*.css", "**/*.scss"]
+focus = ["scan order", "primary and secondary actions", "typography hierarchy", "spacing scale", "grouping and proximity", "shared design tokens"]
+rubric = """
+Review UI-facing source for visual hierarchy and information structure.
+
+Report every plausible issue with concrete file, line, and source evidence. Prefer
+high recall; use low confidence when the source suggests a problem but rendered
+behavior cannot be proven. Look for competing primary actions, flat or inverted
+heading hierarchy, arbitrary one-off spacing or type values, weak grouping,
+inconsistent token usage, and dense layouts that make the intended scan order
+unclear. Do not claim a rendered visual defect that source evidence cannot support.
+Do not suggest broad rewrites; prefer small, local remediation slices.
+"""
+
+[[agent_reviews]]
+id = "states-and-interactions"
+category = "ui-state"
+severity = "observation"
+paths = ["**/*.tsx", "**/*.jsx", "**/*.vue"]
+focus = ["loading states", "empty states", "error states", "disabled states", "button hierarchy", "feedback after actions"]
+rubric = """
+Review UI-facing source for complete interaction and data-state coverage.
+
+Report plausible missing loading, empty, error, disabled, success, or retry
+states when the source clearly performs async work, renders collections, submits
+forms, or changes persistent state. Review whether primary, secondary, and
+destructive actions are distinguishable and whether a user receives feedback
+after important actions. Cite the exact branch, handler, or render path. Prefer
+high recall and allow low-confidence observations when a state is suggested but
+not fully inferable. Do not invent runtime behavior or require every component
+to implement every state.
+"""
+
+[[agent_reviews]]
+id = "accessibility-foundations"
+category = "accessibility"
+severity = "observation"
+paths = ["**/*.tsx", "**/*.jsx", "**/*.vue", "**/*.css", "**/*.scss"]
+focus = ["semantic controls", "accessible names", "keyboard and focus behavior", "contrast relationships", "responsive overflow"]
+rubric = """
+Review UI-facing source for accessibility foundations that can be supported by
+source evidence.
+
+Report plausible issues involving non-semantic interactive elements, missing
+accessible names, keyboard or focus gaps, text and background tokens whose
+contrast relationship appears unsafe, and content or controls that can overflow
+their container. Cite the exact element, style, token, or interaction handler.
+Prefer high recall and use low confidence when CSS variable resolution or
+rendered viewport behavior is unavailable. Do not claim WCAG compliance or
+failure without enough source evidence to support the claim.
+"""
+
+[[agent_reviews]]
+id = "visual-restraint-and-system-fit"
+category = "visual-restraint"
+severity = "observation"
+paths = ["**/*.tsx", "**/*.jsx", "**/*.vue", "**/*.css", "**/*.scss"]
+focus = ["decorative clutter", "shadows and gradients", "corner radii", "card repetition", "design-system reuse", "responsive density"]
+rubric = """
+Review UI-facing source for visual restraint and fit with the existing product
+system.
+
+Report plausible decorative or structural choices that add noise without
+supporting comprehension: unnecessary borders, shadows, gradients, oversized
+radii, repeated card templates, ornamental labels, duplicated visual patterns,
+and one-off components or tokens where an existing shared pattern appears
+available. Use concrete file, line, and source evidence. Prefer high recall and
+allow low-confidence observations when the source cannot establish the final
+rendered result. Do not treat every deviation from a design system as a defect;
+call out the evidence and the likely user impact.
+"""

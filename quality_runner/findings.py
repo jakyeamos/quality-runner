@@ -22,6 +22,7 @@ ALLOWED_HANDOFF_STATUSES = {
     "gates-blocked",
     "gates-failed",
     "gates-clean",
+    "review-required",
 }
 
 
@@ -106,6 +107,9 @@ def validate_remediation_plan(plan: dict[str, Any]) -> ValidationResult:
             slice_item.get("action_groups")
         ):
             errors.append(f"slice {slice_id} action_groups must be a list of action groups")
+    phase_candidates = plan.get("phase_candidates")
+    if phase_candidates is not None and not _phase_candidate_list(phase_candidates):
+        errors.append("remediation plan phase_candidates must be a list of phase candidates")
     return {"passed": not errors, "errors": errors}
 
 
@@ -140,6 +144,17 @@ def validate_agent_handoff(handoff: dict[str, Any]) -> ValidationResult:
     if not _string_list(handoff.get("slice_ids")):
         errors.append("agent handoff slice_ids must be a string list")
 
+    phase_candidates = handoff.get("phase_candidates")
+    if phase_candidates is not None and not _phase_candidate_summary_list(phase_candidates):
+        errors.append("agent handoff phase_candidates must be a list of phase summaries")
+    next_phase_candidate = handoff.get("next_phase_candidate")
+    if next_phase_candidate is not None and not _phase_candidate_summary(next_phase_candidate):
+        errors.append("agent handoff next_phase_candidate must be a phase summary object")
+
+    skill_review = handoff.get("skill_review")
+    if skill_review is not None and not _skill_review_summary(skill_review):
+        errors.append("agent handoff skill_review must be a skill review summary object")
+
     gate_verification = handoff.get("gate_verification")
     if gate_verification is not None and not _gate_verification_summary(gate_verification):
         errors.append("agent handoff gate_verification must be a gate verification summary object")
@@ -158,6 +173,9 @@ def validate_agent_handoff(handoff: dict[str, Any]) -> ValidationResult:
     if status in {"clean", "gates-clean"}:
         if next_slice is not None:
             errors.append("agent handoff next_slice must be null for clean status")
+    elif status == "review-required":
+        if next_slice is not None and not _slice_item(next_slice):
+            errors.append("agent handoff next_slice must be a remediation slice object")
     elif (
         status in {"planned", "gates-discovered", "gates-executed", "gates-blocked", "gates-failed"}
         and next_slice is not None
@@ -234,10 +252,95 @@ def _gate_blocker(value: object) -> bool:
     return _non_empty_string(value.get("id")) and _non_empty_string(value.get("status"))
 
 
+def _skill_review_summary(value: object) -> bool:
+    if not isinstance(value, dict):
+        return False
+    if value.get("status") not in {
+        "not-run",
+        "review-pending",
+        "review-required",
+        "reviewed",
+        "review-rejected",
+    }:
+        return False
+    mode = value.get("mode")
+    if mode is not None and mode not in {"off", "auto", "parallel", "required"}:
+        return False
+    automatic = value.get("automatic")
+    if automatic is not None and not isinstance(automatic, bool):
+        return False
+    for key in ("review_count", "unresolved_count"):
+        count = value.get(key)
+        if count is not None and (not isinstance(count, int) or count < 0):
+            return False
+    if not _non_empty_string_list(value.get("active_skill_ids")):
+        return False
+    if not _non_empty_string_list(value.get("review_ids")):
+        return False
+    unresolved = value.get("unresolved_review_ids")
+    if not isinstance(unresolved, list) or not all(_non_empty_string(item) for item in unresolved):
+        return False
+    return all(
+        _non_empty_string(value.get(key))
+        for key in ("packet_json", "packet_markdown")
+        if key in value
+    ) and all(
+        _non_empty_string(value.get(key))
+        for key in ("report_json", "report_source_run_id")
+        if key in value
+    )
+
+
 def _optional_action_group_list(value: object) -> bool:
     if value is None:
         return True
     return isinstance(value, list) and all(_action_group(item) for item in value)
+
+
+def _phase_candidate_list(value: object) -> bool:
+    return isinstance(value, list) and all(_phase_candidate(item) for item in value)
+
+
+def _phase_candidate(value: object) -> bool:
+    if not isinstance(value, dict):
+        return False
+    required_strings = ("id", "domain", "title", "priority", "status")
+    if not all(_non_empty_string(value.get(field)) for field in required_strings):
+        return False
+    if value.get("priority") not in ALLOWED_PRIORITIES:
+        return False
+    if value.get("status") not in {"planned", "review-required"}:
+        return False
+    if not isinstance(value.get("slice_ids"), list) or not _string_list(value["slice_ids"]):
+        return False
+    if not isinstance(value.get("finding_ids"), list) or not _string_list(value["finding_ids"]):
+        return False
+    return (
+        _non_empty_string_list(value.get("actions"))
+        and _non_empty_string_list(value.get("verification_gates"))
+        and isinstance(value.get("slice_count"), int)
+        and isinstance(value.get("finding_count"), int)
+    )
+
+
+def _phase_candidate_summary_list(value: object) -> bool:
+    return isinstance(value, list) and all(_phase_candidate_summary(item) for item in value)
+
+
+def _phase_candidate_summary(value: object) -> bool:
+    if not isinstance(value, dict):
+        return False
+    required_strings = ("id", "domain", "title", "priority", "status")
+    if not all(_non_empty_string(value.get(field)) for field in required_strings):
+        return False
+    if value.get("priority") not in ALLOWED_PRIORITIES:
+        return False
+    if value.get("status") not in {"planned", "review-required"}:
+        return False
+    return all(
+        isinstance(value.get(field), int) and value[field] >= 0
+        for field in ("slice_count", "finding_count")
+    )
 
 
 def _action_group(value: object) -> bool:

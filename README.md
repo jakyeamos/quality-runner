@@ -57,6 +57,17 @@ quality-runner-mcp --version
 quality-runner doctor --json
 ```
 
+When Quality Runner is installed from this checkout in editable mode, refresh
+the installed command surface after local changes with:
+
+```bash
+quality-runner self-update --json
+```
+
+For an explicit local checkout, pass `--source /path/to/quality-runner`.
+Without an editable checkout, the command falls back to `uv tool upgrade
+quality-runner`.
+
 Quality Runner also carries compatibility surfaces for the two smaller extracted
 packages it supersedes publicly:
 

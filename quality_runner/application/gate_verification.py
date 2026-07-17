@@ -30,6 +30,7 @@ from quality_runner.gate_verification import (
     verify_discovered_gates,
 )
 from quality_runner.git_branches import prepare_scan_branch
+from quality_runner.progress import ProgressCallback, emit_progress
 from quality_runner.readiness import evaluate_readiness
 from quality_runner.unwired_from_dead_code import merge_dead_code_unwired_findings
 from quality_runner.workflow_helpers import combined_warnings, gate_timeouts
@@ -37,7 +38,11 @@ from quality_runner.workflow_internal import verify_payload_status
 from quality_runner.worktree_verify import gate_worktree_session, resolve_worktree_mode
 
 
-def run_gate_verification(request: VerificationRequest) -> VerificationResult:
+def run_gate_verification(
+    request: VerificationRequest,
+    *,
+    progress: ProgressCallback | None = None,
+) -> VerificationResult:
     resolved_worktree_mode = resolve_worktree_mode(request.policy.worktree_mode)
     if request.policy.execute_discovered_gates and resolved_worktree_mode != "disposable":
         raise ValueError(
@@ -48,7 +53,12 @@ def run_gate_verification(request: VerificationRequest) -> VerificationResult:
         checkout_most_advanced_branch=request.checkout_most_advanced_branch,
     )
     run_dir = prepare_artifact_dir(request.repo_root, request.run_id)
-    analysis = analyze_read_only_audit(_audit_request(request, branch_warnings))
+    emit_progress(progress, "discovery", "repository facts and scan scope")
+    analysis = analyze_read_only_audit(
+        _audit_request(request, branch_warnings),
+        progress=progress,
+    )
+    emit_progress(progress, "verify-gates", "discovered repository gates")
     artifact_paths = prepare_verification_v1_artifacts(analysis, run_dir=run_dir)
     gate_execution_plan, gate_verification = _execute_discovered_gates(
         analysis=analysis,

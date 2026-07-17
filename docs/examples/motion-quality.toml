@@ -1,0 +1,160 @@
+id = "motion-quality"
+name = "Motion Quality"
+version = "0.1.0"
+description = "Source-level motion hazards and high-recall review criteria for purpose, easing, duration, physicality, interruptibility, performance, accessibility, and cohesion."
+
+[[deterministic_rules]]
+id = "unbounded-transition"
+type = "disallowed_pattern"
+category = "motion-performance"
+severity = "observation"
+confidence = "medium"
+paths = ["*.css", "**/*.css", "*.scss", "**/*.scss", "*.html", "**/*.html", "*.js", "**/*.js", "*.jsx", "**/*.jsx", "*.ts", "**/*.ts", "*.tsx", "**/*.tsx", "*.vue", "**/*.vue"]
+disallowed_patterns = ['(?i)\btransition(?:-property)?\s*:\s*all\b']
+message = "A transition animates all properties and requires explicit motion review."
+risk = "Unintended layout or paint properties may animate, increasing visual noise and dropped-frame risk."
+expected = "Name the intended properties explicitly, usually limiting motion to transform, opacity, color, or another justified property."
+verification = "Review the interaction in context and rerun quality-runner after resolving or accepting the observation."
+
+[[deterministic_rules]]
+id = "layout-property-animation"
+type = "disallowed_pattern"
+category = "motion-performance"
+severity = "observation"
+confidence = "low"
+paths = ["*.css", "**/*.css", "*.scss", "**/*.scss", "*.html", "**/*.html", "*.js", "**/*.js", "*.jsx", "**/*.jsx", "*.ts", "**/*.ts", "*.tsx", "**/*.tsx", "*.vue", "**/*.vue"]
+disallowed_patterns = ['(?i)\btransition(?:-property)?\s*:[^;\n]*(?:width|height|margin|padding|top|left)\b']
+message = "A transition appears to animate a layout property and requires performance review."
+risk = "Layout-property animation can trigger repeated layout work instead of staying on a compositor-friendly path."
+expected = "Prefer transform or opacity where the interaction permits, or document and measure the layout animation."
+verification = "Review the animated property and measure the affected path before rerunning quality-runner."
+
+[[deterministic_rules]]
+id = "scale-zero-entry"
+type = "disallowed_pattern"
+category = "motion-physicality"
+severity = "observation"
+confidence = "medium"
+paths = ["*.css", "**/*.css", "*.scss", "**/*.scss", "*.html", "**/*.html", "*.js", "**/*.js", "*.jsx", "**/*.jsx", "*.ts", "**/*.ts", "*.tsx", "**/*.tsx", "*.vue", "**/*.vue"]
+disallowed_patterns = ['(?i)\bscale\s*\(\s*0(?:\.0+)?\s*\)']
+message = "A scale-zero motion starts from nothing and requires physicality review."
+risk = "The element can appear to come from nowhere and feel disconnected from its trigger or spatial context."
+expected = "Use a small nonzero initial scale with opacity where appropriate, or document why scale-zero is intentional."
+verification = "Review the entry origin and feel in context, then rerun quality-runner after resolving or accepting the observation."
+
+[[deterministic_rules]]
+id = "ease-in-ui-motion"
+type = "disallowed_pattern"
+category = "motion-feel"
+severity = "observation"
+confidence = "low"
+paths = ["*.css", "**/*.css", "*.scss", "**/*.scss", "*.html", "**/*.html", "*.js", "**/*.js", "*.jsx", "**/*.jsx", "*.ts", "**/*.ts", "*.tsx", "**/*.tsx", "*.vue", "**/*.vue"]
+disallowed_patterns = ['(?i)\bease-in\b', '(?i)\beaseIn\b']
+message = "Ease-in motion on an interface interaction should be reviewed for sluggish arrival."
+risk = "Ease-in delays the moment the user is watching most and can make controls feel slow or unresponsive."
+expected = "Prefer ease-out or a deliberate custom curve for UI entry and feedback, unless the interaction has a documented reason."
+verification = "Review the motion at interaction speed and rerun quality-runner after resolving or accepting the observation."
+
+[[deterministic_rules]]
+id = "motion-without-reduced-motion"
+type = "trigger_without_required"
+category = "motion-accessibility"
+severity = "observation"
+confidence = "low"
+paths = ["*.css", "**/*.css", "*.scss", "**/*.scss"]
+trigger_patterns = ['(?i)@keyframes\b', '(?i)\btransition\s*:', '(?i)\banimation\s*:']
+required_patterns = ['(?i)prefers-reduced-motion']
+message = "A stylesheet contains motion without visible reduced-motion handling."
+risk = "Users who request reduced motion may still receive movement that causes discomfort or distraction."
+expected = "Add a reduced-motion treatment that removes movement while preserving necessary state feedback, or document the exception."
+verification = "Test the stylesheet with reduced motion enabled and rerun quality-runner after resolving or accepting the observation."
+
+[[agent_reviews]]
+id = "purpose-and-frequency"
+category = "motion-purpose"
+severity = "observation"
+paths = ["*.css", "**/*.css", "*.scss", "**/*.scss", "*.html", "**/*.html", "*.js", "**/*.js", "*.jsx", "**/*.jsx", "*.ts", "**/*.ts", "*.tsx", "**/*.tsx", "*.vue", "**/*.vue"]
+focus = ["motion purpose", "interaction frequency", "keyboard actions", "feedback value", "missed simplifications"]
+rubric = """
+Review whether each animation has a clear product or interaction purpose.
+
+Report plausible motion that exists only for decoration, fires on high-frequency
+or keyboard-driven actions, repeats too often, or should be deleted or reduced
+to preserve responsiveness. Also report abrupt state changes where a small
+amount of purposeful motion would explain spatial or state continuity. Cite the
+exact trigger, component, or style. Prefer high recall and use low confidence
+when usage frequency or product context is not visible; do not assume that
+delight motion is wrong on rare or first-time experiences.
+"""
+
+[[agent_reviews]]
+id = "easing-duration-and-origin"
+category = "motion-physicality"
+severity = "observation"
+paths = ["*.css", "**/*.css", "*.scss", "**/*.scss", "*.html", "**/*.html", "*.js", "**/*.js", "*.jsx", "**/*.jsx", "*.ts", "**/*.ts", "*.tsx", "**/*.tsx", "*.vue", "**/*.vue"]
+focus = ["easing", "duration", "transform origin", "popover and tooltip entry", "spring configuration", "spatial continuity"]
+rubric = """
+Review motion feel, timing, and physical correctness.
+
+Report plausible sluggish easing, UI durations over roughly 300ms without a
+clear reason, scale-zero entrances, trigger-anchored surfaces that animate from
+the wrong origin, weak spring settings, or transitions that do not match the
+direction of the state change. Cite the exact value and component context.
+Prefer high recall and use low confidence when rendered feel or component role
+is not visible. Treat centered modal motion as distinct from trigger-anchored
+popover or tooltip motion.
+"""
+
+[[agent_reviews]]
+id = "interruptibility-and-performance"
+category = "motion-performance"
+severity = "observation"
+paths = ["*.css", "**/*.css", "*.scss", "**/*.scss", "*.html", "**/*.html", "*.js", "**/*.js", "*.jsx", "**/*.jsx", "*.ts", "**/*.ts", "*.tsx", "**/*.tsx", "*.vue", "**/*.vue"]
+focus = ["interruptibility", "keyframes", "GPU-friendly properties", "layout thrash", "recalc storms", "rapid interactions"]
+rubric = """
+Review motion for interruption safety and rendering cost.
+
+Report plausible rapidly-triggered or gesture-driven motion that restarts from
+zero, keyframes that cannot retarget from the current state, layout-property
+animation, parent style recalculation storms, or expensive work on busy paths.
+Prefer transitions or springs when the current state must be retargeted. Cite
+the exact animation, handler, property, or style update. Prefer high recall and
+use low confidence when runtime load is unavailable; do not treat every
+keyframe as wrong outside rapidly changing UI.
+"""
+
+[[agent_reviews]]
+id = "accessibility-and-pointer-gating"
+category = "motion-accessibility"
+severity = "observation"
+paths = ["*.css", "**/*.css", "*.scss", "**/*.scss", "*.html", "**/*.html", "*.js", "**/*.js", "*.jsx", "**/*.jsx", "*.ts", "**/*.ts", "*.tsx", "**/*.tsx", "*.vue", "**/*.vue"]
+focus = ["reduced motion", "hover gating", "pointer capability", "keyboard interaction", "focus feedback", "state communication"]
+rubric = """
+Review motion for accessibility and input-modality safety.
+
+Report plausible missing prefers-reduced-motion handling, ungated hover motion,
+movement on keyboard or high-frequency actions, loss of focus or state feedback
+when movement is removed, and interactions that assume a fine pointer. Cite the
+exact selector, media query, event handler, or component. Prefer high recall and
+use low confidence when the rendered interaction cannot be verified. Reduced
+motion should remove unnecessary movement while preserving essential state and
+feedback.
+"""
+
+[[agent_reviews]]
+id = "cohesion-and-simplification"
+category = "motion-cohesion"
+severity = "observation"
+paths = ["*.css", "**/*.css", "*.scss", "**/*.scss", "*.html", "**/*.html", "*.js", "**/*.js", "*.jsx", "**/*.jsx", "*.ts", "**/*.ts", "*.tsx", "**/*.tsx", "*.vue", "**/*.vue"]
+focus = ["motion personality", "design tokens", "stagger", "crossfades", "asymmetric timing", "cohesion with surrounding UI"]
+rubric = """
+Review motion as part of the product's overall personality and system.
+
+Report plausible motion that feels inconsistent with adjacent components,
+duplicates timing or easing tokens, uses symmetric timing where deliberate
+actions should differ from system responses, crossfades states without enough
+spatial continuity, or animates everything when a simpler hierarchy would read
+better. Cite the exact component and nearby convention. Prefer high recall and
+use low confidence when the full product surface is unavailable. When unsure,
+consider deletion or reduction before adding more motion.
+"""

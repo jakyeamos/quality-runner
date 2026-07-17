@@ -35,6 +35,7 @@ from quality_runner.cli_review import review_command_payload
 from quality_runner.cli_rollout import rollout_command_payload
 from quality_runner.cli_skills import skill_command_payload
 from quality_runner.cli_status import export_handoff_payload, status_payload
+from quality_runner.cli_update import update_command_payload
 from quality_runner.code_quality import preview_ignored_paths
 from quality_runner.config import CONFIG_FILE_NAME, load_repo_config
 from quality_runner.controller_reports import validate_controller_report
@@ -45,6 +46,7 @@ from quality_runner.exclusion_preflight import (
     run_exclusion_preflight_command,
 )
 from quality_runner.intent import workflow_intent_from_cli_args
+from quality_runner.progress import ProgressCallback
 from quality_runner.release_smoke import release_smoke_payload
 from quality_runner.run_summary import build_run_summary
 from quality_runner.workflow_skills import load_skill_review_report_json
@@ -55,9 +57,15 @@ EXPENSIVE_IGNORED_PATH_SECONDS_THRESHOLD = 5.0
 MAX_INTERACTIVE_IGNORED_PATHS = 10
 
 
-def payload_for_args(args: argparse.Namespace) -> dict[str, Any]:
+def payload_for_args(
+    args: argparse.Namespace,
+    *,
+    progress: ProgressCallback | None = None,
+) -> dict[str, Any]:
     if args.command == "doctor":
         return doctor_payload(include_environment=True)
+    if args.command == "self-update":
+        return update_command_payload(args.source)
     if args.command == "release-smoke":
         from quality_runner.cli import build_parser
 
@@ -136,6 +144,7 @@ def payload_for_args(args: argparse.Namespace) -> dict[str, Any]:
             checkout_most_advanced_branch=args.checkout_most_advanced_branch,
             skill_review_report=_optional_skill_review_report(args),
             agent_review_mode=args.agent_review_mode,
+            progress=progress,
             intent=workflow_intent_from_cli_args(args, repo_root=repo_root, run_id=args.run_id),
         )
     if args.command == "audit":
@@ -179,6 +188,7 @@ def payload_for_args(args: argparse.Namespace) -> dict[str, Any]:
             checkout_most_advanced_branch=args.checkout_most_advanced_branch,
             skill_review_report=_optional_skill_review_report(args),
             agent_review_mode=args.agent_review_mode,
+            progress=progress,
             intent=workflow_intent_from_cli_args(args, repo_root=repo_root, run_id=args.run_id),
         )
     if args.command == "verify-gates":
@@ -203,6 +213,7 @@ def payload_for_args(args: argparse.Namespace) -> dict[str, Any]:
             skill_review_report=_optional_skill_review_report(args),
             agent_review_mode=args.agent_review_mode,
             scan_exclusion_overlay=_scan_exclusion_overlay(args, repo_root),
+            progress=progress,
             intent=workflow_intent_from_cli_args(args, repo_root=repo_root, run_id=args.run_id),
         )
     if args.command == "verify":
@@ -234,7 +245,11 @@ def payload_for_args(args: argparse.Namespace) -> dict[str, Any]:
             )
         )
     if args.command == "refresh":
-        return refresh_command_payload(args, _validated_repo_path(args.repo_path))
+        return refresh_command_payload(
+            args,
+            _validated_repo_path(args.repo_path),
+            progress=progress,
+        )
     if args.command == "remediation-delta":
         return remediation_delta_command_payload(args, _validated_repo_path(args.repo_path))
     if args.command in {"plan", "phase"}:

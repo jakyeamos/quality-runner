@@ -1,0 +1,50 @@
+{
+  "fixture_id": "bounded-markdown-skill",
+  "evidence": [
+    {
+      "id": "markdown-link-semantics",
+      "source": "kepano/obsidian-skills",
+      "revision": "a1dc48e68138490d522c04cbf5822214c6eb1202",
+      "path": "skills/obsidian-markdown/SKILL.md",
+      "locator": "L14-L19, L21-L43",
+      "knowledge_role": "format",
+      "enforceability": "deterministic",
+      "normalization_status": "not_applicable",
+      "evidence": "Internal vault connections use wikilinks; external URLs use standard Markdown links, with heading and block targets supported.",
+      "evidence_preserved": true,
+      "mapping_status": "mapped",
+      "mapping_target": "format_rule:link-target",
+      "loss_reason": null
+    },
+    {
+      "id": "markdown-render-verification",
+      "source": "kepano/obsidian-skills",
+      "revision": "a1dc48e68138490d522c04cbf5822214c6eb1202",
+      "path": "skills/obsidian-markdown/SKILL.md",
+      "locator": "L10-L19",
+      "knowledge_role": "workflow",
+      "enforceability": "agent_review",
+      "normalization_status": "not_applicable",
+      "evidence": "The authoring workflow ends by verifying that the note renders correctly in Obsidian reading view.",
+      "evidence_preserved": true,
+      "mapping_status": "context_only",
+      "mapping_target": "agent_review:renderer-verification",
+      "loss_reason": "Application rendering is not a local QR predicate."
+    },
+    {
+      "id": "markdown-progressive-references",
+      "source": "kepano/obsidian-skills",
+      "revision": "a1dc48e68138490d522c04cbf5822214c6eb1202",
+      "path": "skills/obsidian-markdown/references/PROPERTIES.md",
+      "locator": "L1-L61",
+      "knowledge_role": "format",
+      "enforceability": "context_only",
+      "normalization_status": "not_applicable",
+      "evidence": "Properties, embeds, and callouts are delegated to focused reference files rather than fully expanded in the bounded core skill.",
+      "evidence_preserved": true,
+      "mapping_status": "mapped",
+      "mapping_target": "source_bundle:progressive-reference",
+      "loss_reason": null
+    }
+  ]
+}

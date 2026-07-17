@@ -18,6 +18,7 @@ from quality_runner.core.audit_contracts import (
     ScanExclusionOverlay,
 )
 from quality_runner.git_branches import prepare_scan_branch
+from quality_runner.progress import ProgressCallback
 from quality_runner.workflow_helpers import combined_warnings
 from quality_runner.workflow_internal import generated_run_id
 from quality_runner.workflow_skills import skill_review_summary
@@ -35,6 +36,7 @@ def inspect_payload(
     intent: AuditPayload | None = None,
     agent_review_mode: str | None = None,
     scan_exclusion_overlay: ScanExclusionOverlay | None = None,
+    progress: ProgressCallback | None = None,
 ) -> dict[str, Any]:
     resolved_run_id = generated_run_id() if run_id is None else run_id
     branch_warnings = prepare_scan_branch(
@@ -54,7 +56,8 @@ def inspect_payload(
             agent_review_mode=agent_review_mode,
             scan_exclusion_overlay=scan_exclusion_overlay,
             intent=intent,
-        )
+        ),
+        progress=progress,
     )
     artifact_paths = write_inspect_v1_artifacts(analysis, run_dir=run_dir)
     skill_review = _skill_review_from_analysis(analysis, artifact_paths)
@@ -85,6 +88,7 @@ def run_payload(
     intent: AuditPayload | None = None,
     agent_review_mode: str | None = None,
     scan_exclusion_overlay: ScanExclusionOverlay | None = None,
+    progress: ProgressCallback | None = None,
 ) -> dict[str, Any]:
     resolved_run_id = generated_run_id() if run_id is None else run_id
     branch_warnings = prepare_scan_branch(
@@ -104,7 +108,8 @@ def run_payload(
             agent_review_mode=agent_review_mode,
             scan_exclusion_overlay=scan_exclusion_overlay,
             intent=intent,
-        )
+        ),
+        progress=progress,
     )
     planned, artifact_paths = plan_and_write_run_v1_artifacts(analysis, run_dir=run_dir)
     skill_review = _skill_review_from_analysis(analysis, artifact_paths)

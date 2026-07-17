@@ -1,0 +1,103 @@
+id = "pr-risk"
+name = "PR Risk and Merge Readiness"
+version = "0.1.0"
+description = "Source-level merge-integrity signals and high-recall review criteria for changed surfaces, contracts, regressions, scope, and handoff."
+
+[[deterministic_rules]]
+id = "merge-conflict-marker"
+type = "disallowed_pattern"
+category = "merge-integrity"
+severity = "warning"
+confidence = "high"
+paths = ["**/*.py", "**/*.js", "**/*.jsx", "**/*.ts", "**/*.tsx", "**/*.go", "**/*.rs", "**/*.java", "**/*.sql", "**/*.sh", "**/*.bash", "**/*.yml", "**/*.yaml", "**/*.toml", "**/*.json"]
+disallowed_patterns = ['^<<<<<<<(?:\s|$)', '^>>>>>>>?(?:\s|$)', '^=======$']
+message = "A merge-conflict marker is present in source or configuration."
+risk = "The repository may not parse, build, or represent a coherent implementation."
+expected = "Resolve the conflict markers and rerun the affected quality gates before merging."
+verification = "Rerun quality-runner and the repository's focused tests, build, and lint checks after resolving the conflict."
+
+[[agent_reviews]]
+id = "changed-surface-map"
+category = "pr-surface"
+severity = "observation"
+paths = ["**/*.py", "**/*.js", "**/*.jsx", "**/*.ts", "**/*.tsx", "**/*.go", "**/*.rs", "**/*.java", "**/*.sql", "**/*.yml", "**/*.yaml", "**/*.toml", "**/*.json", "**/*.md"]
+focus = ["touched files", "entry points", "public contracts", "data flows", "permissions", "generated artifacts"]
+rubric = """
+Review the change surface for a pull request or branch.
+
+Use diff or PR metadata when it is available. Map touched files to the entry
+points, public contracts, data flows, permissions, generated artifacts, and
+operational paths they affect. Report plausible unreviewed surfaces with
+concrete file, line, and source evidence. If diff metadata is unavailable,
+state that evidence gap instead of inferring which files changed. Prefer high
+recall and use low confidence when the dependency path is incomplete.
+"""
+
+[[agent_reviews]]
+id = "contract-and-regression-risk"
+category = "pr-regression"
+severity = "observation"
+paths = ["**/*.py", "**/*.js", "**/*.jsx", "**/*.ts", "**/*.tsx", "**/*.go", "**/*.rs", "**/*.java", "**/*.sql", "**/*.yml", "**/*.yaml", "**/*.toml", "**/*.json"]
+focus = ["API contracts", "schema changes", "behavior changes", "error paths", "permission changes", "regression tests"]
+rubric = """
+Review the change for contract and regression risk.
+
+Report plausible behavior, API, schema, CLI, permission, configuration, or
+error-path changes that lack a matching regression test, compatibility note,
+validation, or migration evidence. Trace the changed source to its consumers
+when possible and cite the exact line or contract. Prefer high recall and use
+low confidence when downstream consumers or runtime configuration are not
+visible. Do not infer a breaking change from private implementation details.
+"""
+
+[[agent_reviews]]
+id = "scope-and-cohesion"
+category = "pr-scope"
+severity = "observation"
+paths = ["**/*.py", "**/*.js", "**/*.jsx", "**/*.ts", "**/*.tsx", "**/*.go", "**/*.rs", "**/*.java", "**/*.sql", "**/*.yml", "**/*.yaml", "**/*.toml", "**/*.json", "**/*.md"]
+focus = ["unrelated changes", "duplicate implementations", "temporary adapters", "speculative abstractions", "documentation alignment", "generated-file drift"]
+rubric = """
+Review whether the change is coherent and appropriately scoped.
+
+Report plausible unrelated edits, duplicated owners, compatibility shims without
+a removal boundary, speculative abstractions, generated-file drift, or source
+changes whose docs/configuration no longer agree. Cite the exact files and
+explain the review or maintenance risk. Prefer high recall and allow
+low-confidence observations when repository history is unavailable. Do not
+penalize a multi-file change when the files form one necessary contract.
+"""
+
+[[agent_reviews]]
+id = "merge-evidence"
+category = "pr-verification"
+severity = "observation"
+paths = ["**/*.py", "**/*.js", "**/*.jsx", "**/*.ts", "**/*.tsx", "**/*.go", "**/*.rs", "**/*.java", "**/*.sql", "**/*.yml", "**/*.yaml", "**/*.toml", "**/*.json", "**/*.md"]
+focus = ["CI status", "test evidence", "lint and type checks", "migration checks", "review blockers", "known failures"]
+rubric = """
+Review the evidence needed to merge the change safely.
+
+Report plausible blockers or evidence gaps where CI, tests, lint, type checks,
+builds, migrations, security checks, or required review results are missing,
+stale, bypassed, or documented without a current result. Cite the exact
+workflow, command, artifact, or failure. Prefer high recall and use low
+confidence when execution results are unavailable; never claim a command passed
+from configuration alone.
+"""
+
+[[agent_reviews]]
+id = "handoff-and-remediation"
+category = "pr-handoff"
+severity = "observation"
+paths = ["**/*.py", "**/*.js", "**/*.jsx", "**/*.ts", "**/*.tsx", "**/*.go", "**/*.rs", "**/*.java", "**/*.sql", "**/*.yml", "**/*.yaml", "**/*.toml", "**/*.json", "**/*.md"]
+focus = ["finding evidence", "ordered fixes", "verification commands", "known limitations", "ownership", "follow-up risks"]
+rubric = """
+Review whether the change is ready for a clear review handoff.
+
+Report plausible findings whose evidence, risk, expected improvement, or
+verification path is unclear, and unresolved risks that lack an owner,
+disposition, or next action. Prefer small remediation slices tied to concrete
+files and lines. Preserve explicit evidence gaps and conflicting signals.
+Prefer high recall and use low confidence when the missing context is external
+to the repository. Do not turn the review into implementation or merge the
+change on the author's behalf.
+"""

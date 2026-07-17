@@ -2,12 +2,18 @@ from __future__ import annotations
 
 from typing import Any
 
+from quality_runner.verification_contract import verification_contract_fields
+
 PRIORITY_ORDER = {"high": 0, "medium": 1, "low": 2}
 
 
 def slice_for_finding(finding: dict[str, Any]) -> dict[str, Any]:
     finding_id = finding["id"]
     recommended_fix = finding["recommended_fix"]
+    verification_contract = verification_contract_fields(
+        finding,
+        explicit_mode=finding.get("verification_mode"),
+    )
     slice_item = {
         "id": f"remediate-{finding_id}",
         "title": f"Remediate {finding_id}",
@@ -19,6 +25,7 @@ def slice_for_finding(finding: dict[str, Any]) -> dict[str, Any]:
                 "category": finding["category"],
                 "summary": finding["summary"],
                 **_optional_actionability(finding),
+                **verification_contract,
             }
         ],
         "actions": [
@@ -26,6 +33,7 @@ def slice_for_finding(finding: dict[str, Any]) -> dict[str, Any]:
             f"Rerun quality-runner and confirm {finding_id} no longer appears.",
         ],
         "verification_gates": list(finding["verification"]),
+        **verification_contract,
     }
     score = finding.get("score")
     if isinstance(score, int):

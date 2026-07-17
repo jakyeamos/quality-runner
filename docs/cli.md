@@ -75,6 +75,18 @@ Returns:
 - package version
 - local Python/platform details
 
+## `quality-runner self-update`
+
+Refreshes the installed Quality Runner tool. An editable installation is
+detected automatically and reinstalled from its local checkout; use `--source`
+to select a different local checkout explicitly. If no editable checkout is
+available, QR uses `uv tool upgrade quality-runner`.
+
+```bash
+quality-runner self-update --json
+quality-runner self-update --source /path/to/quality-runner --json
+```
+
 ## `quality-runner inspect`
 
 Inspects repo shape, standards, and quality capability signals without producing

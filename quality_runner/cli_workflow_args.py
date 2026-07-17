@@ -61,6 +61,11 @@ def add_workflow_arguments(parser: argparse.ArgumentParser) -> None:
         help="Agent skill-review policy for this run",
     )
     add_intent_cli_arguments(parser)
+    parser.add_argument(
+        "--no-progress",
+        action="store_true",
+        help="Disable stderr progress and heartbeat diagnostics",
+    )
     parser.add_argument("--json", action="store_true", help="Emit JSON output")
 
 

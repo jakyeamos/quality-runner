@@ -20,6 +20,25 @@ def handoff_status(
     return "clean" if not slices else "planned"
 
 
+def apply_skill_review_status(status: str, skill_review: dict[str, Any] | None) -> str:
+    if not isinstance(skill_review, dict):
+        return status
+    if skill_review.get("status") not in {"review-required", "review-rejected"}:
+        return status
+    return (
+        "review-required"
+        if status
+        in {
+            "clean",
+            "planned",
+            "gates-discovered",
+            "gates-executed",
+            "gates-clean",
+        }
+        else status
+    )
+
+
 def _available_capabilities(capability_map: dict[str, Any] | None) -> list[dict[str, Any]]:
     if not isinstance(capability_map, dict):
         return []

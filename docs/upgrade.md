@@ -15,6 +15,17 @@ uv tool upgrade quality-runner
 quality-runner doctor --json
 ```
 
+When working from a local editable checkout, use QR's command surface to keep
+the installed tool aligned with that checkout:
+
+```bash
+quality-runner self-update --json
+```
+
+Use `quality-runner self-update --source /path/to/quality-runner --json` when
+the checkout is not the one recorded by the editable installation. QR falls
+back to `uv tool upgrade quality-runner` when no editable source is available.
+
 To select the release version explicitly:
 
 ```bash

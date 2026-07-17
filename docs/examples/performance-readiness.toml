@@ -1,0 +1,119 @@
+id = "performance-readiness"
+name = "Performance Readiness"
+version = "0.1.0"
+description = "Source-level performance risk signals and high-recall review criteria for measurement, hot paths, I/O, runtime scaling, and load verification."
+
+[[deterministic_rules]]
+id = "select-star"
+type = "disallowed_pattern"
+category = "performance-query"
+severity = "observation"
+confidence = "low"
+paths = ["*.sql", "**/*.sql", "*.py", "**/*.py", "*.js", "**/*.js", "*.jsx", "**/*.jsx", "*.ts", "**/*.ts", "*.tsx", "**/*.tsx", "*.go", "**/*.go", "*.rs", "**/*.rs", "*.java", "**/*.java"]
+disallowed_patterns = ['(?i)\bSELECT\s+\*']
+message = "A SELECT * query should be reviewed for unnecessary data transfer and index or projection cost."
+risk = "The query may fetch more columns or data than the caller needs, increasing latency, memory use, and coupling to schema growth."
+expected = "Select the required columns or document why the full row is necessary for this access path."
+verification = "Review the query plan and representative result size, then rerun quality-runner after resolving or accepting the observation."
+
+[[deterministic_rules]]
+id = "blocking-call-in-source"
+type = "disallowed_pattern"
+category = "performance-concurrency"
+severity = "observation"
+confidence = "low"
+paths = ["*.py", "**/*.py", "*.js", "**/*.js", "*.jsx", "**/*.jsx", "*.ts", "**/*.ts", "*.tsx", "**/*.tsx", "*.go", "**/*.go", "*.rs", "**/*.rs", "*.java", "**/*.java"]
+disallowed_patterns = ['(?i)\btime\.sleep\s*\(', '\breadFileSync\s*\(', '\bexecSync\s*\(', '\bspawnSync\s*\(']
+message = "A blocking call should be reviewed for event-loop, worker, or request-path impact."
+risk = "Synchronous waits or I/O can block concurrent work and increase tail latency when used on a hot or asynchronous path."
+expected = "Use an asynchronous or bounded alternative where appropriate, or document why the call is isolated from latency-sensitive work."
+verification = "Review the call context and measure the affected path, then rerun quality-runner after resolving or accepting the observation."
+
+[[agent_reviews]]
+id = "measurement-and-profiling"
+category = "performance-evidence"
+severity = "observation"
+paths = ["*.py", "**/*.py", "*.js", "**/*.js", "*.jsx", "**/*.jsx", "*.ts", "**/*.ts", "*.tsx", "**/*.tsx", "*.go", "**/*.go", "*.rs", "**/*.rs", "*.java", "**/*.java", "*.sql", "**/*.sql", "*.yml", "**/*.yml", "*.yaml", "**/*.yaml", "*.toml", "**/*.toml", "*.md", "*.json", "**/*.json"]
+focus = ["baseline metrics", "profiling", "latency budgets", "SLOs", "measurement gaps", "representative workloads"]
+rubric = """
+Review performance claims and risks for measurement quality.
+
+Report plausible optimization or scaling decisions that lack a baseline,
+profile, latency or resource budget, representative workload, or repeatable
+measurement command. Cite the exact hot path, benchmark, metric, or missing
+artifact. Prefer high recall and use low confidence when runtime and traffic
+are external to the repository. Do not call code slow from complexity or style
+alone; identify the measurement evidence that is missing or contradictory.
+"""
+
+[[agent_reviews]]
+id = "hot-path-and-scaling"
+category = "performance-scaling"
+severity = "observation"
+paths = ["*.py", "**/*.py", "*.js", "**/*.js", "*.jsx", "**/*.jsx", "*.ts", "**/*.ts", "*.tsx", "**/*.tsx", "*.go", "**/*.go", "*.rs", "**/*.rs", "*.java", "**/*.java", "*.sql", "**/*.sql", "*.yml", "**/*.yml", "*.yaml", "**/*.yaml", "*.md", "**/*.md"]
+focus = ["nested loops", "N+1 queries", "unbounded collections", "cache boundaries", "algorithmic growth", "connection pools"]
+rubric = """
+Review source for plausible hot-path and scaling risks.
+
+Report nested or repeated work, N+1 data access, unbounded collection loads,
+repeated parsing, missing cache boundaries, high-growth algorithms, or resource
+pools that may fail under representative load. Cite the exact loop, query,
+serializer, cache, or pool configuration and explain the growth or contention
+path. Prefer high recall and use low confidence when query planners, data size,
+or runtime caching are not visible. Do not assert a performance defect without
+identifying the workload or scaling mechanism that makes it plausible.
+"""
+
+[[agent_reviews]]
+id = "io-and-concurrency"
+category = "performance-concurrency"
+severity = "observation"
+paths = ["*.py", "**/*.py", "*.js", "**/*.js", "*.jsx", "**/*.jsx", "*.ts", "**/*.ts", "*.tsx", "**/*.tsx", "*.go", "**/*.go", "*.rs", "**/*.rs", "*.java", "**/*.java", "*.yml", "**/*.yml", "*.yaml", "**/*.yaml", "*.toml", "**/*.toml"]
+focus = ["blocking I/O", "serial network calls", "unbounded concurrency", "timeouts", "retries", "backpressure"]
+rubric = """
+Review I/O and concurrency behavior for tail-latency and reliability risk.
+
+Report plausible blocking calls on asynchronous or request paths, serial
+network or database operations that could be parallelized safely, unbounded
+fan-out, missing timeouts, retry storms, absent backpressure, or resource
+cleanup gaps. Cite the exact call, loop, task group, queue, timeout, or retry
+configuration. Prefer high recall and use low confidence when framework
+execution semantics are not visible. Distinguish intentional serialization
+from accidental sequential work.
+"""
+
+[[agent_reviews]]
+id = "bundle-and-runtime"
+category = "performance-runtime"
+severity = "observation"
+paths = ["*.js", "**/*.js", "*.jsx", "**/*.jsx", "*.ts", "**/*.ts", "*.tsx", "**/*.tsx", "*.css", "**/*.css", "*.html", "**/*.html", "*.json", "**/*.json", "*.yml", "**/*.yml", "*.yaml", "**/*.yaml", "*.md", "**/*.md"]
+focus = ["bundle size", "client/server boundaries", "render work", "asset loading", "memory lifetime", "long tasks"]
+rubric = """
+Review frontend and runtime source for bundle, render, and memory risks.
+
+Report plausible oversized client boundaries, eager asset or dependency
+loading, repeated render work, unnecessary serialization, retained listeners
+or resources, and unbounded in-memory data. Cite the exact import, component,
+asset, effect, cache, or build configuration. Prefer high recall and use low
+confidence when bundler output, browser traces, or device profiles are absent.
+Do not infer a user-visible performance failure without identifying the runtime
+path and missing evidence.
+"""
+
+[[agent_reviews]]
+id = "verification-and-load"
+category = "performance-verification"
+severity = "observation"
+paths = ["*.py", "**/*.py", "*.js", "**/*.js", "*.jsx", "**/*.jsx", "*.ts", "**/*.ts", "*.tsx", "**/*.tsx", "*.go", "**/*.go", "*.rs", "**/*.rs", "*.java", "**/*.java", "*.yml", "**/*.yml", "*.yaml", "**/*.yaml", "*.toml", "**/*.toml", "*.md", "**/*.md"]
+focus = ["load tests", "performance regression checks", "benchmarks", "profiling commands", "budgets", "production-like fixtures"]
+rubric = """
+Review whether important performance risks have a verification path.
+
+Report plausible gaps where hot paths, query changes, bundle changes, concurrency
+changes, or scaling claims lack benchmarks, load tests, profiling commands,
+budgets, representative fixtures, or a repeatable before-and-after check. Cite
+the changed surface and nearest available verification artifact. Prefer high
+recall and use low confidence when performance testing is delegated to an
+external environment. Prefer measurement-first remediation over speculative
+micro-optimizations.
+"""

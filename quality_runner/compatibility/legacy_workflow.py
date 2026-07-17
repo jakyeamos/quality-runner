@@ -1,17 +1,17 @@
 from __future__ import annotations
 
-import json
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
 from quality_runner.application.audit_workflows import inspect_payload, run_payload
 from quality_runner.application.verification_workflows import verify_gates_payload
-from quality_runner.artifacts import existing_artifact_dir, safe_child_file, write_json
 from quality_runner.core.audit_contracts import ScanExclusionOverlay
+from quality_runner.progress import ProgressCallback
 from quality_runner.refresh_workflow import run_refresh_payload
 from quality_runner.review_delta import build_review_delta, persist_review_delta
 from quality_runner.run_summary import build_run_summary
+from quality_runner.workflow_review_metadata import attach_review_metadata
 
 PayloadCallback = Callable[..., dict[str, Any]]
 
@@ -44,6 +44,7 @@ def refresh_payload(
     agent_review_mode: str | None = None,
     scan_exclusion_overlay: ScanExclusionOverlay | None = None,
     readiness_evidence_file: Path | None = None,
+    progress: ProgressCallback | None = None,
 ) -> dict[str, Any]:
     review_enabled = review_cycle_id is not None or review_iteration is not None
     if review_enabled:
@@ -79,6 +80,7 @@ def refresh_payload(
         run_callback=run_callback,
         verify_callback=verify_callback,
         summary_callback=summary_callback,
+        progress=progress,
     )
     if not review_enabled:
         return payload
@@ -94,7 +96,7 @@ def refresh_payload(
         baseline_run_id=baseline_run_id,
     )
     delta_paths = persist_review_delta(repo_root=repo_root, run_id=verify_run_id, payload=delta)
-    _attach_review_metadata(
+    attach_review_metadata(
         repo_root=repo_root,
         run_id=verify_run_id,
         cycle_id=review_cycle_id,
@@ -105,26 +107,3 @@ def refresh_payload(
     payload["review_delta"] = delta
     payload["review_delta_paths"] = delta_paths
     return payload
-
-
-def _attach_review_metadata(
-    *,
-    repo_root: Path,
-    run_id: str,
-    cycle_id: str,
-    iteration: int,
-    baseline_run_id: str | None,
-    delta_paths: dict[str, str],
-) -> None:
-    run_dir = existing_artifact_dir(repo_root, run_id)
-    manifest_path = safe_child_file(run_dir, "run-manifest.json")
-    if not manifest_path.exists():
-        return
-    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    manifest["review_cycle"] = {
-        "cycle_id": cycle_id,
-        "iteration": iteration,
-        "baseline_run_id": baseline_run_id,
-        "artifact_paths": delta_paths,
-    }
-    write_json(manifest_path, manifest)

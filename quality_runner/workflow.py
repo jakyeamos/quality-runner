@@ -7,6 +7,7 @@ from quality_runner.application.audit_workflows import inspect_payload, run_payl
 from quality_runner.application.verification_workflows import verify_gates_payload
 from quality_runner.compatibility.legacy_workflow import refresh_payload as _refresh_payload
 from quality_runner.core.audit_contracts import ScanExclusionOverlay
+from quality_runner.progress import ProgressCallback
 from quality_runner.refresh_workflow import run_refresh_payload
 from quality_runner.run_summary import build_run_summary
 from quality_runner.workflow_internal import generated_run_id
@@ -42,6 +43,7 @@ def refresh_payload(
     execute_discovered_gates: bool = False,
     agent_review_mode: str | None = None,
     scan_exclusion_overlay: ScanExclusionOverlay | None = None,
+    progress: ProgressCallback | None = None,
 ) -> dict[str, Any]:
     return _refresh_payload(
         repo_root=repo_root,
@@ -70,4 +72,5 @@ def refresh_payload(
         verify_callback=verify_gates_payload,
         summary_callback=build_run_summary,
         refresh_runner=run_refresh_payload,
+        progress=progress,
     )

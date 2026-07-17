@@ -5,6 +5,7 @@ from collections.abc import Mapping, Sequence
 from pathlib import Path
 
 from quality_runner.artifacts import prepare_artifact_dir, write_json, write_text
+from quality_runner.skill_decomposition import write_skill_decomposition_artifacts
 
 SECTION_TITLES = (
     ("missed_requirements", "Missed requirements"),
@@ -28,6 +29,7 @@ def persist_review_artifacts(
     context: Mapping[str, object],
     report: Mapping[str, object],
     save: bool = True,
+    decomposition_report: Mapping[str, object] | None = None,
 ) -> dict[str, str]:
     if not save:
         return {}
@@ -46,7 +48,15 @@ def persist_review_artifacts(
     write_text(paths["review_report_md"], render_review_markdown(report))
     write_text(paths["review_agent_packet_md"], render_agent_packet(context))
     write_text(paths["review_fix_prompts_md"], render_fix_prompts(report))
-    return {name: str(path) for name, path in paths.items()}
+    result = {name: str(path) for name, path in paths.items()}
+    if decomposition_report is not None:
+        result.update(
+            write_skill_decomposition_artifacts(
+                run_dir=run_dir,
+                report=decomposition_report,
+            )
+        )
+    return result
 
 
 def render_review_markdown(report: Mapping[str, object]) -> str:

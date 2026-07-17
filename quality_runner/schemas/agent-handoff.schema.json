@@ -8,7 +8,7 @@
     "schema": { "const": "quality-runner-agent-handoff-v0.2" },
     "run_id": { "type": ["string", "null"] },
     "status": {
-      "enum": ["clean", "planned", "gates-discovered", "gates-executed", "gates-blocked", "gates-failed", "gates-clean"]
+      "enum": ["clean", "planned", "gates-discovered", "gates-executed", "gates-blocked", "gates-failed", "gates-clean", "review-required"]
     },
     "implementation_allowed": { "const": false },
     "artifact_paths": {
@@ -34,7 +34,19 @@
       "items": { "type": "string", "minLength": 1 },
       "default": []
     },
+    "phase_candidates": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/phaseCandidateSummary" },
+      "default": []
+    },
+    "next_phase_candidate": {
+      "oneOf": [
+        { "type": "null" },
+        { "$ref": "#/$defs/phaseCandidateSummary" }
+      ]
+    },
     "gate_verification": { "$ref": "#/$defs/gateVerificationSummary" },
+    "skill_review": { "$ref": "#/$defs/skillReviewSummary" },
     "next_slice": {
       "oneOf": [
         { "type": "null" },
@@ -122,6 +134,69 @@
           "type": "array",
           "items": { "type": "string", "minLength": 1 },
           "minItems": 1
+        },
+        "verification_mode": { "enum": ["command", "evidence"] },
+        "verification_requirements": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        }
+      },
+      "additionalProperties": true,
+      "allOf": [
+        {
+          "if": {
+            "required": ["verification_mode"],
+            "properties": { "verification_mode": { "const": "evidence" } }
+          },
+          "then": { "required": ["verification_requirements"] }
+        }
+      ]
+    },
+    "phaseCandidateSummary": {
+      "type": "object",
+      "required": [
+        "id",
+        "domain",
+        "title",
+        "priority",
+        "status",
+        "slice_count",
+        "finding_count"
+      ],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "domain": { "type": "string", "minLength": 1 },
+        "title": { "type": "string", "minLength": 1 },
+        "priority": { "enum": ["high", "medium", "low"] },
+        "status": { "enum": ["planned", "review-required"] },
+        "slice_count": { "type": "integer", "minimum": 0 },
+        "finding_count": { "type": "integer", "minimum": 0 },
+        "score": { "type": "integer", "minimum": 0 },
+        "requires_review": { "type": "boolean" },
+        "review_slice_count": { "type": "integer", "minimum": 0 },
+        "workstreams": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "representative_slice_ids": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "representative_paths": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "actions": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "verification_gates": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "verification_modes": {
+          "type": "array",
+          "items": { "enum": ["command", "evidence"] }
         }
       },
       "additionalProperties": true
@@ -259,6 +334,36 @@
       "properties": {
         "type": { "type": "string", "minLength": 1 },
         "path": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": false
+    },
+    "skillReviewSummary": {
+      "type": "object",
+      "required": ["status", "active_skill_ids", "review_ids", "unresolved_review_ids"],
+      "properties": {
+        "mode": { "enum": ["off", "auto", "parallel", "required"] },
+        "status": { "enum": ["not-run", "review-pending", "review-required", "reviewed", "review-rejected"] },
+        "active_skill_ids": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "minItems": 1
+        },
+        "review_ids": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "minItems": 1
+        },
+        "unresolved_review_ids": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "automatic": { "type": "boolean" },
+        "review_count": { "type": "integer", "minimum": 0 },
+        "unresolved_count": { "type": "integer", "minimum": 0 },
+        "packet_json": { "type": "string", "minLength": 1 },
+        "packet_markdown": { "type": "string", "minLength": 1 },
+        "report_json": { "type": "string", "minLength": 1 },
+        "report_source_run_id": { "type": "string", "minLength": 1 }
       },
       "additionalProperties": false
     },

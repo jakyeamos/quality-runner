@@ -9,9 +9,15 @@ from quality_runner.compatibility.legacy_workflow import refresh_payload
 from quality_runner.core.audit_contracts import ScanExclusionOverlay
 from quality_runner.exclusion_preflight import normalize_run_only_exclusion_overlay
 from quality_runner.intent import resolve_workflow_intent
+from quality_runner.progress import ProgressCallback
 
 
-def refresh_command_payload(args: argparse.Namespace, repo_root: Path) -> dict[str, Any]:
+def refresh_command_payload(
+    args: argparse.Namespace,
+    repo_root: Path,
+    *,
+    progress: ProgressCallback | None = None,
+) -> dict[str, Any]:
     workflow_intent = resolve_workflow_intent(
         repo_root=repo_root,
         run_id=f"{args.run_id_prefix}-verify",
@@ -45,6 +51,7 @@ def refresh_command_payload(args: argparse.Namespace, repo_root: Path) -> dict[s
         review_iteration=args.review_iteration,
         agent_review_mode=getattr(args, "agent_review_mode", None),
         scan_exclusion_overlay=_scan_exclusion_overlay(args, repo_root),
+        progress=progress,
     )
     if args.handoff_output:
         payload["handoff_export"] = export_handoff_payload(

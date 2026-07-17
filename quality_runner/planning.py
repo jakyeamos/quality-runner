@@ -3,27 +3,27 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from quality_runner.adoption import (
-    adoption_stage_markdown,
-    build_adoption_stage,
-    handoff_adoption_stage,
-    stopping_criteria,
-)
+from quality_runner.adoption import build_adoption_stage, handoff_adoption_stage, stopping_criteria
 from quality_runner.handoff_gate_suggestions import (
     gate_severity,
     suggested_gate_command,
 )
 from quality_runner.handoff_gate_summary import (
-    action_group_markdown,
     build_gate_verification_summary,
     gate_blocker_slice,
     gate_handoff_status,
 )
 from quality_runner.handoff_markdown import render_handoff_markdown as render_handoff_markdown
-from quality_runner.handoff_status import handoff_status
+from quality_runner.handoff_status import apply_skill_review_status, handoff_status
 from quality_runner.lifecycle_status import compute_lifecycle_status
+from quality_runner.planning_markdown import render_plan_markdown as _render_plan_markdown
 from quality_runner.planning_slices import finding_sort_key, slice_for_finding, slice_sort_key
 from quality_runner.remediation_clusters import structural_cluster_slices
+from quality_runner.remediation_domains import (
+    annotate_remediation_slices,
+    build_phase_candidates,
+    phase_candidate_summaries,
+)
 from quality_runner.remediation_wiring import wiring_decision_slices
 from quality_runner.runner_checks import runner_provided_checks
 from quality_runner.schema_constants import AGENT_HANDOFF_SCHEMA, REMEDIATION_PLAN_SCHEMA
@@ -31,6 +31,10 @@ from quality_runner.security.handoff import security_review_handoff
 from quality_runner.slice_enrichment import enrich_remediation_slices
 
 PRIORITY_ORDER = {"high": 0, "medium": 1, "low": 2}
+
+
+def render_plan_markdown(plan: dict[str, Any]) -> str:
+    return _render_plan_markdown(plan)
 
 
 def build_remediation_plan(
@@ -85,7 +89,20 @@ def build_remediation_plan(
         code_quality_scan=code_quality_scan,
         run_id=run_id,
     )
+    security_review_slices = enrich_remediation_slices(
+        security_review_slices,
+        repo_root=repo_root,
+        git_state=git_state,
+        code_quality_scan=code_quality_scan,
+        run_id=run_id,
+    )
     slices = sorted(slices, key=slice_sort_key)
+    slices = annotate_remediation_slices(slices)
+    security_review_slices = annotate_remediation_slices(security_review_slices)
+    phase_candidates = build_phase_candidates(
+        slices,
+        security_review_slices=security_review_slices,
+    )
     adoption_stage = build_adoption_stage(
         findings=remediation_findings,
         missing_gates=_missing_repo_owned_gates(capability_map),
@@ -99,56 +116,14 @@ def build_remediation_plan(
         "implementation_allowed": False,
         "adoption_stage": adoption_stage,
         "stopping_criteria": stopping_criteria(adoption_stage),
+        "planning_mode": "domain",
+        "phase_candidate_count": len(phase_candidates),
+        "leaf_slice_count": len(slices) + len(security_review_slices),
+        "phase_candidates": phase_candidates,
         "slices": slices,
         **({"security_review_slices": security_review_slices} if security_review_slices else {}),
         "warnings": _warnings(capability_map),
     }
-
-
-def render_plan_markdown(plan: dict[str, Any]) -> str:
-    lines = [
-        "# Quality Runner Remediation Plan",
-        "",
-        f"- Schema: {plan.get('schema')}",
-        f"- Implementation allowed: {str(plan.get('implementation_allowed')).lower()}",
-        "",
-        "## Adoption Stage",
-        "",
-        *adoption_stage_markdown(plan.get("adoption_stage")),
-        "",
-        "## Stopping Criteria",
-        "",
-        *_markdown_items(plan.get("stopping_criteria")),
-        "",
-        "## Slices",
-        "",
-    ]
-
-    slices = plan.get("slices")
-    if isinstance(slices, list) and slices:
-        for slice_item in slices:
-            if not isinstance(slice_item, dict):
-                continue
-            lines.extend(
-                [
-                    f"### {slice_item.get('id')}",
-                    "",
-                    f"- Title: {slice_item.get('title')}",
-                    f"- Priority: {slice_item.get('priority')}",
-                    "- Findings:",
-                    *_finding_markdown_items(slice_item.get("findings")),
-                    "- Actions:",
-                    *_markdown_items(slice_item.get("actions")),
-                    *action_group_markdown(slice_item.get("action_groups")),
-                    "- Verification:",
-                    *_markdown_items(slice_item.get("verification_gates")),
-                    "",
-                ]
-            )
-    else:
-        lines.extend(["No remediation slices are required.", ""])
-
-    return "\n".join(lines).rstrip() + "\n"
 
 
 def build_agent_handoff(
@@ -163,6 +138,7 @@ def build_agent_handoff(
     intent_docs: list[dict[str, str]] | None = None,
     lifecycle_status: str | None = None,
     repo_scan: dict[str, Any] | None = None,
+    skill_review: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     missing_gates = _missing_repo_owned_gates(capability_map)
     gate_summary = build_gate_verification_summary(
@@ -175,11 +151,13 @@ def build_agent_handoff(
         capability_map=capability_map,
         missing_repo_owned_gates=missing_gates,
     )
+    status = apply_skill_review_status(status, skill_review)
     next_slice = (
         gate_blocker_slice(gate_summary)
         or _author_decision_slice(remediation_plan)
         or _next_slice(remediation_plan)
     )
+    phase_candidates = phase_candidate_summaries(_phase_candidates(remediation_plan))
     adoption_stage = handoff_adoption_stage(remediation_plan)
     resolved_lifecycle = lifecycle_status or compute_lifecycle_status(
         summary_status=str(gate_summary.get("status") if gate_summary else status),
@@ -197,6 +175,8 @@ def build_agent_handoff(
         "warnings": _warnings(remediation_plan),
         "finding_ids": [finding["id"] for finding in _findings(audit_report)],
         "slice_ids": [slice_item["id"] for slice_item in _slices(remediation_plan)],
+        "phase_candidates": phase_candidates,
+        "next_phase_candidate": phase_candidates[0] if phase_candidates else None,
         "missing_repo_owned_gates": missing_gates,
         "runner_provided_checks": runner_provided_checks(_findings(audit_report)),
         "adoption_stage": adoption_stage,
@@ -208,6 +188,7 @@ def build_agent_handoff(
         **_optional_value("intent", intent),
         **_optional_value("intent_docs", intent_docs or _intent_docs_from_scan(repo_scan)),
         **_optional_value("lifecycle_status", resolved_lifecycle),
+        **_optional_value("skill_review", skill_review),
         "next_slice": next_slice,
         "verification_gates": _slice_verification_gates(next_slice),
     }
@@ -332,6 +313,13 @@ def _slices(plan: dict[str, Any]) -> list[dict[str, str]]:
     ]
 
 
+def _phase_candidates(plan: dict[str, Any]) -> list[dict[str, Any]]:
+    candidates = plan.get("phase_candidates")
+    if not isinstance(candidates, list):
+        return []
+    return [candidate for candidate in candidates if isinstance(candidate, dict)]
+
+
 def _next_slice(plan: dict[str, Any]) -> dict[str, Any] | None:
     slices = plan.get("slices")
     if not isinstance(slices, list) or not slices:
@@ -387,6 +375,8 @@ def _copy_next_slice(first: dict[str, Any]) -> dict[str, Any] | None:
         "drift_check",
         "scope",
         "stop_conditions",
+        "verification_mode",
+        "verification_requirements",
     ):
         if field in first:
             next_slice[field] = first[field]
@@ -427,36 +417,6 @@ def _warnings(payload: dict[str, Any]) -> list[dict[str, str]]:
         if isinstance(code, str) and isinstance(message, str) and isinstance(path, str):
             normalized.append({"code": code, "message": message, "path": path})
     return normalized
-
-
-def _markdown_items(value: object) -> list[str]:
-    if not isinstance(value, list):
-        return ["- unavailable"]
-    items = [item for item in value if isinstance(item, str) and item]
-    if not items:
-        return ["- unavailable"]
-    return [f"- {item}" for item in items]
-
-
-def _finding_markdown_items(value: object) -> list[str]:
-    if not isinstance(value, list):
-        return ["- unavailable"]
-
-    items: list[str] = []
-    for finding in value:
-        if not isinstance(finding, dict):
-            continue
-        finding_id = finding.get("id")
-        summary = finding.get("summary")
-        if isinstance(finding_id, str) and finding_id and isinstance(summary, str) and summary:
-            line = f"- {finding_id}: {summary}"
-            actionability = finding.get("actionability")
-            if isinstance(actionability, str) and actionability:
-                line += f" [{actionability}]"
-            items.append(line)
-    if not items:
-        return ["- unavailable"]
-    return items
 
 
 def _optional_actionability(finding: dict[str, Any]) -> dict[str, str]:

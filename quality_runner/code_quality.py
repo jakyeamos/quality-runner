@@ -1,16 +1,15 @@
 from __future__ import annotations
 
-import gzip
 import hashlib
 from pathlib import Path
 from typing import Any
 
 from quality_runner.code_quality_architecture import architecture_findings
+from quality_runner.code_quality_bundles import bundle_budget_findings
 from quality_runner.code_quality_duplicates import _extract_functions
 from quality_runner.code_quality_findings import (
     CATEGORY_ORDER,
     _counts,
-    _finding,
     _finding_sort_key,
 )
 from quality_runner.code_quality_ledger import (
@@ -50,15 +49,8 @@ __all__ = [
     "render_resolution_ledger_markdown",
 ]
 
-DEFAULT_GZIPPED_JS_BUNDLE_BYTES = 200_000
 DEFAULT_LARGE_FILE_LINES = _DEFAULT_LARGE_FILE_LINES
 DEFAULT_FAT_ROUTER_LINES = _DEFAULT_FAT_ROUTER_LINES
-JS_BUNDLE_DIRS = (
-    ".next/static/chunks",
-    "build/static/js",
-    "dist/assets",
-    "out/_next/static/chunks",
-)
 
 
 def create_code_quality_scan(
@@ -133,7 +125,7 @@ def create_code_quality_scan(
         findings.extend(ponytail_findings(scanned_files))
 
     if "speed" not in disabled_groups:
-        findings.extend(_bundle_budget_findings(root))
+        findings.extend(bundle_budget_findings(root))
 
     if "integrate" not in disabled_groups:
         findings.extend(unwired_findings(scanned_files, config))
@@ -223,37 +215,3 @@ def preview_ignored_paths(
 def _skipped_file_path(item: AuditPayload) -> str:
     path = item.get("path")
     return path if isinstance(path, str) else ""
-
-
-def _bundle_budget_findings(root: Path) -> list[dict[str, Any]]:
-    findings: list[dict[str, Any]] = []
-    for bundle_dir in JS_BUNDLE_DIRS:
-        path = root / bundle_dir
-        if not path.is_dir():
-            continue
-        for bundle in sorted(path.rglob("*.js")):
-            if bundle.name.endswith(".map") or not bundle.is_file():
-                continue
-            raw = bundle.read_bytes()
-            gzipped_size = len(gzip.compress(raw))
-            if gzipped_size <= DEFAULT_GZIPPED_JS_BUNDLE_BYTES:
-                continue
-            relative_path = bundle.relative_to(root).as_posix()
-            findings.append(
-                _finding(
-                    category="speed",
-                    severity="observation",
-                    confidence="medium",
-                    file=relative_path,
-                    line=1,
-                    rule_id="large-js-bundle-artifact",
-                    evidence=f"{gzipped_size} gzipped bytes",
-                    expected_improvement=(
-                        "Split initial routes, lazy-load heavy features, or remove unused dependencies."
-                    ),
-                    risk="Large initial JavaScript bundles delay load and interaction readiness.",
-                    verification="Run bundle analysis and the relevant frontend build.",
-                    remediation_bucket="frontend performance and bundle budget",
-                )
-            )
-    return findings

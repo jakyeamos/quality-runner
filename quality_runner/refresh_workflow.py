@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any
 
 from quality_runner.core.audit_contracts import ScanExclusionOverlay
+from quality_runner.progress import ProgressCallback, emit_progress
 from quality_runner.refresh_timeout import (
     build_timeout_verify_artifacts,
     not_started_refresh_phase,
@@ -45,6 +46,7 @@ def run_refresh_payload(
     agent_review_mode: str | None = None,
     scan_exclusion_overlay: ScanExclusionOverlay | None = None,
     readiness_evidence_file: Path | None = None,
+    progress: ProgressCallback | None = None,
 ) -> dict[str, Any]:
     inspect_run_id = f"{run_id_prefix}-inspect"
     run_run_id = f"{run_id_prefix}-run"
@@ -115,6 +117,7 @@ def run_refresh_payload(
         return result
 
     try:
+        emit_progress(progress, "refresh/inspect", f"run_id={inspect_run_id}")
         inspect_result = run_total_bounded_phase(
             phase="inspect",
             phase_key="inspect",
@@ -128,8 +131,10 @@ def run_refresh_payload(
                 agent_review_mode=agent_review_mode,
                 scan_exclusion_overlay=scan_exclusion_overlay,
                 intent=intent,
+                progress=progress,
             ),
         )
+        emit_progress(progress, "refresh/run", f"run_id={run_run_id}")
         run_result = run_total_bounded_phase(
             phase="run",
             phase_key="run",
@@ -143,8 +148,10 @@ def run_refresh_payload(
                 agent_review_mode=agent_review_mode,
                 scan_exclusion_overlay=scan_exclusion_overlay,
                 intent=intent,
+                progress=progress,
             ),
         )
+        emit_progress(progress, "refresh/verify-gates", f"run_id={verify_run_id}")
         verify_result = _run_verify_phase(
             repo_root=repo_root,
             run_id=verify_run_id,
@@ -168,7 +175,9 @@ def run_refresh_payload(
             agent_review_mode=agent_review_mode,
             scan_exclusion_overlay=scan_exclusion_overlay,
             readiness_evidence_file=readiness_evidence_file,
+            progress=progress,
         )
+        emit_progress(progress, "refresh/summary", f"run_id={verify_run_id}")
         summary = summary_callback(
             repo_root=repo_root,
             run_id=verify_run_id,
@@ -270,6 +279,7 @@ def _run_verify_phase(
     agent_review_mode: str | None,
     scan_exclusion_overlay: ScanExclusionOverlay | None,
     readiness_evidence_file: Path | None,
+    progress: ProgressCallback | None,
 ) -> dict[str, Any]:
     current.phase = "verify-gates"
     current.phase_key = "verify"
@@ -287,6 +297,7 @@ def _run_verify_phase(
     if verify_deadline <= 0:
         raise TimeoutError(current.timeout_reason)
     with workflow_deadline(seconds=verify_deadline, reason=current.timeout_reason):
+        emit_progress(progress, "verify-gates/execution", f"run_id={run_id}")
         verify_result = verify_callback(
             repo_root=repo_root,
             run_id=run_id,
@@ -303,6 +314,7 @@ def _run_verify_phase(
             agent_review_mode=agent_review_mode,
             scan_exclusion_overlay=scan_exclusion_overlay,
             intent=intent,
+            progress=progress,
         )
     phase_timings["verify"] = phase_timing(
         started=current.phase_started,

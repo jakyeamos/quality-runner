@@ -1,0 +1,120 @@
+id = "data-integrity"
+name = "Data Integrity and Migration Safety"
+version = "0.1.0"
+description = "Source-level data-loss signals and high-recall review criteria for invariants, migrations, backfills, pipelines, reconciliation, and verification."
+
+[[deterministic_rules]]
+id = "destructive-schema-operation"
+type = "disallowed_pattern"
+category = "data-loss-risk"
+severity = "observation"
+confidence = "medium"
+paths = ["**/migrations/*.sql", "**/migrations/**/*.sql", "**/alembic/versions/*.py", "**/alembic/versions/**/*.py", "**/prisma/migrations/*.sql", "**/prisma/migrations/**/*.sql", "**/db/migrations/*.sql", "**/db/migrations/**/*.sql", "**/database/migrations/*.sql", "**/database/migrations/**/*.sql", "**/*.sql"]
+disallowed_patterns = ['(?i)\bDROP\s+(?:TABLE|COLUMN|DATABASE)\b', '(?i)\bTRUNCATE\s+(?:TABLE\s+)?\w+']
+message = "A destructive schema operation appears in a migration and requires explicit data-loss review."
+risk = "The migration may irreversibly remove schema or data that active readers, rollback paths, or backups still depend on."
+expected = "Confirm the affected data, dependency order, backup or recovery plan, and rollback or forward-fix strategy before applying the migration."
+verification = "Review the migration against representative data and rerun the migration and rollback verification after resolving or accepting the observation."
+
+[[deterministic_rules]]
+id = "unconditional-delete-operation"
+type = "disallowed_pattern"
+category = "data-loss-risk"
+severity = "observation"
+confidence = "low"
+paths = ["**/migrations/*.sql", "**/migrations/**/*.sql", "**/alembic/versions/*.py", "**/alembic/versions/**/*.py", "**/prisma/migrations/*.sql", "**/prisma/migrations/**/*.sql", "**/db/migrations/*.sql", "**/db/migrations/**/*.sql", "**/database/migrations/*.sql", "**/database/migrations/**/*.sql", "**/*.sql"]
+disallowed_patterns = ['(?i)\bDELETE\s+FROM\s+\w+']
+message = "A delete operation appears in a migration and requires scope and recovery review."
+risk = "A broad delete can remove more records than intended and may be difficult to reverse after partial execution."
+expected = "Confirm the predicate, affected-row bounds, backup or recovery path, and idempotent rerun behavior."
+verification = "Review the migration with representative data and rerun migration verification after resolving or accepting the observation."
+
+[[agent_reviews]]
+id = "schema-and-invariants"
+category = "data-schema"
+severity = "observation"
+paths = ["**/*.py", "**/*.js", "**/*.jsx", "**/*.ts", "**/*.tsx", "**/*.go", "**/*.rs", "**/*.java", "**/*.sql", "**/schema/**", "**/models/**", "**/migrations/**", "**/*.yml", "**/*.yaml", "**/*.md"]
+focus = ["invariants", "uniqueness", "nullability", "foreign keys", "state transitions", "derived data"]
+rubric = """
+Review schemas, models, and data-writing code for correctness invariants.
+
+Map important entities, relationships, uniqueness rules, nullability, foreign
+keys, enum or status transitions, and derived values. Report plausible gaps
+where the invariant is only implied in application code, can be bypassed by
+another writer, or is not protected by a constraint or verification test. Cite
+the exact schema, model, write path, or test. Prefer high recall and use low
+confidence when the full set of writers or database behavior is not visible.
+Do not invent domain rules that the repository does not establish.
+"""
+
+[[agent_reviews]]
+id = "migration-and-backfill"
+category = "migration-safety"
+severity = "observation"
+paths = ["**/*.py", "**/*.js", "**/*.jsx", "**/*.ts", "**/*.tsx", "**/*.go", "**/*.rs", "**/*.java", "**/*.sql", "**/migrations/**", "**/alembic/**", "**/prisma/**", "**/db/**", "**/*.yml", "**/*.yaml", "**/*.md"]
+focus = ["ordering", "idempotency", "backfill batching", "lock and downtime risk", "partial failure", "rollback or forward fix"]
+rubric = """
+Review migrations and backfills for safe execution.
+
+Report plausible risks involving non-idempotent steps, destructive ordering,
+long locks, unbounded backfills, partial failure, mixed-version compatibility,
+missing rollback or forward-fix paths, and migrations that cannot be safely
+re-run. Cite the exact operation, batch loop, dependency, or verification
+artifact. Prefer high recall and use low confidence when database size,
+traffic, or deployment sequencing is not visible. Do not assume a down
+migration is safe merely because it exists.
+"""
+
+[[agent_reviews]]
+id = "pipeline-and-reconciliation"
+category = "data-pipeline"
+severity = "observation"
+paths = ["**/*.py", "**/*.js", "**/*.jsx", "**/*.ts", "**/*.tsx", "**/*.go", "**/*.rs", "**/*.java", "**/etl/**", "**/pipeline/**", "**/import/**", "**/export/**", "**/jobs/**", "**/*.yml", "**/*.yaml", "**/*.md"]
+focus = ["idempotency", "deduplication", "retry behavior", "reconciliation", "partial processing", "exactly-once assumptions"]
+rubric = """
+Review imports, exports, ETL jobs, queues, and data pipelines for correctness.
+
+Report plausible duplication, loss, ordering, retry, partial-processing, or
+reconciliation gaps. Look for jobs that cannot resume safely, rely on
+exactly-once behavior without evidence, lack stable keys or checkpoints, or
+write results without comparing expected and observed counts. Cite the exact
+loop, queue handler, checkpoint, reconciliation query, or test. Prefer high
+recall and use low confidence when runtime delivery guarantees are external to
+the repository.
+"""
+
+[[agent_reviews]]
+id = "data-loss-and-duplication"
+category = "data-correctness"
+severity = "observation"
+paths = ["**/*.py", "**/*.js", "**/*.jsx", "**/*.ts", "**/*.tsx", "**/*.go", "**/*.rs", "**/*.java", "**/*.sql", "**/migrations/**", "**/jobs/**", "**/services/**", "**/*.yml", "**/*.yaml", "**/*.md"]
+focus = ["record loss", "duplicate writes", "concurrent updates", "stale reads", "soft-delete semantics", "recovery evidence"]
+rubric = """
+Review data mutation paths for loss, duplication, and concurrency risk.
+
+Report plausible unguarded overwrites, duplicate inserts, stale-read updates,
+ambiguous soft-delete behavior, missing conflict handling, or recovery paths
+that cannot preserve or reconstruct affected records. Cite the exact query,
+transaction, mutation, or state transition. Prefer high recall and use low
+confidence when transaction isolation or database constraints are not visible.
+Do not call a race a confirmed defect without identifying the interleaving or
+missing guard that makes it plausible.
+"""
+
+[[agent_reviews]]
+id = "verification-and-fixtures"
+category = "data-verification"
+severity = "observation"
+paths = ["**/*.py", "**/*.js", "**/*.jsx", "**/*.ts", "**/*.tsx", "**/*.go", "**/*.rs", "**/*.java", "**/*.sql", "**/tests/**", "**/test/**", "**/fixtures/**", "**/migrations/**", "**/*.yml", "**/*.yaml", "**/*.md"]
+focus = ["invariant tests", "migration tests", "representative fixtures", "boundary cases", "reconciliation evidence", "restore verification"]
+rubric = """
+Review whether data correctness claims have verification evidence.
+
+Report plausible gaps where schema invariants, migrations, backfills, imports,
+exports, retries, reconciliation, data-loss recovery, or representative edge
+cases lack tests or executable checks. Cite the exact operation and the nearest
+existing test or missing verification path. Prefer high recall and use low
+confidence when the repository delegates verification to an external staging
+or production process. Prefer verification-first remediation over speculative
+test volume.
+"""
