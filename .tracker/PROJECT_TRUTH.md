@@ -12,6 +12,12 @@ rerun commands invoke the checkout that produced the report instead of a bare
 PATH binary, so consumer repos and branches do not silently remain on v0.3.0.
 Consumer usage is documented in `docs/consumer-tooling.md`.
 
+The short `qr` console command shipped in `6fe83ec`. It points to the same
+CLI entrypoint as `quality-runner`, so a one-time editable install from this
+checkout gives local consumers a stable command surface that follows the
+checkout's current code without repeated `--project` invocations or GitHub
+fetches.
+
 The native QR phase-planning contract shipped in `1f44c21`. Quality Runner now
 owns evidence-backed phase and plan documents under `.planning/quality-runner/`,
 including deterministic waves, dependency metadata, next-plan dispatch, batch
@@ -159,6 +165,11 @@ order and retains linked leaf slices. GSD remains optional and independent.
   no push or merge was attempted for this isolated commit.
 
 ## Current Verification
+
+- 2026-07-16: Added and committed the `qr` console alias in `6fe83ec`.
+  Focused entrypoint and release-documentation coverage passed (`10 passed`),
+  touched-file Ruff and diff checks passed, and the normal commit hook's full
+  Pre-CR changed-line coverage completed successfully.
 
 - 2026-07-16: Added seamless automatic skill-review coverage and native
   security-first phase materialization. The default `auto` mode now requires
