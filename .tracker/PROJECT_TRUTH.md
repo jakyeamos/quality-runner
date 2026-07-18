@@ -92,12 +92,14 @@ gate execution, and records verification-mode timeout provenance. Its Tenure
 dogfood completed verify-gates in 190.647 seconds with 886 cache hits, zero
 misses/recomputations, all 11 gates skipped for missing consent, and no timeout;
 Tenure source status remained clean.
+The follow-up `dbb892f` also preserves controller deadlines through Git branch
+and manifest reads instead of treating them as ordinary OS errors.
 
 ## Current Position
 
 - Target: a typed v2 core behind CLI, MCP, and compatibility adapters.
 - Current isolated follow-up: `codex/dev-fold-incremental-artifact` at
-  `f99fec1`; it is not pushed, published, released, or merged into the dirty
+  `dbb892f`; it is not pushed, published, released, or merged into the dirty
   canonical `dev` checkout.
 - Next slice: reconcile the user-owned dirty `dev` checkout and review the
   isolated follow-up before any promotion.
@@ -124,6 +126,9 @@ Tenure source status remained clean.
   and timeout-mode diagnostics, and passes the commit Pre-CR hook. Focused
   refresh/verification tests pass; the full suite reached 671 passes with one
   timing-sensitive disposable-verification failure.
+- `dbb892f` preserves verify-phase controller timeouts through Git branch and
+  manifest discovery; the focused disposable-verification and CLI timeout
+  tests pass, and the commit Pre-CR hook passes.
 - Canonical planning documents: `docs/modernization/`.
 - Public compatibility: retain `quality_evidence_contract` and
   `repo_quality_certifier` during a published transition window.
@@ -233,6 +238,8 @@ Tenure source status remained clean.
 
 ## Recent Progress
 
+- 2026-07-18: `dbb892f` preserves verification deadlines through Git discovery
+  and keeps timeout artifacts attributable to the verification mode.
 - 2026-07-18: `f99fec1` completes read-only verify-gates analysis reuse and
   execution-consent-safe fallback behavior; Tenure dogfood completed without
   timeout or gate execution, with all 11 discovered gates skipped.
