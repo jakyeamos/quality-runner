@@ -80,6 +80,8 @@ type ScanExclusionOverlay = list[str] | dict[str, list[str]]
 MAX_SCAN_PROGRESS_PATHS = 20
 _SCAN_PROGRESS: dict[str, Any] = {
     "last_directory": None,
+    "last_activity_kind": None,
+    "last_activity_path": None,
     "last_paths": [],
     "last_skipped_paths": [],
     "visited_paths": 0,
@@ -269,6 +271,8 @@ def gitignore_scan_exclusions(root: Path) -> list[str]:
 
 def reset_scan_progress() -> None:
     _SCAN_PROGRESS["last_directory"] = None
+    _SCAN_PROGRESS["last_activity_kind"] = None
+    _SCAN_PROGRESS["last_activity_path"] = None
     _SCAN_PROGRESS["last_paths"] = []
     _SCAN_PROGRESS["last_skipped_paths"] = []
     _SCAN_PROGRESS["visited_paths"] = 0
@@ -280,6 +284,8 @@ def reset_scan_progress() -> None:
 def scan_progress_snapshot() -> dict[str, Any]:
     return {
         "last_directory": _SCAN_PROGRESS["last_directory"],
+        "last_activity_kind": _SCAN_PROGRESS["last_activity_kind"],
+        "last_activity_path": _SCAN_PROGRESS["last_activity_path"],
         "last_paths": list(_SCAN_PROGRESS["last_paths"]),
         "last_skipped_paths": list(_SCAN_PROGRESS["last_skipped_paths"]),
         "visited_paths": _SCAN_PROGRESS["visited_paths"],
@@ -289,11 +295,18 @@ def scan_progress_snapshot() -> dict[str, Any]:
     }
 
 
+def record_scan_activity(root: Path, path: Path, *, kind: str) -> None:
+    _SCAN_PROGRESS["last_activity_kind"] = kind
+    _SCAN_PROGRESS["last_activity_path"] = _relative_path(root, path)
+
+
 def _record_directory(root: Path, directory: Path) -> None:
     _SCAN_PROGRESS["last_directory"] = _relative_path(root, directory)
+    record_scan_activity(root, directory, kind="path-traversal")
 
 
 def _record_path(root: Path, path: Path) -> None:
+    record_scan_activity(root, path, kind="path-traversal")
     _SCAN_PROGRESS["visited_paths"] += 1
     _increment_count("visited_top_level_counts", _top_level(root, path))
     paths = _SCAN_PROGRESS["last_paths"]
@@ -305,6 +318,7 @@ def _record_path(root: Path, path: Path) -> None:
 
 
 def _record_skipped(root: Path, path: Path) -> None:
+    record_scan_activity(root, path, kind="excluded-path-pruning")
     _SCAN_PROGRESS["skipped_paths"] += 1
     _increment_count("skipped_top_level_counts", _top_level(root, path))
     paths = _SCAN_PROGRESS["last_skipped_paths"]

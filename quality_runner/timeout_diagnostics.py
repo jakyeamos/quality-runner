@@ -6,10 +6,14 @@ DATA_CACHE_HINTS = ("cache", "data", "dataset", "external", "corpus", "generated
 
 
 def timeout_diagnostics_payload(scan_progress: dict[str, Any]) -> dict[str, Any]:
-    return {
+    payload: dict[str, Any] = {
         "scan_progress": scan_progress,
         "pruning_recommendations": scan_pruning_recommendations(scan_progress),
     }
+    activity = _scan_activity(scan_progress)
+    if activity:
+        payload["scan_activity"] = activity
+    return payload
 
 
 def concise_timeout_diagnostics(payload: dict[str, Any]) -> dict[str, Any]:
@@ -19,7 +23,7 @@ def concise_timeout_diagnostics(payload: dict[str, Any]) -> dict[str, Any]:
     scan_progress = diagnostics.get("scan_progress")
     if not isinstance(scan_progress, dict):
         scan_progress = {}
-    return {
+    result = {
         **_optional_string("timeout_scope", payload.get("timeout_scope")),
         **_optional_string("reason", payload.get("reason")),
         **_optional_int("timeout_seconds", payload.get("timeout_seconds")),
@@ -32,6 +36,12 @@ def concise_timeout_diagnostics(payload: dict[str, Any]) -> dict[str, Any]:
         "last_skipped_paths": _string_list(scan_progress.get("last_skipped_paths")),
         "pruning_recommendations": _recommendations(diagnostics.get("pruning_recommendations")),
     }
+    activity = _scan_activity(scan_progress)
+    if not activity:
+        activity = _scan_activity(payload)
+    if activity:
+        result["scan_activity"] = activity
+    return result
 
 
 def timeout_recommended_action(*, timeout_seconds: int, diagnostics: dict[str, Any]) -> str:
@@ -51,6 +61,19 @@ def timeout_diagnostics_markdown(value: object) -> list[str]:
     if not isinstance(value, dict):
         return []
     lines: list[str] = []
+    activity = _scan_activity(value)
+    if activity:
+        kind = activity.get("kind")
+        path = activity.get("path")
+        if isinstance(kind, str) and isinstance(path, str):
+            label = {
+                "excluded-directory-estimation": (
+                    "excluded-directory estimation (not actual scan work)"
+                ),
+                "text-scan": "actual text scan",
+                "path-traversal": "actual repository traversal",
+            }.get(kind, kind)
+            lines.append(f"  - Scan activity: {label} at `{path}`")
     last_directory = value.get("last_directory")
     if isinstance(last_directory, str) and last_directory:
         lines.append(f"  - Last traversal directory: `{last_directory}`")
@@ -73,6 +96,28 @@ def timeout_diagnostics_markdown(value: object) -> list[str]:
                     line += f" ({reason})"
                 lines.append(line)
     return lines
+
+
+def _scan_activity(value: object) -> dict[str, str]:
+    if not isinstance(value, dict):
+        return {}
+    nested = value.get("scan_activity")
+    if isinstance(nested, dict):
+        nested_activity = _scan_activity(nested)
+        if nested_activity:
+            return nested_activity
+    kind = value.get("last_activity_kind")
+    path = value.get("last_activity_path")
+    if not isinstance(kind, str) or not kind:
+        kind = value.get("kind")
+    if not isinstance(path, str) or not path:
+        path = value.get("path")
+    activity: dict[str, str] = {}
+    if isinstance(kind, str) and kind:
+        activity["kind"] = kind
+    if isinstance(path, str) and path:
+        activity["path"] = path
+    return activity
 
 
 def scan_pruning_recommendations(scan_progress: dict[str, Any]) -> list[dict[str, Any]]:
