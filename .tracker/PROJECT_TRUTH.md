@@ -80,6 +80,12 @@ it into `main` at `c6e92cc`. The release-readiness contract recognizes dynamic
 Workflow discovery keeps the exact commands declared by CI, with 49 focused
 regression tests, green exact-head GitHub CI, a passing release profile, and
 verified PyPI publication.
+The isolated P1 fix in `4d7f72b` prevents scan-scope from recursively estimating
+protected, generated, and scan-excluded artifact directories such as
+`.quality-runner`, `.git`, and `.planning`, while preserving source-owned ignored
+directory estimates. It adds inspect/preflight regression coverage for a
+10,000-file QR artifact tree and activity-aware timeout diagnostics. The fix is
+on `codex/qr-p1-excluded-artifact-estimate`; it is not pushed or released.
 
 ## Current Position
 
@@ -93,6 +99,9 @@ verified PyPI publication.
   The temporary `codex/dev-feature-port` worktree/ref and the superseded
   `quality-skill-corpus-workflow` branch were pruned after the behavioral port
   audit; unrelated active branches remain separate.
+- Current P1 fix branch: `codex/qr-p1-excluded-artifact-estimate` at `4d7f72b`;
+  focused validation passes, and no push, publish, release, or Quality Runner
+  gate execution was performed.
 - Canonical planning documents: `docs/modernization/`.
 - Public compatibility: retain `quality_evidence_contract` and
   `repo_quality_certifier` during a published transition window.
@@ -191,9 +200,15 @@ verified PyPI publication.
 - The release profile intentionally blocks without current CI provenance,
   repo-local release evidence, disposable execution where required, and owner
   acceptance; it does not infer release readiness from configured commands.
+- The P1 fix passes 56 focused tests and full static validation. The full suite
+  reached 652 passing tests; three unrelated environment/timing-sensitive tests
+  failed in this shell (`uv` unavailable and two timing/cleanup checks).
 
 ## Recent Progress
 
+- 2026-07-17: `4d7f72b` stops recursive estimates for protected/generated/
+  excluded artifact directories, adds 10,000-file inspect/preflight regression
+  coverage, and distinguishes actual scan work in timeout diagnostics.
 - 2026-07-17: `b5a610e` makes release-gate discovery execute the exact commands
   declared by CI, including scoped Vulture coverage; focused tests pass and
   exact-head GitHub CI is green.
