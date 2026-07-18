@@ -36,6 +36,7 @@ def inspect_payload(
     intent: AuditPayload | None = None,
     agent_review_mode: str | None = None,
     scan_exclusion_overlay: ScanExclusionOverlay | None = None,
+    include_paths: tuple[str, ...] = (),
     progress: ProgressCallback | None = None,
 ) -> dict[str, Any]:
     resolved_run_id = generated_run_id() if run_id is None else run_id
@@ -55,6 +56,7 @@ def inspect_payload(
             skill_review_report=skill_review_report,
             agent_review_mode=agent_review_mode,
             scan_exclusion_overlay=scan_exclusion_overlay,
+            include_paths=include_paths,
             intent=intent,
         ),
         progress=progress,
@@ -88,6 +90,7 @@ def run_payload(
     intent: AuditPayload | None = None,
     agent_review_mode: str | None = None,
     scan_exclusion_overlay: ScanExclusionOverlay | None = None,
+    include_paths: tuple[str, ...] = (),
     progress: ProgressCallback | None = None,
 ) -> dict[str, Any]:
     resolved_run_id = generated_run_id() if run_id is None else run_id
@@ -107,6 +110,7 @@ def run_payload(
             skill_review_report=skill_review_report,
             agent_review_mode=agent_review_mode,
             scan_exclusion_overlay=scan_exclusion_overlay,
+            include_paths=include_paths,
             intent=intent,
         ),
         progress=progress,
@@ -141,6 +145,7 @@ def _audit_request(
     agent_review_mode: str | None,
     scan_exclusion_overlay: ScanExclusionOverlay | None,
     intent: AuditPayload | None,
+    include_paths: tuple[str, ...],
 ) -> AuditRequest:
     return AuditRequest(
         repo_root=repo_root,
@@ -154,6 +159,7 @@ def _audit_request(
         intent=intent,
         scan_exclusion_overlay=scan_exclusion_overlay,
         agent_review_mode=agent_review_mode,
+        include_paths=include_paths,
     )
 
 

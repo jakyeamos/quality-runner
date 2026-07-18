@@ -106,7 +106,12 @@ def analyze_read_only_audit(
         config=config,
     )
     if request.scan_exclusion_overlay is None:
-        text_scan_scope = create_text_scan_scope(repo_root, scan=scan, config=config)
+        text_scan_scope = create_text_scan_scope(
+            repo_root,
+            scan=scan,
+            config=config,
+            include_paths=request.include_paths,
+        )
         security_scan_scope = text_scan_scope
         code_quality_scan_scope = text_scan_scope
     else:
@@ -115,6 +120,7 @@ def analyze_read_only_audit(
             scan=scan,
             config=config,
             module="code_quality",
+            include_paths=request.include_paths,
         )
         code_quality_scan_scope = text_scan_scope
         security_scan_scope = create_text_scan_scope(
@@ -122,7 +128,9 @@ def analyze_read_only_audit(
             scan=scan,
             config=config,
             module="security",
+            include_paths=request.include_paths,
         )
+    scan = {**scan, "include_paths": list(request.include_paths)}
     emit_progress(progress, "security", "security surface and dependency analysis")
     security_scan = create_security_scan(
         repo_root,

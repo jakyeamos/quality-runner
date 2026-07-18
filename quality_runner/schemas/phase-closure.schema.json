@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://quality-runner.dev/schemas/phase-closure.schema.json",
+  "title": "Quality Runner GSD Phase Closure",
+  "type": "object",
+  "required": ["schema", "status", "phase_id", "counts", "findings", "blockers"],
+  "properties": {
+    "schema": { "const": "quality-runner-phase-closure-v0.1" },
+    "status": { "enum": ["passed", "blocked"] },
+    "implementation_allowed": { "const": false },
+    "phase_id": { "type": "string", "minLength": 1 },
+    "plan_id": { "type": ["string", "null"] },
+    "counts": { "type": "object", "additionalProperties": { "type": "integer", "minimum": 0 } },
+    "findings": { "type": "object" },
+    "blockers": { "type": "array", "items": { "type": "string" } },
+    "early_refresh": { "type": "object" }
+  },
+  "additionalProperties": true
+}

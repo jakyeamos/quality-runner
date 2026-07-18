@@ -9,6 +9,7 @@ from quality_runner.compatibility.legacy_workflow import refresh_payload
 from quality_runner.core.audit_contracts import ScanExclusionOverlay
 from quality_runner.exclusion_preflight import normalize_run_only_exclusion_overlay
 from quality_runner.intent import resolve_workflow_intent
+from quality_runner.phase_contract import load_phase_contract, scan_include_paths
 from quality_runner.progress import ProgressCallback
 
 
@@ -24,6 +25,10 @@ def refresh_command_payload(
         goal=args.intent,
         intent_file=Path(args.intent_file).expanduser().resolve() if args.intent_file else None,
     )
+    include_paths = tuple(getattr(args, "include_path", []) or [])
+    if not include_paths and getattr(args, "phase_contract", None):
+        contract = load_phase_contract(Path(args.phase_contract).expanduser().resolve())
+        include_paths = scan_include_paths(contract)
     payload = refresh_payload(
         repo_root=repo_root,
         run_id_prefix=args.run_id_prefix,
@@ -51,6 +56,7 @@ def refresh_command_payload(
         review_iteration=args.review_iteration,
         agent_review_mode=getattr(args, "agent_review_mode", None),
         scan_exclusion_overlay=_scan_exclusion_overlay(args, repo_root),
+        include_paths=include_paths,
         progress=progress,
     )
     if args.handoff_output:

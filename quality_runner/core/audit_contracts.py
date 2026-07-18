@@ -28,6 +28,7 @@ class AuditRequest:
     scan_exclusion_overlay: ScanExclusionOverlay | None = None
     agent_review_mode: str | None = None
     readiness_evidence_file: Path | None = None
+    include_paths: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -45,6 +46,7 @@ class TextScanScope:
     max_text_files: int
     scan_exclusions: tuple[str, ...]
     security_surface_paths: tuple[str, ...] = ()
+    include_paths: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)

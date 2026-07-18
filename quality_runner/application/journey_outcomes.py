@@ -34,6 +34,7 @@ def audit_journey_outcome(
     agent_review_mode: str | None = None,
     scan_exclusion_overlay: ScanExclusionOverlay | None = None,
     readiness_evidence_file: Path | None = None,
+    include_paths: tuple[str, ...] = (),
 ) -> JourneyOutcome:
     branch_before = checked_out_branch(repo_root)
     payload = (
@@ -48,6 +49,7 @@ def audit_journey_outcome(
             skill_review_report=skill_review_report,
             agent_review_mode=agent_review_mode,
             scan_exclusion_overlay=scan_exclusion_overlay,
+            include_paths=include_paths,
             intent=intent,
         )
         if inspect_only
@@ -62,6 +64,7 @@ def audit_journey_outcome(
             skill_review_report=skill_review_report,
             agent_review_mode=agent_review_mode,
             scan_exclusion_overlay=scan_exclusion_overlay,
+            include_paths=include_paths,
             intent=intent,
         )
     )

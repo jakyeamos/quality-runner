@@ -28,6 +28,7 @@ from quality_runner.cli_gate import (
     gate_status_command_payload,
 )
 from quality_runner.cli_handoff import handoff_command_payload
+from quality_runner.cli_phase import phase_command_payload
 from quality_runner.cli_planning import planning_command_payload
 from quality_runner.cli_refresh import refresh_command_payload
 from quality_runner.cli_remediation import remediation_delta_command_payload
@@ -46,6 +47,7 @@ from quality_runner.exclusion_preflight import (
     run_exclusion_preflight_command,
 )
 from quality_runner.intent import workflow_intent_from_cli_args
+from quality_runner.phase_contract import load_phase_contract, scan_include_paths
 from quality_runner.progress import ProgressCallback
 from quality_runner.release_smoke import release_smoke_payload
 from quality_runner.run_summary import build_run_summary
@@ -64,6 +66,8 @@ def payload_for_args(
 ) -> dict[str, Any]:
     if args.command == "doctor":
         return doctor_payload(include_environment=True)
+    if args.command == "phase-check":
+        return phase_command_payload(args)
     if args.command == "self-update":
         return update_command_payload(args.source)
     if args.command == "release-smoke":
@@ -141,6 +145,7 @@ def payload_for_args(
             ),
             include_ignored_paths=_interactive_include_ignored_paths(args, repo_root),
             scan_exclusion_overlay=_scan_exclusion_overlay(args, repo_root),
+            include_paths=_include_paths_from_args(args),
             checkout_most_advanced_branch=args.checkout_most_advanced_branch,
             skill_review_report=_optional_skill_review_report(args),
             agent_review_mode=args.agent_review_mode,
@@ -165,6 +170,7 @@ def payload_for_args(
                 skill_review_report=_legacy_payload(_optional_skill_review_report(args)),
                 agent_review_mode=args.agent_review_mode,
                 scan_exclusion_overlay=_scan_exclusion_overlay(args, repo_root),
+                include_paths=_include_paths_from_args(args),
                 intent=_legacy_payload(
                     workflow_intent_from_cli_args(args, repo_root=repo_root, run_id=args.run_id)
                 ),
@@ -188,6 +194,7 @@ def payload_for_args(
             checkout_most_advanced_branch=args.checkout_most_advanced_branch,
             skill_review_report=_optional_skill_review_report(args),
             agent_review_mode=args.agent_review_mode,
+            include_paths=_include_paths_from_args(args),
             progress=progress,
             intent=workflow_intent_from_cli_args(args, repo_root=repo_root, run_id=args.run_id),
         )
@@ -354,6 +361,15 @@ def _validated_repo_path(repo_path: str) -> Path:
     if not root.is_dir():
         raise NotADirectoryError(f"repo root is not a directory: {root}")
     return root
+
+
+def _include_paths_from_args(args: argparse.Namespace) -> tuple[str, ...]:
+    explicit = tuple(getattr(args, "include_path", []) or [])
+    contract_path = getattr(args, "phase_contract", None)
+    if explicit or not contract_path:
+        return explicit
+    contract = load_phase_contract(Path(contract_path).expanduser().resolve())
+    return scan_include_paths(contract)
 
 
 def _interactive_include_ignored_paths(args: argparse.Namespace, repo_root: Path) -> list[str]:

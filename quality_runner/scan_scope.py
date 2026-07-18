@@ -81,6 +81,7 @@ def create_text_scan_scope(
     scan: dict[str, Any],
     config: dict[str, Any],
     module: str | None = None,
+    include_paths: tuple[str, ...] = (),
 ) -> TextScanScope:
     root = repo_root.expanduser().resolve()
     policy = structural_scan_policy(config)
@@ -93,12 +94,14 @@ def create_text_scan_scope(
         include_ignored_paths=set(policy["include_ignored_paths"]),
         scan_exclusions=scan_exclusions,
         max_text_files=policy["max_text_files"],
+        include_paths=include_paths,
     )
     security_surface_paths = discover_security_surface_paths(
         root,
         generated_paths=generated_paths(scan),
         include_ignored_paths=set(policy["include_ignored_paths"]),
         scan_exclusions=scan_exclusions,
+        include_paths=include_paths,
     )
     files = tuple(_read_text_file(root, path) for path in paths)
     return TextScanScope(
@@ -108,6 +111,7 @@ def create_text_scan_scope(
         max_text_files=policy["max_text_files"],
         scan_exclusions=tuple(scan_exclusions),
         security_surface_paths=tuple(security_surface_paths),
+        include_paths=include_paths,
     )
 
 
@@ -119,12 +123,16 @@ def discover_text_files(
     include_ignored_paths: set[str],
     scan_exclusions: list[str],
     max_text_files: int,
+    include_paths: tuple[str, ...] = (),
 ) -> list[Path]:
     files: list[Path] = []
     scan_budget_exceeded = False
     for current_root, dir_names, file_names in os.walk(root):
         current_path = Path(current_root)
         relative_current = current_path.relative_to(root).as_posix()
+        if include_paths and not _scope_allows_directory(relative_current, include_paths):
+            dir_names[:] = []
+            continue
         if scan_budget_exceeded:
             skipped_files.append(
                 skipped_directory_entry(root, current_path, "scan budget exceeded")
@@ -166,6 +174,8 @@ def discover_text_files(
         for file_name in sorted(file_names):
             path = current_path / file_name
             relative_path = path.relative_to(root).as_posix()
+            if include_paths and not _scope_includes_file(relative_path, include_paths):
+                continue
             if path.is_symlink() or not path.is_file():
                 continue
             if is_scan_excluded(
@@ -204,11 +214,15 @@ def discover_security_surface_paths(
     generated_paths: set[str],
     include_ignored_paths: set[str],
     scan_exclusions: list[str],
+    include_paths: tuple[str, ...] = (),
 ) -> list[str]:
     surface_paths: list[str] = []
     for current_root, dir_names, file_names in os.walk(root):
         current_path = Path(current_root)
         relative_current = current_path.relative_to(root).as_posix()
+        if include_paths and not _scope_allows_directory(relative_current, include_paths):
+            dir_names[:] = []
+            continue
         ignored_names: set[str] = set()
         for name in sorted(dir_names):
             relative_name = _join_relative(relative_current, name)
@@ -239,6 +253,8 @@ def discover_security_surface_paths(
         for file_name in sorted(file_names):
             path = current_path / file_name
             relative_path = path.relative_to(root).as_posix()
+            if include_paths and not _scope_includes_file(relative_path, include_paths):
+                continue
             if path.is_symlink() or not path.is_file():
                 continue
             if is_scan_excluded(
@@ -267,6 +283,23 @@ def generated_paths(scan: dict[str, Any]) -> set[str]:
         if isinstance(path, str) and path:
             paths.add(path.strip("/"))
     return paths
+
+
+def _scope_allows_directory(path: str, include_paths: tuple[str, ...]) -> bool:
+    normalized = path.strip("/")
+    if normalized == ".":
+        normalized = ""
+    return not normalized or any(
+        item == normalized
+        or item.startswith(f"{normalized}/")
+        or normalized.startswith(f"{item}/")
+        for item in include_paths
+    )
+
+
+def _scope_includes_file(path: str, include_paths: tuple[str, ...]) -> bool:
+    normalized = path.strip("/")
+    return any(normalized == item or normalized.startswith(f"{item}/") for item in include_paths)
 
 
 def is_text_file(path: Path) -> bool:

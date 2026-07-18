@@ -46,6 +46,7 @@ def run_refresh_payload(
     agent_review_mode: str | None = None,
     scan_exclusion_overlay: ScanExclusionOverlay | None = None,
     readiness_evidence_file: Path | None = None,
+    include_paths: tuple[str, ...] = (),
     progress: ProgressCallback | None = None,
 ) -> dict[str, Any]:
     inspect_run_id = f"{run_id_prefix}-inspect"
@@ -127,6 +128,7 @@ def run_refresh_payload(
                 profile=profile,
                 ci_status_json=ci_status_json,
                 readiness_evidence_file=readiness_evidence_file,
+                include_paths=include_paths,
                 checkout_most_advanced_branch=checkout_most_advanced_branch,
                 agent_review_mode=agent_review_mode,
                 scan_exclusion_overlay=scan_exclusion_overlay,
@@ -144,6 +146,7 @@ def run_refresh_payload(
                 profile=profile,
                 ci_status_json=ci_status_json,
                 readiness_evidence_file=readiness_evidence_file,
+                include_paths=include_paths,
                 checkout_most_advanced_branch=checkout_most_advanced_branch,
                 agent_review_mode=agent_review_mode,
                 scan_exclusion_overlay=scan_exclusion_overlay,

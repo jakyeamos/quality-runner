@@ -45,6 +45,18 @@ def add_workflow_arguments(parser: argparse.ArgumentParser) -> None:
         ),
     )
     parser.add_argument(
+        "--include-path",
+        action="append",
+        default=[],
+        metavar="PATH",
+        help="Restrict this QR run to a repo-relative path; repeat for multiple paths",
+    )
+    parser.add_argument(
+        "--phase-contract",
+        default=None,
+        help="Load scan paths from a validated QR/GSD phase contract JSON file",
+    )
+    parser.add_argument(
         "--checkout-most-advanced-branch",
         action="store_true",
         help="Switch to the local branch with the highest commit count before scanning",
