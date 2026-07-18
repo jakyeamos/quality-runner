@@ -90,9 +90,8 @@ on `codex/qr-p1-excluded-artifact-estimate`; it is not pushed or released.
 ## Current Position
 
 - Target: a typed v2 core behind CLI, MCP, and compatibility adapters.
-- Next slice: use the isolated integration revision for the authorized Tenure
-  read-only refresh, then promote only after the user-owned dirty `dev`
-  checkout is reconciled.
+- Next slice: run the authorized Tenure read-only refresh from `5217270`, then
+  promote only after the user-owned dirty `dev` checkout is reconciled.
 - `codex/release-0.6.0` was merged by PR #5 into `main` at `c6e92cc`; `main`
   and the `v0.6.0` tag are published.
 - `dev` is the canonical integration branch, is published to `origin/dev`, and
@@ -108,6 +107,9 @@ on `codex/qr-p1-excluded-artifact-estimate`; it is not pushed or released.
   evidence, bounded refresh retention, and hermetic Git fixture configuration.
 - Follow-up `81d560d` keeps read-only planning source/artifact-free by disabling
   cache persistence for that path and reporting the disabled state explicitly.
+- `5217270` wires the legacy/CLI refresh path to the ignored cache root for
+  normal inspect/run phases, keeps gate-execution cache-free, adds semantic
+  similarity cache evidence/reuse, and preserves direct read-only isolation.
 - Canonical planning documents: `docs/modernization/`.
 - Public compatibility: retain `quality_evidence_contract` and
   `repo_quality_certifier` during a published transition window.
@@ -188,6 +190,9 @@ on `codex/qr-p1-excluded-artifact-estimate`; it is not pushed or released.
   focused regression tests pass, exact-head GitHub CI is green, and the release
   profile passes on the promoted release candidate.
 
+- `5217270` passes the full 669-test suite, Ruff lint/format, Basedpyright,
+  Vulture, and the source-size guard; no QR gate was invoked.
+
 ## Risks
 
 - Generated evidence can contain target-repository output; it remains local and
@@ -206,19 +211,16 @@ on `codex/qr-p1-excluded-artifact-estimate`; it is not pushed or released.
 - The release profile intentionally blocks without current CI provenance,
   repo-local release evidence, disposable execution where required, and owner
   acceptance; it does not infer release readiness from configured commands.
-- The P1 fix passes 56 focused tests and full static validation. The full suite
-  reached 652 passing tests; three unrelated environment/timing-sensitive tests
-  failed in this shell (`uv` unavailable and two timing/cleanup checks).
 - `fa291c2` passes 41 focused cache/exclusion/artifact tests, 103 broader
   code-quality/security/config/artifact tests, Ruff, BasedPyright, and Vulture;
   Quality Runner gate execution was not invoked.
-- `81d560d` plus the integration series pass the full relevant suite with
-  `UV_CACHE_DIR=/private/tmp/quality-runner-uv-cache`: 631 tests passed;
-  touched production sources pass Ruff and BasedPyright. The normal commit
-  hook also completed successfully; no Quality Runner gate was invoked.
+- The normal commit hook for `5217270` completed successfully in 301 seconds;
+  it retained the existing `tests/test_cli.py` oversized-source warning.
 
 ## Recent Progress
 
+- 2026-07-18: `5217270` completes refresh cache wiring, semantic cache reuse,
+  cache evidence, and warm-prefix regression coverage; 669 tests passed.
 - 2026-07-18: `fa291c2` integrates the local P1 excluded-artifact estimate fix
   with safe incremental scan caching and refresh artifact retention in an
   isolated revision; no push, publish, release, or gate execution occurred.
@@ -259,30 +261,3 @@ on `codex/qr-p1-excluded-artifact-estimate`; it is not pushed or released.
 - 2026-07-17: `960d094` adds the native QR phase lifecycle and domain-aware
   `plan auto` workflow under `.planning/quality-runner/`; it remains advisory,
   idempotent, and separate from source changes, commits, pushes, and root GSD.
-- 2026-07-17: `87d81f8` adds remediation delta evidence and the explicit
-  `remediation-delta` command, preserving the boundary between QR evidence and
-  project planning systems.
-- 2026-07-17: `831d9a4` completes the skill corpus command surface for
-  classify/append/sync and makes selected-skill review coverage explicit.
-- 2026-07-17: `f292a1e` routes rollout provenance and consumer invocation
-  through a checkout-aware source-first runner, with local and refreshed
-  latest modes documented for downstream repositories.
-- 2026-07-17: `f75c431` ports artifact privacy/retention and gate-response
-  redaction into the current application architecture, with an explicit
-  `prune-artifacts` command that never deletes unless `--apply` is supplied.
-- 2026-07-17: `94b2d42` ports the canonical skill corpus and selection layer,
-  QR-native similarity, and module-status observability into the isolated
-  canonical-dev port branch; the application façade remains intact.
-- 2026-07-17: `da79745` ports the first Quality Skills contract batch into
-  canonical `dev` while retaining the application workflow façades and
-  evidence-redaction boundary.
-
-- 2026-07-13: v0.5.1 released: PR #2 merged at `a101bd4`, tag workflow and
-  six-job CI passed, PyPI publishes wheel/sdist, GitHub Release is public, and
-  a disposable PyPI install passes CLI, doctor, release-smoke, and MCP checks.
-- 2026-07-13: `c71b130` adds a pinned Python dependency audit, upgrades pytest
-  to 9.0.3, and prevents untrusted baseline manifests from injecting Git diff
-  options; all pre-tag gates and installed-wheel smoke checks pass.
-- 2026-07-13: `948107f` prepares v0.5.1 metadata and the main README release
-  guidance; final pre-tag checks, PR merge, tag, PyPI publication, and GitHub
-  Release creation remain in sequence.
