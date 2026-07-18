@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import os
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any
 
 from quality_runner.code_quality_paths import (
@@ -18,10 +18,12 @@ from quality_runner.code_quality_paths import (
 from quality_runner.code_quality_similarity import similarity_policy_defaults
 from quality_runner.core.audit_contracts import AuditPayload, ScannedTextFile, TextScanScope
 from quality_runner.scan_exclusions import (
-    effective_scan_exclusions as configured_effective_scan_exclusions,
+    ALWAYS_EXCLUDED_PATH_PARTS,
+    matches_scan_exclusion,
+    record_scan_activity,
 )
 from quality_runner.scan_exclusions import (
-    matches_scan_exclusion,
+    effective_scan_exclusions as configured_effective_scan_exclusions,
 )
 from quality_runner.security_surface_paths import is_security_surface_path
 
@@ -31,6 +33,9 @@ DEFAULT_SKIPPED_PATH_ESTIMATE_LIMIT = 10_000
 DEFAULT_MAX_TEXT_FILES = 2_500
 DEFAULT_MAX_SECURITY_SURFACE_PATHS = 5_000
 ESTIMATED_SCAN_SECONDS_PER_TEXT_FILE = 0.015
+NON_RECURSIVE_SKIPPED_DIRECTORY_REASONS = frozenset(
+    {"artifact directory", "generated directory", "scan exclusion"}
+)
 TEXT_FILE_NAMES = {"Dockerfile", "Makefile"}
 SECURITY_SURFACE_FILE_NAMES = {"Cargo.toml", "go.mod", "package.json", "pyproject.toml"}
 
@@ -124,6 +129,7 @@ def discover_text_files(
     scan_budget_exceeded = False
     for current_root, dir_names, file_names in os.walk(root):
         current_path = Path(current_root)
+        record_scan_activity(root, current_path, kind="text-scan")
         relative_current = current_path.relative_to(root).as_posix()
         if scan_budget_exceeded:
             skipped_files.append(
@@ -208,6 +214,7 @@ def discover_security_surface_paths(
     surface_paths: list[str] = []
     for current_root, dir_names, file_names in os.walk(root):
         current_path = Path(current_root)
+        record_scan_activity(root, current_path, kind="text-scan")
         relative_current = current_path.relative_to(root).as_posix()
         ignored_names: set[str] = set()
         for name in sorted(dir_names):
@@ -288,17 +295,35 @@ def effective_scan_exclusions(
 
 def skipped_directory_entry(root: Path, path: Path, reason: str) -> AuditPayload:
     relative_path = path.relative_to(root).as_posix()
-    estimated_files, estimate_truncated = estimate_text_files(path)
+    if should_estimate_skipped_directory(relative_path, reason):
+        record_scan_activity(root, path, kind="excluded-directory-estimation")
+        estimated_files, estimate_truncated = estimate_text_files(path)
+        estimate_status = "estimated"
+        estimate_reason = "recursive text-file count"
+    else:
+        estimated_files = 0
+        estimate_truncated = False
+        estimate_status = "not-estimated"
+        estimate_reason = "protected or excluded artifact directory"
     return {
         "path": relative_path,
         "reason": reason,
         "estimated_text_files": estimated_files,
         "estimated_scan_seconds": estimated_scan_seconds(estimated_files),
         "estimate_truncated": estimate_truncated,
+        "estimate_status": estimate_status,
+        "estimate_reason": estimate_reason,
         "include_config_hint": (
             f'[quality_runner.structural_scan] include_ignored_paths = ["{relative_path}"]'
         ),
     }
+
+
+def should_estimate_skipped_directory(relative_path: str, reason: str) -> bool:
+    path_parts = PurePosixPath(relative_path).parts
+    if any(part in ALWAYS_EXCLUDED_PATH_PARTS for part in path_parts):
+        return False
+    return reason not in NON_RECURSIVE_SKIPPED_DIRECTORY_REASONS
 
 
 def is_scan_excluded(
@@ -334,10 +359,24 @@ def scan_budget_summary(
 
 def skipped_path_summary(skipped_files: list[AuditPayload]) -> AuditPayload:
     estimated_files = 0
+    estimated_directories = 0
+    unestimated_directories = 0
     for item in skipped_files:
         value = item.get("estimated_text_files")
         if isinstance(value, int):
             estimated_files += value
+        estimate_status = item.get("estimate_status")
+        if estimate_status == "estimated":
+            estimated_directories += 1
+        elif estimate_status == "not-estimated":
+            unestimated_directories += 1
+    directory_estimate_status = (
+        "none"
+        if not estimated_directories and not unestimated_directories
+        else "partial"
+        if unestimated_directories
+        else "complete"
+    )
     return {
         "skipped_paths": len(skipped_files),
         "skipped_estimated_text_files": estimated_files,
@@ -345,6 +384,9 @@ def skipped_path_summary(skipped_files: list[AuditPayload]) -> AuditPayload:
         "skipped_estimate_truncated": any(
             item.get("estimate_truncated") is True for item in skipped_files
         ),
+        "skipped_estimated_directories": estimated_directories,
+        "skipped_unestimated_directories": unestimated_directories,
+        "skipped_directory_estimate_status": directory_estimate_status,
     }
 
 
