@@ -38,6 +38,7 @@ def inspect_payload(
     scan_exclusion_overlay: ScanExclusionOverlay | None = None,
     analysis_cache_root: Path | None = None,
     progress: ProgressCallback | None = None,
+    refresh_context: dict[str, object] | None = None,
 ) -> dict[str, Any]:
     resolved_run_id = generated_run_id() if run_id is None else run_id
     branch_warnings = prepare_scan_branch(
@@ -61,6 +62,7 @@ def inspect_payload(
         ),
         progress=progress,
     )
+    _record_refresh_analysis(refresh_context, analysis, source="current-refresh-inspect")
     artifact_paths = write_inspect_v1_artifacts(analysis, run_dir=run_dir)
     skill_review = _skill_review_from_analysis(analysis, artifact_paths)
 
@@ -92,6 +94,7 @@ def run_payload(
     scan_exclusion_overlay: ScanExclusionOverlay | None = None,
     analysis_cache_root: Path | None = None,
     progress: ProgressCallback | None = None,
+    refresh_context: dict[str, object] | None = None,
 ) -> dict[str, Any]:
     resolved_run_id = generated_run_id() if run_id is None else run_id
     branch_warnings = prepare_scan_branch(
@@ -115,6 +118,7 @@ def run_payload(
         ),
         progress=progress,
     )
+    _record_refresh_analysis(refresh_context, analysis, source="current-refresh-run")
     planned, artifact_paths = plan_and_write_run_v1_artifacts(analysis, run_dir=run_dir)
     skill_review = _skill_review_from_analysis(analysis, artifact_paths)
 
@@ -210,3 +214,15 @@ def _optional_field(key: str, value: object) -> dict[str, Any]:
 def _agent_review_mode(analysis: Any) -> AgentReviewMode:
     mode = getattr(getattr(analysis, "request", None), "agent_review_mode", None)
     return cast(AgentReviewMode, mode) if mode in AGENT_REVIEW_MODES else "auto"
+
+
+def _record_refresh_analysis(
+    refresh_context: dict[str, object] | None,
+    analysis: Any,
+    *,
+    source: str,
+) -> None:
+    if refresh_context is None:
+        return
+    refresh_context["audit_analysis"] = analysis
+    refresh_context["analysis_source"] = source

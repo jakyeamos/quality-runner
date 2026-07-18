@@ -12,6 +12,7 @@ from quality_runner.application.verification_v1_artifacts import (
     write_partial_gate_verification_v1,
 )
 from quality_runner.artifacts import prepare_artifact_dir
+from quality_runner.config import load_repo_config
 from quality_runner.core.audit_contracts import (
     AuditAnalysis,
     AuditPayload,
@@ -30,10 +31,16 @@ from quality_runner.gate_verification import (
     verify_discovered_gates,
 )
 from quality_runner.git_branches import prepare_scan_branch
+from quality_runner.incremental_analysis_identity import configuration_identity
+from quality_runner.manifest import git_state_for_repo
 from quality_runner.progress import ProgressCallback, emit_progress
 from quality_runner.readiness import evaluate_readiness
 from quality_runner.unwired_from_dead_code import merge_dead_code_unwired_findings
-from quality_runner.workflow_helpers import combined_warnings, gate_timeouts
+from quality_runner.workflow_helpers import (
+    combined_warnings,
+    config_with_scan_exclusion_overrides,
+    gate_timeouts,
+)
 from quality_runner.workflow_internal import verify_payload_status
 from quality_runner.worktree_verify import gate_worktree_session, resolve_worktree_mode
 
@@ -41,6 +48,8 @@ from quality_runner.worktree_verify import gate_worktree_session, resolve_worktr
 def run_gate_verification(
     request: VerificationRequest,
     *,
+    analysis_override: AuditAnalysis | None = None,
+    analysis_cache_root: Path | None = None,
     progress: ProgressCallback | None = None,
 ) -> VerificationResult:
     resolved_worktree_mode = resolve_worktree_mode(request.policy.worktree_mode)
@@ -54,8 +63,11 @@ def run_gate_verification(
     )
     run_dir = prepare_artifact_dir(request.repo_root, request.run_id)
     emit_progress(progress, "discovery", "repository facts and scan scope")
-    analysis = analyze_read_only_audit(
-        _audit_request(request, branch_warnings),
+    analysis, analysis_reuse = _resolve_analysis(
+        request=request,
+        branch_warnings=branch_warnings,
+        analysis_override=analysis_override,
+        analysis_cache_root=analysis_cache_root,
         progress=progress,
     )
     emit_progress(progress, "verify-gates", "discovered repository gates")
@@ -65,6 +77,13 @@ def run_gate_verification(
         request=request,
         run_dir=run_dir,
         resolved_worktree_mode=resolved_worktree_mode,
+        analysis_reuse=analysis_reuse,
+    )
+    gate_verification = _audit_payload(
+        {
+            **_legacy_payload(gate_verification),
+            "analysis_reuse": analysis_reuse,
+        }
     )
     verified_capability_map = _audit_payload(
         apply_gate_verification(
@@ -149,6 +168,7 @@ def _execute_discovered_gates(
     request: VerificationRequest,
     run_dir: Path,
     resolved_worktree_mode: str,
+    analysis_reuse: AuditPayload,
 ) -> tuple[GateExecutionPlan, GateVerificationPayload]:
     policy = request.policy
     effective_worktree_mode = (
@@ -159,7 +179,9 @@ def _execute_discovered_gates(
     def write_partial_gate_verification(gate_verification: dict[str, Any]) -> None:
         write_partial_gate_verification_v1(
             run_dir=run_dir,
-            gate_verification=_gate_verification_payload(gate_verification),
+            gate_verification=_gate_verification_payload(
+                {**gate_verification, "analysis_reuse": analysis_reuse}
+            ),
         )
 
     with gate_worktree_session(
@@ -207,6 +229,8 @@ def _execute_discovered_gates(
 def _audit_request(
     request: VerificationRequest,
     branch_warnings: list[dict[str, str]],
+    *,
+    analysis_cache_root: Path | None,
 ) -> AuditRequest:
     return AuditRequest(
         repo_root=request.repo_root,
@@ -220,7 +244,136 @@ def _audit_request(
         scan_exclusion_overlay=request.scan_exclusion_overlay,
         agent_review_mode=request.agent_review_mode,
         readiness_evidence_file=request.readiness_evidence_file,
+        analysis_cache_root=(
+            None if request.policy.execute_discovered_gates else analysis_cache_root
+        ),
     )
+
+
+def _resolve_analysis(
+    *,
+    request: VerificationRequest,
+    branch_warnings: list[dict[str, str]],
+    analysis_override: AuditAnalysis | None,
+    analysis_cache_root: Path | None,
+    progress: ProgressCallback | None,
+) -> tuple[AuditAnalysis, AuditPayload]:
+    if (
+        not request.policy.execute_discovered_gates
+        and analysis_override is not None
+        and _analysis_matches_request(analysis_override, request)
+    ):
+        return (
+            _rebind_analysis(
+                analysis_override,
+                request=request,
+                branch_warnings=branch_warnings,
+            ),
+            {
+                "status": "reused",
+                "source": "current-refresh-run",
+                "cache_status": "preserved",
+            },
+        )
+
+    analysis = analyze_read_only_audit(
+        _audit_request(
+            request,
+            branch_warnings,
+            analysis_cache_root=analysis_cache_root,
+        ),
+        progress=progress,
+    )
+    return (
+        analysis,
+        {
+            "status": "recomputed",
+            "source": (
+                "fresh-gate-analysis"
+                if request.policy.execute_discovered_gates
+                else "fresh-read-only-audit"
+            ),
+            "cache_status": (
+                "disabled"
+                if request.policy.execute_discovered_gates or analysis_cache_root is None
+                else "enabled"
+            ),
+        },
+    )
+
+
+def _analysis_matches_request(analysis: AuditAnalysis, request: VerificationRequest) -> bool:
+    stored = analysis.request
+    if (
+        stored.repo_root.expanduser().resolve() != request.repo_root.expanduser().resolve()
+        or stored.profile != request.profile
+        or stored.ci_status_json != request.ci_status_json
+        or stored.skill_review_report != request.skill_review_report
+        or stored.intent != request.intent
+        or stored.scan_exclusion_overlay != request.scan_exclusion_overlay
+        or (
+            request.agent_review_mode is not None
+            and stored.agent_review_mode != request.agent_review_mode
+        )
+        or stored.readiness_evidence_file != request.readiness_evidence_file
+    ):
+        return False
+    captured_git = _legacy_payload(analysis.scan).get("git_provenance")
+    if not isinstance(captured_git, dict):
+        return False
+    captured_config = _legacy_payload(analysis.config)
+    current_config = config_with_scan_exclusion_overrides(
+        load_repo_config(request.repo_root),
+        request.scan_exclusion_overlay,
+    )
+    if configuration_identity(request.repo_root, captured_config) != configuration_identity(
+        request.repo_root, current_config
+    ):
+        return False
+    current_git = git_state_for_repo(request.repo_root)
+    return all(
+        captured_git.get(key) == current_git.get(key) for key in ("head_sha", "branch", "dirty")
+    )
+
+
+def _rebind_analysis(
+    analysis: AuditAnalysis,
+    *,
+    request: VerificationRequest,
+    branch_warnings: list[dict[str, str]],
+) -> AuditAnalysis:
+    rebound_request = replace(
+        analysis.request,
+        run_id=request.run_id,
+        profile=request.profile,
+        ci_status_json=request.ci_status_json,
+        branch_warnings=tuple(_audit_warning(warning) for warning in branch_warnings),
+        skill_review_report=request.skill_review_report,
+        intent=request.intent,
+        scan_exclusion_overlay=request.scan_exclusion_overlay,
+        agent_review_mode=(
+            analysis.request.agent_review_mode
+            if request.agent_review_mode is None
+            else request.agent_review_mode
+        ),
+        readiness_evidence_file=request.readiness_evidence_file,
+    )
+    return replace(
+        analysis,
+        request=rebound_request,
+        scan=_with_run_id(analysis.scan, request.run_id),
+        security_scan=_with_run_id(analysis.security_scan, request.run_id),
+        code_quality_scan=_with_run_id(analysis.code_quality_scan, request.run_id),
+    )
+
+
+def _with_run_id(payload: AuditPayload, run_id: str) -> AuditPayload:
+    rebound = {**_legacy_payload(payload), "run_id": run_id}
+    for provenance_key in ("git_provenance", "provenance"):
+        provenance = rebound.get(provenance_key)
+        if isinstance(provenance, dict):
+            rebound[provenance_key] = {**provenance, "workflow_run_id": run_id}
+    return _audit_payload(rebound)
 
 
 def _audit_warning(warning: dict[str, str]) -> AuditWarning:

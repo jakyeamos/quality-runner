@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import subprocess
 from pathlib import Path
 from typing import cast
 
@@ -261,6 +262,65 @@ def test_refresh_gate_execution_disables_analysis_cache(tmp_path: Path) -> None:
     assert captured["analysis_cache_root"] is None
 
 
+def test_refresh_gate_execution_recomputes_verify_analysis_without_cache(
+    tmp_path: Path, monkeypatch
+) -> None:
+    import quality_runner.application.gate_verification as gate_verification
+    from quality_runner.compatibility.legacy_workflow import refresh_payload
+
+    requests: list[object] = []
+    original_analyze = gate_verification.analyze_read_only_audit
+
+    _write(tmp_path / "tracked.txt", "original\n")
+    subprocess.run(["git", "init"], cwd=tmp_path, check=True, capture_output=True, text=True)
+    subprocess.run(["git", "add", "."], cwd=tmp_path, check=True)
+    subprocess.run(
+        [
+            "git",
+            "-c",
+            "user.email=quality-runner@example.com",
+            "-c",
+            "user.name=Quality Runner",
+            "commit",
+            "-m",
+            "Initial commit",
+        ],
+        cwd=tmp_path,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+    def counted_analyze(request: object, **kwargs: object) -> object:
+        requests.append(request)
+        return original_analyze(request, **kwargs)
+
+    monkeypatch.setattr(gate_verification, "analyze_read_only_audit", counted_analyze)
+    refresh_payload(
+        repo_root=tmp_path,
+        run_id_prefix="gate-cache-execution-refresh",
+        execute_discovered_gates=True,
+        worktree_mode="disposable",
+    )
+
+    assert len(requests) == 1
+    assert getattr(requests[0], "analysis_cache_root") is None
+    verification = json.loads(
+        (
+            tmp_path
+            / ".quality-runner"
+            / "runs"
+            / "gate-cache-execution-refresh-verify"
+            / "gate-verification.json"
+        ).read_text()
+    )
+    assert verification["analysis_reuse"] == {
+        "status": "recomputed",
+        "source": "fresh-gate-analysis",
+        "cache_status": "disabled",
+    }
+
+
 def test_refresh_new_run_prefix_reuses_warm_cache_without_repeating_file_work(
     tmp_path: Path, monkeypatch
 ) -> None:
@@ -339,12 +399,9 @@ def test_refresh_new_run_prefix_reuses_warm_cache_without_repeating_file_work(
     assert first_code_calls > 0
     assert first_security_calls > 0
     assert first_similarity_calls > 0
-    assert code_calls - first_code_calls == verify_code["analysis_cache"]["considered_files"]
-    assert (
-        security_calls - first_security_calls
-        == verify_security["analysis_cache"]["considered_files"]
-    )
-    assert similarity_calls - first_similarity_calls == 1
+    assert code_calls - first_code_calls == 0
+    assert security_calls - first_security_calls == 0
+    assert similarity_calls - first_similarity_calls == 0
     assert code["analysis_cache"]["cache_hits"] == code["analysis_cache"]["considered_files"]
     assert code["analysis_cache"]["cache_misses"] == 0
     assert (
@@ -352,6 +409,41 @@ def test_refresh_new_run_prefix_reuses_warm_cache_without_repeating_file_work(
     )
     assert security["analysis_cache"]["cache_misses"] == 0
     assert code["semantic_similarity_cache"]["cache_status"] == "hit"
+    verification = json.loads((verify_dir / "gate-verification.json").read_text())
+    assert verification["analysis_reuse"] == {
+        "status": "reused",
+        "source": "current-refresh-run",
+        "cache_status": "preserved",
+    }
+    assert verify_code["analysis_cache"] == code["analysis_cache"]
+    assert verify_security["analysis_cache"] == security["analysis_cache"]
+    assert verify_code["semantic_similarity_cache"] == code["semantic_similarity_cache"]
+
+
+def test_warm_read_only_refresh_does_not_reenter_verify_audit(tmp_path: Path, monkeypatch) -> None:
+    import quality_runner.application.gate_verification as gate_verification
+    from quality_runner.compatibility.legacy_workflow import refresh_payload
+
+    _write(tmp_path / "src" / "source.ts", "export const source = true;\n")
+    refresh_payload(repo_root=tmp_path, run_id_prefix="verify-reuse-first")
+
+    def unexpected_verify_audit(*_: object, **__: object) -> object:
+        raise AssertionError("warm read-only refresh re-entered verify audit")
+
+    monkeypatch.setattr(gate_verification, "analyze_read_only_audit", unexpected_verify_audit)
+    payload = refresh_payload(repo_root=tmp_path, run_id_prefix="verify-reuse-warm")
+
+    assert payload["runs"]["verify"]["status"] == "blocked"
+    verification = json.loads(
+        (
+            tmp_path
+            / ".quality-runner"
+            / "runs"
+            / "verify-reuse-warm-verify"
+            / "gate-verification.json"
+        ).read_text()
+    )
+    assert verification["analysis_reuse"]["status"] == "reused"
 
 
 def test_refresh_retention_preserves_all_current_phase_runs(tmp_path: Path) -> None:

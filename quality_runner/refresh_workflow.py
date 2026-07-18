@@ -72,6 +72,7 @@ def run_refresh_payload(
         total_timeout_reason=total_timeout_reason,
     )
     reset_scan_progress()
+    refresh_context: dict[str, object] = {}
     resolved_verify_timeout = timeout_contract["verify_timeout_seconds"]
     resolved_verify_reason = timeout_contract["verify_timeout_reason"]
     resolved_total_reason = timeout_contract["total_timeout_reason"]
@@ -144,6 +145,7 @@ def run_refresh_payload(
                 scan_exclusion_overlay=scan_exclusion_overlay,
                 intent=intent,
                 analysis_cache_root=analysis_cache_root,
+                refresh_context=refresh_context,
                 progress=progress,
             ),
         )
@@ -162,6 +164,7 @@ def run_refresh_payload(
                 scan_exclusion_overlay=scan_exclusion_overlay,
                 intent=intent,
                 analysis_cache_root=analysis_cache_root,
+                refresh_context=refresh_context,
                 progress=progress,
             ),
         )
@@ -189,6 +192,8 @@ def run_refresh_payload(
             agent_review_mode=agent_review_mode,
             scan_exclusion_overlay=scan_exclusion_overlay,
             readiness_evidence_file=readiness_evidence_file,
+            analysis_cache_root=analysis_cache_root,
+            refresh_context=refresh_context,
             progress=progress,
         )
         emit_progress(progress, "refresh/summary", f"run_id={verify_run_id}")
@@ -233,6 +238,11 @@ def run_refresh_payload(
             else None,
             baseline_run_id=baseline_run_id,
             timeout_scope=current.timeout_scope,
+            timeout_context=_timeout_context(
+                phase=current.phase,
+                execute_discovered_gates=execute_discovered_gates,
+                refresh_context=refresh_context,
+            ),
         )
     return {
         "schema": "quality-runner-refresh-result-v0.1",
@@ -293,6 +303,8 @@ def _run_verify_phase(
     agent_review_mode: str | None,
     scan_exclusion_overlay: ScanExclusionOverlay | None,
     readiness_evidence_file: Path | None,
+    analysis_cache_root: Path | None,
+    refresh_context: dict[str, object],
     progress: ProgressCallback | None,
 ) -> dict[str, Any]:
     current.phase = "verify-gates"
@@ -310,6 +322,7 @@ def _run_verify_phase(
         current.timeout_scope = "total-refresh"
     if verify_deadline <= 0:
         raise TimeoutError(current.timeout_reason)
+    reset_scan_progress()
     with workflow_deadline(seconds=verify_deadline, reason=current.timeout_reason):
         emit_progress(progress, "verify-gates/execution", f"run_id={run_id}")
         verify_result = verify_callback(
@@ -328,6 +341,8 @@ def _run_verify_phase(
             agent_review_mode=agent_review_mode,
             scan_exclusion_overlay=scan_exclusion_overlay,
             intent=intent,
+            analysis_cache_root=analysis_cache_root,
+            refresh_context=refresh_context,
             progress=progress,
         )
     phase_timings["verify"] = phase_timing(
@@ -355,3 +370,22 @@ def _public_timeout_contract(contract: dict[str, Any]) -> dict[str, Any]:
         "total_timeout_seconds": contract["total_timeout_seconds"],
         "total_timeout_reason": contract["total_timeout_reason"],
     }
+
+
+def _timeout_context(
+    *,
+    phase: str,
+    execute_discovered_gates: bool,
+    refresh_context: dict[str, object],
+) -> dict[str, str]:
+    if phase == "verify-gates":
+        mode = "gate-command-execution" if execute_discovered_gates else "read-only-gate-discovery"
+        analysis_source = (
+            "fresh-gate-analysis"
+            if execute_discovered_gates
+            else str(refresh_context.get("analysis_source") or "fresh-read-only-audit")
+        )
+    else:
+        mode = f"{phase}-analysis"
+        analysis_source = str(refresh_context.get("analysis_source") or "unknown")
+    return {"mode": mode, "analysis_source": analysis_source}

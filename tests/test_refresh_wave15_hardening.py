@@ -120,6 +120,7 @@ def test_refresh_payload_finalizes_partial_verify_artifacts_when_verify_times_ou
     run_dir = tmp_path / ".quality-runner" / "runs" / "refresh-timeout-verify"
     gate_verification = json.loads((run_dir / "gate-verification.json").read_text())
     run_summary = json.loads((run_dir / "run-summary.json").read_text())
+    timeout_artifact = json.loads((run_dir / "workflow-timeout.json").read_text())
 
     assert payload["status"] == "blocked"
     assert payload["runs"]["verify"]["status"] == "blocked"
@@ -132,6 +133,10 @@ def test_refresh_payload_finalizes_partial_verify_artifacts_when_verify_times_ou
     assert gate_verification["failure_type"] == "workflow-timeout"
     assert gate_verification["reason"] == "controller deadline exceeded while verifying gates"
     assert gate_verification["timeout_scope"] == "verify-phase"
+    assert timeout_artifact["diagnostics"]["verification"] == {
+        "mode": "read-only-gate-discovery",
+        "analysis_source": "current-refresh-run",
+    }
     assert len(gate_verification["gates"]) == 1
     timeout_gate = gate_verification["gates"][0]
     assert {
@@ -153,6 +158,40 @@ def test_refresh_payload_finalizes_partial_verify_artifacts_when_verify_times_ou
     )
     assert json.loads((run_dir / "gate-execution-plan.json").read_text()) == []
     assert run_summary["recommended_classification"] == "workflow-timeout-blocker"
+
+
+def test_refresh_timeout_diagnostics_identify_gate_command_execution(
+    tmp_path: Path, monkeypatch: object
+) -> None:
+    from quality_runner import workflow
+
+    def timeout_verify(**_: object) -> dict[str, object]:
+        raise TimeoutError("gate command execution deadline")
+
+    monkeypatch.setattr(workflow, "verify_gates_payload", timeout_verify)
+
+    workflow.refresh_payload(
+        repo_root=tmp_path,
+        run_id_prefix="gate-execution-timeout",
+        execute_discovered_gates=True,
+        worktree_mode="disposable",
+        workflow_timeout_seconds=30,
+        workflow_timeout_reason="gate command execution deadline",
+    )
+    timeout_artifact = json.loads(
+        (
+            tmp_path
+            / ".quality-runner"
+            / "runs"
+            / "gate-execution-timeout-verify"
+            / "workflow-timeout.json"
+        ).read_text()
+    )
+
+    assert timeout_artifact["diagnostics"]["verification"] == {
+        "mode": "gate-command-execution",
+        "analysis_source": "fresh-gate-analysis",
+    }
 
 
 def test_refresh_payload_total_timeout_writes_agent_handoff_when_inspect_times_out(
