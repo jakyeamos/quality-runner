@@ -63,6 +63,7 @@ def create_code_quality_scan(
     require_skill_review_coverage: bool = False,
     text_scan_scope: TextScanScope | None = None,
     persist_cache: bool = True,
+    cache_root: Path | None = None,
 ) -> dict[str, Any]:
     root = repo_root.expanduser().resolve()
     policy = structural_scan_policy(config)
@@ -79,6 +80,7 @@ def create_code_quality_scan(
         analysis_kind="code-quality",
         config=config,
         persist=persist_cache,
+        cache_root=cache_root,
     )
     findings: list[dict[str, Any]] = []
     extracted_functions: list[dict[str, Any]] = []
@@ -120,17 +122,21 @@ def create_code_quality_scan(
 
     semantic_similarity_clusters = 0
     semantic_similarity_tools: dict[str, str] = {}
+    semantic_similarity_cache: dict[str, Any] = {}
     (
         duplicate_clusters,
         deduplicate_findings,
         semantic_similarity_clusters,
         semantic_similarity_tools,
+        semantic_similarity_cache,
     ) = collect_deduplicate_scan(
         root,
         extracted_functions=extracted_functions,
         scanned_files=scanned_files,
         policy=policy,
         disabled_groups=disabled_groups,
+        persist_cache=persist_cache,
+        cache_root=cache_root,
     )
     findings.extend(deduplicate_findings)
 
@@ -198,6 +204,7 @@ def create_code_quality_scan(
         "quality_skills": quality_skills,
         "skill_coverage": skill_coverage,
         "skill_selection": skill_selection,
+        "semantic_similarity_cache": semantic_similarity_cache,
         "analysis_cache": analysis_cache.evidence(considered_files=len(scope.files)),
     }
 

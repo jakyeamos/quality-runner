@@ -36,6 +36,7 @@ def inspect_payload(
     intent: AuditPayload | None = None,
     agent_review_mode: str | None = None,
     scan_exclusion_overlay: ScanExclusionOverlay | None = None,
+    analysis_cache_root: Path | None = None,
     progress: ProgressCallback | None = None,
 ) -> dict[str, Any]:
     resolved_run_id = generated_run_id() if run_id is None else run_id
@@ -56,6 +57,7 @@ def inspect_payload(
             agent_review_mode=agent_review_mode,
             scan_exclusion_overlay=scan_exclusion_overlay,
             intent=intent,
+            analysis_cache_root=analysis_cache_root,
         ),
         progress=progress,
     )
@@ -88,6 +90,7 @@ def run_payload(
     intent: AuditPayload | None = None,
     agent_review_mode: str | None = None,
     scan_exclusion_overlay: ScanExclusionOverlay | None = None,
+    analysis_cache_root: Path | None = None,
     progress: ProgressCallback | None = None,
 ) -> dict[str, Any]:
     resolved_run_id = generated_run_id() if run_id is None else run_id
@@ -108,6 +111,7 @@ def run_payload(
             agent_review_mode=agent_review_mode,
             scan_exclusion_overlay=scan_exclusion_overlay,
             intent=intent,
+            analysis_cache_root=analysis_cache_root,
         ),
         progress=progress,
     )
@@ -141,6 +145,7 @@ def _audit_request(
     agent_review_mode: str | None,
     scan_exclusion_overlay: ScanExclusionOverlay | None,
     intent: AuditPayload | None,
+    analysis_cache_root: Path | None,
 ) -> AuditRequest:
     return AuditRequest(
         repo_root=repo_root,
@@ -152,6 +157,7 @@ def _audit_request(
         branch_warnings=tuple(_audit_warning(warning) for warning in branch_warnings),
         skill_review_report=skill_review_report,
         intent=intent,
+        analysis_cache_root=analysis_cache_root,
         scan_exclusion_overlay=scan_exclusion_overlay,
         agent_review_mode=agent_review_mode,
     )

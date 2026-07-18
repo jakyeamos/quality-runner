@@ -39,6 +39,7 @@ def create_security_scan(
     standards_packet: dict[str, Any] | None = None,
     text_scan_scope: TextScanScope | None = None,
     persist_cache: bool = True,
+    cache_root: Path | None = None,
 ) -> dict[str, Any]:
     root = repo_root.expanduser().resolve()
     settings = security_settings(config)
@@ -52,6 +53,7 @@ def create_security_scan(
             root,
             config,
             persist_cache=persist_cache,
+            cache_root=cache_root,
         )
         return disabled_scan
 
@@ -80,6 +82,7 @@ def create_security_scan(
             "surfaces": surfaces,
         },
         persist=persist_cache,
+        cache_root=cache_root,
     )
     candidates: list[dict[str, Any]] = []
     for file_info in scanned_files:
@@ -377,6 +380,7 @@ def _disabled_cache_evidence(
     config: dict[str, Any],
     *,
     persist_cache: bool,
+    cache_root: Path | None,
 ) -> dict[str, object]:
     cache = IncrementalAnalysisCache(
         repo_root,
@@ -384,6 +388,7 @@ def _disabled_cache_evidence(
         config=config,
         context={"enabled": False},
         persist=persist_cache,
+        cache_root=cache_root,
     )
     evidence = cache.evidence(considered_files=0)
     evidence["status"] = "disabled"

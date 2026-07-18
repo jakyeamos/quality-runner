@@ -15,7 +15,6 @@ from quality_runner.code_quality_paths import (
     _top_level_ignored_directory_reason,
     _under_generated_path,
 )
-from quality_runner.code_quality_similarity import similarity_policy_defaults
 from quality_runner.core.audit_contracts import AuditPayload, ScannedTextFile, TextScanScope
 from quality_runner.scan_exclusions import (
     ALWAYS_EXCLUDED_PATH_PARTS,
@@ -26,6 +25,7 @@ from quality_runner.scan_exclusions import (
     effective_scan_exclusions as configured_effective_scan_exclusions,
 )
 from quality_runner.security_surface_paths import is_security_surface_path
+from quality_runner.semantic_similarity_policy import similarity_policy_defaults
 
 DEFAULT_LARGE_FILE_LINES = 500
 DEFAULT_FAT_ROUTER_LINES = 500

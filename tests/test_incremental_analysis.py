@@ -148,9 +148,7 @@ def test_corrupt_entries_and_index_recompute_fail_closed(tmp_path: Path) -> None
     del entry["content_sha256"]
     index_path.write_text(json.dumps(index), encoding="utf-8")
     malformed_index = _code_quality_scan(tmp_path)
-    assert malformed_index["analysis_cache"]["invalidation_reasons"] == {
-        "cache-index-corrupt": 1
-    }
+    assert malformed_index["analysis_cache"]["invalidation_reasons"] == {"cache-index-corrupt": 1}
 
     index = json.loads(index_path.read_text(encoding="utf-8"))
     entry = index["entries"]["code-quality:src/one.ts"]
@@ -218,6 +216,144 @@ def test_security_cache_reuses_unchanged_file_results(tmp_path: Path, monkeypatc
     assert second["analysis_cache"]["cache_misses"] == 0
 
 
+def test_legacy_refresh_enables_cache_for_normal_read_only_phases(tmp_path: Path) -> None:
+    from quality_runner.compatibility.legacy_workflow import refresh_payload
+
+    _write(tmp_path / "src" / "source.ts", "const source: any = {};\n")
+
+    refresh_payload(repo_root=tmp_path, run_id_prefix="legacy-cache-refresh")
+
+    inspect_dir = tmp_path / ".quality-runner" / "runs" / "legacy-cache-refresh-inspect"
+    run_dir = tmp_path / ".quality-runner" / "runs" / "legacy-cache-refresh-run"
+    inspect_code = json.loads((inspect_dir / "code-quality-scan.json").read_text())
+    run_code = json.loads((run_dir / "code-quality-scan.json").read_text())
+    inspect_security = json.loads((inspect_dir / "security-scan.json").read_text())
+    run_security = json.loads((run_dir / "security-scan.json").read_text())
+
+    assert inspect_code["analysis_cache"]["persisted"] is True
+    assert inspect_code["analysis_cache"]["cache_misses"] > 0
+    assert run_code["analysis_cache"]["cache_hits"] > 0
+    assert run_code["analysis_cache"]["cache_misses"] == 0
+    assert inspect_security["analysis_cache"]["persisted"] is True
+    assert run_security["analysis_cache"]["cache_hits"] > 0
+    assert run_security["analysis_cache"]["cache_misses"] == 0
+    assert inspect_code["semantic_similarity_cache"]["persisted"] is True
+    assert run_code["semantic_similarity_cache"]["cache_status"] == "hit"
+
+
+def test_refresh_gate_execution_disables_analysis_cache(tmp_path: Path) -> None:
+    from quality_runner.compatibility.legacy_workflow import refresh_payload
+
+    captured: dict[str, object] = {}
+
+    def refresh_stub(**kwargs: object) -> dict[str, object]:
+        captured.update(kwargs)
+        return {"status": "stubbed"}
+
+    refresh_payload(
+        repo_root=tmp_path,
+        run_id_prefix="gate-cache-policy",
+        execute_discovered_gates=True,
+        refresh_runner=refresh_stub,
+    )
+
+    assert captured["execute_discovered_gates"] is True
+    assert captured["analysis_cache_root"] is None
+
+
+def test_refresh_new_run_prefix_reuses_warm_cache_without_repeating_file_work(
+    tmp_path: Path, monkeypatch
+) -> None:
+    import quality_runner.code_quality as code_quality
+    import quality_runner.code_quality_similarity as similarity
+    import quality_runner.security.scan as security_scan
+    from quality_runner.compatibility.legacy_workflow import refresh_payload
+
+    for index in range(6):
+        _write(
+            tmp_path / "src" / f"module-{index}.ts",
+            "\n".join(
+                [
+                    f"export function parse{index}(value: string) {{",
+                    "  const normalized = value.trim();",
+                    "  if (normalized.length === 0) {",
+                    '    return "empty";',
+                    "  }",
+                    "  return normalized.toUpperCase();",
+                    "}",
+                    "",
+                ]
+            ),
+        )
+
+    code_calls = 0
+    security_calls = 0
+    similarity_calls = 0
+    original_code_scan = code_quality._scan_file
+    original_security_scan = security_scan.scan_security_candidates
+    original_similarity_scan = similarity.native_similarity_scan
+
+    def counted_code_scan(**kwargs: object) -> list[dict[str, object]]:
+        nonlocal code_calls
+        code_calls += 1
+        return original_code_scan(
+            relative_path=str(kwargs["relative_path"]),
+            text=str(kwargs["text"]),
+            lines=cast(list[str], kwargs["lines"]),
+            disabled_groups=cast(set[str], kwargs["disabled_groups"]),
+            large_file_lines=int(kwargs["large_file_lines"]),
+            fat_router_lines=int(kwargs["fat_router_lines"]),
+        )
+
+    def counted_security_scan(**kwargs: object) -> list[dict[str, object]]:
+        nonlocal security_calls
+        security_calls += len(cast(list[dict[str, object]], kwargs["scanned_files"]))
+        return original_security_scan(
+            scanned_files=cast(list[dict[str, object]], kwargs["scanned_files"]),
+            disabled_groups=cast(list[str], kwargs["disabled_groups"]),
+            surfaces=cast(dict[str, bool], kwargs["surfaces"]),
+        )
+
+    def counted_similarity_scan(*args: object, **kwargs: object) -> dict[str, object]:
+        nonlocal similarity_calls
+        similarity_calls += 1
+        return original_similarity_scan(*args, **kwargs)
+
+    monkeypatch.setattr(code_quality, "_scan_file", counted_code_scan)
+    monkeypatch.setattr(security_scan, "scan_security_candidates", counted_security_scan)
+    monkeypatch.setattr(similarity, "native_similarity_scan", counted_similarity_scan)
+
+    refresh_payload(repo_root=tmp_path, run_id_prefix="warm-prefix-a")
+    first_code_calls = code_calls
+    first_security_calls = security_calls
+    first_similarity_calls = similarity_calls
+    refresh_payload(repo_root=tmp_path, run_id_prefix="warm-prefix-b")
+
+    run_dir = tmp_path / ".quality-runner" / "runs" / "warm-prefix-b-run"
+    verify_dir = tmp_path / ".quality-runner" / "runs" / "warm-prefix-b-verify"
+    code = json.loads((run_dir / "code-quality-scan.json").read_text())
+    security = json.loads((run_dir / "security-scan.json").read_text())
+    verify_code = json.loads((verify_dir / "code-quality-scan.json").read_text())
+    verify_security = json.loads((verify_dir / "security-scan.json").read_text())
+
+    assert first_code_calls > 0
+    assert first_security_calls > 0
+    assert first_similarity_calls > 0
+    assert code_calls - first_code_calls == verify_code["analysis_cache"]["considered_files"]
+    assert (
+        security_calls - first_security_calls
+        == verify_security["analysis_cache"]["considered_files"]
+    )
+    assert similarity_calls - first_similarity_calls == 1
+    assert code["analysis_cache"]["cache_hits"] == code["analysis_cache"]["considered_files"]
+    assert code["analysis_cache"]["cache_misses"] == 0
+    assert (
+        security["analysis_cache"]["cache_hits"] == security["analysis_cache"]["considered_files"]
+    )
+    assert security["analysis_cache"]["cache_misses"] == 0
+    assert code["semantic_similarity_cache"]["cache_status"] == "hit"
+
+
 def test_refresh_retention_preserves_all_current_phase_runs(tmp_path: Path) -> None:
     from quality_runner.workflow import refresh_payload
 
@@ -240,11 +376,7 @@ def test_refresh_retention_preserves_all_current_phase_runs(tmp_path: Path) -> N
     ]
     artifact = json.loads(
         (
-            tmp_path
-            / ".quality-runner"
-            / "runs"
-            / "refresh-current-run"
-            / "code-quality-scan.json"
+            tmp_path / ".quality-runner" / "runs" / "refresh-current-run" / "code-quality-scan.json"
         ).read_text(encoding="utf-8")
     )
     assert artifact["analysis_cache"]["schema"] == (

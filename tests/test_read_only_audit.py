@@ -62,6 +62,27 @@ def test_read_only_planning_validates_before_the_artifact_renderer_runs(tmp_path
     )
     assert analysis.code_quality_scan["analysis_cache"]["status"] == "disabled"
     assert analysis.security_scan["analysis_cache"]["status"] == "disabled"
+    assert analysis.code_quality_scan["semantic_similarity_cache"]["status"] == "disabled"
+    assert analysis.code_quality_scan["semantic_similarity_cache"]["persisted"] is False
+    assert not (tmp_path / ".quality-runner").exists()
+
+
+def test_read_only_analysis_uses_external_cache_without_repo_artifacts(tmp_path: Path) -> None:
+    write_js_fixture(tmp_path)
+    cache_root = tmp_path / "analysis-cache"
+
+    first = analyze_read_only_audit(
+        _request(tmp_path, "cached-first", analysis_cache_root=cache_root)
+    )
+    second = analyze_read_only_audit(
+        _request(tmp_path, "cached-second", analysis_cache_root=cache_root)
+    )
+
+    assert first.code_quality_scan["analysis_cache"]["cache_misses"] > 0
+    assert second.code_quality_scan["analysis_cache"]["cache_hits"] > 0
+    assert first.security_scan["analysis_cache"]["cache_misses"] > 0
+    assert second.security_scan["analysis_cache"]["cache_hits"] > 0
+    assert cache_root.exists()
     assert not (tmp_path / ".quality-runner").exists()
 
 
@@ -222,6 +243,7 @@ def _request(
     run_id: str,
     *,
     include_ignored_paths: tuple[str, ...] = (),
+    analysis_cache_root: Path | None = None,
 ) -> AuditRequest:
     return AuditRequest(
         repo_root=repo_root,
@@ -232,4 +254,5 @@ def _request(
         branch_warnings=(),
         skill_review_report=None,
         intent=None,
+        analysis_cache_root=analysis_cache_root,
     )

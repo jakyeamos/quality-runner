@@ -31,7 +31,14 @@ Artifacts are written under:
   category `architecture` when configured in `.quality-runner.toml`. Opt-in
   Quality Skill findings use category `skill:<skill-id>` when configured.
   Partially built or unwired work uses category `integrate`; see
-  [Unwired Work Detection](unwired-work.md).
+  [Unwired Work Detection](unwired-work.md). The `analysis_cache` object records
+  per-file cache hits, misses, invalidation reasons, index state, and whether
+  persistence is enabled. Normal `refresh` inspect/run phases persist this
+  cache under the ignored `.quality-runner/cache/incremental-analysis-v1/`
+  directory; direct read-only analysis and gate-execution refreshes keep it
+  disabled. The `semantic_similarity_cache` object records the corresponding
+  whole-report cache state under
+  `.quality-runner/cache/semantic-similarity-v1/`.
 - `package-manager-preflight.json`: detected package-manager state, declared
   `packageManager`, lockfiles, and non-blocking warnings such as mixed lockfiles.
 - `standards.json`: compiled standards packet for the selected profile,

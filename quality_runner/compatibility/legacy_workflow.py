@@ -10,7 +10,7 @@ from quality_runner.artifacts import cleanup_artifacts
 from quality_runner.config import load_repo_config
 from quality_runner.core.audit_contracts import ScanExclusionOverlay
 from quality_runner.progress import ProgressCallback
-from quality_runner.refresh_workflow import run_refresh_payload
+from quality_runner.refresh_workflow import resolve_analysis_cache_root, run_refresh_payload
 from quality_runner.review_delta import build_review_delta, persist_review_delta
 from quality_runner.run_summary import build_run_summary
 from quality_runner.workflow_review_metadata import attach_review_metadata
@@ -46,6 +46,7 @@ def refresh_payload(
     agent_review_mode: str | None = None,
     scan_exclusion_overlay: ScanExclusionOverlay | None = None,
     readiness_evidence_file: Path | None = None,
+    analysis_cache_root: Path | None = None,
     progress: ProgressCallback | None = None,
 ) -> dict[str, Any]:
     review_enabled = review_cycle_id is not None or review_iteration is not None
@@ -57,6 +58,11 @@ def refresh_payload(
         assert review_cycle_id is not None
         assert review_iteration is not None
         assert intent is not None
+    resolved_analysis_cache_root = resolve_analysis_cache_root(
+        repo_root,
+        execute_discovered_gates=execute_discovered_gates,
+        analysis_cache_root=analysis_cache_root,
+    )
     payload = refresh_runner(
         repo_root=repo_root,
         run_id_prefix=run_id_prefix,
@@ -78,6 +84,7 @@ def refresh_payload(
         agent_review_mode=agent_review_mode,
         scan_exclusion_overlay=scan_exclusion_overlay,
         readiness_evidence_file=readiness_evidence_file,
+        analysis_cache_root=resolved_analysis_cache_root,
         inspect_callback=inspect_callback,
         run_callback=run_callback,
         verify_callback=verify_callback,

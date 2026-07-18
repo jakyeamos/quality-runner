@@ -20,6 +20,17 @@ from quality_runner.scan_exclusions import reset_scan_progress
 PayloadCallback = Callable[..., dict[str, Any]]
 
 
+def resolve_analysis_cache_root(
+    repo_root: Path,
+    *,
+    execute_discovered_gates: bool,
+    analysis_cache_root: Path | None,
+) -> Path | None:
+    if execute_discovered_gates:
+        return None
+    return analysis_cache_root or repo_root.expanduser().resolve() / ".quality-runner"
+
+
 def run_refresh_payload(
     *,
     repo_root: Path,
@@ -46,6 +57,7 @@ def run_refresh_payload(
     agent_review_mode: str | None = None,
     scan_exclusion_overlay: ScanExclusionOverlay | None = None,
     readiness_evidence_file: Path | None = None,
+    analysis_cache_root: Path | None = None,
     progress: ProgressCallback | None = None,
 ) -> dict[str, Any]:
     inspect_run_id = f"{run_id_prefix}-inspect"
@@ -131,6 +143,7 @@ def run_refresh_payload(
                 agent_review_mode=agent_review_mode,
                 scan_exclusion_overlay=scan_exclusion_overlay,
                 intent=intent,
+                analysis_cache_root=analysis_cache_root,
                 progress=progress,
             ),
         )
@@ -148,6 +161,7 @@ def run_refresh_payload(
                 agent_review_mode=agent_review_mode,
                 scan_exclusion_overlay=scan_exclusion_overlay,
                 intent=intent,
+                analysis_cache_root=analysis_cache_root,
                 progress=progress,
             ),
         )

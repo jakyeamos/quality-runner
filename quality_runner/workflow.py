@@ -8,7 +8,7 @@ from quality_runner.application.verification_workflows import verify_gates_paylo
 from quality_runner.compatibility.legacy_workflow import refresh_payload as _refresh_payload
 from quality_runner.core.audit_contracts import ScanExclusionOverlay
 from quality_runner.progress import ProgressCallback
-from quality_runner.refresh_workflow import run_refresh_payload
+from quality_runner.refresh_workflow import resolve_analysis_cache_root, run_refresh_payload
 from quality_runner.run_summary import build_run_summary
 from quality_runner.workflow_internal import generated_run_id
 
@@ -67,6 +67,12 @@ def refresh_payload(
         intent=intent,
         review_cycle_id=review_cycle_id,
         review_iteration=review_iteration,
+        readiness_evidence_file=None,
+        analysis_cache_root=resolve_analysis_cache_root(
+            repo_root,
+            execute_discovered_gates=execute_discovered_gates,
+            analysis_cache_root=None,
+        ),
         inspect_callback=inspect_payload,
         run_callback=run_payload,
         verify_callback=verify_gates_payload,

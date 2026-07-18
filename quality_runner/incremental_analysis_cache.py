@@ -51,8 +51,14 @@ class IncrementalAnalysisCache:
         config: Mapping[str, object],
         context: Mapping[str, object] | None = None,
         persist: bool = True,
+        cache_root: Path | None = None,
     ) -> None:
         self._repo_root = repo_root.expanduser().resolve()
+        self._cache_root = (
+            cache_root.expanduser().resolve()
+            if cache_root is not None
+            else self._repo_root / ".quality-runner"
+        )
         self._analysis_kind = analysis_kind
         self._persist = persist
         self._context_identity = _json_hash(context or {})
@@ -66,7 +72,7 @@ class IncrementalAnalysisCache:
 
     @property
     def cache_dir(self) -> Path:
-        return self._repo_root / ".quality-runner" / "cache" / INCREMENTAL_ANALYSIS_CACHE_DIRECTORY
+        return self._cache_root / "cache" / INCREMENTAL_ANALYSIS_CACHE_DIRECTORY
 
     def get_or_compute(
         self,
