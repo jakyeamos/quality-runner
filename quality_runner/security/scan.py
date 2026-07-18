@@ -38,6 +38,7 @@ def create_security_scan(
     config: dict[str, Any],
     standards_packet: dict[str, Any] | None = None,
     text_scan_scope: TextScanScope | None = None,
+    persist_cache: bool = True,
 ) -> dict[str, Any]:
     root = repo_root.expanduser().resolve()
     settings = security_settings(config)
@@ -47,7 +48,11 @@ def create_security_scan(
             repo_root=root,
             scan_exclusions=effective_scan_exclusions(root, config, module="security"),
         )
-        disabled_scan["analysis_cache"] = _disabled_cache_evidence(root, config)
+        disabled_scan["analysis_cache"] = _disabled_cache_evidence(
+            root,
+            config,
+            persist_cache=persist_cache,
+        )
         return disabled_scan
 
     standards = standards_packet or {}
@@ -74,6 +79,7 @@ def create_security_scan(
             "disabled_rule_groups": disabled_groups,
             "surfaces": surfaces,
         },
+        persist=persist_cache,
     )
     candidates: list[dict[str, Any]] = []
     for file_info in scanned_files:
@@ -366,12 +372,18 @@ def _disabled_security_scan(
     }
 
 
-def _disabled_cache_evidence(repo_root: Path, config: dict[str, Any]) -> dict[str, object]:
+def _disabled_cache_evidence(
+    repo_root: Path,
+    config: dict[str, Any],
+    *,
+    persist_cache: bool,
+) -> dict[str, object]:
     cache = IncrementalAnalysisCache(
         repo_root,
         analysis_kind="security",
         config=config,
         context={"enabled": False},
+        persist=persist_cache,
     )
     evidence = cache.evidence(considered_files=0)
     evidence["status"] = "disabled"

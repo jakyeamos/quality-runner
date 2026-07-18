@@ -249,7 +249,9 @@ cache state recomputes the affected file instead of being treated as fresh.
 
 The cache is not a scan input: `.quality-runner/` remains excluded from source
 discovery, and cache entries contain only validated scanner results. Run output
-continues to live under `.quality-runner/runs/<run-id>/`.
+continues to live under `.quality-runner/runs/<run-id>/`. Read-only planning uses
+the same analysis code with cache persistence disabled; it recomputes safely and
+leaves no `.quality-runner` cache behind.
 
 To bound generated run output, configure one or both limits:
 

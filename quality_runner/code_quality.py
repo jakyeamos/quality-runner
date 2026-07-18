@@ -62,6 +62,7 @@ def create_code_quality_scan(
     skill_review_report: dict[str, Any] | None = None,
     require_skill_review_coverage: bool = False,
     text_scan_scope: TextScanScope | None = None,
+    persist_cache: bool = True,
 ) -> dict[str, Any]:
     root = repo_root.expanduser().resolve()
     policy = structural_scan_policy(config)
@@ -77,6 +78,7 @@ def create_code_quality_scan(
         root,
         analysis_kind="code-quality",
         config=config,
+        persist=persist_cache,
     )
     findings: list[dict[str, Any]] = []
     extracted_functions: list[dict[str, Any]] = []

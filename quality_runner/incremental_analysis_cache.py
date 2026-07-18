@@ -33,6 +33,7 @@ class _CacheStats:
     considered_files: int = 0
     cache_hits: int = 0
     cache_misses: int = 0
+    recomputed_files: int = 0
     write_failures: int = 0
     pruned_entries: int = 0
     invalidation_reasons: Counter[str] = field(default_factory=Counter)
@@ -49,9 +50,11 @@ class IncrementalAnalysisCache:
         analysis_kind: str,
         config: Mapping[str, object],
         context: Mapping[str, object] | None = None,
+        persist: bool = True,
     ) -> None:
         self._repo_root = repo_root.expanduser().resolve()
         self._analysis_kind = analysis_kind
+        self._persist = persist
         self._context_identity = _json_hash(context or {})
         self._configuration_identity = configuration_identity(self._repo_root, config)
         self._dependency_state_identity = dependency_state_identity(self._repo_root)
@@ -75,6 +78,9 @@ class IncrementalAnalysisCache:
         content_sha256: str | None = None,
     ) -> AnalysisResult:
         self._stats.considered_files += 1
+        if not self._persist:
+            self._record_recomputed_path(relative_path)
+            return compute()
         identity = self._identity_for_file(
             relative_path=relative_path,
             source_text=source_text,
@@ -102,9 +108,12 @@ class IncrementalAnalysisCache:
 
     def evidence(self, *, considered_files: int | None = None) -> dict[str, object]:
         considered = self._stats.considered_files if considered_files is None else considered_files
-        self._load_index()
+        if self._persist:
+            self._load_index()
         reason_counts = dict(sorted(self._stats.invalidation_reasons.items()))
-        if considered == 0:
+        if not self._persist:
+            status = "disabled"
+        elif considered == 0:
             status = "not-needed"
         elif self._stats.write_failures:
             status = "degraded"
@@ -122,15 +131,16 @@ class IncrementalAnalysisCache:
             "considered_files": considered,
             "cache_hits": self._stats.cache_hits,
             "cache_misses": self._stats.cache_misses,
-            "recomputed_files": self._stats.cache_misses,
+            "recomputed_files": self._stats.recomputed_files,
             "invalidation_reasons": reason_counts,
             "recomputed_path_samples": list(self._stats.recomputed_paths),
-            "recomputed_path_sample_truncated": self._stats.cache_misses
+            "recomputed_path_sample_truncated": self._stats.recomputed_files
             > len(self._stats.recomputed_paths),
             "write_failures": self._stats.write_failures,
             "pruned_entries": self._stats.pruned_entries,
-            "index_status": self._index_status,
+            "index_status": self._index_status if self._persist else "disabled",
             "index_entries": len(self._index),
+            "persisted": self._persist,
             "identity": {
                 "quality_runner_version": __version__,
                 "scanner_implementation_sha256": self._scanner_implementation_identity,
@@ -280,6 +290,8 @@ class IncrementalAnalysisCache:
         identity: dict[str, object],
         result: AnalysisResult,
     ) -> None:
+        if not self._persist:
+            return
         cache_key = _json_hash(identity)
         if not _safe_cache_tree(self._repo_root, self.cache_dir):
             self._stats.write_failures += 1
@@ -347,8 +359,12 @@ class IncrementalAnalysisCache:
 
     def _record_miss(self, relative_path: str, reasons: list[str]) -> None:
         self._stats.cache_misses += 1
+        self._stats.recomputed_files += 1
         for reason in reasons:
             self._stats.invalidation_reasons[reason] += 1
+        self._record_recomputed_path(relative_path)
+
+    def _record_recomputed_path(self, relative_path: str) -> None:
         if len(self._stats.recomputed_paths) < _MAX_RECOMPUTED_PATH_SAMPLES:
             self._stats.recomputed_paths.append(relative_path)
 

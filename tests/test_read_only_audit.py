@@ -60,6 +60,8 @@ def test_read_only_planning_validates_before_the_artifact_renderer_runs(tmp_path
         isinstance(slice_item.get("context_id"), str)
         for slice_item in planned.remediation_plan["slices"]
     )
+    assert analysis.code_quality_scan["analysis_cache"]["status"] == "disabled"
+    assert analysis.security_scan["analysis_cache"]["status"] == "disabled"
     assert not (tmp_path / ".quality-runner").exists()
 
 
