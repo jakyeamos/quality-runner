@@ -86,12 +86,21 @@ protected, generated, and scan-excluded artifact directories such as
 directory estimates. It adds inspect/preflight regression coverage for a
 10,000-file QR artifact tree and activity-aware timeout diagnostics. The fix is
 on `codex/qr-p1-excluded-artifact-estimate`; it is not pushed or released.
+The isolated follow-up `f99fec1` reuses valid current-refresh run analysis during
+non-executing verify-gates, preserves fresh cache-free analysis for authorized
+gate execution, and records verification-mode timeout provenance. Its Tenure
+dogfood completed verify-gates in 190.647 seconds with 886 cache hits, zero
+misses/recomputations, all 11 gates skipped for missing consent, and no timeout;
+Tenure source status remained clean.
 
 ## Current Position
 
 - Target: a typed v2 core behind CLI, MCP, and compatibility adapters.
-- Next slice: run the authorized Tenure read-only refresh from `5217270`, then
-  promote only after the user-owned dirty `dev` checkout is reconciled.
+- Current isolated follow-up: `codex/dev-fold-incremental-artifact` at
+  `f99fec1`; it is not pushed, published, released, or merged into the dirty
+  canonical `dev` checkout.
+- Next slice: reconcile the user-owned dirty `dev` checkout and review the
+  isolated follow-up before any promotion.
 - `codex/release-0.6.0` was merged by PR #5 into `main` at `c6e92cc`; `main`
   and the `v0.6.0` tag are published.
 - `dev` is the canonical integration branch, is published to `origin/dev`, and
@@ -110,6 +119,11 @@ on `codex/qr-p1-excluded-artifact-estimate`; it is not pushed or released.
 - `5217270` wires the legacy/CLI refresh path to the ignored cache root for
   normal inspect/run phases, keeps gate-execution cache-free, adds semantic
   similarity cache evidence/reuse, and preserves direct read-only isolation.
+- `f99fec1` folds current-refresh analysis into non-executing verify-gates,
+  keeps authorized gate execution fresh and cache-free, adds reuse provenance
+  and timeout-mode diagnostics, and passes the commit Pre-CR hook. Focused
+  refresh/verification tests pass; the full suite reached 671 passes with one
+  timing-sensitive disposable-verification failure.
 - Canonical planning documents: `docs/modernization/`.
 - Public compatibility: retain `quality_evidence_contract` and
   `repo_quality_certifier` during a published transition window.
@@ -219,6 +233,9 @@ on `codex/qr-p1-excluded-artifact-estimate`; it is not pushed or released.
 
 ## Recent Progress
 
+- 2026-07-18: `f99fec1` completes read-only verify-gates analysis reuse and
+  execution-consent-safe fallback behavior; Tenure dogfood completed without
+  timeout or gate execution, with all 11 discovered gates skipped.
 - 2026-07-18: `5217270` completes refresh cache wiring, semantic cache reuse,
   cache evidence, and warm-prefix regression coverage; 669 tests passed.
 - 2026-07-18: `fa291c2` integrates the local P1 excluded-artifact estimate fix
@@ -258,6 +275,3 @@ on `codex/qr-p1-excluded-artifact-estimate`; it is not pushed or released.
   exclusions and retaining the current application/compatibility façades.
 - 2026-07-17: `546122e` reduces remediation-delta implementation noise while
   preserving its fingerprints, package evidence, and recommendation payload.
-- 2026-07-17: `960d094` adds the native QR phase lifecycle and domain-aware
-  `plan auto` workflow under `.planning/quality-runner/`; it remains advisory,
-  idempotent, and separate from source changes, commits, pushes, and root GSD.
