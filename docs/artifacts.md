@@ -236,6 +236,34 @@ can still expose sensitive context. Retain or remove artifacts using the target
 repository's normal evidence-retention policy. See the [Threat Model](threat-model.md)
 for the remaining execution boundary.
 
+## Incremental scan cache and retention
+
+Per-file code-quality and security results are cached separately from run output
+under `.quality-runner/cache/incremental-analysis-v1/`. Cache keys include the
+relative source path, source-content digest, Quality Runner version, scanner
+implementation digest, normalized scanner configuration, relevant dependency
+state, and the active analysis context. Each scan artifact records cache hits,
+misses, recomputation counts, and invalidation reasons. Cache entries are
+validated before reuse and written atomically; missing, corrupt, or interrupted
+cache state recomputes the affected file instead of being treated as fresh.
+
+The cache is not a scan input: `.quality-runner/` remains excluded from source
+discovery, and cache entries contain only validated scanner results. Run output
+continues to live under `.quality-runner/runs/<run-id>/`.
+
+To bound generated run output, configure one or both limits:
+
+```toml
+[quality_runner.artifacts]
+retention_runs = 12
+retention_days = 30
+```
+
+Completed `refresh` runs apply the configured policy after the final phase while
+preserving the current inspect, run, and verify directories. The explicit
+`prune-artifacts` command remains available for a dry run or an on-demand
+cleanup; deletion requires `--apply`.
+
 ## Gate Verification Artifacts
 
 `quality-runner verify-gates` records discovered command-backed capabilities,

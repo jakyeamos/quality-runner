@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import hashlib
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from quality_runner.code_quality_architecture import architecture_findings
 from quality_runner.code_quality_bundles import bundle_budget_findings
@@ -25,6 +25,7 @@ from quality_runner.code_quality_summary import quality_summary_fields
 from quality_runner.code_quality_unwired import unwired_findings
 from quality_runner.core.audit_contracts import AuditPayload, TextScanScope
 from quality_runner.evidence_redaction import redact_secret_like_source_lines
+from quality_runner.incremental_analysis_cache import IncrementalAnalysisCache
 from quality_runner.scan_scope import (
     DEFAULT_FAT_ROUTER_LINES as _DEFAULT_FAT_ROUTER_LINES,
 )
@@ -72,6 +73,11 @@ def create_code_quality_scan(
         module="code_quality",
     )
     skipped_files = list(scope.skipped_files)
+    analysis_cache = IncrementalAnalysisCache(
+        root,
+        analysis_kind="code-quality",
+        config=config,
+    )
     findings: list[dict[str, Any]] = []
     extracted_functions: list[dict[str, Any]] = []
     accountability: list[dict[str, Any]] = []
@@ -81,7 +87,21 @@ def create_code_quality_scan(
         relative_path = file_info.path
         source_text = file_info.text
         source_lines = file_info.lines
-        lines = redact_secret_like_source_lines(source_lines)
+        file_result = analysis_cache.get_or_compute(
+            relative_path=relative_path,
+            source_text=source_text,
+            compute=lambda relative_path=relative_path, source_lines=source_lines: (
+                _analyze_code_quality_file(
+                    relative_path=relative_path,
+                    source_lines=source_lines,
+                    disabled_groups=disabled_groups,
+                    large_file_lines=policy["large_file_lines"],
+                    fat_router_lines=policy["fat_router_lines"],
+                )
+            ),
+            validate=_valid_code_quality_file_result,
+        )
+        lines = _string_list_result(file_result, "redacted_lines")
         text = "\n".join(lines)
         scanned_files.append({"path": relative_path, "text": text, "lines": lines})
         accountability.append(
@@ -93,17 +113,8 @@ def create_code_quality_scan(
                 "check_coverage": _check_coverage(relative_path),
             }
         )
-        findings.extend(
-            _scan_file(
-                relative_path=relative_path,
-                text=text,
-                lines=lines,
-                disabled_groups=disabled_groups,
-                large_file_lines=policy["large_file_lines"],
-                fat_router_lines=policy["fat_router_lines"],
-            )
-        )
-        extracted_functions.extend(_extract_functions(relative_path, lines))
+        findings.extend(_dict_list_result(file_result, "findings"))
+        extracted_functions.extend(_dict_list_result(file_result, "extracted_functions"))
 
     semantic_similarity_clusters = 0
     semantic_similarity_tools: dict[str, str] = {}
@@ -185,7 +196,54 @@ def create_code_quality_scan(
         "quality_skills": quality_skills,
         "skill_coverage": skill_coverage,
         "skill_selection": skill_selection,
+        "analysis_cache": analysis_cache.evidence(considered_files=len(scope.files)),
     }
+
+
+def _analyze_code_quality_file(
+    *,
+    relative_path: str,
+    source_lines: list[str],
+    disabled_groups: set[str],
+    large_file_lines: int,
+    fat_router_lines: int,
+) -> dict[str, object]:
+    lines = redact_secret_like_source_lines(source_lines)
+    text = "\n".join(lines)
+    return {
+        "redacted_lines": lines,
+        "findings": _scan_file(
+            relative_path=relative_path,
+            text=text,
+            lines=lines,
+            disabled_groups=disabled_groups,
+            large_file_lines=large_file_lines,
+            fat_router_lines=fat_router_lines,
+        ),
+        "extracted_functions": _extract_functions(relative_path, lines),
+    }
+
+
+def _valid_code_quality_file_result(result: dict[str, object]) -> bool:
+    return (
+        _string_list_result(result, "redacted_lines") is not None
+        and _dict_list_result(result, "findings") is not None
+        and _dict_list_result(result, "extracted_functions") is not None
+    )
+
+
+def _string_list_result(result: dict[str, object], key: str) -> list[str]:
+    value = result.get(key)
+    if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
+        raise ValueError(f"invalid cached code-quality result field: {key}")
+    return list(value)
+
+
+def _dict_list_result(result: dict[str, object], key: str) -> list[dict[str, Any]]:
+    value = result.get(key)
+    if not isinstance(value, list) or not all(isinstance(item, dict) for item in value):
+        raise ValueError(f"invalid cached code-quality result field: {key}")
+    return [cast(dict[str, Any], item) for item in value]
 
 
 def preview_ignored_paths(

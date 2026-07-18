@@ -6,6 +6,8 @@ from typing import Any
 
 from quality_runner.application.audit_workflows import inspect_payload, run_payload
 from quality_runner.application.verification_workflows import verify_gates_payload
+from quality_runner.artifacts import cleanup_artifacts
+from quality_runner.config import load_repo_config
 from quality_runner.core.audit_contracts import ScanExclusionOverlay
 from quality_runner.progress import ProgressCallback
 from quality_runner.refresh_workflow import run_refresh_payload
@@ -83,6 +85,14 @@ def refresh_payload(
         progress=progress,
     )
     if not review_enabled:
+        _prune_completed_refresh_artifacts(
+            repo_root=repo_root,
+            run_ids={
+                f"{run_id_prefix}-inspect",
+                f"{run_id_prefix}-run",
+                f"{run_id_prefix}-verify",
+            },
+        )
         return payload
     if review_cycle_id is None or review_iteration is None or intent is None:
         raise AssertionError("review metadata was unexpectedly cleared")
@@ -106,4 +116,24 @@ def refresh_payload(
     )
     payload["review_delta"] = delta
     payload["review_delta_paths"] = delta_paths
+    _prune_completed_refresh_artifacts(
+        repo_root=repo_root,
+        run_ids={
+            f"{run_id_prefix}-inspect",
+            f"{run_id_prefix}-run",
+            f"{run_id_prefix}-verify",
+        },
+    )
     return payload
+
+
+def _prune_completed_refresh_artifacts(*, repo_root: Path, run_ids: set[str]) -> None:
+    try:
+        cleanup_artifacts(
+            repo_root,
+            config=load_repo_config(repo_root),
+            apply=True,
+            preserve_run_ids=run_ids,
+        )
+    except (OSError, ValueError):
+        return
