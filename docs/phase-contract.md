@@ -20,6 +20,6 @@ Create a contract with the `quality-runner-phase-contract-v0.1` schema:
 }
 ```
 
-Use `--phase-contract` with `refresh` to derive the scoped scan paths. Use `phase-check` after the phase refresh to write `phase-closure.json` and `phase-closure.md` into the current run directory.
+Use `--phase-contract` with `refresh` to derive the scoped scan paths. Use `phase-check` against the refresh `-run` artifact (not the `-verify` gate artifact) to write `phase-closure.json` and `phase-closure.md` into the current run directory.
 
 QR reports new, persisted, resolved, out-of-scope, actionable, dispositioned, and unmapped findings. Closure is blocked by actionable or unmapped findings, invalid accepted dispositions, or a recommended early refresh. QR writes evidence artifacts only; GSD remains the owner of `.planning/ROADMAP.md`, `.planning/STATE.md`, plan files, execution, and commits.
