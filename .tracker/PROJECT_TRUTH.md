@@ -1,6 +1,6 @@
 # Quality Runner Project Truth
 
-Last updated: 2026-07-17
+Last updated: 2026-07-18
 
 ## Current State
 
@@ -90,8 +90,8 @@ on `codex/qr-p1-excluded-artifact-estimate`; it is not pushed or released.
 ## Current Position
 
 - Target: a typed v2 core behind CLI, MCP, and compatibility adapters.
-- Next slice: start the next scoped follow-up from the released `main`/`dev`
-  baseline.
+- Next slice: review and promote the isolated incremental-cache integration
+  revision after the user-owned dirty `dev` checkout is reconciled.
 - `codex/release-0.6.0` was merged by PR #5 into `main` at `c6e92cc`; `main`
   and the `v0.6.0` tag are published.
 - `dev` is the canonical integration branch, is published to `origin/dev`, and
@@ -102,6 +102,9 @@ on `codex/qr-p1-excluded-artifact-estimate`; it is not pushed or released.
 - Current P1 fix branch: `codex/qr-p1-excluded-artifact-estimate` at `4d7f72b`;
   focused validation passes, and no push, publish, release, or Quality Runner
   gate execution was performed.
+- Integrated local revision: `fa291c2` merges the P1 exclusion-estimation fix
+  and adds safe incremental code-quality/security caching, explicit invalidation
+  evidence, bounded refresh retention, and hermetic Git fixture configuration.
 - Canonical planning documents: `docs/modernization/`.
 - Public compatibility: retain `quality_evidence_contract` and
   `repo_quality_certifier` during a published transition window.
@@ -203,9 +206,15 @@ on `codex/qr-p1-excluded-artifact-estimate`; it is not pushed or released.
 - The P1 fix passes 56 focused tests and full static validation. The full suite
   reached 652 passing tests; three unrelated environment/timing-sensitive tests
   failed in this shell (`uv` unavailable and two timing/cleanup checks).
+- `fa291c2` passes 41 focused cache/exclusion/artifact tests, 103 broader
+  code-quality/security/config/artifact tests, Ruff, BasedPyright, and Vulture;
+  Quality Runner gate execution was not invoked.
 
 ## Recent Progress
 
+- 2026-07-18: `fa291c2` integrates the local P1 excluded-artifact estimate fix
+  with safe incremental scan caching and refresh artifact retention in an
+  isolated revision; no push, publish, release, or gate execution occurred.
 - 2026-07-17: `4d7f72b` stops recursive estimates for protected/generated/
   excluded artifact directories, adds 10,000-file inspect/preflight regression
   coverage, and distinguishes actual scan work in timeout diagnostics.
