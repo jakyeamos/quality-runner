@@ -160,6 +160,8 @@ def _git_output(repo_root: Path, *args: str) -> str | None:
             text=True,
             timeout=5,
         )
+    except TimeoutError:
+        raise
     except (OSError, subprocess.TimeoutExpired):
         return None
     if result.returncode != 0:
