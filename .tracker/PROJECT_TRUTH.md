@@ -81,9 +81,9 @@ Workflow discovery keeps the exact commands declared by CI, with 49 focused
 regression tests, green exact-head GitHub CI, a passing release profile, and
 verified PyPI publication.
 
-The isolated `codex/qr-adaptive-timeouts` follow-up at `0bc7d37` adds local,
-identity-bound refresh timeout calibration without changing the published
-release surface.
+The reviewed `codex/dev-fold-qr-adaptive-timeouts` integration at `49c3dda`
+folds the local, identity-bound refresh timeout calibration from `0bc7d37`
+without changing the published release surface.
 
 ## Current Position
 
@@ -98,8 +98,10 @@ release surface.
   `quality-skill-corpus-workflow` branch were pruned after the behavioral port
   audit; unrelated active branches remain separate.
 - Canonical planning documents: `docs/modernization/`.
-- `codex/qr-adaptive-timeouts` implements repo-calibrated refresh budgets; it
-  remains isolated and unpublished pending review.
+- `codex/dev-fold-qr-adaptive-timeouts` is the reviewed integration branch at
+  `49c3dda`; 86 focused tests and static checks pass, while the full suite has
+  666 behavioral passes and one network-blocked packaged-build check. The live
+  `origin/dev` head remains unchanged pending final promotion.
 - Public compatibility: retain `quality_evidence_contract` and
   `repo_quality_certifier` during a published transition window.
 
@@ -119,11 +121,11 @@ release surface.
   the tag release workflow pass; the public PyPI wheel and source archive are
   verified by digest, and an isolated PyPI install passes CLI, doctor,
   release-smoke, and MCP checks.
-- `0bc7d37` adds candidate/active local timeout baselines, exclusion-bound
-  identity validation, phase budgets, explicit overrides, and 86 focused
-  regression tests; Ruff, formatting, Basedpyright, Vulture, and the full
-  suite's 666 behavioral tests pass. The packaged build check needs network
-  access to resolve uncached uv dependencies.
+- `49c3dda` integrates `0bc7d37`, which adds candidate/active local timeout
+  baselines, exclusion-bound identity validation, phase budgets, explicit
+  overrides, and 86 focused regression tests; Ruff, formatting, Basedpyright,
+  Vulture, and the full suite's 666 behavioral tests pass. The packaged build
+  check needs network access to resolve uncached uv dependencies.
 - `c71b130` passes the full 556-test pytest suite, Ruff lint/format,
   Basedpyright, Vulture, lock validation, pip-audit, release smoke, build, and
   installed-wheel smoke checks. GitHub CI and the tag release workflow pass;
@@ -208,9 +210,9 @@ release surface.
 
 ## Recent Progress
 
-- 2026-07-19: `0bc7d37` adds repo-calibrated refresh timeout baselines with
-  three-run activation, exclusion preflight binding, phase/total budgets, and
-  explicit timeout provenance; focused tests and static checks pass.
+- 2026-07-19: `49c3dda` folds the published adaptive-timeout branch into an
+  isolated dev integration; focused tests and static checks pass, with one
+  network-blocked packaged-build check recorded separately.
 - 2026-07-17: `b5a610e` makes release-gate discovery execute the exact commands
   declared by CI, including scoped Vulture coverage; focused tests pass and
   exact-head GitHub CI is green.
