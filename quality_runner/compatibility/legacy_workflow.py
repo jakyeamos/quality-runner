@@ -6,6 +6,8 @@ from typing import Any
 
 from quality_runner.application.audit_workflows import inspect_payload, run_payload
 from quality_runner.application.verification_workflows import verify_gates_payload
+from quality_runner.artifacts import cleanup_artifacts
+from quality_runner.config import load_repo_config
 from quality_runner.core.audit_contracts import ScanExclusionOverlay
 from quality_runner.progress import ProgressCallback
 from quality_runner.refresh_workflow import run_refresh_payload
@@ -45,6 +47,13 @@ def refresh_payload(
     scan_exclusion_overlay: ScanExclusionOverlay | None = None,
     readiness_evidence_file: Path | None = None,
     progress: ProgressCallback | None = None,
+    focus_paths: list[str] | None = None,
+    inspect_timeout_seconds: int | None = None,
+    run_timeout_seconds: int | None = None,
+    analysis_mode: str = "full",
+    cache_mode: str = "repo",
+    cache_root: Path | None = None,
+    performance_budget_seconds: float | None = None,
 ) -> dict[str, Any]:
     review_enabled = review_cycle_id is not None or review_iteration is not None
     if review_enabled:
@@ -67,6 +76,8 @@ def refresh_payload(
         workflow_timeout_reason=workflow_timeout_reason,
         total_timeout_seconds=total_timeout_seconds,
         total_timeout_reason=total_timeout_reason,
+        inspect_timeout_seconds=inspect_timeout_seconds,
+        run_timeout_seconds=run_timeout_seconds,
         checkout_most_advanced_branch=checkout_most_advanced_branch,
         execute_discovered_gates=execute_discovered_gates,
         allow_mutating_gates=allow_mutating_gates,
@@ -81,8 +92,21 @@ def refresh_payload(
         verify_callback=verify_callback,
         summary_callback=summary_callback,
         progress=progress,
+        focus_paths=focus_paths,
+        analysis_mode=analysis_mode,
+        cache_mode=cache_mode,
+        cache_root=cache_root,
+        performance_budget_seconds=performance_budget_seconds,
     )
     if not review_enabled:
+        _prune_completed_refresh_artifacts(
+            repo_root=repo_root,
+            run_ids={
+                f"{run_id_prefix}-inspect",
+                f"{run_id_prefix}-run",
+                f"{run_id_prefix}-verify",
+            },
+        )
         return payload
     if review_cycle_id is None or review_iteration is None or intent is None:
         raise AssertionError("review metadata was unexpectedly cleared")
@@ -106,4 +130,24 @@ def refresh_payload(
     )
     payload["review_delta"] = delta
     payload["review_delta_paths"] = delta_paths
+    _prune_completed_refresh_artifacts(
+        repo_root=repo_root,
+        run_ids={
+            f"{run_id_prefix}-inspect",
+            f"{run_id_prefix}-run",
+            f"{run_id_prefix}-verify",
+        },
+    )
     return payload
+
+
+def _prune_completed_refresh_artifacts(*, repo_root: Path, run_ids: set[str]) -> None:
+    try:
+        cleanup_artifacts(
+            repo_root,
+            config=load_repo_config(repo_root),
+            apply=True,
+            preserve_run_ids=run_ids,
+        )
+    except (OSError, ValueError):
+        return

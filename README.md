@@ -178,6 +178,10 @@ The normal workflow is:
 See [Agent Usage](docs/agent-usage.md) for the copy-paste phase and batch
 templates agents should follow.
 
+Planning-loop contracts, performance receipts, explicit cache modes, and the
+GSD/Terrace integration boundary are documented in
+[Planning and Delivery Contracts](docs/planning-contracts.md).
+
 ## Commands
 
 For new work, begin with the four outcome-first commands:
@@ -219,6 +223,9 @@ quality-runner remediation-delta /path/to/repo --run-id current --baseline-run-i
 quality-runner plan init /path/to/repo --json
 quality-runner plan status /path/to/repo --json
 quality-runner plan auto /path/to/repo --run-id baseline-001-run --json
+quality-runner plan contract prepare /path/to/repo --phase-id phase-1 --plan-id plan-1 --json
+quality-runner plan preflight /path/to/repo --contract contract.json --plan-file PLAN.md --json
+quality-runner plan reconcile /path/to/repo --contract contract.json --result-file delivery-result.json --json
 quality-runner phase next /path/to/repo --phase 1 --json
 quality-runner phase record-batch /path/to/repo --phase 1 --plan 1 --result-file batch.json --json
 quality-runner phase update /path/to/repo --phase 1 --baseline-run-id before --run-id after --json

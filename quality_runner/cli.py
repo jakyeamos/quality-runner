@@ -148,6 +148,18 @@ def build_parser() -> argparse.ArgumentParser:
         help="Verify-gates phase timeout; defaults to a multiple of --timeout-seconds",
     )
     refresh_parser.add_argument(
+        "--inspect-timeout-seconds",
+        type=int,
+        default=None,
+        help="Independent inspect-phase timeout; defaults to the verify timeout",
+    )
+    refresh_parser.add_argument(
+        "--run-timeout-seconds",
+        type=int,
+        default=None,
+        help="Independent run-phase timeout; defaults to the verify timeout",
+    )
+    refresh_parser.add_argument(
         "--workflow-timeout-reason",
         default=None,
         help="Reason recorded when the verify-gates timeout fires",
@@ -172,6 +184,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--execute-gates",
         action="store_true",
         help="Execute discovered repository commands in a disposable worktree during refresh",
+    )
+    refresh_parser.add_argument(
+        "--changed-only",
+        action="store_true",
+        help="Limit inspect/run analysis to paths changed from the baseline and working tree",
     )
     add_worktree_verify_arguments(refresh_parser)
     refresh_parser.add_argument(
@@ -362,6 +379,8 @@ def main(argv: list[str] | None = None) -> int:
     if parsed.command == "summarize-run" and has_rejected_self_check(payload):
         return 1
     if parsed.command == "self-update" and payload.get("status") in {"blocked", "failed"}:
+        return 1
+    if parsed.command == "plan" and payload.get("status") == "blocked":
         return 1
     return 0
 

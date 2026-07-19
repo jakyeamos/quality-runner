@@ -10,6 +10,7 @@ from quality_runner.core.audit_contracts import ScanExclusionOverlay
 from quality_runner.exclusion_preflight import normalize_run_only_exclusion_overlay
 from quality_runner.intent import resolve_workflow_intent
 from quality_runner.progress import ProgressCallback
+from quality_runner.review_delta import git_changed_paths
 
 
 def refresh_command_payload(
@@ -24,6 +25,13 @@ def refresh_command_payload(
         goal=args.intent,
         intent_file=Path(args.intent_file).expanduser().resolve() if args.intent_file else None,
     )
+    changed_paths = (
+        git_changed_paths(repo_root, args.baseline_run_id)
+        if getattr(args, "changed_only", False)
+        else []
+    )
+    if getattr(args, "changed_only", False) and not changed_paths:
+        raise ValueError("--changed-only requires at least one changed path")
     payload = refresh_payload(
         repo_root=repo_root,
         run_id_prefix=args.run_id_prefix,
@@ -41,6 +49,8 @@ def refresh_command_payload(
         workflow_timeout_reason=args.workflow_timeout_reason,
         total_timeout_seconds=args.total_timeout_seconds,
         total_timeout_reason=args.total_timeout_reason,
+        inspect_timeout_seconds=args.inspect_timeout_seconds,
+        run_timeout_seconds=args.run_timeout_seconds,
         checkout_most_advanced_branch=args.checkout_most_advanced_branch,
         execute_discovered_gates=getattr(args, "execute_gates", False),
         allow_mutating_gates=args.allow_mutating_gates,
@@ -51,7 +61,16 @@ def refresh_command_payload(
         review_iteration=args.review_iteration,
         agent_review_mode=getattr(args, "agent_review_mode", None),
         scan_exclusion_overlay=_scan_exclusion_overlay(args, repo_root),
+        focus_paths=(changed_paths if getattr(args, "changed_only", False) else None),
         progress=progress,
+        analysis_mode=args.analysis_mode,
+        cache_mode=args.cache_mode,
+        cache_root=(
+            Path(args.cache_dir).expanduser().resolve()
+            if getattr(args, "cache_dir", None)
+            else None
+        ),
+        performance_budget_seconds=args.performance_budget_seconds,
     )
     if args.handoff_output:
         payload["handoff_export"] = export_handoff_payload(

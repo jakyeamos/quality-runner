@@ -58,6 +58,7 @@ DEFAULT_SCAN_EXCLUSIONS = [
     ".continue",
     ".cursor",
     ".planning",
+    ".design-sync/previews/**",
     ".superpowers",
     ".tracker",
     "docs",

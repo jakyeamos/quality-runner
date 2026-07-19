@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import hashlib
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
+from quality_runner.cache_modes import CacheMode
 from quality_runner.code_quality_architecture import architecture_findings
 from quality_runner.code_quality_bundles import bundle_budget_findings
 from quality_runner.code_quality_duplicates import _extract_functions
@@ -16,7 +17,7 @@ from quality_runner.code_quality_ledger import (
     build_resolution_ledger,
     render_resolution_ledger_markdown,
 )
-from quality_runner.code_quality_paths import _check_coverage, _string_or_none
+from quality_runner.code_quality_paths import _check_coverage, _split_lines, _string_or_none
 from quality_runner.code_quality_ponytail import ponytail_findings
 from quality_runner.code_quality_rules import _scan_file
 from quality_runner.code_quality_similarity import collect_deduplicate_scan
@@ -25,6 +26,7 @@ from quality_runner.code_quality_summary import quality_summary_fields
 from quality_runner.code_quality_unwired import unwired_findings
 from quality_runner.core.audit_contracts import AuditPayload, TextScanScope
 from quality_runner.evidence_redaction import redact_secret_like_source_lines
+from quality_runner.incremental_analysis_cache import IncrementalAnalysisCache
 from quality_runner.scan_scope import (
     DEFAULT_FAT_ROUTER_LINES as _DEFAULT_FAT_ROUTER_LINES,
 )
@@ -41,6 +43,7 @@ from quality_runner.scan_scope import (
     structural_scan_policy,
 )
 from quality_runner.schema_constants import CODE_QUALITY_SCAN_SCHEMA
+from quality_runner.source_analysis_cache import SourceAnalysisCache
 
 __all__ = [
     "build_resolution_ledger",
@@ -61,6 +64,9 @@ def create_code_quality_scan(
     skill_review_report: dict[str, Any] | None = None,
     require_skill_review_coverage: bool = False,
     text_scan_scope: TextScanScope | None = None,
+    analysis_mode: str = "full",
+    cache_mode: CacheMode | str = "repo",
+    cache_root: Path | None = None,
 ) -> dict[str, Any]:
     root = repo_root.expanduser().resolve()
     policy = structural_scan_policy(config)
@@ -70,67 +76,120 @@ def create_code_quality_scan(
         scan=scan,
         config=config,
         module="code_quality",
+        cache_mode=str(cache_mode),
+        cache_root=cache_root,
+        read_files=analysis_mode == "full",
     )
     skipped_files = list(scope.skipped_files)
+    source_analysis_cache = (
+        cast(SourceAnalysisCache, scope.source_analysis_cache)
+        if scope.source_analysis_cache is not None
+        else SourceAnalysisCache(root, cache_mode=cache_mode, cache_root=cache_root)
+    )
+    analysis_cache = IncrementalAnalysisCache(
+        root,
+        analysis_kind="code-quality",
+        config=config,
+        cache_mode=cache_mode,
+        cache_root=cache_root,
+    )
     findings: list[dict[str, Any]] = []
     extracted_functions: list[dict[str, Any]] = []
     accountability: list[dict[str, Any]] = []
     scanned_files: list[dict[str, Any]] = []
 
-    for file_info in scope.files:
-        relative_path = file_info.path
-        source_text = file_info.text
-        source_lines = file_info.lines
-        lines = redact_secret_like_source_lines(source_lines)
+    if scope.files:
+        source_items = [(file_info.path, file_info.text, file_info.lines) for file_info in scope.files]
+    else:
+        source_items = [(relative_path, "", []) for relative_path in scope.file_paths]
+    for relative_path, source_text, source_lines in source_items:
+        if source_text:
+            file_result = analysis_cache.get_or_compute(
+                relative_path=relative_path,
+                source_text=source_text,
+                compute=lambda relative_path=relative_path, source_text=source_text, source_lines=source_lines: (
+                    _analyze_code_quality_file(
+                        relative_path=relative_path,
+                        source_text=source_text,
+                        source_lines=source_lines,
+                        source_analysis_cache=source_analysis_cache,
+                        disabled_groups=disabled_groups,
+                        large_file_lines=policy["large_file_lines"],
+                        fat_router_lines=policy["fat_router_lines"],
+                    )
+                ),
+                validate=_valid_code_quality_file_result,
+            )
+        else:
+            file_result = analysis_cache.get_or_compute_from_path(
+                relative_path=relative_path,
+                source_path=root / relative_path,
+                compute=lambda source_text, relative_path=relative_path: _analyze_code_quality_file(
+                    relative_path=relative_path,
+                    source_text=source_text,
+                    source_lines=_split_lines(source_text),
+                    source_analysis_cache=source_analysis_cache,
+                    disabled_groups=disabled_groups,
+                    large_file_lines=policy["large_file_lines"],
+                    fat_router_lines=policy["fat_router_lines"],
+                ),
+                validate=_valid_code_quality_file_result,
+            )
+        lines = _string_list_result(file_result, "redacted_lines")
         text = "\n".join(lines)
         scanned_files.append({"path": relative_path, "text": text, "lines": lines})
         accountability.append(
             {
                 "path": relative_path,
                 "line_count": len(lines),
-                "sha256": hashlib.sha256(source_text.encode("utf-8")).hexdigest(),
+                "sha256": analysis_cache.content_sha256_for(relative_path)
+                or hashlib.sha256(source_text.encode("utf-8")).hexdigest(),
                 "scan_status": "scanned",
                 "check_coverage": _check_coverage(relative_path),
             }
         )
-        findings.extend(
-            _scan_file(
-                relative_path=relative_path,
-                text=text,
-                lines=lines,
-                disabled_groups=disabled_groups,
-                large_file_lines=policy["large_file_lines"],
-                fat_router_lines=policy["fat_router_lines"],
-            )
-        )
-        extracted_functions.extend(_extract_functions(relative_path, lines))
+        findings.extend(_dict_list_result(file_result, "findings"))
+        extracted_functions.extend(_dict_list_result(file_result, "extracted_functions"))
 
+    deferred_checks: list[dict[str, str]] = []
     semantic_similarity_clusters = 0
     semantic_similarity_tools: dict[str, str] = {}
-    (
-        duplicate_clusters,
-        deduplicate_findings,
-        semantic_similarity_clusters,
-        semantic_similarity_tools,
-    ) = collect_deduplicate_scan(
-        root,
-        extracted_functions=extracted_functions,
-        scanned_files=scanned_files,
-        policy=policy,
-        disabled_groups=disabled_groups,
-    )
-    findings.extend(deduplicate_findings)
+    duplicate_clusters: list[dict[str, Any]] = []
+    if analysis_mode == "balanced":
+        deferred_checks.extend(
+            {
+                "check": check,
+                "reason": "global analysis is deferred until an explicit full refresh",
+                "severity": "advisory",
+            }
+            for check in ("similarity", "ponytail", "bundle", "unwired", "architecture")
+        )
+        semantic_similarity_tools = {"quality-runner": "deferred"}
+    else:
+        (
+            duplicate_clusters,
+            deduplicate_findings,
+            semantic_similarity_clusters,
+            semantic_similarity_tools,
+        ) = collect_deduplicate_scan(
+            root,
+            extracted_functions=extracted_functions,
+            scanned_files=scanned_files,
+            policy=policy,
+            disabled_groups=disabled_groups,
+        )
+        findings.extend(deduplicate_findings)
 
-    if "ponytail" not in disabled_groups:
-        findings.extend(ponytail_findings(scanned_files))
+        if "ponytail" not in disabled_groups:
+            findings.extend(ponytail_findings(scanned_files))
 
-    if "speed" not in disabled_groups:
-        findings.extend(bundle_budget_findings(root))
+        if "speed" not in disabled_groups:
+            findings.extend(bundle_budget_findings(root))
 
-    if "integrate" not in disabled_groups:
-        findings.extend(unwired_findings(scanned_files, config))
+        if "integrate" not in disabled_groups:
+            findings.extend(unwired_findings(scanned_files, config))
 
-    findings.extend(architecture_findings(scanned_files, config))
+        findings.extend(architecture_findings(scanned_files, config))
     skill_findings, skill_coverage, quality_skills, skill_selection = (
         scan_quality_skills_with_selection(
             root,
@@ -185,7 +244,65 @@ def create_code_quality_scan(
         "quality_skills": quality_skills,
         "skill_coverage": skill_coverage,
         "skill_selection": skill_selection,
+        "analysis_mode": analysis_mode,
+        "coverage": "partial" if deferred_checks else "full",
+        "deferred_checks": deferred_checks,
+        "analysis_cache": analysis_cache.evidence(
+            considered_files=len(scope.file_paths or tuple(file_info.path for file_info in scope.files))
+        ),
     }
+
+
+def _analyze_code_quality_file(
+    *,
+    relative_path: str,
+    source_text: str,
+    source_lines: list[str],
+    source_analysis_cache: SourceAnalysisCache,
+    disabled_groups: set[str],
+    large_file_lines: int,
+    fat_router_lines: int,
+) -> dict[str, object]:
+    lines = source_analysis_cache.redacted_lines_for_source(
+        source_text=source_text,
+        source_lines=source_lines,
+        redactor=redact_secret_like_source_lines,
+    )
+    text = "\n".join(lines)
+    return {
+        "redacted_lines": lines,
+        "findings": _scan_file(
+            relative_path=relative_path,
+            text=text,
+            lines=lines,
+            disabled_groups=disabled_groups,
+            large_file_lines=large_file_lines,
+            fat_router_lines=fat_router_lines,
+        ),
+        "extracted_functions": _extract_functions(relative_path, lines),
+    }
+
+
+def _valid_code_quality_file_result(result: dict[str, object]) -> bool:
+    return (
+        _string_list_result(result, "redacted_lines") is not None
+        and _dict_list_result(result, "findings") is not None
+        and _dict_list_result(result, "extracted_functions") is not None
+    )
+
+
+def _string_list_result(result: dict[str, object], key: str) -> list[str]:
+    value = result.get(key)
+    if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
+        raise ValueError(f"invalid cached code-quality result field: {key}")
+    return list(value)
+
+
+def _dict_list_result(result: dict[str, object], key: str) -> list[dict[str, Any]]:
+    value = result.get(key)
+    if not isinstance(value, list) or not all(isinstance(item, dict) for item in value):
+        raise ValueError(f"invalid cached code-quality result field: {key}")
+    return [cast(dict[str, Any], item) for item in value]
 
 
 def preview_ignored_paths(

@@ -6,6 +6,11 @@ from typing import Any
 
 from quality_runner.architecture_config_parse import parse_architecture_section
 from quality_runner.artifact_config_parse import parse_artifacts_section
+from quality_runner.disposition_config import (
+    DISPOSITION_FILE_NAME,
+    load_grouped_dispositions,
+    parse_inline_dispositions,
+)
 from quality_runner.integrate_config_parse import parse_integrate_section
 from quality_runner.scan_exclusions_config import parse_scan_exclusions_by_module
 from quality_runner.security.config_parse import parse_security_section
@@ -15,17 +20,20 @@ from quality_runner.structural_scan_config_parse import parse_structural_scan_se
 CONFIG_FILE_NAME = ".quality-runner.toml"
 CONFIG_SCHEMA = "quality-runner-config-v0.1"
 PROFILE_EXTENDS_DEFAULT = "default"
-ACCEPTED_DISPOSITION_STATUSES = {
-    "accepted-intentional",
-    "accepted-false-positive",
-    "blocked-with-prerequisite",
-}
 
 
 def load_repo_config(repo_root: Path) -> dict[str, Any]:
-    path = repo_root.expanduser().resolve() / CONFIG_FILE_NAME
-    if not path.exists():
+    root = repo_root.expanduser().resolve()
+    path = root / CONFIG_FILE_NAME
+    disposition_path = root / DISPOSITION_FILE_NAME
+    if not path.exists() and not disposition_path.exists():
         return _empty_config(path=None, warnings=[])
+
+    if not path.exists():
+        accepted_dispositions, warnings = load_grouped_dispositions(root)
+        return _empty_config(path=DISPOSITION_FILE_NAME, warnings=warnings) | {
+            "accepted_dispositions": accepted_dispositions,
+        }
 
     try:
         payload = tomllib.loads(path.read_text(encoding="utf-8"))
@@ -66,7 +74,12 @@ def load_repo_config(repo_root: Path) -> dict[str, Any]:
     warnings.extend(module_warnings)
     gates = _gates(section.get("gates"), warnings)
     exceptions = _accepted_exceptions(section.get("accepted_exceptions"), warnings)
-    accepted_dispositions = _accepted_dispositions(section.get("accepted_dispositions"), warnings)
+    accepted_dispositions = parse_inline_dispositions(
+        section.get("accepted_dispositions"), warnings
+    )
+    grouped_dispositions, grouped_warnings = load_grouped_dispositions(root)
+    accepted_dispositions.extend(grouped_dispositions)
+    warnings.extend(grouped_warnings)
     gate_timeouts = _positive_int_mapping(
         section.get("gate_timeouts"), "quality_runner.gate_timeouts", warnings
     )
@@ -407,85 +420,6 @@ def _accepted_exceptions(value: object, warnings: list[dict[str, str]]) -> list[
     return accepted
 
 
-def _accepted_dispositions(
-    value: object,
-    warnings: list[dict[str, str]],
-) -> list[dict[str, Any]]:
-    if value is None:
-        return []
-    if not isinstance(value, list):
-        warnings.append(
-            _warning(
-                "invalid_quality_runner_config_field",
-                "quality_runner.accepted_dispositions must be a list of tables",
-            )
-        )
-        return []
-
-    accepted: list[dict[str, Any]] = []
-    for index, item in enumerate(value):
-        if not isinstance(item, dict):
-            _accepted_disposition_warning(index, warnings)
-            continue
-        fingerprint = item.get("fingerprint")
-        status = item.get("status")
-        reason = item.get("reason")
-        owner = item.get("owner")
-        expires = item.get("expires")
-        source_run_id = item.get("source_run_id")
-        review_evidence = item.get("review_evidence")
-        if (
-            isinstance(fingerprint, str)
-            and fingerprint
-            and isinstance(status, str)
-            and status in ACCEPTED_DISPOSITION_STATUSES
-            and isinstance(reason, str)
-            and reason
-            and isinstance(owner, str)
-            and owner
-            and (expires is None or isinstance(expires, str))
-            and (source_run_id is None or isinstance(source_run_id, str))
-            and (
-                review_evidence is None
-                or (
-                    isinstance(review_evidence, list)
-                    and all(isinstance(entry, str) and entry for entry in review_evidence)
-                )
-            )
-        ):
-            accepted.append(
-                {
-                    "fingerprint": fingerprint,
-                    "status": status,
-                    "reason": reason,
-                    "owner": owner,
-                    **({"expires": expires} if isinstance(expires, str) and expires else {}),
-                    **(
-                        {"source_run_id": source_run_id}
-                        if isinstance(source_run_id, str) and source_run_id
-                        else {}
-                    ),
-                    **(
-                        {"review_evidence": review_evidence}
-                        if isinstance(review_evidence, list) and review_evidence
-                        else {}
-                    ),
-                }
-            )
-        else:
-            _accepted_disposition_warning(index, warnings)
-    return accepted
-
-
-def _accepted_disposition_warning(index: int, warnings: list[dict[str, str]]) -> None:
-    warnings.append(
-        _warning(
-            "invalid_quality_runner_config_field",
-            f"quality_runner.accepted_dispositions[{index}] must include fingerprint, status, reason, owner, and optional expires strings",
-        )
-    )
-
-
 def _accepted_exception_warning(index: int, warnings: list[dict[str, str]]) -> None:
     warnings.append(
         _warning(
@@ -495,5 +429,5 @@ def _accepted_exception_warning(index: int, warnings: list[dict[str, str]]) -> N
     )
 
 
-def _warning(code: str, message: str) -> dict[str, str]:
-    return dict(code=code, message=message, path=CONFIG_FILE_NAME)
+def _warning(code: str, message: str, *, path: str = CONFIG_FILE_NAME) -> dict[str, str]:
+    return dict(code=code, message=message, path=path)

@@ -67,10 +67,12 @@ def test_run_payload_writes_audit_plan_and_handoff(tmp_path: Path) -> None:
         "repo_scan_json",
         "code_quality_scan_json",
         "security_scan_json",
+        "security_review_obligations_json",
         "package_manager_preflight_json",
         "standards_json",
         "capability_matrix_json",
         "run_manifest_json",
+        "performance_json",
         "quality_audit_json",
         "remediation_plan_json",
         "remediation_context_json",
@@ -94,6 +96,7 @@ def test_run_payload_writes_audit_plan_and_handoff(tmp_path: Path) -> None:
     assert Path(artifact_paths["run_manifest_json"]).exists()
     assert Path(artifact_paths["quality_audit_json"]).exists()
     assert Path(artifact_paths["code_quality_scan_json"]).exists()
+    assert Path(artifact_paths["security_review_obligations_json"]).exists()
     assert Path(artifact_paths["package_manager_preflight_json"]).exists()
     assert Path(artifact_paths["resolution_ledger_json"]).exists()
     assert Path(artifact_paths["resolution_ledger_md"]).exists()

@@ -4,6 +4,8 @@ from pathlib import Path
 from typing import Any
 
 from quality_runner.adoption import build_adoption_stage, handoff_adoption_stage, stopping_criteria
+from quality_runner.core.audit_contracts import TextScanScope
+from quality_runner.evidence_excerpts import SourceExcerptReader
 from quality_runner.handoff_gate_suggestions import (
     gate_severity,
     suggested_gate_command,
@@ -44,6 +46,7 @@ def build_remediation_plan(
     code_quality_scan: dict[str, Any] | None = None,
     repo_root: Path | None = None,
     git_state: dict[str, Any] | None = None,
+    text_scan_scope: TextScanScope | None = None,
 ) -> dict[str, Any]:
     all_findings = sorted(_findings(audit_report), key=finding_sort_key)
     remediation_findings = [
@@ -61,33 +64,33 @@ def build_remediation_plan(
         code_quality_scan,
         excluded_categories={"integrate"} if wiring_slices else set(),
     )
-    slices = sorted(
-        [
-            *[
-                slice_for_finding(finding)
-                for finding in remediation_findings
-                if _include_finding_slice(
-                    finding,
-                    structural_slices=structural_slices,
-                    wiring_slices=wiring_slices,
-                )
-            ],
-            *structural_slices,
-            *wiring_slices,
+    slices = [
+        *[
+            slice_for_finding(finding)
+            for finding in remediation_findings
+            if _include_finding_slice(
+                finding,
+                structural_slices=structural_slices,
+                wiring_slices=wiring_slices,
+            )
         ],
-        key=slice_sort_key,
-    )
-    security_review_slices = sorted(
-        [slice_for_finding(finding) for finding in security_review_findings],
-        key=slice_sort_key,
-    )
+        *structural_slices,
+        *wiring_slices,
+    ]
+    security_review_slices = [slice_for_finding(finding) for finding in security_review_findings]
     run_id = _string_or_none(audit_report.get("run_id"))
+    excerpt_reader = (
+        SourceExcerptReader(repo_root, source_scope=text_scan_scope)
+        if repo_root is not None
+        else None
+    )
     slices = enrich_remediation_slices(
         slices,
         repo_root=repo_root,
         git_state=git_state,
         code_quality_scan=code_quality_scan,
         run_id=run_id,
+        excerpt_reader=excerpt_reader,
     )
     security_review_slices = enrich_remediation_slices(
         security_review_slices,
@@ -95,6 +98,7 @@ def build_remediation_plan(
         git_state=git_state,
         code_quality_scan=code_quality_scan,
         run_id=run_id,
+        excerpt_reader=excerpt_reader,
     )
     slices = sorted(slices, key=slice_sort_key)
     slices = annotate_remediation_slices(slices)
@@ -295,6 +299,7 @@ def _findings(audit_report: dict[str, Any]) -> list[dict[str, Any]]:
                     "verification": verification,
                     "score": score if isinstance(score, int) else _default_score(severity),
                     **_optional_actionability(finding),
+                    **_optional_disposition(finding),
                 }
             )
     return normalized
@@ -427,6 +432,20 @@ def _optional_actionability(finding: dict[str, Any]) -> dict[str, str]:
     payload: dict[str, str] = {"actionability": actionability}
     if isinstance(rationale, str) and rationale:
         payload["actionability_rationale"] = rationale
+    return payload
+
+
+def _optional_disposition(finding: dict[str, Any]) -> dict[str, Any]:
+    payload: dict[str, Any] = {}
+    for key in (
+        "disposition_class",
+        "disposition_group",
+        "disposition_required",
+        "owner_role",
+        "disposition_rationale",
+    ):
+        if key in finding and finding[key] is not None:
+            payload[key] = finding[key]
     return payload
 
 

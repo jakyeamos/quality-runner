@@ -60,6 +60,29 @@ def add_workflow_arguments(parser: argparse.ArgumentParser) -> None:
         default=None,
         help="Agent skill-review policy for this run",
     )
+    parser.add_argument(
+        "--analysis-mode",
+        choices=["balanced", "full"],
+        default="full",
+        help="Use the fast planning loop or the explicit full assurance scan",
+    )
+    parser.add_argument(
+        "--cache-mode",
+        choices=["repo", "external", "disabled"],
+        default="repo",
+        help="Choose repository, external, or disabled analysis-cache persistence",
+    )
+    parser.add_argument(
+        "--cache-dir",
+        default=None,
+        help="External cache root; used with --cache-mode external",
+    )
+    parser.add_argument(
+        "--performance-budget-seconds",
+        type=float,
+        default=None,
+        help="Record a bounded partial receipt when this analysis budget is exceeded",
+    )
     add_intent_cli_arguments(parser)
     parser.add_argument(
         "--no-progress",

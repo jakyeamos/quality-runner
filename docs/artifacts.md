@@ -236,6 +236,55 @@ can still expose sensitive context. Retain or remove artifacts using the target
 repository's normal evidence-retention policy. See the [Threat Model](threat-model.md)
 for the remaining execution boundary.
 
+## Incremental scan cache and retention
+
+Repository inventory and per-file code-quality/security results are cached
+separately from run output under `.quality-runner/cache/`. Inventory uses
+`.quality-runner/cache/repository-inventory-v1/`; per-file results use
+`.quality-runner/cache/incremental-analysis-v1/`. Cache keys include the
+relative source path, source-content digest, Quality Runner version, scanner
+implementation digest, normalized scanner configuration, relevant dependency
+state, and the active analysis context. Each scan artifact records cache hits,
+misses, recomputation counts, and invalidation reasons. Cache entries are
+validated before reuse and written atomically; missing, corrupt, or interrupted
+cache state recomputes the affected file instead of being treated as fresh.
+
+The cache is not a scan input: `.quality-runner/` remains excluded from source
+discovery, and cache entries contain only validated scanner results. Run output
+continues to live under `.quality-runner/runs/<run-id>/`. Cache persistence is an
+explicit run mode:
+
+- `repo` reads and refreshes the normal target-repository cache under
+  `.quality-runner/cache/`.
+- `external` reads and refreshes a cache outside the target checkout, namespaced
+  by repository identity. This is the default for planning and contract
+  preflight workflows, and leaves no target-repository cache state.
+- `disabled` reads and writes no analysis cache and is reserved for diagnostics.
+
+Each run records the selected mode, cache hits, misses, invalidation reasons,
+recomputed files, index writes, and source bytes read in its machine-readable
+`performance.json` receipt. It also records deferred checks and timeout reasons;
+partial evidence is never presented as a complete assurance scan. Normal
+planning reuses these caches and records inventory plus per-module cache evidence
+in `repo-scan.json`, `security-scan.json`, and `code-quality-scan.json`.
+
+For a small change review, `refresh --changed-only` limits source analysis to the
+baseline and working-tree changed paths. It fails closed when no changed path is
+available rather than silently claiming a focused review.
+
+To bound generated run output, configure one or both limits:
+
+```toml
+[quality_runner.artifacts]
+retention_runs = 12
+retention_days = 30
+```
+
+Completed `refresh` runs apply the configured policy after the final phase while
+preserving the current inspect, run, and verify directories. The explicit
+`prune-artifacts` command remains available for a dry run or an on-demand
+cleanup; deletion requires `--apply`.
+
 ## Gate Verification Artifacts
 
 `quality-runner verify-gates` records discovered command-backed capabilities,
@@ -421,7 +470,13 @@ publication proof.
 Discovery skips common non-product trees by default: `docs`, `fixtures`,
 `corpus`, `generated-corpus`, `generated-corpora`, `vendor`, `vendors`,
 `vendored`, and `third_party`, alongside tool output directories such as
-`.git`, `.quality-runner`, `node_modules`, `dist`, and `build`.
+`.git`, `.quality-runner`, `node_modules`, `dist`, and `build`. Generated preview
+output below `.design-sync/previews/` is excluded while tracked `.design-sync`
+configuration remains inspectable.
+
+Refresh gives inspect and run independent phase budgets through
+`--inspect-timeout-seconds` and `--run-timeout-seconds`; the overall deadline, when
+provided, remains a hard upper bound.
 
 Root `.gitignore` entries are also applied during traversal, so untracked
 ignored dependency, cache, generated, or nested-project directories are pruned

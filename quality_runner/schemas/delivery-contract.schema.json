@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://quality-runner.dev/schemas/delivery-contract.schema.json",
+  "title": "Quality Runner delivery contract",
+  "type": "object",
+  "required": [
+    "schema",
+    "contract_id",
+    "contract_stage",
+    "repo_root",
+    "qr_run_refs",
+    "source_fingerprints",
+    "standards",
+    "obligations",
+    "analysis_mode",
+    "cache_mode",
+    "coverage",
+    "deferred_checks",
+    "performance"
+  ],
+  "properties": {
+    "schema": {"const": "quality-runner-delivery-contract-v0.1"},
+    "contract_id": {"type": "string", "minLength": 1},
+    "contract_stage": {"type": "string", "enum": ["prepare", "refresh"]},
+    "created_at": {"type": "string", "minLength": 1},
+    "repo_root": {"type": "string", "minLength": 1},
+    "intent": {"type": ["string", "null"]},
+    "phase_id": {"type": ["string", "null"]},
+    "plan_id": {"type": ["string", "null"]},
+    "qr_run_refs": {"type": "array", "items": {"type": "object"}},
+    "git_baseline": {"type": "object"},
+    "source_fingerprints": {"type": "object", "additionalProperties": {"type": "string"}},
+    "standards": {"type": "object"},
+    "context": {"type": "object"},
+    "research": {"type": "object"},
+    "obligations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "kind", "scope", "acceptance_criteria", "required_evidence", "verification_commands", "stop_conditions"],
+        "properties": {
+          "id": {"type": "string", "minLength": 1},
+          "kind": {"type": "string", "enum": ["hard", "advisory"]},
+          "scope": {"type": "array", "items": {"type": "string"}},
+          "acceptance_criteria": {"type": "array", "items": {"type": "string"}},
+          "required_evidence": {"type": "array", "items": {"type": "string"}},
+          "verification_commands": {"type": "array", "items": {"type": "string"}},
+          "stop_conditions": {"type": "array", "items": {"type": "string"}}
+        },
+        "additionalProperties": true
+      }
+    },
+    "analysis_mode": {"type": "string", "enum": ["balanced", "full"]},
+    "cache_mode": {"type": "string", "enum": ["repo", "external", "disabled"]},
+    "latency_budget_seconds": {"type": ["number", "null"], "minimum": 0},
+    "evidence_freshness": {"type": "string", "minLength": 1},
+    "coverage": {"type": "object"},
+    "deferred_checks": {"type": "array", "items": {"type": "object"}},
+    "performance": {"type": ["object", "null"]},
+    "blockers": {"type": "array", "items": {"type": "object"}}
+  },
+  "additionalProperties": true
+}

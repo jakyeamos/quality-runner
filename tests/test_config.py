@@ -228,6 +228,86 @@ def test_load_repo_config_reads_structural_scan_policy_and_accepted_dispositions
     ]
 
 
+def test_load_repo_config_reads_compact_grouped_dispositions_without_local_config(tmp_path) -> None:
+    from quality_runner.config import load_repo_config
+
+    (tmp_path / ".quality-runner-dispositions.toml").write_text(
+        "\n".join(
+            [
+                'schema = "quality-runner-dispositions-v1"',
+                "",
+                "[[quality_runner.accepted_disposition_groups]]",
+                'status = "accepted-false-positive"',
+                'reason = "Safe fixture values."',
+                'owner = "security"',
+                'expires = "2999-01-01"',
+                'source_run_id = "qr-test"',
+                'review_evidence = ["evidence.md"]',
+                'fingerprints = ["sec-one", "sec-two"]',
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    config = load_repo_config(tmp_path)
+
+    assert config["path"] == ".quality-runner-dispositions.toml"
+    assert config["warnings"] == []
+    assert config["accepted_dispositions"] == [
+        {
+            "fingerprint": "sec-one",
+            "status": "accepted-false-positive",
+            "reason": "Safe fixture values.",
+            "owner": "security",
+            "expires": "2999-01-01",
+            "source_run_id": "qr-test",
+            "review_evidence": ["evidence.md"],
+        },
+        {
+            "fingerprint": "sec-two",
+            "status": "accepted-false-positive",
+            "reason": "Safe fixture values.",
+            "owner": "security",
+            "expires": "2999-01-01",
+            "source_run_id": "qr-test",
+            "review_evidence": ["evidence.md"],
+        },
+    ]
+
+
+def test_load_repo_config_rejects_duplicate_grouped_fingerprints(tmp_path) -> None:
+    from quality_runner.config import load_repo_config
+
+    (tmp_path / ".quality-runner-dispositions.toml").write_text(
+        "\n".join(
+            [
+                'schema = "quality-runner-dispositions-v1"',
+                "",
+                "[[quality_runner.accepted_disposition_groups]]",
+                'status = "accepted-false-positive"',
+                'reason = "First."',
+                'owner = "security"',
+                'fingerprints = ["sec-duplicate"]',
+                "",
+                "[[quality_runner.accepted_disposition_groups]]",
+                'status = "accepted-false-positive"',
+                'reason = "Second."',
+                'owner = "security"',
+                'fingerprints = ["sec-duplicate"]',
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    config = load_repo_config(tmp_path)
+
+    assert len(config["accepted_dispositions"]) == 1
+    assert config["accepted_dispositions"][0]["reason"] == "First."
+    assert config["warnings"][0]["code"] == "invalid_quality_runner_dispositions"
+
+
 def test_load_repo_config_reads_integrate_policy(tmp_path) -> None:
     from quality_runner.config import load_repo_config
 
@@ -770,6 +850,9 @@ def test_packaged_schema_files_are_parseable() -> None:
         "phase-batch-result.schema.json",
         "phase-verification.schema.json",
         "outcome.schema.json",
+        "performance.schema.json",
+        "delivery-contract.schema.json",
+        "delivery-result.schema.json",
     }
 
     loaded = {}

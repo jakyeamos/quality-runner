@@ -44,6 +44,13 @@ def refresh_payload(
     agent_review_mode: str | None = None,
     scan_exclusion_overlay: ScanExclusionOverlay | None = None,
     progress: ProgressCallback | None = None,
+    focus_paths: list[str] | None = None,
+    inspect_timeout_seconds: int | None = None,
+    run_timeout_seconds: int | None = None,
+    analysis_mode: str = "full",
+    cache_mode: str = "repo",
+    cache_root: Path | None = None,
+    performance_budget_seconds: float | None = None,
 ) -> dict[str, Any]:
     return _refresh_payload(
         repo_root=repo_root,
@@ -57,6 +64,8 @@ def refresh_payload(
         workflow_timeout_reason=workflow_timeout_reason,
         total_timeout_seconds=total_timeout_seconds,
         total_timeout_reason=total_timeout_reason,
+        inspect_timeout_seconds=inspect_timeout_seconds,
+        run_timeout_seconds=run_timeout_seconds,
         checkout_most_advanced_branch=checkout_most_advanced_branch,
         execute_discovered_gates=execute_discovered_gates,
         agent_review_mode=agent_review_mode,
@@ -73,4 +82,9 @@ def refresh_payload(
         summary_callback=build_run_summary,
         refresh_runner=run_refresh_payload,
         progress=progress,
+        focus_paths=focus_paths,
+        analysis_mode=analysis_mode,
+        cache_mode=cache_mode,
+        cache_root=cache_root,
+        performance_budget_seconds=performance_budget_seconds,
     )

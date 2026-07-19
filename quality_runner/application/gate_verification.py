@@ -220,6 +220,7 @@ def _audit_request(
         scan_exclusion_overlay=request.scan_exclusion_overlay,
         agent_review_mode=request.agent_review_mode,
         readiness_evidence_file=request.readiness_evidence_file,
+        cache_mode="external",
     )
 
 

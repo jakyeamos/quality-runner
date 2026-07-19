@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://quality-runner.dev/schemas/delivery-result.schema.json",
+  "title": "Quality Runner delivery result",
+  "type": "object",
+  "required": ["schema", "operation", "status", "implementation_allowed", "contract_id", "blockers"],
+  "properties": {
+    "schema": {"const": "quality-runner-delivery-result-v0.1"},
+    "operation": {"type": "string", "enum": ["preflight", "reconcile"]},
+    "status": {"type": "string", "enum": ["ready", "blocked", "reconciled"]},
+    "implementation_allowed": {"const": false},
+    "contract_id": {"type": "string", "minLength": 1},
+    "contract_path": {"type": "string", "minLength": 1},
+    "plan_scanned": {"type": "boolean"},
+    "repository_scanned": {"type": "boolean"},
+    "coverage": {"type": "array", "items": {"type": "object"}},
+    "obligation_results": {"type": "array", "items": {"type": "object"}},
+    "blockers": {"type": "array", "items": {"type": "object"}},
+    "source_fingerprints": {"type": "object"},
+    "qr_run_id": {"type": ["string", "null"]},
+    "current_qr_delta": {"type": "object"},
+    "performance": {"type": ["object", "null"]},
+    "reconciliation_path": {"type": "string"}
+  },
+  "additionalProperties": true
+}
