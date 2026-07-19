@@ -101,6 +101,12 @@ render their invocation name for help/no-argument guidance and preserve the
 existing version and JSON contracts. No tags, registries, or published
 artifacts were changed.
 
+The short `qr` console command shipped in `fe48b25`. It points to the same CLI
+entrypoint as `quality-runner`, so a one-time editable install from this
+checkout gives local consumers a stable command surface that follows the
+checkout's current code without repeated `--project` invocations or GitHub
+fetches.
+
 ## Current Position
 
 - Target: a typed v2 core behind CLI, MCP, and compatibility adapters.
