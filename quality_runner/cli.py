@@ -20,6 +20,7 @@ from quality_runner.cli_human_summary import human_summary
 from quality_runner.cli_journeys import add_journey_commands
 from quality_runner.cli_outcome import OUTCOME_SCHEMA, render_outcome
 from quality_runner.cli_payload import payload_for_args
+from quality_runner.cli_phase import add_phase_commands
 from quality_runner.cli_planning import add_planning_commands
 from quality_runner.cli_remediation import add_remediation_commands
 from quality_runner.cli_review import add_review_command
@@ -304,6 +305,7 @@ def build_parser(prog: str = CANONICAL_PROGRAM) -> argparse.ArgumentParser:
     add_remediation_commands(subparsers)
 
     add_planning_commands(subparsers)
+    add_phase_commands(subparsers)
 
     doctor_parser = subparsers.add_parser("doctor", help="Check Quality Runner readiness")
     doctor_parser.add_argument("--json", action="store_true", help="Emit JSON output")
@@ -382,6 +384,7 @@ def main(argv: list[str] | None = None) -> int:
             "validate-remediation-context",
             "validate-slice-spec",
             "review-worker",
+            "phase-check",
             "exclusions",
         }
         and payload.get("status") == "rejected"
@@ -392,6 +395,8 @@ def main(argv: list[str] | None = None) -> int:
     if parsed.command == "release-smoke" and payload.get("status") != "passed":
         return 1
     if parsed.command == "summarize-run" and has_rejected_self_check(payload):
+        return 1
+    if parsed.command == "phase-check" and payload.get("status") != "passed":
         return 1
     if parsed.command == "self-update" and payload.get("status") in {"blocked", "failed"}:
         return 1

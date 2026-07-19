@@ -135,6 +135,7 @@ def analyze_read_only_audit(
                 scan=scan,
                 config=config,
                 focus_paths=request.focus_paths,
+                include_paths=request.include_paths,
                 read_files=request.analysis_mode == "full",
                 cache_mode=cache_mode,
                 cache_root=cache_root,
@@ -148,6 +149,7 @@ def analyze_read_only_audit(
                 config=config,
                 module="code_quality",
                 focus_paths=request.focus_paths,
+                include_paths=request.include_paths,
                 read_files=request.analysis_mode == "full",
                 cache_mode=cache_mode,
                 cache_root=cache_root,
@@ -159,6 +161,7 @@ def analyze_read_only_audit(
                 config=config,
                 module="security",
                 focus_paths=request.focus_paths,
+                include_paths=request.include_paths,
                 read_files=request.analysis_mode == "full",
                 cache_mode=cache_mode,
                 cache_root=cache_root,
@@ -203,6 +206,7 @@ def analyze_read_only_audit(
             severity = deferred.get("severity", "advisory")
             if isinstance(check, str) and isinstance(reason, str) and isinstance(severity, str):
                 recorder.defer(check, reason=reason, severity=severity)
+    scan = {**scan, "include_paths": list(request.include_paths)}
     scan = append_warnings(scan, skill_warnings)
     scan["cache_summary"] = _cache_summary(
         scan=scan,

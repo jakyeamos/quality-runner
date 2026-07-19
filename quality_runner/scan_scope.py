@@ -5,22 +5,26 @@ from pathlib import Path
 from typing import Any
 
 from quality_runner.code_quality_paths import (
-    TEXT_EXTENSIONS,
     _artifact_directory_reason,
     _ignored_directory_reason,
     _is_generated_file,
-    _is_included_or_included_parent,
     _join_relative,
     _top_level_ignored_directory_reason,
     _under_generated_path,
 )
 from quality_runner.core.audit_contracts import AuditPayload, ScannedTextFile, TextScanScope
 from quality_runner.scan_exclusions import (
-    effective_scan_exclusions as configured_effective_scan_exclusions,
-)
-from quality_runner.scan_exclusions import (
-    matches_scan_exclusion,
     record_scan_activity,
+)
+from quality_runner.scan_scope_helpers import (
+    _scope_allows_directory,
+    _scope_includes_file,
+    effective_scan_exclusions,
+    generated_paths,
+    is_scan_excluded,
+    is_security_surface_file,
+    is_text_file,
+    normalized_path_list,
 )
 from quality_runner.scan_scope_reading import read_text_file
 from quality_runner.scan_scope_reporting import (
@@ -33,7 +37,6 @@ from quality_runner.scan_scope_reporting import (
 from quality_runner.scan_scope_reporting import (
     fast_skipped_directory_entry as _fast_skipped_directory_entry,
 )
-from quality_runner.security_surface_paths import is_security_surface_path
 from quality_runner.semantic_similarity_policy import similarity_policy_defaults
 from quality_runner.source_analysis_cache import SourceAnalysisCache
 
@@ -41,9 +44,6 @@ DEFAULT_LARGE_FILE_LINES = 500
 DEFAULT_FAT_ROUTER_LINES = 500
 DEFAULT_MAX_TEXT_FILES = 2_500
 DEFAULT_MAX_SECURITY_SURFACE_PATHS = 5_000
-TEXT_FILE_NAMES = {"Dockerfile", "Makefile"}
-SECURITY_SURFACE_FILE_NAMES = {"Cargo.toml", "go.mod", "package.json", "pyproject.toml"}
-
 __all__ = [
     "create_text_scan_scope",
     "discover_scan_inventory",
@@ -113,6 +113,7 @@ def create_text_scan_scope(
     read_files: bool = True,
     cache_mode: str = "repo",
     cache_root: Path | None = None,
+    include_paths: tuple[str, ...] = (),
 ) -> TextScanScope:
     root = repo_root.expanduser().resolve()
     policy = structural_scan_policy(config)
@@ -124,6 +125,7 @@ def create_text_scan_scope(
         scan_exclusions=scan_exclusions,
         max_text_files=policy["max_text_files"],
         focus_paths=focus_paths,
+        include_paths=include_paths,
     )
     paths = inventory["text_paths"]
     skipped_files = list(inventory["skipped_files"])
@@ -156,6 +158,7 @@ def create_text_scan_scope(
         focus_paths=tuple(sorted(set(focus_paths))),
         file_paths=tuple(path.relative_to(root).as_posix() for path in paths),
         inventory=inventory_payload,
+        include_paths=include_paths,
     )
 
 
@@ -167,6 +170,7 @@ def discover_scan_inventory(
     scan_exclusions: list[str],
     max_text_files: int,
     focus_paths: tuple[str, ...] = (),
+    include_paths: tuple[str, ...] = (),
 ) -> dict[str, Any]:
     """Walk the repository once and produce both analysis and security scope inputs."""
     text_paths: list[Path] = []
@@ -186,6 +190,9 @@ def discover_scan_inventory(
         metrics["visited_directories"] += 1
         metrics["visited_paths"] += 1
         relative_current = current_path.relative_to(root).as_posix()
+        if include_paths and not _scope_allows_directory(relative_current, include_paths):
+            dir_names[:] = []
+            continue
         ignored: list[tuple[str, str]] = []
         for name in sorted(dir_names):
             relative_name = _join_relative(relative_current, name)
@@ -223,6 +230,8 @@ def discover_scan_inventory(
             metrics["visited_paths"] += 1
             path = current_path / file_name
             relative_path = path.relative_to(root).as_posix()
+            if include_paths and not _scope_includes_file(relative_path, include_paths):
+                continue
             if path.is_symlink() or not path.is_file():
                 continue
             if is_scan_excluded(
@@ -290,6 +299,7 @@ def discover_text_files(
     scan_exclusions: list[str],
     max_text_files: int,
     focus_paths: tuple[str, ...] = (),
+    include_paths: tuple[str, ...] = (),
 ) -> list[Path]:
     files: list[Path] = []
     scan_budget_exceeded = False
@@ -297,6 +307,9 @@ def discover_text_files(
         current_path = Path(current_root)
         record_scan_activity(root, current_path, kind="text-scan")
         relative_current = current_path.relative_to(root).as_posix()
+        if include_paths and not _scope_allows_directory(relative_current, include_paths):
+            dir_names[:] = []
+            continue
         if scan_budget_exceeded:
             skipped_files.append(
                 skipped_directory_entry(root, current_path, "scan budget exceeded")
@@ -338,6 +351,8 @@ def discover_text_files(
         for file_name in sorted(file_names):
             path = current_path / file_name
             relative_path = path.relative_to(root).as_posix()
+            if include_paths and not _scope_includes_file(relative_path, include_paths):
+                continue
             if path.is_symlink() or not path.is_file():
                 continue
             if is_scan_excluded(
@@ -379,12 +394,16 @@ def discover_security_surface_paths(
     include_ignored_paths: set[str],
     scan_exclusions: list[str],
     focus_paths: tuple[str, ...] = (),
+    include_paths: tuple[str, ...] = (),
 ) -> list[str]:
     surface_paths: list[str] = []
     for current_root, dir_names, file_names in os.walk(root):
         current_path = Path(current_root)
         record_scan_activity(root, current_path, kind="text-scan")
         relative_current = current_path.relative_to(root).as_posix()
+        if include_paths and not _scope_allows_directory(relative_current, include_paths):
+            dir_names[:] = []
+            continue
         ignored_names: set[str] = set()
         for name in sorted(dir_names):
             relative_name = _join_relative(relative_current, name)
@@ -415,6 +434,8 @@ def discover_security_surface_paths(
         for file_name in sorted(file_names):
             path = current_path / file_name
             relative_path = path.relative_to(root).as_posix()
+            if include_paths and not _scope_includes_file(relative_path, include_paths):
+                continue
             if path.is_symlink() or not path.is_file():
                 continue
             if is_scan_excluded(
@@ -440,59 +461,3 @@ def _path_in_focus(relative_path: str, focus_paths: tuple[str, ...]) -> bool:
         for focus in (item.strip("/") for item in focus_paths)
         if focus
     )
-
-
-def generated_paths(scan: dict[str, Any]) -> set[str]:
-    generated_code = scan.get("generated_code")
-    if not isinstance(generated_code, list):
-        return set()
-    paths: set[str] = set()
-    for item in generated_code:
-        if not isinstance(item, dict):
-            continue
-        path = item.get("path")
-        if isinstance(path, str) and path:
-            paths.add(path.strip("/"))
-    return paths
-
-
-def is_text_file(path: Path) -> bool:
-    return path.suffix in TEXT_EXTENSIONS or path.name in TEXT_FILE_NAMES
-
-
-def is_security_surface_file(path: Path, relative_path: str) -> bool:
-    return path.name in SECURITY_SURFACE_FILE_NAMES or is_security_surface_path(relative_path)
-
-
-def effective_scan_exclusions(
-    root: Path,
-    config: dict[str, Any],
-    *,
-    module: str | None = None,
-) -> list[str]:
-    return configured_effective_scan_exclusions(root, config, module=module)
-
-
-def is_scan_excluded(
-    relative_path: str,
-    *,
-    scan_exclusions: list[str],
-    include_ignored_paths: set[str],
-) -> bool:
-    normalized = relative_path.strip("/")
-    return bool(
-        normalized
-        and not _is_included_or_included_parent(normalized, include_ignored_paths)
-        and matches_scan_exclusion(normalized, scan_exclusions)
-    )
-
-
-def normalized_path_list(value: object) -> list[str]:
-    if not isinstance(value, list):
-        return []
-    paths: list[str] = []
-    for item in value:
-        if not isinstance(item, str) or not item:
-            continue
-        paths.append(item.strip("/"))
-    return paths

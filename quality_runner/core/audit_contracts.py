@@ -36,6 +36,7 @@ class AuditRequest:
     cache_mode: CacheMode | None = None
     cache_root: Path | None = None
     performance_budget_seconds: float | None = None
+    include_paths: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -57,6 +58,7 @@ class TextScanScope:
     focus_paths: tuple[str, ...] = ()
     file_paths: tuple[str, ...] = ()
     inventory: AuditPayload | None = None
+    include_paths: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
