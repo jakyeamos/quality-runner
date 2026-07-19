@@ -65,7 +65,7 @@ def test_release_docs_describe_current_release_plan_and_release_history() -> Non
     assert "quality_runner_review" in upgrade_docs
     assert "historical runtime-display mismatch" in upgrade_docs
     assert "uv tool list" in upgrade_docs
-    assert "quality-runner review /path/to/repo --mode blind --json" in readme
+    assert "qr review /path/to/repo --mode blind --json" in readme
     assert "older `0.2.0` template" in release_docs
     assert (
         "quality-runner refresh /path/to/repo --run-id-prefix refresh-001 --handoff-output handoff.md --json"

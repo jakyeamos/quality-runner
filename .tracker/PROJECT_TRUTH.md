@@ -2,7 +2,6 @@
 
 Last updated: 2026-07-19
 
-
 ## Current State
 
 Quality Runner is a public, local-first quality orchestration package. It
@@ -93,6 +92,14 @@ for missing consent, and no timeout; Tenure source status remained clean.
 The reviewed `codex/dev-fold-qr-adaptive-timeouts` integration at `49c3dda`
 folds the local, identity-bound refresh timeout calibration from `0bc7d37`
 without changing the published release surface.
+
+The follow-up branch `codex/qr-command-surface-quality-runner` at `9107285`
+makes `qr` the canonical human-facing console command while retaining
+`quality-runner` as a compatibility alias. Root help, README quickstart, and
+CLI reference lead with audit, review, verify, runs, and doctor; both scripts
+render their invocation name for help/no-argument guidance and preserve the
+existing version and JSON contracts. No tags, registries, or published
+artifacts were changed.
 
 ## Current Position
 
@@ -276,3 +283,84 @@ without changing the published release surface.
 - 2026-07-17: `287fe95` adds remediation-context packets and readiness
   validation to run/verify artifacts while keeping source changes external and
   preserving the v0.5.1 application/compatibility seams.
+- 2026-07-13: v0.5.1 released: PR #2 merged at `a101bd4`, tag workflow and
+  six-job CI passed, PyPI publishes wheel/sdist, GitHub Release is public, and
+  a disposable PyPI install passes CLI, doctor, release-smoke, and MCP checks.
+- 2026-07-13: `c71b130` adds a pinned Python dependency audit, upgrades pytest
+  to 9.0.3, and prevents untrusted baseline manifests from injecting Git diff
+  options; all pre-tag gates and installed-wheel smoke checks pass.
+- 2026-07-13: `948107f` prepares v0.5.1 metadata and the main README release
+  guidance; final pre-tag checks, PR merge, tag, PyPI publication, and GitHub
+  Release creation remain in sequence.
+- 2026-07-13: `141635e` closes the focused source-evidence follow-up with
+  lexer-backed private-field, malformed-syntax, computed-log, and tokenless
+  value protection; 554 tests and two independent reviews are clean.
+- 2026-07-13: Independent merge review found four P2s. `bf6c9e7` closes
+  typed/commented/expression source-evidence gaps; `b4b5e6e` preserves v0.1,
+  emits v0.2 consent-aware gates, and corrects skill/release instructions.
+- 2026-07-13: M7 completed in `279cc8a`: context-aware redaction covers
+  multiline source evidence and security candidates; built wheels smoke the MCP
+  Review outcome as well as default v2 and frozen v1 CLI output.
+- 2026-07-13: `cd30948` adds `main`-ancestry release gating, built-wheel Review
+  projection checks, and accurate historical rollback/Homebrew documentation.
+- 2026-07-13: `4dee5af` closes the source-evidence redaction bypass across
+  code-quality, slice-enrichment, and security candidate artifacts; `27deaa4`
+  resolves its package-cycle regression.
+- 2026-07-13: `9fcea7d` restored positional workflow compatibility, the frozen
+  Review v1 field shape, and the `ReviewFinding` facade without weakening the
+  default v2 packet-ready outcome.
+- 2026-07-13: M7 compatibility regression in `dc09ec0`: default Review
+  outcomes retain v1-readable persisted artifacts for downgrade safety.
+- 2026-07-13: M7 guidance in `633b96e`: canonical upgrade/rollback policy,
+  release evidence, and artifact-sensitivity guidance now match the cutover.
+- 2026-07-13: M7 cutover in `32e7b26`: CLI Review defaults to v2, retains
+  `--legacy-output` v1 JSON through 0.7.x, and documents legacy MCP discovery.
+- 2026-07-13: Began M7 in `113f143`: security candidates redact secret-like
+  literals before fingerprints and persisted scan/audit/handoff evidence.
+- 2026-07-13: M7 release evidence in `66ce3ef`: pinned development tools and
+  installed-wheel doctor, release-smoke, and MCP outcome discovery checks.
+- 2026-07-13: Completed M6 on `codex/gpt56-modernization` (`0b5ac2e`,
+  `56c94d4`): application-owned workflow/outcome/packet/report paths, typed
+  root façades, built-wheel compatibility, 520 passing tests, and clean reviews.
+- 2026-07-17: `9107285` makes `qr` canonical in the packaged entrypoints,
+  root help, README quickstart, CLI reference, and focused compatibility
+  tests; `quality-runner` remains a working alias and no publication occurred.
+- 2026-07-13: v0.5.1 released: PR #2 merged at `a101bd4`, tag workflow and
+  six-job CI passed, PyPI publishes wheel/sdist, GitHub Release is public, and
+  a disposable PyPI install passes CLI, doctor, release-smoke, and MCP checks.
+- 2026-07-13: `c71b130` adds a pinned Python dependency audit, upgrades pytest
+  to 9.0.3, and prevents untrusted baseline manifests from injecting Git diff
+  options; all pre-tag gates and installed-wheel smoke checks pass.
+- 2026-07-13: `948107f` prepares v0.5.1 metadata and the main README release
+  guidance; final pre-tag checks, PR merge, tag, PyPI publication, and GitHub
+  Release creation remain in sequence.
+- 2026-07-13: `141635e` closes the focused source-evidence follow-up with
+  lexer-backed private-field, malformed-syntax, computed-log, and tokenless
+  value protection; 554 tests and two independent reviews are clean.
+- 2026-07-13: Independent merge review found four P2s. `bf6c9e7` closes
+  typed/commented/expression source-evidence gaps; `b4b5e6e` preserves v0.1,
+  emits v0.2 consent-aware gates, and corrects skill/release instructions.
+- 2026-07-13: M7 completed in `279cc8a`: context-aware redaction covers
+  multiline source evidence and security candidates; built wheels smoke the MCP
+  Review outcome as well as default v2 and frozen v1 CLI output.
+- 2026-07-13: `cd30948` adds `main`-ancestry release gating, built-wheel Review
+  projection checks, and accurate historical rollback/Homebrew documentation.
+- 2026-07-13: `4dee5af` closes the source-evidence redaction bypass across
+  code-quality, slice-enrichment, and security candidate artifacts; `27deaa4`
+  resolves its package-cycle regression.
+- 2026-07-13: `9fcea7d` restored positional workflow compatibility, the frozen
+  Review v1 field shape, and the `ReviewFinding` facade without weakening the
+  default v2 packet-ready outcome.
+- 2026-07-13: M7 compatibility regression in `dc09ec0`: default Review
+  outcomes retain v1-readable persisted artifacts for downgrade safety.
+- 2026-07-13: M7 guidance in `633b96e`: canonical upgrade/rollback policy,
+  release evidence, and artifact-sensitivity guidance now match the cutover.
+- 2026-07-13: M7 cutover in `32e7b26`: CLI Review defaults to v2, retains
+  `--legacy-output` v1 JSON through 0.7.x, and documents legacy MCP discovery.
+- 2026-07-13: Began M7 in `113f143`: security candidates redact secret-like
+  literals before fingerprints and persisted scan/audit/handoff evidence.
+- 2026-07-13: M7 release evidence in `66ce3ef`: pinned development tools and
+  installed-wheel doctor, release-smoke, and MCP outcome discovery checks.
+- 2026-07-13: Completed M6 on `codex/gpt56-modernization` (`0b5ac2e`,
+  `56c94d4`): application-owned workflow/outcome/packet/report paths, typed
+  root façades, built-wheel compatibility, 520 passing tests, and clean reviews.
