@@ -41,6 +41,8 @@ def refresh_command_payload(
         workflow_timeout_reason=args.workflow_timeout_reason,
         total_timeout_seconds=args.total_timeout_seconds,
         total_timeout_reason=args.total_timeout_reason,
+        inspect_timeout_seconds=getattr(args, "inspect_timeout_seconds", None),
+        run_timeout_seconds=getattr(args, "run_timeout_seconds", None),
         checkout_most_advanced_branch=args.checkout_most_advanced_branch,
         execute_discovered_gates=getattr(args, "execute_gates", False),
         allow_mutating_gates=args.allow_mutating_gates,

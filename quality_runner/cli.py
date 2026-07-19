@@ -148,6 +148,18 @@ def build_parser() -> argparse.ArgumentParser:
         help="Verify-gates phase timeout; defaults to a multiple of --timeout-seconds",
     )
     refresh_parser.add_argument(
+        "--inspect-timeout-seconds",
+        type=int,
+        default=None,
+        help="Explicit inspect phase timeout; otherwise uses the active adaptive budget or fallback",
+    )
+    refresh_parser.add_argument(
+        "--run-timeout-seconds",
+        type=int,
+        default=None,
+        help="Explicit run phase timeout; otherwise uses the active adaptive budget or fallback",
+    )
+    refresh_parser.add_argument(
         "--workflow-timeout-reason",
         default=None,
         help="Reason recorded when the verify-gates timeout fires",

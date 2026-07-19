@@ -38,6 +38,7 @@ from quality_runner.scan_exclusions import (
     effective_scan_exclusions_by_module,
     gitignore_scan_exclusions,
     normalize_scan_exclusion_module,
+    scan_exclusion_contract,
     scan_exclusion_overlay_parts,
 )
 
@@ -49,6 +50,7 @@ def generated_run_id() -> str:
 def build_exclusion_packet(repo_root: Path, run_id: str) -> dict[str, object]:
     root = repo_root.expanduser().resolve()
     config = load_repo_config(root)
+    exclusion_contract = scan_exclusion_contract(root, config)
     configured = string_list(config.get("scan_exclusions"))
     effective_by_module = effective_scan_exclusions_by_module(root, config)
     effective = effective_by_module["structural"]
@@ -70,7 +72,7 @@ def build_exclusion_packet(repo_root: Path, run_id: str) -> dict[str, object]:
         "run_id": run_id,
         "repo_root": str(root),
         "created_at": datetime.now(UTC).isoformat(),
-        "repo_fingerprint": repository_fingerprint(root),
+        "repo_fingerprint": repository_fingerprint(root, config=config),
         "config": {
             "path": CONFIG_FILE_NAME if (root / CONFIG_FILE_NAME).is_file() else None,
             "sha256": file_sha256(root / CONFIG_FILE_NAME),
@@ -78,6 +80,7 @@ def build_exclusion_packet(repo_root: Path, run_id: str) -> dict[str, object]:
             "configured_scan_exclusions_by_module": configured_by_module,
             "effective_scan_exclusions": effective,
             "effective_scan_exclusions_by_module": effective_by_module,
+            "scan_exclusion_fingerprint": exclusion_contract["fingerprint"],
             "structural_scan": json_safe(config.get("structural_scan")),
             "gate_timeouts": gate_timeouts,
             "timeout_signals": {
