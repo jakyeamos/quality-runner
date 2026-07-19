@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import ast
 import json
+from dataclasses import replace
 from pathlib import Path
 
 from quality_runner.application.read_only_audit import (
@@ -95,6 +96,26 @@ def test_shared_scope_includes_go_module_metadata_for_security_surface_detection
 
     assert "go.mod" not in {item.path for item in analysis.text_scan_scope.files}
     assert "go.mod" in analysis.text_scan_scope.security_surface_paths
+    assert analysis.security_scan["surfaces"]["dependency_manifest"] is True
+
+
+def test_balanced_focus_keeps_dependency_manifests_in_security_scope(tmp_path: Path) -> None:
+    (tmp_path / "package.json").write_text('{"name":"fixture"}\n', encoding="utf-8")
+    (tmp_path / "src").mkdir()
+    (tmp_path / "src" / "changed.ts").write_text(
+        "export const changed = true;\n", encoding="utf-8"
+    )
+
+    analysis = analyze_read_only_audit(
+        replace(
+            _request(tmp_path, "focused-security-scope"),
+            focus_paths=("src/changed.ts",),
+            analysis_mode="balanced",
+            cache_mode="disabled",
+        )
+    )
+
+    assert "package.json" in analysis.text_scan_scope.security_surface_paths
     assert analysis.security_scan["surfaces"]["dependency_manifest"] is True
 
 

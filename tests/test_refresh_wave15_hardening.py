@@ -116,6 +116,8 @@ def test_refresh_payload_finalizes_partial_verify_artifacts_when_verify_times_ou
         run_id_prefix="refresh-timeout",
         workflow_timeout_seconds=30,
         workflow_timeout_reason="controller deadline exceeded while verifying gates",
+        execute_discovered_gates=True,
+        worktree_mode="disposable",
     )
     run_dir = tmp_path / ".quality-runner" / "runs" / "refresh-timeout-verify"
     gate_verification = json.loads((run_dir / "gate-verification.json").read_text())

@@ -4,7 +4,8 @@ from pathlib import Path
 from typing import Any, cast
 
 from quality_runner.agent_review_policy import AGENT_REVIEW_MODES, AgentReviewMode
-from quality_runner.artifacts import write_json, write_text
+from quality_runner.application.performance_artifacts import write_performance_artifact
+from quality_runner.artifacts import prepare_directory, safe_child_file, write_json, write_text
 from quality_runner.core.audit_contracts import (
     AuditAnalysis,
     AuditArtifactPaths,
@@ -16,6 +17,7 @@ from quality_runner.intent import attach_intent_artifacts, intent_for_run
 from quality_runner.manifest import build_run_manifest
 from quality_runner.planning import render_handoff_markdown
 from quality_runner.remediation_context import build_remediation_context_for_plan
+from quality_runner.security.review_obligations import build_security_review_obligations
 from quality_runner.slice_specs import write_slice_specs
 from quality_runner.workflow_helpers import add_scan_exclusion_artifact
 from quality_runner.workflow_skills import quality_skill_identities, write_skill_review_artifacts
@@ -42,6 +44,11 @@ def prepare_verification_v1_artifacts(
             skill_review_report=_legacy_optional_payload(analysis.request.skill_review_report),
             agent_review_mode=_agent_review_mode(analysis),
         )
+    )
+    write_performance_artifact(
+        analysis,
+        run_dir=run_dir,
+        artifact_paths=artifact_paths,
     )
     return artifact_paths
 
@@ -81,6 +88,12 @@ def write_completed_verification_v1_artifacts(
     )
     artifact_paths["security_scan_json"] = str(
         write_json(run_dir / "security-scan.json", _legacy_payload(analysis.security_scan))
+    )
+    artifact_paths["security_review_obligations_json"] = str(
+        write_json(
+            run_dir / "security-review-obligations.json",
+            build_security_review_obligations(_legacy_payload(analysis.security_scan)),
+        )
     )
     artifact_paths["package_manager_preflight_json"] = str(
         write_json(
@@ -126,6 +139,15 @@ def write_completed_verification_v1_artifacts(
     )
     if slice_spec_paths:
         artifact_paths["slice_specs_dir"] = str(run_dir / "slice-specs")
+    security_slice_paths = write_security_review_slice_specs(
+        run_dir,
+        build_security_review_obligations(_legacy_payload(analysis.security_scan)),
+        run_id=analysis.request.run_id,
+    )
+    if security_slice_paths:
+        artifact_paths["security_review_slice_specs_dir"] = str(
+            run_dir / "security-review-slice-specs"
+        )
     handoff = _legacy_payload(planned_audit.handoff)
     artifact_paths["agent_handoff_json"] = str(write_json(run_dir / "agent-handoff.json", handoff))
     artifact_paths["agent_handoff_md"] = str(
@@ -152,11 +174,78 @@ def write_completed_verification_v1_artifacts(
     return artifact_paths
 
 
+def write_security_review_slice_specs(
+    run_dir: Path,
+    obligations_payload: dict[str, Any],
+    *,
+    run_id: str,
+) -> dict[str, str]:
+    obligations = obligations_payload.get("obligations")
+    if not isinstance(obligations, list):
+        return {}
+    specs_dir = prepare_directory(run_dir, "security-review-slice-specs")
+    paths: dict[str, str] = {}
+    for obligation in obligations:
+        if not isinstance(obligation, dict):
+            continue
+        obligation_id = obligation.get("id")
+        if not isinstance(obligation_id, str) or not obligation_id:
+            continue
+        slice_id = f"security-review-{obligation_id}"
+        refs = obligation.get("candidate_refs")
+        lines = [
+            f"# Security Review Slice: {slice_id}",
+            "",
+            f"- Run: `{run_id}`",
+            f"- Finding: `{obligation.get('finding_id')}`",
+            f"- Status: `{obligation.get('status')}`",
+            "",
+            "## Review contract",
+            "",
+            *[
+                f"- {item}"
+                for item in obligation.get("review_instructions", [])
+                if isinstance(item, str)
+            ],
+            "",
+            "## Exact candidate references",
+            "",
+        ]
+        if isinstance(refs, list) and refs:
+            for ref in refs:
+                if not isinstance(ref, dict):
+                    continue
+                file = ref.get("file")
+                line = ref.get("line")
+                location = (
+                    f"{file}:{line}"
+                    if isinstance(file, str) and isinstance(line, int)
+                    else str(file or "unknown")
+                )
+                lines.append(f"- `{location}` ({ref.get('category', 'uncategorized')})")
+        else:
+            lines.append(
+                "- No specific candidate reference was produced; review the stated scope and record that limitation."
+            )
+        lines.extend(["", "## Completion criteria", ""])
+        lines.extend(
+            f"- {item}"
+            for item in obligation.get("completion_criteria", [])
+            if isinstance(item, str)
+        )
+        target = safe_child_file(specs_dir, f"{slice_id}.md")
+        paths[slice_id] = str(write_text(target, "\n".join(lines).rstrip() + "\n"))
+    return paths
+
+
 def _artifact_paths(run_dir: Path) -> AuditArtifactPaths:
     return {
         "repo_scan_json": str(run_dir / "repo-scan.json"),
         "code_quality_scan_json": str(run_dir / "code-quality-scan.json"),
         "security_scan_json": str(run_dir / "security-scan.json"),
+        "security_review_obligations_json": str(
+            run_dir / "security-review-obligations.json"
+        ),
         "package_manager_preflight_json": str(run_dir / "package-manager-preflight.json"),
         "standards_json": str(run_dir / "standards.json"),
         "capability_matrix_json": str(run_dir / "capability-matrix.json"),
@@ -168,6 +257,7 @@ def _artifact_paths(run_dir: Path) -> AuditArtifactPaths:
         "agent_handoff_json": str(run_dir / "agent-handoff.json"),
         "agent_handoff_md": str(run_dir / "agent-handoff.md"),
         "run_manifest_json": str(run_dir / "run-manifest.json"),
+        "performance_json": str(run_dir / "performance.json"),
     }
 
 

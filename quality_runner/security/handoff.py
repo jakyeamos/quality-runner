@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from quality_runner.security.review_obligations import build_security_review_obligations
+
 
 def security_review_handoff(
     security_scan: dict[str, Any] | None,
@@ -20,11 +22,14 @@ def security_review_handoff(
     missing_gates = security_scan.get("missing_capabilities", [])
     candidates = security_scan.get("candidates", [])
     agent_gates = security_scan.get("agent_review_gates", [])
+    obligations = build_security_review_obligations(security_scan)
     return {
         "executable_repo_gates": executable_gates,
         "missing_repo_owned_gates": missing_gates if isinstance(missing_gates, list) else [],
         "security_candidates": candidates if isinstance(candidates, list) else [],
         "agent_review_gates": agent_gates if isinstance(agent_gates, list) else [],
+        "review_obligations": obligations["obligations"],
+        "review_obligation_count": obligations["obligation_count"],
         "capability_matrix_security_summary": (
             capability_map.get("security_summary") if isinstance(capability_map, dict) else None
         ),

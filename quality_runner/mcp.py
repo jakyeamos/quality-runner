@@ -19,6 +19,7 @@ from quality_runner.gate_controller import (
     record_gate_response,
 )
 from quality_runner.intent import resolve_workflow_intent
+from quality_runner.mcp_delivery_contract import delivery_contract_payload, delivery_contract_tool
 from quality_runner.mcp_journeys import is_journey_tool, journey_tool_payload, journey_tools
 from quality_runner.standards import DEFAULT_PROFILE
 from quality_runner.workflow_internal import generated_run_id
@@ -184,6 +185,7 @@ def list_tools() -> list[dict[str, Any]]:
             "inputSchema": propose_fix_schema,
         },
         review_mcp_tool(),
+        delivery_contract_tool(),
         *journey_tools(),
     ]
 
@@ -200,6 +202,10 @@ def call_tool(name: str, arguments: dict[str, Any] | None = None) -> dict[str, A
     if name == "quality_runner_review":
         repo_root = _validated_repo_root(args)
         return _tool_result(review_mcp_payload(args, repo_root))
+
+    if name == "quality_runner_delivery_contract":
+        repo_root = _validated_repo_root(args)
+        return _tool_result(delivery_contract_payload(args, repo_root=repo_root))
 
     if name == "quality_runner_inspect_repo":
         repo_root = _validated_repo_root(args)

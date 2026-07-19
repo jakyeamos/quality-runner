@@ -4,6 +4,7 @@ import hashlib
 from pathlib import Path
 from typing import Any, cast
 
+from quality_runner.cache_modes import CacheMode
 from quality_runner.code_quality_architecture import architecture_findings
 from quality_runner.code_quality_bundles import bundle_budget_findings
 from quality_runner.code_quality_duplicates import _extract_functions
@@ -16,7 +17,7 @@ from quality_runner.code_quality_ledger import (
     build_resolution_ledger,
     render_resolution_ledger_markdown,
 )
-from quality_runner.code_quality_paths import _check_coverage, _string_or_none
+from quality_runner.code_quality_paths import _check_coverage, _split_lines, _string_or_none
 from quality_runner.code_quality_ponytail import ponytail_findings
 from quality_runner.code_quality_rules import _scan_file
 from quality_runner.code_quality_similarity import collect_deduplicate_scan
@@ -42,6 +43,7 @@ from quality_runner.scan_scope import (
     structural_scan_policy,
 )
 from quality_runner.schema_constants import CODE_QUALITY_SCAN_SCHEMA
+from quality_runner.source_analysis_cache import SourceAnalysisCache
 
 __all__ = [
     "build_resolution_ledger",
@@ -63,6 +65,8 @@ def create_code_quality_scan(
     require_skill_review_coverage: bool = False,
     text_scan_scope: TextScanScope | None = None,
     persist_cache: bool = True,
+    analysis_mode: str = "full",
+    cache_mode: CacheMode | str = "repo",
     cache_root: Path | None = None,
 ) -> dict[str, Any]:
     root = repo_root.expanduser().resolve()
@@ -73,38 +77,66 @@ def create_code_quality_scan(
         scan=scan,
         config=config,
         module="code_quality",
+        cache_mode=str(cache_mode),
+        cache_root=cache_root,
+        read_files=analysis_mode == "full",
     )
     skipped_files = list(scope.skipped_files)
+    source_analysis_cache = (
+        cast(SourceAnalysisCache, scope.source_analysis_cache)
+        if scope.source_analysis_cache is not None
+        else SourceAnalysisCache(root, cache_mode=cache_mode, cache_root=cache_root)
+    )
     analysis_cache = IncrementalAnalysisCache(
         root,
         analysis_kind="code-quality",
         config=config,
-        persist=persist_cache,
+        cache_mode=cache_mode if persist_cache else "disabled",
         cache_root=cache_root,
     )
+    effective_persist_cache = persist_cache and str(cache_mode) != "disabled"
     findings: list[dict[str, Any]] = []
     extracted_functions: list[dict[str, Any]] = []
     accountability: list[dict[str, Any]] = []
     scanned_files: list[dict[str, Any]] = []
 
-    for file_info in scope.files:
-        relative_path = file_info.path
-        source_text = file_info.text
-        source_lines = file_info.lines
-        file_result = analysis_cache.get_or_compute(
-            relative_path=relative_path,
-            source_text=source_text,
-            compute=lambda relative_path=relative_path, source_lines=source_lines: (
-                _analyze_code_quality_file(
+    if scope.files:
+        source_items = [(file_info.path, file_info.text, file_info.lines) for file_info in scope.files]
+    else:
+        source_items = [(relative_path, "", []) for relative_path in scope.file_paths]
+    for relative_path, source_text, source_lines in source_items:
+        if source_text:
+            file_result = analysis_cache.get_or_compute(
+                relative_path=relative_path,
+                source_text=source_text,
+                compute=lambda relative_path=relative_path, source_text=source_text, source_lines=source_lines: (
+                    _analyze_code_quality_file(
+                        relative_path=relative_path,
+                        source_text=source_text,
+                        source_lines=source_lines,
+                        source_analysis_cache=source_analysis_cache,
+                        disabled_groups=disabled_groups,
+                        large_file_lines=policy["large_file_lines"],
+                        fat_router_lines=policy["fat_router_lines"],
+                    )
+                ),
+                validate=_valid_code_quality_file_result,
+            )
+        else:
+            file_result = analysis_cache.get_or_compute_from_path(
+                relative_path=relative_path,
+                source_path=root / relative_path,
+                compute=lambda source_text, relative_path=relative_path: _analyze_code_quality_file(
                     relative_path=relative_path,
-                    source_lines=source_lines,
+                    source_text=source_text,
+                    source_lines=_split_lines(source_text),
+                    source_analysis_cache=source_analysis_cache,
                     disabled_groups=disabled_groups,
                     large_file_lines=policy["large_file_lines"],
                     fat_router_lines=policy["fat_router_lines"],
-                )
-            ),
-            validate=_valid_code_quality_file_result,
-        )
+                ),
+                validate=_valid_code_quality_file_result,
+            )
         lines = _string_list_result(file_result, "redacted_lines")
         text = "\n".join(lines)
         scanned_files.append({"path": relative_path, "text": text, "lines": lines})
@@ -112,7 +144,8 @@ def create_code_quality_scan(
             {
                 "path": relative_path,
                 "line_count": len(lines),
-                "sha256": hashlib.sha256(source_text.encode("utf-8")).hexdigest(),
+                "sha256": analysis_cache.content_sha256_for(relative_path)
+                or hashlib.sha256(source_text.encode("utf-8")).hexdigest(),
                 "scan_status": "scanned",
                 "check_coverage": _check_coverage(relative_path),
             }
@@ -120,36 +153,49 @@ def create_code_quality_scan(
         findings.extend(_dict_list_result(file_result, "findings"))
         extracted_functions.extend(_dict_list_result(file_result, "extracted_functions"))
 
+    deferred_checks: list[dict[str, str]] = []
     semantic_similarity_clusters = 0
     semantic_similarity_tools: dict[str, str] = {}
     semantic_similarity_cache: dict[str, Any] = {}
-    (
-        duplicate_clusters,
-        deduplicate_findings,
-        semantic_similarity_clusters,
-        semantic_similarity_tools,
-        semantic_similarity_cache,
-    ) = collect_deduplicate_scan(
-        root,
-        extracted_functions=extracted_functions,
-        scanned_files=scanned_files,
-        policy=policy,
-        disabled_groups=disabled_groups,
-        persist_cache=persist_cache,
-        cache_root=cache_root,
-    )
-    findings.extend(deduplicate_findings)
+    duplicate_clusters: list[dict[str, Any]] = []
+    if analysis_mode == "balanced":
+        deferred_checks.extend(
+            {
+                "check": check,
+                "reason": "global analysis is deferred until an explicit full refresh",
+                "severity": "advisory",
+            }
+            for check in ("similarity", "ponytail", "bundle", "unwired", "architecture")
+        )
+        semantic_similarity_tools = {"quality-runner": "deferred"}
+    else:
+        (
+            duplicate_clusters,
+            deduplicate_findings,
+            semantic_similarity_clusters,
+            semantic_similarity_tools,
+            semantic_similarity_cache,
+        ) = collect_deduplicate_scan(
+            root,
+            extracted_functions=extracted_functions,
+            scanned_files=scanned_files,
+            policy=policy,
+            disabled_groups=disabled_groups,
+            persist_cache=effective_persist_cache,
+            cache_root=cache_root,
+        )
+        findings.extend(deduplicate_findings)
 
-    if "ponytail" not in disabled_groups:
-        findings.extend(ponytail_findings(scanned_files))
+        if "ponytail" not in disabled_groups:
+            findings.extend(ponytail_findings(scanned_files))
 
-    if "speed" not in disabled_groups:
-        findings.extend(bundle_budget_findings(root))
+        if "speed" not in disabled_groups:
+            findings.extend(bundle_budget_findings(root))
 
-    if "integrate" not in disabled_groups:
-        findings.extend(unwired_findings(scanned_files, config))
+        if "integrate" not in disabled_groups:
+            findings.extend(unwired_findings(scanned_files, config))
 
-    findings.extend(architecture_findings(scanned_files, config))
+        findings.extend(architecture_findings(scanned_files, config))
     skill_findings, skill_coverage, quality_skills, skill_selection = (
         scan_quality_skills_with_selection(
             root,
@@ -205,19 +251,30 @@ def create_code_quality_scan(
         "skill_coverage": skill_coverage,
         "skill_selection": skill_selection,
         "semantic_similarity_cache": semantic_similarity_cache,
-        "analysis_cache": analysis_cache.evidence(considered_files=len(scope.files)),
+        "analysis_mode": analysis_mode,
+        "coverage": "partial" if deferred_checks else "full",
+        "deferred_checks": deferred_checks,
+        "analysis_cache": analysis_cache.evidence(
+            considered_files=len(scope.file_paths or tuple(file_info.path for file_info in scope.files))
+        ),
     }
 
 
 def _analyze_code_quality_file(
     *,
     relative_path: str,
+    source_text: str,
     source_lines: list[str],
+    source_analysis_cache: SourceAnalysisCache,
     disabled_groups: set[str],
     large_file_lines: int,
     fat_router_lines: int,
-) -> dict[str, object]:
-    lines = redact_secret_like_source_lines(source_lines)
+    ) -> dict[str, object]:
+    lines = source_analysis_cache.redacted_lines_for_source(
+        source_text=source_text,
+        source_lines=source_lines,
+        redactor=redact_secret_like_source_lines,
+    )
     text = "\n".join(lines)
     return {
         "redacted_lines": lines,

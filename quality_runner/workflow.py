@@ -48,6 +48,10 @@ def refresh_payload(
     run_timeout_seconds: int | None = None,
     focus_paths: list[str] | None = None,
     cache_state: str = "not-configured",
+    analysis_mode: str = "full",
+    cache_mode: str = "repo",
+    cache_root: Path | None = None,
+    performance_budget_seconds: float | None = None,
 ) -> dict[str, Any]:
     return _refresh_payload(
         repo_root=repo_root,
@@ -65,6 +69,10 @@ def refresh_payload(
         run_timeout_seconds=run_timeout_seconds,
         focus_paths=focus_paths,
         cache_state=cache_state,
+        analysis_mode=analysis_mode,
+        cache_mode=cache_mode,
+        cache_root=cache_root,
+        performance_budget_seconds=performance_budget_seconds,
         checkout_most_advanced_branch=checkout_most_advanced_branch,
         execute_discovered_gates=execute_discovered_gates,
         agent_review_mode=agent_review_mode,

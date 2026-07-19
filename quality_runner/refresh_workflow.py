@@ -8,6 +8,7 @@ from typing import Any
 from quality_runner.core.audit_contracts import ScanExclusionOverlay
 from quality_runner.progress import ProgressCallback, emit_progress
 from quality_runner.refresh_timeout import (
+    build_skipped_verify_artifacts,
     build_timeout_verify_artifacts,
     not_started_refresh_phase,
     phase_timing,
@@ -15,6 +16,7 @@ from quality_runner.refresh_timeout import (
     timeout_refresh_phase,
     workflow_deadline,
 )
+from quality_runner.refresh_timeout_context import timeout_context
 from quality_runner.scan_exclusions import reset_scan_progress
 from quality_runner.timeout_baseline import (
     load_gate_execution_plan,
@@ -67,6 +69,10 @@ def run_refresh_payload(
     focus_paths: list[str] | None = None,
     cache_state: str = "not-configured",
     analysis_cache_root: Path | None = None,
+    analysis_mode: str = "full",
+    cache_mode: str = "repo",
+    cache_root: Path | None = None,
+    performance_budget_seconds: float | None = None,
     progress: ProgressCallback | None = None,
 ) -> dict[str, Any]:
     inspect_run_id = f"{run_id_prefix}-inspect"
@@ -178,6 +184,11 @@ def run_refresh_payload(
                 intent=intent,
                 analysis_cache_root=analysis_cache_root,
                 refresh_context=refresh_context,
+                focus_paths=focus_paths,
+                analysis_mode=analysis_mode,
+                cache_mode=cache_mode,
+                cache_root=cache_root,
+                performance_budget_seconds=performance_budget_seconds,
                 progress=progress,
             ),
             phase_timeout_seconds=resolved_inspect_timeout,
@@ -198,38 +209,63 @@ def run_refresh_payload(
                 intent=intent,
                 analysis_cache_root=analysis_cache_root,
                 refresh_context=refresh_context,
+                focus_paths=focus_paths,
+                analysis_mode=analysis_mode,
+                cache_mode=cache_mode,
+                cache_root=cache_root,
+                performance_budget_seconds=performance_budget_seconds,
                 progress=progress,
             ),
             phase_timeout_seconds=resolved_run_timeout,
         )
         emit_progress(progress, "refresh/verify-gates", f"run_id={verify_run_id}")
-        verify_result = _run_verify_phase(
-            repo_root=repo_root,
-            run_id=verify_run_id,
-            profile=profile,
-            ci_status_json=ci_status_json,
-            timeout_seconds=timeout_seconds,
-            checkout_most_advanced_branch=checkout_most_advanced_branch,
-            execute_discovered_gates=execute_discovered_gates,
-            allow_mutating_gates=allow_mutating_gates,
-            worktree_mode=worktree_mode,
-            allow_dirty_worktree_verify=allow_dirty_worktree_verify,
-            resolved_verify_timeout=resolved_verify_timeout,
-            resolved_verify_reason=resolved_verify_reason,
-            resolved_total_reason=resolved_total_reason,
-            total_timeout_seconds=resolved_total_timeout,
-            remaining_total_seconds=remaining_total_seconds,
-            phase_timings=phase_timings,
-            current=current,
-            verify_callback=verify_callback,
-            intent=intent,
-            agent_review_mode=agent_review_mode,
-            scan_exclusion_overlay=scan_exclusion_overlay,
-            readiness_evidence_file=readiness_evidence_file,
-            analysis_cache_root=analysis_cache_root,
-            refresh_context=refresh_context,
-            progress=progress,
+        run_manifest_path = (
+            repo_root / ".quality-runner" / "runs" / run_run_id / "run-manifest.json"
         )
+        if not execute_discovered_gates and not run_manifest_path.is_file():
+            current.phase = "verify-gates"
+            current.phase_key = "verify"
+            current.phase_started = time.monotonic()
+            verify_result = build_skipped_verify_artifacts(
+                repo_root=repo_root,
+                run_id=verify_run_id,
+                reason=(
+                    "refresh completed inspect/run callbacks without a run artifact; "
+                    "gate verification was not started"
+                ),
+            )
+            phase_timings["verify"] = phase_timing(
+                started=current.phase_started,
+                status="blocked",
+            )
+        else:
+            verify_result = _run_verify_phase(
+                repo_root=repo_root,
+                run_id=verify_run_id,
+                profile=profile,
+                ci_status_json=ci_status_json,
+                timeout_seconds=timeout_seconds,
+                checkout_most_advanced_branch=checkout_most_advanced_branch,
+                execute_discovered_gates=execute_discovered_gates,
+                allow_mutating_gates=allow_mutating_gates,
+                worktree_mode=worktree_mode,
+                allow_dirty_worktree_verify=allow_dirty_worktree_verify,
+                resolved_verify_timeout=resolved_verify_timeout,
+                resolved_verify_reason=resolved_verify_reason,
+                resolved_total_reason=resolved_total_reason,
+                total_timeout_seconds=resolved_total_timeout,
+                remaining_total_seconds=remaining_total_seconds,
+                phase_timings=phase_timings,
+                current=current,
+                verify_callback=verify_callback,
+                intent=intent,
+                agent_review_mode=agent_review_mode,
+                scan_exclusion_overlay=scan_exclusion_overlay,
+                readiness_evidence_file=readiness_evidence_file,
+                analysis_cache_root=analysis_cache_root,
+                refresh_context=refresh_context,
+                progress=progress,
+            )
         emit_progress(progress, "refresh/summary", f"run_id={verify_run_id}")
         summary = summary_callback(
             repo_root=repo_root,
@@ -272,10 +308,11 @@ def run_refresh_payload(
             else None,
             baseline_run_id=baseline_run_id,
             timeout_scope=current.timeout_scope,
-            timeout_context=_timeout_context(
+            timeout_context=timeout_context(
                 phase=current.phase,
                 execute_discovered_gates=execute_discovered_gates,
                 refresh_context=refresh_context,
+                timeout_reason=current.timeout_reason,
             ),
         )
         timed_out = True
@@ -452,22 +489,3 @@ def _public_timeout_contract(contract: dict[str, Any]) -> dict[str, Any]:
         "total_timeout_source": contract["total_timeout_source"],
         "total_timeout_reason": contract["total_timeout_reason"],
     }
-
-
-def _timeout_context(
-    *,
-    phase: str,
-    execute_discovered_gates: bool,
-    refresh_context: dict[str, object],
-) -> dict[str, str]:
-    if phase == "verify-gates":
-        mode = "gate-command-execution" if execute_discovered_gates else "read-only-gate-discovery"
-        analysis_source = (
-            "fresh-gate-analysis"
-            if execute_discovered_gates
-            else str(refresh_context.get("analysis_source") or "fresh-read-only-audit")
-        )
-    else:
-        mode = f"{phase}-analysis"
-        analysis_source = str(refresh_context.get("analysis_source") or "unknown")
-    return {"mode": mode, "analysis_source": analysis_source}

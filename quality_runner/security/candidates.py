@@ -12,6 +12,7 @@ from quality_runner.evidence_redaction import (
     analyze_secret_like_source_lines,
     redact_secret_like_literals,
 )
+from quality_runner.security.disposition import classify_security_candidate
 from quality_runner.security.taxonomy import SECURITY_TAXONOMY_CATEGORIES
 
 _CANDIDATE_ID = 0
@@ -102,6 +103,7 @@ def scan_security_candidates(
     scanned_files: list[dict[str, Any]],
     disabled_groups: list[str],
     surfaces: dict[str, bool],
+    owner_role: str = "security-maintainer",
 ) -> list[dict[str, Any]]:
     global _CANDIDATE_ID
     candidates: list[dict[str, Any]] = []
@@ -148,6 +150,7 @@ def scan_security_candidates(
                                 evidence=_candidate_evidence(cat, evidence_lines[line_number - 1]),
                                 description=description,
                                 requires_agent_review=_requires_agent_review(cat),
+                                owner_role=owner_role,
                             )
                         )
 
@@ -193,6 +196,7 @@ def scan_security_candidates(
                                 evidence=_candidate_evidence(cat, evidence_lines[line_number - 1]),
                                 description=description,
                                 requires_agent_review=True,
+                                owner_role=owner_role,
                             )
                         )
 
@@ -214,6 +218,7 @@ def scan_security_candidates(
                     evidence=f"Webhook handler in {relative_path} without obvious signature verification.",
                     description="Webhook route may lack signature verification.",
                     requires_agent_review=True,
+                    owner_role=owner_role,
                 )
             )
 
@@ -236,6 +241,7 @@ def scan_security_candidates(
                 evidence=evidence,
                 description=description,
                 requires_agent_review=_requires_agent_review(category),
+                owner_role=owner_role,
             )
         )
 
@@ -253,10 +259,18 @@ def _candidate(
     evidence: str,
     description: str,
     requires_agent_review: bool,
+    owner_role: str = "security-maintainer",
 ) -> dict[str, Any]:
     global _CANDIDATE_ID
     _CANDIDATE_ID += 1
     candidate_id = f"SEC-{category.replace('-', '_')}-{_CANDIDATE_ID:04d}"
+    disposition = classify_security_candidate(
+        category=category,
+        confidence=confidence,
+        file=file,
+        evidence=evidence,
+        owner_role=owner_role,
+    )
     return {
         "id": candidate_id,
         "category": category,
@@ -271,6 +285,7 @@ def _candidate(
         "verification_guidance": _verification_guidance(category),
         "false_positive_guidance": _false_positive_guidance(category),
         "requires_agent_review": requires_agent_review,
+        **disposition,
         "summary": description,
         "fingerprint": security_candidate_fingerprint(
             category=category,

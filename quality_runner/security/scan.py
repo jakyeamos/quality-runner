@@ -4,6 +4,7 @@ import hashlib
 from pathlib import Path
 from typing import Any
 
+from quality_runner.cache_modes import CacheMode
 from quality_runner.code_quality_paths import _split_lines
 from quality_runner.core.audit_contracts import AuditPayload, TextScanScope
 from quality_runner.incremental_analysis_cache import IncrementalAnalysisCache
@@ -38,10 +39,12 @@ def create_security_scan(
     config: dict[str, Any],
     standards_packet: dict[str, Any] | None = None,
     text_scan_scope: TextScanScope | None = None,
-    persist_cache: bool = True,
+    cache_mode: CacheMode | str = "repo",
     cache_root: Path | None = None,
+    persist_cache: bool | None = None,
 ) -> dict[str, Any]:
     root = repo_root.expanduser().resolve()
+    effective_cache_mode = "disabled" if persist_cache is False else cache_mode
     settings = security_settings(config)
     if not settings["enabled"]:
         disabled_scan = _disabled_security_scan(
@@ -52,7 +55,7 @@ def create_security_scan(
         disabled_scan["analysis_cache"] = _disabled_cache_evidence(
             root,
             config,
-            persist_cache=persist_cache,
+            cache_mode=effective_cache_mode,
             cache_root=cache_root,
         )
         return disabled_scan
@@ -71,6 +74,7 @@ def create_security_scan(
         config=config,
         text_scan_scope=text_scan_scope,
         scan_exclusions=scan_exclusions,
+        cache_mode=effective_cache_mode,
     )
     disabled_groups = settings["disabled_rule_groups"]
     analysis_cache = IncrementalAnalysisCache(
@@ -79,28 +83,51 @@ def create_security_scan(
         config=config,
         context={
             "disabled_rule_groups": disabled_groups,
+            "owner_role": settings["owner_role"],
             "surfaces": surfaces,
         },
-        persist=persist_cache,
+        cache_mode=effective_cache_mode,
         cache_root=cache_root,
     )
     candidates: list[dict[str, Any]] = []
     for file_info in scanned_files:
         relative_path = str(file_info["path"])
-        source_text = str(file_info.get("text", ""))
-        file_result = analysis_cache.get_or_compute(
-            relative_path=relative_path,
-            source_text=source_text,
-            compute=lambda file_info=file_info: {
-                "candidates": scan_security_candidates(
-                    scanned_files=[file_info],
-                    disabled_groups=disabled_groups,
-                    surfaces=surfaces,
-                )
-            },
-            validate=_valid_security_file_result,
-            content_sha256=_content_sha256(file_info),
-        )
+        if isinstance(file_info.get("text"), str):
+            source_text = str(file_info.get("text", ""))
+            file_result = analysis_cache.get_or_compute(
+                relative_path=relative_path,
+                source_text=source_text,
+                compute=lambda file_info=file_info: {
+                    "candidates": scan_security_candidates(
+                        scanned_files=[file_info],
+                        disabled_groups=disabled_groups,
+                        surfaces=surfaces,
+                        owner_role=settings["owner_role"],
+                    )
+                },
+                validate=_valid_security_file_result,
+                content_sha256=_content_sha256(file_info),
+            )
+        else:
+            file_result = analysis_cache.get_or_compute_from_path(
+                relative_path=relative_path,
+                source_path=root / relative_path,
+                compute=lambda source_text, relative_path=relative_path: {
+                    "candidates": scan_security_candidates(
+                        scanned_files=[
+                            {
+                                "path": relative_path,
+                                "text": source_text,
+                                "lines": _split_lines(source_text),
+                            }
+                        ],
+                        disabled_groups=disabled_groups,
+                        surfaces=surfaces,
+                        owner_role=settings["owner_role"],
+                    )
+                },
+                validate=_valid_security_file_result,
+            )
         candidates.extend(_candidate_list_result(file_result))
     _renumber_security_candidate_ids(candidates)
     available, missing = detect_security_capabilities(
@@ -144,6 +171,7 @@ def create_security_scan(
             "enabled": settings["enabled"],
             "agent_review_gates": settings["agent_review_gates"],
             "require_security_baseline": settings["require_security_baseline"],
+            "owner_role": settings["owner_role"],
         },
     }
 
@@ -206,7 +234,14 @@ def detect_security_surfaces(
         files_by_path = {file_info.path: file_info.text for file_info in text_scan_scope.files}
         for relative_path in text_scan_scope.security_surface_paths:
             _record_security_surface(surfaces, relative_path, Path(relative_path).name)
-            if _raw_content_surface_text(relative_path, files_by_path.get(relative_path, "")):
+            surface_text = files_by_path.get(relative_path)
+            if surface_text is None:
+                surface_path = repo_root / relative_path
+                try:
+                    surface_text = surface_path.read_text(encoding="utf-8", errors="replace")
+                except OSError:
+                    surface_text = ""
+            if _raw_content_surface_text(relative_path, surface_text):
                 surfaces["publication_visibility"] = True
     else:
         for path in repo_root.rglob("*"):
@@ -236,12 +271,15 @@ def _scan_files(
     config: dict[str, Any],
     scan_exclusions: list[str] | None = None,
     text_scan_scope: TextScanScope | None = None,
+    cache_mode: CacheMode | str = "repo",
 ) -> list[dict[str, Any]]:
     if text_scan_scope is not None:
-        return [
-            {"path": file_info.path, "text": file_info.text, "lines": file_info.lines}
-            for file_info in text_scan_scope.files
-        ]
+        if text_scan_scope.files:
+            return [
+                {"path": file_info.path, "text": file_info.text, "lines": file_info.lines}
+                for file_info in text_scan_scope.files
+            ]
+        return [{"path": relative_path} for relative_path in text_scan_scope.file_paths]
 
     effective_exclusions = scan_exclusions or effective_scan_exclusions(
         repo_root,
@@ -379,15 +417,17 @@ def _disabled_cache_evidence(
     repo_root: Path,
     config: dict[str, Any],
     *,
-    persist_cache: bool,
-    cache_root: Path | None,
+    cache_mode: CacheMode | str = "repo",
+    cache_root: Path | None = None,
+    persist_cache: bool | None = None,
 ) -> dict[str, object]:
+    effective_cache_mode = "disabled" if persist_cache is False else cache_mode
     cache = IncrementalAnalysisCache(
         repo_root,
         analysis_kind="security",
         config=config,
         context={"enabled": False},
-        persist=persist_cache,
+        cache_mode=effective_cache_mode,
         cache_root=cache_root,
     )
     evidence = cache.evidence(considered_files=0)

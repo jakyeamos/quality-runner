@@ -316,6 +316,8 @@ def test_refresh_payload_preserves_partial_verify_artifacts_when_timeout_finaliz
         run_id_prefix="refresh-timeout-preserve",
         workflow_timeout_seconds=30,
         workflow_timeout_reason="controller deadline exceeded while verifying gates",
+        execute_discovered_gates=True,
+        worktree_mode="disposable",
     )
     run_dir = tmp_path / ".quality-runner" / "runs" / "refresh-timeout-preserve-verify"
     gate_plan = json.loads((run_dir / "gate-execution-plan.json").read_text())
@@ -373,6 +375,8 @@ def test_refresh_payload_records_timeout_contract_and_phase_timings(
         verify_timeout_seconds=17,
         total_timeout_seconds=45,
         total_timeout_reason="controller full refresh budget",
+        execute_discovered_gates=True,
+        worktree_mode="disposable",
     )
 
     assert payload["timeout_contract"]["per_gate_timeout_seconds"] == 9
@@ -407,6 +411,8 @@ def test_refresh_payload_total_timeout_finalizes_when_run_phase_is_interrupted(
         workflow_timeout_seconds=60,
         total_timeout_seconds=30,
         total_timeout_reason="controller full refresh budget",
+        execute_discovered_gates=True,
+        worktree_mode="disposable",
     )
     run_dir = tmp_path / ".quality-runner" / "runs" / "refresh-total-timeout-verify"
     gate_verification = json.loads((run_dir / "gate-verification.json").read_text())
@@ -451,6 +457,8 @@ def test_refresh_payload_total_timeout_scope_is_distinct_from_verify_phase(
         workflow_timeout_seconds=60,
         total_timeout_seconds=30,
         total_timeout_reason="controller full refresh budget",
+        execute_discovered_gates=True,
+        worktree_mode="disposable",
     )
     run_dir = tmp_path / ".quality-runner" / "runs" / "refresh-total-scope-verify"
     gate_verification = json.loads((run_dir / "gate-verification.json").read_text())

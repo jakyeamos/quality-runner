@@ -213,6 +213,64 @@ def timeout_refresh_phase(
     }
 
 
+def build_skipped_verify_artifacts(
+    *,
+    repo_root: Path,
+    run_id: str,
+    reason: str,
+) -> dict[str, Any]:
+    run_dir = prepare_artifact_dir(repo_root, run_id)
+    verification = {
+        "schema": GATE_VERIFICATION_SCHEMA,
+        "run_id": run_id,
+        "status": "blocked",
+        "skip_type": "execution-consent-required",
+        "reason": reason,
+        "execution_authorized": False,
+        "verification_context": {"execution_authorized": False, "worktree_mode": "in-place"},
+        "gates": [
+            {
+                "id": "refresh-execution-consent",
+                "status": "blocked",
+                "skip_type": "execution-consent-required",
+                "reason": reason,
+            }
+        ],
+    }
+    artifact_paths = {
+        "gate_execution_plan_json": str(run_dir / "gate-execution-plan.json"),
+        "gate_verification_json": str(run_dir / "gate-verification.json"),
+        "run_manifest_json": str(run_dir / "run-manifest.json"),
+        "agent_handoff_md": str(run_dir / "agent-handoff.md"),
+    }
+    write_text(run_dir / "gate-execution-plan.json", "[]\n")
+    write_json(run_dir / "gate-verification.json", verification)
+    write_text(
+        run_dir / "agent-handoff.md",
+        "# Quality Runner Agent Handoff\n\n"
+        "Verification was not started because explicit gate-execution consent was not provided.\n"
+        "Inspect/run evidence remains available in the sibling refresh artifacts.\n",
+    )
+    write_json(
+        run_dir / "run-manifest.json",
+        build_run_manifest(
+            repo_root=repo_root,
+            run_id=run_id,
+            mode="verify-gates",
+            artifact_paths=artifact_paths,
+        ),
+    )
+    return {
+        "schema": "quality-runner-verify-gates-result-v0.1",
+        "status": "blocked",
+        "implementation_allowed": False,
+        "run_id": run_id,
+        "skip_type": "execution-consent-required",
+        "reason": reason,
+        "artifact_paths": artifact_paths,
+    }
+
+
 @contextmanager
 def workflow_deadline(*, seconds: int | float, reason: str) -> Iterator[None]:
     if seconds <= 0:

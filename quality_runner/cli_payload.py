@@ -144,6 +144,10 @@ def payload_for_args(
             checkout_most_advanced_branch=args.checkout_most_advanced_branch,
             skill_review_report=_optional_skill_review_report(args),
             agent_review_mode=args.agent_review_mode,
+            analysis_mode=args.analysis_mode,
+            cache_mode=args.cache_mode,
+            cache_root=_cache_root(args),
+            performance_budget_seconds=args.performance_budget_seconds,
             progress=progress,
             intent=workflow_intent_from_cli_args(args, repo_root=repo_root, run_id=args.run_id),
         )
@@ -188,6 +192,10 @@ def payload_for_args(
             checkout_most_advanced_branch=args.checkout_most_advanced_branch,
             skill_review_report=_optional_skill_review_report(args),
             agent_review_mode=args.agent_review_mode,
+            analysis_mode=args.analysis_mode,
+            cache_mode=args.cache_mode,
+            cache_root=_cache_root(args),
+            performance_budget_seconds=args.performance_budget_seconds,
             progress=progress,
             intent=workflow_intent_from_cli_args(args, repo_root=repo_root, run_id=args.run_id),
         )
@@ -354,6 +362,11 @@ def _validated_repo_path(repo_path: str) -> Path:
     if not root.is_dir():
         raise NotADirectoryError(f"repo root is not a directory: {root}")
     return root
+
+
+def _cache_root(args: argparse.Namespace) -> Path | None:
+    value = getattr(args, "cache_dir", None)
+    return Path(value).expanduser().resolve() if isinstance(value, str) and value else None
 
 
 def _interactive_include_ignored_paths(args: argparse.Namespace, repo_root: Path) -> list[str]:

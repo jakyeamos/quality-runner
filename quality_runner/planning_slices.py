@@ -25,6 +25,7 @@ def slice_for_finding(finding: dict[str, Any]) -> dict[str, Any]:
                 "category": finding["category"],
                 "summary": finding["summary"],
                 **_optional_actionability(finding),
+                **_optional_disposition(finding),
                 **verification_contract,
             }
         ],
@@ -103,4 +104,18 @@ def _optional_actionability(finding: dict[str, Any]) -> dict[str, str]:
     payload: dict[str, str] = {"actionability": actionability}
     if isinstance(rationale, str) and rationale:
         payload["actionability_rationale"] = rationale
+    return payload
+
+
+def _optional_disposition(finding: dict[str, Any]) -> dict[str, Any]:
+    payload: dict[str, Any] = {}
+    for key in (
+        "disposition_class",
+        "disposition_group",
+        "disposition_required",
+        "owner_role",
+        "disposition_rationale",
+    ):
+        if key in finding and finding[key] is not None:
+            payload[key] = finding[key]
     return payload

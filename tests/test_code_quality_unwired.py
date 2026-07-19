@@ -78,3 +78,88 @@ def test_code_quality_scan_can_disable_integrate_group(tmp_path: Path) -> None:
     )
 
     assert all(finding["category"] != "integrate" for finding in result["findings"])
+
+
+def test_unwired_scan_ignores_test_only_references() -> None:
+    from quality_runner.code_quality_unwired import unwired_findings
+
+    definition = {
+        "path": "src/feature.ts",
+        "text": "export function Feature() {}\n",
+        "lines": ["export function Feature() {}"],
+    }
+    test_reference = {
+        "path": "tests/feature.test.ts",
+        "text": "Feature();\n",
+        "lines": ["Feature();"],
+    }
+
+    findings = unwired_findings([definition, test_reference], {})
+    assert any(finding["rule_id"] == "export-without-references" for finding in findings)
+
+    consumer = {
+        "path": "src/consumer.ts",
+        "text": "Feature();\n",
+        "lines": ["Feature();"],
+    }
+    findings = unwired_findings([definition, test_reference, consumer], {})
+    assert all(finding["rule_id"] != "export-without-references" for finding in findings)
+
+
+def test_reference_index_scans_each_non_test_file_once(monkeypatch) -> None:
+    from quality_runner import code_quality_unwired
+
+    original_pattern = code_quality_unwired._SYMBOL_REFERENCE_RE
+    calls = 0
+
+    class CountingPattern:
+        def finditer(self, text: str):
+            nonlocal calls
+            calls += 1
+            return original_pattern.finditer(text)
+
+    monkeypatch.setattr(code_quality_unwired, "_SYMBOL_REFERENCE_RE", CountingPattern())
+    source_files = [
+        {
+            "path": f"src/file-{index}.ts",
+            "text": f"export const Symbol{index} = {index};\n",
+            "lines": [f"export const Symbol{index} = {index};"],
+        }
+        for index in range(20)
+    ]
+    source_files.append(
+        {
+            "path": "tests/file.test.ts",
+            "text": "Symbol1();\n",
+            "lines": ["Symbol1();"],
+        }
+    )
+
+    reference_index = code_quality_unwired._build_reference_index(source_files)
+
+    assert calls == 20
+    assert reference_index.paths_by_symbol["Symbol1"] == frozenset({"src/file-1.ts"})
+
+
+def test_reference_index_summarizes_registration_paths_once() -> None:
+    from quality_runner import code_quality_unwired
+
+    source_files = [
+        {
+            "path": "src/feature.ts",
+            "text": "export function Feature() {}\n",
+            "lines": ["export function Feature() {}"],
+        },
+        {
+            "path": "src/router.ts",
+            "text": "register(Feature);\n",
+            "lines": ["register(Feature);"],
+        },
+    ]
+
+    reference_index = code_quality_unwired._build_reference_index(
+        source_files,
+        registration_paths={"src/router.ts"},
+    )
+
+    assert reference_index.registration_paths_by_symbol["Feature"] == frozenset({"src/router.ts"})

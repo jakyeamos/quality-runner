@@ -807,3 +807,27 @@ Review emits the v2 journey projection by default. Packet-only review is
 existing CLI consumer requires the frozen v1 field shape; it emits a versioned
 stderr notice. The [Upgrade and Compatibility Guide](upgrade.md) defines the
 support window and rollback path.
+
+## Planning delivery contracts
+
+The additive contract commands are designed for fast planning and execution
+loops:
+
+```bash
+quality-runner plan contract prepare REPO [options]
+quality-runner plan contract refresh REPO --contract CONTRACT [options]
+quality-runner plan preflight REPO --contract CONTRACT --plan-file PLAN
+quality-runner plan reconcile REPO --contract CONTRACT --result-file RESULT
+```
+
+Contract preparation and refresh default to balanced analysis with an external
+cache and a 30-second performance budget. Preflight reads saved artifacts and
+the native plan only; it does not trigger a QR scan. Reconciliation consumes a
+structured result and the current QR delta. Use the MCP equivalent
+`quality_runner_delivery_contract` for tool callers.
+
+For planning loops, pass `--analysis-mode balanced` and
+`--cache-mode external`. Use `--analysis-mode full` at phase, release, or audit
+boundaries. `--cache-mode disabled` is diagnostic only. See
+[Planning and Delivery Contracts](planning-contracts.md) for the receipt fields
+and blocker rules.

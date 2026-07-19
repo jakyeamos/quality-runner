@@ -11,7 +11,9 @@ from quality_runner.application.audit_v1_artifacts import (
 )
 from quality_runner.application.read_only_audit import analyze_read_only_audit
 from quality_runner.artifacts import prepare_artifact_dir
+from quality_runner.cache_modes import CacheMode
 from quality_runner.core.audit_contracts import (
+    AnalysisMode,
     AuditPayload,
     AuditRequest,
     AuditWarning,
@@ -37,6 +39,11 @@ def inspect_payload(
     agent_review_mode: str | None = None,
     scan_exclusion_overlay: ScanExclusionOverlay | None = None,
     analysis_cache_root: Path | None = None,
+    focus_paths: list[str] | None = None,
+    analysis_mode: str = "full",
+    cache_mode: CacheMode | str | None = None,
+    cache_root: Path | None = None,
+    performance_budget_seconds: float | None = None,
     progress: ProgressCallback | None = None,
     refresh_context: dict[str, object] | None = None,
 ) -> dict[str, Any]:
@@ -59,6 +66,11 @@ def inspect_payload(
             scan_exclusion_overlay=scan_exclusion_overlay,
             intent=intent,
             analysis_cache_root=analysis_cache_root,
+            focus_paths=focus_paths,
+            analysis_mode=analysis_mode,
+            cache_mode=cache_mode,
+            cache_root=cache_root,
+            performance_budget_seconds=performance_budget_seconds,
         ),
         progress=progress,
     )
@@ -93,6 +105,11 @@ def run_payload(
     agent_review_mode: str | None = None,
     scan_exclusion_overlay: ScanExclusionOverlay | None = None,
     analysis_cache_root: Path | None = None,
+    focus_paths: list[str] | None = None,
+    analysis_mode: str = "full",
+    cache_mode: CacheMode | str | None = None,
+    cache_root: Path | None = None,
+    performance_budget_seconds: float | None = None,
     progress: ProgressCallback | None = None,
     refresh_context: dict[str, object] | None = None,
 ) -> dict[str, Any]:
@@ -115,6 +132,11 @@ def run_payload(
             scan_exclusion_overlay=scan_exclusion_overlay,
             intent=intent,
             analysis_cache_root=analysis_cache_root,
+            focus_paths=focus_paths,
+            analysis_mode=analysis_mode,
+            cache_mode=cache_mode,
+            cache_root=cache_root,
+            performance_budget_seconds=performance_budget_seconds,
         ),
         progress=progress,
     )
@@ -150,6 +172,11 @@ def _audit_request(
     scan_exclusion_overlay: ScanExclusionOverlay | None,
     intent: AuditPayload | None,
     analysis_cache_root: Path | None,
+    focus_paths: list[str] | None,
+    analysis_mode: str,
+    cache_mode: CacheMode | str | None,
+    cache_root: Path | None,
+    performance_budget_seconds: float | None,
 ) -> AuditRequest:
     return AuditRequest(
         repo_root=repo_root,
@@ -164,6 +191,17 @@ def _audit_request(
         analysis_cache_root=analysis_cache_root,
         scan_exclusion_overlay=scan_exclusion_overlay,
         agent_review_mode=agent_review_mode,
+        focus_paths=tuple(sorted(set(focus_paths or []))),
+        analysis_mode=cast(
+            AnalysisMode,
+            analysis_mode if analysis_mode in {"balanced", "full"} else "full",
+        ),
+        cache_mode=cast(
+            CacheMode | None,
+            cache_mode if cache_mode in {"repo", "external", "disabled"} else None,
+        ),
+        cache_root=cache_root,
+        performance_budget_seconds=performance_budget_seconds,
     )
 
 

@@ -28,6 +28,7 @@ def security_settings(config: dict[str, Any]) -> dict[str, Any]:
     required = section.get("required_capabilities")
     disabled_groups = section.get("disabled_rule_groups")
     severity = section.get("severity")
+    owner_role = section.get("owner_role")
     minimum_agent_review = "medium"
     if isinstance(severity, dict):
         value = severity.get("minimum_agent_review")
@@ -42,6 +43,7 @@ def security_settings(config: dict[str, Any]) -> dict[str, Any]:
         or list(DEFAULT_REQUIRED_SECURITY_CAPABILITIES),
         "disabled_rule_groups": _string_list(disabled_groups),
         "minimum_agent_review": minimum_agent_review,
+        "owner_role": owner_role if isinstance(owner_role, str) and owner_role else "security-maintainer",
         "configured": True,
     }
 
@@ -54,6 +56,7 @@ def _default_security_settings(*, configured: bool) -> dict[str, Any]:
         "required_capabilities": list(DEFAULT_REQUIRED_SECURITY_CAPABILITIES),
         "disabled_rule_groups": [],
         "minimum_agent_review": "medium",
+        "owner_role": "security-maintainer",
         "configured": configured,
     }
 

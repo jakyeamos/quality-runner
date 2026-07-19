@@ -27,6 +27,7 @@ def test_mcp_lists_quality_runner_tools() -> None:
         "quality_runner_review_outcome",
         "quality_runner_verify_outcome",
         "quality_runner_runs_outcome",
+        "quality_runner_delivery_contract",
     }
     descriptions = {tool["name"]: tool["description"] for tool in tools}
     assert "supported through 0.7.x" in descriptions["quality_runner_review"]
@@ -270,7 +271,7 @@ def test_mcp_initialize_and_tools_list_jsonrpc() -> None:
     assert initialize["result"]["serverInfo"] == {"name": "quality-runner", "version": __version__}
     assert initialize["result"]["capabilities"] == {"tools": {"listChanged": False}}
     assert tools is not None
-    assert len(tools["result"]["tools"]) == 14
+    assert len(tools["result"]["tools"]) == 15
 
 
 def test_mcp_notifications_do_not_return_response() -> None:
@@ -503,4 +504,4 @@ def test_mcp_main_stdio_loop_writes_jsonrpc_response(monkeypatch, capsys) -> Non
     assert exit_code == 0
     response = json.loads(capsys.readouterr().out)
     assert response["id"] == 1
-    assert len(response["result"]["tools"]) == 14
+    assert len(response["result"]["tools"]) == 15

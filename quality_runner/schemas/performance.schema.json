@@ -1,0 +1,34 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://quality-runner.dev/schemas/performance.schema.json",
+  "title": "Quality Runner performance receipt",
+  "type": "object",
+  "required": [
+    "schema",
+    "status",
+    "analysis_mode",
+    "cache_mode",
+    "elapsed_seconds",
+    "phase_timings",
+    "counters",
+    "deferred_checks",
+    "timeout_reasons"
+  ],
+  "properties": {
+    "schema": {"const": "quality-runner-performance-v0.1"},
+    "status": {"type": "string", "enum": ["complete", "partial", "timeout"]},
+    "analysis_mode": {"type": "string", "enum": ["balanced", "full"]},
+    "cache_mode": {"type": "string", "enum": ["repo", "external", "disabled"]},
+    "elapsed_seconds": {"type": "number", "minimum": 0},
+    "budget_seconds": {"type": ["number", "null"], "minimum": 0},
+    "budget_exceeded": {"type": "boolean"},
+    "phase_timings": {"type": "object", "additionalProperties": {"type": "number", "minimum": 0}},
+    "counters": {"type": "object", "additionalProperties": {"type": "integer", "minimum": 0}},
+    "deferred_checks": {"type": "array", "items": {"type": "object"}},
+    "timeout_reasons": {"type": "array", "items": {"type": "object"}},
+    "current_phase": {"type": ["string", "null"]},
+    "resume_command": {"type": ["string", "null"]},
+    "artifact_write_seconds": {"type": "number", "minimum": 0}
+  },
+  "additionalProperties": true
+}

@@ -1,17 +1,38 @@
 from __future__ import annotations
 
-import hashlib
 import json
-import os
-import tempfile
 from collections import Counter
 from collections.abc import Callable, Mapping
-from contextlib import suppress
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import cast
 
 from quality_runner import __version__
+from quality_runner.cache_modes import CacheMode, cache_directory, resolve_cache_mode
+from quality_runner.incremental_analysis_cache_io import (
+    atomic_write_json as _atomic_write_json,
+)
+from quality_runner.incremental_analysis_cache_io import (
+    cache_directory_label as _cache_directory_label,
+)
+from quality_runner.incremental_analysis_cache_io import (
+    is_safe_cache_key as _is_safe_cache_key,
+)
+from quality_runner.incremental_analysis_cache_io import (
+    json_hash as _json_hash,
+)
+from quality_runner.incremental_analysis_cache_io import (
+    read_source_text as _read_source_text,
+)
+from quality_runner.incremental_analysis_cache_io import (
+    safe_cache_tree as _safe_cache_tree,
+)
+from quality_runner.incremental_analysis_cache_io import (
+    sha256_text as _sha256_text,
+)
+from quality_runner.incremental_analysis_cache_io import (
+    source_signature as _source_signature,
+)
 from quality_runner.incremental_analysis_identity import (
     configuration_identity,
     dependency_state_identity,
@@ -26,6 +47,7 @@ _MAX_RECOMPUTED_PATH_SAMPLES = 100
 AnalysisResult = dict[str, object]
 AnalysisResultValidator = Callable[[AnalysisResult], bool]
 AnalysisResultFactory = Callable[[], AnalysisResult]
+AnalysisResultFromSourceFactory = Callable[[str], AnalysisResult]
 
 
 @dataclass
@@ -38,6 +60,8 @@ class _CacheStats:
     pruned_entries: int = 0
     invalidation_reasons: Counter[str] = field(default_factory=Counter)
     recomputed_paths: list[str] = field(default_factory=list)
+    index_writes: int = 0
+    source_bytes_read: int = 0
 
 
 class IncrementalAnalysisCache:
@@ -50,17 +74,18 @@ class IncrementalAnalysisCache:
         analysis_kind: str,
         config: Mapping[str, object],
         context: Mapping[str, object] | None = None,
-        persist: bool = True,
+        cache_mode: CacheMode | str = "repo",
         cache_root: Path | None = None,
+        persist: bool | None = None,
     ) -> None:
         self._repo_root = repo_root.expanduser().resolve()
-        self._cache_root = (
-            cache_root.expanduser().resolve()
-            if cache_root is not None
-            else self._repo_root / ".quality-runner"
-        )
         self._analysis_kind = analysis_kind
-        self._persist = persist
+        resolved_cache_mode = resolve_cache_mode(cache_mode)
+        if persist is False:
+            resolved_cache_mode = "disabled"
+        self._cache_mode = resolved_cache_mode
+        self._persist = self._cache_mode != "disabled"
+        self._cache_root = cache_root.expanduser().resolve() if cache_root is not None else None
         self._context_identity = _json_hash(context or {})
         self._configuration_identity = configuration_identity(self._repo_root, config)
         self._dependency_state_identity = dependency_state_identity(self._repo_root)
@@ -69,10 +94,21 @@ class IncrementalAnalysisCache:
         self._index: dict[str, dict[str, object]] = {}
         self._index_loaded = False
         self._index_status = "unloaded"
+        self._index_dirty = False
+        self._last_content_sha256: dict[str, str] = {}
 
     @property
     def cache_dir(self) -> Path:
-        return self._cache_root / "cache" / INCREMENTAL_ANALYSIS_CACHE_DIRECTORY
+        return cache_directory(
+            self._repo_root,
+            mode=resolve_cache_mode(self._cache_mode),
+            cache_root=self._cache_root,
+            component=INCREMENTAL_ANALYSIS_CACHE_DIRECTORY,
+        )
+
+    @property
+    def cache_mode(self) -> CacheMode:
+        return resolve_cache_mode(self._cache_mode)
 
     def get_or_compute(
         self,
@@ -86,12 +122,15 @@ class IncrementalAnalysisCache:
         self._stats.considered_files += 1
         if not self._persist:
             self._record_recomputed_path(relative_path)
+            self._stats.source_bytes_read += len(source_text.encode("utf-8"))
             return compute()
+        self._stats.source_bytes_read += len(source_text.encode("utf-8"))
         identity = self._identity_for_file(
             relative_path=relative_path,
             source_text=source_text,
             content_sha256=content_sha256,
         )
+        self._last_content_sha256[relative_path] = str(identity["content_sha256"])
         lookup_key = f"{self._analysis_kind}:{relative_path}"
         self._load_index()
         prior = self._index.get(lookup_key)
@@ -112,10 +151,78 @@ class IncrementalAnalysisCache:
         )
         return result
 
+    def get_or_compute_from_path(
+        self,
+        *,
+        relative_path: str,
+        source_path: Path,
+        compute: AnalysisResultFromSourceFactory,
+        validate: AnalysisResultValidator,
+    ) -> AnalysisResult:
+        """Use file metadata to avoid reading unchanged sources on cache hits."""
+        self._stats.considered_files += 1
+        if not self._persist:
+            source_text = _read_source_text(source_path)
+            self._stats.source_bytes_read += len(source_text.encode("utf-8"))
+            self._record_recomputed_path(relative_path)
+            return compute(source_text)
+        signature = _source_signature(source_path)
+        self._load_index()
+        lookup_key = f"{self._analysis_kind}:{relative_path}"
+        prior = self._index.get(lookup_key)
+        prior_record = prior if isinstance(prior, dict) else None
+        prior_signature = (
+            prior_record.get("source_signature") if prior_record is not None else None
+        )
+        if isinstance(prior_signature, dict) and prior_signature == signature:
+            content_sha256 = prior_record.get("content_sha256") if prior_record is not None else None
+            if isinstance(content_sha256, str) and content_sha256:
+                identity = self._identity_for_file(
+                    relative_path=relative_path,
+                    source_text="",
+                    content_sha256=content_sha256,
+                    source_signature=signature,
+                )
+                reasons = self._invalidation_reasons(prior, identity)
+                if not reasons:
+                    cached = self._read_cached_result(prior, identity, validate)
+                    if cached is not None:
+                        self._stats.cache_hits += 1
+                        self._last_content_sha256[relative_path] = content_sha256
+                        return cached
+                    reasons = [self._cache_read_failure_reason(prior)]
+                self._record_miss(relative_path, reasons)
+            else:
+                self._record_miss(relative_path, ["cache-index-corrupt"])
+        else:
+            reason = "missing-entry" if prior is None else "source-stat-changed"
+            self._record_miss(relative_path, [reason])
+
+        source_text = _read_source_text(source_path)
+        self._stats.source_bytes_read += len(source_text.encode("utf-8"))
+        identity = self._identity_for_file(
+            relative_path=relative_path,
+            source_text=source_text,
+            content_sha256=None,
+            source_signature=signature,
+        )
+        self._last_content_sha256[relative_path] = str(identity["content_sha256"])
+        result = compute(source_text)
+        self._write_result(
+            lookup_key=lookup_key,
+            identity=identity,
+            result=result,
+        )
+        return result
+
+    def content_sha256_for(self, relative_path: str) -> str | None:
+        return self._last_content_sha256.get(relative_path)
+
     def evidence(self, *, considered_files: int | None = None) -> dict[str, object]:
         considered = self._stats.considered_files if considered_files is None else considered_files
         if self._persist:
             self._load_index()
+            self.flush()
         reason_counts = dict(sorted(self._stats.invalidation_reasons.items()))
         if not self._persist:
             status = "disabled"
@@ -133,7 +240,7 @@ class IncrementalAnalysisCache:
             "schema": INCREMENTAL_ANALYSIS_CACHE_SCHEMA,
             "analysis_kind": self._analysis_kind,
             "status": status,
-            "cache_directory": str(self.cache_dir.relative_to(self._repo_root)),
+            "cache_directory": _cache_directory_label(self.cache_dir, self._repo_root),
             "considered_files": considered,
             "cache_hits": self._stats.cache_hits,
             "cache_misses": self._stats.cache_misses,
@@ -147,12 +254,17 @@ class IncrementalAnalysisCache:
             "index_status": self._index_status if self._persist else "disabled",
             "index_entries": len(self._index),
             "persisted": self._persist,
+            "cache_mode": self._cache_mode,
+            "cache_root": str(self.cache_dir),
+            "index_writes": self._stats.index_writes,
+            "source_bytes_read": self._stats.source_bytes_read,
             "identity": {
                 "quality_runner_version": __version__,
                 "scanner_implementation_sha256": self._scanner_implementation_identity,
                 "configuration_sha256": self._configuration_identity,
                 "dependency_state_sha256": self._dependency_state_identity,
                 "analysis_context_sha256": self._context_identity,
+                "repository_root_sha256": _sha256_text(str(self._repo_root)),
             },
             "key_fields": [
                 "relative_path",
@@ -162,8 +274,30 @@ class IncrementalAnalysisCache:
                 "configuration_sha256",
                 "dependency_state_sha256",
                 "analysis_context_sha256",
+                "repository_root_sha256",
             ],
         }
+
+    def flush(self) -> None:
+        """Persist one accumulated index update after a scan, not once per file."""
+        if not self._persist or not self._index_dirty:
+            return
+        if not _safe_cache_tree(self.cache_dir):
+            self._stats.write_failures += 1
+            return
+        self._prune_entries()
+        if not _atomic_write_json(
+            self.cache_dir / _CACHE_INDEX_NAME,
+            {
+                "schema": INCREMENTAL_ANALYSIS_CACHE_SCHEMA,
+                "entries": self._index,
+            },
+        ):
+            self._stats.write_failures += 1
+            return
+        self._index_status = "ready"
+        self._stats.index_writes += 1
+        self._index_dirty = False
 
     def _identity_for_file(
         self,
@@ -171,6 +305,7 @@ class IncrementalAnalysisCache:
         relative_path: str,
         source_text: str,
         content_sha256: str | None,
+        source_signature: dict[str, int] | None = None,
     ) -> dict[str, object]:
         return {
             "analysis_kind": self._analysis_kind,
@@ -181,13 +316,15 @@ class IncrementalAnalysisCache:
             "configuration_sha256": self._configuration_identity,
             "dependency_state_sha256": self._dependency_state_identity,
             "analysis_context_sha256": self._context_identity,
+            "repository_root_sha256": _sha256_text(str(self._repo_root)),
+            "source_signature": source_signature,
         }
 
     def _load_index(self) -> None:
         if self._index_loaded:
             return
         self._index_loaded = True
-        if not _safe_cache_tree(self._repo_root, self.cache_dir):
+        if not _safe_cache_tree(self.cache_dir):
             self._index_status = "unavailable"
             return
         index_path = self.cache_dir / _CACHE_INDEX_NAME
@@ -250,7 +387,7 @@ class IncrementalAnalysisCache:
         identity: dict[str, object],
         validate: AnalysisResultValidator,
     ) -> AnalysisResult | None:
-        if prior is None or not _safe_cache_tree(self._repo_root, self.cache_dir):
+        if prior is None or not _safe_cache_tree(self.cache_dir):
             return None
         cache_key = prior.get("cache_key")
         if not isinstance(cache_key, str) or not _is_safe_cache_key(cache_key):
@@ -279,7 +416,7 @@ class IncrementalAnalysisCache:
             return None
 
     def _cache_read_failure_reason(self, prior: dict[str, object] | None) -> str:
-        if not _safe_cache_tree(self._repo_root, self.cache_dir):
+        if not _safe_cache_tree(self.cache_dir):
             return "cache-unavailable"
         if prior is None:
             return "missing-entry"
@@ -299,7 +436,7 @@ class IncrementalAnalysisCache:
         if not self._persist:
             return
         cache_key = _json_hash(identity)
-        if not _safe_cache_tree(self._repo_root, self.cache_dir):
+        if not _safe_cache_tree(self.cache_dir):
             self._stats.write_failures += 1
             return
         entry_path = self.cache_dir / "entries" / f"{cache_key}.json"
@@ -313,17 +450,8 @@ class IncrementalAnalysisCache:
             self._stats.write_failures += 1
             return
         self._index[lookup_key] = {**identity, "cache_key": cache_key}
-        if not _atomic_write_json(
-            self.cache_dir / _CACHE_INDEX_NAME,
-            {
-                "schema": INCREMENTAL_ANALYSIS_CACHE_SCHEMA,
-                "entries": self._index,
-            },
-        ):
-            self._stats.write_failures += 1
-            return
+        self._index_dirty = True
         self._index_status = "ready"
-        self._prune_entries()
 
     def _prune_entries(self) -> None:
         entries_dir = self.cache_dir / "entries"
@@ -352,14 +480,8 @@ class IncrementalAnalysisCache:
                     for lookup_key, metadata in self._index.items()
                     if metadata.get("cache_key") not in removed_keys
                 }
-                if _atomic_write_json(
-                    self.cache_dir / _CACHE_INDEX_NAME,
-                    {
-                        "schema": INCREMENTAL_ANALYSIS_CACHE_SCHEMA,
-                        "entries": self._index,
-                    },
-                ):
-                    self._stats.pruned_entries += len(removed_keys)
+                self._index_dirty = True
+                self._stats.pruned_entries += len(removed_keys)
         except OSError:
             return
 
@@ -373,59 +495,3 @@ class IncrementalAnalysisCache:
     def _record_recomputed_path(self, relative_path: str) -> None:
         if len(self._stats.recomputed_paths) < _MAX_RECOMPUTED_PATH_SAMPLES:
             self._stats.recomputed_paths.append(relative_path)
-
-
-def _safe_cache_tree(repo_root: Path, cache_dir: Path) -> bool:
-    current = repo_root
-    for segment in (".quality-runner", "cache", INCREMENTAL_ANALYSIS_CACHE_DIRECTORY):
-        current = current / segment
-        if current.is_symlink():
-            return False
-    entries = cache_dir / "entries"
-    return not entries.exists() or entries.is_dir() and not entries.is_symlink()
-
-
-def _atomic_write_json(path: Path, payload: Mapping[str, object]) -> bool:
-    try:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        if path.is_symlink() or path.parent.is_symlink():
-            return False
-        temporary_path: str | None = None
-        try:
-            with tempfile.NamedTemporaryFile(
-                "w",
-                encoding="utf-8",
-                dir=path.parent,
-                prefix=f".{path.name}.",
-                suffix=".tmp",
-                delete=False,
-            ) as handle:
-                temporary_path = handle.name
-                json.dump(payload, handle, ensure_ascii=False, sort_keys=True)
-                handle.write("\n")
-                handle.flush()
-                os.fsync(handle.fileno())
-            os.replace(temporary_path, path)
-            temporary_path = None
-            return True
-        finally:
-            if temporary_path is not None:
-                with suppress(OSError):
-                    Path(temporary_path).unlink()
-    except (OSError, TypeError, ValueError):
-        return False
-
-
-def _is_safe_cache_key(value: str) -> bool:
-    return len(value) == 64 and all(character in "0123456789abcdef" for character in value)
-
-
-def _sha256_text(value: str) -> str:
-    return hashlib.sha256(value.encode("utf-8")).hexdigest()
-
-
-def _json_hash(value: object) -> str:
-    payload = json.dumps(
-        value, ensure_ascii=False, sort_keys=True, separators=(",", ":"), default=str
-    )
-    return _sha256_text(payload)

@@ -247,6 +247,7 @@ def _audit_request(
         analysis_cache_root=(
             None if request.policy.execute_discovered_gates else analysis_cache_root
         ),
+        cache_mode=(None if request.policy.execute_discovered_gates else "external"),
     )
 
 

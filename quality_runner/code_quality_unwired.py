@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import re
+from collections.abc import Mapping
+from dataclasses import dataclass
 from fnmatch import fnmatchcase
 from pathlib import Path
 from typing import Any
@@ -26,6 +28,13 @@ HANDLER_RE = re.compile(
     r"^\s*(?:export\s+)?(?:async\s+)?(?:function|def)\s+"
     r"([A-Za-z_][A-Za-z0-9_]*(?:Handler|_handler)|handle[A-Z_][A-Za-z0-9_]*|handle_[A-Za-z0-9_]+)"
 )
+_SYMBOL_REFERENCE_RE = re.compile(r"(?<![\w$])([A-Za-z_$][\w$]*)(?![\w$])")
+
+
+@dataclass(frozen=True)
+class _ReferenceIndex:
+    paths_by_symbol: Mapping[str, frozenset[str]]
+    registration_paths_by_symbol: Mapping[str, frozenset[str]]
 
 
 def unwired_findings(
@@ -43,6 +52,11 @@ def unwired_findings(
         for item in source_files
         if _path_matches_any(item["path"], policy["registration_globs"])
     ]
+    registration_paths = {item["path"] for item in registration_files}
+    reference_index = _build_reference_index(
+        source_files,
+        registration_paths=registration_paths,
+    )
     findings: list[dict[str, Any]] = []
     for item in source_files:
         path = item["path"]
@@ -53,11 +67,17 @@ def unwired_findings(
         findings.extend(
             _export_without_reference_findings(
                 item,
-                source_files,
+                reference_index,
                 entrypoint_globs=policy["entrypoint_globs"],
             )
         )
-        findings.extend(_handler_without_registration_findings(item, registration_files))
+        findings.extend(
+            _handler_without_registration_findings(
+                item,
+                reference_index,
+                registration_paths,
+            )
+        )
     return findings
 
 
@@ -147,7 +167,7 @@ def _todo_scaffold_findings(
 
 def _export_without_reference_findings(
     item: dict[str, Any],
-    source_files: list[dict[str, Any]],
+    reference_index: _ReferenceIndex,
     *,
     entrypoint_globs: list[str],
 ) -> list[dict[str, Any]]:
@@ -159,7 +179,7 @@ def _export_without_reference_findings(
         symbol = _exported_symbol(path, line)
         if symbol is None or _skip_symbol(symbol):
             continue
-        if _symbol_referenced_elsewhere(symbol, path, source_files):
+        if _symbol_referenced_elsewhere(symbol, path, reference_index):
             continue
         findings.append(
             _finding(
@@ -184,21 +204,19 @@ def _export_without_reference_findings(
 
 def _handler_without_registration_findings(
     item: dict[str, Any],
-    registration_files: list[dict[str, Any]],
+    reference_index: _ReferenceIndex,
+    registration_paths: set[str],
 ) -> list[dict[str, Any]]:
-    if not registration_files:
+    if not registration_paths:
         return []
     path = item["path"]
     findings: list[dict[str, Any]] = []
-    registration_text = "\n".join(
-        registration["text"] for registration in registration_files if registration["path"] != path
-    )
     for index, line in enumerate(item["lines"], start=1):
         match = HANDLER_RE.match(line)
         if match is None:
             continue
         symbol = match.group(1)
-        if re.search(rf"\b{re.escape(symbol)}\b", registration_text):
+        if _symbol_referenced_in_paths(symbol, path, reference_index):
             continue
         findings.append(
             _finding(
@@ -259,19 +277,51 @@ def _exported_symbol(path: str, line: str) -> str | None:
     return match.group(1) if match is not None else None
 
 
+def _build_reference_index(
+    source_files: list[dict[str, Any]],
+    *,
+    registration_paths: set[str] | None = None,
+) -> _ReferenceIndex:
+    references: dict[str, set[str]] = {}
+    registration_references: dict[str, set[str]] = {}
+    configured_registration_paths = registration_paths or set()
+    for item in source_files:
+        path = item["path"]
+        if _is_test_file(path):
+            continue
+        for match in _SYMBOL_REFERENCE_RE.finditer(item["text"]):
+            symbol = match.group(1)
+            references.setdefault(symbol, set()).add(path)
+            if path in configured_registration_paths:
+                registration_references.setdefault(symbol, set()).add(path)
+    return _ReferenceIndex(
+        paths_by_symbol={symbol: frozenset(paths) for symbol, paths in references.items()},
+        registration_paths_by_symbol={
+            symbol: frozenset(paths) for symbol, paths in registration_references.items()
+        },
+    )
+
+
 def _symbol_referenced_elsewhere(
     symbol: str,
     defining_path: str,
-    source_files: list[dict[str, Any]],
+    reference_index: _ReferenceIndex,
 ) -> bool:
-    pattern = re.compile(rf"\b{re.escape(symbol)}\b")
-    for item in source_files:
-        path = item["path"]
-        if path == defining_path or _is_test_file(path):
-            continue
-        if pattern.search(item["text"]):
-            return True
-    return False
+    paths = reference_index.paths_by_symbol.get(symbol)
+    if not paths:
+        return False
+    return len(paths) > 1 if defining_path in paths else True
+
+
+def _symbol_referenced_in_paths(
+    symbol: str,
+    defining_path: str,
+    reference_index: _ReferenceIndex,
+) -> bool:
+    paths = reference_index.registration_paths_by_symbol.get(symbol)
+    if not paths:
+        return False
+    return len(paths) > 1 if defining_path in paths else True
 
 
 def _skip_symbol(symbol: str) -> bool:

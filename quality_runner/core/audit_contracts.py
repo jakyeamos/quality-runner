@@ -7,6 +7,8 @@ from typing import Literal, TypedDict
 type AuditPayload = dict[str, object]
 type AuditArtifactPaths = dict[str, str]
 type ScanExclusionOverlay = list[str] | dict[str, list[str]]
+type AnalysisMode = Literal["balanced", "full"]
+type CacheMode = Literal["repo", "external", "disabled"]
 
 
 class AuditWarning(TypedDict):
@@ -29,6 +31,11 @@ class AuditRequest:
     agent_review_mode: str | None = None
     readiness_evidence_file: Path | None = None
     analysis_cache_root: Path | None = None
+    focus_paths: tuple[str, ...] = ()
+    analysis_mode: AnalysisMode = "full"
+    cache_mode: CacheMode | None = None
+    cache_root: Path | None = None
+    performance_budget_seconds: float | None = None
 
 
 @dataclass(frozen=True)
@@ -46,6 +53,10 @@ class TextScanScope:
     max_text_files: int
     scan_exclusions: tuple[str, ...]
     security_surface_paths: tuple[str, ...] = ()
+    source_analysis_cache: object | None = None
+    focus_paths: tuple[str, ...] = ()
+    file_paths: tuple[str, ...] = ()
+    inventory: AuditPayload | None = None
 
 
 @dataclass(frozen=True)
@@ -59,6 +70,7 @@ class AuditAnalysis:
     code_quality_scan: AuditPayload
     package_manager_preflight: AuditPayload
     text_scan_scope: TextScanScope
+    performance: AuditPayload | None = None
 
 
 @dataclass(frozen=True)
