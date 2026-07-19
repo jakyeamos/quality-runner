@@ -81,20 +81,14 @@ it into `main` at `c6e92cc`. The release-readiness contract recognizes dynamic
 Workflow discovery keeps the exact commands declared by CI, with 49 focused
 regression tests, green exact-head GitHub CI, a passing release profile, and
 verified PyPI publication.
-The isolated P1 fix in `4d7f72b` prevents scan-scope from recursively estimating
-protected, generated, and scan-excluded artifact directories such as
-`.quality-runner`, `.git`, and `.planning`, while preserving source-owned ignored
-directory estimates. It adds inspect/preflight regression coverage for a
-10,000-file QR artifact tree and activity-aware timeout diagnostics. The fix is
-on `codex/qr-p1-excluded-artifact-estimate`; it is not pushed or released.
-The isolated follow-up `f99fec1` reuses valid current-refresh run analysis during
-non-executing verify-gates, preserves fresh cache-free analysis for authorized
-gate execution, and records verification-mode timeout provenance. Its Tenure
-dogfood completed verify-gates in 190.647 seconds with 886 cache hits, zero
-misses/recomputations, all 11 gates skipped for missing consent, and no timeout;
-Tenure source status remained clean.
-The follow-up `dbb892f` also preserves controller deadlines through Git branch
-and manifest reads instead of treating them as ordinary OS errors.
+The P1 exclusion-estimation fix in `4d7f72b` and the incremental analysis/cache
+follow-ups through `dbb892f` are included in the reviewed `dev` fold. They keep
+protected and generated artifact trees out of recursive estimates, preserve
+cache-free read-only planning and authorized fresh gate execution, reuse only
+matching current-refresh analysis, and preserve controller deadlines through
+Git and manifest discovery. The recorded Tenure dogfood completed in 190.647
+seconds with 886 cache hits, zero misses/recomputations, all 11 gates skipped
+for missing consent, and no timeout; Tenure source status remained clean.
 
 The reviewed `codex/dev-fold-qr-adaptive-timeouts` integration at `49c3dda`
 folds the local, identity-bound refresh timeout calibration from `0bc7d37`
@@ -103,42 +97,20 @@ without changing the published release surface.
 ## Current Position
 
 - Target: a typed v2 core behind CLI, MCP, and compatibility adapters.
-- Current isolated follow-up: `codex/dev-fold-incremental-artifact` at
-  `dbb892f`; it is not pushed, published, released, or merged into the dirty
-  canonical `dev` checkout.
-- Next slice: reconcile the user-owned dirty `dev` checkout and review the
-  isolated follow-up before any promotion.
+- Reviewed integration: `a66850d` combines the adaptive timeout and incremental
+  analysis/artifact folds and is ready as the promoted `dev` tip.
+- Next slice: start the next scoped follow-up from the promoted `dev` baseline.
 - `codex/release-0.6.0` was merged by PR #5 into `main` at `c6e92cc`; `main`
   and the `v0.6.0` tag are published.
 - `dev` is the canonical integration branch, is published to `origin/dev`, and
-  is synchronized to `c6e92cc`.
+  the reviewed combined fold is `a66850d`.
   The temporary `codex/dev-feature-port` worktree/ref and the superseded
   `quality-skill-corpus-workflow` branch were pruned after the behavioral port
   audit; unrelated active branches remain separate.
-- Current P1 fix branch: `codex/qr-p1-excluded-artifact-estimate` at `4d7f72b`;
-  focused validation passes, and no push, publish, release, or Quality Runner
-  gate execution was performed.
-- Integrated local revision: `fa291c2` merges the P1 exclusion-estimation fix
-  and adds safe incremental code-quality/security caching, explicit invalidation
-  evidence, bounded refresh retention, and hermetic Git fixture configuration.
-- Follow-up `81d560d` keeps read-only planning source/artifact-free by disabling
-  cache persistence for that path and reporting the disabled state explicitly.
-- `5217270` wires the legacy/CLI refresh path to the ignored cache root for
-  normal inspect/run phases, keeps gate-execution cache-free, adds semantic
-  similarity cache evidence/reuse, and preserves direct read-only isolation.
-- `f99fec1` folds current-refresh analysis into non-executing verify-gates,
-  keeps authorized gate execution fresh and cache-free, adds reuse provenance
-  and timeout-mode diagnostics, and passes the commit Pre-CR hook. Focused
-  refresh/verification tests pass; the full suite reached 671 passes with one
-  timing-sensitive disposable-verification failure.
-- `dbb892f` preserves verify-phase controller timeouts through Git branch and
-  manifest discovery; the focused disposable-verification and CLI timeout
-  tests pass, and the commit Pre-CR hook passes.
 - Canonical planning documents: `docs/modernization/`.
-- `codex/dev-fold-qr-adaptive-timeouts` is the reviewed integration branch at
-  `49c3dda`; 86 focused tests and static checks pass, while the full suite has
-  666 behavioral passes and one network-blocked packaged-build check. The live
-  `origin/dev` head remains unchanged pending final promotion.
+- Combined fold verification: 133 focused tests, Ruff, formatting, Basedpyright,
+  Vulture, source-size, and diff checks pass; the full suite has 687 behavioral
+  passes and one network-blocked packaged-build check.
 - Public compatibility: retain `quality_evidence_contract` and
   `repo_quality_certifier` during a published transition window.
 
@@ -163,6 +135,10 @@ without changing the published release surface.
   overrides, and 86 focused regression tests; Ruff, formatting, Basedpyright,
   Vulture, and the full suite's 666 behavioral tests pass. The packaged build
   check needs network access to resolve uncached uv dependencies.
+- `a66850d` combines that timeout fold with the incremental analysis, semantic
+  reuse, exclusion-estimation, and verification-deadline work; 133 focused
+  tests and all static gates pass, while the full suite has 687 behavioral
+  passes and the packaged build remains network-blocked.
 - `c71b130` passes the full 556-test pytest suite, Ruff lint/format,
   Basedpyright, Vulture, lock validation, pip-audit, release smoke, build, and
   installed-wheel smoke checks. GitHub CI and the tag release workflow pass;
@@ -252,12 +228,15 @@ without changing the published release surface.
   Quality Runner gate execution was not invoked.
 - The normal commit hook for `5217270` completed successfully in 301 seconds;
   it retained the existing `tests/test_cli.py` oversized-source warning.
+- The `a66850d` integration commit's 90-second Pre-CR guard timed out and
+  recorded the existing weak-test and oversized-test warnings; no bypass flag
+  was used.
 
 ## Recent Progress
 
-- 2026-07-19: `49c3dda` folds the published adaptive-timeout branch into an
-  isolated dev integration; focused tests and static checks pass, with one
-  network-blocked packaged-build check recorded separately.
+- 2026-07-19: `a66850d` combines the adaptive-timeout and incremental-artifact
+  folds; 133 focused tests and static checks pass, with 687 full-suite
+  behavioral passes and one network-blocked packaged-build check.
 - 2026-07-18: `dbb892f` preserves verification deadlines through Git discovery
   and keeps timeout artifacts attributable to the verification mode.
 - 2026-07-18: `f99fec1` completes read-only verify-gates analysis reuse and
