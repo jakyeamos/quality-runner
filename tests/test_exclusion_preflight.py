@@ -6,6 +6,7 @@ from pathlib import Path
 
 import pytest
 
+from quality_runner import exclusion_preflight_inventory
 from quality_runner.cli import build_parser
 from quality_runner.exclusion_preflight import (
     EXCLUSION_REPORT_SCHEMA,
@@ -150,6 +151,34 @@ def test_report_validation_recomputes_effective_exclusion_fingerprint(tmp_path: 
 
     assert validation["passed"] is False
     assert any("fingerprint" in error for error in validation["errors"])  # type: ignore[union-attr]
+
+
+def test_exclusion_preflight_does_not_walk_protected_artifact_tree(
+    tmp_path: Path,
+    monkeypatch: object,
+) -> None:
+    artifact_root = tmp_path / ".quality-runner"
+    for index in range(500):
+        path = artifact_root / "runs" / f"legacy-{index // 100:03d}" / f"artifact-{index}.json"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("{}\n", encoding="utf-8")
+
+    walked_paths: list[Path] = []
+    original_walk = exclusion_preflight_inventory.os.walk
+
+    def tracking_walk(path: object, *args: object, **kwargs: object) -> object:
+        walked_paths.append(Path(path).resolve())
+        return original_walk(path, *args, **kwargs)
+
+    monkeypatch.setattr(exclusion_preflight_inventory.os, "walk", tracking_walk)
+    packet = build_exclusion_packet(tmp_path, "protected-artifact-preflight")
+
+    assert artifact_root.resolve() not in walked_paths
+    assert packet["traversal"]["visited_files"] == 0  # type: ignore[index]
+    assert all(
+        not str(candidate["path"]).startswith(".quality-runner")
+        for candidate in packet["candidates"]  # type: ignore[index]
+    )
 
 
 def test_suggest_packet_includes_unowned_directory(tmp_path: Path) -> None:

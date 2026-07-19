@@ -247,13 +247,14 @@ def build_timeout_verify_artifacts(
     baseline_run_id: str | None,
     timeout_scope: str = "verify-phase",
     phase_elapsed_seconds: float | None = None,
+    timeout_context: dict[str, str] | None = None,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     run_dir = prepare_artifact_dir(repo_root, run_id)
     plan_path = run_dir / "gate-execution-plan.json"
     verification_path = run_dir / "gate-verification.json"
     existing_plan = _existing_plan(plan_path)
     existing_verification = _existing_verification(verification_path)
-    diagnostics = _timeout_diagnostics()
+    diagnostics = _timeout_diagnostics(timeout_context=timeout_context)
     timeout_payload = {
         "schema": WORKFLOW_TIMEOUT_ARTIFACT_SCHEMA,
         "status": "blocked",
@@ -394,8 +395,11 @@ def _timeout_capability_map() -> dict[str, Any]:
     }
 
 
-def _timeout_diagnostics() -> dict[str, Any]:
-    return timeout_diagnostics_payload(scan_progress_snapshot())
+def _timeout_diagnostics(*, timeout_context: dict[str, str] | None) -> dict[str, Any]:
+    diagnostics = timeout_diagnostics_payload(scan_progress_snapshot())
+    if timeout_context is not None:
+        diagnostics["verification"] = timeout_context
+    return diagnostics
 
 
 def _existing_plan(path: Path) -> list[Any]:

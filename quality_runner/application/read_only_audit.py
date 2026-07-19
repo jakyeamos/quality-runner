@@ -130,6 +130,8 @@ def analyze_read_only_audit(
         config=config,
         standards_packet=standards_packet,
         text_scan_scope=security_scan_scope,
+        persist_cache=request.analysis_cache_root is not None,
+        cache_root=request.analysis_cache_root,
     )
     capability_map = merge_security_into_capability_map(capability_map, security_scan)
     emit_progress(progress, "code-quality", "structural scan and selected skill packs")
@@ -140,6 +142,8 @@ def analyze_read_only_audit(
         skill_review_report=_legacy_optional_payload(request.skill_review_report),
         require_skill_review_coverage=resolved_agent_review_mode in {"auto", "required"},
         text_scan_scope=code_quality_scan_scope,
+        persist_cache=request.analysis_cache_root is not None,
+        cache_root=request.analysis_cache_root,
     )
     scan = append_warnings(scan, skill_warnings)
     package_manager_preflight = build_package_manager_preflight(repo_root, scan)

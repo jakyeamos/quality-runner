@@ -2,6 +2,7 @@
 
 Last updated: 2026-07-19
 
+
 ## Current State
 
 Quality Runner is a public, local-first quality orchestration package. It
@@ -80,6 +81,20 @@ it into `main` at `c6e92cc`. The release-readiness contract recognizes dynamic
 Workflow discovery keeps the exact commands declared by CI, with 49 focused
 regression tests, green exact-head GitHub CI, a passing release profile, and
 verified PyPI publication.
+The isolated P1 fix in `4d7f72b` prevents scan-scope from recursively estimating
+protected, generated, and scan-excluded artifact directories such as
+`.quality-runner`, `.git`, and `.planning`, while preserving source-owned ignored
+directory estimates. It adds inspect/preflight regression coverage for a
+10,000-file QR artifact tree and activity-aware timeout diagnostics. The fix is
+on `codex/qr-p1-excluded-artifact-estimate`; it is not pushed or released.
+The isolated follow-up `f99fec1` reuses valid current-refresh run analysis during
+non-executing verify-gates, preserves fresh cache-free analysis for authorized
+gate execution, and records verification-mode timeout provenance. Its Tenure
+dogfood completed verify-gates in 190.647 seconds with 886 cache hits, zero
+misses/recomputations, all 11 gates skipped for missing consent, and no timeout;
+Tenure source status remained clean.
+The follow-up `dbb892f` also preserves controller deadlines through Git branch
+and manifest reads instead of treating them as ordinary OS errors.
 
 The reviewed `codex/dev-fold-qr-adaptive-timeouts` integration at `49c3dda`
 folds the local, identity-bound refresh timeout calibration from `0bc7d37`
@@ -88,8 +103,11 @@ without changing the published release surface.
 ## Current Position
 
 - Target: a typed v2 core behind CLI, MCP, and compatibility adapters.
-- Next slice: start the next scoped follow-up from the released `main`/`dev`
-  baseline.
+- Current isolated follow-up: `codex/dev-fold-incremental-artifact` at
+  `dbb892f`; it is not pushed, published, released, or merged into the dirty
+  canonical `dev` checkout.
+- Next slice: reconcile the user-owned dirty `dev` checkout and review the
+  isolated follow-up before any promotion.
 - `codex/release-0.6.0` was merged by PR #5 into `main` at `c6e92cc`; `main`
   and the `v0.6.0` tag are published.
 - `dev` is the canonical integration branch, is published to `origin/dev`, and
@@ -97,6 +115,25 @@ without changing the published release surface.
   The temporary `codex/dev-feature-port` worktree/ref and the superseded
   `quality-skill-corpus-workflow` branch were pruned after the behavioral port
   audit; unrelated active branches remain separate.
+- Current P1 fix branch: `codex/qr-p1-excluded-artifact-estimate` at `4d7f72b`;
+  focused validation passes, and no push, publish, release, or Quality Runner
+  gate execution was performed.
+- Integrated local revision: `fa291c2` merges the P1 exclusion-estimation fix
+  and adds safe incremental code-quality/security caching, explicit invalidation
+  evidence, bounded refresh retention, and hermetic Git fixture configuration.
+- Follow-up `81d560d` keeps read-only planning source/artifact-free by disabling
+  cache persistence for that path and reporting the disabled state explicitly.
+- `5217270` wires the legacy/CLI refresh path to the ignored cache root for
+  normal inspect/run phases, keeps gate-execution cache-free, adds semantic
+  similarity cache evidence/reuse, and preserves direct read-only isolation.
+- `f99fec1` folds current-refresh analysis into non-executing verify-gates,
+  keeps authorized gate execution fresh and cache-free, adds reuse provenance
+  and timeout-mode diagnostics, and passes the commit Pre-CR hook. Focused
+  refresh/verification tests pass; the full suite reached 671 passes with one
+  timing-sensitive disposable-verification failure.
+- `dbb892f` preserves verify-phase controller timeouts through Git branch and
+  manifest discovery; the focused disposable-verification and CLI timeout
+  tests pass, and the commit Pre-CR hook passes.
 - Canonical planning documents: `docs/modernization/`.
 - `codex/dev-fold-qr-adaptive-timeouts` is the reviewed integration branch at
   `49c3dda`; 86 focused tests and static checks pass, while the full suite has
@@ -186,6 +223,9 @@ without changing the published release surface.
   focused regression tests pass, exact-head GitHub CI is green, and the release
   profile passes on the promoted release candidate.
 
+- `5217270` passes the full 669-test suite, Ruff lint/format, Basedpyright,
+  Vulture, and the source-size guard; no QR gate was invoked.
+
 ## Risks
 
 - Generated evidence can contain target-repository output; it remains local and
@@ -207,12 +247,32 @@ without changing the published release surface.
 - Refresh timeout baselines remain local under `.quality-runner/cache` and are
   invalidated by repository-surface, exclusion, policy, version, or gate-plan
   changes; they are not release evidence.
+- `fa291c2` passes 41 focused cache/exclusion/artifact tests, 103 broader
+  code-quality/security/config/artifact tests, Ruff, BasedPyright, and Vulture;
+  Quality Runner gate execution was not invoked.
+- The normal commit hook for `5217270` completed successfully in 301 seconds;
+  it retained the existing `tests/test_cli.py` oversized-source warning.
 
 ## Recent Progress
 
 - 2026-07-19: `49c3dda` folds the published adaptive-timeout branch into an
   isolated dev integration; focused tests and static checks pass, with one
   network-blocked packaged-build check recorded separately.
+- 2026-07-18: `dbb892f` preserves verification deadlines through Git discovery
+  and keeps timeout artifacts attributable to the verification mode.
+- 2026-07-18: `f99fec1` completes read-only verify-gates analysis reuse and
+  execution-consent-safe fallback behavior; Tenure dogfood completed without
+  timeout or gate execution, with all 11 discovered gates skipped.
+- 2026-07-18: `5217270` completes refresh cache wiring, semantic cache reuse,
+  cache evidence, and warm-prefix regression coverage; 669 tests passed.
+- 2026-07-18: `fa291c2` integrates the local P1 excluded-artifact estimate fix
+  with safe incremental scan caching and refresh artifact retention in an
+  isolated revision; no push, publish, release, or gate execution occurred.
+- 2026-07-18: `81d560d` makes read-only planning cache-free, records disabled
+  cache evidence, and verifies the full relevant suite without gate execution.
+- 2026-07-17: `4d7f72b` stops recursive estimates for protected/generated/
+  excluded artifact directories, adds 10,000-file inspect/preflight regression
+  coverage, and distinguishes actual scan work in timeout diagnostics.
 - 2026-07-17: `b5a610e` makes release-gate discovery execute the exact commands
   declared by CI, including scoped Vulture coverage; focused tests pass and
   exact-head GitHub CI is green.
@@ -237,16 +297,3 @@ without changing the published release surface.
 - 2026-07-17: `287fe95` adds remediation-context packets and readiness
   validation to run/verify artifacts while keeping source changes external and
   preserving the v0.5.1 application/compatibility seams.
-- 2026-07-17: `74e368a` adds scan-exclusion preflight and module-aware run-only
-  overlays while preserving security coverage for structural/code-quality
-  exclusions and retaining the current application/compatibility façades.
-- 2026-07-17: `546122e` reduces remediation-delta implementation noise while
-  preserving its fingerprints, package evidence, and recommendation payload.
-- 2026-07-17: `960d094` adds the native QR phase lifecycle and domain-aware
-  `plan auto` workflow under `.planning/quality-runner/`; it remains advisory,
-  idempotent, and separate from source changes, commits, pushes, and root GSD.
-- 2026-07-17: `87d81f8` adds remediation delta evidence and the explicit
-  `remediation-delta` command, preserving the boundary between QR evidence and
-  project planning systems.
-- 2026-07-17: `831d9a4` completes the skill corpus command surface for
-  classify/append/sync and makes selected-skill review coverage explicit.

@@ -75,6 +75,8 @@ def _git_output(repo_root: Path, *args: str) -> str | None:
             ["git", *args], cwd=repo_root, check=False, capture_output=True, text=True, timeout=5,
         )
         # fmt: on
+    except TimeoutError:
+        raise
     except (OSError, subprocess.TimeoutExpired):
         return None
     if result.returncode != 0:

@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import hashlib
 from pathlib import Path
 from typing import Any
 
 from quality_runner.code_quality_paths import _split_lines
 from quality_runner.core.audit_contracts import AuditPayload, TextScanScope
+from quality_runner.incremental_analysis_cache import IncrementalAnalysisCache
 from quality_runner.scan_exclusions import effective_scan_exclusions, matches_scan_exclusion
 from quality_runner.scan_scope import discover_text_files
 from quality_runner.schema_constants import SECURITY_SCAN_SCHEMA
@@ -36,15 +38,24 @@ def create_security_scan(
     config: dict[str, Any],
     standards_packet: dict[str, Any] | None = None,
     text_scan_scope: TextScanScope | None = None,
+    persist_cache: bool = True,
+    cache_root: Path | None = None,
 ) -> dict[str, Any]:
     root = repo_root.expanduser().resolve()
     settings = security_settings(config)
     if not settings["enabled"]:
-        return _disabled_security_scan(
+        disabled_scan = _disabled_security_scan(
             scan=scan,
             repo_root=root,
             scan_exclusions=effective_scan_exclusions(root, config, module="security"),
         )
+        disabled_scan["analysis_cache"] = _disabled_cache_evidence(
+            root,
+            config,
+            persist_cache=persist_cache,
+            cache_root=cache_root,
+        )
+        return disabled_scan
 
     standards = standards_packet or {}
     scan_exclusions = effective_scan_exclusions(root, config, module="security")
@@ -62,11 +73,36 @@ def create_security_scan(
         scan_exclusions=scan_exclusions,
     )
     disabled_groups = settings["disabled_rule_groups"]
-    candidates = scan_security_candidates(
-        scanned_files=scanned_files,
-        disabled_groups=disabled_groups,
-        surfaces=surfaces,
+    analysis_cache = IncrementalAnalysisCache(
+        root,
+        analysis_kind="security",
+        config=config,
+        context={
+            "disabled_rule_groups": disabled_groups,
+            "surfaces": surfaces,
+        },
+        persist=persist_cache,
+        cache_root=cache_root,
     )
+    candidates: list[dict[str, Any]] = []
+    for file_info in scanned_files:
+        relative_path = str(file_info["path"])
+        source_text = str(file_info.get("text", ""))
+        file_result = analysis_cache.get_or_compute(
+            relative_path=relative_path,
+            source_text=source_text,
+            compute=lambda file_info=file_info: {
+                "candidates": scan_security_candidates(
+                    scanned_files=[file_info],
+                    disabled_groups=disabled_groups,
+                    surfaces=surfaces,
+                )
+            },
+            validate=_valid_security_file_result,
+            content_sha256=_content_sha256(file_info),
+        )
+        candidates.extend(_candidate_list_result(file_result))
+    _renumber_security_candidate_ids(candidates)
     available, missing = detect_security_capabilities(
         scan=scan,
         standards_packet=standards,
@@ -103,6 +139,7 @@ def create_security_scan(
         "missing_capabilities": missing,
         "available_capabilities": available,
         "surfaces": surfaces,
+        "analysis_cache": analysis_cache.evidence(considered_files=len(scanned_files)),
         "settings": {
             "enabled": settings["enabled"],
             "agent_review_gates": settings["agent_review_gates"],
@@ -336,6 +373,53 @@ def _disabled_security_scan(
         "surfaces": {},
         "settings": {"enabled": False},
     }
+
+
+def _disabled_cache_evidence(
+    repo_root: Path,
+    config: dict[str, Any],
+    *,
+    persist_cache: bool,
+    cache_root: Path | None,
+) -> dict[str, object]:
+    cache = IncrementalAnalysisCache(
+        repo_root,
+        analysis_kind="security",
+        config=config,
+        context={"enabled": False},
+        persist=persist_cache,
+        cache_root=cache_root,
+    )
+    evidence = cache.evidence(considered_files=0)
+    evidence["status"] = "disabled"
+    return evidence
+
+
+def _valid_security_file_result(result: dict[str, object]) -> bool:
+    return _candidate_list_result(result) is not None
+
+
+def _candidate_list_result(result: dict[str, object]) -> list[dict[str, Any]]:
+    value = result.get("candidates")
+    if not isinstance(value, list) or not all(isinstance(item, dict) for item in value):
+        raise ValueError("invalid cached security result field: candidates")
+    return [dict(item) for item in value]
+
+
+def _renumber_security_candidate_ids(candidates: list[dict[str, Any]]) -> None:
+    for index, candidate in enumerate(candidates, start=1):
+        category = str(candidate.get("category", "candidate")).replace("-", "_")
+        candidate["id"] = f"SEC-{category}-{index:04d}"
+
+
+def _content_sha256(file_info: dict[str, Any]) -> str | None:
+    value = file_info.get("content_sha256")
+    if isinstance(value, str) and value:
+        return value
+    text = file_info.get("text")
+    if isinstance(text, str):
+        return hashlib.sha256(text.encode("utf-8")).hexdigest()
+    return None
 
 
 def _string_or_none(value: object) -> str | None:

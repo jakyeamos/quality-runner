@@ -453,7 +453,9 @@ Refresh JSON includes `timeout_contract` and `phase_timings` so controllers can
 distinguish a deliberate full-evidence run from a hard end-to-end deadline.
 When a timeout fires, `workflow-timeout.json`, the verify result, and
 `gate-verification.json` include `timeout_scope` as either `verify-phase` or
-`total-refresh`.
+`total-refresh`. The nested timeout diagnostics also identify whether the
+deadline was in `gate-command-execution` or `read-only-gate-discovery` and
+whether the audit came from the current refresh run or a fresh fallback audit.
 
 Agent handoffs from refresh use `quality-runner-agent-handoff-v0.2` and route
 verified gate outcomes with `gates-clean`, `gates-blocked`, and `gates-failed`.

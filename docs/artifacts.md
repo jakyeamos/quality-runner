@@ -31,7 +31,19 @@ Artifacts are written under:
   category `architecture` when configured in `.quality-runner.toml`. Opt-in
   Quality Skill findings use category `skill:<skill-id>` when configured.
   Partially built or unwired work uses category `integrate`; see
-  [Unwired Work Detection](unwired-work.md).
+  [Unwired Work Detection](unwired-work.md). The `analysis_cache` object records
+  per-file cache hits, misses, invalidation reasons, index state, and whether
+  persistence is enabled. Normal `refresh` inspect/run phases persist this
+  cache under the ignored `.quality-runner/cache/incremental-analysis-v1/`
+  directory; direct read-only analysis and gate-execution refreshes keep it
+  disabled. A normal non-executing `refresh` carries the current `run` analysis
+  into `verify-gates` when the request and Git identity still match, so the
+  verify artifacts reuse the completed evidence instead of rescanning it. The
+  `gate-verification.json` `analysis_reuse` object records whether that handoff
+  was reused or whether verification fell back to a fresh audit. The
+  `semantic_similarity_cache` object records the corresponding whole-report
+  cache state under
+  `.quality-runner/cache/semantic-similarity-v1/`.
 - `package-manager-preflight.json`: detected package-manager state, declared
   `packageManager`, lockfiles, and non-blocking warnings such as mixed lockfiles.
 - `standards.json`: compiled standards packet for the selected profile,
@@ -236,6 +248,36 @@ can still expose sensitive context. Retain or remove artifacts using the target
 repository's normal evidence-retention policy. See the [Threat Model](threat-model.md)
 for the remaining execution boundary.
 
+## Incremental scan cache and retention
+
+Per-file code-quality and security results are cached separately from run output
+under `.quality-runner/cache/incremental-analysis-v1/`. Cache keys include the
+relative source path, source-content digest, Quality Runner version, scanner
+implementation digest, normalized scanner configuration, relevant dependency
+state, and the active analysis context. Each scan artifact records cache hits,
+misses, recomputation counts, and invalidation reasons. Cache entries are
+validated before reuse and written atomically; missing, corrupt, or interrupted
+cache state recomputes the affected file instead of being treated as fresh.
+
+The cache is not a scan input: `.quality-runner/` remains excluded from source
+discovery, and cache entries contain only validated scanner results. Run output
+continues to live under `.quality-runner/runs/<run-id>/`. Read-only planning uses
+the same analysis code with cache persistence disabled; it recomputes safely and
+leaves no `.quality-runner` cache behind.
+
+To bound generated run output, configure one or both limits:
+
+```toml
+[quality_runner.artifacts]
+retention_runs = 12
+retention_days = 30
+```
+
+Completed `refresh` runs apply the configured policy after the final phase while
+preserving the current inspect, run, and verify directories. The explicit
+`prune-artifacts` command remains available for a dry run or an on-demand
+cleanup; deletion requires `--apply`.
+
 ## Gate Verification Artifacts
 
 `quality-runner verify-gates` records discovered command-backed capabilities,
@@ -255,7 +297,8 @@ remain non-executable evidence.
   mutation risk, timeout, and whether execution needs consent.
 - `gate-verification.json`: per-gate command, source, exit code, duration,
   timeout, capability kind, bounded stdout/stderr tail fields, skipped reason,
-  failure type, recommended environment action, and status.
+  failure type, recommended environment action, status, and `analysis_reuse`
+  provenance for the refresh-to-verify audit handoff.
 - `quality-audit.json`
 - `remediation-plan.json`
 - `slice-specs/`

@@ -27,6 +27,8 @@ def create_code_quality_scan_with_skills(
     skill_review_report: dict[str, Any] | None,
     require_skill_review_coverage: bool = False,
     text_scan_scope: TextScanScope | None = None,
+    persist_cache: bool = True,
+    cache_root: Path | None = None,
 ) -> tuple[dict[str, Any], list[dict[str, str]]]:
     code_quality_scan = create_code_quality_scan(
         repo_root,
@@ -35,6 +37,8 @@ def create_code_quality_scan_with_skills(
         skill_review_report=skill_review_report,
         require_skill_review_coverage=require_skill_review_coverage,
         text_scan_scope=text_scan_scope,
+        persist_cache=persist_cache,
+        cache_root=cache_root,
     )
     selection = code_quality_scan.get("skill_selection")
     skill_warnings = (
