@@ -16,6 +16,11 @@ from quality_runner.refresh_timeout import (
     workflow_deadline,
 )
 from quality_runner.scan_exclusions import reset_scan_progress
+from quality_runner.timeout_baseline import (
+    load_gate_execution_plan,
+    record_timeout_sample,
+    resolve_timeout_context,
+)
 
 PayloadCallback = Callable[..., dict[str, Any]]
 
@@ -33,6 +38,8 @@ def run_refresh_payload(
     workflow_timeout_reason: str | None,
     total_timeout_seconds: int | None,
     total_timeout_reason: str | None,
+    inspect_timeout_seconds: int | None = None,
+    run_timeout_seconds: int | None = None,
     checkout_most_advanced_branch: bool,
     execute_discovered_gates: bool = False,
     allow_mutating_gates: bool,
@@ -46,11 +53,20 @@ def run_refresh_payload(
     agent_review_mode: str | None = None,
     scan_exclusion_overlay: ScanExclusionOverlay | None = None,
     readiness_evidence_file: Path | None = None,
+    focus_paths: list[str] | None = None,
+    cache_state: str = "not-configured",
     progress: ProgressCallback | None = None,
 ) -> dict[str, Any]:
     inspect_run_id = f"{run_id_prefix}-inspect"
     run_run_id = f"{run_id_prefix}-run"
     verify_run_id = f"{run_id_prefix}-verify"
+    adaptive_context = resolve_timeout_context(
+        repo_root,
+        profile=profile,
+        per_gate_timeout_seconds=timeout_seconds,
+        scan_exclusion_overlay=scan_exclusion_overlay,
+        gate_plan=load_gate_execution_plan(repo_root, verify_run_id),
+    )
     timeout_contract = resolve_refresh_timeout_contract(
         per_gate_timeout_seconds=timeout_seconds,
         workflow_timeout_seconds=workflow_timeout_seconds,
@@ -58,52 +74,68 @@ def run_refresh_payload(
         workflow_timeout_reason=workflow_timeout_reason,
         total_timeout_seconds=total_timeout_seconds,
         total_timeout_reason=total_timeout_reason,
+        inspect_timeout_seconds=inspect_timeout_seconds,
+        run_timeout_seconds=run_timeout_seconds,
+        adaptive=adaptive_context,
     )
     reset_scan_progress()
     resolved_verify_timeout = timeout_contract["verify_timeout_seconds"]
     resolved_verify_reason = timeout_contract["verify_timeout_reason"]
     resolved_total_reason = timeout_contract["total_timeout_reason"]
+    resolved_inspect_timeout = timeout_contract["inspect_timeout_seconds"]
+    resolved_run_timeout = timeout_contract["run_timeout_seconds"]
+    resolved_total_timeout = timeout_contract["total_timeout_seconds"]
     phase_timings: dict[str, dict[str, Any]] = {}
     total_started = time.monotonic()
     current = _RefreshTimeoutState(
         phase="inspect",
         phase_key="inspect",
         phase_started=total_started,
-        timeout_seconds=total_timeout_seconds or resolved_verify_timeout,
+        timeout_seconds=(
+            resolved_total_timeout
+            if resolved_total_timeout is not None
+            else resolved_inspect_timeout
+        ),
         timeout_reason=resolved_total_reason or resolved_verify_reason,
-        timeout_scope="total-refresh" if total_timeout_seconds is not None else "verify-phase",
+        timeout_scope="total-refresh" if resolved_total_timeout is not None else "phase",
     )
     inspect_result = not_started_refresh_phase(inspect_run_id, "inspect")
     run_result = not_started_refresh_phase(run_run_id, "run")
+    summary: dict[str, Any] = {"status": "unknown"}
 
     def remaining_total_seconds() -> float | None:
-        if total_timeout_seconds is None:
+        if resolved_total_timeout is None:
             return None
-        return total_timeout_seconds - (time.monotonic() - total_started)
+        return resolved_total_timeout - (time.monotonic() - total_started)
 
     def run_total_bounded_phase(
         *,
         phase: str,
         phase_key: str,
         callback: Callable[[], dict[str, Any]],
+        phase_timeout_seconds: int,
     ) -> dict[str, Any]:
         current.phase = phase
         current.phase_key = phase_key
         current.phase_started = time.monotonic()
-        current.timeout_seconds = total_timeout_seconds or resolved_verify_timeout
-        current.timeout_reason = resolved_total_reason or resolved_verify_reason
-        current.timeout_scope = (
-            "total-refresh" if total_timeout_seconds is not None else "verify-phase"
-        )
+        current.timeout_seconds = phase_timeout_seconds
+        phase_reason = f"refresh {phase} phase exceeded {phase_timeout_seconds} seconds"
+        current.timeout_reason = phase_reason
+        current.timeout_scope = "phase"
         remaining = remaining_total_seconds()
         try:
-            if remaining is None:
-                result = callback()
-            else:
+            effective_timeout = phase_timeout_seconds
+            if remaining is not None:
                 if remaining <= 0:
+                    current.timeout_reason = resolved_total_reason or phase_reason
+                    current.timeout_scope = "total-refresh"
                     raise TimeoutError(current.timeout_reason)
-                with workflow_deadline(seconds=remaining, reason=current.timeout_reason):
-                    result = callback()
+                effective_timeout = min(effective_timeout, remaining)
+                if effective_timeout < phase_timeout_seconds:
+                    current.timeout_reason = resolved_total_reason or phase_reason
+                    current.timeout_scope = "total-refresh"
+            with workflow_deadline(seconds=effective_timeout, reason=current.timeout_reason):
+                result = callback()
         except TimeoutError:
             phase_timings[phase_key] = phase_timing(
                 started=current.phase_started,
@@ -133,6 +165,7 @@ def run_refresh_payload(
                 intent=intent,
                 progress=progress,
             ),
+            phase_timeout_seconds=resolved_inspect_timeout,
         )
         emit_progress(progress, "refresh/run", f"run_id={run_run_id}")
         run_result = run_total_bounded_phase(
@@ -150,6 +183,7 @@ def run_refresh_payload(
                 intent=intent,
                 progress=progress,
             ),
+            phase_timeout_seconds=resolved_run_timeout,
         )
         emit_progress(progress, "refresh/verify-gates", f"run_id={verify_run_id}")
         verify_result = _run_verify_phase(
@@ -166,7 +200,7 @@ def run_refresh_payload(
             resolved_verify_timeout=resolved_verify_timeout,
             resolved_verify_reason=resolved_verify_reason,
             resolved_total_reason=resolved_total_reason,
-            total_timeout_seconds=total_timeout_seconds,
+            total_timeout_seconds=resolved_total_timeout,
             remaining_total_seconds=remaining_total_seconds,
             phase_timings=phase_timings,
             current=current,
@@ -220,6 +254,37 @@ def run_refresh_payload(
             baseline_run_id=baseline_run_id,
             timeout_scope=current.timeout_scope,
         )
+        timed_out = True
+    else:
+        timed_out = False
+
+    baseline_recording = (
+        {
+            "status": "skipped",
+            "reason": "timed-out refreshes cannot update the timeout baseline",
+        }
+        if timed_out
+        else record_timeout_sample(
+            repo_root,
+            run_id_prefix=run_id_prefix,
+            profile=profile,
+            per_gate_timeout_seconds=timeout_seconds,
+            phase_timings=phase_timings,
+            summary=summary,
+            execute_discovered_gates=execute_discovered_gates,
+            scan_exclusion_overlay=scan_exclusion_overlay,
+            timed_out=False,
+            gate_plan=load_gate_execution_plan(repo_root, verify_run_id),
+            focus_paths=focus_paths,
+            cache_state=cache_state,
+        )
+    )
+    timeout_contract["baseline_recording"] = baseline_recording
+    if isinstance(baseline_recording, dict) and baseline_recording.get("status") == "recorded":
+        timeout_contract["baseline_id"] = baseline_recording.get("baseline_id")
+        timeout_contract["baseline_sample_count"] = baseline_recording.get("sample_count", 0)
+        timeout_contract["baseline_status"] = baseline_recording.get("state")
+        timeout_contract["baseline_identity_sha256"] = baseline_recording.get("identity_sha256")
     return {
         "schema": "quality-runner-refresh-result-v0.1",
         "status": summary["status"],
@@ -291,7 +356,9 @@ def _run_verify_phase(
     remaining = remaining_total_seconds()
     if remaining is not None and remaining < verify_deadline:
         verify_deadline = remaining
-        current.timeout_seconds = total_timeout_seconds or resolved_verify_timeout
+        current.timeout_seconds = (
+            total_timeout_seconds if total_timeout_seconds is not None else resolved_verify_timeout
+        )
         current.timeout_reason = resolved_total_reason or resolved_verify_reason
         current.timeout_scope = "total-refresh"
     if verify_deadline <= 0:
@@ -336,8 +403,23 @@ def _timeout_elapsed_seconds(
 def _public_timeout_contract(contract: dict[str, Any]) -> dict[str, Any]:
     return {
         "per_gate_timeout_seconds": contract["per_gate_timeout_seconds"],
+        "timeout_policy": contract["timeout_policy"],
+        "source": contract["source"],
+        "baseline_status": contract["baseline_status"],
+        "baseline_reason": contract["baseline_reason"],
+        "baseline_id": contract["baseline_id"],
+        "baseline_path": contract["baseline_path"],
+        "baseline_identity_sha256": contract["baseline_identity_sha256"],
+        "baseline_sample_count": contract["baseline_sample_count"],
+        "expected_gate_plan_sha256": contract["expected_gate_plan_sha256"],
+        "baseline_recording": contract.get("baseline_recording"),
+        "inspect_timeout_seconds": contract["inspect_timeout_seconds"],
+        "inspect_timeout_source": contract["inspect_timeout_source"],
         "verify_timeout_seconds": contract["verify_timeout_seconds"],
         "verify_timeout_source": contract["verify_timeout_source"],
+        "run_timeout_seconds": contract["run_timeout_seconds"],
+        "run_timeout_source": contract["run_timeout_source"],
         "total_timeout_seconds": contract["total_timeout_seconds"],
+        "total_timeout_source": contract["total_timeout_source"],
         "total_timeout_reason": contract["total_timeout_reason"],
     }

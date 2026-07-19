@@ -45,6 +45,10 @@ def refresh_payload(
     scan_exclusion_overlay: ScanExclusionOverlay | None = None,
     readiness_evidence_file: Path | None = None,
     progress: ProgressCallback | None = None,
+    inspect_timeout_seconds: int | None = None,
+    run_timeout_seconds: int | None = None,
+    focus_paths: list[str] | None = None,
+    cache_state: str = "not-configured",
 ) -> dict[str, Any]:
     review_enabled = review_cycle_id is not None or review_iteration is not None
     if review_enabled:
@@ -67,6 +71,10 @@ def refresh_payload(
         workflow_timeout_reason=workflow_timeout_reason,
         total_timeout_seconds=total_timeout_seconds,
         total_timeout_reason=total_timeout_reason,
+        inspect_timeout_seconds=inspect_timeout_seconds,
+        run_timeout_seconds=run_timeout_seconds,
+        focus_paths=focus_paths,
+        cache_state=cache_state,
         checkout_most_advanced_branch=checkout_most_advanced_branch,
         execute_discovered_gates=execute_discovered_gates,
         allow_mutating_gates=allow_mutating_gates,

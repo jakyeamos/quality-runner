@@ -417,6 +417,20 @@ quality-runner refresh /path/to/repo --run-id-prefix refresh-001 --total-timeout
 quality-runner refresh /path/to/repo --run-id-prefix refresh-001 --execute-gates --worktree-mode disposable --json
 ```
 
+Refresh timeout calibration is local to the target repository. A complete
+full refresh with `--execute-gates` writes a candidate to
+`.quality-runner/cache/refresh-timeout-baseline-v1.json`; the third matching
+successful run activates separate inspect, run, and verify budgets plus a total
+budget. The identity includes the QR version, profile, configuration,
+`.gitignore`, effective module exclusions, scan policy, included-file inventory,
+and discovered gate plan. Timed-out, partial, changed-only, cache-ambiguous,
+run-only-overlay, or unvalidated custom-exclusion runs never update it.
+
+Use `--inspect-timeout-seconds`, `--run-timeout-seconds`,
+`--verify-timeout-seconds`, or `--total-timeout-seconds` to override the learned
+value for that invocation. Missing, malformed, or stale baselines use the
+existing fixed timeout defaults.
+
 Use `--handoff-output` for the normal single-repo workflow where the scan and
 the human remediation plan should be produced together. Refresh still writes the
 canonical `agent-handoff.md` under `.quality-runner/runs/<prefix>-verify/`;
@@ -428,6 +442,8 @@ Timeout flags are explicit about scope:
 - `--verify-timeout-seconds` caps the `verify-gates` phase.
 - `--workflow-timeout-seconds` is a backward-compatible alias for
   `--verify-timeout-seconds`.
+- `--inspect-timeout-seconds` caps the `inspect` phase for one invocation.
+- `--run-timeout-seconds` caps the `run` phase for one invocation.
 - `--total-timeout-seconds` is optional and caps the full refresh across
   inspect, run, and verify.
 - `--workflow-timeout-reason` records why the verify-phase deadline exists.

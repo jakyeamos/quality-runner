@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import hashlib
+import json
 from collections.abc import Iterator, Sequence
 from fnmatch import fnmatchcase
 from pathlib import Path
@@ -150,6 +152,38 @@ def effective_scan_exclusions_by_module(
     }
 
 
+def scan_exclusion_contract(
+    root: Path,
+    config: dict[str, Any] | None,
+) -> dict[str, Any]:
+    configured = config.get("scan_exclusions") if isinstance(config, dict) else None
+    configured_by_module = (
+        config.get("scan_exclusions_by_module") if isinstance(config, dict) else None
+    )
+    effective_by_module = effective_scan_exclusions_by_module(root, config)
+    payload = {
+        "configured_scan_exclusions": (
+            [item for item in configured if isinstance(item, str)]
+            if isinstance(configured, list)
+            else []
+        ),
+        "configured_scan_exclusions_by_module": (
+            {
+                module: [item for item in values if isinstance(item, str)]
+                for module, values in configured_by_module.items()
+                if isinstance(module, str) and isinstance(values, list)
+            }
+            if isinstance(configured_by_module, dict)
+            else {}
+        ),
+        "gitignore_patterns": gitignore_scan_exclusions(root),
+        "gitignore_sha256": _gitignore_sha256(root),
+        "effective_scan_exclusions_by_module": effective_by_module,
+    }
+    content = json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
+    return {**payload, "fingerprint": hashlib.sha256(content.encode("utf-8")).hexdigest()}
+
+
 def normalize_scan_exclusion_module(value: str) -> str:
     normalized = value.strip().lower().replace("-", "_")
     if normalized not in SCAN_EXCLUSION_MODULES:
@@ -265,6 +299,16 @@ def gitignore_scan_exclusions(root: Path) -> list[str]:
             continue
         patterns.append(stripped.lstrip("/").rstrip("/"))
     return _unique(patterns)
+
+
+def _gitignore_sha256(root: Path) -> str | None:
+    path = root / ".gitignore"
+    if not path.is_file() or path.is_symlink():
+        return None
+    try:
+        return hashlib.sha256(path.read_bytes()).hexdigest()
+    except OSError:
+        return None
 
 
 def reset_scan_progress() -> None:

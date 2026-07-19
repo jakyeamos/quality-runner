@@ -25,6 +25,7 @@ from quality_runner.scan_exclusions import (
     effective_scan_exclusions_by_module,
     gitignore_scan_exclusions,
     resolve_scan_exclusions,
+    scan_exclusion_contract,
 )
 
 
@@ -130,6 +131,8 @@ def run_exclusion_preflight_command(
 
     effective_by_module = effective_scan_exclusions_by_module(root, load_repo_config(root))
     effective_exclusions = effective_by_module[SCAN_EXCLUSION_SCOPE_ALL]
+    effective_contract = scan_exclusion_contract(root, load_repo_config(root))
+    config_result["scan_exclusion_fingerprint"] = effective_contract["fingerprint"]
     report_scope_value = report.get("scope") if isinstance(report, dict) else None
     report_scope = (
         report_scope_value

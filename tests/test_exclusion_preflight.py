@@ -139,6 +139,19 @@ def test_suggest_packet_contains_deterministic_candidate_evidence(tmp_path: Path
     assert config_path.read_text(encoding="utf-8") == before_config
 
 
+def test_report_validation_recomputes_effective_exclusion_fingerprint(tmp_path: Path) -> None:
+    _make_candidate(tmp_path)
+    packet = build_exclusion_packet(tmp_path, "fingerprint-001")
+    report = _report_for(packet, tmp_path)
+
+    (tmp_path / ".gitignore").write_text("generated-output/\n", encoding="utf-8")
+
+    validation = validate_exclusion_report(packet, report, repo_root=tmp_path)
+
+    assert validation["passed"] is False
+    assert any("fingerprint" in error for error in validation["errors"])  # type: ignore[union-attr]
+
+
 def test_suggest_packet_includes_unowned_directory(tmp_path: Path) -> None:
     subprocess.run(["git", "init", "-q"], cwd=tmp_path, check=True)
     (tmp_path / "tracked.py").write_text("print('tracked')\n", encoding="utf-8")

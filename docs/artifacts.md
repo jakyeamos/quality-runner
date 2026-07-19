@@ -263,6 +263,13 @@ remain non-executable evidence.
 - `agent-handoff.md`
 - `run-manifest.json`
 
+Refresh runs also record timeout provenance in `timeout_contract`, including
+the policy/source, baseline id and identity hash, sample count, and the learned
+phase/total budgets. When a complete full run is eligible for calibration, QR
+copies the baseline payload to `timeout-baseline.json` in the verify run and
+updates the local, uncommitted cache at
+`.quality-runner/cache/refresh-timeout-baseline-v1.json`.
+
 Execution requires both `--execute-gates` and `--worktree-mode disposable`.
 The disposable checkout is created at `HEAD`, QR writes artifacts to the
 original repository, and the checkout is removed after verification. It avoids

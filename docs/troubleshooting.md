@@ -35,9 +35,12 @@ uv build
 Quality Runner uses a custom LCOV helper:
 
 ```bash
-python3.14 scripts/run_pytest_with_lcov.py
+python3.14 scripts/run_pytest_with_lcov.py --changed-only
 pre-cr run --workspace .
 ```
+
+The commit hook uses `--changed-only` to select tests associated with staged
+source modules. Run the wrapper without that flag for the full LCOV suite.
 
 Documentation, workflow files, tests, and packaging metadata are excluded from
 changed-line coverage surfaces.

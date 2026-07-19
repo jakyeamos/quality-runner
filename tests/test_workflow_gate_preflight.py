@@ -375,13 +375,14 @@ def test_refresh_payload_records_timeout_contract_and_phase_timings(
         total_timeout_reason="controller full refresh budget",
     )
 
-    assert payload["timeout_contract"] == {
-        "per_gate_timeout_seconds": 9,
-        "verify_timeout_seconds": 17,
-        "verify_timeout_source": "explicit",
-        "total_timeout_seconds": 45,
-        "total_timeout_reason": "controller full refresh budget",
-    }
+    assert payload["timeout_contract"]["per_gate_timeout_seconds"] == 9
+    assert payload["timeout_contract"]["verify_timeout_seconds"] == 17
+    assert payload["timeout_contract"]["verify_timeout_source"] == "explicit"
+    assert payload["timeout_contract"]["total_timeout_seconds"] == 45
+    assert payload["timeout_contract"]["total_timeout_reason"] == "controller full refresh budget"
+    assert payload["timeout_contract"]["source"] == "explicit"
+    assert payload["timeout_contract"]["timeout_policy"] == "adaptive"
+    assert payload["timeout_contract"]["baseline_status"] == "fallback"
     assert payload["phase_timings"].keys() == {"inspect", "run", "verify"}
     assert all(timing["elapsed_seconds"] >= 0 for timing in payload["phase_timings"].values())
 

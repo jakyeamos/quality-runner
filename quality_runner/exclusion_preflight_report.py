@@ -6,6 +6,7 @@ import re
 from pathlib import Path, PurePosixPath
 from typing import cast
 
+from quality_runner.config import load_repo_config
 from quality_runner.exclusion_preflight_support import (
     EXCLUSION_PACKET_SCHEMA,
     EXCLUSION_REPORT_SCHEMA,
@@ -20,6 +21,7 @@ from quality_runner.scan_exclusions import (
     SCAN_EXCLUSION_MODULES,
     SCAN_EXCLUSION_SCOPE_ALL,
     SCAN_EXCLUSION_SCOPE_MODULE,
+    scan_exclusion_contract,
 )
 
 
@@ -185,6 +187,18 @@ def validate_exclusion_report(
     if isinstance(packet_fingerprint, dict):
         if repository_fingerprint(root) != packet_fingerprint:
             errors.append("packet repo/config fingerprint is stale for the target repository")
+        current_exclusions = scan_exclusion_contract(root, load_repo_config(root))
+        packet_config = packet_dict.get("config")
+        if not isinstance(packet_config, dict):
+            errors.append("packet config must contain the effective-exclusion fingerprint")
+        else:
+            if packet_config.get("scan_exclusion_fingerprint") != current_exclusions["fingerprint"]:
+                errors.append("packet effective-exclusion fingerprint is stale")
+            if (
+                packet_config.get("effective_scan_exclusions_by_module")
+                != current_exclusions["effective_scan_exclusions_by_module"]
+            ):
+                errors.append("packet effective module exclusions are stale")
     else:
         errors.append("packet repo_fingerprint must be an object")
     reviewer = report_dict.get("reviewer")

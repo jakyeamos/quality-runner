@@ -8,12 +8,14 @@ from dataclasses import dataclass, field
 from pathlib import Path, PurePosixPath
 from typing import cast
 
-from quality_runner.config import CONFIG_FILE_NAME
+from quality_runner import __version__
+from quality_runner.config import CONFIG_FILE_NAME, load_repo_config
 from quality_runner.scan_exclusions import (
     ALWAYS_EXCLUDED_PATH_PARTS,
     ARTIFACT_DIRECTORY_NAMES,
     TOP_LEVEL_ARTIFACT_DIRECTORY_NAMES,
     matches_scan_exclusion,
+    scan_exclusion_contract,
 )
 from quality_runner.schema_constants import (
     SCAN_EXCLUSION_PACKET_SCHEMA,
@@ -101,8 +103,14 @@ class DirectoryStats:
     extensions: Counter[str] = field(default_factory=Counter)
 
 
-def repository_fingerprint(repo_root: Path) -> dict[str, object]:
+def repository_fingerprint(
+    repo_root: Path,
+    *,
+    config: dict[str, object] | None = None,
+) -> dict[str, object]:
     root = repo_root.expanduser().resolve()
+    resolved_config = config if config is not None else load_repo_config(root)
+    exclusions = scan_exclusion_contract(root, resolved_config)
     git_root = git_output(root, "rev-parse", "--show-toplevel")
     if git_root is None or Path(git_root).resolve() != root:
         return {
@@ -111,6 +119,12 @@ def repository_fingerprint(repo_root: Path) -> dict[str, object]:
             "branch": None,
             "tracked_worktree_dirty": None,
             "config_sha256": file_sha256(root / CONFIG_FILE_NAME),
+            "gitignore_sha256": exclusions["gitignore_sha256"],
+            "scan_exclusion_fingerprint": exclusions["fingerprint"],
+            "effective_scan_exclusions_by_module": exclusions[
+                "effective_scan_exclusions_by_module"
+            ],
+            "quality_runner_version": __version__,
         }
     status = git_output(root, "status", "--porcelain", "--untracked-files=no")
     return {
@@ -119,6 +133,10 @@ def repository_fingerprint(repo_root: Path) -> dict[str, object]:
         "branch": git_output(root, "rev-parse", "--abbrev-ref", "HEAD"),
         "tracked_worktree_dirty": bool(status),
         "config_sha256": file_sha256(root / CONFIG_FILE_NAME),
+        "gitignore_sha256": exclusions["gitignore_sha256"],
+        "scan_exclusion_fingerprint": exclusions["fingerprint"],
+        "effective_scan_exclusions_by_module": exclusions["effective_scan_exclusions_by_module"],
+        "quality_runner_version": __version__,
     }
 
 

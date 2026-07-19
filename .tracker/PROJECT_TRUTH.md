@@ -1,6 +1,6 @@
 # Quality Runner Project Truth
 
-Last updated: 2026-07-17
+Last updated: 2026-07-19
 
 ## Current State
 
@@ -81,6 +81,10 @@ Workflow discovery keeps the exact commands declared by CI, with 49 focused
 regression tests, green exact-head GitHub CI, a passing release profile, and
 verified PyPI publication.
 
+The isolated `codex/qr-adaptive-timeouts` follow-up at `0bc7d37` adds local,
+identity-bound refresh timeout calibration without changing the published
+release surface.
+
 ## Current Position
 
 - Target: a typed v2 core behind CLI, MCP, and compatibility adapters.
@@ -94,6 +98,8 @@ verified PyPI publication.
   `quality-skill-corpus-workflow` branch were pruned after the behavioral port
   audit; unrelated active branches remain separate.
 - Canonical planning documents: `docs/modernization/`.
+- `codex/qr-adaptive-timeouts` implements repo-calibrated refresh budgets; it
+  remains isolated and unpublished pending review.
 - Public compatibility: retain `quality_evidence_contract` and
   `repo_quality_certifier` during a published transition window.
 
@@ -113,6 +119,11 @@ verified PyPI publication.
   the tag release workflow pass; the public PyPI wheel and source archive are
   verified by digest, and an isolated PyPI install passes CLI, doctor,
   release-smoke, and MCP checks.
+- `0bc7d37` adds candidate/active local timeout baselines, exclusion-bound
+  identity validation, phase budgets, explicit overrides, and 86 focused
+  regression tests; Ruff, formatting, Basedpyright, Vulture, and the full
+  suite's 666 behavioral tests pass. The packaged build check needs network
+  access to resolve uncached uv dependencies.
 - `c71b130` passes the full 556-test pytest suite, Ruff lint/format,
   Basedpyright, Vulture, lock validation, pip-audit, release smoke, build, and
   installed-wheel smoke checks. GitHub CI and the tag release workflow pass;
@@ -191,9 +202,15 @@ verified PyPI publication.
 - The release profile intentionally blocks without current CI provenance,
   repo-local release evidence, disposable execution where required, and owner
   acceptance; it does not infer release readiness from configured commands.
+- Refresh timeout baselines remain local under `.quality-runner/cache` and are
+  invalidated by repository-surface, exclusion, policy, version, or gate-plan
+  changes; they are not release evidence.
 
 ## Recent Progress
 
+- 2026-07-19: `0bc7d37` adds repo-calibrated refresh timeout baselines with
+  three-run activation, exclusion preflight binding, phase/total budgets, and
+  explicit timeout provenance; focused tests and static checks pass.
 - 2026-07-17: `b5a610e` makes release-gate discovery execute the exact commands
   declared by CI, including scoped Vulture coverage; focused tests pass and
   exact-head GitHub CI is green.
@@ -231,25 +248,3 @@ verified PyPI publication.
   project planning systems.
 - 2026-07-17: `831d9a4` completes the skill corpus command surface for
   classify/append/sync and makes selected-skill review coverage explicit.
-- 2026-07-17: `f292a1e` routes rollout provenance and consumer invocation
-  through a checkout-aware source-first runner, with local and refreshed
-  latest modes documented for downstream repositories.
-- 2026-07-17: `f75c431` ports artifact privacy/retention and gate-response
-  redaction into the current application architecture, with an explicit
-  `prune-artifacts` command that never deletes unless `--apply` is supplied.
-- 2026-07-17: `94b2d42` ports the canonical skill corpus and selection layer,
-  QR-native similarity, and module-status observability into the isolated
-  canonical-dev port branch; the application façade remains intact.
-- 2026-07-17: `da79745` ports the first Quality Skills contract batch into
-  canonical `dev` while retaining the application workflow façades and
-  evidence-redaction boundary.
-
-- 2026-07-13: v0.5.1 released: PR #2 merged at `a101bd4`, tag workflow and
-  six-job CI passed, PyPI publishes wheel/sdist, GitHub Release is public, and
-  a disposable PyPI install passes CLI, doctor, release-smoke, and MCP checks.
-- 2026-07-13: `c71b130` adds a pinned Python dependency audit, upgrades pytest
-  to 9.0.3, and prevents untrusted baseline manifests from injecting Git diff
-  options; all pre-tag gates and installed-wheel smoke checks pass.
-- 2026-07-13: `948107f` prepares v0.5.1 metadata and the main README release
-  guidance; final pre-tag checks, PR merge, tag, PyPI publication, and GitHub
-  Release creation remain in sequence.
