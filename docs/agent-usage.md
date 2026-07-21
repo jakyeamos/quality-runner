@@ -1,8 +1,10 @@
 # Agent Usage
 
-Quality Runner gives agents evidence and a handoff. QR can also maintain an
-advisory native phase plan; the external agent or human still owns source
-changes, commits, pushes, and execution decisions.
+Quality Runner gives agents evidence, an outcome, and a handoff. QR can also
+maintain advisory phase and delivery plans; the external agent or human still
+owns source changes, commits, pushes, and execution decisions. Use this page
+for the operating protocol and the [CLI Reference](cli.md) for exhaustive
+options and artifact details.
 
 ## Invocation
 
@@ -12,7 +14,77 @@ should use the source-first contract in [Consumer Tooling](consumer-tooling.md):
 quality-runner ...` for latest QR, or `uv run --project /path/to/quality-runner
 quality-runner ...` for a specific checkout.
 
-## Start With QR
+## Choose the QR journey
+
+Use the canonical `qr` command for new work. `quality-runner` is a compatible
+alias. Confirm the installation, then choose the smallest journey that matches
+the task:
+
+```bash
+qr doctor --json
+qr audit /path/to/repo --run-id qr-<date-or-task> --json
+qr review /path/to/repo --mode blind --run-id review-<date-or-task> --json
+qr verify /path/to/repo --run-id qr-<date-or-task>-verify --json
+qr runs /path/to/repo --json
+```
+
+- `doctor` checks local installation readiness.
+- If the installed command is stale relative to a local checkout, use
+  `qr self-update --source /path/to/quality-runner --json` and rerun `doctor`.
+- `audit` inspects the repository and prepares audit, remediation, and handoff
+  evidence without editing source.
+- `review` is Fresh Review: it prepares an immutable packet, then validates a
+  locally supplied response bound to that packet. A packet-ready or
+  `awaiting-evidence` result is not a clean review. Use `--mode task` or
+  `--mode combined` only when the task input is available.
+- `verify` records gate evidence. It stays evidence-only unless the caller
+  explicitly authorizes `--execute-gates --worktree-mode disposable`.
+- `runs` reads bounded run history and does not create a new summary artifact.
+
+For a review response, reuse the run id and the response path printed by the
+preparation result; never hand-edit packet identity fields:
+
+```bash
+qr review /path/to/repo \
+  --run-id review-<date-or-task> \
+  --adapter-output .quality-runner/runs/review-<date-or-task>/review-adapter-response.json \
+  --json
+```
+
+For `audit`, `review`, `verify`, and `runs`, parse the v2 outcome
+(`quality-runner-outcome-v0.2`) rather than treating exit code `0` as semantic
+success. Read its `state`, `assessment`, evidence strength, writes, safety
+mode, and `next_action`; blocked, limited, and awaiting-evidence states are
+truthful outcomes that require routing.
+
+Use the established `refresh` workflow below when a controller needs one
+combined inspect/run/verify/handoff cycle, adaptive refresh controls, or the
+task-scoped implement-review loop.
+
+## Choose scan scope explicitly
+
+QR excludes fixture, documentation, vendored, generated, and tool-output trees
+by default. An agent must make the scan boundary explicit when the task names a
+repository-owned file under one of those defaults:
+
+- use `--include-path <path>` for a bounded scan that re-includes the requested
+  path;
+- use `--include-ignored-path <path>` to re-include that path while preserving
+  the rest of the repository scan;
+- use `--scan-exclusion <dir>` only for a run-only global overlay, knowing that
+  it changes security coverage;
+- use `--scan-exclusion-module code_quality=<dir>` or the other supported module
+  names when only one QR-owned scanner should omit a directory and security
+  coverage must remain.
+
+Review `scan_inclusions` in the generated scan artifacts to prove what was
+included. Protected runtime and artifact paths such as `.git`,
+`.quality-runner`, `.venv`, `node_modules`, `build`, and `dist` remain
+fail-closed. For a persistent exclusion, use `exclusions suggest`, review the
+packet, run `exclusions validate`, and apply only a validated report with the
+explicit `exclusions apply --apply` consent.
+
+## Established refresh workflow
 
 Run QR before editing:
 
@@ -26,13 +98,13 @@ quality-runner refresh /path/to/repo \
 This default refresh records gate evidence; it is not executable-gate proof.
 Only use `--execute-gates --worktree-mode disposable` after explicit user
 authorization, and treat it as arbitrary local-code execution in a disposable
-checkout rather than a sandbox.
-
-If the task names a repository-owned file below a default-excluded directory,
-make that reasoning explicit in the QR invocation instead of assuming the file
-was scanned. Use `--include-path <path>` for a bounded scan or
-`--include-ignored-path <path>` to keep the rest of the repository in scope.
-The resulting artifacts record the selected `scan_inclusions`.
+checkout rather than a sandbox. `--allow-dirty-worktree-verify` permits
+verification of `HEAD` while retaining local edits; it does not verify those
+edits. For iterative planning, use `--analysis-mode balanced` with
+`--cache-mode external`; use `--analysis-mode full` at phase, audit, or release
+boundaries. `--cache-mode disabled` is diagnostic. Read cache and analysis
+provenance in the artifacts so reused evidence is not mistaken for a fresh
+full scan.
 
 Then read:
 
@@ -116,6 +188,50 @@ quality-runner review-worker /path/to/repo \
   --worker-report worker-report.json \
   --json
 ```
+
+## Route follow-up work through the matching surface
+
+Use the artifact already produced by QR as the source of truth, then choose the
+next controller or planning surface:
+
+- For one bounded remediation slice, start with the matching
+  `slice-specs/<slice-id>.md`, run its drift check, and validate
+  `remediation-context.json` before editing. A rejected context or stale slice
+  is a stop condition, not permission to guess.
+- For a controller decision on an existing run, use `gate`, `gate-status`, and
+  `gate-respond`. These append controller history and dispositions; they do not
+  edit source or rerun the scan.
+- For a worker completion handoff, run `validate-report` and, when normalizing
+  a report, `controller-report lint --strict`; use `review-worker` to compare
+  baseline and final QR evidence.
+- For an implement-review loop, pass the task through `--intent` or
+  `--intent-file` with a stable `--review-cycle-id` and 1-based
+  `--review-iteration`. Read `review-delta.json` and `.md`, apply only the
+  task-scoped fixes, and stop when the delta recommends `stop`. Unrelated
+  findings remain `out_of_scope`.
+- If artifacts already exist, use `export-handoff` or `export-slice-specs` to
+  regenerate the controller handoff or cold-executor specs without rescanning.
+- For multi-repository work, use `rollout` so each repository gets isolated
+  run ids and controller artifacts. Rollout is evidence-only by default; use
+  the same explicit disposable execution pair for gate execution.
+- For QR-owned planning, use `plan auto` and the `phase` commands. For a
+  structured execution contract, use `plan contract prepare`,
+  `plan contract refresh`, `plan preflight`, and `plan reconcile`. Balanced
+  analysis with an external cache is
+  appropriate for iterative planning; use full analysis at phase, release, or
+  audit boundaries, and use disabled cache only for diagnostics.
+- For repository skill evidence, use the skill review/validation surfaces and
+  attach the validated report with `--skill-review-report`; see
+  [Quality Skills](quality-skills.md).
+- Before packaging or publishing, run `release-smoke`. MCP integrations should
+  prefer the four additive outcome tools and treat `tools/list` as the current
+  registry; v1 tools remain compatibility surfaces.
+
+The exact command forms and artifact schemas are maintained in the
+[CLI Reference](cli.md), [Artifact Contract](artifacts.md),
+[Planning and Delivery Contracts](planning-contracts.md), and
+[MCP Integration](mcp.md). Do not infer a new command or artifact name from an
+older handoff.
 
 ## Native QR Phase Workflow
 

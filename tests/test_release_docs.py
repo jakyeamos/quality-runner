@@ -120,6 +120,31 @@ def test_release_docs_include_example_handoffs() -> None:
         assert expected in content
 
 
+def test_agent_instructions_route_current_qr_surfaces() -> None:
+    agent_usage = (ROOT / "docs" / "agent-usage.md").read_text(encoding="utf-8")
+    plugin_skill = (ROOT / "quality_runner" / "plugin" / "SKILL.md").read_text(encoding="utf-8")
+
+    for content in (agent_usage, plugin_skill):
+        for term in (
+            "qr doctor",
+            "qr audit",
+            "qr review",
+            "qr verify",
+            "qr runs",
+            "quality-runner-outcome-v0.2",
+            "--include-path",
+            "--include-ignored-path",
+            "scan_inclusions",
+            "gate-respond",
+            "review-delta",
+            "release-smoke",
+        ):
+            assert term in content
+
+    assert "plan contract prepare" in agent_usage
+    assert "controller-report lint --strict" in agent_usage
+
+
 def test_ci_and_release_workflows_smoke_built_wheel_outcome_and_mcp_surfaces() -> None:
     ci = (ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
     release = (ROOT / ".github" / "workflows" / "release.yml").read_text(encoding="utf-8")

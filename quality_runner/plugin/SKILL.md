@@ -7,11 +7,13 @@ description: Run standalone audit-and-plan quality orchestration for a repositor
 
 Use this skill when the user asks to audit a repository against quality standards, run Quality Runner, inspect available quality gates, or produce a remediation plan.
 
-Quality Runner's preferred journeys are outcome-first. They write local
-`.quality-runner/` evidence as needed but do not modify target source files.
-Discovered gates remain evidence-only unless a user explicitly authorizes
-`--execute-gates --worktree-mode disposable`; that runs local commands in a
-disposable checkout, not a sandbox.
+Quality Runner's preferred journeys are outcome-first. The canonical executable
+is `qr`; `quality-runner` remains a compatible alias. Confirm the install with
+`qr doctor --json`, then choose `audit`, `review`, `verify`, or `runs`. They
+write local `.quality-runner/` evidence as needed but do not modify target
+source files. Discovered gates remain evidence-only unless a user explicitly
+authorizes `--execute-gates --worktree-mode disposable`; that runs local
+commands in a disposable checkout, not a sandbox.
 
 Preferred MCP tools:
 
@@ -30,18 +32,37 @@ agent; Quality Runner does not apply those fixes.
 CLI fallback:
 
 ```bash
-quality-runner audit /path/to/repo --run-id qr-<date-or-task> --json
-quality-runner verify /path/to/repo --run-id qr-<date-or-task>-verify --json
-quality-runner runs /path/to/repo --json
+qr doctor --json
+qr audit /path/to/repo --run-id qr-<date-or-task> --json
+qr review /path/to/repo --mode blind --run-id review-<date-or-task> --json
+qr verify /path/to/repo --run-id qr-<date-or-task>-verify --json
+qr runs /path/to/repo --json
 ```
+
+For the four journey commands, read the
+`quality-runner-outcome-v0.2` fields (`state`, `assessment`, evidence, writes,
+safety, and `next_action`) instead of treating exit code `0` as a clean result.
+When a task names a file below QR's default exclusions, use
+`--include-path` for a bounded scan or `--include-ignored-path` to preserve the
+rest of the scan, then inspect `scan_inclusions`. Use module-scoped
+`--scan-exclusion-module` when security coverage must remain; protected paths
+stay fail-closed.
+
+Use `refresh` for the combined inspect/run/verify/handoff workflow and its
+intent/review-cycle delta loop; read the resulting `review-delta.json` and
+`review-delta.md`. Use `gate`/`gate-status`/`gate-respond` for controller
+decisions, `review-worker` plus strict report validation for worker handoffs,
+`plan`/`phase` or delivery contracts for bounded planning, `rollout` for
+isolated multi-repository runs, and `release-smoke` before release. The full
+agent protocol is in `docs/agent-usage.md`.
 
 For planning and execution loops, use the additive delivery contract surface:
 
 ```bash
-quality-runner plan contract prepare /path/to/repo --phase-id phase-1 --plan-id plan-1 --json
-quality-runner plan contract refresh /path/to/repo --contract CONTRACT --json
-quality-runner plan preflight /path/to/repo --contract CONTRACT --plan-file PLAN.md --json
-quality-runner plan reconcile /path/to/repo --contract CONTRACT --result-file delivery-result.json --json
+qr plan contract prepare /path/to/repo --phase-id phase-1 --plan-id plan-1 --json
+qr plan contract refresh /path/to/repo --contract CONTRACT --json
+qr plan preflight /path/to/repo --contract CONTRACT --plan-file PLAN.md --json
+qr plan reconcile /path/to/repo --contract CONTRACT --result-file delivery-result.json --json
 ```
 
 Contract preparation and refresh use balanced analysis with an external cache by
