@@ -3,7 +3,7 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: GPT-5.6 modernization
 status: complete
-last_updated: "2026-07-17T15:14:10Z"
+last_updated: "2026-07-21T20:00:00Z"
 progress:
   total_phases: 8
   completed_phases: 8
@@ -22,12 +22,13 @@ See `.planning/PROJECT.md` for the established product boundary and
 **Core value:** Give developers and agents trustworthy local evidence before
 they authorize repository changes.
 
-**Current focus:** v0.6.0 released; no active implementation phase.
+**Current focus:** v0.6.0 released; explicit scan-scope inclusion follow-up is
+active on `codex/qr-flexible-scan-scope`.
 
 ## Current Position
 
-- Branch: `main`
-- Baseline: `main` at 0.6.0 / commit `c6e92cc`
+- Branch: `codex/qr-flexible-scan-scope`
+- Baseline: `dev` at commit `ca2e34b`; implementation commit `4b0c2ab`
 - Release metadata and readiness discovery fixes: `e3f5f5f`; PR #5 merged at
   `c6e92cc`, tag `v0.6.0` and PyPI publication are verified.
 - Audit and planning: complete
@@ -51,12 +52,11 @@ they authorize repository changes.
 
 ## Active Phase
 
-- **Phase:** release-follow-up
-- **Slug:** release-0.6.0
-- **Status:** Complete
-- **Completion gate:** Met: full pre-tag validation, reviewed promotion to
-  `main`, `v0.6.0` tag, successful PyPI publication, and fresh public-install
-  verification.
+- **Phase:** scan-scope-flexibility
+- **Slug:** explicit-scan-inclusion-controls
+- **Status:** In progress
+- **Completion gate:** Implementation and verification are complete on
+  `4b0c2ab`; truth-file commit and branch push remain.
 
 ## Key Decisions
 
@@ -81,10 +81,14 @@ they authorize repository changes.
 
 ## Next Step
 
-Start the next scoped follow-up from the released `main`/`dev` baseline.
+Commit the truth-file update and push `codex/qr-flexible-scan-scope`; do not
+merge, tag, publish, or alter canonical release state in this slice.
 
 ## Recent Progress
 
+- 2026-07-21: `4b0c2ab` adds bounded/full-scan inclusion controls, protected
+  path fail-closed behavior, inclusion provenance, and refresh/verify wiring;
+  732 behavioral tests pass.
 - 2026-07-17: `b5a610e` makes release-gate discovery preserve exact CI
   workflow commands; focused tests pass and exact-head GitHub CI is green.
 - 2026-07-17: PR #5 merged v0.6.0 at `c6e92cc`; tag `v0.6.0`, release workflow
@@ -124,18 +128,3 @@ Start the next scoped follow-up from the released `main`/`dev` baseline.
 - 2026-07-13: M7 compatibility regression in `dc09ec0`: a default Review
   outcome's persisted context, manifest, and report still round-trip through
   the v1 readers.
-- 2026-07-13: M7 guidance in `633b96e`: one upgrade guide now owns candidate,
-  support-window, rollback, and MCP policy; linked docs describe artifact
-  sensitivity and reproducible release evidence without claiming publication.
-- 2026-07-13: M7 cutover in `32e7b26`: Fresh Review defaults to v2 outcomes;
-  `--legacy-output` preserves v1 stdout through 0.7.x, while legacy MCP stays
-  v1 with discovery notices.
-- 2026-07-13: M7 release evidence in `66ce3ef`: a committed uv lock pins the
-  validation tools; CI/release install the wheel, run doctor and release smoke,
-  and discover the v2 MCP tools before publish.
-- 2026-07-13: M7 began in `113f143`: secret-like candidate literals are
-  redacted before fingerprinting or artifact persistence; the normal-run
-  regression scans all generated artifacts for the original marker.
-- 2026-07-13: M6 completed in `0b5ac2e` and `56c94d4`: application owns
-  workflow, outcome, packet, and report execution; root façades preserve v1
-  behavior; 520 tests, wheel, smoke, and three reviews passed.
