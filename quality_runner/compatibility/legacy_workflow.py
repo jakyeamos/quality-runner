@@ -57,6 +57,7 @@ def refresh_payload(
     cache_mode: str = "repo",
     cache_root: Path | None = None,
     performance_budget_seconds: float | None = None,
+    include_ignored_paths: list[str] | None = None,
 ) -> dict[str, Any]:
     review_enabled = review_cycle_id is not None or review_iteration is not None
     if review_enabled:
@@ -92,6 +93,7 @@ def refresh_payload(
         cache_mode=cache_mode,
         cache_root=cache_root,
         performance_budget_seconds=performance_budget_seconds,
+        include_ignored_paths=tuple(include_ignored_paths or []),
         checkout_most_advanced_branch=checkout_most_advanced_branch,
         execute_discovered_gates=execute_discovered_gates,
         allow_mutating_gates=allow_mutating_gates,

@@ -206,7 +206,11 @@ def analyze_read_only_audit(
             severity = deferred.get("severity", "advisory")
             if isinstance(check, str) and isinstance(reason, str) and isinstance(severity, str):
                 recorder.defer(check, reason=reason, severity=severity)
-    scan = {**scan, "include_paths": list(request.include_paths)}
+    scan = {
+        **scan,
+        "include_paths": list(request.include_paths),
+        "scan_inclusions": list(text_scan_scope.scan_inclusions),
+    }
     scan = append_warnings(scan, skill_warnings)
     scan["cache_summary"] = _cache_summary(
         scan=scan,
@@ -217,6 +221,8 @@ def analyze_read_only_audit(
     scan["scan_scope"] = {
         "mode": "focused-changed-surface" if request.focus_paths else "repository",
         "paths": list(request.focus_paths),
+        "include_paths": list(request.include_paths),
+        "scan_inclusions": list(text_scan_scope.scan_inclusions),
         "fail_closed_on_empty_focus": bool(request.focus_paths),
         "analysis_mode": request.analysis_mode,
     }

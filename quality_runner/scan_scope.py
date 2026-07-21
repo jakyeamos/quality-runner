@@ -117,11 +117,12 @@ def create_text_scan_scope(
 ) -> TextScanScope:
     root = repo_root.expanduser().resolve()
     policy = structural_scan_policy(config)
+    scan_inclusions = _unique_paths([*policy["include_ignored_paths"], *include_paths])
     scan_exclusions = effective_scan_exclusions(root, config, module=module)
     inventory = discover_scan_inventory(
         root,
         generated_paths=generated_paths(scan),
-        include_ignored_paths=set(policy["include_ignored_paths"]),
+        include_ignored_paths=set(scan_inclusions),
         scan_exclusions=scan_exclusions,
         max_text_files=policy["max_text_files"],
         focus_paths=focus_paths,
@@ -159,6 +160,7 @@ def create_text_scan_scope(
         file_paths=tuple(path.relative_to(root).as_posix() for path in paths),
         inventory=inventory_payload,
         include_paths=include_paths,
+        scan_inclusions=tuple(scan_inclusions),
     )
 
 
@@ -173,6 +175,7 @@ def discover_scan_inventory(
     include_paths: tuple[str, ...] = (),
 ) -> dict[str, Any]:
     """Walk the repository once and produce both analysis and security scope inputs."""
+    include_ignored_paths = set(include_ignored_paths) | set(include_paths)
     text_paths: list[Path] = []
     security_surface_paths: list[str] = []
     skipped_files: list[AuditPayload] = []
@@ -301,6 +304,7 @@ def discover_text_files(
     focus_paths: tuple[str, ...] = (),
     include_paths: tuple[str, ...] = (),
 ) -> list[Path]:
+    include_ignored_paths = set(include_ignored_paths) | set(include_paths)
     files: list[Path] = []
     scan_budget_exceeded = False
     for current_root, dir_names, file_names in os.walk(root):
@@ -396,6 +400,7 @@ def discover_security_surface_paths(
     focus_paths: tuple[str, ...] = (),
     include_paths: tuple[str, ...] = (),
 ) -> list[str]:
+    include_ignored_paths = set(include_ignored_paths) | set(include_paths)
     surface_paths: list[str] = []
     for current_root, dir_names, file_names in os.walk(root):
         current_path = Path(current_root)
@@ -461,3 +466,17 @@ def _path_in_focus(relative_path: str, focus_paths: tuple[str, ...]) -> bool:
         for focus in (item.strip("/") for item in focus_paths)
         if focus
     )
+
+
+def _unique_paths(values: list[object]) -> list[str]:
+    paths: list[str] = []
+    seen: set[str] = set()
+    for value in values:
+        if not isinstance(value, str):
+            continue
+        normalized = value.strip().strip("/")
+        if not normalized or normalized in seen:
+            continue
+        paths.append(normalized)
+        seen.add(normalized)
+    return paths

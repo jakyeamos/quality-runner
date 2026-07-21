@@ -143,7 +143,7 @@ def payload_for_args(
                 if args.readiness_evidence_file
                 else None
             ),
-            include_ignored_paths=_interactive_include_ignored_paths(args, repo_root),
+            include_ignored_paths=_include_ignored_paths_from_args(args, repo_root),
             scan_exclusion_overlay=_scan_exclusion_overlay(args, repo_root),
             include_paths=_include_paths_from_args(args),
             checkout_most_advanced_branch=args.checkout_most_advanced_branch,
@@ -169,12 +169,12 @@ def payload_for_args(
                     if args.readiness_evidence_file
                     else None
                 ),
-                include_ignored_paths=_interactive_include_ignored_paths(args, repo_root),
+                include_ignored_paths=_include_ignored_paths_from_args(args, repo_root),
                 checkout_most_advanced_branch=args.checkout_most_advanced_branch,
                 skill_review_report=_legacy_payload(_optional_skill_review_report(args)),
                 agent_review_mode=args.agent_review_mode,
-                scan_exclusion_overlay=_scan_exclusion_overlay(args, repo_root),
                 include_paths=_include_paths_from_args(args),
+                scan_exclusion_overlay=_scan_exclusion_overlay(args, repo_root),
                 intent=_legacy_payload(
                     workflow_intent_from_cli_args(args, repo_root=repo_root, run_id=args.run_id)
                 ),
@@ -193,7 +193,7 @@ def payload_for_args(
                 if args.readiness_evidence_file
                 else None
             ),
-            include_ignored_paths=_interactive_include_ignored_paths(args, repo_root),
+            include_ignored_paths=_include_ignored_paths_from_args(args, repo_root),
             scan_exclusion_overlay=_scan_exclusion_overlay(args, repo_root),
             checkout_most_advanced_branch=args.checkout_most_advanced_branch,
             skill_review_report=_optional_skill_review_report(args),
@@ -227,6 +227,8 @@ def payload_for_args(
             allow_dirty_worktree_verify=args.allow_dirty_worktree_verify,
             skill_review_report=_optional_skill_review_report(args),
             agent_review_mode=args.agent_review_mode,
+            include_ignored_paths=_include_ignored_paths_from_args(args, repo_root),
+            include_paths=_include_paths_from_args(args),
             scan_exclusion_overlay=_scan_exclusion_overlay(args, repo_root),
             progress=progress,
             intent=workflow_intent_from_cli_args(args, repo_root=repo_root, run_id=args.run_id),
@@ -253,6 +255,8 @@ def payload_for_args(
                 allow_dirty_worktree_verify=args.allow_dirty_worktree_verify,
                 skill_review_report=_legacy_payload(_optional_skill_review_report(args)),
                 agent_review_mode=args.agent_review_mode,
+                include_ignored_paths=_include_ignored_paths_from_args(args, repo_root),
+                include_paths=_include_paths_from_args(args),
                 scan_exclusion_overlay=_scan_exclusion_overlay(args, repo_root),
                 intent=_legacy_payload(
                     workflow_intent_from_cli_args(args, repo_root=repo_root, run_id=args.run_id)
@@ -375,6 +379,7 @@ def _cache_root(args: argparse.Namespace) -> Path | None:
     value = getattr(args, "cache_dir", None)
     return Path(value).expanduser().resolve() if isinstance(value, str) and value else None
 
+
 def _include_paths_from_args(args: argparse.Namespace) -> tuple[str, ...]:
     explicit = tuple(getattr(args, "include_path", []) or [])
     contract_path = getattr(args, "phase_contract", None)
@@ -409,6 +414,15 @@ def _interactive_include_ignored_paths(args: argparse.Namespace, repo_root: Path
         return paths
     print("Keeping these paths excluded for this run.", file=sys.stderr)
     return []
+
+
+def _include_ignored_paths_from_args(args: argparse.Namespace, repo_root: Path) -> list[str]:
+    explicit = [
+        item
+        for item in (getattr(args, "include_ignored_path", []) or [])
+        if isinstance(item, str) and item
+    ]
+    return _unique_strings([*explicit, *_interactive_include_ignored_paths(args, repo_root)])
 
 
 def _should_prompt_for_ignored_paths(args: argparse.Namespace) -> bool:

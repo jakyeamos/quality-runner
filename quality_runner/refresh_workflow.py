@@ -74,11 +74,14 @@ def run_refresh_payload(
     cache_root: Path | None = None,
     performance_budget_seconds: float | None = None,
     include_paths: tuple[str, ...] = (),
+    include_ignored_paths: tuple[str, ...] = (),
     progress: ProgressCallback | None = None,
 ) -> dict[str, Any]:
     inspect_run_id = f"{run_id_prefix}-inspect"
     run_run_id = f"{run_id_prefix}-run"
     verify_run_id = f"{run_id_prefix}-verify"
+    scope_kwargs = {"include_paths": include_paths}
+    scope_kwargs["include_ignored_paths"] = include_ignored_paths
     adaptive_context = resolve_timeout_context(
         repo_root,
         profile=profile,
@@ -179,7 +182,7 @@ def run_refresh_payload(
                 profile=profile,
                 ci_status_json=ci_status_json,
                 readiness_evidence_file=readiness_evidence_file,
-                include_paths=include_paths,
+                **scope_kwargs,
                 checkout_most_advanced_branch=checkout_most_advanced_branch,
                 agent_review_mode=agent_review_mode,
                 scan_exclusion_overlay=scan_exclusion_overlay,
@@ -205,7 +208,7 @@ def run_refresh_payload(
                 profile=profile,
                 ci_status_json=ci_status_json,
                 readiness_evidence_file=readiness_evidence_file,
-                include_paths=include_paths,
+                **scope_kwargs,
                 checkout_most_advanced_branch=checkout_most_advanced_branch,
                 agent_review_mode=agent_review_mode,
                 scan_exclusion_overlay=scan_exclusion_overlay,
@@ -263,6 +266,7 @@ def run_refresh_payload(
                 verify_callback=verify_callback,
                 intent=intent,
                 agent_review_mode=agent_review_mode,
+                scope_kwargs=scope_kwargs,
                 scan_exclusion_overlay=scan_exclusion_overlay,
                 readiness_evidence_file=readiness_evidence_file,
                 analysis_cache_root=analysis_cache_root,
@@ -406,6 +410,7 @@ def _run_verify_phase(
     verify_callback: PayloadCallback,
     intent: dict[str, Any] | None,
     agent_review_mode: str | None,
+    scope_kwargs: dict[str, tuple[str, ...]],
     scan_exclusion_overlay: ScanExclusionOverlay | None,
     readiness_evidence_file: Path | None,
     analysis_cache_root: Path | None,
@@ -446,6 +451,7 @@ def _run_verify_phase(
             worktree_mode=worktree_mode,
             allow_dirty_worktree_verify=allow_dirty_worktree_verify,
             agent_review_mode=agent_review_mode,
+            **scope_kwargs,
             scan_exclusion_overlay=scan_exclusion_overlay,
             intent=intent,
             analysis_cache_root=analysis_cache_root,

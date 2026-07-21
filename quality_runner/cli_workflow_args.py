@@ -49,7 +49,20 @@ def add_workflow_arguments(parser: argparse.ArgumentParser) -> None:
         action="append",
         default=[],
         metavar="PATH",
-        help="Restrict this QR run to a repo-relative path; repeat for multiple paths",
+        help=(
+            "Restrict this QR run to a repo-relative path and explicitly include it even "
+            "when normally excluded; repeat for multiple paths"
+        ),
+    )
+    parser.add_argument(
+        "--include-ignored-path",
+        action="append",
+        default=[],
+        metavar="PATH",
+        help=(
+            "Include a normally ignored or excluded repo-relative path without narrowing "
+            "the rest of the scan; repeat for multiple paths"
+        ),
     )
     parser.add_argument(
         "--phase-contract",

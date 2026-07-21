@@ -51,6 +51,7 @@ def create_security_scan(
             scan=scan,
             repo_root=root,
             scan_exclusions=effective_scan_exclusions(root, config, module="security"),
+            scan_inclusions=(list(text_scan_scope.scan_inclusions) if text_scan_scope else []),
         )
         disabled_scan["analysis_cache"] = _disabled_cache_evidence(
             root,
@@ -153,6 +154,9 @@ def create_security_scan(
         "repo_root": str(root),
         "scan_exclusion_scope": "security",
         "scan_exclusions": scan_exclusions,
+        "scan_inclusions": list(text_scan_scope.scan_inclusions)
+        if text_scan_scope is not None
+        else [],
         "summary": {
             "total_candidates": len(candidates),
             "candidates_by_category": by_category,
@@ -389,6 +393,7 @@ def _disabled_security_scan(
     scan: dict[str, Any],
     repo_root: Path,
     scan_exclusions: list[str],
+    scan_inclusions: list[str],
 ) -> dict[str, Any]:
     return {
         "schema": SECURITY_SCAN_SCHEMA,
@@ -396,6 +401,7 @@ def _disabled_security_scan(
         "repo_root": str(repo_root),
         "scan_exclusion_scope": "security",
         "scan_exclusions": scan_exclusions,
+        "scan_inclusions": scan_inclusions,
         "summary": {
             "total_candidates": 0,
             "candidates_by_category": {},

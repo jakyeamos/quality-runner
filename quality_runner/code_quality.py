@@ -217,6 +217,7 @@ def create_code_quality_scan(
         "repo_root": str(root),
         "scan_exclusion_scope": "code_quality",
         "scan_exclusions": list(scope.scan_exclusions),
+        "scan_inclusions": list(scope.scan_inclusions),
         "summary": {
             "total_files": len(accountability),
             "total_lines": sum(item["line_count"] for item in accountability),

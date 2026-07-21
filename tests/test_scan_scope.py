@@ -59,3 +59,38 @@ def test_large_protected_artifact_tree_is_not_recursively_estimated(
     assert result["summary"]["skipped_estimated_scan_seconds"] == 0.0
     assert result["summary"]["skipped_unestimated_directories"] == 4
     assert result["summary"]["skipped_directory_estimate_status"] == "partial"
+
+
+def test_explicit_include_path_overrides_default_exclusion(tmp_path: Path) -> None:
+    from quality_runner.scan_scope import create_text_scan_scope
+
+    _write(tmp_path / "docs" / "ENVIRONMENT.md", "NEXT_PUBLIC_SITE_URL\n")
+    _write(tmp_path / "src" / "index.ts", "export const value = 1;\n")
+
+    scope = create_text_scan_scope(
+        tmp_path,
+        scan={"generated_code": []},
+        config={},
+        include_paths=("docs",),
+    )
+
+    assert [item.path for item in scope.files] == ["docs/ENVIRONMENT.md"]
+    assert scope.scan_inclusions == ("docs",)
+    assert not any(item.get("path") == "docs" for item in scope.skipped_files)
+
+
+def test_explicit_include_cannot_open_protected_paths(tmp_path: Path) -> None:
+    from quality_runner.scan_scope import create_text_scan_scope
+
+    _write(tmp_path / ".git" / "config", "[core]\n")
+    _write(tmp_path / "docs" / "ENVIRONMENT.md", "NEXT_PUBLIC_SITE_URL\n")
+
+    scope = create_text_scan_scope(
+        tmp_path,
+        scan={"generated_code": []},
+        config={},
+        include_paths=(".git", "docs"),
+    )
+
+    assert [item.path for item in scope.files] == ["docs/ENVIRONMENT.md"]
+    assert any(item.get("path") == ".git" for item in scope.skipped_files)

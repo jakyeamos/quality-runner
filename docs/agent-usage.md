@@ -28,6 +28,12 @@ Only use `--execute-gates --worktree-mode disposable` after explicit user
 authorization, and treat it as arbitrary local-code execution in a disposable
 checkout rather than a sandbox.
 
+If the task names a repository-owned file below a default-excluded directory,
+make that reasoning explicit in the QR invocation instead of assuming the file
+was scanned. Use `--include-path <path>` for a bounded scan or
+`--include-ignored-path <path>` to keep the rest of the repository in scope.
+The resulting artifacts record the selected `scan_inclusions`.
+
 Then read:
 
 - `/path/to/repo/.quality-runner/exports/qr-handoff.md`

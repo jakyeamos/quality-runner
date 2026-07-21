@@ -533,6 +533,11 @@ The active all-module list is written to `repo-scan.json` as
 `scan_exclusion_preflight` to `repo-scan.json` and `run-manifest.json`, and
 writes `scan-exclusion-overlay.json` without changing `.quality-runner.toml`.
 
+Explicit run-only inclusions are written as `scan_inclusions` in the repository,
+code-quality, and security scan artifacts. `repo-scan.json` also records the
+combined decision under `scan_scope`; this distinguishes a file included
+intentionally from one covered by the default scan surface.
+
 The `exclusions suggest`, `validate`, and `apply` stages write their packet,
 report, result, and manifest under the selected run directory. The apply result
 also records the configuration hashes and unified diff.

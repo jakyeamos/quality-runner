@@ -52,6 +52,7 @@ def refresh_payload(
     cache_mode: str = "repo",
     cache_root: Path | None = None,
     performance_budget_seconds: float | None = None,
+    include_ignored_paths: list[str] | None = None,
 ) -> dict[str, Any]:
     return _refresh_payload(
         repo_root=repo_root,
@@ -73,6 +74,7 @@ def refresh_payload(
         cache_mode=cache_mode,
         cache_root=cache_root,
         performance_budget_seconds=performance_budget_seconds,
+        include_ignored_paths=include_ignored_paths,
         checkout_most_advanced_branch=checkout_most_advanced_branch,
         execute_discovered_gates=execute_discovered_gates,
         agent_review_mode=agent_review_mode,

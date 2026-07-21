@@ -8,10 +8,11 @@ from quality_runner.code_quality_paths import (
     _is_included_or_included_parent,
 )
 from quality_runner.scan_exclusions import (
-    effective_scan_exclusions as configured_effective_scan_exclusions,
+    ALWAYS_EXCLUDED_PATH_PARTS,
+    matches_scan_exclusion,
 )
 from quality_runner.scan_exclusions import (
-    matches_scan_exclusion,
+    effective_scan_exclusions as configured_effective_scan_exclusions,
 )
 from quality_runner.security_surface_paths import is_security_surface_path
 
@@ -74,6 +75,10 @@ def is_scan_excluded(
     include_ignored_paths: set[str],
 ) -> bool:
     normalized = relative_path.strip("/")
+    if any(
+        part in ALWAYS_EXCLUDED_PATH_PARTS for part in normalized.split("/")
+    ) and _is_included_or_included_parent(normalized, include_ignored_paths):
+        return True
     return bool(
         normalized
         and not _is_included_or_included_parent(normalized, include_ignored_paths)
