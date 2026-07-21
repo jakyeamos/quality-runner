@@ -34,6 +34,12 @@
       },
       "additionalProperties": false
     },
+    "scan_scope": { "$ref": "scan-scope.schema.json" },
+    "included_file_count": {
+      "type": "object",
+      "additionalProperties": { "type": ["integer", "null"], "minimum": 0 }
+    },
+    "cache": { "type": "object" },
     "scan_exclusion_preflight": {
       "type": "object",
       "required": ["source", "scope", "requested_paths", "effective_exclusion_patterns"],

@@ -10,6 +10,10 @@ from quality_runner.core.audit_contracts import AuditPayload, TextScanScope
 from quality_runner.incremental_analysis_cache import IncrementalAnalysisCache
 from quality_runner.scan_exclusions import effective_scan_exclusions, matches_scan_exclusion
 from quality_runner.scan_scope import discover_text_files
+from quality_runner.scan_scope_resolver import (
+    artifact_scan_scope,
+    resolve_effective_scan_scope,
+)
 from quality_runner.schema_constants import SECURITY_SCAN_SCHEMA
 from quality_runner.security.agent_gates import build_agent_review_gates
 from quality_runner.security.candidates import scan_security_candidates, taxonomy_payload
@@ -48,12 +52,22 @@ def create_security_scan(
     root = repo_root.expanduser().resolve()
     effective_cache_mode = "disabled" if persist_cache is False else cache_mode
     settings = security_settings(config)
+    resolved_scope = resolve_effective_scan_scope(root, config)
+    scan_exclusions = list(resolved_scope["effective_scan_exclusions_by_module"]["security"])
     if not settings["enabled"]:
         disabled_scan = _disabled_security_scan(
             scan=scan,
             repo_root=root,
-            scan_exclusions=effective_scan_exclusions(root, config, module="security"),
+            scan_exclusions=scan_exclusions,
             scan_inclusions=(list(text_scan_scope.scan_inclusions) if text_scan_scope else []),
+            scan_scope=artifact_scan_scope(
+                scan,
+                repo_root=root,
+                config=config,
+                module="security",
+                scan_exclusions=scan_exclusions,
+                included_file_count=0,
+            ),
         )
         disabled_scan["analysis_cache"] = _disabled_cache_evidence(
             root,
@@ -65,7 +79,6 @@ def create_security_scan(
         return disabled_scan
 
     standards = standards_packet or {}
-    scan_exclusions = effective_scan_exclusions(root, config, module="security")
     surfaces = detect_security_surfaces(
         root,
         scan=scan,
@@ -152,6 +165,19 @@ def create_security_scan(
         category = str(candidate.get("category") or "unknown")
         by_category[category] = by_category.get(category, 0) + 1
 
+    included_file_count = len(scanned_files)
+    scan_scope = artifact_scan_scope(
+        scan,
+        repo_root=root,
+        config=config,
+        module="security",
+        scan_exclusions=scan_exclusions,
+        included_file_count=included_file_count,
+    )
+    provenance = scan.get("provenance")
+    if not isinstance(provenance, dict):
+        provenance = scan_scope["provenance"]
+
     return {
         "schema": SECURITY_SCAN_SCHEMA,
         "run_id": _string_or_none(scan.get("run_id")),
@@ -162,6 +188,10 @@ def create_security_scan(
         "scan_inclusions": list(text_scan_scope.scan_inclusions)
         if text_scan_scope is not None
         else [],
+        "scan_scope": scan_scope,
+        "included_file_count": included_file_count,
+        "cache": scan_scope["cache"],
+        "provenance": provenance,
         "summary": {
             "total_candidates": len(candidates),
             "candidates_by_category": by_category,
@@ -407,6 +437,7 @@ def _disabled_security_scan(
     repo_root: Path,
     scan_exclusions: list[str],
     scan_inclusions: list[str],
+    scan_scope: dict[str, Any],
 ) -> dict[str, Any]:
     return {
         "schema": SECURITY_SCAN_SCHEMA,
@@ -416,6 +447,10 @@ def _disabled_security_scan(
         "scan_exclusion_scope": "security",
         "scan_exclusions": scan_exclusions,
         "scan_inclusions": scan_inclusions,
+        "scan_scope": scan_scope,
+        "included_file_count": 0,
+        "cache": scan_scope["cache"],
+        "provenance": scan_scope["provenance"],
         "summary": {
             "total_candidates": 0,
             "candidates_by_category": {},

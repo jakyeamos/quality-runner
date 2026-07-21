@@ -45,6 +45,10 @@ from quality_runner.remediation_context import (
 )
 from quality_runner.resolution import resolved_planning_inputs
 from quality_runner.scan_scope import create_text_scan_scope
+from quality_runner.scan_scope_resolver import (
+    resolve_effective_scan_scope,
+    update_scan_scope_counts,
+)
 from quality_runner.security.ledger import merge_security_ledger_entries
 from quality_runner.security.scan import create_security_scan, merge_security_into_capability_map
 from quality_runner.standards import DEFAULT_PROFILE, compile_standards
@@ -125,52 +129,45 @@ def analyze_read_only_audit(
             config=config,
             scan=scan,
         )
+        scan["scan_scope"] = resolve_effective_scan_scope(repo_root, config)
         resolved_agent_review_mode = resolve_agent_review_mode(
             requested=request.agent_review_mode,
             profile=profile,
             config=config,
         )
     with recorder.stage("scope"):
-        if request.scan_exclusion_overlay is None:
-            text_scan_scope = create_text_scan_scope(
-                repo_root,
-                scan=scan,
-                config=config,
-                focus_paths=request.focus_paths,
-                include_paths=request.include_paths,
-                read_files=request.analysis_mode == "full",
-                cache_mode=cache_mode,
-                cache_root=cache_root,
-                cache_namespace_root=request.cache_namespace_root,
-            )
-            security_scan_scope = text_scan_scope
-            code_quality_scan_scope = text_scan_scope
-        else:
-            text_scan_scope = create_text_scan_scope(
-                repo_root,
-                scan=scan,
-                config=config,
-                module="code_quality",
-                focus_paths=request.focus_paths,
-                include_paths=request.include_paths,
-                read_files=request.analysis_mode == "full",
-                cache_mode=cache_mode,
-                cache_root=cache_root,
-                cache_namespace_root=request.cache_namespace_root,
-            )
-            code_quality_scan_scope = text_scan_scope
-            security_scan_scope = create_text_scan_scope(
-                repo_root,
-                scan=scan,
-                config=config,
-                module="security",
-                focus_paths=request.focus_paths,
-                include_paths=request.include_paths,
-                read_files=request.analysis_mode == "full",
-                cache_mode=cache_mode,
-                cache_root=cache_root,
-                cache_namespace_root=request.cache_namespace_root,
-            )
+        code_quality_scan_scope = create_text_scan_scope(
+            repo_root,
+            scan=scan,
+            config=config,
+            module="code_quality",
+            focus_paths=request.focus_paths,
+            include_paths=request.include_paths,
+            read_files=request.analysis_mode == "full",
+            cache_mode=cache_mode,
+            cache_root=cache_root,
+            cache_namespace_root=request.cache_namespace_root,
+        )
+        security_scan_scope = create_text_scan_scope(
+            repo_root,
+            scan=scan,
+            config=config,
+            module="security",
+            focus_paths=request.focus_paths,
+            include_paths=request.include_paths,
+            read_files=request.analysis_mode == "full",
+            cache_mode=cache_mode,
+            cache_root=cache_root,
+            cache_namespace_root=request.cache_namespace_root,
+        )
+        text_scan_scope = code_quality_scan_scope
+        update_scan_scope_counts(
+            scan,
+            {
+                "code_quality": len(code_quality_scan_scope.files),
+                "security": len(security_scan_scope.files),
+            },
+        )
         if text_scan_scope.inventory is not None:
             recorder.counters(
                 {
@@ -242,6 +239,9 @@ def analyze_read_only_audit(
     }
     if request.scope_metadata is not None:
         scan_scope["provenance"] = dict(request.scope_metadata)
+    effective_scope = scan.get("scan_scope")
+    if isinstance(effective_scope, dict):
+        scan_scope = {**effective_scope, **scan_scope}
     scan["scan_scope"] = scan_scope
     with recorder.stage("package-preflight"):
         package_manager_preflight = build_package_manager_preflight(repo_root, scan)

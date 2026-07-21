@@ -14,6 +14,7 @@ from quality_runner.code_quality_paths import (
 )
 from quality_runner.core.audit_contracts import AuditPayload, ScannedTextFile, TextScanScope
 from quality_runner.scan_exclusions import (
+    normalize_scan_exclusion_module,
     record_scan_activity,
 )
 from quality_runner.scan_scope_helpers import (
@@ -36,6 +37,10 @@ from quality_runner.scan_scope_reporting import (
 )
 from quality_runner.scan_scope_reporting import (
     fast_skipped_directory_entry as _fast_skipped_directory_entry,
+)
+from quality_runner.scan_scope_resolver import (
+    resolve_effective_scan_scope,
+    resolve_scan_config,
 )
 from quality_runner.semantic_similarity_policy import similarity_policy_defaults
 from quality_runner.source_analysis_cache import SourceAnalysisCache
@@ -113,7 +118,7 @@ def create_text_scan_scope(
     repo_root: Path,
     *,
     scan: dict[str, Any],
-    config: dict[str, Any],
+    config: dict[str, Any] | None,
     module: str | None = None,
     focus_paths: tuple[str, ...] = (),
     read_files: bool = True,
@@ -123,9 +128,12 @@ def create_text_scan_scope(
     include_paths: tuple[str, ...] = (),
 ) -> TextScanScope:
     root = repo_root.expanduser().resolve()
-    policy = structural_scan_policy(config)
+    resolved_config = resolve_scan_config(root, config)
+    resolved_scope = resolve_effective_scan_scope(root, resolved_config)
+    scope_key = "all-modules" if module is None else normalize_scan_exclusion_module(module)
+    policy = structural_scan_policy(resolved_config)
     scan_inclusions = _unique_paths([*policy["include_ignored_paths"], *include_paths])
-    scan_exclusions = effective_scan_exclusions(root, config, module=module)
+    scan_exclusions = list(resolved_scope["effective_scan_exclusions_by_module"][scope_key])
     inventory = discover_scan_inventory(
         root,
         generated_paths=generated_paths(scan),

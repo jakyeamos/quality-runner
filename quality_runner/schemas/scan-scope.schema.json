@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://quality-runner.dev/schemas/scan-scope.schema.json",
+  "title": "Quality Runner Effective Scan Scope",
+  "type": "object",
+  "required": [
+    "status",
+    "resolver",
+    "fingerprint",
+    "config_path",
+    "config_sha256",
+    "effective_scan_exclusions",
+    "effective_scan_exclusions_by_module",
+    "included_file_count",
+    "cache",
+    "provenance"
+  ],
+  "properties": {
+    "status": { "enum": ["available", "unavailable"] },
+    "resolver": { "const": "quality-runner-effective-scan-scope-v1" },
+    "fingerprint": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+    "config_path": { "type": ["string", "null"] },
+    "config_sha256": { "type": ["string", "null"] },
+    "effective_scan_exclusions": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "effective_scan_exclusions_by_module": {
+      "type": "object",
+      "required": ["all-modules", "structural", "code_quality", "security"],
+      "additionalProperties": {
+        "type": "array",
+        "items": { "type": "string", "minLength": 1 }
+      }
+    },
+    "included_file_count": {
+      "anyOf": [
+        { "type": "integer", "minimum": 0 },
+        {
+          "type": "object",
+          "additionalProperties": { "type": ["integer", "null"], "minimum": 0 }
+        },
+        { "type": "null" }
+      ]
+    },
+    "cache": {
+      "type": "object",
+      "required": ["status", "reused", "reason"],
+      "properties": {
+        "status": { "type": "string", "minLength": 1 },
+        "reused": { "type": "boolean" },
+        "reason": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": true
+    },
+    "provenance": {
+      "type": "object",
+      "required": ["quality_runner_version"],
+      "properties": {
+        "quality_runner_version": { "type": "string", "minLength": 1 },
+        "config_path": { "type": ["string", "null"] },
+        "config_sha256": { "type": ["string", "null"] }
+      },
+      "additionalProperties": true
+    },
+    "module": { "type": "string", "minLength": 1 },
+    "reason": { "type": "string", "minLength": 1 },
+    "warnings": { "type": "array", "items": { "type": "object" } }
+  },
+  "additionalProperties": true
+}

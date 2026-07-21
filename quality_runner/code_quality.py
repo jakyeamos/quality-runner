@@ -47,6 +47,7 @@ from quality_runner.scan_scope import (
     skipped_path_summary,
     structural_scan_policy,
 )
+from quality_runner.scan_scope_resolver import artifact_scan_scope
 from quality_runner.schema_constants import CODE_QUALITY_SCAN_SCHEMA
 from quality_runner.skill_capabilities import build_skill_capabilities
 from quality_runner.source_analysis_cache import SourceAnalysisCache
@@ -257,6 +258,19 @@ def create_code_quality_scan(
         },
     )
 
+    included_file_count = len(accountability)
+    scan_scope = artifact_scan_scope(
+        scan,
+        repo_root=root,
+        config=config,
+        module="code_quality",
+        scan_exclusions=scope.scan_exclusions,
+        included_file_count=included_file_count,
+    )
+    provenance = scan.get("provenance")
+    if not isinstance(provenance, dict):
+        provenance = scan_scope["provenance"]
+
     return {
         "schema": CODE_QUALITY_SCAN_SCHEMA,
         "run_id": string_or_none(scan.get("run_id")),
@@ -265,6 +279,10 @@ def create_code_quality_scan(
         "scan_exclusion_scope": "code_quality",
         "scan_exclusions": list(scope.scan_exclusions),
         "scan_inclusions": list(scope.scan_inclusions),
+        "scan_scope": scan_scope,
+        "included_file_count": included_file_count,
+        "cache": scan_scope["cache"],
+        "provenance": provenance,
         "summary": {
             "total_files": len(accountability),
             "total_lines": sum(item["line_count"] for item in accountability),

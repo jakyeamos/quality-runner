@@ -586,3 +586,4 @@ def test_load_repo_config_reads_scan_exclusions(tmp_path) -> None:
 
     assert config["scan_exclusions"] == ["samples", "generated-reports/**"]
     assert config["warnings"] == []
+

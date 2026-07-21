@@ -19,9 +19,9 @@ from quality_runner.discovery_quality import quality_commands as discover_qualit
 from quality_runner.intent_docs import discover_intent_docs
 from quality_runner.inventory_cache import load_or_build_inventory
 from quality_runner.manifest import git_state_for_repo
-from quality_runner.scan_exclusions import (
-    effective_scan_exclusions,
-    effective_scan_exclusions_by_module,
+from quality_runner.scan_scope_resolver import (
+    resolve_effective_scan_scope,
+    resolve_scan_config,
 )
 from quality_runner.schema_constants import REPO_SCAN_SCHEMA
 from quality_runner.surfaces import detect_surfaces
@@ -72,9 +72,11 @@ def _inspect_repo_uncached(
     config: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     root = _validated_repo_root(repo_root)
-    scan_exclusions = effective_scan_exclusions(root, config)
-    structural_scan_exclusions = effective_scan_exclusions(root, config, module="structural")
-    scan_exclusions_by_module = effective_scan_exclusions_by_module(root, config)
+    resolved_config = resolve_scan_config(root, config)
+    scan_scope = resolve_effective_scan_scope(root, resolved_config)
+    scan_exclusions = list(scan_scope["effective_scan_exclusions"])
+    scan_exclusions_by_module = dict(scan_scope["effective_scan_exclusions_by_module"])
+    structural_scan_exclusions = list(scan_exclusions_by_module["structural"])
     package_json, warnings = read_package_json(root)
     pyproject, pyproject_warnings = read_pyproject(root)
     warnings.extend(pyproject_warnings)
@@ -135,6 +137,9 @@ def _inspect_repo_uncached(
         "workspaces": workspaces,
         "scan_exclusions": scan_exclusions,
         "scan_exclusions_by_module": scan_exclusions_by_module,
+        "scan_scope": scan_scope,
+        "included_file_count": scan_scope["included_file_count"],
+        "cache": scan_scope["cache"],
         "repo_surfaces": repo_surfaces,
         "scripts": scripts,
         "quality_commands": quality_commands,
