@@ -3,7 +3,7 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: GPT-5.6 modernization
 status: complete
-last_updated: "2026-07-21T20:00:00Z"
+last_updated: "2026-07-21T18:32:11Z"
 progress:
   total_phases: 8
   completed_phases: 8
@@ -28,7 +28,8 @@ active on `codex/qr-flexible-scan-scope`.
 ## Current Position
 
 - Branch: `codex/qr-flexible-scan-scope`
-- Baseline: `dev` at commit `ca2e34b`; implementation commit `4b0c2ab`
+- Baseline: `dev` at commit `ca2e34b`; implementation commit `4b0c2ab`,
+  instruction audit commit `3952a54`
 - Release metadata and readiness discovery fixes: `e3f5f5f`; PR #5 merged at
   `c6e92cc`, tag `v0.6.0` and PyPI publication are verified.
 - Audit and planning: complete
@@ -55,8 +56,8 @@ active on `codex/qr-flexible-scan-scope`.
 - **Phase:** scan-scope-flexibility
 - **Slug:** explicit-scan-inclusion-controls
 - **Status:** In progress
-- **Completion gate:** Implementation and verification are complete on
-  `4b0c2ab`; truth-file commit and branch push remain.
+- **Completion gate:** Implementation, instruction audit, and verification are
+  complete on `3952a54`; truth-file commit and branch push remain.
 
 ## Key Decisions
 
@@ -86,6 +87,10 @@ merge, tag, publish, or alter canonical release state in this slice.
 
 ## Recent Progress
 
+- 2026-07-21: `3952a54` aligns the packaged skill and detailed agent guide
+  with canonical journeys, v2 outcomes, scan-scope controls, review/gate/
+  planning/worker/rollout/release routes, and cache provenance; six focused
+  documentation tests pass. Live remote refresh was DNS-blocked.
 - 2026-07-21: `4b0c2ab` adds bounded/full-scan inclusion controls, protected
   path fail-closed behavior, inclusion provenance, and refresh/verify wiring;
   732 behavioral tests pass.
@@ -125,6 +130,3 @@ merge, tag, publish, or alter canonical release state in this slice.
   and refresh slots are stable, Review v1 output/artifacts retain their frozen
   field shape, and the `ReviewFinding` façade is restored while default v2
   outcomes keep their explicit next action.
-- 2026-07-13: M7 compatibility regression in `dc09ec0`: a default Review
-  outcome's persisted context, manifest, and report still round-trip through
-  the v1 readers.

@@ -114,13 +114,19 @@ normally excluded repository-owned file. Shared scanning, verify-gates,
 refresh propagation, and scan artifacts record `scan_inclusions`; protected
 runtime and artifact paths remain fail-closed. The full repository suite passes
 732 tests; the packaged `uv` entrypoint check remains unavailable in this shell.
+The follow-up agent-instruction audit at `3952a54` aligns the detailed guide and
+packaged skill with the canonical `qr` journeys, v2 outcomes, Fresh Review,
+explicit scan scope, controller and worker routing, phase and delivery
+contracts, cache provenance, rollout, MCP, and release-smoke surfaces. Six
+release-documentation tests pass; the normal commit gate recorded only the
+environment warning that `node` was unavailable to Pre-CR.
 
 ## Current Position
 
 - Target: a typed v2 core behind CLI, MCP, and compatibility adapters.
 - Reviewed integration: `a66850d` combines the adaptive timeout and incremental
   analysis/artifact folds and is ready as the promoted `dev` tip.
-- Active follow-up: `codex/qr-flexible-scan-scope` at `4b0c2ab`; no merge,
+- Active follow-up: `codex/qr-flexible-scan-scope` at `3952a54`; no merge,
   publish, tag, or registry change has occurred.
 - `codex/release-0.6.0` was merged by PR #5 into `main` at `c6e92cc`; `main`
   and the `v0.6.0` tag are published.
@@ -136,6 +142,13 @@ runtime and artifact paths remain fail-closed. The full repository suite passes
 - Scan-scope follow-up verification: 92 focused tests, Ruff, Basedpyright,
   compileall, scoped Vulture, and diff checks pass; 732 behavioral tests pass
   with only the unavailable-`uv` packaging test deselected.
+- Agent-instruction audit: local branches and tracking refs put the newest
+  folded functionality on `origin/dev` at `ca2e34b`; the current branch adds
+  the scan-scope and instruction follow-ups. `codex/ci-warning-cleanup` is
+  patch-equivalent to the fold and `codex/qr-command-surface` is historical and
+  divergent. A live `git ls-remote origin` refresh was unavailable because DNS
+  could not resolve `github.com`, so remote freshness is not independently
+  claimed here.
 - Public compatibility: retain `quality_evidence_contract` and
   `repo_quality_certifier` during a published transition window.
 
@@ -259,6 +272,11 @@ runtime and artifact paths remain fail-closed. The full repository suite passes
 
 ## Recent Progress
 
+- 2026-07-21: `3952a54` aligns the detailed agent guide and packaged skill
+  with current `qr` journeys, v2 outcomes, scan-scope controls, review/gate/
+  planning/worker/rollout/release routes, and cache provenance; six focused
+  documentation tests pass. Branch freshness was limited to local tracking
+  refs because `git ls-remote origin` was DNS-blocked.
 - 2026-07-21: `4b0c2ab` adds explicit bounded and full-scan inclusion
   controls, protected-path fail-closed behavior, inclusion provenance, and
   refresh/verify propagation; 732 behavioral tests pass.
@@ -298,6 +316,3 @@ runtime and artifact paths remain fail-closed. The full repository suite passes
 - 2026-07-17: canonical `dev` receives the architecture-preserving port and is
   published to `origin/dev`; the completed port branch and superseded source
   branch are pruned, while unrelated active branches remain untouched.
-- 2026-07-17: `b193900` ports release-profile readiness with provenance,
-  repo-local evidence validation, aggregate coverage, artifact/read-only gates,
-  publication review triggers, CLI/refresh propagation, and 621 passing tests.
