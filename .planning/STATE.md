@@ -3,7 +3,7 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: GPT-5.6 modernization
 status: complete
-last_updated: "2026-07-21T18:32:11Z"
+last_updated: "2026-07-21T18:34:51Z"
 progress:
   total_phases: 8
   completed_phases: 8
@@ -90,7 +90,8 @@ merge, tag, publish, or alter canonical release state in this slice.
 - 2026-07-21: `3952a54` aligns the packaged skill and detailed agent guide
   with canonical journeys, v2 outcomes, scan-scope controls, review/gate/
   planning/worker/rollout/release routes, and cache provenance; six focused
-  documentation tests pass. Live remote refresh was DNS-blocked.
+  documentation tests pass. A live origin refresh confirms the pushed branch
+  alongside `dev` and `main`.
 - 2026-07-21: `4b0c2ab` adds bounded/full-scan inclusion controls, protected
   path fail-closed behavior, inclusion provenance, and refresh/verify wiring;
   732 behavioral tests pass.

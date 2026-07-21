@@ -142,13 +142,10 @@ environment warning that `node` was unavailable to Pre-CR.
 - Scan-scope follow-up verification: 92 focused tests, Ruff, Basedpyright,
   compileall, scoped Vulture, and diff checks pass; 732 behavioral tests pass
   with only the unavailable-`uv` packaging test deselected.
-- Agent-instruction audit: local branches and tracking refs put the newest
-  folded functionality on `origin/dev` at `ca2e34b`; the current branch adds
-  the scan-scope and instruction follow-ups. `codex/ci-warning-cleanup` is
-  patch-equivalent to the fold and `codex/qr-command-surface` is historical and
-  divergent. A live `git ls-remote origin` refresh was unavailable because DNS
-  could not resolve `github.com`, so remote freshness is not independently
-  claimed here.
+- Agent-instruction audit: live `git ls-remote --heads origin` confirms the
+  remote branch set is `main` at `9f6c677`, `dev` at `ca2e34b`, and the current
+  follow-up at `0159b3a`. The older local `codex/ci-warning-cleanup` and
+  `codex/qr-command-surface` refs are not additional current remote branches.
 - Public compatibility: retain `quality_evidence_contract` and
   `repo_quality_certifier` during a published transition window.
 
@@ -275,8 +272,8 @@ environment warning that `node` was unavailable to Pre-CR.
 - 2026-07-21: `3952a54` aligns the detailed agent guide and packaged skill
   with current `qr` journeys, v2 outcomes, scan-scope controls, review/gate/
   planning/worker/rollout/release routes, and cache provenance; six focused
-  documentation tests pass. Branch freshness was limited to local tracking
-  refs because `git ls-remote origin` was DNS-blocked.
+  documentation tests pass. The subsequent live origin refresh confirms the
+  pushed branch alongside `dev` and `main`.
 - 2026-07-21: `4b0c2ab` adds explicit bounded and full-scan inclusion
   controls, protected-path fail-closed behavior, inclusion provenance, and
   refresh/verify propagation; 732 behavioral tests pass.
