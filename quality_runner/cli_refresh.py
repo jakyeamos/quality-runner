@@ -78,6 +78,11 @@ def refresh_command_payload(
             else None
         ),
         performance_budget_seconds=args.performance_budget_seconds,
+        include_ignored_paths=[
+            item
+            for item in (getattr(args, "include_ignored_path", []) or [])
+            if isinstance(item, str) and item
+        ],
     )
     if args.handoff_output:
         payload["handoff_export"] = export_handoff_payload(

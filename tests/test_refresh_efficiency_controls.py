@@ -52,6 +52,48 @@ def test_read_only_refresh_skips_verify_without_execution_consent(tmp_path: Path
     assert payload["runs"]["verify"]["skip_type"] == "execution-consent-required"  # type: ignore[index]
 
 
+def test_refresh_preserves_explicit_scan_inclusions_across_phases(tmp_path: Path) -> None:
+    captured: dict[str, dict[str, object]] = {}
+
+    def inspect(**kwargs: object) -> dict[str, object]:
+        captured["inspect"] = kwargs
+        return {"status": "inspected"}
+
+    def run(**kwargs: object) -> dict[str, object]:
+        captured["run"] = kwargs
+        return {"status": "planned"}
+
+    payload = run_refresh_payload(
+        repo_root=tmp_path,
+        run_id_prefix="scope-propagation",
+        baseline_run_id=None,
+        profile=None,
+        ci_status_json=None,
+        timeout_seconds=5,
+        workflow_timeout_seconds=None,
+        verify_timeout_seconds=None,
+        workflow_timeout_reason=None,
+        total_timeout_seconds=None,
+        total_timeout_reason=None,
+        checkout_most_advanced_branch=False,
+        execute_discovered_gates=False,
+        allow_mutating_gates=False,
+        intent=None,
+        inspect_callback=inspect,
+        run_callback=run,
+        verify_callback=lambda **_: {"status": "blocked"},
+        summary_callback=lambda **_: {"status": "blocked"},
+        include_paths=("docs",),
+        include_ignored_paths=("data",),
+    )
+
+    assert payload["status"] == "blocked"
+    assert captured["inspect"]["include_paths"] == ("docs",)
+    assert captured["inspect"]["include_ignored_paths"] == ("data",)
+    assert captured["run"]["include_paths"] == ("docs",)
+    assert captured["run"]["include_ignored_paths"] == ("data",)
+
+
 def test_inventory_cache_reuses_clean_repository_inventory(tmp_path: Path) -> None:
     (tmp_path / "package.json").write_text('{"scripts": {"test": "true"}}\n', encoding="utf-8")
 

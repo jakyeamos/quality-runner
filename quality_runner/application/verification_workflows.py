@@ -26,6 +26,8 @@ def verify_gates_payload(
     intent: AuditPayload | None = None,
     execute_discovered_gates: bool = False,
     agent_review_mode: str | None = None,
+    include_ignored_paths: list[str] | None = None,
+    include_paths: tuple[str, ...] = (),
     scan_exclusion_overlay: ScanExclusionOverlay | None = None,
     progress: ProgressCallback | None = None,
     analysis_cache_root: Path | None = None,
@@ -53,6 +55,8 @@ def verify_gates_payload(
             skill_review_report=skill_review_report,
             intent=intent,
             scan_exclusion_overlay=scan_exclusion_overlay,
+            include_ignored_paths=tuple(include_ignored_paths or []),
+            include_paths=include_paths,
             agent_review_mode=agent_review_mode,
         ),
         analysis_override=(

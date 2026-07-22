@@ -92,6 +92,8 @@ def verify_journey_outcome(
     skill_review_report: LegacyPayload | None,
     intent: LegacyPayload | None,
     agent_review_mode: str | None = None,
+    include_ignored_paths: list[str] | None = None,
+    include_paths: tuple[str, ...] = (),
     scan_exclusion_overlay: ScanExclusionOverlay | None = None,
     readiness_evidence_file: Path | None = None,
 ) -> JourneyOutcome:
@@ -112,6 +114,8 @@ def verify_journey_outcome(
         skill_review_report=skill_review_report,
         intent=intent,
         agent_review_mode=agent_review_mode,
+        include_ignored_paths=include_ignored_paths,
+        include_paths=include_paths,
         scan_exclusion_overlay=scan_exclusion_overlay,
     )
     legacy_payload = _payload_mapping(payload)

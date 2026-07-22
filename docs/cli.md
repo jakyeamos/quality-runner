@@ -188,6 +188,10 @@ arguments where they apply:
 - `--profile`: standards profile override
 - `--run-id`: stable run id (refresh uses `--run-id-prefix` instead)
 - `--interactive`: prompt before excluding expensive default-ignored scan paths
+- `--include-path PATH`: restrict the run to a path and explicitly re-include it
+  when it would normally be excluded; repeat for multiple paths
+- `--include-ignored-path PATH`: re-include a normally ignored path without
+  narrowing the rest of the scan; repeat for multiple paths
 - `--scan-exclusion DIR`: exclude this repo-relative directory for this run
   only; repeat for multiple directories. This is a global overlay and changes
   security scan coverage without editing repository configuration.

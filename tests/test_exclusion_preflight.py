@@ -452,6 +452,11 @@ def test_cli_exclusion_stages_and_run_overlay_are_wired() -> None:
 
     run_args = parser.parse_args(["run", ".", "--scan-exclusion", "generated-output"])
     assert run_args.scan_exclusion == ["generated-output"]
+    include_args = parser.parse_args(
+        ["run", ".", "--include-path", "docs", "--include-ignored-path", "data"]
+    )
+    assert include_args.include_path == ["docs"]
+    assert include_args.include_ignored_path == ["data"]
     module_args = parser.parse_args(
         ["run", ".", "--scan-exclusion-module", "code_quality=generated-output"]
     )

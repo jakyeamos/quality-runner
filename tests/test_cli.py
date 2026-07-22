@@ -224,6 +224,38 @@ def test_cli_run_interactive_can_include_expensive_paths_once(tmp_path: Path) ->
     assert "data/row-0.ts" in scanned_paths
 
 
+def test_cli_run_can_include_default_excluded_path_explicitly(tmp_path: Path) -> None:
+    write_js_fixture(tmp_path)
+    (tmp_path / "docs").mkdir()
+    (tmp_path / "docs" / "ENVIRONMENT.md").write_text("NEXT_PUBLIC_SITE_URL\n", encoding="utf-8")
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "quality_runner",
+            "run",
+            str(tmp_path),
+            "--run-id",
+            "cli-explicit-include",
+            "--include-ignored-path",
+            "docs",
+            "--json",
+        ],
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+    payload = json.loads(result.stdout)
+    code_quality = json.loads(Path(payload["artifact_paths"]["code_quality_scan_json"]).read_text())
+    scanned_paths = {item["path"] for item in code_quality["accountability"]}
+
+    assert "docs/ENVIRONMENT.md" in scanned_paths
+    assert "docs" in code_quality["scan_inclusions"]
+
+
 def test_cli_inspect_json_writes_inspection_artifacts(tmp_path: Path) -> None:
     write_js_fixture(tmp_path)
 

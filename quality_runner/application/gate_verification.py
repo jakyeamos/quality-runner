@@ -38,6 +38,7 @@ from quality_runner.readiness import evaluate_readiness
 from quality_runner.unwired_from_dead_code import merge_dead_code_unwired_findings
 from quality_runner.workflow_helpers import (
     combined_warnings,
+    config_with_include_overrides,
     config_with_scan_exclusion_overrides,
     gate_timeouts,
 )
@@ -237,10 +238,11 @@ def _audit_request(
         run_id=request.run_id,
         profile=request.profile,
         ci_status_json=request.ci_status_json,
-        include_ignored_paths=(),
         branch_warnings=tuple(_audit_warning(warning) for warning in branch_warnings),
         skill_review_report=request.skill_review_report,
         intent=request.intent,
+        include_ignored_paths=request.include_ignored_paths,
+        include_paths=request.include_paths,
         scan_exclusion_overlay=request.scan_exclusion_overlay,
         agent_review_mode=request.agent_review_mode,
         readiness_evidence_file=request.readiness_evidence_file,
@@ -311,6 +313,8 @@ def _analysis_matches_request(analysis: AuditAnalysis, request: VerificationRequ
         or stored.ci_status_json != request.ci_status_json
         or stored.skill_review_report != request.skill_review_report
         or stored.intent != request.intent
+        or stored.include_ignored_paths != request.include_ignored_paths
+        or stored.include_paths != request.include_paths
         or stored.scan_exclusion_overlay != request.scan_exclusion_overlay
         or (
             request.agent_review_mode is not None
@@ -326,6 +330,10 @@ def _analysis_matches_request(analysis: AuditAnalysis, request: VerificationRequ
     current_config = config_with_scan_exclusion_overrides(
         load_repo_config(request.repo_root),
         request.scan_exclusion_overlay,
+    )
+    current_config = config_with_include_overrides(
+        current_config,
+        list(request.include_ignored_paths),
     )
     if configuration_identity(request.repo_root, captured_config) != configuration_identity(
         request.repo_root, current_config
@@ -351,6 +359,8 @@ def _rebind_analysis(
         branch_warnings=tuple(_audit_warning(warning) for warning in branch_warnings),
         skill_review_report=request.skill_review_report,
         intent=request.intent,
+        include_ignored_paths=request.include_ignored_paths,
+        include_paths=request.include_paths,
         scan_exclusion_overlay=request.scan_exclusion_overlay,
         agent_review_mode=(
             analysis.request.agent_review_mode

@@ -381,6 +381,20 @@ Use `quality-runner exclusions suggest` to produce a deterministic review
 packet before changing configuration. Only `exclusions apply --apply` can
 mutate `.quality-runner.toml`.
 
+Agents can make an explicit, run-only inclusion decision when a repository-owned
+source or policy file lives under one of those defaults:
+
+```bash
+qr inspect /path/to/repo --include-path docs/infrastructure.md --json
+qr inspect /path/to/repo --include-ignored-path docs/infrastructure.md --json
+```
+
+`--include-path` narrows the scan and re-includes the requested ordinary path;
+`--include-ignored-path` re-includes it while preserving the rest of the scan.
+Both decisions are recorded as `scan_inclusions` in the run artifacts. Protected
+runtime and artifact paths such as `.git`, `.quality-runner`, `node_modules`,
+`build`, and `dist` remain excluded.
+
 ## Safety Boundary
 
 Quality Runner may create or update files under

@@ -36,6 +36,8 @@ class VerificationRequest:
     skill_review_report: AuditPayload | None
     intent: AuditPayload | None
     scan_exclusion_overlay: ScanExclusionOverlay | None = None
+    include_ignored_paths: tuple[str, ...] = ()
+    include_paths: tuple[str, ...] = ()
     agent_review_mode: str | None = None
     readiness_evidence_file: Path | None = None
 

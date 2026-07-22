@@ -59,6 +59,7 @@ class TextScanScope:
     file_paths: tuple[str, ...] = ()
     inventory: AuditPayload | None = None
     include_paths: tuple[str, ...] = ()
+    scan_inclusions: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)

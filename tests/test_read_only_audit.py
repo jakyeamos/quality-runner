@@ -224,6 +224,20 @@ def test_include_overrides_do_not_change_discovery_or_standards_inputs(tmp_path:
     assert "include_ignored_paths" not in standards_config.get("structural_scan", {})
 
 
+def test_include_path_reopens_default_excluded_docs_for_shared_scan(tmp_path: Path) -> None:
+    from quality_runner.application.read_only_audit import analyze_read_only_audit
+
+    (tmp_path / "docs").mkdir()
+    (tmp_path / "docs" / "ENVIRONMENT.md").write_text("NEXT_PUBLIC_SITE_URL\n", encoding="utf-8")
+
+    analysis = analyze_read_only_audit(_request(tmp_path, "include-docs", include_paths=("docs",)))
+
+    assert [item.path for item in analysis.text_scan_scope.files] == ["docs/ENVIRONMENT.md"]
+    assert analysis.text_scan_scope.scan_inclusions == ("docs",)
+    assert analysis.scan["scan_scope"]["include_paths"] == ["docs"]
+    assert analysis.code_quality_scan["scan_inclusions"] == ["docs"]
+
+
 def test_run_renderer_preserves_v1_artifact_path_snapshots(tmp_path: Path) -> None:
     from quality_runner.workflow import run_payload
 
@@ -264,6 +278,7 @@ def _request(
     run_id: str,
     *,
     include_ignored_paths: tuple[str, ...] = (),
+    include_paths: tuple[str, ...] = (),
     analysis_cache_root: Path | None = None,
 ) -> AuditRequest:
     return AuditRequest(
@@ -276,4 +291,5 @@ def _request(
         skill_review_report=None,
         intent=None,
         analysis_cache_root=analysis_cache_root,
+        include_paths=include_paths,
     )
