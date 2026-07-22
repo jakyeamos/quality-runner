@@ -99,6 +99,11 @@ Classification is advisory lexical evidence, not an automatic merge. Assign a
 candidate to an existing pack when it fits; create a new pack only when it has a
 meaningfully different domain or adoption boundary.
 
+The repository includes a review-only environment-legibility candidate at
+`docs/skill-candidates/environment-legibility.toml`. It is intentionally
+validated and classified before any personal-corpus append or repository sync;
+the candidate itself is not active by default.
+
 ```bash
 # Recommend existing packs.
 quality-runner skill classify /tmp/new-skill.toml \
