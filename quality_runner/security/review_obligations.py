@@ -5,26 +5,16 @@ from typing import Any
 from quality_runner.schema_constants import SECURITY_REVIEW_OBLIGATIONS_SCHEMA
 
 _CATEGORY_MATCHES: dict[str, frozenset[str]] = {
-    "security_api_route_auth_review": frozenset(
-        {"missing-auth", "acl-check", "cross-tenant-id"}
-    ),
-    "security_auth_surface_review": frozenset(
-        {"missing-auth", "auth-bypass", "jwt-handling"}
-    ),
-    "security_webhook_signature_review": frozenset(
-        {"webhook-handler", "service-entry-point"}
-    ),
-    "security_dangerous_sink_review": frozenset(
-        {"dangerous-sink", "rce", "dangerous-html"}
-    ),
+    "security_api_route_auth_review": frozenset({"missing-auth", "acl-check", "cross-tenant-id"}),
+    "security_auth_surface_review": frozenset({"missing-auth", "auth-bypass", "jwt-handling"}),
+    "security_webhook_signature_review": frozenset({"webhook-handler", "service-entry-point"}),
+    "security_dangerous_sink_review": frozenset({"dangerous-sink", "rce", "dangerous-html"}),
     "security_redirect_review": frozenset({"unsafe-redirect", "open-redirect"}),
     "security_secret_exposure_review": frozenset(
         {"secrets-exposure", "secret-in-fallback", "secret-in-log", "secret-env-var"}
     ),
     "security_dependency_risk_review": frozenset(),
-    "security_rate_limit_review": frozenset(
-        {"rate-limit-bypass", "expensive-api-abuse"}
-    ),
+    "security_rate_limit_review": frozenset({"rate-limit-bypass", "expensive-api-abuse"}),
 }
 
 
@@ -71,8 +61,7 @@ def validate_security_review_obligations(payload: dict[str, Any]) -> dict[str, A
     errors: list[str] = []
     if payload.get("schema") != SECURITY_REVIEW_OBLIGATIONS_SCHEMA:
         errors.append(
-            "security review obligations schema must be "
-            f"{SECURITY_REVIEW_OBLIGATIONS_SCHEMA}"
+            f"security review obligations schema must be {SECURITY_REVIEW_OBLIGATIONS_SCHEMA}"
         )
     obligations = payload.get("obligations")
     if not isinstance(obligations, list):
@@ -101,9 +90,7 @@ def validate_security_review_obligations(payload: dict[str, Any]) -> dict[str, A
     return {"passed": not errors, "errors": errors}
 
 
-def _obligation_for_gate(
-    gate: dict[str, Any], candidates: list[dict[str, Any]]
-) -> dict[str, Any]:
+def _obligation_for_gate(gate: dict[str, Any], candidates: list[dict[str, Any]]) -> dict[str, Any]:
     gate_id = str(gate["id"])
     candidate_refs = [
         _candidate_ref(candidate)

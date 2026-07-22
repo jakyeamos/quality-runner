@@ -229,7 +229,9 @@ def reconcile_delivery_contract(
     current_run_id = run_id or _optional_string(execution.get("qr_run_id"))
     blockers: list[dict[str, Any]] = []
     if execution.get("schema") not in {DELIVERY_RESULT_SCHEMA, None}:
-        blockers.append({"type": "missing_evidence", "message": "execution result schema is invalid"})
+        blockers.append(
+            {"type": "missing_evidence", "message": "execution result schema is invalid"}
+        )
     expected_fingerprints = _dict_value(contract.get("source_fingerprints"))
     actual_fingerprints = _dict_value(execution.get("source_fingerprints"))
     if not actual_fingerprints:
@@ -307,7 +309,9 @@ def reconcile_delivery_contract(
         if current_run_id
         else contract_path.expanduser().resolve().parent
     )
-    result["reconciliation_path"] = str(write_json(output_dir / "delivery-reconciliation.json", result))
+    result["reconciliation_path"] = str(
+        write_json(output_dir / "delivery-reconciliation.json", result)
+    )
     return result
 
 
@@ -386,7 +390,9 @@ def _build_contract(
         "intent": intent,
         "phase_id": phase_id,
         "plan_id": plan_id,
-        "qr_run_refs": [{"run_id": run_id, "artifact_paths": run_payload_result.get("artifact_paths", {})}],
+        "qr_run_refs": [
+            {"run_id": run_id, "artifact_paths": run_payload_result.get("artifact_paths", {})}
+        ],
         "git_baseline": _git_baseline(repo_scan),
         "source_fingerprints": source_fingerprints,
         "standards": {
@@ -397,7 +403,10 @@ def _build_contract(
             "truth_files": [repo_scan.get("truth_file")] if repo_scan.get("truth_file") else [],
             "qr_local_authority": True,
         },
-        "context": {"refs": sorted(context_refs or []), "repo_scan": repo_scan.get("intent_docs", [])},
+        "context": {
+            "refs": sorted(context_refs or []),
+            "repo_scan": repo_scan.get("intent_docs", []),
+        },
         "research": {"refs": sorted(research_refs or [])},
         "obligations": obligations,
         "analysis_mode": analysis_mode,
@@ -407,7 +416,9 @@ def _build_contract(
         "coverage": {
             "status": "partial" if deferred_checks else "complete",
             "hard_obligations": sum(1 for item in obligations if item.get("kind") == "hard"),
-            "advisory_obligations": sum(1 for item in obligations if item.get("kind") == "advisory"),
+            "advisory_obligations": sum(
+                1 for item in obligations if item.get("kind") == "advisory"
+            ),
         },
         "deferred_checks": deferred_checks,
         "performance": performance,
@@ -416,7 +427,9 @@ def _build_contract(
     }
 
 
-def _build_obligations(remediation_plan: dict[str, Any], security: dict[str, Any]) -> list[dict[str, Any]]:
+def _build_obligations(
+    remediation_plan: dict[str, Any], security: dict[str, Any]
+) -> list[dict[str, Any]]:
     obligations: list[dict[str, Any]] = []
     slices = remediation_plan.get("slices")
     if isinstance(slices, list):
@@ -445,7 +458,10 @@ def _build_obligations(remediation_plan: dict[str, Any], security: dict[str, Any
                     "acceptance_criteria": acceptance,
                     "required_evidence": _string_list(item.get("verification_gates")),
                     "verification_commands": _string_list(item.get("verification_gates")),
-                    "stop_conditions": ["mandatory evidence is missing", "source fingerprint is stale"],
+                    "stop_conditions": [
+                        "mandatory evidence is missing",
+                        "source fingerprint is stale",
+                    ],
                 }
             )
     for item in _list_of_dicts(security.get("agent_review_gates")):

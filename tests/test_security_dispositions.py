@@ -16,13 +16,16 @@ def test_env_reads_are_triageable_without_becoming_author_blockers() -> None:
 
     assert disposition["disposition_class"] == "triage"
     assert disposition["disposition_required"] is False
-    assert actionability_for_finding(
-        {
-            "category": "security:secret-env-var",
-            "severity": "blocker",
-            **disposition,
-        }
-    )[0] == "needs-triage"
+    assert (
+        actionability_for_finding(
+            {
+                "category": "security:secret-env-var",
+                "severity": "blocker",
+                **disposition,
+            }
+        )[0]
+        == "needs-triage"
+    )
 
 
 def test_high_signal_candidate_requires_owner_review() -> None:
@@ -35,13 +38,16 @@ def test_high_signal_candidate_requires_owner_review() -> None:
 
     assert disposition["disposition_class"] == "human-review"
     assert disposition["disposition_required"] is True
-    assert actionability_for_finding(
-        {
-            "category": "security:secrets-exposure",
-            "severity": "blocker",
-            **disposition,
-        }
-    )[0] == "needs-author-decision"
+    assert (
+        actionability_for_finding(
+            {
+                "category": "security:secrets-exposure",
+                "severity": "blocker",
+                **disposition,
+            }
+        )[0]
+        == "needs-author-decision"
+    )
 
 
 def test_security_audit_preserves_disposition_metadata() -> None:

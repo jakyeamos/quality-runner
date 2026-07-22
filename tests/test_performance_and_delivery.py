@@ -170,9 +170,7 @@ def test_reconcile_blocks_missing_hard_evidence_and_accepts_matching_receipt(
         cache_mode="disabled",
     )
     contract_path = Path(contract["contract_path"])
-    hard_obligations = [
-        item for item in contract["obligations"] if item.get("kind") == "hard"
-    ]
+    hard_obligations = [item for item in contract["obligations"] if item.get("kind") == "hard"]
     missing_path = tmp_path / "missing-result.json"
     write_json(
         missing_path,

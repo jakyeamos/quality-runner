@@ -125,7 +125,9 @@ def early_refresh_recommendation(
     security_paths = [
         path
         for path in paths
-        if any(marker in f"/{path.lower()}" for marker in ("/auth", "/security", "/webhook", "/api/"))
+        if any(
+            marker in f"/{path.lower()}" for marker in ("/auth", "/security", "/webhook", "/api/")
+        )
     ]
     reasons = [
         *(["changed path is outside the declared phase scope"] if out_of_scope else []),
@@ -133,9 +135,7 @@ def early_refresh_recommendation(
     ]
     if paths:
         reasons.extend(
-            item
-            for item in contract.get("early_refresh_triggers", [])
-            if isinstance(item, str)
+            item for item in contract.get("early_refresh_triggers", []) if isinstance(item, str)
         )
     return {
         "recommended": bool(reasons),
@@ -148,4 +148,6 @@ def early_refresh_recommendation(
 def _normalized_paths(value: object) -> tuple[str, ...]:
     if not isinstance(value, list):
         return ()
-    return tuple(item.replace("\\", "/").strip("/") for item in value if isinstance(item, str) and item)
+    return tuple(
+        item.replace("\\", "/").strip("/") for item in value if isinstance(item, str) and item
+    )

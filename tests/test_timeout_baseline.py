@@ -211,7 +211,7 @@ def test_profile_config_gitignore_inventory_and_gate_plan_invalidate_baseline(
     )
     assert stale_version["status"] == "fallback"
 
-    monkeypatch.setattr(baseline_support, "__version__", "0.6.0")
+    monkeypatch.setattr(baseline_support, "__version__", "0.7.0")
     matching = resolve_timeout_context(
         tmp_path,
         profile="default",

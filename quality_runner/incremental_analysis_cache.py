@@ -171,11 +171,11 @@ class IncrementalAnalysisCache:
         lookup_key = f"{self._analysis_kind}:{relative_path}"
         prior = self._index.get(lookup_key)
         prior_record = prior if isinstance(prior, dict) else None
-        prior_signature = (
-            prior_record.get("source_signature") if prior_record is not None else None
-        )
+        prior_signature = prior_record.get("source_signature") if prior_record is not None else None
         if isinstance(prior_signature, dict) and prior_signature == signature:
-            content_sha256 = prior_record.get("content_sha256") if prior_record is not None else None
+            content_sha256 = (
+                prior_record.get("content_sha256") if prior_record is not None else None
+            )
             if isinstance(content_sha256, str) and content_sha256:
                 identity = self._identity_for_file(
                     relative_path=relative_path,

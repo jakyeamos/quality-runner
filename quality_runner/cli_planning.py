@@ -51,16 +51,16 @@ def add_planning_commands(
     contract_parser = plan_subparsers.add_parser(
         "contract", help="Prepare or refresh a QR delivery contract"
     )
-    contract_subparsers = contract_parser.add_subparsers(
-        dest="contract_action", required=True
-    )
+    contract_subparsers = contract_parser.add_subparsers(dest="contract_action", required=True)
     for action, help_text in (
         ("prepare", "Create an immutable contract before research"),
         ("refresh", "Create a new immutable contract after research or context"),
     ):
         action_parser = contract_subparsers.add_parser(action, help=help_text)
         action_parser.add_argument("repo_path", help="Target repository path")
-        action_parser.add_argument("--run-id", default=None, help="QR run id to bind to the contract")
+        action_parser.add_argument(
+            "--run-id", default=None, help="QR run id to bind to the contract"
+        )
         action_parser.add_argument("--phase-id", default=None)
         action_parser.add_argument("--plan-id", default=None)
         action_parser.add_argument("--intent", default=None)
@@ -91,7 +91,9 @@ def add_planning_commands(
     )
     plan_reconcile.add_argument("repo_path", help="Target repository path")
     plan_reconcile.add_argument("--contract", required=True, help="Delivery contract JSON")
-    plan_reconcile.add_argument("--result-file", required=True, help="Structured delivery result JSON")
+    plan_reconcile.add_argument(
+        "--result-file", required=True, help="Structured delivery result JSON"
+    )
     plan_reconcile.add_argument("--run-id", default=None, help="Current QR delta run id")
     plan_reconcile.add_argument("--json", action="store_true", help="Emit JSON output")
 
@@ -173,11 +175,7 @@ def planning_command_payload(args: argparse.Namespace, validated_repo_path: Any)
                 ),
             )
         if args.plan_action == "contract":
-            cache_root = (
-                Path(args.cache_dir).expanduser().resolve()
-                if args.cache_dir
-                else None
-            )
+            cache_root = Path(args.cache_dir).expanduser().resolve() if args.cache_dir else None
             common = {
                 "repo_root": repo_root,
                 "run_id": args.run_id,

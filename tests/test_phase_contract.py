@@ -104,7 +104,9 @@ def test_contract_file_round_trip(tmp_path: Path) -> None:
     assert load_phase_contract(path)["phase_id"] == "67"
 
 
-def test_phase_check_cli_writes_closure_artifacts(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+def test_phase_check_cli_writes_closure_artifacts(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
     import json
 
     for run_id, findings in (("baseline", []), ("current", [_finding("keep")])):
@@ -115,19 +117,22 @@ def test_phase_check_cli_writes_closure_artifacts(tmp_path: Path, capsys: pytest
     contract_path = tmp_path / "contract.json"
     contract_path.write_text(json.dumps(_contract()), encoding="utf-8")
 
-    assert main(
-        [
-            "phase-check",
-            str(tmp_path),
-            "--run-id",
-            "current",
-            "--baseline-run-id",
-            "baseline",
-            "--contract",
-            str(contract_path),
-            "--json",
-        ]
-    ) == 0
+    assert (
+        main(
+            [
+                "phase-check",
+                str(tmp_path),
+                "--run-id",
+                "current",
+                "--baseline-run-id",
+                "baseline",
+                "--contract",
+                str(contract_path),
+                "--json",
+            ]
+        )
+        == 0
+    )
     capsys.readouterr()
     assert (tmp_path / ".quality-runner/runs/current/phase-closure.json").exists()
     assert (tmp_path / ".quality-runner/runs/current/phase-closure.md").exists()

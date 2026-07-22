@@ -92,9 +92,5 @@ def test_run_emits_obligation_artifact_and_handoff_records(tmp_path: Path) -> No
 
     assert artifact_path.name == "security-review-obligations.json"
     assert obligations["obligation_count"] >= 2
-    assert "security_api_route_auth_review" in {
-        item["id"] for item in obligations["obligations"]
-    }
-    assert handoff["security_review"]["review_obligation_count"] == obligations[
-        "obligation_count"
-    ]
+    assert "security_api_route_auth_review" in {item["id"] for item in obligations["obligations"]}
+    assert handoff["security_review"]["review_obligation_count"] == obligations["obligation_count"]

@@ -89,7 +89,9 @@ def test_changed_only_selects_staged_tests(tmp_path: Path, monkeypatch) -> None:
     (tmp_path / "tests").mkdir()
     (tmp_path / "tests" / "test_config.py").write_text("", encoding="utf-8")
 
-    assert module.build_pytest_args(["--changed-only", "--ignore", "tests/test_entrypoints.py"]) == [
+    assert module.build_pytest_args(
+        ["--changed-only", "--ignore", "tests/test_entrypoints.py"]
+    ) == [
         "-q",
         "--ignore",
         "tests/test_entrypoints.py",

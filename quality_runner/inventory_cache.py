@@ -33,12 +33,15 @@ def load_or_build_inventory(
         ci_checks=ci_checks,
         extra_warnings=extra_warnings,
     )
-    path = cache_directory(
-        root,
-        mode=mode,
-        cache_root=cache_root,
-        component="repository-inventory-v1",
-    ) / f"{key}.json"
+    path = (
+        cache_directory(
+            root,
+            mode=mode,
+            cache_root=cache_root,
+            component="repository-inventory-v1",
+        )
+        / f"{key}.json"
+    )
     if mode == "disabled":
         payload = dict(build())
         payload["inventory_cache"] = _evidence(
@@ -123,7 +126,9 @@ def _read(path: Path) -> dict[str, Any] | None:
         payload = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, UnicodeDecodeError, json.JSONDecodeError):
         return None
-    return payload if isinstance(payload, dict) and payload.get("schema") == REPO_SCAN_SCHEMA else None
+    return (
+        payload if isinstance(payload, dict) and payload.get("schema") == REPO_SCAN_SCHEMA else None
+    )
 
 
 def _write(path: Path, payload: dict[str, Any]) -> None:
