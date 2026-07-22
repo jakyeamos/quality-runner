@@ -1,6 +1,6 @@
 # Quality Runner Project Truth
 
-Last updated: 2026-07-21
+Last updated: 2026-07-22
 
 ## Current State
 
@@ -107,31 +107,28 @@ checkout gives local consumers a stable command surface that follows the
 checkout's current code without repeated `--project` invocations or GitHub
 fetches.
 
-The scoped `codex/qr-flexible-scan-scope` follow-up at `4b0c2ab` makes scan
-scope agent-selectable: `--include-path` reopens a bounded path and
-`--include-ignored-path` preserves the rest of the scan while reopening a
-normally excluded repository-owned file. Shared scanning, verify-gates,
-refresh propagation, and scan artifacts record `scan_inclusions`; protected
-runtime and artifact paths remain fail-closed. The full repository suite passes
-732 tests; the packaged `uv` entrypoint check remains unavailable in this shell.
-The follow-up agent-instruction audit at `3952a54` aligns the detailed guide and
-packaged skill with the canonical `qr` journeys, v2 outcomes, Fresh Review,
-explicit scan scope, controller and worker routing, phase and delivery
-contracts, cache provenance, rollout, MCP, and release-smoke surfaces. Six
-release-documentation tests pass; the normal commit gate recorded only the
-environment warning that `node` was unavailable to Pre-CR.
+The full-audit fold `4d4fd3c` integrates the scan-scope and agent-instruction
+follow-ups into the dev ancestry. The gate-stabilization commit `477c8c4`
+isolates user Git configuration in the test harness and formats the five files
+changed by the fold. The merged branch passes 734 tests, Ruff lint, fold-scoped
+Ruff formatting, Basedpyright, Vulture, pip-audit, build, installed-wheel
+doctor/release-smoke, CLI review, legacy projection, and MCP discovery. The
+repository-wide format check still reports 18 pre-existing files outside this
+fold; those unrelated changes were preserved. The release surface remains
+0.6.0 with no new tag or registry publication.
 
 ## Current Position
 
 - Target: a typed v2 core behind CLI, MCP, and compatibility adapters.
-- Reviewed integration: `a66850d` combines the adaptive timeout and incremental
-  analysis/artifact folds and is ready as the promoted `dev` tip.
-- Active follow-up: `codex/qr-flexible-scan-scope` at `3952a54`; no merge,
-  publish, tag, or registry change has occurred.
+- Reviewed integration: `codex/full-audit-fold-quality-runner` at `477c8c4`
+  contains the five-commit scan-scope/agent-guidance fold plus the verified
+  gate-stabilization fix; it is ready for a dev-only promotion.
+- Active follow-up: none for this fold; no new tag, registry publication, or
+  main promotion has occurred.
 - `codex/release-0.6.0` was merged by PR #5 into `main` at `c6e92cc`; `main`
   and the `v0.6.0` tag are published.
-- `dev` is the canonical integration branch, is published to `origin/dev`, and
-  the reviewed combined fold is `a66850d`.
+- `dev` is the canonical integration branch, is published to `origin/dev` at
+  `ca2e34b`, and this verified fold is ready to move it forward.
   The temporary `codex/dev-feature-port` worktree/ref and the superseded
   `quality-skill-corpus-workflow` branch were pruned after the behavioral port
   audit; unrelated active branches remain separate.
@@ -139,9 +136,10 @@ environment warning that `node` was unavailable to Pre-CR.
 - Combined fold verification: 133 focused tests, Ruff, formatting, Basedpyright,
   Vulture, source-size, and diff checks pass; the full suite has 687 behavioral
   passes and one network-blocked packaged-build check.
-- Scan-scope follow-up verification: 92 focused tests, Ruff, Basedpyright,
-  compileall, scoped Vulture, and diff checks pass; 732 behavioral tests pass
-  with only the unavailable-`uv` packaging test deselected.
+- Scan-scope fold verification: 734 behavioral tests, Ruff lint, fold-scoped
+  formatting, Basedpyright, Vulture, pip-audit, build, installed-wheel smoke,
+  release-smoke, review projections, and MCP discovery pass. The full format
+  command remains red only for 18 pre-existing files outside the fold.
 - Agent-instruction audit: live `git ls-remote --heads origin` confirms the
   remote branch set is `main` at `9f6c677`, `dev` at `ca2e34b`, and the current
   follow-up at `0159b3a`. The older local `codex/ci-warning-cleanup` and
