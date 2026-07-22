@@ -102,9 +102,7 @@ def test_shared_scope_includes_go_module_metadata_for_security_surface_detection
 def test_balanced_focus_keeps_dependency_manifests_in_security_scope(tmp_path: Path) -> None:
     (tmp_path / "package.json").write_text('{"name":"fixture"}\n', encoding="utf-8")
     (tmp_path / "src").mkdir()
-    (tmp_path / "src" / "changed.ts").write_text(
-        "export const changed = true;\n", encoding="utf-8"
-    )
+    (tmp_path / "src" / "changed.ts").write_text("export const changed = true;\n", encoding="utf-8")
 
     analysis = analyze_read_only_audit(
         replace(
