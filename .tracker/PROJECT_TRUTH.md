@@ -121,12 +121,12 @@ contracts, cache provenance, rollout, MCP, and release-smoke surfaces. Six
 release-documentation tests pass; the normal commit gate recorded only the
 environment warning that `node` was unavailable to Pre-CR.
 
-The environment-legibility skill candidate is review-only and lives at
+The environment-legibility candidate lives at
 `docs/skill-candidates/environment-legibility.toml`. Commit `e1a56da` adds its
 validated candidate, candidate regression test, and isolated Git configuration
-fixture. It classifies into the existing `developer-experience` pack and its
-append is currently dry-run validated; the personal corpus remains unchanged
-until explicit activation approval.
+fixture. It is activated in the existing `developer-experience` pack at
+version `0.1.1`; the personal corpus remains active with the manifest and
+active-pack list unchanged.
 
 ## Current Position
 
@@ -149,9 +149,9 @@ until explicit activation approval.
 - Scan-scope follow-up verification: 92 focused tests, Ruff, Basedpyright,
   compileall, scoped Vulture, and diff checks pass; 732 behavioral tests pass
   with only the unavailable-`uv` packaging test deselected.
-- Environment-legibility candidate verification: 26 focused candidate/skill-
-  corpus tests pass, and the full suite passes 735 tests; candidate ingest,
-  classification, and no-write append dry run all return no errors.
+- Environment-legibility activation verification: candidate ingest and
+  classification return no errors; the active `developer-experience` pack is
+  version `0.1.1` with exactly two namespaced environment-legibility entries.
 - Agent-instruction audit: live `git ls-remote --heads origin` confirms the
   remote branch set is `main` at `9f6c677`, `dev` at `ca2e34b`, and the current
   follow-up at `0159b3a`. The older local `codex/ci-warning-cleanup` and
@@ -284,9 +284,9 @@ until explicit activation approval.
   planning/worker/rollout/release routes, and cache provenance; six focused
   documentation tests pass. The subsequent live origin refresh confirms the
   pushed branch alongside `dev` and `main`.
-- 2026-07-22: `e1a56da` adds the review-only environment-legibility candidate,
-  isolates global Git configuration in tests, and validates the candidate
-  against the personal corpus without mutating it.
+- 2026-07-22: `e1a56da` adds the environment-legibility candidate and isolates
+  global Git configuration in tests; explicit activation then updated the
+  active `developer-experience` pack to `0.1.1` without changing the manifest.
 - 2026-07-21: `4b0c2ab` adds explicit bounded and full-scan inclusion
   controls, protected-path fail-closed behavior, inclusion provenance, and
   refresh/verify propagation; 732 behavioral tests pass.
