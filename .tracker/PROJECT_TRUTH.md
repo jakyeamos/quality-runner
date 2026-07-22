@@ -120,15 +120,15 @@ fold; those unrelated changes were preserved. The release surface remains
 ## Current Position
 
 - Target: a typed v2 core behind CLI, MCP, and compatibility adapters.
-- Reviewed integration: `codex/full-audit-fold-quality-runner` at `477c8c4`
+- Reviewed integration: `codex/full-audit-fold-quality-runner` at `7f7123d`
   contains the five-commit scan-scope/agent-guidance fold plus the verified
-  gate-stabilization fix; it is ready for a dev-only promotion.
-- Active follow-up: none for this fold; no new tag, registry publication, or
-  main promotion has occurred.
+  gate-stabilization and truth updates; it is promoted to canonical dev.
+- Active follow-up: release reconciliation remains separate; no new tag,
+  registry publication, or main promotion has occurred.
 - `codex/release-0.6.0` was merged by PR #5 into `main` at `c6e92cc`; `main`
   and the `v0.6.0` tag are published.
 - `dev` is the canonical integration branch, is published to `origin/dev` at
-  `ca2e34b`, and this verified fold is ready to move it forward.
+  `7f7123d`, and contains the verified scan-scope fold.
   The temporary `codex/dev-feature-port` worktree/ref and the superseded
   `quality-skill-corpus-workflow` branch were pruned after the behavioral port
   audit; unrelated active branches remain separate.
