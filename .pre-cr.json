@@ -5,10 +5,18 @@
     ".pre-cr/coverage.lcov"
   ],
   "coverageFormat": "lcov",
-  "qualityAdapters": [],
+  "qualityAdapters": [
+    {
+      "name": "environment-contract",
+      "command": "python3 scripts/check_environment_contract.py",
+      "required": true
+    }
+  ],
   "threshold": 80,
   "excludePatterns": [
+    ".agents/**",
     ".github/**",
+    "AGENTS.md",
     ".gitignore",
     ".pre-cr.json",
     ".quality-runner/**",
