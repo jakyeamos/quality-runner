@@ -125,14 +125,14 @@ occurred.
 - Target: a typed v2 core behind CLI, MCP, and compatibility adapters.
 - Reviewed integration: canonical `dev` now contains the five-commit
   scan-scope/agent-guidance fold, verified gate stabilization, and the 0.7.0
-  release-preparation metadata and formatter remediation at `90d0521`.
+  release-preparation metadata and formatter remediation at `8157057`.
 - Active follow-up: complete the self-audit review packet and external trusted
   publisher/tag/release checks; no new tag, registry publication, or `main`
   promotion has occurred.
 - `codex/release-0.6.0` was merged by PR #5 into `main` at `c6e92cc`; `main`
   and the `v0.6.0` tag are published.
 - `dev` is the canonical integration branch, is published to `origin/dev` at
-  `90d0521`, and contains the verified 0.7.0 release-preparation fold. The
+  `8157057`, and contains the verified 0.7.0 release-preparation fold. The
   release remains on hold until the self-audit review packet and external
   publication gates clear.
   The temporary `codex/dev-feature-port` worktree/ref and the superseded
@@ -150,8 +150,8 @@ occurred.
   artifact gates passed. The self-audit remains review-pending with zero high
   findings and no confirmed vulnerability.
 - Agent-instruction audit: live `git ls-remote --heads origin` confirms the
-  remote branch set is `main` at `9f6c677`, `dev` at `90d0521`, and the current
-  follow-up at `90d0521`. The older local `codex/ci-warning-cleanup` and
+  remote branch set is `main` at `9f6c677`, `dev` at `8157057`, and the current
+  follow-up at `8157057`. The older local `codex/ci-warning-cleanup` and
   `codex/qr-command-surface` refs are not additional current remote branches.
 - Public compatibility: retain `quality_evidence_contract` and
   `repo_quality_certifier` during a published transition window.
