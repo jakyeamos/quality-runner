@@ -174,6 +174,12 @@ def _usable_verification(verification: LegacyPayload | None) -> LegacyPayload | 
         for gate in gates
     ):
         return None
+    only_gate_ids = verification.get("only_gate_ids")
+    if only_gate_ids is not None and (
+        not isinstance(only_gate_ids, list)
+        or any(not isinstance(gate_id, str) or not gate_id for gate_id in only_gate_ids)
+    ):
+        return None
     if status == "passed" and not any(gate.get("status") == "passed" for gate in gates):
         return None
     if status == "failed" and not any(gate.get("status") == "failed" for gate in gates):
@@ -206,6 +212,7 @@ def _verify_confidence(
             limitations=["Gate verification artifact was unavailable."],
         )
     limitations = _unexecuted_gate_limitations(verification)
+    _append_unique(limitations, _selected_gate_limitation(verification))
     if execution.commands_executed:
         if not execution.isolated:
             limitations.append("Recorded execution did not prove disposable worktree isolation.")
@@ -255,6 +262,24 @@ def _unexecuted_gate_limitations(verification: LegacyPayload) -> list[str]:
         if limitation not in limitations:
             limitations.append(limitation)
     return limitations
+
+
+def _selected_gate_limitation(verification: LegacyPayload) -> str | None:
+    selected = verification.get("only_gate_ids")
+    if not isinstance(selected, list) or not selected:
+        return None
+    gate_ids = [gate_id for gate_id in selected if isinstance(gate_id, str)]
+    if not gate_ids:
+        return None
+    return (
+        "Verification was scoped to selected gate(s): "
+        f"{', '.join(gate_ids)}; other discovered gates were not run."
+    )
+
+
+def _append_unique(values: list[str], value: str | None) -> None:
+    if value and value not in values:
+        values.append(value)
 
 
 def _review_finding_count(payload: LegacyPayload) -> int:

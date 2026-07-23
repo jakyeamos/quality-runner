@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sys
+from collections.abc import Iterable
 from pathlib import Path
 from typing import Any
 
@@ -11,7 +12,9 @@ from quality_runner.dependency_setup import (
 from quality_runner.gate_execution import verify_gate
 from quality_runner.gate_execution_policy import (
     build_gate_execution_plan,
+    normalize_gate_ids,
     ordered_capabilities,
+    select_gate_capabilities,
     valid_gate_timeouts,
 )
 from quality_runner.gate_provenance import verification_provenance
@@ -36,6 +39,7 @@ def verify_discovered_gates(
     mutations_isolated: bool = False,
     verification_context: dict[str, Any] | None = None,
     on_partial_result: Any | None = None,
+    only_gate_ids: Iterable[str] | None = None,
 ) -> dict[str, Any]:
     if execute_discovered_gates and (
         not mutations_isolated
@@ -47,10 +51,12 @@ def verify_discovered_gates(
     passed_leaf_ids: set[str] = set()
     dependency_setup_blockers: dict[tuple[str, str], dict[str, Any]] = {}
     resolved_gate_timeouts = valid_gate_timeouts(gate_timeouts)
+    resolved_only_gate_ids = normalize_gate_ids(only_gate_ids)
+    selected_capability_map = select_gate_capabilities(capability_map, resolved_only_gate_ids)
     execution_repo = execution_root or repo_root
     execution_plan = build_gate_execution_plan(
         repo_root=execution_repo,
-        capability_map=capability_map,
+        capability_map=selected_capability_map,
         timeout_seconds=timeout_seconds,
         gate_timeouts=resolved_gate_timeouts,
         execute_discovered_gates=execute_discovered_gates,
@@ -58,7 +64,7 @@ def verify_discovered_gates(
         allow_mutating_gates=allow_mutating_gates,
         mutations_isolated=mutations_isolated,
     )
-    for capability in ordered_capabilities(capability_map):
+    for capability in ordered_capabilities(selected_capability_map):
         capability_id = str(capability.get("id") or "unknown")
         timeout = resolved_gate_timeouts.get(capability_id, timeout_seconds)
         blocked_by_setup = dependency_setup_blockers.get(
@@ -105,6 +111,7 @@ def verify_discovered_gates(
                     allow_mutating_gates=allow_mutating_gates,
                     execution_plan=execution_plan,
                     verification_context=verification_context,
+                    only_gate_ids=resolved_only_gate_ids,
                 )
             )
     return _verification_payload(
@@ -118,6 +125,7 @@ def verify_discovered_gates(
         allow_mutating_gates=allow_mutating_gates,
         execution_plan=execution_plan,
         verification_context=verification_context,
+        only_gate_ids=resolved_only_gate_ids,
     )
 
 
@@ -163,6 +171,7 @@ def _verification_payload(
     allow_mutating_gates: bool,
     execution_plan: list[dict[str, Any]],
     verification_context: dict[str, Any] | None = None,
+    only_gate_ids: tuple[str, ...] = (),
 ) -> dict[str, Any]:
     return {
         "schema": GATE_VERIFICATION_SCHEMA,
@@ -182,6 +191,7 @@ def _verification_payload(
         ),
         "execution_plan": execution_plan,
         "gates": gates,
+        "only_gate_ids": list(only_gate_ids),
         **_optional_field("verification_context", verification_context),
     }
 

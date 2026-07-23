@@ -200,6 +200,8 @@ arguments where they apply:
   Structural and code-quality overlays preserve security coverage.
 - `--checkout-most-advanced-branch`: switch to the local most-advanced branch first
 - `--skill-review-report`: merge a validated agent skill review report into findings
+- `--only-gate GATE_ID`: for `verify` and `verify-gates`, restrict execution and
+  evidence to selected discovered executable gate ids; repeat for multiple gates
 - `--json`: emit machine-readable CLI output
 
 Intent is optional. When supplied, QR writes `intent.json` and embeds the packet
@@ -375,7 +377,15 @@ through the detected package manager.
 quality-runner verify-gates /path/to/repo --run-id verify-001 --json
 quality-runner verify-gates /path/to/repo --timeout-seconds 300 --json
 quality-runner verify-gates /path/to/repo --execute-gates --worktree-mode disposable --json
+quality-runner verify-gates /path/to/repo --only-gate lint \
+  --execute-gates --worktree-mode disposable --json
 ```
+
+`--only-gate` is an execution scope, not a readiness claim. The selected ids
+must be discovered as executable gates or the command fails closed. The gate
+artifact records `only_gate_ids`, and the canonical `verify` outcome remains
+limited because other discovered gates were not run. Omit the flag to retain
+the default all-discovered-gates behavior.
 
 Repos can override individual gate timeouts in `.quality-runner.toml`:
 

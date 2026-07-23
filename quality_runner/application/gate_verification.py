@@ -205,6 +205,7 @@ def _execute_discovered_gates(
                 read_only_gates=policy.read_only_gates,
                 allow_mutating_gates=policy.allow_mutating_gates,
                 mutations_isolated=worktree_session.mutations_isolated,
+                only_gate_ids=policy.only_gate_ids,
             )
         )
         write_gate_execution_plan_v1(run_dir=run_dir, gate_execution_plan=gate_execution_plan)
@@ -220,6 +221,7 @@ def _execute_discovered_gates(
                 allow_mutating_gates=policy.allow_mutating_gates,
                 execution_root=worktree_session.execution_root,
                 mutations_isolated=worktree_session.mutations_isolated,
+                only_gate_ids=policy.only_gate_ids,
                 verification_context=verification_context,
                 on_partial_result=write_partial_gate_verification,
             )

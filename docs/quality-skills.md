@@ -104,6 +104,12 @@ The repository includes a review-only environment-legibility candidate at
 validated and classified before any personal-corpus append or repository sync;
 the candidate itself is not active by default.
 
+The environment-legibility pack is a review skill, not a command-backed gate.
+Use it with the audit workflow; do not pass `environment-legibility` to
+`--only-gate`. That selector is reserved for executable repository gates such
+as `lint` or `tests`, and rejects unknown ids instead of silently broadening
+the run.
+
 ```bash
 # Recommend existing packs.
 quality-runner skill classify /tmp/new-skill.toml \

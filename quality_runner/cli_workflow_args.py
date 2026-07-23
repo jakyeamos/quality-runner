@@ -153,4 +153,22 @@ def add_verify_arguments(parser: argparse.ArgumentParser) -> None:
         action="store_true",
         help="Allow known or suspected mutating gates to execute",
     )
+    parser.add_argument(
+        "--only-gate",
+        action="append",
+        default=[],
+        type=_non_empty_gate_id,
+        metavar="GATE_ID",
+        help=(
+            "Restrict verification to one discovered executable gate; repeat for multiple "
+            "gates. Unknown ids fail closed."
+        ),
+    )
     add_worktree_verify_arguments(parser)
+
+
+def _non_empty_gate_id(value: str) -> str:
+    normalized = value.strip()
+    if not normalized:
+        raise argparse.ArgumentTypeError("gate id must be non-empty")
+    return normalized
