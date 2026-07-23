@@ -16,124 +16,41 @@ wheel digest is `34c96cedfbe555033cfbde863e4144c13fd91510d512f1b482428d5181a3c1d
 and the source archive digest is
 `99445e86ea7fe686380f3e291d67ffbf20420f500fe6b3fb9562b5d72bdf277e`. A fresh
 PyPI install passes version, doctor, release-smoke, and MCP discovery. The
-protected
-`codex/gpt56-modernization` branch contains M0 trust-boundary work in
-`f36dcf4`, M1 typed Fresh Review contracts in `cb12746`, M2 typed read-only
-audit orchestration in `3f23204`, and M3 typed verification orchestration in
-`8705cc1`. M4 in `75d8ac4` adds the additive v2 journey-outcome contract,
-outcome-first CLI/MCP surfaces, bounded run history, and precise safety
-projections. M5 in `f5c8610` completes the two-phase Fresh Review lifecycle:
-strict packet-bound local responses, isolated combined packets, auditable
-handoffs, and truthful artifact/outcome reporting. The modernization branch
-has been merged and published. M6 began in
-`0b5ac2e`: application-owned audit, verification, and journey services now sit
-behind explicit workflow and outcome façades, with installed-wheel facade
-checks. M6 completes in `56c94d4`: packet construction and report normalization
-now have application owners, while root review façades retain their v1 type and
-direct-combined compatibility contracts. M7 is complete: `113f143` redacts
-secret-like candidate literals before they are fingerprinted or persisted, and
-`66ce3ef` locks the development toolchain while testing doctor, v2 outcomes,
-and MCP discovery from the built wheel. `32e7b26` makes CLI Fresh Review v2
-outcome-first, with an explicit stderr-noticed v1 projection through 0.7.x;
-the MCP v1 tool remains a separate compatibility surface. `633b96e` records
-candidate-aware upgrade, rollback, release, and sensitive-artifact guidance.
-`dc09ec0` proves that a default v2 Review run still persists v1-readable
-context, manifest, and report artifacts. `9fcea7d` restores legacy positional
-workflow slots, freezes the published v1 Review field shape, and re-exports the
-public `ReviewFinding` type while retaining explicit v2 next-action guidance.
-`4dee5af` shares redaction across security candidates, code-quality findings,
-and remediation excerpts so source-secret markers do not persist in those paths;
-`27deaa4` moves the helper to a neutral module to preserve the import boundary.
-`cd30948` requires release tags to be ancestors of `main`, smoke-tests default
-v2 and frozen v1 Review behavior from installed wheels, and corrects the
-release, rollback, and Homebrew guidance. M7 completes in `279cc8a`: source
-evidence redaction now covers multiline typed, concatenated, and template
-literals across code-quality, remediation excerpts, and security candidates;
-CI/release and installed-wheel tests execute the MCP v2 Review outcome.
-Independent post-M7 review found four P2 release blockers. `bf6c9e7` closes
-the source-evidence redaction bypasses for typed, commented, and expression
-assignments. `b4b5e6e` preserves the v0.1 gate schema, emits the consent-aware
-v0.2 artifact, and repairs the packaged skill and clean-install release path.
-`141635e` completes the focused source-evidence hardening with lexical context
-for private fields, malformed syntax, computed logging, and tokenless values.
-`948107f` prepares the v0.5.1 citation, changelog, upgrade guidance, and public
-README. `c71b130` adds a pinned Python dependency audit and validates untrusted
-baseline Git revisions before review-delta comparisons. Its reviewed merge,
-tag, release workflow, and published-artifact smoke checks have completed.
-`b193900` adds the release-profile readiness contract: repository and CI
-provenance, repo-local release evidence validation, aggregate command coverage,
-artifact-manifest/read-only gates, publication-boundary review triggers, CLI and
-refresh evidence overrides, and compatibility-preserving v0.5.1 wiring.
-`67bd698` completes the remaining quality workflow port: local-first self-update,
-stderr progress reporting, resolution-aware planning, domain phase candidates,
-read-only filesystem integrity, structured verification contracts, skill
-decomposition, UI quality fixtures, and starter-pack examples.
-The architecture-preserving port is now integrated and published on canonical
-`dev` as v0.6.0; its 650-test/static-analysis/release-smoke evidence remains
-attached to the port commits and the release promotion.
-The short `qr` console command is now part of the canonical dev CLI surface. It
-maps to the same `quality_runner.cli:main` entrypoint as `quality-runner`, is
-included in the v0.6.0 package, and is covered by packaged entrypoint tests.
-The isolated `codex/release-0.6.0` branch completed at `e3f5f5f`; PR #5 merged
-it into `main` at `c6e92cc`. The release-readiness contract recognizes dynamic
-`_version.py` metadata and the installed-wheel `release-smoke` CI command.
-Workflow discovery keeps the exact commands declared by CI, with 49 focused
-regression tests, green exact-head GitHub CI, a passing release profile, and
-verified PyPI publication.
-The P1 exclusion-estimation fix in `4d7f72b` and the incremental analysis/cache
-follow-ups through `dbb892f` are included in the reviewed `dev` fold. They keep
-protected and generated artifact trees out of recursive estimates, preserve
-cache-free read-only planning and authorized fresh gate execution, reuse only
-matching current-refresh analysis, and preserve controller deadlines through
-Git and manifest discovery. The recorded Tenure dogfood completed in 190.647
-seconds with 886 cache hits, zero misses/recomputations, all 11 gates skipped
-for missing consent, and no timeout; Tenure source status remained clean.
+protected `codex/gpt56-modernization` branch contains the typed v2 trust-boundary,
+Fresh Review, audit, verification, and journey work through `8705cc1`; M7
+redaction and release hardening complete in `279cc8a`. `c71b130` adds the
+pinned dependency audit and untrusted baseline validation. `b193900` adds the
+release-profile readiness contract, and `67bd698` completes the remaining
+quality workflow port. The architecture-preserving port is integrated and
+published on canonical `dev` as v0.6.0; its evidence remains attached to the
+port commits and release promotion.
 
-The reviewed `codex/dev-fold-qr-adaptive-timeouts` integration at `49c3dda`
-folds the local, identity-bound refresh timeout calibration from `0bc7d37`
-without changing the published release surface.
+The short `qr` console command is part of the canonical dev CLI surface and
+the published 0.6.0 package. The reviewed `codex/dev-fold-qr-adaptive-timeouts`
+integration at `49c3dda` folds local timeout calibration without changing the
+published release surface. The scoped `codex/qr-flexible-scan-scope` follow-up
+at `4b0c2ab` makes scan scope agent-selectable and keeps protected runtime and
+artifact paths fail-closed. Commit `0de7d75` adds fail-closed `--only-gate`
+selection and carries selected gate IDs through verification, outcomes, and
+workflow preflight. Its 73 focused tests, Ruff, Basedpyright, changed-file
+formatting, Vulture, release-smoke, source build, and installed-wheel smoke
+pass. The full suite recorded 738 passes and one network-blocked packaged
+console-script test; that exact test passed under the approved network path.
+No tag, registry, or published artifact changed.
 
-The follow-up branch `codex/qr-command-surface-quality-runner` at `9107285`
-makes `qr` the canonical human-facing console command while retaining
-`quality-runner` as a compatibility alias. Root help, README quickstart, and
-CLI reference lead with audit, review, verify, runs, and doctor; both scripts
-render their invocation name for help/no-argument guidance and preserve the
-existing version and JSON contracts. No tags, registries, or published
-artifacts were changed.
-
-The short `qr` console command shipped in `fe48b25`. It points to the same CLI
-entrypoint as `quality-runner`, so a one-time editable install from this
-checkout gives local consumers a stable command surface that follows the
-checkout's current code without repeated `--project` invocations or GitHub
-fetches.
-
-The scoped `codex/qr-flexible-scan-scope` follow-up at `4b0c2ab` makes scan
-scope agent-selectable: `--include-path` reopens a bounded path and
-`--include-ignored-path` preserves the rest of the scan while reopening a
-normally excluded repository-owned file. Shared scanning, verify-gates,
-refresh propagation, and scan artifacts record `scan_inclusions`; protected
-runtime and artifact paths remain fail-closed. The full repository suite passes
-732 tests; the packaged `uv` entrypoint check remains unavailable in this shell.
-The follow-up agent-instruction audit at `3952a54` aligns the detailed guide and
-packaged skill with the canonical `qr` journeys, v2 outcomes, Fresh Review,
-explicit scan scope, controller and worker routing, phase and delivery
-contracts, cache provenance, rollout, MCP, and release-smoke surfaces. Six
-release-documentation tests pass; the normal commit gate recorded only the
-environment warning that `node` was unavailable to Pre-CR.
-
-The environment-legibility candidate lives at
-`docs/skill-candidates/environment-legibility.toml`. Commit `e1a56da` adds its
-validated candidate, candidate regression test, and isolated Git configuration
-fixture. It is activated in the existing `developer-experience` pack at
-version `0.1.1`; the personal corpus remains active with the manifest and
-active-pack list unchanged.
+The follow-up agent-instruction audit at `3952a54` aligns the detailed guide
+and packaged skill with current `qr` journeys, v2 outcomes, scan-scope,
+review/gate/planning/worker/rollout/release routes, and cache provenance. The
+environment-legibility candidate at `e1a56da` is activated in the existing
+`developer-experience` pack at version `0.1.1`; the personal corpus remains
+active with the manifest and active-pack list unchanged.
 
 ## Current Position
 
 - Target: a typed v2 core behind CLI, MCP, and compatibility adapters.
 - Reviewed integration: `a66850d` combines the adaptive timeout and incremental
   analysis/artifact folds and is ready as the promoted `dev` tip.
-- Active follow-up: `codex/qr-flexible-scan-scope` at `e1a56da`; no merge,
+- Active follow-up: `codex/qr-flexible-scan-scope` at `0de7d75`; no merge,
   publish, tag, or registry change has occurred.
 - `codex/release-0.6.0` was merged by PR #5 into `main` at `c6e92cc`; `main`
   and the `v0.6.0` tag are published.
@@ -152,6 +69,10 @@ active-pack list unchanged.
 - Environment-legibility activation verification: candidate ingest and
   classification return no errors; the active `developer-experience` pack is
   version `0.1.1` with exactly two namespaced environment-legibility entries.
+- Selected-gate verification: 73 focused tests, Ruff, Basedpyright,
+  changed-file formatting, Vulture, release-smoke, source build, and isolated
+  wheel smoke pass; the full-suite packaging failure was reproduced as a
+  network-only issue and passed when rerun with network access.
 - Agent-instruction audit: live `git ls-remote --heads origin` confirms the
   remote branch set is `main` at `9f6c677`, `dev` at `ca2e34b`, and the current
   follow-up at `0159b3a`. The older local `codex/ci-warning-cleanup` and
@@ -278,7 +199,9 @@ active-pack list unchanged.
   was used.
 
 ## Recent Progress
-
+- 2026-07-22: `0de7d75` adds fail-closed `--only-gate` selection and carries
+  selected gate IDs through verification, outcomes, and workflow preflight;
+  focused/static/package checks pass and the branch remains unmerged.
 - 2026-07-21: `3952a54` aligns the detailed agent guide and packaged skill
   with current `qr` journeys, v2 outcomes, scan-scope controls, review/gate/
   planning/worker/rollout/release routes, and cache provenance; six focused
@@ -319,10 +242,3 @@ active-pack list unchanged.
 - 2026-07-17: Folded the short `qr` console command into the canonical `dev`
   line from `codex/qr-command-surface-main`; focused entrypoint tests, Ruff,
   formatting, and diff checks pass. No version bump or release tag was made.
-- 2026-07-17: `67bd698` completes the remaining quality workflow port with
-  local self-update, progress, resolution-aware planning, phase candidates,
-  read-only integrity, verification contracts, skill decomposition, UI quality,
-  starter packs, and 650 passing tests.
-- 2026-07-17: canonical `dev` receives the architecture-preserving port and is
-  published to `origin/dev`; the completed port branch and superseded source
-  branch are pruned, while unrelated active branches remain untouched.
