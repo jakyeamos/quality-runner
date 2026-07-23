@@ -129,6 +129,11 @@ occurred.
 - Active follow-up: complete the self-audit review packet and external trusted
   publisher/tag/release checks; no new tag, registry publication, or `main`
   promotion has occurred.
+- Environment-legibility remediation: the clean
+  `codex/full-audit-fold-quality-runner` candidate at `a387a51` now has a
+  compact agent router, eight routed context packets, executable freshness and
+  safety checks, a required Pre-CR adapter, and CI validation. It remains a
+  reviewable fold candidate; no published release surface changed.
 - `codex/release-0.6.0` was merged by PR #5 into `main` at `c6e92cc`; `main`
   and the `v0.6.0` tag are published.
 - `dev` is the canonical integration branch, is published to `origin/dev` at
@@ -317,6 +322,8 @@ occurred.
   local self-update, progress, resolution-aware planning, phase candidates,
   read-only integrity, verification contracts, skill decomposition, UI quality,
   starter packs, and 650 passing tests.
-- 2026-07-17: canonical `dev` receives the architecture-preserving port and is
-  published to `origin/dev`; the completed port branch and superseded source
-  branch are pruned, while unrelated active branches remain untouched.
+- 2026-07-22: `a387a51` adds the repository environment contract; 739 tests,
+  Ruff lint/format, BasedPyright, Vulture, pip-audit, package build, and the
+  environment-aware Pre-CR gate pass. The build required authorized network
+  access to resolve `setuptools`; no target repository or publication surface
+  changed.
