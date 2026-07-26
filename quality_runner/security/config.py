@@ -43,7 +43,9 @@ def security_settings(config: dict[str, Any]) -> dict[str, Any]:
         or list(DEFAULT_REQUIRED_SECURITY_CAPABILITIES),
         "disabled_rule_groups": _string_list(disabled_groups),
         "minimum_agent_review": minimum_agent_review,
-        "owner_role": owner_role if isinstance(owner_role, str) and owner_role else "security-maintainer",
+        "owner_role": owner_role
+        if isinstance(owner_role, str) and owner_role
+        else "security-maintainer",
         "configured": True,
     }
 

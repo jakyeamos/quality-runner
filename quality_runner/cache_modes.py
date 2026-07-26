@@ -50,7 +50,9 @@ def cache_directory(
         return root / ".quality-runner" / "cache" / component
     if mode == "external":
         external_root = (
-            cache_root.expanduser().resolve() if cache_root is not None else default_external_cache_root()
+            cache_root.expanduser().resolve()
+            if cache_root is not None
+            else default_external_cache_root()
         )
         return external_root / cache_namespace(root) / component
     return root / ".quality-runner" / "cache" / component

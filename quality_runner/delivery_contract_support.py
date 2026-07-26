@@ -81,8 +81,10 @@ def obligation_covered(obligation: dict[str, Any], plan: str) -> bool:
     if isinstance(obligation_id, str) and obligation_id in plan:
         return True
     scope = obligation.get("scope")
-    return isinstance(scope, list) and bool(scope) and all(
-        isinstance(path, str) and path in plan for path in scope
+    return (
+        isinstance(scope, list)
+        and bool(scope)
+        and all(isinstance(path, str) and path in plan for path in scope)
     )
 
 
@@ -138,11 +140,17 @@ def dict_value(value: object) -> dict[str, Any]:
 
 
 def list_of_dicts(value: object) -> list[dict[str, Any]]:
-    return [dict(item) for item in value if isinstance(item, dict)] if isinstance(value, list) else []
+    return (
+        [dict(item) for item in value if isinstance(item, dict)] if isinstance(value, list) else []
+    )
 
 
 def string_list(value: object) -> list[str]:
-    return [item for item in value if isinstance(item, str) and item] if isinstance(value, list) else []
+    return (
+        [item for item in value if isinstance(item, str) and item]
+        if isinstance(value, list)
+        else []
+    )
 
 
 def optional_string(value: object) -> str | None:
@@ -150,7 +158,9 @@ def optional_string(value: object) -> str | None:
 
 
 def value_hash(value: object) -> str:
-    payload = json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"), default=str)
+    payload = json.dumps(
+        value, ensure_ascii=False, sort_keys=True, separators=(",", ":"), default=str
+    )
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 

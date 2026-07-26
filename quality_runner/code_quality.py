@@ -101,7 +101,9 @@ def create_code_quality_scan(
     scanned_files: list[dict[str, Any]] = []
 
     if scope.files:
-        source_items = [(file_info.path, file_info.text, file_info.lines) for file_info in scope.files]
+        source_items = [
+            (file_info.path, file_info.text, file_info.lines) for file_info in scope.files
+        ]
     else:
         source_items = [(relative_path, "", []) for relative_path in scope.file_paths]
     for relative_path, source_text, source_lines in source_items:
@@ -256,7 +258,9 @@ def create_code_quality_scan(
         "coverage": "partial" if deferred_checks else "full",
         "deferred_checks": deferred_checks,
         "analysis_cache": analysis_cache.evidence(
-            considered_files=len(scope.file_paths or tuple(file_info.path for file_info in scope.files))
+            considered_files=len(
+                scope.file_paths or tuple(file_info.path for file_info in scope.files)
+            )
         ),
     }
 
@@ -270,7 +274,7 @@ def _analyze_code_quality_file(
     disabled_groups: set[str],
     large_file_lines: int,
     fat_router_lines: int,
-    ) -> dict[str, object]:
+) -> dict[str, object]:
     lines = source_analysis_cache.redacted_lines_for_source(
         source_text=source_text,
         source_lines=source_lines,

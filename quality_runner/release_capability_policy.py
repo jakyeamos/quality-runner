@@ -42,4 +42,6 @@ def required_by(
 ) -> dict[str, str] | None:
     if profile != "release":
         return None
-    return {capability_id: "profile" for capability_id in script_capabilities} | {"pre_cr": "profile"}
+    return {capability_id: "profile" for capability_id in script_capabilities} | {
+        "pre_cr": "profile"
+    }

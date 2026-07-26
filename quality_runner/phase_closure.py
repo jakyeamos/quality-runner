@@ -37,7 +37,8 @@ def build_phase_closure(
     dispositions = {
         fingerprint: status
         for fingerprint in [*new, *persisted]
-        if (status := statuses.get(fingerprint)) in {"accepted-false-positive", "accepted-intentional"}
+        if (status := statuses.get(fingerprint))
+        in {"accepted-false-positive", "accepted-intentional"}
     }
     actionable = [
         fingerprint
@@ -46,8 +47,7 @@ def build_phase_closure(
         or fingerprint not in dispositions
     ]
     ownership = {
-        fingerprint: finding_owner(fingerprint, contract)
-        for fingerprint in [*new, *persisted]
+        fingerprint: finding_owner(fingerprint, contract) for fingerprint in [*new, *persisted]
     }
     unmapped = sorted(
         fingerprint for fingerprint, owner in ownership.items() if not owner["mapped"]
@@ -74,8 +74,12 @@ def build_phase_closure(
             "persisted": [
                 _ref(current[item], ownership[item], statuses.get(item)) for item in persisted
             ],
-            "resolved": [_ref(baseline[item], finding_owner(item, contract), None) for item in resolved],
-            "out_of_scope": [_ref(current[item], finding_owner(item, contract), None) for item in out_of_scope],
+            "resolved": [
+                _ref(baseline[item], finding_owner(item, contract), None) for item in resolved
+            ],
+            "out_of_scope": [
+                _ref(current[item], finding_owner(item, contract), None) for item in out_of_scope
+            ],
         },
         "counts": {
             "new": len(new),
@@ -140,7 +144,9 @@ def render_phase_closure(payload: dict[str, Any]) -> str:
     lines.extend(f"- {key}: {value}" for key, value in counts.items())
     lines.extend(["", "## Blockers", ""])
     blockers = payload.get("blockers")
-    lines.extend(f"- {item}" for item in blockers if isinstance(item, str)) if blockers else lines.append("- None")
+    lines.extend(
+        f"- {item}" for item in blockers if isinstance(item, str)
+    ) if blockers else lines.append("- None")
     lines.extend(["", "## Early refresh", ""])
     early = payload.get("early_refresh", {})
     lines.append(f"- Recommended: `{early.get('recommended', False)}`")
@@ -151,7 +157,9 @@ def render_phase_closure(payload: dict[str, Any]) -> str:
 
 def _findings(payload: dict[str, Any]) -> list[dict[str, Any]]:
     findings = payload.get("findings")
-    return [item for item in findings if isinstance(item, dict)] if isinstance(findings, list) else []
+    return (
+        [item for item in findings if isinstance(item, dict)] if isinstance(findings, list) else []
+    )
 
 
 def _index(findings: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
@@ -162,7 +170,10 @@ def _fingerprint(finding: dict[str, Any]) -> str:
     value = finding.get("fingerprint")
     if isinstance(value, str) and value:
         return value
-    stable = {key: finding.get(key) for key in ("id", "rule_id", "category", "file", "summary", "evidence")}
+    stable = {
+        key: finding.get(key)
+        for key in ("id", "rule_id", "category", "file", "summary", "evidence")
+    }
     return hashlib.sha256(json.dumps(stable, sort_keys=True, default=str).encode()).hexdigest()
 
 
