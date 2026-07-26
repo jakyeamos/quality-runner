@@ -266,7 +266,16 @@ def _build_summary(
     priority_counts: dict[str, int] = {}
     dynamic_counts = {
         key: 0
-        for key in ("selected", "reused", "passed", "failed", "blocked", "timeout", "unknown")
+        for key in (
+            "selected",
+            "reused",
+            "passed",
+            "failed",
+            "blocked",
+            "unavailable",
+            "timeout",
+            "unknown",
+        )
     }
     unresolved: list[str] = []
     for result in repositories:
@@ -294,6 +303,8 @@ def _build_summary(
                 dynamic_counts["failed"] += 1
             elif state == "blocked":
                 dynamic_counts["blocked"] += 1
+            elif state == "unavailable":
+                dynamic_counts["unavailable"] += 1
             elif state == "timeout":
                 dynamic_counts["timeout"] += 1
             elif state == "unknown":
@@ -320,6 +331,7 @@ def _build_summary(
         "dynamic_passed": dynamic_counts["passed"],
         "dynamic_failed": dynamic_counts["failed"],
         "dynamic_blocked": dynamic_counts["blocked"],
+        "dynamic_unavailable": dynamic_counts["unavailable"],
         "dynamic_timeout": dynamic_counts["timeout"],
         "mean_maturity": round(sum(all_scores) / len(all_scores), 3) if all_scores else None,
         "dimension_means": means,

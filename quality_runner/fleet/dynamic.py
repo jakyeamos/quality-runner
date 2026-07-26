@@ -144,10 +144,22 @@ def _execute_dynamic(
         result["source_integrity_before"] = before
         return result
     setup = _git_command(source, "worktree", "add", "--detach", str(worktree), head, timeout=30)
-    if setup["returncode"] != 0:
+    if setup["returncode"] != 0 or not worktree.is_dir():
+        cleanup = _git_command(source, "worktree", "remove", "--force", str(worktree), timeout=30)
         result["status"] = "blocked"
-        result["reason"] = redact_text(setup["stderr"] or setup["stdout"], root=source)[:500]
+        result["reason"] = (
+            redact_text(setup["stderr"] or setup["stdout"], root=source)[:500]
+            if setup["returncode"] != 0
+            else "git worktree add reported success but the disposable directory is unavailable"
+        )
+        result["cleanup"] = {
+            "status": "passed" if cleanup["returncode"] == 0 else "failed",
+            "returncode": cleanup["returncode"],
+        }
         result["source_integrity_before"] = before
+        after = checkout_fingerprint(source)
+        result["source_integrity_after"] = after
+        result["source_unchanged"] = before == after
         return result
     try:
         statuses: list[str] = []
@@ -168,6 +180,8 @@ def _execute_dynamic(
             result["status"] = "timeout"
         elif "blocked" in statuses:
             result["status"] = "blocked"
+        elif "unavailable" in statuses:
+            result["status"] = "unavailable"
         elif "failed" in statuses:
             result["status"] = "failed"
         elif statuses and all(status == "passed" for status in statuses):
@@ -207,6 +221,14 @@ def _run_dynamic_command(
             "command_hash": hash_text(command_text),
             "stdout_length": len(str(error.output or "")),
             "stderr_length": len(str(error.stderr or "")),
+        }
+    except OSError as error:
+        return {
+            "command_id": command.get("id"),
+            "capability": command.get("id"),
+            "status": "unavailable",
+            "reason": redact_text(str(error), root=worktree)[:500],
+            "command_hash": hash_text(command_text),
         }
     stdout = str(result.get("stdout", ""))
     stderr = str(result.get("stderr", ""))

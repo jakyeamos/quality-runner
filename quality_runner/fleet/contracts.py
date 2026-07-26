@@ -115,6 +115,7 @@ def public_projection(payload: dict[str, Any]) -> dict[str, Any]:
         "dynamic_passed",
         "dynamic_failed",
         "dynamic_blocked",
+        "dynamic_unavailable",
         "mean_maturity",
         "dimension_means",
         "finding_counts",
