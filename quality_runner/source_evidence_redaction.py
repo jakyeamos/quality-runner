@@ -43,6 +43,7 @@ _LEGACY_EVIDENCE_PATTERNS = tuple(
     re.compile(pattern)
     for pattern in (SECRET_ASSIGNMENT_PATTERN, SECRET_FALLBACK_PATTERN, SECRET_LOG_PATTERN)
 )
+_FALLBACK_OPERATOR_PATTERN = re.compile(r"\?\?|\|\|")
 _VALUE_TOKEN_KINDS = frozenset({"string", "comment", "regex"})
 _CONTINUATION_END = frozenset("=+-*/%?&|,.:([{\\")
 _CONTINUATION_START = frozenset("+-*/%?&|,.:([{")
@@ -127,15 +128,12 @@ def _assignment_spans(lexed: LexedSource) -> list[_SourceSpan]:
 
 
 def _fallback_spans(lexed: LexedSource) -> list[_SourceSpan]:
-    spans: list[_SourceSpan] = []
-    index = 0
-    while index < len(lexed.code) - 1:
-        if lexed.code.startswith(("??", "||"), index):
-            spans.append(_span_for_value(lexed, "fallback", index, index + 2, 12))
-            index += 2
-        else:
-            index += 1
-    return _dedupe_spans(spans)
+    return _dedupe_spans(
+        [
+            _span_for_value(lexed, "fallback", match.start(), match.end(), 12)
+            for match in _FALLBACK_OPERATOR_PATTERN.finditer(lexed.code)
+        ]
+    )
 
 
 def _assignment_operator_after_name(lexed: LexedSource, name_start: int, start: int) -> int | None:

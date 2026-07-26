@@ -501,6 +501,7 @@ def test_source_redaction_preserves_input_cardinality_and_log_redaction() -> Non
 
 
 def test_malformed_log_contexts_do_not_rescan_the_remaining_source() -> None:
+    import sys
     from time import perf_counter
 
     from quality_runner.evidence_redaction import redact_secret_like_source_lines
@@ -515,7 +516,8 @@ def test_malformed_log_contexts_do_not_rescan_the_remaining_source() -> None:
         ]
     )
 
-    assert perf_counter() - started < 1
+    performance_budget_seconds = 5 if sys.gettrace() is not None else 1
+    assert perf_counter() - started < performance_budget_seconds
 
 
 def test_source_redaction_fails_closed_for_adversarial_lexer_contexts(tmp_path: Path) -> None:
