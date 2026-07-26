@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import json
+import math
 import subprocess
 from datetime import date
 from pathlib import Path
@@ -39,6 +40,7 @@ REQUIRED_COMMANDS = (
     "uv build",
     "python3 scripts/check_environment_contract.py",
 )
+MIN_HOOK_TIMEOUT_SECONDS = 360
 REVIEW_RE = r"last_reviewed:\s*(\d{4}-\d{2}-\d{2})"
 SECRET_NAMES = {
     ".env",
@@ -126,6 +128,17 @@ def validate(root: Path) -> list[str]:
     else:
         missing = [command for command in REQUIRED_COMMANDS if command not in commands]
         errors.extend(f"missing quality command: {command}" for command in missing)
+    hook_timeout = pre_cr.get("hookTimeoutSeconds")
+    if (
+        isinstance(hook_timeout, bool)
+        or not isinstance(hook_timeout, (int, float))
+        or not math.isfinite(float(hook_timeout))
+        or hook_timeout < MIN_HOOK_TIMEOUT_SECONDS
+    ):
+        errors.append(
+            ".pre-cr.json hookTimeoutSeconds must be at least "
+            f"{MIN_HOOK_TIMEOUT_SECONDS} for the traced test contract"
+        )
     adapters = pre_cr.get("qualityAdapters", [])
     environment_adapter = next(
         (

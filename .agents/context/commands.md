@@ -26,6 +26,10 @@ expected to report `no-changes` on an unchanged checkout; it is not a
 replacement for the full ladder above. CI and release workflows are the
 authoritative remote declarations of the same gates.
 
+The repository commit hook uses `hookTimeoutSeconds: 360` in `.pre-cr.json`.
+This budget covers the traced changed-line runner on this repository; lower it
+only after a measured replacement run establishes a smaller safe bound.
+
 Quality commands must be bounded and offline-capable. They must not publish,
 deploy, tag, push, call a provider, collect credentials, or execute a
 remediation action. If a dependency cache, tool, or gate is unavailable, keep

@@ -12,7 +12,7 @@ def test_current_repository_environment_contract_passes() -> None:
     assert validate(root) == []
 
 
-def test_environment_contract_requires_quality_adapter(tmp_path: Path) -> None:
+def test_environment_contract_requires_quality_adapter_and_safe_timeout(tmp_path: Path) -> None:
     root = Path(__file__).resolve().parents[1]
     for relative_path in (
         "AGENTS.md",
@@ -45,11 +45,16 @@ def test_environment_contract_requires_quality_adapter(tmp_path: Path) -> None:
         )
     config = json.loads((root / ".pre-cr.json").read_text(encoding="utf-8"))
     config["qualityAdapters"] = []
+    config["hookTimeoutSeconds"] = 90
     (tmp_path / ".pre-cr.json").write_text(json.dumps(config), encoding="utf-8")
 
     errors = validate(tmp_path)
 
     assert "required environment-contract quality adapter is missing" in errors
+    assert (
+        ".pre-cr.json hookTimeoutSeconds must be at least 360 for the traced test contract"
+        in errors
+    )
 
 
 def test_secret_path_helper_rejects_sensitive_names() -> None:
