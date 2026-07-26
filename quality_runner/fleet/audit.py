@@ -303,6 +303,7 @@ def _build_summary(
         dimension: round(sum(scores) / len(scores), 3) if scores else None
         for dimension, scores in sorted(dimension_scores.items())
     }
+    stable_repositories = sorted(repositories, key=lambda item: str(item.get("repo_id", "")))
     return {
         "schema": "quality-runner-fleet-summary-v0.1",
         "status": "completed",
@@ -342,8 +343,10 @@ def _build_summary(
             {
                 "audit_id": audit_id,
                 "as_of": as_of,
-                "repositories": [item.get("static_provenance_hash") for item in repositories],
-                "dynamic": [item.get("dynamic") for item in repositories],
+                "repositories": [
+                    item.get("static_provenance_hash") for item in stable_repositories
+                ],
+                "dynamic": [item.get("dynamic") for item in stable_repositories],
             }
         ),
     }

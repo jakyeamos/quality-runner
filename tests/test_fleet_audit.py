@@ -116,6 +116,25 @@ def test_dynamic_audit_uses_disposable_worktree_and_replays(tmp_path: Path) -> N
     assert second["summary"]["dynamic_reused"] == 1
 
 
+def test_fleet_replay_is_deterministic_for_multiple_repositories(tmp_path: Path) -> None:
+    projects = tmp_path / "projects"
+    _init_repo(projects / "alpha")
+    _init_repo(projects / "beta")
+    output = tmp_path / "fleet-output"
+
+    first = fleet_audit_payload(
+        projects_root=projects,
+        output_dir=output,
+        as_of="2026-07-26T17:00:00+00:00",
+    )
+
+    assert first["summary"]["repository_count"] == 2
+    replay = fleet_replay_payload(output_dir=Path(first["artifact_root"]))
+
+    assert replay["status"] == "passed"
+    assert replay["deterministic"] is True
+
+
 def test_public_report_contains_aggregates_only(tmp_path: Path) -> None:
     projects = tmp_path / "projects"
     root = projects / "fixture"
