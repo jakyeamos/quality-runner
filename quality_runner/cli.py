@@ -23,6 +23,7 @@ from quality_runner.cli_payload import payload_for_args
 from quality_runner.cli_phase import add_phase_commands
 from quality_runner.cli_planning import add_planning_commands
 from quality_runner.cli_remediation import add_remediation_commands
+from quality_runner.cli_repo_hygiene import add_repo_hygiene_commands
 from quality_runner.cli_review import add_review_command
 from quality_runner.cli_rollout import add_rollout_command
 from quality_runner.cli_skills import add_skill_commands
@@ -61,7 +62,7 @@ Compatibility commands remain available:
 
 Advanced operations:
   refresh, rollout, gate, controller-report, skill, proposal, remediation,
-  plan, phase, release-smoke, and worker handoff tools
+  plan, phase, repo-hygiene, release-smoke, and worker handoff tools
 
 Run '{program_name} <command> --help' for options. Audit, review, verify, and
 runs emit a compact outcome card by default and v2 JSON with --json. Use
@@ -299,6 +300,7 @@ def build_parser(prog: str = CANONICAL_PROGRAM) -> argparse.ArgumentParser:
     add_fix_proposal_command(subparsers)
 
     add_artifact_commands(subparsers)
+    add_repo_hygiene_commands(subparsers)
 
     add_handoff_commands(subparsers)
 
@@ -401,6 +403,8 @@ def main(argv: list[str] | None = None) -> int:
     if parsed.command == "self-update" and payload.get("status") in {"blocked", "failed"}:
         return 1
     if parsed.command == "plan" and payload.get("status") == "blocked":
+        return 1
+    if parsed.command == "repo-hygiene" and payload.get("status") in {"fail", "blocked"}:
         return 1
     return 0
 

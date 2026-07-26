@@ -119,7 +119,7 @@ def load_repo_config(repo_root: Path) -> dict[str, Any]:
         payload["security"] = security
     if skills:
         payload["skills"] = skills
-    if artifacts:
+    if artifacts or "artifacts" in section:
         payload["artifacts"] = artifacts
     if readiness:
         payload["readiness"] = readiness

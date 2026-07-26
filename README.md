@@ -101,6 +101,7 @@ qr audit /path/to/repo --run-id baseline-001 --json
 qr review /path/to/repo --mode blind --json
 qr verify /path/to/repo --run-id baseline-001-verify --json
 qr runs /path/to/repo --json
+qr repo-hygiene check /path/to/repo --json
 ```
 
 `audit` creates evidence and a remediation plan without editing source files.
@@ -124,6 +125,17 @@ qr verify /path/to/repo \
 Disposable execution protects the ordinary source checkout from normal gate
 mutations; it is not a sandbox for arbitrary commands. See the
 [CLI Reference](docs/cli.md) for the full execution and dirty-worktree contract.
+
+`repo-hygiene check` emits the versioned `repo-hygiene-v1` contract. It detects
+tracked confirmed generated output, missing ignore coverage, JavaScript package
+manager conflicts, clear workspace candidates, CI coverage, and ownership
+blocks. It deliberately preserves ambiguous `build/` and `data/` paths unless
+stronger generated-file evidence exists. `repo-hygiene apply --apply` is the
+only command that can add confirmed ignore rules, and it fails closed for dirty,
+recent, or multi-worktree repositories. Repositories with their own CI can
+call `.github/workflows/repo-hygiene-reusable.yml` by exact Quality Runner
+commit SHA and pass that same SHA as `quality-runner-ref`; repositories without
+CI remain covered by the central projects sweep.
 
 Legacy `inspect`, `run`, `verify-gates`, `status`, and orchestration commands
 remain available for compatibility. Use `refresh` when a controller needs its

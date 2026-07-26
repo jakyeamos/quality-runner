@@ -32,6 +32,7 @@ from quality_runner.cli_phase import phase_command_payload
 from quality_runner.cli_planning import planning_command_payload
 from quality_runner.cli_refresh import refresh_command_payload
 from quality_runner.cli_remediation import remediation_delta_command_payload
+from quality_runner.cli_repo_hygiene import repo_hygiene_payload
 from quality_runner.cli_review import review_command_payload
 from quality_runner.cli_rollout import rollout_command_payload
 from quality_runner.cli_skills import skill_command_payload
@@ -313,7 +314,10 @@ def payload_for_args(
         return prune_artifacts_payload(
             repo_root=_validated_repo_path(args.repo_path),
             apply=args.apply,
+            preserve_run_ids=set(args.preserve_run_id),
         )
+    if args.command == "repo-hygiene":
+        return repo_hygiene_payload(args, validated_repo_path=_validated_repo_path)
     raise ValueError(f"unsupported command: {args.command}")
 
 
