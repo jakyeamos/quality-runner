@@ -419,16 +419,26 @@ def _repo_hygiene_config(root: Path) -> dict[str, Any]:
 
 
 def _configured_exceptions(config: dict[str, Any]) -> list[dict[str, Any]]:
-    reason = config.get("pnpm_version_exception")
-    if not isinstance(reason, str) or not reason.strip():
-        return []
-    return [
-        {
-            "code": "pnpm-version-exception",
-            "reason": reason.strip(),
-            "source": ".quality-runner.toml",
-        }
-    ]
+    exceptions: list[dict[str, Any]] = []
+    version_reason = config.get("pnpm_version_exception")
+    if isinstance(version_reason, str) and version_reason.strip():
+        exceptions.append(
+            {
+                "code": "pnpm-version-exception",
+                "reason": version_reason.strip(),
+                "source": ".quality-runner.toml",
+            }
+        )
+    package_manager_reason = config.get("package_manager_exception")
+    if isinstance(package_manager_reason, str) and package_manager_reason.strip():
+        exceptions.append(
+            {
+                "code": "package-manager-exception",
+                "reason": package_manager_reason.strip(),
+                "source": ".quality-runner.toml",
+            }
+        )
+    return exceptions
 
 
 def _string_list(value: object) -> list[str]:

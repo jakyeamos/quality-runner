@@ -74,6 +74,12 @@ def _package_manager_state(
     pnpm_lock = "pnpm-lock.yaml" in lockfiles
     manager_name, manager_version = _parse_package_manager(package_values)
     version_exception = config.get("pnpm_version_exception")
+    package_manager_exception = config.get("package_manager_exception")
+    package_manager_exception = (
+        package_manager_exception.strip()
+        if isinstance(package_manager_exception, str) and package_manager_exception.strip()
+        else None
+    )
     violations: list[dict[str, Any]] = []
     violations.extend(
         {
@@ -86,6 +92,8 @@ def _package_manager_state(
     )
     if not applicable:
         manager_status = "not_applicable"
+    elif package_manager_exception is not None:
+        manager_status = "exception"
     else:
         if not pnpm_lock:
             violations.append(
@@ -139,6 +147,7 @@ def _package_manager_state(
         "lockfiles": lockfiles,
         "pnpm_lockfile": pnpm_lock,
         "version_exception": version_exception if isinstance(version_exception, str) else None,
+        "package_manager_exception": package_manager_exception,
         "violations": violations,
         "workspace": workspace,
     }

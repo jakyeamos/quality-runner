@@ -94,6 +94,27 @@ def test_pnpm_state_detects_conflicts_and_accepts_explicit_exception(tmp_path: P
     } <= codes
 
 
+def test_package_manager_exception_preserves_fixture_lockfile_diversity(tmp_path: Path) -> None:
+    _git(tmp_path, "init", "-q")
+    (tmp_path / "package.json").write_text(
+        json.dumps({"name": "fixture", "packageManager": "npm@10.0.0"}) + "\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "package-lock.json").write_text("{}\n", encoding="utf-8")
+    (tmp_path / ".quality-runner.toml").write_text(
+        "[quality_runner.repo_hygiene]\n"
+        'package_manager_exception = "Fixture corpus intentionally preserves upstream lockfiles."\n',
+        encoding="utf-8",
+    )
+    _commit(tmp_path)
+
+    report = check_repo_hygiene(tmp_path)
+
+    assert report["package_manager"]["status"] == "exception"
+    assert report["package_manager"]["violations"] == []
+    assert any(item["code"] == "package-manager-exception" for item in report["exceptions"])
+
+
 def test_pnpm_workspace_candidate_is_reported_but_not_created(tmp_path: Path) -> None:
     _git(tmp_path, "init", "-q")
     (tmp_path / "package.json").write_text(

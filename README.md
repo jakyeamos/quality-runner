@@ -135,7 +135,10 @@ only command that can add confirmed ignore rules, and it fails closed for dirty,
 recent, or multi-worktree repositories. Repositories with their own CI can
 call `.github/workflows/repo-hygiene-reusable.yml` by exact Quality Runner
 commit SHA and pass that same SHA as `quality-runner-ref`; repositories without
-CI remain covered by the central projects sweep.
+CI remain covered by the central projects sweep. A repository that intentionally
+preserves fixture or upstream package-manager diversity may document
+`[quality_runner.repo_hygiene] package_manager_exception = "..."`; the result
+is an explicit exception rather than a blind lockfile migration.
 
 Legacy `inspect`, `run`, `verify-gates`, `status`, and orchestration commands
 remain available for compatibility. Use `refresh` when a controller needs its
