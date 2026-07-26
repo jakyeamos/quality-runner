@@ -594,15 +594,12 @@ def test_verify_gates_skips_ci_only_pseudo_gates(tmp_path: Path) -> None:
 def test_verify_gates_does_not_block_on_file_evidence_capabilities(tmp_path: Path) -> None:
     from quality_runner.workflow import verify_gates_payload
 
-    tracker = tmp_path / ".tracker"
-    tracker.mkdir()
-    (tracker / "PROJECT_TRUTH.md").write_text("# Truth\n", encoding="utf-8")
     (tmp_path / "package.json").write_text(
         json.dumps({"scripts": {"test": f"{sys.executable} -c 'import sys; sys.exit(0)'"}}),
         encoding="utf-8",
     )
     (tmp_path / ".quality-runner.toml").write_text(
-        '[quality_runner]\nrequired_capabilities = ["tests", "truth_file"]\n',
+        '[quality_runner]\nrequired_capabilities = ["tests"]\n',
         encoding="utf-8",
     )
 
@@ -618,12 +615,7 @@ def test_verify_gates_does_not_block_on_file_evidence_capabilities(tmp_path: Pat
     assert payload["status"] == "passed"
     assert [(gate["id"], gate["status"]) for gate in verification["gates"]] == [
         ("tests", "passed"),
-        ("truth_file", "skipped"),
     ]
-    assert verification["gates"][1]["capability_kind"] == "evidence_file"
-    assert (
-        verification["gates"][1]["reason"] == "capability is file evidence, not an executable gate"
-    )
 
 
 def test_verify_gates_classifies_environment_restricted_failures(tmp_path: Path) -> None:

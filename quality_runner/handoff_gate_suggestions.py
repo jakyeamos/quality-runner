@@ -2,7 +2,7 @@ from __future__ import annotations
 
 
 def gate_severity(capability_id: str) -> str:
-    if capability_id in {"formatter", "lint", "typecheck", "tests", "dead_code", "truth_file"}:
+    if capability_id in {"formatter", "lint", "typecheck", "tests", "dead_code"}:
         return "blocker"
     return "warning"
 
@@ -18,7 +18,6 @@ def suggested_gate_command(capability_id: str, language: object) -> str:
         "runtime_smoke": "python -m <package_or_console_script>",
         "pre_pr": "quality-runner run . --json",
         "pre_cr": "pre-cr run --workspace . --json",
-        "truth_file": "maintain .tracker/PROJECT_TRUTH.md",
     }
     javascript_commands = {
         "formatter": "pnpm format",
@@ -30,7 +29,6 @@ def suggested_gate_command(capability_id: str, language: object) -> str:
         "runtime_smoke": "pnpm smoke",
         "pre_pr": "pnpm pre-pr",
         "pre_cr": "pnpm pre-cr",
-        "truth_file": "maintain .tracker/PROJECT_TRUTH.md",
         "security_secrets_scan": "gitleaks detect --source .",
         "security_dependency_audit": "pnpm audit --audit-level high",
         "security_static_analysis": "semgrep --config auto",

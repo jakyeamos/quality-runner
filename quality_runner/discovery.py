@@ -141,7 +141,6 @@ def _inspect_repo_uncached(
         "intent_docs": intent_docs,
         "agent_instruction_files": agent_instruction_files,
         "pre_cr_config": pre_cr_config,
-        "truth_file": _first_existing(root, [".tracker/PROJECT_TRUTH.md"]),
         "quality_contract": _detect_quality_contract(root, scripts, agent_instruction_files),
         "ci_files": ci_files,
         "ci_checks": ci_checks or [],
@@ -247,10 +246,6 @@ def _detect_quality_contract(
         )
         or "dead-code" in scripts
         or "audit:dead-code" in scripts,
-        "truth_file": _has_instruction_term(
-            instruction_text,
-            ("project_truth.md", "project truth", ".tracker/project_truth.md"),
-        ),
     }
     return {
         "declared": any(required_terms.values()),

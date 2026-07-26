@@ -15,7 +15,7 @@ It expects:
 
 - pnpm for JavaScript dependency management
 - lint, typecheck, tests, and dead-code checks before completion
-- `.tracker/PROJECT_TRUTH.md` maintenance when a repo has a truth file
+- optional planning notes when a repository chooses to keep them
 - audit-and-plan-only behavior from Quality Runner itself
 
 The `release` profile is selected with `--profile release` or by setting

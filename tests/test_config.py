@@ -17,8 +17,8 @@ def test_load_repo_config_reads_default_profile_required_capabilities_and_except
                 'required_capabilities = ["lint", "tests"]',
                 "",
                 "[[quality_runner.accepted_exceptions]]",
-                'capability = "truth_file"',
-                'reason = "Fixture repo has no project truth file."',
+                'capability = "unused_capability"',
+                'reason = "Fixture repo has an unused capability."',
                 'owner = "platform"',
                 'expires = "2999-01-01"',
                 "",
@@ -40,8 +40,8 @@ def test_load_repo_config_reads_default_profile_required_capabilities_and_except
         "scan_exclusions": [],
         "accepted_exceptions": [
             {
-                "capability": "truth_file",
-                "reason": "Fixture repo has no project truth file.",
+                "capability": "unused_capability",
+                "reason": "Fixture repo has an unused capability.",
                 "owner": "platform",
                 "expires": "2999-01-01",
             }
@@ -524,11 +524,11 @@ def test_detect_capabilities_applies_required_capabilities_and_active_exceptions
         "\n".join(
             [
                 "[quality_runner]",
-                'required_capabilities = ["lint", "tests", "truth_file"]',
+                'required_capabilities = ["lint", "tests"]',
                 "",
                 "[[quality_runner.accepted_exceptions]]",
-                'capability = "truth_file"',
-                'reason = "Truth file will be added after bootstrap."',
+                    'capability = "state_file"',
+                    'reason = "Planning context is optional."',
                 'owner = "platform"',
                 'expires = "2999-01-01"',
                 "",
@@ -551,14 +551,7 @@ def test_detect_capabilities_applies_required_capabilities_and_active_exceptions
             "required_by": "config",
         }
     ]
-    assert capability_map["accepted_exceptions"] == [
-        {
-            "capability": "truth_file",
-            "reason": "Truth file will be added after bootstrap.",
-            "owner": "platform",
-            "expires": "2999-01-01",
-        }
-    ]
+    assert capability_map["accepted_exceptions"] == []
 
 
 def test_configured_gates_satisfy_capabilities_and_policy_metadata_reaches_audit(
@@ -636,9 +629,6 @@ def test_detect_capabilities_handles_file_sources_and_inactive_exceptions(tmp_pa
     from quality_runner.discovery import inspect_repo
     from quality_runner.standards import compile_standards
 
-    tracker = tmp_path / ".tracker"
-    tracker.mkdir()
-    (tracker / "PROJECT_TRUTH.md").write_text("# Truth\n", encoding="utf-8")
     (tmp_path / "package.json").write_text(
         json.dumps({"scripts": {"pre-cr": "pre-cr run"}}),
         encoding="utf-8",
@@ -647,7 +637,7 @@ def test_detect_capabilities_handles_file_sources_and_inactive_exceptions(tmp_pa
         "\n".join(
             [
                 "[quality_runner]",
-                'required_capabilities = ["pre_cr", "truth_file", "tests", "not_real"]',
+                'required_capabilities = ["pre_cr", "tests", "not_real"]',
                 "",
                 "[[quality_runner.accepted_exceptions]]",
                 'capability = "tests"',
@@ -681,18 +671,6 @@ def test_detect_capabilities_handles_file_sources_and_inactive_exceptions(tmp_pa
             "required_by": "config",
             "verification_state": {
                 "discovery": "command-discovered",
-                "execution": "not-run",
-                "result": "unknown",
-            },
-        },
-        {
-            "id": "truth_file",
-            "type": "file",
-            "capability_kind": "evidence_file",
-            "source": ".tracker/PROJECT_TRUTH.md",
-            "required_by": "config",
-            "verification_state": {
-                "discovery": "file-discovered",
                 "execution": "not-run",
                 "result": "unknown",
             },

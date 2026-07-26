@@ -394,7 +394,6 @@ def _build_contract(
             "packet_schema": standards.get("schema"),
             "quality_skills": code_quality.get("quality_skills", []),
             "repo_instructions": repo_scan.get("agent_instruction_files", []),
-            "truth_files": [repo_scan.get("truth_file")] if repo_scan.get("truth_file") else [],
             "qr_local_authority": True,
         },
         "context": {"refs": sorted(context_refs or []), "repo_scan": repo_scan.get("intent_docs", [])},

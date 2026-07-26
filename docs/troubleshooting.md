@@ -49,7 +49,7 @@ changed-line coverage surfaces.
 
 That is expected. Quality Runner reports repo-owned quality gates it cannot
 detect, such as lint, typecheck, tests, build, dead-code checks, Pre-CR, and
-truth-file maintenance. These are separate from runner-provided structural
+optional planning-note maintenance. These are separate from runner-provided structural
 checks, which Quality Runner performs itself during the scan.
 
 The tool does not install dependencies or create repo scripts automatically.

@@ -61,7 +61,6 @@ CORE_GATE_IDS = (
     "anti_slop",
     "data_state_integrity",
     "observability_debuggability",
-    "repo_truth",
     "local_quality_contract",
     "ci",
     "local_hook",
@@ -93,7 +92,6 @@ GATE_LABELS = {
     "anti_slop": "Anti-Slop Heuristics",
     "data_state_integrity": "Data / State Integrity",
     "observability_debuggability": "Observability / Debuggability",
-    "repo_truth": "Project Truth",
     "local_quality_contract": "AIOS Local Quality Contract",
     "ci": "Remote CI",
     "local_hook": "Local Hook Enforcement",
@@ -420,10 +418,10 @@ BROAD_RUBRIC_DEFINITIONS = {
     },
     "truth_docs_accuracy": {
         "title": "Truth And Documentation Accuracy",
-        "standard": "AGENTS, README, project truth, and adoption docs reflect the current runnable state and known blockers.",
+        "standard": "AGENTS, README, and adoption docs reflect the current runnable state and known blockers.",
         "gate_caveat": "File-presence checks prove documents exist, not that they are accurate.",
         "required_evidence": [
-            "truth files compared to current repo state",
+            "repo evidence compared to current repo state",
             "setup and quality commands verified",
             "known blockers documented",
             "accepted exceptions visible",
@@ -855,14 +853,6 @@ def _gate_evidence(
                 if "observability_debuggability" in contract_gates
             ),
         ],
-        "repo_truth": [
-            *(
-                ".tracker/PROJECT_TRUTH.md"
-                for _ in [0]
-                if _exists(repo_root, ".tracker/PROJECT_TRUTH.md")
-            ),
-            *("AGENTS.md" for _ in [0] if _exists(repo_root, "AGENTS.md")),
-        ],
         "local_quality_contract": [".aios-quality-gate.json"]
         if _exists(repo_root, ".aios-quality-gate.json")
         else [],
@@ -1139,7 +1129,6 @@ def scan_repo_gate_facts(repo_root: Path, *, run_id: str) -> dict[str, Any]:
                 "tsconfig.json",
                 ".pre-cr.json",
                 ".aios-quality-gate.json",
-                ".tracker/PROJECT_TRUTH.md",
                 "AGENTS.md",
                 "knip.json",
                 "docs/release.md",
@@ -1177,8 +1166,6 @@ def _gate_status(gate_id: str, evidence: list[str]) -> str:
     if gate_id in {"formatter", "lint", "typecheck", "tests", "build"} and all(
         not item.startswith("package.json:scripts.") for item in evidence
     ):
-        return "partial"
-    if gate_id == "repo_truth" and ".tracker/PROJECT_TRUTH.md" not in evidence:
         return "partial"
     return "present"
 
@@ -1405,7 +1392,6 @@ def _gate_phase_cluster(gate_id: str) -> str:
     }:
         return "release_runtime_and_state_integrity"
     if gate_id in {
-        "repo_truth",
         "local_quality_contract",
         "pre_cr",
         "pre_pr_readiness",
@@ -1597,8 +1583,7 @@ def _broad_known_evidence(
             ),
         ],
         "truth_docs_accuracy": [
-            *_gate_evidence_items(gates_by_id, ("repo_truth",)),
-            *(item for item in files if item in {"AGENTS.md", ".tracker/PROJECT_TRUTH.md"}),
+            *(item for item in files if item in {"AGENTS.md"}),
         ],
         "ci_local_proof_integrity": [
             *_gate_evidence_items(gates_by_id, ("ci", "local_hook", "pre_pr_readiness")),
@@ -2268,7 +2253,6 @@ def _final_certification_phase(repo_path: str) -> dict[str, Any]:
             "Final adoption output distinguishes aios_wired, quality_standard_compliant, and release_ready or stronger readiness.",
             "Inherited lint/test baselines are either cleared or represented as blocking remediation phases, not excused as completed adoption work.",
             "Every blocker and accepted exception is explicit.",
-            "PROJECT_TRUTH reflects the real current state.",
         ],
         "acceptance_criteria": [
             "No full standards-compliance claim is made without the applicable gate profile, checked gate evidence, and cited rubric proof.",

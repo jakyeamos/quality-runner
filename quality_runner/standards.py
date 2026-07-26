@@ -64,9 +64,6 @@ def _sources(scan: dict[str, Any], profile: str, config: dict[str, Any]) -> list
             if isinstance(path, str) and path:
                 sources.append({"type": "agent_instructions", "path": path})
 
-    truth_file = scan.get("truth_file")
-    if isinstance(truth_file, str) and truth_file:
-        sources.append({"type": "truth_file", "path": truth_file})
 
     intent_docs = scan.get("intent_docs")
     if isinstance(intent_docs, list):
@@ -95,11 +92,6 @@ def _requirements(
             "id": "quality_ladder",
             "level": "hard",
             "description": "Run lint, type checking, tests, and dead-code checks before completion.",
-        },
-        {
-            "id": "truth_file_current",
-            "level": "hard",
-            "description": "Maintain .tracker/PROJECT_TRUTH.md when the repo has a truth file.",
         },
         {
             "id": "audit_and_plan_only",
