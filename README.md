@@ -104,6 +104,24 @@ qr runs /path/to/repo --json
 qr repo-hygiene check /path/to/repo --json
 ```
 
+For the cross-repository environment contract, QR owns both the review profile
+and the bounded fleet scanner. Static inspection covers every identity under a
+bounded projects root; dynamic commands are opt-in and run only in QR-owned
+disposable worktrees for changed or incomplete evidence:
+
+```bash
+qr audit /path/to/repo --profile environment-legibility --json
+qr fleet audit run --all --projects-root /path/to/projects --json
+qr fleet audit replay --audit-id AUDIT_ID --json
+qr fleet audit report --audit-id AUDIT_ID --json
+```
+
+The fleet audit resolves the documented development branch, preferring `dev`,
+and never selects a branch by commit-count maturity. Dirty, detached, stale,
+prunable, or unverifiable target checkouts receive static findings only. Fleet
+artifacts are private by default; the report command emits an aggregate-only
+projection that remains explicitly review-required before publication.
+
 `audit` creates evidence and a remediation plan without editing source files.
 `review` makes a prepared packet visibly `awaiting-evidence`, rather than
 treating the absence of a packet-bound local response as clean. `verify`

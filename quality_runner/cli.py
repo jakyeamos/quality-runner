@@ -14,6 +14,7 @@ from quality_runner.cli_controller_reports import (
     has_rejected_self_check,
 )
 from quality_runner.cli_fix_proposals import add_fix_proposal_command
+from quality_runner.cli_fleet import add_fleet_commands
 from quality_runner.cli_gate import add_gate_commands
 from quality_runner.cli_handoff import add_handoff_commands
 from quality_runner.cli_human_summary import human_summary
@@ -64,6 +65,12 @@ Advanced operations:
   refresh, rollout, gate, controller-report, skill, proposal, remediation,
   plan, phase, repo-hygiene, release-smoke, and worker handoff tools
 
+Fleet environment audit:
+  fleet audit run --all       static-all audit with optional changed-only dynamic checks
+  fleet audit show --repo-id  inspect a private repository finding and plan
+  fleet audit replay          verify deterministic artifact regeneration
+  fleet audit report          write an aggregate-only reviewable projection
+
 Run '{program_name} <command> --help' for options. Audit, review, verify, and
 runs emit a compact outcome card by default and v2 JSON with --json. Use
 review --legacy-output only for the supported v1 compatibility projection.
@@ -94,6 +101,7 @@ def build_parser(prog: str = CANONICAL_PROGRAM) -> argparse.ArgumentParser:
     subparsers = parser.add_subparsers(dest="command")
 
     add_journey_commands(subparsers)
+    add_fleet_commands(subparsers)
 
     run_parser = subparsers.add_parser("run", help="Inspect a repo and write audit artifacts")
     add_workflow_arguments(run_parser)

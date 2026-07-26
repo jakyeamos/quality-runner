@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "quality-runner-environment-legibility-finding-v0.1",
+  "type": "object",
+  "required": ["schema", "finding_id", "repo_id", "dimension", "status", "provenance_hash"],
+  "properties": {
+    "schema": {"const": "quality-runner-environment-legibility-finding-v0.1"},
+    "finding_id": {"type": "string", "minLength": 1},
+    "repo_id": {"type": "string", "minLength": 1},
+    "dimension": {"type": "string", "minLength": 1},
+    "status": {"enum": ["absent", "discoverable", "validated", "maintained", "unknown", "stale", "blocked", "not_applicable"]},
+    "score": {"type": ["integer", "null"], "minimum": 0, "maximum": 4},
+    "provenance_hash": {"type": "string", "minLength": 16}
+  },
+  "additionalProperties": true
+}

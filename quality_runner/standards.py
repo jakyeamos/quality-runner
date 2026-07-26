@@ -8,7 +8,9 @@ from quality_runner.schema_constants import STANDARDS_PACKET_SCHEMA
 
 DEFAULT_PROFILE = "default"
 RELEASE_PROFILE = "release"
-SUPPORTED_PROFILES = {DEFAULT_PROFILE, RELEASE_PROFILE}
+ENVIRONMENT_LEGIBILITY_PROFILE = "environment-legibility"
+ENVIRONMENT_LEGIBILITY_PROFILE_VERSION = "0.2.0"
+SUPPORTED_PROFILES = {DEFAULT_PROFILE, RELEASE_PROFILE, ENVIRONMENT_LEGIBILITY_PROFILE}
 BUILTIN_PROFILE_CONFIGS: dict[str, dict[str, Any]] = {
     RELEASE_PROFILE: {
         "extends": DEFAULT_PROFILE,
@@ -22,7 +24,16 @@ BUILTIN_PROFILE_CONFIGS: dict[str, dict[str, Any]] = {
             "aggregate_coverage",
         ],
         "allowed_package_managers": [],
-    }
+    },
+    ENVIRONMENT_LEGIBILITY_PROFILE: {
+        "extends": DEFAULT_PROFILE,
+        "version": ENVIRONMENT_LEGIBILITY_PROFILE_VERSION,
+        "source": "docs/skill-candidates/environment-legibility.toml",
+        "execution": "quality-runner-fleet-read-only",
+        "required_capabilities_configured": True,
+        "required_capabilities": ["environment_legibility", "evidence_provenance"],
+        "allowed_package_managers": [],
+    },
 }
 
 

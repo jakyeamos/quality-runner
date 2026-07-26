@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "quality-runner-fleet-report-v0.1",
+  "type": "object",
+  "required": ["schema", "audit_id", "summary", "privacy", "publication"],
+  "properties": {
+    "schema": {"const": "quality-runner-fleet-report-v0.1"},
+    "audit_id": {"type": "string", "minLength": 1},
+    "summary": {"type": "object"},
+    "privacy": {"type": "object"},
+    "publication": {"type": "object"}
+  },
+  "additionalProperties": true
+}
