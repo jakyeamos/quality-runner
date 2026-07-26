@@ -35,3 +35,6 @@ packet that matches the task; do not load the whole repository or generated
 The runner is provider-neutral and AIOS-independent. Generated evidence may
 contain sensitive repository details; it remains local unless a human reviews
 and explicitly publishes a redacted projection.
+
+The routed contract was revalidated after commit `968d82b`; refresh this index
+when command, quality-adapter, or release-boundary behavior changes.
