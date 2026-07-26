@@ -56,6 +56,33 @@ def test_prunable_registered_worktree_is_recorded_without_execution_readiness(
     assert missing["detached"] is False
 
 
+def test_nested_git_repositories_are_discovered_as_separate_identities(tmp_path: Path) -> None:
+    projects = tmp_path / "projects"
+    parent = projects / "parent"
+    nested = parent / "nested"
+    _repo(parent)
+    _repo(nested)
+
+    records = discover_repositories(projects)
+
+    assert {item["primary_path"] for item in records} == {
+        str(parent.resolve()),
+        str(nested.resolve()),
+    }
+
+
+def test_generated_nested_worktrees_are_excluded_from_identity_discovery(tmp_path: Path) -> None:
+    projects = tmp_path / "projects"
+    parent = projects / "parent"
+    generated = parent / "data" / "audit-worktrees" / "generated"
+    _repo(parent)
+    _repo(generated)
+
+    records = discover_repositories(projects)
+
+    assert [item["primary_path"] for item in records] == [str(parent.resolve())]
+
+
 def test_no_remote_identity_uses_common_git_dir_or_path(tmp_path: Path) -> None:
     root = tmp_path / "repo"
     _repo(root)

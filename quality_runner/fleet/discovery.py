@@ -16,20 +16,35 @@ from quality_runner.fleet.contracts import (
 
 EXCLUDED_DIRECTORIES = {
     ".git",
+    ".build",
+    ".cache",
+    ".gradle",
+    ".idea",
     ".quality-runner",
     ".venv",
     ".tox",
+    ".nox",
     ".mypy_cache",
     ".pytest_cache",
     ".ruff_cache",
     ".next",
+    ".swiftpm",
     ".turbo",
     ".pnpm-store",
+    ".worktrees",
+    ".tmp",
+    ".uv-cache",
     "node_modules",
     "vendor",
+    "__pycache__",
+    "artifacts",
+    "data",
     "build",
     "dist",
     "coverage",
+    "runs",
+    "target",
+    "worktrees",
     "DerivedData",
 }
 
@@ -219,7 +234,6 @@ def _discover_roots(root: Path) -> list[Path]:
         current_path = Path(current)
         if has_git:
             found.append(current_path.resolve())
-            directories[:] = []
     return sorted(set(found), key=lambda path: path.as_posix())
 
 
