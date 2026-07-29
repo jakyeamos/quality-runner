@@ -39,7 +39,9 @@ Every run writes `invariant-verification.json`. Each invariant receives one of:
 
 `advisory` is the default and cannot block the repository result. Promote an
 invariant to `required` only after the command is deterministic and the proof
-surfaces are stable. A required failure fails verification; required
+surfaces are stable. Reusable candidate promotion also requires the governed
+fleet evidence and human receipt described in
+[Bug-learning lifecycle](bug-learning.md). A required failure fails verification; required
 `blocked`, `unknown`, or `stale` evidence blocks verification without claiming
 the behavior failed.
 
@@ -60,8 +62,10 @@ Use the smallest durable scope:
 
 1. Reproduce the defect and add a repository regression test.
 2. Register it as an advisory semantic invariant.
-3. Observe deterministic results in normal runs.
-4. Promote it to required only when failures should stop integration.
+3. Record classified, costed observations in the candidate registry.
+4. Aggregate independent repository evidence.
+5. Obtain an explicit human promotion decision.
+6. Promote it to required only when the promotion receipt is supported.
 
 Do not add one-off symptoms, generic corpus examples, or flaky end-to-end
 checks. The invariant should express a repeated architectural boundary with a

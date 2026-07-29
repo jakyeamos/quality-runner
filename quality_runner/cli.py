@@ -8,6 +8,7 @@ from typing import Any, cast
 
 from quality_runner import __version__
 from quality_runner.cli_artifacts import add_artifact_commands
+from quality_runner.cli_candidates import add_candidate_commands
 from quality_runner.cli_controller_reports import (
     add_controller_report_command,
     add_controller_report_summary_arguments,
@@ -63,7 +64,7 @@ Compatibility commands remain available:
 
 Advanced operations:
   refresh, rollout, gate, controller-report, skill, proposal, remediation,
-  plan, phase, repo-hygiene, release-smoke, and worker handoff tools
+  plan, phase, candidates, repo-hygiene, release-smoke, and worker handoff tools
 
 Fleet environment audit:
   fleet audit run --all       static-all audit with optional changed-only dynamic checks
@@ -102,6 +103,7 @@ def build_parser(prog: str = CANONICAL_PROGRAM) -> argparse.ArgumentParser:
 
     add_journey_commands(subparsers)
     add_fleet_commands(subparsers)
+    add_candidate_commands(subparsers)
 
     run_parser = subparsers.add_parser("run", help="Inspect a repo and write audit artifacts")
     add_workflow_arguments(run_parser)
@@ -413,6 +415,12 @@ def main(argv: list[str] | None = None) -> int:
     if parsed.command == "plan" and payload.get("status") == "blocked":
         return 1
     if parsed.command == "repo-hygiene" and payload.get("status") in {"fail", "blocked"}:
+        return 1
+    if parsed.command == "candidates" and payload.get("status") not in {
+        "passed",
+        "completed",
+        "supported",
+    }:
         return 1
     return 0
 

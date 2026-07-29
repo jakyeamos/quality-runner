@@ -6,6 +6,8 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path, PurePosixPath
 from typing import Any
 
+from quality_runner.bug_learning import required_promotion_blocker
+
 INVARIANT_REPORT_SCHEMA = "quality-runner-invariant-verification-v0.1"
 INVARIANT_EVIDENCE_SCHEMA = "quality-runner-invariant-evidence-v0.1"
 INVARIANT_ID_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
@@ -54,6 +56,19 @@ def add_invariant_capabilities(
 ) -> None:
     repo_root = _repo_root(scan, standards_packet)
     for invariant in configured_invariants(standards_packet):
+        promotion_blocker = required_promotion_blocker(repo_root, invariant)
+        if promotion_blocker is not None:
+            missing.append(
+                {
+                    "id": invariant["id"],
+                    "type": "invariant",
+                    "reason": promotion_blocker,
+                    "language": invariant["ecosystem"],
+                    "owner": invariant["owner"],
+                    "required_by": "candidate-promotion-contract",
+                }
+            )
+            continue
         missing_surfaces = _missing_surfaces(repo_root, invariant)
         if missing_surfaces:
             if invariant["enforcement"] == "required":
@@ -87,6 +102,8 @@ def add_invariant_capabilities(
                 "enforcement": invariant["enforcement"],
                 "description": invariant["description"],
                 "surfaces": list(invariant["surfaces"]),
+                **_optional("candidate_id", invariant.get("candidate_id")),
+                **_optional("promotion_receipt", invariant.get("promotion_receipt")),
                 **(
                     {"required_by": "repository-invariant"}
                     if invariant["enforcement"] == "required"
@@ -191,6 +208,8 @@ def _parse_invariant(
     ecosystem = value.get("ecosystem", "repository")
     mutating_risk = value.get("mutating_risk", "unknown")
     freshness_days = value.get("freshness_days", 30)
+    candidate_id = value.get("candidate_id")
+    promotion_receipt = value.get("promotion_receipt")
 
     valid = True
     if not isinstance(invariant_id, str) or not INVARIANT_ID_RE.fullmatch(invariant_id):
@@ -217,13 +236,22 @@ def _parse_invariant(
         valid = False
     if not isinstance(freshness_days, int) or isinstance(freshness_days, bool) or freshness_days <= 0:
         valid = False
+    if candidate_id is not None and (
+        not isinstance(candidate_id, str) or not INVARIANT_ID_RE.fullmatch(candidate_id)
+    ):
+        valid = False
+    if promotion_receipt is not None and (
+        not isinstance(promotion_receipt, str) or not _safe_relative_path(promotion_receipt)
+    ):
+        valid = False
     if not valid:
         warnings.append(
             _warning(
                 f"{field} must include a kebab-case id, description, owner, safe relative "
                 "surfaces, and command or evidence_file; enforcement must be advisory or "
                 "required, mutating_risk must be safe, unknown, or mutating, and "
-                "freshness_days must be a positive integer"
+                "freshness_days must be a positive integer; candidate_id must be kebab-case "
+                "and promotion_receipt must be a safe relative path when supplied"
             )
         )
         return None
@@ -240,6 +268,8 @@ def _parse_invariant(
         "ecosystem": ecosystem,
         "mutating_risk": mutating_risk,
         "freshness_days": freshness_days,
+        **({"candidate_id": candidate_id} if isinstance(candidate_id, str) else {}),
+        **({"promotion_receipt": promotion_receipt} if isinstance(promotion_receipt, str) else {}),
     }
 
 
@@ -257,7 +287,16 @@ def _invariant_result(
         "owner": invariant.get("owner"),
         "enforcement": invariant.get("enforcement", "advisory"),
         "surfaces": list(invariant.get("surfaces", [])),
+        **_optional("candidate_id", invariant.get("candidate_id")),
     }
+    promotion_blocker = required_promotion_blocker(repo_root, invariant)
+    if promotion_blocker is not None:
+        return {
+            **base,
+            "status": "blocked",
+            "reason": promotion_blocker,
+            "source": str(invariant.get("promotion_receipt") or "promotion-receipt"),
+        }
     missing_surfaces = _missing_surfaces(repo_root, invariant)
     if missing_surfaces:
         return {

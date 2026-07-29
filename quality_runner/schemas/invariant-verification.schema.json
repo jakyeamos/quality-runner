@@ -47,6 +47,10 @@
         },
         "description": { "type": "string", "minLength": 1 },
         "owner": { "type": "string", "minLength": 1 },
+        "candidate_id": {
+          "type": "string",
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+        },
         "enforcement": { "enum": ["advisory", "required"] },
         "surfaces": {
           "type": "array",

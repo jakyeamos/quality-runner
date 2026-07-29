@@ -404,6 +404,14 @@ stable enough to block integration. See
 [Semantic Invariants](docs/semantic-invariants.md) for the config and promotion
 contract.
 
+Confirmed bug lessons use the separate repository-owned
+`quality-runner-candidates.json` registry. `qr candidates validate` enforces
+that every declared regression receives a candidate or documented disposition;
+`qr candidates aggregate` preserves fleet observation history; and
+`qr candidates promotion-check` requires both passing evidence criteria and an
+explicit human decision before a candidate-linked invariant can become
+required. See [Bug-learning lifecycle](docs/bug-learning.md).
+
 ## Scan Exclusions
 
 Discovery skips fixture corpora, docs, vendored trees, generated corpora, and

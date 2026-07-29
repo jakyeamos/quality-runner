@@ -31,6 +31,32 @@ qr doctor --json
 Existing callers can use `quality-runner` in place of `qr` with the same help,
 version, and JSON behavior.
 
+## `quality-runner candidates`
+
+The candidate workflow captures every declared confirmed bug lesson without
+automatically creating a scanner rule:
+
+```bash
+quality-runner candidates validate /path/to/repo --json
+quality-runner candidates aggregate \
+  --projects-root /path/to/projects \
+  --output /private/path/candidate-fleet.json \
+  --json
+quality-runner candidates promotion-check /path/to/repo \
+  --candidate-id candidate-id \
+  --fleet-evidence /private/path/candidate-fleet.json \
+  --decision /path/to/repo/promotion-decision.json \
+  --output /path/to/repo/promotion-receipt.json \
+  --json
+```
+
+Validation is read-only. Aggregation and promotion checks write only their
+explicit output paths; aggregation merges prior observation history there.
+Unsupported transitions, uncovered regressions, invalid registries, incomplete
+fleet evidence, failed precision/cost/freshness/fixture criteria, or missing
+human approval return a non-zero CLI status. See
+[Bug-learning lifecycle](bug-learning.md) for the schemas and thresholds.
+
 `inspect`, `run`, and `verify-gates` remain supported v1 compatibility commands.
 `review --legacy-output` provides the established v1 review JSON field shape
 when an existing CLI consumer requires it; the notice is sent to stderr so

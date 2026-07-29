@@ -16,6 +16,7 @@ from quality_runner.application.journey_outcomes import (
 from quality_runner.application.outcome_projection import LegacyPayload
 from quality_runner.application.verification_workflows import verify_gates_payload
 from quality_runner.cli_artifacts import prune_artifacts_payload
+from quality_runner.cli_candidates import candidate_command_payload
 from quality_runner.cli_controller_reports import (
     controller_report_command_payload,
     controller_report_from_summary_payload,
@@ -71,6 +72,8 @@ def payload_for_args(
         return doctor_payload(include_environment=True)
     if args.command == "fleet":
         return fleet_command_payload(args)
+    if args.command == "candidates":
+        return candidate_command_payload(args)
     if args.command == "phase-check":
         return phase_command_payload(args)
     if args.command == "self-update":
