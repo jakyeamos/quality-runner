@@ -261,7 +261,12 @@ def _evaluate_gate(
     gate["command_path"] = command_path
     gate["command_version"] = version
     gate["argv"] = argv
-    if configured.get("state") != "certified":
+    configured_state = configured.get("state")
+    if configured_state in {"blocked", "unavailable"}:
+        gate["state"] = configured_state
+        gate["blocker"] = configured.get("blocker") or f"gate declared {configured_state}"
+        return gate
+    if configured_state != "certified":
         gate["state"] = "candidate"
         return gate
     issues = _certification_issues(configured)

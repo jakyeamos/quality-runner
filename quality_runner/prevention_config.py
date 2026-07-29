@@ -9,7 +9,7 @@ RULE_STATES = {
     "trigger-verified",
     "behavior-verified",
 }
-GATE_STATES = {"candidate", "certified"}
+GATE_STATES = {"candidate", "certified", "blocked", "unavailable"}
 
 
 def parse_prevention_section(
@@ -133,6 +133,7 @@ def _gates(value: object, warnings: list[dict[str, str]]) -> list[dict[str, Any]
                 "required": required_gate,
                 "timeout_seconds": timeout,
                 "scope": _optional_string(item.get("scope"), f"{field}.scope", warnings),
+                "blocker": _optional_string(item.get("blocker"), f"{field}.blocker", warnings),
                 "evidence_refs": _string_list(
                     item.get("evidence_refs"), f"{field}.evidence_refs", warnings
                 ),

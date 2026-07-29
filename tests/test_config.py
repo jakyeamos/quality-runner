@@ -103,6 +103,34 @@ def test_load_repo_config_reads_explicit_prevention_policy(tmp_path) -> None:
     assert prevention["gates"][0]["state"] == "certified"
 
 
+def test_load_repo_config_preserves_declared_unavailable_gate(tmp_path) -> None:
+    from quality_runner.config import load_repo_config
+
+    (tmp_path / ".quality-runner.toml").write_text(
+        "\n".join(
+            [
+                "[[quality_runner.prevention.gates]]",
+                'id = "smoke"',
+                'command = "pnpm smoke"',
+                'state = "unavailable"',
+                "required = false",
+                'owner = "quality"',
+                'rationale = "The script is not defined."',
+                'bootstrap = "pnpm install --frozen-lockfile"',
+                'mutation_risk = "isolated-only"',
+                'blocker = "package.json has no smoke script"',
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    config = load_repo_config(tmp_path)
+
+    assert config["warnings"] == []
+    assert config["prevention"]["gates"][0]["state"] == "unavailable"
+    assert config["prevention"]["gates"][0]["blocker"] == "package.json has no smoke script"
+
+
 def test_load_repo_config_reads_gates_and_severity_overrides(tmp_path) -> None:
     from quality_runner.config import load_repo_config
 

@@ -4,6 +4,9 @@ Quality Runner treats a repository command as preventative only after it has a
 resolved executable and version, a documented bootstrap, repeatable passing
 behavior, an intentional failure fixture, local evidence, and CI evidence.
 Merely appearing in CI is not certification.
+Repositories may explicitly mark a proposed gate `blocked` or `unavailable`
+with a concrete blocker; readiness preserves that state instead of presenting
+the gate as a usable candidate.
 
 The first Quality Runner certification covers the locked development environment
 created by `uv sync --locked --all-groups --python 3.13`:

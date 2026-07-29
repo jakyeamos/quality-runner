@@ -45,6 +45,24 @@ def test_candidate_gate_remains_advisory(tmp_path: Path) -> None:
     assert readiness["gates"][0]["state"] == "candidate"
 
 
+def test_declared_unavailable_gate_preserves_evidence(tmp_path: Path) -> None:
+    readiness = evaluate_readiness(
+        repo_root=tmp_path,
+        prevention={
+            "gates": [
+                _gate(
+                    f"{sys.executable} --version",
+                    state="unavailable",
+                    blocker="the repository does not define this script",
+                )
+            ]
+        },
+    )
+
+    assert readiness["gates"][0]["state"] == "unavailable"
+    assert readiness["gates"][0]["blocker"] == "the repository does not define this script"
+
+
 def test_missing_required_tool_is_unavailable_and_blocks(tmp_path: Path) -> None:
     readiness = evaluate_readiness(
         repo_root=tmp_path,
