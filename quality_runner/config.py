@@ -12,6 +12,7 @@ from quality_runner.disposition_config import (
     parse_inline_dispositions,
 )
 from quality_runner.integrate_config_parse import parse_integrate_section
+from quality_runner.invariants import parse_invariants
 from quality_runner.scan_exclusions_config import parse_scan_exclusions_by_module
 from quality_runner.security.config_parse import parse_security_section
 from quality_runner.skills_config_parse import parse_skills_section
@@ -73,6 +74,7 @@ def load_repo_config(repo_root: Path) -> dict[str, Any]:
     )
     warnings.extend(module_warnings)
     gates = _gates(section.get("gates"), warnings)
+    invariants = parse_invariants(section.get("invariants"), warnings)
     exceptions = _accepted_exceptions(section.get("accepted_exceptions"), warnings)
     accepted_dispositions = parse_inline_dispositions(
         section.get("accepted_dispositions"), warnings
@@ -105,6 +107,7 @@ def load_repo_config(repo_root: Path) -> dict[str, Any]:
         accepted_exceptions=exceptions,
         accepted_dispositions=accepted_dispositions,
         gates=gates,
+        invariants=invariants,
         gate_timeouts=gate_timeouts,
         severity_overrides=severity_overrides,
         structural_scan=structural_scan,
@@ -128,7 +131,7 @@ def load_repo_config(repo_root: Path) -> dict[str, Any]:
 
 # fmt: off
 def _config(
-    *, path: str | None, default_profile: str | None, profiles: dict[str, dict[str, Any]], required_capabilities: list[str], required_capabilities_configured: bool, allowed_package_managers: list[str], scan_exclusions: list[str], scan_exclusions_by_module: dict[str, list[str]], accepted_exceptions: list[dict[str, str]], accepted_dispositions: list[dict[str, str]], gates: list[dict[str, Any]], gate_timeouts: dict[str, int], severity_overrides: dict[str, str], structural_scan: dict[str, Any], readiness: dict[str, Any], warnings: list[dict[str, str]],
+    *, path: str | None, default_profile: str | None, profiles: dict[str, dict[str, Any]], required_capabilities: list[str], required_capabilities_configured: bool, allowed_package_managers: list[str], scan_exclusions: list[str], scan_exclusions_by_module: dict[str, list[str]], accepted_exceptions: list[dict[str, str]], accepted_dispositions: list[dict[str, str]], gates: list[dict[str, Any]], invariants: list[dict[str, Any]], gate_timeouts: dict[str, int], severity_overrides: dict[str, str], structural_scan: dict[str, Any], readiness: dict[str, Any], warnings: list[dict[str, str]],
 ) -> dict[str, Any]:
     payload: dict[str, Any] = dict(
         schema=CONFIG_SCHEMA,
@@ -142,6 +145,7 @@ def _config(
         accepted_exceptions=accepted_exceptions,
         accepted_dispositions=accepted_dispositions,
         gates=gates,
+        invariants=invariants,
         gate_timeouts=gate_timeouts,
         severity_overrides=severity_overrides,
         structural_scan=structural_scan,
@@ -168,6 +172,7 @@ def _empty_config(*, path: str | None, warnings: list[dict[str, str]]) -> dict[s
         accepted_exceptions=[],
         accepted_dispositions=[],
         gates=[],
+        invariants=[],
         gate_timeouts={},
         severity_overrides={},
         structural_scan={},

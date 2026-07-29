@@ -76,6 +76,7 @@ def write_completed_verification_v1_artifacts(
     artifact_paths: AuditArtifactPaths,
     gate_execution_plan: GateExecutionPlan,
     gate_verification: GateVerificationPayload,
+    invariant_report: AuditPayload,
     verified_capability_map: AuditPayload,
     code_quality_scan: AuditPayload,
     planned_audit: AuditPlan,
@@ -112,6 +113,9 @@ def write_completed_verification_v1_artifacts(
     )
     artifact_paths["gate_verification_json"] = str(
         write_json(run_dir / "gate-verification.json", _legacy_payload(gate_verification))
+    )
+    artifact_paths["invariant_verification_json"] = str(
+        write_json(run_dir / "invariant-verification.json", _legacy_payload(invariant_report))
     )
     artifact_paths["quality_audit_json"] = str(
         write_json(run_dir / "quality-audit.json", _legacy_payload(planned_audit.audit_report))
@@ -251,6 +255,7 @@ def _artifact_paths(run_dir: Path) -> AuditArtifactPaths:
         "capability_matrix_json": str(run_dir / "capability-matrix.json"),
         "gate_execution_plan_json": str(run_dir / "gate-execution-plan.json"),
         "gate_verification_json": str(run_dir / "gate-verification.json"),
+        "invariant_verification_json": str(run_dir / "invariant-verification.json"),
         "quality_audit_json": str(run_dir / "quality-audit.json"),
         "remediation_plan_json": str(run_dir / "remediation-plan.json"),
         "remediation_context_json": str(run_dir / "remediation-context.json"),

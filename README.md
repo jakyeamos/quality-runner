@@ -393,6 +393,17 @@ repo-policy reference. For opt-in layer-boundary rules, see
 [Architecture Contracts](docs/architecture-contracts.md). For opt-in user-defined
 standards packs, see [Quality Skills](docs/quality-skills.md).
 
+## Semantic Invariants
+
+Repositories can promote a reproduced behavior regression into a named,
+owned, executable contract with `[[quality_runner.invariants]]`. Invariants
+start as advisory, run through the normal disposable gate boundary, and write
+`invariant-verification.json` with honest `passed`, `failed`, `blocked`,
+`unknown`, or `stale` status. Promote one to `required` only when its proof is
+stable enough to block integration. See
+[Semantic Invariants](docs/semantic-invariants.md) for the config and promotion
+contract.
+
 ## Scan Exclusions
 
 Discovery skips fixture corpora, docs, vendored trees, generated corpora, and
