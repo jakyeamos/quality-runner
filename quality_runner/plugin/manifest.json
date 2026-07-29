@@ -45,7 +45,8 @@
       "quality_runner_audit_outcome",
       "quality_runner_review_outcome",
       "quality_runner_verify_outcome",
-      "quality_runner_runs_outcome"
+      "quality_runner_runs_outcome",
+      "quality_runner_delivery_contract"
     ]
   },
   "skill": "SKILL.md"

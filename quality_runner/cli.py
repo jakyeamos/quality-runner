@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+from pathlib import Path
 from typing import Any, cast
 
 from quality_runner import __version__
@@ -19,6 +20,7 @@ from quality_runner.cli_human_summary import human_summary
 from quality_runner.cli_journeys import add_journey_commands
 from quality_runner.cli_outcome import OUTCOME_SCHEMA, render_outcome
 from quality_runner.cli_payload import payload_for_args
+from quality_runner.cli_phase import add_phase_commands
 from quality_runner.cli_planning import add_planning_commands
 from quality_runner.cli_remediation import add_remediation_commands
 from quality_runner.cli_review import add_review_command
@@ -35,19 +37,25 @@ from quality_runner.core.outcome_contracts import JourneyOutcome
 from quality_runner.progress import ProgressReporter
 from quality_runner.standards import DEFAULT_PROFILE
 
-ROOT_HELP = """usage: quality-runner <journey> [options]
+CANONICAL_PROGRAM = "qr"
+COMPATIBILITY_PROGRAM = "quality-runner"
+
+
+def _root_help(program_name: str) -> str:
+    return f"""usage: {program_name} <journey> [options]
 
 Quality Runner records local evidence and the safest next action for a repository.
+The canonical command is 'qr'; 'quality-runner' remains a compatibility alias.
 
-Start with a journey:
+Stable journeys:
   audit REPO            inspect a repository and prepare remediation evidence
   review REPO           prepare or run a fresh, read-only review (v2 outcome)
   verify REPO           record gate evidence; execution requires explicit consent
   runs REPO             read recent evidence without creating new artifacts
-
-Common setup:
-  init REPO             create a starter Quality Runner configuration
   doctor                confirm local installation readiness
+
+Configuration:
+  init REPO             create a starter Quality Runner configuration
 
 Compatibility commands remain available:
   inspect, run, verify-gates, status, summarize-run, export-handoff
@@ -56,10 +64,13 @@ Advanced operations:
   task, refresh, rollout, gate, controller-report, skill, proposal, remediation,
   plan, phase, release-smoke, and worker handoff tools
 
-Run 'quality-runner <command> --help' for options. Audit, review, verify, and
+Run '{program_name} <command> --help' for options. Audit, review, verify, and
 runs emit a compact outcome card by default and v2 JSON with --json. Use
 review --legacy-output only for the supported v1 compatibility projection.
 """
+
+
+ROOT_HELP = _root_help(CANONICAL_PROGRAM)
 
 _LEGACY_COMMAND_REPLACEMENTS = {
     "inspect": "audit --inspect-only",
@@ -69,12 +80,16 @@ _LEGACY_COMMAND_REPLACEMENTS = {
 _PROGRESS_COMMANDS = {"run", "inspect", "verify-gates", "refresh", "release-smoke"}
 
 
-def build_parser() -> argparse.ArgumentParser:
+def build_parser(prog: str = CANONICAL_PROGRAM) -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        prog="quality-runner",
+        prog=prog,
         description="Audit a repo and produce an evidence-backed remediation plan.",
     )
-    parser.format_help = lambda: ROOT_HELP
+
+    def format_root_help() -> str:
+        return ROOT_HELP if prog == CANONICAL_PROGRAM else _root_help(prog)
+
+    parser.format_help = format_root_help
     parser.add_argument("--version", action="version", version=__version__)
     subparsers = parser.add_subparsers(dest="command")
 
@@ -150,6 +165,18 @@ def build_parser() -> argparse.ArgumentParser:
         help="Verify-gates phase timeout; defaults to a multiple of --timeout-seconds",
     )
     refresh_parser.add_argument(
+        "--inspect-timeout-seconds",
+        type=int,
+        default=None,
+        help="Explicit inspect phase timeout; otherwise uses the active adaptive budget or fallback",
+    )
+    refresh_parser.add_argument(
+        "--run-timeout-seconds",
+        type=int,
+        default=None,
+        help="Explicit run phase timeout; otherwise uses the active adaptive budget or fallback",
+    )
+    refresh_parser.add_argument(
         "--workflow-timeout-reason",
         default=None,
         help="Reason recorded when the verify-gates timeout fires",
@@ -174,6 +201,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--execute-gates",
         action="store_true",
         help="Execute discovered repository commands in a disposable worktree during refresh",
+    )
+    refresh_parser.add_argument(
+        "--changed-only",
+        action="store_true",
+        help="Limit inspect/run analysis to paths changed from the baseline and working tree",
     )
     add_worktree_verify_arguments(refresh_parser)
     refresh_parser.add_argument(
@@ -275,6 +307,7 @@ def build_parser() -> argparse.ArgumentParser:
     add_remediation_commands(subparsers)
 
     add_planning_commands(subparsers)
+    add_phase_commands(subparsers)
 
     doctor_parser = subparsers.add_parser("doctor", help="Check Quality Runner readiness")
     doctor_parser.add_argument("--json", action="store_true", help="Emit JSON output")
@@ -302,12 +335,13 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv: list[str] | None = None) -> int:
     args = sys.argv[1:] if argv is None else argv
+    program_name = _program_for_invocation()
     if not args:
         print(f"Quality Runner {__version__}")
-        print("Run 'quality-runner --help' for usage.")
+        print(f"Run '{program_name} --help' for usage.")
         return 0
 
-    parser = build_parser()
+    parser = build_parser(program_name)
     payload: dict[str, Any] = {}
     try:
         parsed = parser.parse_args(args)
@@ -323,10 +357,10 @@ def main(argv: list[str] | None = None) -> int:
         else:
             payload = payload_for_args(parsed)
     except (FileNotFoundError, NotADirectoryError, ValueError, OSError) as error:
-        print(f"quality-runner: error: {error}", file=sys.stderr)
+        print(f"{program_name}: error: {error}", file=sys.stderr)
         return 1
 
-    notice = _compatibility_notice(parsed)
+    notice = _compatibility_notice(parsed, program_name=program_name)
     if notice:
         print(notice, file=sys.stderr)
 
@@ -352,6 +386,7 @@ def main(argv: list[str] | None = None) -> int:
             "validate-remediation-context",
             "validate-slice-spec",
             "review-worker",
+            "phase-check",
             "exclusions",
         }
         and payload.get("status") == "rejected"
@@ -363,6 +398,8 @@ def main(argv: list[str] | None = None) -> int:
         return 1
     if parsed.command == "summarize-run" and has_rejected_self_check(payload):
         return 1
+    if parsed.command == "phase-check" and payload.get("status") != "passed":
+        return 1
     if parsed.command == "self-update" and payload.get("status") in {"blocked", "failed"}:
         return 1
     if parsed.command == "task":
@@ -372,23 +409,34 @@ def main(argv: list[str] | None = None) -> int:
             return 2
         if payload.get("status") == "blocked":
             return 3
+    if parsed.command == "plan" and payload.get("status") == "blocked":
+        return 1
     return 0
 
 
-def _compatibility_notice(parsed: argparse.Namespace) -> str | None:
+def _program_for_invocation(argv0: str | None = None) -> str:
+    invoked_name = Path(argv0 or sys.argv[0]).name.removesuffix(".exe")
+    if invoked_name == COMPATIBILITY_PROGRAM:
+        return COMPATIBILITY_PROGRAM
+    return CANONICAL_PROGRAM
+
+
+def _compatibility_notice(
+    parsed: argparse.Namespace, *, program_name: str = CANONICAL_PROGRAM
+) -> str | None:
     command = parsed.command
     if not isinstance(command, str):
         return None
     if command == "review" and bool(getattr(parsed, "legacy_output", False)):
         return (
-            "quality-runner: warning: --legacy-output emits the v1 review projection, "
+            f"{program_name}: warning: --legacy-output emits the v1 review projection, "
             "supported through 0.7.x; omit it for the v2 outcome."
         )
     replacement = _LEGACY_COMMAND_REPLACEMENTS.get(command)
     if replacement is None:
         return None
     return (
-        f"quality-runner: warning: {command} is a v1 compatibility command, "
+        f"{program_name}: warning: {command} is a v1 compatibility command, "
         f"supported through 0.7.x; use {replacement}."
     )
 

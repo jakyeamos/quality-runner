@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import ast
 import json
+from dataclasses import replace
 from pathlib import Path
 
 from quality_runner.application.read_only_audit import (
@@ -60,6 +61,29 @@ def test_read_only_planning_validates_before_the_artifact_renderer_runs(tmp_path
         isinstance(slice_item.get("context_id"), str)
         for slice_item in planned.remediation_plan["slices"]
     )
+    assert analysis.code_quality_scan["analysis_cache"]["status"] == "disabled"
+    assert analysis.security_scan["analysis_cache"]["status"] == "disabled"
+    assert analysis.code_quality_scan["semantic_similarity_cache"]["status"] == "disabled"
+    assert analysis.code_quality_scan["semantic_similarity_cache"]["persisted"] is False
+    assert not (tmp_path / ".quality-runner").exists()
+
+
+def test_read_only_analysis_uses_external_cache_without_repo_artifacts(tmp_path: Path) -> None:
+    write_js_fixture(tmp_path)
+    cache_root = tmp_path / "analysis-cache"
+
+    first = analyze_read_only_audit(
+        _request(tmp_path, "cached-first", analysis_cache_root=cache_root)
+    )
+    second = analyze_read_only_audit(
+        _request(tmp_path, "cached-second", analysis_cache_root=cache_root)
+    )
+
+    assert first.code_quality_scan["analysis_cache"]["cache_misses"] > 0
+    assert second.code_quality_scan["analysis_cache"]["cache_hits"] > 0
+    assert first.security_scan["analysis_cache"]["cache_misses"] > 0
+    assert second.security_scan["analysis_cache"]["cache_hits"] > 0
+    assert cache_root.exists()
     assert not (tmp_path / ".quality-runner").exists()
 
 
@@ -72,6 +96,26 @@ def test_shared_scope_includes_go_module_metadata_for_security_surface_detection
 
     assert "go.mod" not in {item.path for item in analysis.text_scan_scope.files}
     assert "go.mod" in analysis.text_scan_scope.security_surface_paths
+    assert analysis.security_scan["surfaces"]["dependency_manifest"] is True
+
+
+def test_balanced_focus_keeps_dependency_manifests_in_security_scope(tmp_path: Path) -> None:
+    (tmp_path / "package.json").write_text('{"name":"fixture"}\n', encoding="utf-8")
+    (tmp_path / "src").mkdir()
+    (tmp_path / "src" / "changed.ts").write_text(
+        "export const changed = true;\n", encoding="utf-8"
+    )
+
+    analysis = analyze_read_only_audit(
+        replace(
+            _request(tmp_path, "focused-security-scope"),
+            focus_paths=("src/changed.ts",),
+            analysis_mode="balanced",
+            cache_mode="disabled",
+        )
+    )
+
+    assert "package.json" in analysis.text_scan_scope.security_surface_paths
     assert analysis.security_scan["surfaces"]["dependency_manifest"] is True
 
 
@@ -220,6 +264,7 @@ def _request(
     run_id: str,
     *,
     include_ignored_paths: tuple[str, ...] = (),
+    analysis_cache_root: Path | None = None,
 ) -> AuditRequest:
     return AuditRequest(
         repo_root=repo_root,
@@ -230,4 +275,5 @@ def _request(
         branch_warnings=(),
         skill_review_report=None,
         intent=None,
+        analysis_cache_root=analysis_cache_root,
     )

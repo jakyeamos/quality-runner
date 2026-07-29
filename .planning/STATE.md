@@ -45,6 +45,9 @@ they authorize repository changes.
   guidance; `c71b130` completes the pre-tag gate with dependency-audit and
   untrusted-baseline Git-argument hardening. PR #2 merged, `v0.5.1` is
   published to PyPI, and the GitHub Release is public.
+- Post-release command surface: complete in `9107285`; `qr` is canonical for
+  human-facing help, README quickstart, and packaged entrypoints while
+  `quality-runner` remains a compatible alias with preserved JSON behavior.
 
 ## Active Phase
 
@@ -72,6 +75,9 @@ they authorize repository changes.
   explicit compatibility projection through the published support window.
 - Derive outcome safety claims from observed branch and execution evidence, not
   from requested flags or planned behavior.
+- Lead new CLI usage with `qr` while retaining `quality-runner` as a visible
+  compatibility alias; keep legacy and advanced commands discoverable in root
+  help without making them the first-run path.
 
 ## Next Step
 
@@ -87,6 +93,9 @@ Start the next scoped follow-up from the released `main`/`dev` baseline.
   metadata and installed-wheel release smoke; its exact-head follow-up passes.
 - 2026-07-17: `23da809` prepares v0.6.0 release metadata on the isolated
   release branch; the branch was later promoted and published as v0.6.0.
+- 2026-07-17: `9107285` completes the `qr` command-surface cleanup: packaged
+  alias parity, curated root help, README/CLI quickstart guidance, and focused
+  help/version/JSON contract tests pass; the commit hook quality gate passed.
 - 2026-07-13: v0.5.1 released: PR #2 merged at `a101bd4`, GitHub CI and tag
   release workflow pass, PyPI publishes both artifacts, GitHub Release is
   public, and a disposable PyPI install passes CLI, doctor, smoke, and MCP.

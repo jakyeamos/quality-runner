@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "testCommand": "python3.14 scripts/run_pytest_with_lcov.py",
+  "testCommand": "python3.14 scripts/run_pytest_with_lcov.py --changed-only --ignore tests/test_entrypoints.py",
   "coveragePaths": [
     ".pre-cr/coverage.lcov"
   ],

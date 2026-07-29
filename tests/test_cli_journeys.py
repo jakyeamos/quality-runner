@@ -14,13 +14,26 @@ def test_root_help_leads_with_journeys_before_advanced_operations() -> None:
     result = _cli("--help")
 
     assert result.returncode == 0
+    assert result.stdout.startswith("usage: qr <journey> [options]")
     assert result.stdout.index("audit REPO") < result.stdout.index("Advanced operations")
     assert result.stdout.index("review REPO") < result.stdout.index("Advanced operations")
     assert result.stdout.index("verify REPO") < result.stdout.index("Advanced operations")
     assert result.stdout.index("runs REPO") < result.stdout.index("Advanced operations")
+    assert result.stdout.index("doctor") < result.stdout.index("Advanced operations")
     assert "verify-gates" in result.stdout
     assert "release-smoke" in result.stdout
     assert "review --legacy-output" in result.stdout
+
+
+def test_root_help_can_render_the_compatibility_program_name() -> None:
+    from quality_runner.cli import build_parser
+
+    help_text = build_parser("quality-runner").format_help()
+
+    assert help_text.startswith("usage: quality-runner <journey> [options]")
+    assert "The canonical command is 'qr'" in help_text
+    assert "audit REPO" in help_text
+    assert "doctor" in help_text
 
 
 def test_audit_journey_emits_outcome_json_without_changing_legacy_run(tmp_path: Path) -> None:

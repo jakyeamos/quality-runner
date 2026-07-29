@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Any, cast
 
 from quality_runner.agent_review_policy import AGENT_REVIEW_MODES, AgentReviewMode
+from quality_runner.application.performance_artifacts import write_performance_artifact
 from quality_runner.application.read_only_audit import plan_read_only_audit
 from quality_runner.artifacts import write_json, write_text
 from quality_runner.code_quality import render_resolution_ledger_markdown
@@ -17,6 +18,7 @@ from quality_runner.intent import attach_intent_artifacts, intent_for_run
 from quality_runner.manifest import build_run_manifest
 from quality_runner.module_status import build_module_status
 from quality_runner.planning import render_handoff_markdown
+from quality_runner.security.review_obligations import build_security_review_obligations
 from quality_runner.slice_specs import write_slice_specs
 from quality_runner.workflow_helpers import add_scan_exclusion_artifact
 from quality_runner.workflow_skills import quality_skill_identities, write_skill_review_artifacts
@@ -47,6 +49,12 @@ def write_inspect_v1_artifacts(
         "security_scan_json": str(
             write_json(run_dir / "security-scan.json", _legacy_payload(analysis.security_scan))
         ),
+        "security_review_obligations_json": str(
+            write_json(
+                run_dir / "security-review-obligations.json",
+                build_security_review_obligations(_legacy_payload(analysis.security_scan)),
+            )
+        ),
         "package_manager_preflight_json": str(
             write_json(
                 run_dir / "package-manager-preflight.json",
@@ -76,6 +84,11 @@ def write_inspect_v1_artifacts(
     artifact_paths = attach_intent_artifacts(
         run_dir=run_dir,
         intent=run_intent,
+        artifact_paths=artifact_paths,
+    )
+    artifact_paths = write_performance_artifact(
+        analysis,
+        run_dir=run_dir,
         artifact_paths=artifact_paths,
     )
     manifest = build_run_manifest(
@@ -139,6 +152,12 @@ def plan_and_write_run_v1_artifacts(
     artifact_paths["security_scan_json"] = str(
         write_json(run_dir / "security-scan.json", _legacy_payload(analysis.security_scan))
     )
+    artifact_paths["security_review_obligations_json"] = str(
+        write_json(
+            run_dir / "security-review-obligations.json",
+            build_security_review_obligations(_legacy_payload(analysis.security_scan)),
+        )
+    )
     artifact_paths["package_manager_preflight_json"] = str(
         write_json(
             run_dir / "package-manager-preflight.json",
@@ -154,6 +173,11 @@ def plan_and_write_run_v1_artifacts(
     artifact_paths = attach_intent_artifacts(
         run_dir=run_dir,
         intent=run_intent,
+        artifact_paths=artifact_paths,
+    )
+    artifact_paths = write_performance_artifact(
+        analysis,
+        run_dir=run_dir,
         artifact_paths=artifact_paths,
     )
     manifest = build_run_manifest(
@@ -228,7 +252,11 @@ def _run_artifact_paths(run_dir: Path) -> AuditArtifactPaths:
         "standards_json": str(run_dir / "standards.json"),
         "capability_matrix_json": str(run_dir / "capability-matrix.json"),
         "security_scan_json": str(run_dir / "security-scan.json"),
+        "security_review_obligations_json": str(
+            run_dir / "security-review-obligations.json"
+        ),
         "run_manifest_json": str(run_dir / "run-manifest.json"),
+        "performance_json": str(run_dir / "performance.json"),
         "quality_audit_json": str(run_dir / "quality-audit.json"),
         "remediation_plan_json": str(run_dir / "remediation-plan.json"),
         "remediation_context_json": str(run_dir / "remediation-context.json"),

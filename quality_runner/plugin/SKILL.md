@@ -35,6 +35,22 @@ quality-runner verify /path/to/repo --run-id qr-<date-or-task>-verify --json
 quality-runner runs /path/to/repo --json
 ```
 
+For planning and execution loops, use the additive delivery contract surface:
+
+```bash
+quality-runner plan contract prepare /path/to/repo --phase-id phase-1 --plan-id plan-1 --json
+quality-runner plan contract refresh /path/to/repo --contract CONTRACT --json
+quality-runner plan preflight /path/to/repo --contract CONTRACT --plan-file PLAN.md --json
+quality-runner plan reconcile /path/to/repo --contract CONTRACT --result-file delivery-result.json --json
+```
+
+Contract preparation and refresh use balanced analysis with an external cache by
+default. Preflight reads existing contract and plan artifacts without rescanning;
+reconcile consumes one structured result per execution plan or batch. Use full
+analysis at phase, release, or audit boundaries. Hard obligations, stale source
+fingerprints, missing mandatory evidence, uncovered plan obligations, and
+deferred hard checks block reconciliation; advisory obligations remain visible.
+
 Agent workflow:
 
 1. Run QR before editing source.

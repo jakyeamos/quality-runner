@@ -1,9 +1,10 @@
 # CLI Reference
 
-Quality Runner provides a primary console script and its short local command:
+Quality Runner provides a canonical short console script and a compatibility
+alias:
 
-- `quality-runner`
-- `qr` (short alias for `quality-runner`)
+- `qr` (canonical human-facing command)
+- `quality-runner` (compatibility alias)
 - `quality-runner-mcp`
 
 It also packages compatibility console scripts for existing Repo Quality
@@ -14,17 +15,21 @@ Certifier callers:
 
 ## Outcome-first journeys
 
-New users and integrations should start with `audit`, `review`, `verify`, and
-`runs`. All four render a compact outcome card by default. Their v2 JSON uses
-`quality-runner-outcome-v0.2` and leads with state, assessment, evidence
-confidence, writes, safety, and the safest next action.
+New users and integrations should start with `audit`, `review`, `verify`, `runs`,
+and `doctor` through `qr`. The first four render a compact outcome card by
+default. Their v2 JSON uses `quality-runner-outcome-v0.2` and leads with state,
+assessment, evidence confidence, writes, safety, and the safest next action.
 
 ```bash
-quality-runner audit /path/to/repo --json
-quality-runner review /path/to/repo --mode blind --json
-quality-runner verify /path/to/repo --json
-quality-runner runs /path/to/repo --json
+qr audit /path/to/repo --json
+qr review /path/to/repo --mode blind --json
+qr verify /path/to/repo --json
+qr runs /path/to/repo --json
+qr doctor --json
 ```
+
+Existing callers can use `quality-runner` in place of `qr` with the same help,
+version, and JSON behavior.
 
 `inspect`, `run`, and `verify-gates` remain supported v1 compatibility commands.
 `review --legacy-output` provides the established v1 review JSON field shape
@@ -476,6 +481,20 @@ quality-runner refresh /path/to/repo --run-id-prefix refresh-001 --total-timeout
 quality-runner refresh /path/to/repo --run-id-prefix refresh-001 --execute-gates --worktree-mode disposable --json
 ```
 
+Refresh timeout calibration is local to the target repository. A complete
+full refresh with `--execute-gates` writes a candidate to
+`.quality-runner/cache/refresh-timeout-baseline-v1.json`; the third matching
+successful run activates separate inspect, run, and verify budgets plus a total
+budget. The identity includes the QR version, profile, configuration,
+`.gitignore`, effective module exclusions, scan policy, included-file inventory,
+and discovered gate plan. Timed-out, partial, changed-only, cache-ambiguous,
+run-only-overlay, or unvalidated custom-exclusion runs never update it.
+
+Use `--inspect-timeout-seconds`, `--run-timeout-seconds`,
+`--verify-timeout-seconds`, or `--total-timeout-seconds` to override the learned
+value for that invocation. Missing, malformed, or stale baselines use the
+existing fixed timeout defaults.
+
 Use `--handoff-output` for the normal single-repo workflow where the scan and
 the human remediation plan should be produced together. Refresh still writes the
 canonical `agent-handoff.md` under `.quality-runner/runs/<prefix>-verify/`;
@@ -487,6 +506,8 @@ Timeout flags are explicit about scope:
 - `--verify-timeout-seconds` caps the `verify-gates` phase.
 - `--workflow-timeout-seconds` is a backward-compatible alias for
   `--verify-timeout-seconds`.
+- `--inspect-timeout-seconds` caps the `inspect` phase for one invocation.
+- `--run-timeout-seconds` caps the `run` phase for one invocation.
 - `--total-timeout-seconds` is optional and caps the full refresh across
   inspect, run, and verify.
 - `--workflow-timeout-reason` records why the verify-phase deadline exists.
@@ -496,7 +517,9 @@ Refresh JSON includes `timeout_contract` and `phase_timings` so controllers can
 distinguish a deliberate full-evidence run from a hard end-to-end deadline.
 When a timeout fires, `workflow-timeout.json`, the verify result, and
 `gate-verification.json` include `timeout_scope` as either `verify-phase` or
-`total-refresh`.
+`total-refresh`. The nested timeout diagnostics also identify whether the
+deadline was in `gate-command-execution` or `read-only-gate-discovery` and
+whether the audit came from the current refresh run or a fresh fallback audit.
 
 Agent handoffs from refresh use `quality-runner-agent-handoff-v0.2` and route
 verified gate outcomes with `gates-clean`, `gates-blocked`, and `gates-failed`.
@@ -848,3 +871,27 @@ Review emits the v2 journey projection by default. Packet-only review is
 existing CLI consumer requires the frozen v1 field shape; it emits a versioned
 stderr notice. The [Upgrade and Compatibility Guide](upgrade.md) defines the
 support window and rollback path.
+
+## Planning delivery contracts
+
+The additive contract commands are designed for fast planning and execution
+loops:
+
+```bash
+quality-runner plan contract prepare REPO [options]
+quality-runner plan contract refresh REPO --contract CONTRACT [options]
+quality-runner plan preflight REPO --contract CONTRACT --plan-file PLAN
+quality-runner plan reconcile REPO --contract CONTRACT --result-file RESULT
+```
+
+Contract preparation and refresh default to balanced analysis with an external
+cache and a 30-second performance budget. Preflight reads saved artifacts and
+the native plan only; it does not trigger a QR scan. Reconciliation consumes a
+structured result and the current QR delta. Use the MCP equivalent
+`quality_runner_delivery_contract` for tool callers.
+
+For planning loops, pass `--analysis-mode balanced` and
+`--cache-mode external`. Use `--analysis-mode full` at phase, release, or audit
+boundaries. `--cache-mode disabled` is diagnostic only. See
+[Planning and Delivery Contracts](planning-contracts.md) for the receipt fields
+and blocker rules.

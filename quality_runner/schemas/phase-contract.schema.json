@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://quality-runner.dev/schemas/phase-contract.schema.json",
+  "title": "Quality Runner GSD Phase Contract",
+  "type": "object",
+  "required": ["schema", "phase_id", "scan_tier", "scope"],
+  "properties": {
+    "schema": { "const": "quality-runner-phase-contract-v0.1" },
+    "phase_id": { "type": "string", "minLength": 1 },
+    "plan_id": { "type": ["string", "null"] },
+    "baseline_run_id": { "type": ["string", "null"] },
+    "scan_tier": { "enum": ["targeted", "phase", "repo"] },
+    "scope": {
+      "type": "object",
+      "properties": {
+        "include_paths": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "exclude_paths": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "rules": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "categories": { "type": "array", "items": { "type": "string", "minLength": 1 } }
+      },
+      "additionalProperties": false
+    },
+    "finding_map": { "type": "array", "items": { "type": "object" } },
+    "dispositions": { "type": "array", "items": { "type": "object" } },
+    "early_refresh_triggers": { "type": "array", "items": { "type": "string", "minLength": 1 } }
+  },
+  "additionalProperties": false
+}

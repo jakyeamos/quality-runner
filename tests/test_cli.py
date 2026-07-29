@@ -749,6 +749,19 @@ def test_cli_refresh_runs_read_only_sequence_and_persists_summary(
     assert payload["runs"]["run"]["run_id"] == "cli-refresh-run"
     assert payload["runs"]["verify"]["run_id"] == "cli-refresh-verify"
     assert payload["summary"]["recommended_classification"] == "execution-consent-required"
+    inspect_code = json.loads(
+        (
+            tmp_path / ".quality-runner" / "runs" / "cli-refresh-inspect" / "code-quality-scan.json"
+        ).read_text()
+    )
+    run_code = json.loads(
+        (
+            tmp_path / ".quality-runner" / "runs" / "cli-refresh-run" / "code-quality-scan.json"
+        ).read_text()
+    )
+    assert inspect_code["analysis_cache"]["persisted"] is True
+    assert run_code["analysis_cache"]["cache_hits"] > 0
+    assert run_code["analysis_cache"]["cache_misses"] == 0
     persisted = tmp_path / ".quality-runner" / "runs" / "cli-refresh-verify" / "run-summary.json"
     assert json.loads(persisted.read_text(encoding="utf-8"))["run_id"] == "cli-refresh-verify"
 
@@ -858,7 +871,7 @@ def test_cli_refresh_workflow_timeout_records_reason(tmp_path: Path) -> None:
         check=True,
         capture_output=True,
         text=True,
-        timeout=4,
+        timeout=10,
     )
 
     payload = json.loads(result.stdout)

@@ -384,6 +384,72 @@ def test_similarity_fingerprint_stable_when_line_numbers_change(
     assert first["findings"][0]["fingerprint"] == second["findings"][0]["fingerprint"]
 
 
+def test_similarity_cache_reuses_unchanged_report(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from quality_runner.code_quality_similarity import semantic_similarity_scan
+
+    (tmp_path / "src").mkdir()
+    (tmp_path / "src" / "foo.ts").write_text("export function parseFoo() {}\n", encoding="utf-8")
+    calls = 0
+
+    def fake_which(name: str) -> str | None:
+        return "/usr/local/bin/similarity-ts" if name == "similarity-ts" else None
+
+    def fake_run(command: list[str], **kwargs: object) -> subprocess.CompletedProcess[str]:
+        nonlocal calls
+        calls += 1
+        return subprocess.CompletedProcess(command, 0, PAIR_OUTPUT, "")
+
+    monkeypatch.setattr("quality_runner.code_quality_similarity.shutil.which", fake_which)
+    monkeypatch.setattr("quality_runner.code_quality_similarity.subprocess.run", fake_run)
+
+    first = semantic_similarity_scan(tmp_path, policy=_policy(), disabled_groups=set())
+    second = semantic_similarity_scan(tmp_path, policy=_policy(), disabled_groups=set())
+
+    assert first["cache_status"] == "miss"
+    assert second["cache_status"] == "hit"
+    assert second["scanner_status"][0]["status"] == "cached"
+    assert first["cache_evidence"]["persisted"] is True
+    assert first["cache_evidence"]["cache_misses"] == 1
+    assert second["cache_evidence"]["cache_hits"] == 1
+    assert second["cache_evidence"]["index_status"] == "ready"
+    assert calls == 1
+
+
+def test_similarity_cache_reports_source_invalidation(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from quality_runner.code_quality_similarity import semantic_similarity_scan
+
+    (tmp_path / "src").mkdir()
+    source_path = tmp_path / "src" / "foo.ts"
+    source_path.write_text("export function parseFoo() {}\n", encoding="utf-8")
+
+    def fake_which(name: str) -> str | None:
+        return "/usr/local/bin/similarity-ts" if name == "similarity-ts" else None
+
+    calls = 0
+
+    def fake_run(command: list[str], **kwargs: object) -> subprocess.CompletedProcess[str]:
+        nonlocal calls
+        calls += 1
+        return subprocess.CompletedProcess(command, 0, PAIR_OUTPUT, "")
+
+    monkeypatch.setattr("quality_runner.code_quality_similarity.shutil.which", fake_which)
+    monkeypatch.setattr("quality_runner.code_quality_similarity.subprocess.run", fake_run)
+
+    semantic_similarity_scan(tmp_path, policy=_policy(), disabled_groups=set())
+    source_path.write_text(
+        "export function parseFoo(value: string) { return value; }\n", encoding="utf-8"
+    )
+    result = semantic_similarity_scan(tmp_path, policy=_policy(), disabled_groups=set())
+
+    assert result["cache_status"] == "miss"
+    assert result["cache_evidence"]["invalidation_reasons"] == {"source-content-changed": 1}
+    assert calls == 2
+
+
 def test_python_output_style_parses_pair(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     from quality_runner.code_quality_similarity import semantic_similarity_scan
 

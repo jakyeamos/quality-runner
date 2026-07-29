@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import hashlib
+import json
 from collections.abc import Iterator, Sequence
 from fnmatch import fnmatchcase
 from pathlib import Path
@@ -58,6 +60,7 @@ DEFAULT_SCAN_EXCLUSIONS = [
     ".continue",
     ".cursor",
     ".planning",
+    ".design-sync/previews/**",
     ".superpowers",
     ".tracker",
     "docs",
@@ -80,6 +83,8 @@ type ScanExclusionOverlay = list[str] | dict[str, list[str]]
 MAX_SCAN_PROGRESS_PATHS = 20
 _SCAN_PROGRESS: dict[str, Any] = {
     "last_directory": None,
+    "last_activity_kind": None,
+    "last_activity_path": None,
     "last_paths": [],
     "last_skipped_paths": [],
     "visited_paths": 0,
@@ -148,6 +153,38 @@ def effective_scan_exclusions_by_module(
         )
         for scope in (SCAN_EXCLUSION_SCOPE_ALL, *SCAN_EXCLUSION_MODULES)
     }
+
+
+def scan_exclusion_contract(
+    root: Path,
+    config: dict[str, Any] | None,
+) -> dict[str, Any]:
+    configured = config.get("scan_exclusions") if isinstance(config, dict) else None
+    configured_by_module = (
+        config.get("scan_exclusions_by_module") if isinstance(config, dict) else None
+    )
+    effective_by_module = effective_scan_exclusions_by_module(root, config)
+    payload = {
+        "configured_scan_exclusions": (
+            [item for item in configured if isinstance(item, str)]
+            if isinstance(configured, list)
+            else []
+        ),
+        "configured_scan_exclusions_by_module": (
+            {
+                module: [item for item in values if isinstance(item, str)]
+                for module, values in configured_by_module.items()
+                if isinstance(module, str) and isinstance(values, list)
+            }
+            if isinstance(configured_by_module, dict)
+            else {}
+        ),
+        "gitignore_patterns": gitignore_scan_exclusions(root),
+        "gitignore_sha256": _gitignore_sha256(root),
+        "effective_scan_exclusions_by_module": effective_by_module,
+    }
+    content = json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
+    return {**payload, "fingerprint": hashlib.sha256(content.encode("utf-8")).hexdigest()}
 
 
 def normalize_scan_exclusion_module(value: str) -> str:
@@ -267,8 +304,20 @@ def gitignore_scan_exclusions(root: Path) -> list[str]:
     return _unique(patterns)
 
 
+def _gitignore_sha256(root: Path) -> str | None:
+    path = root / ".gitignore"
+    if not path.is_file() or path.is_symlink():
+        return None
+    try:
+        return hashlib.sha256(path.read_bytes()).hexdigest()
+    except OSError:
+        return None
+
+
 def reset_scan_progress() -> None:
     _SCAN_PROGRESS["last_directory"] = None
+    _SCAN_PROGRESS["last_activity_kind"] = None
+    _SCAN_PROGRESS["last_activity_path"] = None
     _SCAN_PROGRESS["last_paths"] = []
     _SCAN_PROGRESS["last_skipped_paths"] = []
     _SCAN_PROGRESS["visited_paths"] = 0
@@ -280,6 +329,8 @@ def reset_scan_progress() -> None:
 def scan_progress_snapshot() -> dict[str, Any]:
     return {
         "last_directory": _SCAN_PROGRESS["last_directory"],
+        "last_activity_kind": _SCAN_PROGRESS["last_activity_kind"],
+        "last_activity_path": _SCAN_PROGRESS["last_activity_path"],
         "last_paths": list(_SCAN_PROGRESS["last_paths"]),
         "last_skipped_paths": list(_SCAN_PROGRESS["last_skipped_paths"]),
         "visited_paths": _SCAN_PROGRESS["visited_paths"],
@@ -289,11 +340,18 @@ def scan_progress_snapshot() -> dict[str, Any]:
     }
 
 
+def record_scan_activity(root: Path, path: Path, *, kind: str) -> None:
+    _SCAN_PROGRESS["last_activity_kind"] = kind
+    _SCAN_PROGRESS["last_activity_path"] = _relative_path(root, path)
+
+
 def _record_directory(root: Path, directory: Path) -> None:
     _SCAN_PROGRESS["last_directory"] = _relative_path(root, directory)
+    record_scan_activity(root, directory, kind="path-traversal")
 
 
 def _record_path(root: Path, path: Path) -> None:
+    record_scan_activity(root, path, kind="path-traversal")
     _SCAN_PROGRESS["visited_paths"] += 1
     _increment_count("visited_top_level_counts", _top_level(root, path))
     paths = _SCAN_PROGRESS["last_paths"]
@@ -305,6 +363,7 @@ def _record_path(root: Path, path: Path) -> None:
 
 
 def _record_skipped(root: Path, path: Path) -> None:
+    record_scan_activity(root, path, kind="excluded-path-pruning")
     _SCAN_PROGRESS["skipped_paths"] += 1
     _increment_count("skipped_top_level_counts", _top_level(root, path))
     paths = _SCAN_PROGRESS["last_skipped_paths"]

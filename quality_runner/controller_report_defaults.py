@@ -138,11 +138,28 @@ def workflow_timeout_blockers(timeout_diagnostics: object) -> list[str]:
     timeout_scope = first_string(timeout_diagnostics.get("timeout_scope"))
     last_directory = first_string(timeout_diagnostics.get("last_directory"))
     visited_paths = timeout_diagnostics.get("visited_paths")
-    if timeout_scope and last_directory and isinstance(visited_paths, int):
-        blockers.append(
-            f"Workflow timeout: {timeout_scope} timed out at {last_directory} "
-            f"after {visited_paths} visited paths."
-        )
+    scan_activity = timeout_diagnostics.get("scan_activity")
+    activity_path = (
+        scan_activity.get("path")
+        if isinstance(scan_activity, dict) and isinstance(scan_activity.get("path"), str)
+        else None
+    )
+    if timeout_scope and isinstance(visited_paths, int) and (last_directory or activity_path):
+        if (
+            isinstance(scan_activity, dict)
+            and scan_activity.get("kind") == "excluded-directory-estimation"
+            and activity_path
+        ):
+            blockers.append(
+                f"Workflow timeout: {timeout_scope} timed out while estimating excluded "
+                f"directory {scan_activity['path']} (not actual scan work) after "
+                f"{visited_paths} visited paths."
+            )
+        else:
+            blockers.append(
+                f"Workflow timeout: {timeout_scope} timed out at {last_directory or activity_path} "
+                f"after {visited_paths} visited paths."
+            )
     recommendations = timeout_diagnostics.get("pruning_recommendations")
     if isinstance(recommendations, list):
         for recommendation in recommendations:

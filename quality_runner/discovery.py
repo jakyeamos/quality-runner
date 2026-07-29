@@ -7,6 +7,7 @@ from typing import Any
 
 from quality_runner import __version__
 from quality_runner.aggregate_coverage import analyze_aggregate_coverage
+from quality_runner.cache_modes import CacheMode
 from quality_runner.discovery_inputs import (
     _package_scripts,
     _read_package_json,
@@ -16,6 +17,7 @@ from quality_runner.discovery_inputs import (
 )
 from quality_runner.discovery_quality import _quality_commands
 from quality_runner.intent_docs import discover_intent_docs
+from quality_runner.inventory_cache import load_or_build_inventory
 from quality_runner.manifest import git_state_for_repo
 from quality_runner.scan_exclusions import (
     effective_scan_exclusions,
@@ -26,6 +28,38 @@ from quality_runner.surfaces import detect_surfaces
 
 
 def inspect_repo(
+    repo_root: Path,
+    run_id: str,
+    ci_checks: list[dict[str, str | None]] | None = None,
+    extra_warnings: list[dict[str, str]] | None = None,
+    config: dict[str, Any] | None = None,
+    cache_mode: CacheMode | str = "repo",
+    cache_root: Path | None = None,
+) -> dict[str, Any]:
+    payload = load_or_build_inventory(
+        repo_root,
+        config=config,
+        ci_checks=ci_checks,
+        extra_warnings=extra_warnings,
+        cache_mode=cache_mode,
+        cache_root=cache_root,
+        build=lambda: _inspect_repo_uncached(
+            repo_root,
+            run_id,
+            ci_checks=ci_checks,
+            extra_warnings=extra_warnings,
+            config=config,
+        ),
+    )
+    payload["run_id"] = run_id
+    for key in ("git_provenance", "provenance"):
+        provenance = payload.get(key)
+        if isinstance(provenance, dict):
+            provenance["workflow_run_id"] = run_id
+    return payload
+
+
+def _inspect_repo_uncached(
     repo_root: Path,
     run_id: str,
     ci_checks: list[dict[str, str | None]] | None = None,
