@@ -6,7 +6,7 @@ behavior, an intentional failure fixture, local evidence, and CI evidence.
 Merely appearing in CI is not certification.
 
 The first Quality Runner certification covers the locked development environment
-created by `uv sync --locked --all-groups`:
+created by `uv sync --locked --all-groups --python 3.13`:
 
 | Gate | Pinned version | Local command | CI command |
 | --- | --- | --- | --- |
@@ -19,11 +19,16 @@ created by `uv sync --locked --all-groups`:
 fixtures for each gate. `.github/workflows/ci.yml` runs the equivalent pinned
 commands on Python 3.12, 3.13, and 3.14 on Ubuntu and macOS. `qr task` resolves
 the executable from `.venv/bin`, records the path and `--version` output, and
-runs only certified commands inside its isolated source snapshot. Gate
-subprocesses do not inherit user or system Git configuration, so global ignore
-rules and hooks cannot make local evidence differ from CI. The documented
-bootstrap environment supplies the pinned dependency cache; QR does not install
-or update dependencies during a task check.
+runs only certified commands inside its isolated source snapshot. Before those
+commands run, QR executes each distinct certified bootstrap once in the
+snapshot, records the bootstrap executable, version, output, and status, then
+prefers the tools installed into the snapshot's `.venv`. A failed, missing,
+unversioned, or timed-out bootstrap blocks the check instead of being treated as
+a policy violation. Gate subprocesses do not inherit user or system Git
+configuration, caller-selected Python import paths, UV Python, or virtual
+environments, so global ignore rules, hooks, and launcher state cannot make
+local evidence differ from CI. The documented `uv` cache may be reused, but the
+locked environment is materialized independently for each task-check snapshot.
 
 The first promoted QR rule is `code_quality:large-source-file`. Its positive,
 negative, and test-scope/ambiguous boundary fixtures are also in
@@ -32,7 +37,7 @@ negative, and test-scope/ambiguous boundary fixtures are also in
 To refresh local evidence, run:
 
 ```bash
-uv sync --locked --all-groups
+uv sync --locked --all-groups --python 3.13
 uv run --locked pytest -q tests/test_prevention_policy.py
 uv run --locked ruff check .
 uv run --locked ruff format --check .

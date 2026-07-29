@@ -378,6 +378,7 @@ def _cache_root(args: argparse.Namespace) -> Path | None:
     value = getattr(args, "cache_dir", None)
     return Path(value).expanduser().resolve() if isinstance(value, str) and value else None
 
+
 def _include_paths_from_args(args: argparse.Namespace) -> tuple[str, ...]:
     explicit = tuple(getattr(args, "include_path", []) or [])
     contract_path = getattr(args, "phase_contract", None)

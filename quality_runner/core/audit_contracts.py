@@ -35,6 +35,8 @@ class AuditRequest:
     analysis_mode: AnalysisMode = "full"
     cache_mode: CacheMode | None = None
     cache_root: Path | None = None
+    cache_namespace_root: Path | None = None
+    cache_context_identity: str | None = None
     performance_budget_seconds: float | None = None
     include_paths: tuple[str, ...] = ()
 

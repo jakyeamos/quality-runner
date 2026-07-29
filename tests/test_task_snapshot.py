@@ -172,3 +172,182 @@ def test_gate_snapshot_has_git_history_without_replacing_dirty_files(
 
     assert " M tracked.txt" in status
     assert "?? untracked.txt" in status
+
+
+def test_merge_workspace_uses_target_changes_and_overlays_task_work(
+    tmp_path: Path,
+) -> None:
+    repo = _repo(tmp_path)
+    base_sha = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=repo,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    _git(repo, "switch", "-c", "target")
+    (repo / "tracked.txt").write_text("target\n", encoding="utf-8")
+    _git(repo, "commit", "-am", "target change")
+    target_sha = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=repo,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    _git(repo, "switch", "-c", "task", base_sha)
+    (repo / "task.txt").write_text("dirty task work\n", encoding="utf-8")
+
+    with workspace_snapshot(repo, baseline_ref=target_sha) as (_baseline, baseline_manifest):
+        pass
+    with workspace_snapshot(repo, merge_target_ref=target_sha) as (snapshot, manifest):
+        assert (snapshot / "tracked.txt").read_text() == "target\n"
+        assert (snapshot / "task.txt").read_text() == "dirty task work\n"
+        assert manifest["source"]["kind"] == "merge_workspace"
+        assert manifest["source"]["baseline_sha"] == target_sha
+        assert changed_paths(baseline_manifest, manifest) == ["task.txt"]
+
+
+def test_merge_workspace_git_metadata_represents_merge_before_dirty_overlay(
+    tmp_path: Path,
+) -> None:
+    repo = _repo(tmp_path)
+    base_sha = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=repo,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    _git(repo, "switch", "-c", "target")
+    (repo / "tracked.txt").write_text("target\n", encoding="utf-8")
+    _git(repo, "commit", "-am", "target change")
+    target_sha = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=repo,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    _git(repo, "switch", "-c", "task", base_sha)
+    (repo / "untracked.txt").write_text("dirty\n", encoding="utf-8")
+
+    with workspace_snapshot(repo, merge_target_ref=target_sha) as (snapshot, manifest):
+        attach_git_metadata(repo, snapshot, source=manifest["source"])
+        status = subprocess.run(
+            ["git", "status", "--short"],
+            cwd=snapshot,
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout
+        parent_count = len(
+            subprocess.run(
+                ["git", "show", "-s", "--format=%P", "HEAD"],
+                cwd=snapshot,
+                check=True,
+                capture_output=True,
+                text=True,
+            ).stdout.split()
+        )
+
+    assert status == "?? untracked.txt\n"
+    assert parent_count == 2
+
+
+def test_merge_workspace_does_not_write_objects_to_source_repository(
+    tmp_path: Path,
+) -> None:
+    repo = _repo(tmp_path)
+    base_sha = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=repo,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    _git(repo, "switch", "-c", "target")
+    (repo / "target.txt").write_text("target\n", encoding="utf-8")
+    _git(repo, "add", "target.txt")
+    _git(repo, "commit", "-m", "target change")
+    target_sha = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=repo,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    _git(repo, "switch", "-c", "task", base_sha)
+    (repo / "task.txt").write_text("task\n", encoding="utf-8")
+    _git(repo, "add", "task.txt")
+    _git(repo, "commit", "-m", "task change")
+    objects = repo / ".git" / "objects"
+    before = sorted(path.relative_to(objects) for path in objects.rglob("*") if path.is_file())
+
+    with workspace_snapshot(repo, merge_target_ref=target_sha) as (snapshot, manifest):
+        assert (snapshot / "target.txt").read_text() == "target\n"
+        assert (snapshot / "task.txt").read_text() == "task\n"
+        attach_git_metadata(repo, snapshot, source=manifest["source"])
+
+    after = sorted(path.relative_to(objects) for path in objects.rglob("*") if path.is_file())
+    assert after == before
+
+
+def test_merge_workspace_blocks_conflicting_target_and_task_revisions(
+    tmp_path: Path,
+) -> None:
+    repo = _repo(tmp_path)
+    base_sha = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=repo,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    _git(repo, "switch", "-c", "target")
+    (repo / "tracked.txt").write_text("target\n", encoding="utf-8")
+    _git(repo, "commit", "-am", "target change")
+    target_sha = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=repo,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    _git(repo, "switch", "-c", "task", base_sha)
+    (repo / "tracked.txt").write_text("task\n", encoding="utf-8")
+    _git(repo, "commit", "-am", "task change")
+
+    with pytest.raises(SnapshotError, match="unambiguous merge"):
+        with workspace_snapshot(repo, merge_target_ref=target_sha):
+            pass
+
+
+def test_merge_workspace_blocks_untracked_path_overwritten_by_target(
+    tmp_path: Path,
+) -> None:
+    repo = _repo(tmp_path)
+    base_sha = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=repo,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    _git(repo, "switch", "-c", "target")
+    (repo / "target-only.txt").write_text("target\n", encoding="utf-8")
+    _git(repo, "add", "target-only.txt")
+    _git(repo, "commit", "-m", "target path")
+    target_sha = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=repo,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    _git(repo, "switch", "-c", "task", base_sha)
+    (repo / "target-only.txt").write_text("untracked\n", encoding="utf-8")
+
+    with pytest.raises(SnapshotError, match="would be overwritten"):
+        with workspace_snapshot(repo, merge_target_ref=target_sha):
+            pass

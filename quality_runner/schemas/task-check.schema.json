@@ -20,6 +20,10 @@
     "gate_results": { "type": "array" },
     "required_gate_failures": { "type": "array" },
     "blockers": { "type": "array" },
+    "analysis": {
+      "type": "object",
+      "required": ["analysis_mode", "cache_mode", "performance", "cache_summary"]
+    },
     "evidence": { "type": "object" },
     "error": { "type": "object" },
     "warnings": { "type": "array" }

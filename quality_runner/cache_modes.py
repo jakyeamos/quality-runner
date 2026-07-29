@@ -43,6 +43,7 @@ def cache_directory(
     *,
     mode: CacheMode,
     cache_root: Path | None = None,
+    namespace_root: Path | None = None,
     component: str,
 ) -> Path:
     root = repo_root.expanduser().resolve()
@@ -50,7 +51,12 @@ def cache_directory(
         return root / ".quality-runner" / "cache" / component
     if mode == "external":
         external_root = (
-            cache_root.expanduser().resolve() if cache_root is not None else default_external_cache_root()
+            cache_root.expanduser().resolve()
+            if cache_root is not None
+            else default_external_cache_root()
         )
-        return external_root / cache_namespace(root) / component
+        namespace_source = (
+            namespace_root.expanduser().resolve() if namespace_root is not None else root
+        )
+        return external_root / cache_namespace(namespace_source) / component
     return root / ".quality-runner" / "cache" / component

@@ -25,6 +25,8 @@ from quality_runner.schema_constants import (
     TASK_RECORD_SCHEMA,
 )
 from quality_runner.task_contract import (
+    TASK_ANALYSIS_MODE,
+    TASK_CACHE_MODE,
     contract_hashes,
     deduplicate_blockers,
     drift_blockers,
@@ -181,8 +183,24 @@ def check_task(repo_root: Path, *, task_id: str) -> dict[str, Any]:
     include_paths = tuple(
         item for item in prevention.get("snapshot_include_paths", []) if isinstance(item, str)
     )
-    with workspace_snapshot(repo_root, include_paths=include_paths) as (snapshot_root, snapshot):
-        analysis = _analyze(snapshot_root, run_id)
+    baseline_source = cast(dict[str, Any], baseline.get("source", {}))
+    merge_target_ref = (
+        str(baseline_source["head_sha"])
+        if baseline_source.get("kind") == "git_revision"
+        and isinstance(baseline_source.get("head_sha"), str)
+        else None
+    )
+    with workspace_snapshot(
+        repo_root,
+        merge_target_ref=merge_target_ref,
+        include_paths=include_paths,
+    ) as (snapshot_root, snapshot):
+        analysis = _analyze(
+            snapshot_root,
+            run_id,
+            cache_repo_root=repo_root,
+            snapshot_digest=str(snapshot["snapshot_digest"]),
+        )
         findings = normalize_findings(
             code_quality_scan=cast(dict[str, Any], analysis.code_quality_scan),
             security_scan=cast(dict[str, Any], analysis.security_scan),
@@ -190,7 +208,11 @@ def check_task(repo_root: Path, *, task_id: str) -> dict[str, Any]:
         )
         readiness = evaluate_readiness(repo_root=repo_root, prevention=prevention)
         if any(gate.get("state") == "certified" for gate in readiness["gates"]):
-            attach_git_metadata(repo_root, snapshot_root)
+            attach_git_metadata(
+                repo_root,
+                snapshot_root,
+                source=cast(dict[str, Any], snapshot["source"]),
+            )
         gate_results, gate_blockers = run_certified_gates(
             snapshot_root=snapshot_root,
             repo_root=repo_root,
@@ -237,9 +259,12 @@ def check_task(repo_root: Path, *, task_id: str) -> dict[str, Any]:
         "gate_results": gate_results,
         "required_gate_failures": failures,
         "blockers": deduplicate_blockers(blockers),
+        "analysis": _analysis_evidence(analysis),
         "evidence": {
             **contract_hashes(repo_root, config),
             "toolchain_hash": readiness["toolchain_hash"],
+            "task_analysis_mode": TASK_ANALYSIS_MODE,
+            "task_cache_mode": TASK_CACHE_MODE,
         },
     }
     write_json(safe_child_file(run_dir, "workspace-snapshot.json"), snapshot)
@@ -276,7 +301,12 @@ def _capture_baseline(
     ) as (snapshot_root, snapshot):
         if baseline_ref is not None:
             _overlay_config(repo_root, snapshot_root)
-        analysis = _analyze(snapshot_root, run_id)
+        analysis = _analyze(
+            snapshot_root,
+            run_id,
+            cache_repo_root=repo_root,
+            snapshot_digest=str(snapshot["snapshot_digest"]),
+        )
         findings = normalize_findings(
             code_quality_scan=cast(dict[str, Any], analysis.code_quality_scan),
             security_scan=cast(dict[str, Any], analysis.security_scan),
@@ -286,6 +316,8 @@ def _capture_baseline(
     evidence = {
         **contract_hashes(repo_root, config),
         "toolchain_hash": readiness["toolchain_hash"],
+        "task_analysis_mode": TASK_ANALYSIS_MODE,
+        "task_cache_mode": TASK_CACHE_MODE,
     }
     baseline = {
         "schema": TASK_BASELINE_SCHEMA,
@@ -298,6 +330,7 @@ def _capture_baseline(
         "normalized_findings": findings,
         "coverage": findings["coverage"],
         "prevention_readiness": readiness,
+        "analysis": _analysis_evidence(analysis),
         "evidence": evidence,
         "intent": intent,
         "reason": reason,
@@ -311,7 +344,14 @@ def _capture_baseline(
     return baseline
 
 
-def _analyze(snapshot_root: Path, run_id: str) -> Any:
+def _analyze(
+    snapshot_root: Path,
+    run_id: str,
+    *,
+    cache_repo_root: Path,
+    snapshot_digest: str,
+) -> Any:
+    cache_root = cache_repo_root / ".quality-runner" / "cache" / "task-analysis-v1"
     request = AuditRequest(
         repo_root=snapshot_root,
         run_id=run_id,
@@ -321,8 +361,23 @@ def _analyze(snapshot_root: Path, run_id: str) -> Any:
         branch_warnings=(),
         skill_review_report=None,
         intent=None,
+        analysis_mode=TASK_ANALYSIS_MODE,
+        cache_mode=TASK_CACHE_MODE,
+        cache_root=cache_root,
+        cache_namespace_root=cache_repo_root,
+        cache_context_identity=snapshot_digest,
     )
     return analyze_read_only_audit(request)
+
+
+def _analysis_evidence(analysis: Any) -> dict[str, Any]:
+    scan = cast(dict[str, Any], analysis.scan)
+    return {
+        "analysis_mode": TASK_ANALYSIS_MODE,
+        "cache_mode": TASK_CACHE_MODE,
+        "performance": analysis.performance,
+        "cache_summary": scan.get("cache_summary"),
+    }
 
 
 def _required_readiness_blockers(readiness: dict[str, Any]) -> list[dict[str, str]]:

@@ -5,7 +5,6 @@ import json
 import os
 import shutil
 import stat
-import subprocess
 import tempfile
 from collections.abc import Iterator
 from contextlib import contextmanager
@@ -14,6 +13,21 @@ from pathlib import Path, PurePosixPath
 from typing import Any
 
 from quality_runner.schema_constants import WORKSPACE_SNAPSHOT_SCHEMA
+from quality_runner.task_snapshot_git import (
+    SnapshotError,
+)
+from quality_runner.task_snapshot_git import (
+    git as _git,
+)
+from quality_runner.task_snapshot_git import (
+    git_bytes as _git_bytes,
+)
+from quality_runner.task_snapshot_git import (
+    isolated_object_environment as _isolated_object_environment,
+)
+from quality_runner.task_snapshot_git import (
+    merge_tree as _merge_tree,
+)
 
 ALWAYS_EXCLUDED = {".git", ".quality-runner"}
 DEFAULT_EXCLUDED_PARTS = {
@@ -31,32 +45,22 @@ DEFAULT_EXCLUDED_PARTS = {
 }
 
 
-class SnapshotError(RuntimeError):
-    pass
-
-
 @contextmanager
 def workspace_snapshot(
     repo_root: Path,
     *,
     baseline_ref: str | None = None,
+    merge_target_ref: str | None = None,
     include_paths: tuple[str, ...] = (),
 ) -> Iterator[tuple[Path, dict[str, Any]]]:
     repo_root = repo_root.resolve()
     repository = _repository_identity(repo_root)
+    if baseline_ref is not None and merge_target_ref is not None:
+        raise SnapshotError("baseline_ref and merge_target_ref are mutually exclusive")
     with tempfile.TemporaryDirectory(prefix="quality-runner-task-") as temporary:
         snapshot_root = Path(temporary) / "source"
         snapshot_root.mkdir()
-        if baseline_ref is None:
-            entries, exclusions = _copy_workspace(
-                repo_root, snapshot_root, include_paths=include_paths
-            )
-            source = {
-                "kind": "workspace",
-                "head_sha": repository["head_sha"],
-                "baseline_ref": None,
-            }
-        else:
+        if baseline_ref is not None:
             revision = _resolve_revision(repo_root, baseline_ref)
             entries, exclusions = _copy_revision(
                 repo_root,
@@ -68,6 +72,43 @@ def workspace_snapshot(
                 "kind": "git_revision",
                 "head_sha": revision,
                 "baseline_ref": baseline_ref,
+            }
+        elif merge_target_ref is not None:
+            target_revision = _resolve_revision(repo_root, merge_target_ref)
+            object_directory = Path(temporary) / "merge-objects"
+            object_directory.mkdir()
+            merge_environment = _isolated_object_environment(
+                repo_root,
+                object_directory,
+            )
+            merge_tree = _merge_tree(
+                repo_root,
+                target_revision,
+                repository["head_sha"],
+                environment=merge_environment,
+            )
+            entries, exclusions = _copy_merge_workspace(
+                repo_root,
+                snapshot_root,
+                merge_tree,
+                include_paths=include_paths,
+                git_environment=merge_environment,
+            )
+            source = {
+                "kind": "merge_workspace",
+                "head_sha": repository["head_sha"],
+                "baseline_ref": merge_target_ref,
+                "baseline_sha": target_revision,
+                "merge_tree": merge_tree,
+            }
+        else:
+            entries, exclusions = _copy_workspace(
+                repo_root, snapshot_root, include_paths=include_paths
+            )
+            source = {
+                "kind": "workspace",
+                "head_sha": repository["head_sha"],
+                "baseline_ref": None,
             }
         manifest = {
             "schema": WORKSPACE_SNAPSHOT_SCHEMA,
@@ -93,7 +134,12 @@ def changed_paths(
     return sorted(paths)
 
 
-def attach_git_metadata(repo_root: Path, snapshot_root: Path) -> None:
+def attach_git_metadata(
+    repo_root: Path,
+    snapshot_root: Path,
+    *,
+    source: dict[str, Any] | None = None,
+) -> None:
     """Attach local Git history without replacing the materialized workspace."""
     if (snapshot_root / ".git").exists():
         raise SnapshotError("isolated snapshot unexpectedly contains Git metadata")
@@ -110,6 +156,32 @@ def attach_git_metadata(repo_root: Path, snapshot_root: Path) -> None:
     )
     shutil.move(str(metadata_root / ".git"), str(snapshot_root / ".git"))
     metadata_root.rmdir()
+    source_payload = source if isinstance(source, dict) else {}
+    merge_tree = source_payload.get("merge_tree")
+    if isinstance(merge_tree, str):
+        baseline_sha = source_payload.get("baseline_sha")
+        head_sha = source_payload.get("head_sha")
+        if not isinstance(baseline_sha, str) or not isinstance(head_sha, str):
+            raise SnapshotError("merge workspace lacks parent commit evidence")
+        materialized_merge_tree = _merge_tree(snapshot_root, baseline_sha, head_sha)
+        if materialized_merge_tree != merge_tree:
+            raise SnapshotError("merge workspace tree changed while attaching Git metadata")
+        synthetic_commit = _git(
+            snapshot_root,
+            "-c",
+            "user.name=Quality Runner",
+            "-c",
+            "user.email=quality-runner@invalid",
+            "commit-tree",
+            merge_tree,
+            "-p",
+            baseline_sha,
+            "-p",
+            head_sha,
+            "-m",
+            "Quality Runner isolated merge workspace",
+        ).strip()
+        _git(snapshot_root, "update-ref", "HEAD", synthetic_commit)
     _git(snapshot_root, "read-tree", "HEAD")
 
 
@@ -178,8 +250,17 @@ def _copy_revision(
     revision: str,
     *,
     include_paths: tuple[str, ...],
+    git_environment: dict[str, str] | None = None,
 ) -> tuple[list[dict[str, Any]], list[dict[str, str]]]:
-    payload = _git_bytes(repo_root, "ls-tree", "-r", "-z", "--full-tree", revision)
+    payload = _git_bytes(
+        repo_root,
+        "ls-tree",
+        "-r",
+        "-z",
+        "--full-tree",
+        revision,
+        environment=git_environment,
+    )
     entries: list[dict[str, Any]] = []
     exclusions: list[dict[str, str]] = [
         {"path": name, "reason": "quality_runner_internal"} for name in sorted(ALWAYS_EXCLUDED)
@@ -194,7 +275,13 @@ def _copy_revision(
             continue
         if object_type != "blob":
             raise SnapshotError(f"unsafe Git entry type for {path}: {object_type}")
-        content = _git_bytes(repo_root, "cat-file", "blob", object_id)
+        content = _git_bytes(
+            repo_root,
+            "cat-file",
+            "blob",
+            object_id,
+            environment=git_environment,
+        )
         target = snapshot_root / path
         target.parent.mkdir(parents=True, exist_ok=True)
         if mode == "120000":
@@ -225,6 +312,91 @@ def _copy_revision(
             }
         )
     return entries, exclusions
+
+
+def _copy_merge_workspace(
+    repo_root: Path,
+    snapshot_root: Path,
+    merge_tree: str,
+    *,
+    include_paths: tuple[str, ...],
+    git_environment: dict[str, str],
+) -> tuple[list[dict[str, Any]], list[dict[str, str]]]:
+    entries, exclusions = _copy_revision(
+        repo_root,
+        snapshot_root,
+        merge_tree,
+        include_paths=include_paths,
+        git_environment=git_environment,
+    )
+    entries_by_path = {_entry_key(item): item for item in entries}
+    dirty_payload = _git_bytes(
+        repo_root,
+        "diff",
+        "--name-only",
+        "--no-renames",
+        "-z",
+        "HEAD",
+        "--",
+    )
+    untracked_payload = _git_bytes(
+        repo_root,
+        "ls-files",
+        "-z",
+        "--others",
+        "--exclude-standard",
+    )
+    dirty_paths = {_decode_git_path(raw) for raw in dirty_payload.split(b"\0") if raw}
+    untracked_paths = {_decode_git_path(raw) for raw in untracked_payload.split(b"\0") if raw}
+    head_payload = _git_bytes(
+        repo_root,
+        "ls-tree",
+        "-r",
+        "--name-only",
+        "-z",
+        "HEAD",
+    )
+    head_paths = {_decode_git_path(raw) for raw in head_payload.split(b"\0") if raw}
+    for path in sorted(untracked_paths):
+        if path not in head_paths and _path_collides_with_entries(path, entries_by_path):
+            raise SnapshotError(
+                f"untracked workspace path would be overwritten by target merge: {path}"
+            )
+    dirty_paths.update(untracked_paths)
+    for path in sorted(dirty_paths):
+        exclusion = _exclusion_reason(path, include_paths)
+        if exclusion is not None:
+            exclusions.append({"path": path, "reason": exclusion})
+            continue
+        source = repo_root / path
+        target = snapshot_root / path
+        _remove_snapshot_entry(target)
+        if not source.exists() and not source.is_symlink():
+            entries_by_path[path] = {"path": path, "kind": "deleted"}
+            continue
+        entries_by_path[path] = _copy_entry(source, target, path)
+    return (
+        [entries_by_path[path] for path in sorted(entries_by_path)],
+        _deduplicate_exclusions(exclusions),
+    )
+
+
+def _remove_snapshot_entry(path: Path) -> None:
+    if path.is_symlink() or path.is_file():
+        path.unlink()
+    elif path.is_dir():
+        shutil.rmtree(path)
+
+
+def _path_collides_with_entries(
+    path: str,
+    entries_by_path: dict[str, dict[str, Any]],
+) -> bool:
+    prefix = f"{path}/"
+    return path in entries_by_path or any(
+        existing.startswith(prefix) or path.startswith(f"{existing}/")
+        for existing in entries_by_path
+    )
 
 
 def _copy_entry(source: Path, target: Path, relative_path: str) -> dict[str, Any]:
@@ -315,20 +487,3 @@ def _entry_key(item: dict[str, Any]) -> str:
 def _manifest_digest(entries: list[dict[str, Any]]) -> str:
     canonical = json.dumps(entries, sort_keys=True, separators=(",", ":")).encode()
     return hashlib.sha256(canonical).hexdigest()
-
-
-def _git(repo_root: Path, *args: str) -> str:
-    return _git_bytes(repo_root, *args).decode("utf-8", errors="strict")
-
-
-def _git_bytes(repo_root: Path, *args: str) -> bytes:
-    result = subprocess.run(
-        ["git", *args],
-        cwd=repo_root,
-        check=False,
-        capture_output=True,
-    )
-    if result.returncode != 0:
-        detail = result.stderr.decode("utf-8", errors="replace").strip()
-        raise SnapshotError(f"git {' '.join(args)} failed: {detail}")
-    return result.stdout

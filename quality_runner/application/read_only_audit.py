@@ -99,6 +99,8 @@ def analyze_read_only_audit(
             config=config,
             cache_mode=cache_mode,
             cache_root=cache_root,
+            cache_namespace_root=request.cache_namespace_root,
+            cache_context_identity=request.cache_context_identity,
         )
     profile = request.profile or _default_profile(config)
     with recorder.stage("standards"):
@@ -139,6 +141,7 @@ def analyze_read_only_audit(
                 read_files=request.analysis_mode == "full",
                 cache_mode=cache_mode,
                 cache_root=cache_root,
+                cache_namespace_root=request.cache_namespace_root,
             )
             security_scan_scope = text_scan_scope
             code_quality_scan_scope = text_scan_scope
@@ -153,6 +156,7 @@ def analyze_read_only_audit(
                 read_files=request.analysis_mode == "full",
                 cache_mode=cache_mode,
                 cache_root=cache_root,
+                cache_namespace_root=request.cache_namespace_root,
             )
             code_quality_scan_scope = text_scan_scope
             security_scan_scope = create_text_scan_scope(
@@ -165,6 +169,7 @@ def analyze_read_only_audit(
                 read_files=request.analysis_mode == "full",
                 cache_mode=cache_mode,
                 cache_root=cache_root,
+                cache_namespace_root=request.cache_namespace_root,
             )
         if text_scan_scope.inventory is not None:
             recorder.counters(
@@ -184,6 +189,7 @@ def analyze_read_only_audit(
             text_scan_scope=security_scan_scope,
             cache_mode=cache_mode,
             cache_root=cache_root,
+            cache_namespace_root=request.cache_namespace_root,
         )
         capability_map = merge_security_into_capability_map(capability_map, security_scan)
     with recorder.stage("code-quality"):
@@ -198,6 +204,7 @@ def analyze_read_only_audit(
             analysis_mode=request.analysis_mode,
             cache_mode=cache_mode,
             cache_root=cache_root,
+            cache_namespace_root=request.cache_namespace_root,
         )
     for deferred in code_quality_scan.get("deferred_checks", []):
         if isinstance(deferred, dict):

@@ -41,6 +41,7 @@ def create_security_scan(
     text_scan_scope: TextScanScope | None = None,
     cache_mode: CacheMode | str = "repo",
     cache_root: Path | None = None,
+    cache_namespace_root: Path | None = None,
     persist_cache: bool | None = None,
 ) -> dict[str, Any]:
     root = repo_root.expanduser().resolve()
@@ -57,6 +58,7 @@ def create_security_scan(
             config,
             cache_mode=effective_cache_mode,
             cache_root=cache_root,
+            cache_namespace_root=cache_namespace_root,
         )
         return disabled_scan
 
@@ -88,6 +90,7 @@ def create_security_scan(
         },
         cache_mode=effective_cache_mode,
         cache_root=cache_root,
+        cache_namespace_root=cache_namespace_root,
     )
     candidates: list[dict[str, Any]] = []
     for file_info in scanned_files:
@@ -421,6 +424,7 @@ def _disabled_cache_evidence(
     *,
     cache_mode: CacheMode | str = "repo",
     cache_root: Path | None = None,
+    cache_namespace_root: Path | None = None,
     persist_cache: bool | None = None,
 ) -> dict[str, object]:
     effective_cache_mode = "disabled" if persist_cache is False else cache_mode
@@ -431,6 +435,7 @@ def _disabled_cache_evidence(
         context={"enabled": False},
         cache_mode=effective_cache_mode,
         cache_root=cache_root,
+        cache_namespace_root=cache_namespace_root,
     )
     evidence = cache.evidence(considered_files=0)
     evidence["status"] = "disabled"

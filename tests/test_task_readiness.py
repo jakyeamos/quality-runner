@@ -21,7 +21,7 @@ def _gate(command: str, **overrides: object) -> dict[str, object]:
         "required": True,
         "owner": "quality",
         "rationale": "fixture",
-        "bootstrap": "system Python fixture",
+        "bootstrap": f"{sys.executable} -c \"print('bootstrap ok')\"",
         "mutation_risk": "read-only",
         "scope": "fixture",
         "timeout_seconds": 10,
@@ -177,10 +177,67 @@ def test_bootstrap_or_permission_failure_is_blocked_not_policy_violation(
     assert required_gate_failures(results) == []
 
 
+def test_certified_gate_bootstrap_failure_blocks_execution(tmp_path: Path) -> None:
+    readiness = evaluate_readiness(
+        repo_root=tmp_path,
+        prevention={
+            "gates": [
+                _gate(
+                    f"{sys.executable} -c \"print('gate must not run')\"",
+                    bootstrap=f'{sys.executable} -c "raise SystemExit(9)"',
+                )
+            ]
+        },
+    )
+
+    results, blockers = run_certified_gates(
+        snapshot_root=tmp_path,
+        repo_root=tmp_path,
+        readiness=readiness,
+    )
+
+    assert results[0]["status"] == "blocked"
+    assert results[0]["bootstrap"]["exit_code"] == 9
+    assert "gate must not run" not in results[0]["stdout"]
+    assert blockers[0]["code"] == "gate_evidence_unknown"
+
+
+def test_shared_certified_bootstrap_runs_once(tmp_path: Path) -> None:
+    marker = tmp_path / "bootstrap-count.txt"
+    bootstrap = (
+        f"{sys.executable} -c "
+        f'"from pathlib import Path; p=Path({str(marker)!r}); '
+        "p.write_text(p.read_text() + 'x' if p.exists() else 'x')\""
+    )
+    readiness = evaluate_readiness(
+        repo_root=tmp_path,
+        prevention={
+            "gates": [
+                _gate(f"{sys.executable} --version", id="one", bootstrap=bootstrap),
+                _gate(f"{sys.executable} --version", id="two", bootstrap=bootstrap),
+            ]
+        },
+    )
+
+    results, blockers = run_certified_gates(
+        snapshot_root=tmp_path,
+        repo_root=tmp_path,
+        readiness=readiness,
+    )
+
+    assert blockers == []
+    assert [item["status"] for item in results] == ["passed", "passed"]
+    assert marker.read_text() == "x"
+
+
 def test_gate_environment_isolates_git_config_and_preserves_bootstrap_cache(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setenv("UV_CACHE_DIR", "/documented/bootstrap/cache")
+    monkeypatch.setenv("UV_PYTHON", "/caller/python")
+    monkeypatch.setenv("UV_PROJECT_ENVIRONMENT", "/caller/project-environment")
+    monkeypatch.setenv("VIRTUAL_ENV", "/caller/virtual-environment")
+    monkeypatch.setenv("PYTHONPATH", "/caller/import-path")
 
     environment = task_readiness._gate_environment(tmp_path, [])
 
@@ -188,3 +245,24 @@ def test_gate_environment_isolates_git_config_and_preserves_bootstrap_cache(
     assert environment["GIT_CONFIG_SYSTEM"] == "/dev/null"
     assert environment["XDG_CONFIG_HOME"].endswith("xdg-config")
     assert environment["UV_CACHE_DIR"] == "/documented/bootstrap/cache"
+    assert "UV_PYTHON" not in environment
+    assert "UV_PROJECT_ENVIRONMENT" not in environment
+    assert "VIRTUAL_ENV" not in environment
+    assert "PYTHONPATH" not in environment
+
+
+def test_certified_bootstrap_records_resolved_version(tmp_path: Path) -> None:
+    readiness = evaluate_readiness(
+        repo_root=tmp_path,
+        prevention={"gates": [_gate(f"{sys.executable} --version")]},
+    )
+
+    results, blockers = run_certified_gates(
+        snapshot_root=tmp_path,
+        repo_root=tmp_path,
+        readiness=readiness,
+    )
+
+    assert blockers == []
+    assert results[0]["bootstrap"]["command_path"] == sys.executable
+    assert results[0]["bootstrap"]["command_version"].startswith("Python ")

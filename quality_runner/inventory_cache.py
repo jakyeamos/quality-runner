@@ -24,6 +24,8 @@ def load_or_build_inventory(
     build: Any,
     cache_mode: CacheMode | str = "repo",
     cache_root: Path | None = None,
+    cache_namespace_root: Path | None = None,
+    cache_context_identity: str | None = None,
 ) -> dict[str, Any]:
     root = repo_root.expanduser().resolve()
     mode = resolve_cache_mode(cache_mode)
@@ -32,13 +34,19 @@ def load_or_build_inventory(
         config=config,
         ci_checks=ci_checks,
         extra_warnings=extra_warnings,
+        repository_identity_root=cache_namespace_root,
+        cache_context_identity=cache_context_identity,
     )
-    path = cache_directory(
-        root,
-        mode=mode,
-        cache_root=cache_root,
-        component="repository-inventory-v1",
-    ) / f"{key}.json"
+    path = (
+        cache_directory(
+            root,
+            mode=mode,
+            cache_root=cache_root,
+            namespace_root=cache_namespace_root,
+            component="repository-inventory-v1",
+        )
+        / f"{key}.json"
+    )
     if mode == "disabled":
         payload = dict(build())
         payload["inventory_cache"] = _evidence(
@@ -67,10 +75,17 @@ def inventory_key(
     config: dict[str, Any] | None,
     ci_checks: list[dict[str, str | None]] | None,
     extra_warnings: list[dict[str, str]] | None,
+    repository_identity_root: Path | None = None,
+    cache_context_identity: str | None = None,
 ) -> str:
     state = {
         "quality_runner_version": __version__,
-        "repo_root": str(root),
+        "repo_root": str(
+            repository_identity_root.expanduser().resolve()
+            if repository_identity_root is not None
+            else root
+        ),
+        "cache_context_identity": cache_context_identity,
         "config": config or {},
         "ci_checks": ci_checks or [],
         "extra_warnings": extra_warnings or [],
@@ -123,7 +138,9 @@ def _read(path: Path) -> dict[str, Any] | None:
         payload = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, UnicodeDecodeError, json.JSONDecodeError):
         return None
-    return payload if isinstance(payload, dict) and payload.get("schema") == REPO_SCAN_SCHEMA else None
+    return (
+        payload if isinstance(payload, dict) and payload.get("schema") == REPO_SCAN_SCHEMA else None
+    )
 
 
 def _write(path: Path, payload: dict[str, Any]) -> None:

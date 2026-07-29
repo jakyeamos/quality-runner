@@ -68,6 +68,7 @@ def run_certified_gates(
 ) -> tuple[list[dict[str, Any]], list[dict[str, str]]]:
     results: list[dict[str, Any]] = []
     blockers: list[dict[str, str]] = []
+    bootstrap_results: dict[tuple[str, tuple[str, ...]], dict[str, Any]] = {}
     for gate in readiness.get("gates", []):
         if not isinstance(gate, dict):
             continue
@@ -80,10 +81,45 @@ def run_certified_gates(
                     }
                 )
             continue
+        environment_paths = [
+            Path(path)
+            for path in gate.get("resolved_environment_paths", [])
+            if isinstance(path, str)
+        ]
+        bootstrap_key = (
+            str(gate.get("bootstrap") or ""),
+            tuple(str(path) for path in environment_paths),
+        )
+        bootstrap = bootstrap_results.get(bootstrap_key)
+        if bootstrap is None:
+            bootstrap = _run_bootstrap(
+                snapshot_root=snapshot_root,
+                gate=gate,
+                environment_paths=environment_paths,
+            )
+            bootstrap_results[bootstrap_key] = bootstrap
+        if bootstrap["status"] != "passed":
+            result = _gate_result(
+                gate,
+                status="blocked",
+                exit_code=bootstrap.get("exit_code"),
+                stdout="",
+                stderr=f"certified gate bootstrap failed: {bootstrap.get('stderr', '')}",
+                bootstrap=bootstrap,
+            )
+            results.append(result)
+            blockers.append(
+                {
+                    "code": "gate_evidence_unknown",
+                    "message": f"gate {gate.get('id')} bootstrap is {bootstrap['status']}",
+                }
+            )
+            continue
         result = _run_gate(
             snapshot_root=snapshot_root,
             repo_root=repo_root,
             gate=gate,
+            bootstrap=bootstrap,
         )
         results.append(result)
         if result["status"] in {"timeout", "unavailable", "blocked"}:
@@ -94,6 +130,93 @@ def run_certified_gates(
                 }
             )
     return results, blockers
+
+
+def _run_bootstrap(
+    *,
+    snapshot_root: Path,
+    gate: dict[str, Any],
+    environment_paths: list[Path],
+) -> dict[str, Any]:
+    command = str(gate.get("bootstrap") or "")
+    try:
+        argv = _command_argv(command)
+    except ValueError as error:
+        return {
+            "command": command,
+            "status": "blocked",
+            "exit_code": None,
+            "stdout": "",
+            "stderr": str(error),
+        }
+    command_path = shutil.which(argv[0], path=_search_path(environment_paths))
+    if command_path is None:
+        return {
+            "command": command,
+            "command_path": None,
+            "status": "unavailable",
+            "exit_code": None,
+            "stdout": "",
+            "stderr": f"bootstrap command not found: {argv[0]}",
+        }
+    argv[0] = command_path
+    environment = _gate_environment(snapshot_root, environment_paths)
+    command_version = _command_version(
+        Path(command_path),
+        snapshot_root,
+        environment_paths,
+        environment=environment,
+    )
+    if command_version is None:
+        return {
+            "command": command,
+            "command_path": command_path,
+            "command_version": None,
+            "status": "blocked",
+            "exit_code": None,
+            "stdout": "",
+            "stderr": "bootstrap command did not provide verifiable version output",
+        }
+    timeout = min(int(gate.get("timeout_seconds") or 120), 300)
+    try:
+        result = subprocess.run(
+            argv,
+            cwd=snapshot_root,
+            env=environment,
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+        )
+    except subprocess.TimeoutExpired as error:
+        return {
+            "command": command,
+            "command_path": command_path,
+            "command_version": command_version,
+            "status": "timeout",
+            "exit_code": None,
+            "stdout": _bounded_output(error.stdout),
+            "stderr": _bounded_output(error.stderr),
+        }
+    except OSError as error:
+        return {
+            "command": command,
+            "command_path": command_path,
+            "command_version": command_version,
+            "status": "unavailable",
+            "exit_code": None,
+            "stdout": "",
+            "stderr": str(error),
+        }
+    return {
+        "command": command,
+        "command_path": command_path,
+        "command_version": command_version,
+        "status": "passed" if result.returncode == 0 else "blocked",
+        "exit_code": result.returncode,
+        "stdout": _bounded_output(result.stdout),
+        "stderr": _bounded_output(result.stderr),
+    }
 
 
 def required_gate_failures(results: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -175,9 +298,12 @@ def _run_gate(
     snapshot_root: Path,
     repo_root: Path,
     gate: dict[str, Any],
+    bootstrap: dict[str, Any],
 ) -> dict[str, Any]:
     argv = list(gate.get("argv", []))
-    argv[0] = str(gate["command_path"])
+    snapshot_command = snapshot_root / ".venv" / "bin" / Path(argv[0]).name
+    argv[0] = str(snapshot_command) if snapshot_command.is_file() else str(gate["command_path"])
+    executed_command_path = argv[0]
     environment_paths = [
         Path(path) for path in gate.get("resolved_environment_paths", []) if isinstance(path, str)
     ]
@@ -200,6 +326,8 @@ def _run_gate(
             exit_code=None,
             stdout=_bounded_output(error.stdout),
             stderr=_bounded_output(error.stderr),
+            bootstrap=bootstrap,
+            executed_command_path=executed_command_path,
         )
     except OSError as error:
         return _gate_result(
@@ -208,6 +336,8 @@ def _run_gate(
             exit_code=None,
             stdout="",
             stderr=str(error),
+            bootstrap=bootstrap,
+            executed_command_path=executed_command_path,
         )
     output = f"{result.stdout}\n{result.stderr}".lower()
     status = (
@@ -223,6 +353,8 @@ def _run_gate(
         exit_code=result.returncode,
         stdout=_bounded_output(result.stdout),
         stderr=_bounded_output(result.stderr),
+        bootstrap=bootstrap,
+        executed_command_path=executed_command_path,
     )
 
 
@@ -233,6 +365,8 @@ def _gate_result(
     exit_code: int | None,
     stdout: str,
     stderr: str,
+    bootstrap: dict[str, Any] | None = None,
+    executed_command_path: str | None = None,
 ) -> dict[str, Any]:
     return {
         "id": gate.get("id"),
@@ -241,10 +375,12 @@ def _gate_result(
         "exit_code": exit_code,
         "command": gate.get("command"),
         "command_path": gate.get("command_path"),
+        "executed_command_path": executed_command_path or gate.get("command_path"),
         "command_version": gate.get("command_version"),
         "timeout_seconds": gate.get("timeout_seconds"),
         "stdout": stdout,
         "stderr": stderr,
+        "bootstrap": bootstrap,
     }
 
 
@@ -284,12 +420,19 @@ def _command_version(
     command_path: Path,
     repo_root: Path,
     environment_paths: list[Path],
+    *,
+    environment: dict[str, str] | None = None,
 ) -> str | None:
+    command_environment = (
+        environment
+        if environment is not None
+        else {**os.environ, "PATH": _search_path(environment_paths)}
+    )
     try:
         result = subprocess.run(
             [str(command_path), "--version"],
             cwd=repo_root,
-            env={**os.environ, "PATH": _search_path(environment_paths)},
+            env=command_environment,
             check=False,
             capture_output=True,
             text=True,
@@ -304,16 +447,21 @@ def _command_version(
 def _gate_environment(snapshot_root: Path, environment_paths: list[Path]) -> dict[str, str]:
     cache_root = snapshot_root / ".quality-runner-gate-cache"
     cache_root.mkdir(exist_ok=True)
-    return {
-        **os.environ,
-        "PATH": _search_path(environment_paths),
-        "PYTHONPYCACHEPREFIX": str(cache_root / "pycache"),
-        "XDG_CACHE_HOME": str(cache_root / "xdg"),
-        "XDG_CONFIG_HOME": str(cache_root / "xdg-config"),
-        "GIT_CONFIG_GLOBAL": os.devnull,
-        "GIT_CONFIG_SYSTEM": os.devnull,
-        "CI": "1",
-    }
+    environment = dict(os.environ)
+    for variable in ("PYTHONPATH", "UV_PYTHON", "UV_PROJECT_ENVIRONMENT", "VIRTUAL_ENV"):
+        environment.pop(variable, None)
+    environment.update(
+        {
+            "PATH": _search_path(environment_paths),
+            "PYTHONPYCACHEPREFIX": str(cache_root / "pycache"),
+            "XDG_CACHE_HOME": str(cache_root / "xdg"),
+            "XDG_CONFIG_HOME": str(cache_root / "xdg-config"),
+            "GIT_CONFIG_GLOBAL": os.devnull,
+            "GIT_CONFIG_SYSTEM": os.devnull,
+            "CI": "1",
+        }
+    )
+    return environment
 
 
 def _bounded_output(value: object, limit: int = 20_000) -> str:

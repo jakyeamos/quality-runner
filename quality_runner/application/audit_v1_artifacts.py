@@ -252,9 +252,7 @@ def _run_artifact_paths(run_dir: Path) -> AuditArtifactPaths:
         "standards_json": str(run_dir / "standards.json"),
         "capability_matrix_json": str(run_dir / "capability-matrix.json"),
         "security_scan_json": str(run_dir / "security-scan.json"),
-        "security_review_obligations_json": str(
-            run_dir / "security-review-obligations.json"
-        ),
+        "security_review_obligations_json": str(run_dir / "security-review-obligations.json"),
         "run_manifest_json": str(run_dir / "run-manifest.json"),
         "performance_json": str(run_dir / "performance.json"),
         "quality_audit_json": str(run_dir / "quality-audit.json"),

@@ -8,6 +8,9 @@ from typing import Any, cast
 from quality_runner import __version__
 from quality_runner.config import CONFIG_FILE_NAME
 
+TASK_ANALYSIS_MODE = "full"
+TASK_CACHE_MODE = "external"
+
 
 def contract_hashes(repo_root: Path, config: dict[str, Any]) -> dict[str, str]:
     config_path = repo_root / CONFIG_FILE_NAME
@@ -31,6 +34,8 @@ def drift_blockers(
     current = {
         **contract_hashes(repo_root, config),
         "toolchain_hash": readiness["toolchain_hash"],
+        "task_analysis_mode": TASK_ANALYSIS_MODE,
+        "task_cache_mode": TASK_CACHE_MODE,
     }
     previous = cast(dict[str, str], baseline.get("evidence", {}))
     labels = {
@@ -39,6 +44,8 @@ def drift_blockers(
         "promoted_policy_hash": "promoted policy",
         "rule_pack_hash": "rule pack",
         "toolchain_hash": "toolchain",
+        "task_analysis_mode": "task analysis mode",
+        "task_cache_mode": "task cache mode",
     }
     return [
         {

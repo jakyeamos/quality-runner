@@ -68,6 +68,7 @@ def create_code_quality_scan(
     analysis_mode: str = "full",
     cache_mode: CacheMode | str = "repo",
     cache_root: Path | None = None,
+    cache_namespace_root: Path | None = None,
 ) -> dict[str, Any]:
     root = repo_root.expanduser().resolve()
     policy = structural_scan_policy(config)
@@ -79,13 +80,19 @@ def create_code_quality_scan(
         module="code_quality",
         cache_mode=str(cache_mode),
         cache_root=cache_root,
+        cache_namespace_root=cache_namespace_root,
         read_files=analysis_mode == "full",
     )
     skipped_files = list(scope.skipped_files)
     source_analysis_cache = (
         cast(SourceAnalysisCache, scope.source_analysis_cache)
         if scope.source_analysis_cache is not None
-        else SourceAnalysisCache(root, cache_mode=cache_mode, cache_root=cache_root)
+        else SourceAnalysisCache(
+            root,
+            cache_mode=cache_mode,
+            cache_root=cache_root,
+            cache_namespace_root=cache_namespace_root,
+        )
     )
     analysis_cache = IncrementalAnalysisCache(
         root,
@@ -93,6 +100,7 @@ def create_code_quality_scan(
         config=config,
         cache_mode=cache_mode if persist_cache else "disabled",
         cache_root=cache_root,
+        cache_namespace_root=cache_namespace_root,
     )
     effective_persist_cache = persist_cache and str(cache_mode) != "disabled"
     findings: list[dict[str, Any]] = []
@@ -101,7 +109,9 @@ def create_code_quality_scan(
     scanned_files: list[dict[str, Any]] = []
 
     if scope.files:
-        source_items = [(file_info.path, file_info.text, file_info.lines) for file_info in scope.files]
+        source_items = [
+            (file_info.path, file_info.text, file_info.lines) for file_info in scope.files
+        ]
     else:
         source_items = [(relative_path, "", []) for relative_path in scope.file_paths]
     for relative_path, source_text, source_lines in source_items:
@@ -215,7 +225,7 @@ def create_code_quality_scan(
         "schema": CODE_QUALITY_SCAN_SCHEMA,
         "run_id": _string_or_none(scan.get("run_id")),
         "repo_root": str(root),
-        "coverage": _coverage_status(skipped_files),
+        "coverage": "partial" if deferred_checks else _coverage_status(skipped_files),
         "scan_exclusion_scope": "code_quality",
         "scan_exclusions": list(scope.scan_exclusions),
         "summary": {
@@ -253,10 +263,11 @@ def create_code_quality_scan(
         "skill_selection": skill_selection,
         "semantic_similarity_cache": semantic_similarity_cache,
         "analysis_mode": analysis_mode,
-        "coverage": "partial" if deferred_checks else "full",
         "deferred_checks": deferred_checks,
         "analysis_cache": analysis_cache.evidence(
-            considered_files=len(scope.file_paths or tuple(file_info.path for file_info in scope.files))
+            considered_files=len(
+                scope.file_paths or tuple(file_info.path for file_info in scope.files)
+            )
         ),
     }
 
@@ -270,7 +281,7 @@ def _analyze_code_quality_file(
     disabled_groups: set[str],
     large_file_lines: int,
     fat_router_lines: int,
-    ) -> dict[str, object]:
+) -> dict[str, object]:
     lines = source_analysis_cache.redacted_lines_for_source(
         source_text=source_text,
         source_lines=source_lines,

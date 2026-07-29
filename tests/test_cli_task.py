@@ -71,6 +71,10 @@ def test_task_clean_check_passes_and_writes_canonical_artifacts(tmp_path: Path) 
     payload = json.loads(check.stdout)
     assert payload["status"] == "pass"
     assert payload["delta"]["counts"]["new_enforced"] == 0
+    assert payload["analysis"]["analysis_mode"] == "full"
+    assert payload["analysis"]["cache_mode"] == "external"
+    assert payload["analysis"]["cache_summary"]["analyses"]["code_quality"]["cache_hits"] > 0
+    assert payload["analysis"]["performance"]["elapsed_seconds"] >= 0
     run_dir = repo / ".quality-runner" / "runs" / payload["run_id"]
     assert (run_dir / "task-check.json").is_file()
     assert (run_dir / "task-check.md").is_file()
@@ -132,6 +136,7 @@ def test_task_required_uncertified_gate_is_blocked(tmp_path: Path) -> None:
 
 def test_task_certified_gate_failure_is_violation(tmp_path: Path) -> None:
     command = json.dumps(f'{sys.executable} -c "raise SystemExit(7)"')
+    bootstrap = json.dumps(f"{sys.executable} --version")
     gate = "\n".join(
         [
             "[[quality_runner.prevention.gates]]",
@@ -141,7 +146,7 @@ def test_task_certified_gate_failure_is_violation(tmp_path: Path) -> None:
             "required = true",
             'owner = "quality"',
             'rationale = "Intentional failure fixture."',
-            'bootstrap = "system fixture"',
+            f"bootstrap = {bootstrap}",
             'mutation_risk = "read-only"',
             'scope = "fixture"',
             "timeout_seconds = 10",
@@ -231,3 +236,30 @@ def test_task_rebaseline_preserves_immutable_pr_target(tmp_path: Path) -> None:
     assert source["kind"] == "git_revision"
     assert source["baseline_ref"] == original_source["head_sha"]
     assert source["head_sha"] == original_source["head_sha"]
+
+
+def test_task_pr_check_evaluates_effective_merge_when_target_is_ahead(
+    tmp_path: Path,
+) -> None:
+    repo = _init_repo(tmp_path, large=True)
+    _git(repo, "config", "user.email", "quality-runner@example.com")
+    _git(repo, "config", "user.name", "Quality Runner")
+    _git(repo, "add", "app.py", ".quality-runner.toml")
+    _git(repo, "commit", "-m", "task base")
+    base_sha = _git(repo, "rev-parse", "HEAD")
+    _git(repo, "switch", "-c", "target")
+    (repo / "app.py").write_text("value = 1\n", encoding="utf-8")
+    _git(repo, "commit", "-am", "fix target finding")
+    target_sha = _git(repo, "rev-parse", "HEAD")
+    _git(repo, "switch", "-c", "task", base_sha)
+
+    start = _qr(repo, "start", "--task-id", "target-ahead", "--baseline-ref", target_sha)
+    check = _qr(repo, "check", "--task-id", "target-ahead")
+    payload = json.loads(check.stdout)
+
+    assert start.returncode == 0
+    assert check.returncode == 0
+    assert payload["status"] == "pass"
+    assert payload["snapshot"]["source"]["kind"] == "merge_workspace"
+    assert "app.py" not in payload["changed_paths"]
+    assert payload["delta"]["counts"]["new_enforced"] == 0

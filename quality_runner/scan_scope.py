@@ -113,6 +113,7 @@ def create_text_scan_scope(
     read_files: bool = True,
     cache_mode: str = "repo",
     cache_root: Path | None = None,
+    cache_namespace_root: Path | None = None,
     include_paths: tuple[str, ...] = (),
 ) -> TextScanScope:
     root = repo_root.expanduser().resolve()
@@ -154,6 +155,7 @@ def create_text_scan_scope(
             root,
             cache_mode=cache_mode,
             cache_root=cache_root,
+            cache_namespace_root=cache_namespace_root,
         ),
         focus_paths=tuple(sorted(set(focus_paths))),
         file_paths=tuple(path.relative_to(root).as_posix() for path in paths),
@@ -220,7 +222,9 @@ def discover_scan_inventory(
             if reason is not None:
                 ignored.append((name, reason))
         for directory_name, reason in ignored:
-            skipped_files.append(_fast_skipped_directory_entry(root, current_path / directory_name, reason))
+            skipped_files.append(
+                _fast_skipped_directory_entry(root, current_path / directory_name, reason)
+            )
         metrics["skipped_paths"] += len(ignored)
         ignored_names = {name for name, _reason in ignored}
         dir_names[:] = sorted(name for name in dir_names if name not in ignored_names)
