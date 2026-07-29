@@ -150,6 +150,7 @@ def create_code_quality_scan(
         "schema": CODE_QUALITY_SCAN_SCHEMA,
         "run_id": _string_or_none(scan.get("run_id")),
         "repo_root": str(root),
+        "coverage": _coverage_status(skipped_files),
         "scan_exclusion_scope": "code_quality",
         "scan_exclusions": list(scope.scan_exclusions),
         "summary": {
@@ -215,3 +216,12 @@ def preview_ignored_paths(
 def _skipped_file_path(item: AuditPayload) -> str:
     path = item.get("path")
     return path if isinstance(path, str) else ""
+
+
+def _coverage_status(skipped_files: list[AuditPayload]) -> str:
+    incomplete_reasons = {"scan budget exceeded", "unreadable file", "unsafe entry"}
+    return (
+        "partial"
+        if any(item.get("reason") in incomplete_reasons for item in skipped_files)
+        else "complete"
+    )

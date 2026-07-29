@@ -49,6 +49,7 @@ from quality_runner.intent import workflow_intent_from_cli_args
 from quality_runner.progress import ProgressCallback
 from quality_runner.release_smoke import release_smoke_payload
 from quality_runner.run_summary import build_run_summary
+from quality_runner.task_prevention import task_command_payload
 from quality_runner.workflow_skills import load_skill_review_report_json
 
 INIT_RESULT_SCHEMA = "quality-runner-init-result-v0.1"
@@ -64,6 +65,8 @@ def payload_for_args(
 ) -> dict[str, Any]:
     if args.command == "doctor":
         return doctor_payload(include_environment=True)
+    if args.command == "task":
+        return task_command_payload(args)
     if args.command == "self-update":
         return update_command_payload(args.source)
     if args.command == "release-smoke":

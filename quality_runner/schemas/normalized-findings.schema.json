@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://quality-runner.dev/schemas/normalized-findings.schema.json",
+  "title": "Quality Runner Normalized Findings",
+  "type": "object",
+  "required": ["schema", "coverage", "occurrences", "ambiguities"],
+  "properties": {
+    "schema": { "const": "quality-runner-normalized-findings-v0.1" },
+    "coverage": {
+      "type": "object",
+      "additionalProperties": { "enum": ["complete", "partial", "unknown"] }
+    },
+    "occurrences": { "type": "array", "items": { "$ref": "#/$defs/occurrence" } },
+    "ambiguities": { "type": "array" }
+  },
+  "$defs": {
+    "occurrence": {
+      "type": "object",
+      "required": ["detector", "rule_id", "fingerprint", "source_fingerprint", "path", "line", "severity", "confidence", "coverage_ref", "enforcement_eligible"],
+      "properties": {
+        "detector": { "type": "string" },
+        "rule_id": { "type": "string" },
+        "fingerprint": { "type": "string" },
+        "source_fingerprint": { "type": "string" },
+        "path": { "type": "string" },
+        "line": { "type": ["integer", "null"] },
+        "severity": { "type": "string" },
+        "confidence": { "type": "string" },
+        "coverage_ref": { "type": "string" },
+        "enforcement_eligible": { "type": "boolean" },
+        "evidence": {},
+        "normalization_error": { "type": "string" }
+      }
+    }
+  }
+}

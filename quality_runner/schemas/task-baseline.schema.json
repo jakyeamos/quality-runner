@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://quality-runner.dev/schemas/task-baseline.schema.json",
+  "title": "Quality Runner Task Baseline",
+  "type": "object",
+  "required": ["schema", "task_id", "run_id", "created_at", "repository", "source", "snapshot", "normalized_findings", "coverage", "prevention_readiness", "evidence"],
+  "properties": {
+    "schema": { "const": "quality-runner-task-baseline-v0.1" },
+    "task_id": { "type": "string", "minLength": 1 },
+    "run_id": { "type": "string", "minLength": 1 },
+    "created_at": { "type": "string", "format": "date-time" },
+    "repository": { "type": "object" },
+    "source": { "type": "object" },
+    "snapshot": { "$ref": "workspace-snapshot.schema.json" },
+    "normalized_findings": { "$ref": "normalized-findings.schema.json" },
+    "coverage": { "type": "object" },
+    "prevention_readiness": { "$ref": "prevention-readiness.schema.json" },
+    "evidence": { "type": "object" },
+    "intent": { "type": ["object", "null"] },
+    "reason": { "type": ["string", "null"] },
+    "supersedes": { "type": ["string", "null"] },
+    "analysis_policy_overlay": { "type": "boolean" }
+  }
+}

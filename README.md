@@ -134,6 +134,22 @@ The [Upgrade and Compatibility Guide](docs/upgrade.md) defines the v2 command
 mappings, v1 support window, and non-destructive rollback procedure. Use
 `review --legacy-output` only when an existing CLI consumer requires v1 JSON.
 
+For preventative use during implementation, start a task before editing and
+check the exact dirty workspace before declaring completion:
+
+```bash
+qr task start /path/to/repo --task-id feature-123 --json
+# edit externally
+qr task check /path/to/repo --task-id feature-123 --json
+```
+
+The result is `pass`, `violation`, or `blocked`. Existing findings remain
+visible without blocking unrelated work; only behavior-verified promoted rules
+and certified native gates can enforce policy. QR does not assume that a
+discovered or CI-listed command is mature. See
+[Prevention Readiness](docs/prevention-readiness.md) and the
+[`task` CLI contract](docs/cli.md#quality-runner-task).
+
 Quality Runner writes artifacts under the target repo:
 
 ```text
@@ -370,10 +386,13 @@ mutate `.quality-runner.toml`.
 ## Safety Boundary
 
 Quality Runner may create or update files under
-`.quality-runner/runs/<run-id>/` in the target repository. It does not edit
+`.quality-runner/runs/<run-id>/` or `.quality-runner/tasks/<task-id>/` in the
+target repository. It does not edit
 source files, install dependencies, create commits, call remote services, or
 execute remediation. Discovered gate commands are evidence-only unless the
-caller explicitly requests disposable execution.
+caller explicitly requests disposable execution; `qr task check` executes only
+the gates explicitly certified by repository prevention policy, against its
+isolated workspace snapshot.
 
 Every generated remediation slice includes verification guidance, but a separate
 coding agent must receive user approval before implementation.

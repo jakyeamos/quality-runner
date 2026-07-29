@@ -1,0 +1,37 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://quality-runner.dev/schemas/workspace-snapshot.schema.json",
+  "title": "Quality Runner Workspace Snapshot",
+  "type": "object",
+  "required": ["schema", "repository", "source", "entries", "exclusions", "snapshot_digest"],
+  "properties": {
+    "schema": { "const": "quality-runner-workspace-snapshot-v0.1" },
+    "repository": { "type": "object", "required": ["root", "identity", "head_sha"] },
+    "source": { "type": "object", "required": ["kind", "head_sha", "baseline_ref"] },
+    "entries": { "type": "array", "items": { "$ref": "#/$defs/entry" } },
+    "exclusions": { "type": "array", "items": { "$ref": "#/$defs/exclusion" } },
+    "snapshot_digest": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+  },
+  "$defs": {
+    "entry": {
+      "type": "object",
+      "required": ["path", "kind"],
+      "properties": {
+        "path": { "type": "string", "minLength": 1 },
+        "kind": { "enum": ["file", "symlink", "deleted"] },
+        "mode": { "type": "string" },
+        "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "size": { "type": "integer", "minimum": 0 },
+        "target": { "type": "string" }
+      }
+    },
+    "exclusion": {
+      "type": "object",
+      "required": ["path", "reason"],
+      "properties": {
+        "path": { "type": "string", "minLength": 1 },
+        "reason": { "type": "string", "minLength": 1 }
+      }
+    }
+  }
+}

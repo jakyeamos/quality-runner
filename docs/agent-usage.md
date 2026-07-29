@@ -12,6 +12,37 @@ should use the source-first contract in [Consumer Tooling](consumer-tooling.md):
 quality-runner ...` for latest QR, or `uv run --project /path/to/quality-runner
 quality-runner ...` for a specific checkout.
 
+## Prevent Findings During Implementation
+
+For ordinary implementation work, capture the task baseline before editing:
+
+```bash
+qr task start /path/to/repo --task-id <stable-task-id> --json
+```
+
+After editing and before declaring the implementation complete:
+
+```bash
+qr task check /path/to/repo --task-id <stable-task-id> --json
+```
+
+Fix new enforced findings and failed certified gates. Do not treat persisted
+legacy debt as a task failure, and do not interpret `blocked` as a pass. When
+configuration, rule packs, promoted policy, the toolchain, or the QR version
+changes, review that change and use `task rebaseline --reason ...`; never
+silently enlarge the baseline. PR-target tasks preserve the originally resolved
+target SHA across rebaseline.
+
+Do not assume a fast native check is mature enough for this loop. QR executes
+only gates whose prevention configuration includes the required bootstrap,
+tool provenance, repeatability, intentional-failure, local, and CI evidence.
+Required but uncertified or unavailable gates block the check. Candidate gates
+stay advisory.
+
+QR owns evidence and policy evaluation only. The implementing agent still owns
+source changes and decides how to correct a violation; QR does not edit code,
+drive the agent, install prerequisites, commit, or push.
+
 ## Start With QR
 
 Run QR before editing:

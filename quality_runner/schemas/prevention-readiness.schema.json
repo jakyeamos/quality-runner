@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://quality-runner.dev/schemas/prevention-readiness.schema.json",
+  "title": "Quality Runner Prevention Readiness",
+  "type": "object",
+  "required": ["schema", "gates", "summary", "toolchain_hash"],
+  "properties": {
+    "schema": { "const": "quality-runner-prevention-readiness-v0.1" },
+    "gates": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "command", "state", "required"],
+        "properties": {
+          "id": { "type": "string" },
+          "command": { "type": "string" },
+          "state": { "enum": ["candidate", "certified", "blocked", "unavailable"] },
+          "required": { "type": "boolean" }
+        }
+      }
+    },
+    "summary": { "type": "object" },
+    "toolchain_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+  }
+}

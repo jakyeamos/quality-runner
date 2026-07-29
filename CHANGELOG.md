@@ -2,6 +2,17 @@
 
 All notable changes to Quality Runner are documented here.
 
+## Unreleased
+
+- Added the evidence-backed `qr task start`, `check`, and `rebaseline`
+  implementation loop, including exact dirty-workspace snapshots, normalized
+  occurrence and coverage contracts, deterministic finding deltas, promoted
+  prevention policies, expiring fingerprint waivers, and certified native-gate
+  readiness evidence.
+- Added canonical task, snapshot, normalized-finding, and readiness schemas,
+  plus a non-authoritative CI dogfood pilot. Existing refresh, verify, and
+  review-delta surfaces retain their prior behavior.
+
 ## 0.6.0 - 2026-07-17
 
 - Added Quality Skills corpus classification, canonical selection, append and

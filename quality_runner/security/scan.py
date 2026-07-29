@@ -88,6 +88,7 @@ def create_security_scan(
         "schema": SECURITY_SCAN_SCHEMA,
         "run_id": _string_or_none(scan.get("run_id")),
         "repo_root": str(root),
+        "coverage": _coverage_status(text_scan_scope),
         "scan_exclusion_scope": "security",
         "scan_exclusions": scan_exclusions,
         "summary": {
@@ -319,6 +320,7 @@ def _disabled_security_scan(
         "schema": SECURITY_SCAN_SCHEMA,
         "run_id": _string_or_none(scan.get("run_id")),
         "repo_root": str(repo_root),
+        "coverage": "unknown",
         "scan_exclusion_scope": "security",
         "scan_exclusions": scan_exclusions,
         "summary": {
@@ -340,3 +342,14 @@ def _disabled_security_scan(
 
 def _string_or_none(value: object) -> str | None:
     return value if isinstance(value, str) else None
+
+
+def _coverage_status(text_scan_scope: TextScanScope | None) -> str:
+    if text_scan_scope is None:
+        return "unknown"
+    incomplete_reasons = {"scan budget exceeded", "unreadable file", "unsafe entry"}
+    return (
+        "partial"
+        if any(item.get("reason") in incomplete_reasons for item in text_scan_scope.skipped_files)
+        else "complete"
+    )

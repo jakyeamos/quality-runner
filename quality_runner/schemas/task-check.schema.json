@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://quality-runner.dev/schemas/task-check.schema.json",
+  "title": "Quality Runner Task Check",
+  "type": "object",
+  "required": ["schema", "status"],
+  "properties": {
+    "schema": { "const": "quality-runner-task-check-v0.1" },
+    "status": { "enum": ["pass", "violation", "blocked", "invalid"] },
+    "task_id": { "type": "string" },
+    "run_id": { "type": "string" },
+    "baseline_run_id": { "type": "string" },
+    "repository": { "type": "object" },
+    "snapshot": { "$ref": "workspace-snapshot.schema.json" },
+    "changed_paths": { "type": "array", "items": { "type": "string" } },
+    "coverage": { "type": "object" },
+    "normalized_findings": { "$ref": "normalized-findings.schema.json" },
+    "delta": { "type": "object" },
+    "prevention_readiness": { "$ref": "prevention-readiness.schema.json" },
+    "gate_results": { "type": "array" },
+    "required_gate_failures": { "type": "array" },
+    "blockers": { "type": "array" },
+    "evidence": { "type": "object" },
+    "error": { "type": "object" },
+    "warnings": { "type": "array" }
+  }
+}

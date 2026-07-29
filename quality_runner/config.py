@@ -7,6 +7,8 @@ from typing import Any
 from quality_runner.architecture_config_parse import parse_architecture_section
 from quality_runner.artifact_config_parse import parse_artifacts_section
 from quality_runner.integrate_config_parse import parse_integrate_section
+from quality_runner.prevention_config import parse_prevention_section
+from quality_runner.readiness_config import parse_readiness_section
 from quality_runner.scan_exclusions_config import parse_scan_exclusions_by_module
 from quality_runner.security.config_parse import parse_security_section
 from quality_runner.skills_config_parse import parse_skills_section
@@ -79,7 +81,8 @@ def load_repo_config(repo_root: Path) -> dict[str, Any]:
     architecture = parse_architecture_section(section.get("architecture"), warnings)
     security = parse_security_section(section.get("security"), warnings)
     skills = parse_skills_section(section.get("skills"), warnings)
-    readiness = _readiness(section.get("readiness"), warnings)
+    readiness = parse_readiness_section(section.get("readiness"), warnings)
+    prevention = parse_prevention_section(section.get("prevention"), warnings)
     payload = _config(
         path=CONFIG_FILE_NAME,
         default_profile=default_profile,
@@ -96,6 +99,7 @@ def load_repo_config(repo_root: Path) -> dict[str, Any]:
         severity_overrides=severity_overrides,
         structural_scan=structural_scan,
         readiness=readiness,
+        prevention=prevention,
         warnings=warnings,
     )
     if integrate:
@@ -108,14 +112,12 @@ def load_repo_config(repo_root: Path) -> dict[str, Any]:
         payload["skills"] = skills
     if artifacts:
         payload["artifacts"] = artifacts
-    if readiness:
-        payload["readiness"] = readiness
     return payload
 
 
 # fmt: off
 def _config(
-    *, path: str | None, default_profile: str | None, profiles: dict[str, dict[str, Any]], required_capabilities: list[str], required_capabilities_configured: bool, allowed_package_managers: list[str], scan_exclusions: list[str], scan_exclusions_by_module: dict[str, list[str]], accepted_exceptions: list[dict[str, str]], accepted_dispositions: list[dict[str, str]], gates: list[dict[str, Any]], gate_timeouts: dict[str, int], severity_overrides: dict[str, str], structural_scan: dict[str, Any], readiness: dict[str, Any], warnings: list[dict[str, str]],
+    *, path: str | None, default_profile: str | None, profiles: dict[str, dict[str, Any]], required_capabilities: list[str], required_capabilities_configured: bool, allowed_package_managers: list[str], scan_exclusions: list[str], scan_exclusions_by_module: dict[str, list[str]], accepted_exceptions: list[dict[str, str]], accepted_dispositions: list[dict[str, str]], gates: list[dict[str, Any]], gate_timeouts: dict[str, int], severity_overrides: dict[str, str], structural_scan: dict[str, Any], readiness: dict[str, Any], prevention: dict[str, Any], warnings: list[dict[str, str]],
 ) -> dict[str, Any]:
     payload: dict[str, Any] = dict(
         schema=CONFIG_SCHEMA,
@@ -138,6 +140,8 @@ def _config(
         payload["scan_exclusions_by_module"] = scan_exclusions_by_module
     if readiness:
         payload["readiness"] = readiness
+    if prevention:
+        payload["prevention"] = prevention
     return payload
 # fmt: on
 
@@ -159,32 +163,10 @@ def _empty_config(*, path: str | None, warnings: list[dict[str, str]]) -> dict[s
         severity_overrides={},
         structural_scan={},
         readiness={},
+        prevention={},
         warnings=warnings,
     )
     return payload
-
-
-def _readiness(value: object, warnings: list[dict[str, str]]) -> dict[str, Any]:
-    if value is None:
-        return {}
-    if not isinstance(value, dict):
-        warnings.append(
-            _warning(
-                "invalid_quality_runner_config_field",
-                "quality_runner.readiness must be a table",
-            )
-        )
-        return {}
-    evidence_file = value.get("evidence_file")
-    if evidence_file is not None and (not isinstance(evidence_file, str) or not evidence_file):
-        warnings.append(
-            _warning(
-                "invalid_quality_runner_config_field",
-                "quality_runner.readiness.evidence_file must be a non-empty string",
-            )
-        )
-        return {}
-    return {"evidence_file": evidence_file} if isinstance(evidence_file, str) else {}
 
 
 def _string_value(value: object, field: str, warnings: list[dict[str, str]]) -> str | None:
