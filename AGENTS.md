@@ -19,6 +19,10 @@ packet that matches the task.
 - Keep source changes behavior-focused and add tests for public CLI, MCP,
   workflow, artifact, or schema behavior. Do not weaken a gate to remove a
   finding.
+- `.quality-runner.toml` owns the repository's required blocker gates for the
+  dependency audit and environment contract. Keep the checker in CI and the
+  release workflow. BasedPyright remains strict; fix its findings at source
+  rather than weakening configuration or adding broad suppressions.
 
 The environment contract is executable through
 `python3 scripts/check_environment_contract.py` and is required by

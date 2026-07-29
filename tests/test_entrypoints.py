@@ -14,6 +14,16 @@ from quality_runner import __version__
 ROOT = Path(__file__).resolve().parents[1]
 
 
+def _uv_executable() -> str:
+    resolved = shutil.which("uv")
+    if resolved is not None:
+        return resolved
+    for candidate in (Path("/opt/homebrew/bin/uv"), Path("/usr/local/bin/uv")):
+        if candidate.is_file():
+            return str(candidate)
+    raise AssertionError("uv executable is required for packaged entrypoint verification")
+
+
 def test_package_imports_without_aios() -> None:
     code = (
         "import sys; "
@@ -100,7 +110,7 @@ def test_scaffold_entrypoint_functions_import_and_return_success(monkeypatch) ->
 def test_packaged_console_script_invokes_cli(tmp_path: Path) -> None:
     dist_dir = tmp_path / "dist"
     build_command = [
-        "uv",
+        _uv_executable(),
         "build",
         "--wheel",
         "--out-dir",

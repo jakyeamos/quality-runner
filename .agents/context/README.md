@@ -3,7 +3,7 @@ id: quality-runner.repo-context
 title: Quality Runner Repository Context
 tier: project
 status: active
-last_reviewed: 2026-07-26
+last_reviewed: 2026-07-28
 applies_when:
   - repo_context
 tags:
@@ -36,5 +36,9 @@ The runner is provider-neutral and AIOS-independent. Generated evidence may
 contain sensitive repository details; it remains local unless a human reviews
 and explicitly publishes a redacted projection.
 
-The routed contract was revalidated after commit `9a0d2f7`; refresh this index
-when command, quality-adapter, or release-boundary behavior changes.
+The executable environment contract validates this index's links and freshness,
+the strict type-checking setting, the locked quality ladder, CI and release
+coverage, Quality Runner blocker gates, and secret-file ignore protections.
+Refresh this index when command, quality-adapter, or release-boundary behavior
+changes. Strict type-checking findings are remediation work; they must remain
+visible rather than being suppressed.

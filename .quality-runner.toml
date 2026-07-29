@@ -1,0 +1,21 @@
+[quality_runner]
+
+[[quality_runner.gates]]
+id = "security_dependency_audit"
+command = "uv run --locked pip-audit"
+ecosystem = "python"
+source = "pyproject.toml:dependency-groups.dev"
+owner = "platform"
+required = true
+severity = "blocker"
+mutating_risk = "safe"
+
+[[quality_runner.gates]]
+id = "environment_contract"
+command = "python3 scripts/check_environment_contract.py"
+ecosystem = "python"
+source = "scripts/check_environment_contract.py"
+owner = "repository"
+required = true
+severity = "blocker"
+mutating_risk = "safe"

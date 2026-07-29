@@ -26,6 +26,10 @@ expected to report `no-changes` on an unchanged checkout; it is not a
 replacement for the full ladder above. CI and release workflows are the
 authoritative remote declarations of the same gates.
 
+`.quality-runner.toml` declares the security dependency audit and environment
+contract as required blocker gates. The local checker and both remote workflows
+must remain in agreement with that declaration.
+
 The repository commit hook uses `hookTimeoutSeconds: 360` in `.pre-cr.json`.
 This budget covers the traced changed-line runner on this repository; lower it
 only after a measured replacement run establishes a smaller safe bound.
@@ -34,3 +38,7 @@ Quality commands must be bounded and offline-capable. They must not publish,
 deploy, tag, push, call a provider, collect credentials, or execute a
 remediation action. If a dependency cache, tool, or gate is unavailable, keep
 the result visible as unknown or blocked.
+
+BasedPyright is intentionally configured in strict mode. Existing strictness
+findings are tracked remediation debt and must be fixed at their source; do not
+weaken the mode, add broad ignores, or replace errors with casts.

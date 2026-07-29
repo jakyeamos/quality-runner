@@ -79,6 +79,12 @@ For an explicit local checkout, pass `--source /path/to/quality-runner`.
 Without an editable checkout, the command falls back to `uv tool upgrade
 quality-runner`.
 
+The repository itself is guarded by an executable environment contract:
+`python3 scripts/check_environment_contract.py` runs through `.pre-cr.json`,
+CI, and release checks, and is also a required blocker gate in
+`.quality-runner.toml`. It verifies routed context, strict type-checking
+configuration, locked commands, workflow coverage, and secret-file ignores.
+
 Quality Runner also carries compatibility surfaces for the two smaller extracted
 packages it supersedes publicly:
 

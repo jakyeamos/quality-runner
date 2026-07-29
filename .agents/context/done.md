@@ -6,8 +6,10 @@ A Quality Runner change is complete only when:
   surfaces agree;
 - behavior-focused tests cover the changed public contract or confirmed
   regression;
-- locked pytest, Ruff lint, Ruff format, BasedPyright, Vulture, dependency
-  audit, package build, and the environment contract pass;
+- locked pytest, Ruff lint, Ruff format, strict BasedPyright, Vulture,
+  dependency audit, package build, and the environment contract pass;
+- if strict BasedPyright is not yet green, the remaining findings are named,
+  reproducible remediation debt and have not been suppressed or downgraded;
 - safety boundaries still refuse unauthorized source mutation, remote calls,
   credential collection, and remediation execution;
 - generated evidence contains provenance and redaction metadata and no private

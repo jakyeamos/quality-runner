@@ -36,6 +36,9 @@ jobs:
       - name: Install locked development environment
         run: uv sync --locked --all-groups --python ${{ matrix.python-version }}
 
+      - name: Validate repository environment contract
+        run: python3 scripts/check_environment_contract.py
+
       - name: Run tests
         run: uv run --locked pytest -q
 

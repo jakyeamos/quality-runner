@@ -3,6 +3,8 @@
 - Target Python 3.12 or newer and preserve the locked `uv` environment.
 - Add explicit public return types and typed boundaries for new production
   code. Fix real type errors; do not add broad ignores or casts that hide them.
+- Keep BasedPyright in strict mode. Treat the current strictness backlog as
+  source-level remediation work, not a reason to weaken the repository policy.
 - Keep CLI, MCP, artifact, and schema contracts deterministic. Sort emitted
   collections where order is not semantically meaningful.
 - Preserve evidence provenance, run IDs, schema versions, and redaction
