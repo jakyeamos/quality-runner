@@ -104,3 +104,42 @@ def test_repeated_group_count_change_is_unknown() -> None:
 
     assert delta["unknown"]
     assert any("occurrence matching is ambiguous" in blocker for blocker in delta["blockers"])
+
+
+def test_repeated_group_that_disappears_is_resolved() -> None:
+    payload = _payload()
+    payload["generalDiagnostics"] = [
+        *payload["generalDiagnostics"],
+        {
+            **payload["generalDiagnostics"][0],
+            "range": {
+                "start": {"line": 8, "character": 2},
+                "end": {"line": 8, "character": 6},
+            },
+        },
+    ]
+    payload["summary"] = {
+        "filesAnalyzed": 1,
+        "errorCount": 2,
+        "warningCount": 0,
+        "informationCount": 0,
+    }
+    baseline = _baseline(payload)
+    current = _baseline(
+        {
+            **_payload(),
+            "summary": {
+                "filesAnalyzed": 1,
+                "errorCount": 0,
+                "warningCount": 0,
+                "informationCount": 0,
+            },
+            "generalDiagnostics": [],
+        }
+    )
+
+    delta = compare_baseline(baseline, current, expected_config_sha256="config-hash")
+
+    assert len(delta["resolved"]) == 2
+    assert delta["unknown"] == []
+    assert delta["blockers"] == []

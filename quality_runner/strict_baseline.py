@@ -154,7 +154,9 @@ def compare_baseline(
     ambiguous_groups = {
         group
         for group in set(baseline_groups) | set(current_groups)
-        if max(baseline_groups[group], current_groups[group]) > 1
+        if baseline_groups[group]
+        and current_groups[group]
+        and max(baseline_groups[group], current_groups[group]) > 1
         and baseline_groups[group] != current_groups[group]
     }
     if ambiguous_groups:

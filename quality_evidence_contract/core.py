@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Literal
+from typing import Any, Literal, cast
 
 QUALITY_EVIDENCE_SCHEMA = "quality-evidence-v0.1"
 QUALITY_FINDING_SCHEMA = "quality-finding-v0.1"
@@ -14,14 +14,16 @@ BLOCKING_LEVELS: frozenset[str] = frozenset({"blocker", "error", "critical"})
 def _string_list(value: object) -> list[str]:
     if not isinstance(value, list):
         return []
-    return [str(item) for item in value if str(item).strip()]
+    items = cast(list[object], value)
+    return [str(item) for item in items if str(item).strip()]
 
 
 def normalize_evidence_items(value: object) -> list[dict[str, Any]]:
     if not isinstance(value, list):
         return []
     normalized: list[dict[str, Any]] = []
-    for item in value:
+    for raw_item in cast(list[object], value):
+        item = cast(dict[str, Any], raw_item) if isinstance(raw_item, dict) else raw_item
         if isinstance(item, str):
             normalized.append(
                 {
@@ -33,6 +35,7 @@ def normalize_evidence_items(value: object) -> list[dict[str, Any]]:
             continue
         if not isinstance(item, dict):
             continue
+        item = cast(dict[str, Any], item)
         summary = str(item.get("summary") or item.get("reason") or item.get("file") or "").strip()
         evidence = {
             "schema": QUALITY_EVIDENCE_SCHEMA,

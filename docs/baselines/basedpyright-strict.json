@@ -1,6 +1,6 @@
 {
-  "baseline_reason": "initial strict inventory on merged main",
-  "baseline_ref": "b88be965e1d189b66aed426ea5813879496c05d7",
+  "baseline_reason": "refresh baseline provenance after ratchet-contract amendment",
+  "baseline_ref": "c32818c11854288297f61ee106cfd0fdfb42ec96",
   "config_path": "pyrightconfig.strict.json",
   "config_sha256": "df2c47811d8e65b915dc44955f29b51c82cf3de25b6d7e4a76c8d4e560b20060",
   "coverage": {
