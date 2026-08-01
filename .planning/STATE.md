@@ -3,7 +3,7 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: GPT-5.6 modernization
 status: complete
-last_updated: "2026-07-21T18:34:51Z"
+last_updated: "2026-08-01T19:10:00Z"
 progress:
   total_phases: 8
   completed_phases: 8
@@ -22,14 +22,15 @@ See `.planning/PROJECT.md` for the established product boundary and
 **Core value:** Give developers and agents trustworthy local evidence before
 they authorize repository changes.
 
-**Current focus:** v0.6.0 released; explicit scan-scope inclusion follow-up is
-active on `codex/qr-flexible-scan-scope`.
+**Current focus:** Fold the post-v0.6.0 feature branches into an isolated
+`0.7.0` release candidate while preserving ambiguous dirty worktrees.
 
 ## Current Position
 
 - Branch: `codex/qr-flexible-scan-scope`
 - Baseline: `dev` at commit `ca2e34b`; implementation commit `4b0c2ab`,
-  instruction audit commit `3952a54`
+  instruction audit commit `3952a54`, governed fleet and security evidence
+  commit `6f22555`
 - Release metadata and readiness discovery fixes: `e3f5f5f`; PR #5 merged at
   `c6e92cc`, tag `v0.6.0` and PyPI publication are verified.
 - Audit and planning: complete
@@ -53,11 +54,12 @@ active on `codex/qr-flexible-scan-scope`.
 
 ## Active Phase
 
-- **Phase:** scan-scope-flexibility
-- **Slug:** explicit-scan-inclusion-controls
+- **Phase:** release-fold
+- **Slug:** quality-runner-0-7-0
 - **Status:** In progress
-- **Completion gate:** Implementation, instruction audit, and verification are
-  complete on `3952a54`; truth-file commit and branch push remain.
+- **Completion gate:** All eligible feature history is folded from verified
+  remote `main`, the missing `v0.6.0` GitHub Release baseline is reconciled,
+  and the complete `0.7.0` release ladder passes on the isolated candidate.
 
 ## Key Decisions
 
@@ -82,11 +84,17 @@ active on `codex/qr-flexible-scan-scope`.
 
 ## Next Step
 
-Commit the truth-file update and push `codex/qr-flexible-scan-scope`; do not
-merge, tag, publish, or alter canonical release state in this slice.
+Publish this source branch for provenance, fold it into the isolated
+`codex/main-fold-v0-7-0` candidate, and keep tag/PyPI publication separate
+until the candidate is on the verified canonical `main`.
 
 ## Recent Progress
 
+- 2026-08-01: `6f22555` adds bounded fleet maturity/change-surface evidence,
+  a replay-validated Pronto feed, isolated dependency preparation, and
+  coverage-aware Codex Security evidence. The security adapter was split below
+  the promoted large-source-file threshold; 30 focused tests, Ruff, format, and
+  BasedPyright pass.
 - 2026-07-21: `3952a54` aligns the packaged skill and detailed agent guide
   with canonical journeys, v2 outcomes, scan-scope controls, review/gate/
   planning/worker/rollout/release routes, and cache provenance; six focused
