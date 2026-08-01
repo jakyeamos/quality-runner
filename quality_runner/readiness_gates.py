@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from quality_runner.aggregate_coverage import LEAF_GATE_IDS
 from quality_runner.readiness_evidence import (
@@ -45,8 +45,9 @@ def provenance_gate(
             "release readiness requires current CI evidence with provenance",
             "provenance",
         )
-    for check in checks:
-        if not isinstance(check, dict):
+    for raw_check in cast(list[Any], checks):
+        check = _dict(raw_check)
+        if check is None:
             return _blocked_gate(
                 "evidence_provenance", "CI evidence contains an invalid check", "provenance"
             )
@@ -88,8 +89,8 @@ def provenance_gate(
                 "provenance",
             )
     if evidence_error is None and evidence is not None:
-        target = evidence.get("target")
-        if not isinstance(target, dict) or target.get("head_sha") != head:
+        target = _dict(evidence.get("target"))
+        if target is None or target.get("head_sha") != head:
             return _blocked_gate(
                 "evidence_provenance",
                 "release evidence does not match the current HEAD",
@@ -97,7 +98,7 @@ def provenance_gate(
             )
         branch = current_git.get("branch")
         target_ref = target.get("ref")
-        valid_refs = (
+        valid_refs: set[str] = (
             {branch, f"refs/heads/{branch}"}
             if isinstance(branch, str) and branch and branch != "HEAD"
             else set()
@@ -113,10 +114,11 @@ def provenance_gate(
                 "release evidence target ref does not match the current branch",
                 "provenance",
             )
-        artifact = evidence.get("artifact")
-        artifact_digest = artifact.get("digest") if isinstance(artifact, dict) else None
-        for check in checks:
-            check_digest = check.get("artifact_digest") if isinstance(check, dict) else None
+        artifact = _dict(evidence.get("artifact"))
+        artifact_digest = artifact.get("digest") if artifact is not None else None
+        for raw_check in cast(list[Any], checks):
+            check = _dict(raw_check)
+            check_digest = check.get("artifact_digest") if check is not None else None
             if check_digest and _normalize_digest(check_digest) != _normalize_digest(
                 artifact_digest
             ):
@@ -155,8 +157,8 @@ def manifest_gate(
             evidence_error or "release evidence is missing",
             "evidence",
         )
-    artifact = evidence.get("artifact")
-    if not isinstance(artifact, dict):
+    artifact = _dict(evidence.get("artifact"))
+    if artifact is None:
         return _blocked_gate(
             "release_manifest_coherence", "artifact evidence is missing", "evidence"
         )
@@ -239,14 +241,15 @@ def acceptance_gate(
             evidence_error or "release evidence is missing",
             "review-required",
         )
-    owner = evidence.get("owner")
+    owner = _dict(evidence.get("owner"))
     acceptance = evidence.get("acceptance")
     if not isinstance(owner, dict) or not owner.get("name") or not owner.get("role"):
         return _blocked_gate(
             "release_acceptance_evidence", "owner acceptance is missing", "review-required"
         )
     if not isinstance(acceptance, list) or not any(
-        isinstance(item, dict) and item.get("status") == "accepted" for item in acceptance
+        (item := _dict(raw_item)) is not None and item.get("status") == "accepted"
+        for raw_item in cast(list[Any], acceptance)
     ):
         return _blocked_gate(
             "release_acceptance_evidence",
@@ -255,7 +258,8 @@ def acceptance_gate(
         )
     external_checks = evidence.get("external_checks")
     if isinstance(external_checks, list) and any(
-        not isinstance(item, dict) or item.get("status") != "passed" for item in external_checks
+        (item := _dict(raw_item)) is None or item.get("status") != "passed"
+        for raw_item in cast(list[Any], external_checks)
     ):
         return _blocked_gate(
             "release_acceptance_evidence",
@@ -286,7 +290,8 @@ def migration_evidence_gate(
             "migration_safety", evidence_error or "migration evidence is missing", "evidence"
         )
     migration = evidence.get("migration")
-    if not isinstance(migration, dict):
+    migration = _dict(migration)
+    if migration is None:
         return _blocked_gate("migration_safety", "migration evidence is missing", "evidence")
     required = ("forward", "rollback", "failure_injection", "reconciliation")
     if not all(_proof_passed(migration.get(key)) for key in required):
@@ -301,37 +306,38 @@ def migration_evidence_gate(
 def _proof_passed(value: object) -> bool:
     if value == "passed":
         return True
-    if not isinstance(value, dict) or value.get("status") != "passed":
+    value_map = _dict(value)
+    if value_map is None or value_map.get("status") != "passed":
         return False
-    evidence = value.get("evidence")
-    return (
-        isinstance(evidence, list)
-        and bool(evidence)
-        and all(isinstance(item, str) and item for item in evidence)
-    )
+    evidence = value_map.get("evidence")
+    if not isinstance(evidence, list):
+        return False
+    evidence_items = cast(list[Any], evidence)
+    return bool(evidence_items) and all(isinstance(item, str) and item for item in evidence_items)
 
 
 def aggregate_gate(*, scan: dict[str, Any], capability_map: dict[str, Any]) -> dict[str, Any]:
     coverage = scan.get("aggregate_coverage")
     if not isinstance(coverage, list) or not coverage:
         return _passed_gate("aggregate_coverage", "no opaque aggregate commands were detected")
-    opaque = [item for item in coverage if isinstance(item, dict) and item.get("opaque") is True]
+    coverage_rows = _dict_list(cast(object, coverage))
+    opaque = [item for item in coverage_rows if item.get("opaque") is True]
     required_leaf_ids = {
         str(capability.get("id"))
         for key in ("available", "missing")
-        for capability in capability_map.get(key, [])
-        if isinstance(capability, dict) and capability.get("id") in LEAF_GATE_IDS
+        for capability in _dict_list(capability_map.get(key))
+        if capability.get("id") in LEAF_GATE_IDS
     }
     covered_leaf_ids: set[str] = set()
-    for item in coverage:
-        if isinstance(item, dict) and isinstance(item.get("covered_gate_ids"), list):
+    for item in coverage_rows:
+        if isinstance(item.get("covered_gate_ids"), list):
             covered_leaf_ids.update(
                 gate_id for gate_id in item["covered_gate_ids"] if isinstance(gate_id, str)
             )
     uncovered = [
         item
-        for item in coverage
-        if isinstance(item, dict)
+        for item in coverage_rows
+        if isinstance(item.get("covered_gate_ids"), list)
         and isinstance(item.get("uncovered_gate_ids"), list)
         and item["uncovered_gate_ids"]
     ]
@@ -361,19 +367,18 @@ def publication_gate(
     security_gate = next(
         (
             capability
-            for capability in capability_map.get("available", [])
-            if isinstance(capability, dict)
-            and capability.get("id") == "security_publication_visibility_review"
+            for capability in _dict_list(capability_map.get("available"))
+            if capability.get("id") == "security_publication_visibility_review"
         ),
         None,
     )
-    if isinstance(security_gate, dict) and security_gate.get("status") == "review-complete":
+    if security_gate is not None and security_gate.get("status") == "review-complete":
         return _passed_gate("publication_visibility_review", "publication review was completed")
-    publication = evidence.get("publication") if isinstance(evidence, dict) else None
+    publication = _dict(evidence.get("publication")) if evidence is not None else None
     required = ("authorization", "sanitization", "immutability", "media_access")
     if (
         evidence_error is None
-        and isinstance(publication, dict)
+        and publication is not None
         and all(_proof_passed(publication.get(key)) for key in required)
     ):
         return _passed_gate(
@@ -393,16 +398,26 @@ def read_only_gate(
         isinstance(verification_context, dict)
         and verification_context.get("worktree_mode") == "in-place"
     ):
-        for gate in gate_verification.get("gates", []):
-            if isinstance(gate, dict) and gate.get("mutating_risk") in {"mutating", "unknown"}:
+        for gate in _dict_list(gate_verification.get("gates")):
+            if gate.get("mutating_risk") in {"mutating", "unknown"}:
                 return _blocked_gate(
                     "read_only_integrity",
                     "release profile requires disposable execution for mutating or unknown-risk gates",
                     "isolation",
                 )
-    for gate in gate_verification.get("gates", []):
-        if isinstance(gate, dict) and gate.get("failure_type") == "read-only-mutation":
+    for gate in _dict_list(gate_verification.get("gates")):
+        if gate.get("failure_type") == "read-only-mutation":
             return _blocked_gate(
                 "read_only_integrity", "a gate mutated the source worktree", "read-only-policy"
             )
     return _passed_gate("read_only_integrity", "no unauthorized read-only mutation was detected")
+
+
+def _dict(value: object) -> dict[str, Any] | None:
+    return cast(dict[str, Any], value) if isinstance(value, dict) else None
+
+
+def _dict_list(value: object) -> list[dict[str, Any]]:
+    if not isinstance(value, list):
+        return []
+    return [item for raw_item in cast(list[Any], value) if (item := _dict(raw_item)) is not None]
