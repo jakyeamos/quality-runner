@@ -7,7 +7,7 @@ import json
 import re
 from collections.abc import Mapping, Sequence
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from quality_runner.schema_constants import CODEX_SECURITY_RESULT_SCHEMA
 
@@ -36,9 +36,10 @@ def canonical_json(value: Any) -> str:
 def canonical_hash(value: Any, *, exclude: Sequence[str] = ()) -> str:
     """Hash a JSON value, excluding named top-level hash fields."""
 
-    if isinstance(value, Mapping):
+    value_map = _mapping(value)
+    if value_map is not None:
         excluded = set(exclude)
-        value = {str(key): item for key, item in value.items() if str(key) not in excluded}
+        value = {str(key): item for key, item in value_map.items() if str(key) not in excluded}
     return hashlib.sha256(canonical_json(value).encode("utf-8")).hexdigest()
 
 
@@ -47,9 +48,10 @@ def load_codex_json(path: Path) -> dict[str, Any]:
 
     resolved = path.expanduser().resolve()
     payload = json.loads(resolved.read_text(encoding="utf-8"))
-    if not isinstance(payload, dict):
+    payload_map = _mapping(payload)
+    if payload_map is None:
         raise ValueError(f"JSON object required: {resolved}")
-    return payload
+    return dict(payload_map)
 
 
 def write_codex_json(path: Path, payload: Mapping[str, Any]) -> Path:
@@ -64,8 +66,7 @@ def write_codex_json(path: Path, payload: Mapping[str, Any]) -> Path:
 def _normalize_coverage(raw: Any) -> dict[str, Any]:
     if isinstance(raw, str):
         raw = {"status": raw}
-    if not isinstance(raw, Mapping):
-        raw = {}
+    raw = _mapping(raw) or {}
     status_raw = _normal_key(str(raw.get("status", "unknown")))
     explicit_complete = raw.get("complete")
     complete = status_raw in {"complete", "completed", "full", "covered"}
@@ -113,11 +114,12 @@ def _normalize_coverage(raw: Any) -> dict[str, Any]:
         status = "unknown"
     follow_up = raw.get("follow_up")
     follow_up_complete = complete
-    if isinstance(follow_up, Mapping):
+    follow_up_map = _mapping(follow_up)
+    if follow_up_map is not None:
         follow_up_complete = bool(
-            follow_up.get(
+            follow_up_map.get(
                 "complete",
-                follow_up.get("coverage_complete", follow_up.get("status") == "complete"),
+                follow_up_map.get("coverage_complete", follow_up_map.get("status") == "complete"),
             )
         )
     elif follow_up is not None:
@@ -125,8 +127,9 @@ def _normalize_coverage(raw: Any) -> dict[str, Any]:
     if raw.get("follow_up_complete") is not None:
         follow_up_complete = bool(raw["follow_up_complete"])
     scope = raw.get("scope", "unknown")
-    if isinstance(scope, Mapping):
-        scope = scope.get("type") or scope.get("kind") or scope.get("name") or "unknown"
+    scope_map = _mapping(scope)
+    if scope_map is not None:
+        scope = scope_map.get("type") or scope_map.get("kind") or scope_map.get("name") or "unknown"
     result: dict[str, Any] = {
         "status": status,
         "complete": complete,
@@ -134,7 +137,9 @@ def _normalize_coverage(raw: Any) -> dict[str, Any]:
         "scope": _normal_key(str(scope)) or "unknown",
         "scanned_paths": scanned,
         "expected_paths": expected,
-        "covered_match_keys": sorted(str(item) for item in raw.get("covered_match_keys", []) or []),
+        "covered_match_keys": sorted(
+            str(item) for item in cast(list[Any], raw.get("covered_match_keys", []) or [])
+        ),
     }
     follow_up_of = raw.get("follow_up_of")
     if follow_up_of is not None:
@@ -145,8 +150,8 @@ def _normalize_coverage(raw: Any) -> dict[str, Any]:
 def _raw_coverage(raw: Mapping[str, Any]) -> Any:
     if raw.get("coverage") is not None:
         return raw["coverage"]
-    scan = raw.get("scan")
-    if isinstance(scan, Mapping) and scan.get("coverage") is not None:
+    scan = _mapping(raw.get("scan"))
+    if scan is not None and scan.get("coverage") is not None:
         return scan["coverage"]
     if raw.get("coverage_summary") is not None:
         return raw["coverage_summary"]
@@ -162,8 +167,11 @@ def _raw_coverage(raw: Mapping[str, Any]) -> Any:
 
 def _normalize_source(raw: Mapping[str, Any]) -> dict[str, Any]:
     source = raw.get("source")
-    if isinstance(source, Mapping):
-        descriptor = {str(key): value for key, value in source.items() if value is not None}
+    source_map = _mapping(source)
+    if source_map is not None:
+        descriptor: dict[str, Any] = {
+            str(key): value for key, value in source_map.items() if value is not None
+        }
     elif source is not None:
         descriptor = {"report": str(source)}
     else:
@@ -175,8 +183,9 @@ def _normalize_source(raw: Mapping[str, Any]) -> dict[str, Any]:
 
 def _normalize_repository(raw: Mapping[str, Any]) -> dict[str, Any]:
     value = raw.get("repository") or raw.get("repo")
-    if isinstance(value, Mapping):
-        return {str(key): item for key, item in value.items() if item is not None}
+    value_map = _mapping(value)
+    if value_map is not None:
+        return {str(key): item for key, item in value_map.items() if item is not None}
     if value is not None:
         return {"root": str(value)}
     return {}
@@ -184,8 +193,9 @@ def _normalize_repository(raw: Mapping[str, Any]) -> dict[str, Any]:
 
 def _normalize_revision(raw: Mapping[str, Any]) -> dict[str, Any]:
     value = raw.get("revision")
-    if isinstance(value, Mapping):
-        return {str(key): item for key, item in value.items() if item is not None}
+    value_map = _mapping(value)
+    if value_map is not None:
+        return {str(key): item for key, item in value_map.items() if item is not None}
     revision: dict[str, Any] = {}
     commit = _first_text(raw, ("commit_sha", "commit", "sha", "revision"))
     ref = _first_text(raw, ("ref", "branch", "head"))
@@ -197,11 +207,12 @@ def _normalize_revision(raw: Mapping[str, Any]) -> dict[str, Any]:
 
 
 def _normalize_locations(source: Mapping[str, Any]) -> list[dict[str, Any]]:
-    raw_locations = source.get("locations") or source.get("location") or []
+    raw_locations: Any = source.get("locations") or source.get("location") or []
     if isinstance(raw_locations, (str, Mapping)):
         raw_locations = [raw_locations]
     if not isinstance(raw_locations, list):
         raw_locations = []
+    raw_locations = cast(list[Any], raw_locations)
     normalized: list[dict[str, Any]] = []
     for raw_location in raw_locations:
         location = _location_item(raw_location)
@@ -215,18 +226,20 @@ def _location_item(value: Any) -> dict[str, Any]:
     if isinstance(value, str):
         path = _normalize_path(value)
         return {"file": path} if path else {}
-    if not isinstance(value, Mapping):
+    value_map = _mapping(value)
+    if value_map is None:
         return {}
-    physical = value.get("physicalLocation")
-    if isinstance(physical, Mapping):
+    value = value_map
+    physical = _mapping(value.get("physicalLocation"))
+    if physical is not None:
         return _location_item(physical)
     artifact = value.get("artifactLocation")
     path = _first_text(value, _PATH_KEYS)
-    if not path and isinstance(artifact, Mapping):
-        path = _first_text(artifact, ("uri", "uriBaseId", "path"))
+    artifact_map = _mapping(artifact)
+    if not path and artifact_map is not None:
+        path = _first_text(artifact_map, ("uri", "uriBaseId", "path"))
     region = value.get("region")
-    if not isinstance(region, Mapping):
-        region = {}
+    region = _mapping(region) or {}
     line_value = (
         value.get("line")
         or value.get("start_line")
@@ -251,26 +264,33 @@ def _evidence_items(
     items: list[Any] = []
     if isinstance(value, str):
         items.append(value)
-    elif isinstance(value, Mapping):
-        items.append(dict(value))
+    elif value_map := _mapping(value):
+        items.append(dict(value_map))
     elif isinstance(value, list):
-        items.extend(item for item in value if isinstance(item, (str, Mapping)))
+        items.extend(
+            item
+            for item in cast(list[Any], value)
+            if isinstance(item, str) or _mapping(item) is not None
+        )
     for key in ("attack_path", "remediation", "recommendation", "code_snippet"):
         item = source.get(key)
-        if isinstance(item, (str, Mapping)) and item not in items:
+        if (isinstance(item, str) or _mapping(item) is not None) and item not in items:
             items.append(item)
     if not items:
         items.append({"kind": "codex-finding", "summary": summary})
-    if locations and not any(isinstance(item, Mapping) and item.get("file") for item in items):
+    if locations and not any(
+        (item_map := _mapping(item)) is not None and item_map.get("file") for item in items
+    ):
         items.extend({"kind": "location", **location} for location in locations)
     return items
 
 
 def _metadata(source: Mapping[str, Any]) -> dict[str, Any]:
     value = source.get("metadata") or source.get("properties")
-    if not isinstance(value, Mapping):
+    value_map = _mapping(value)
+    if value_map is None:
         return {}
-    return {str(key): item for key, item in value.items() if item is not None}
+    return {str(key): item for key, item in value_map.items() if item is not None}
 
 
 def _quality_level(source: Mapping[str, Any]) -> str:
@@ -310,27 +330,30 @@ def _validation_result(
         "errors": sorted(str(error) for error in errors),
         "warnings": sorted(str(warning) for warning in warnings),
     }
-    if isinstance(payload, Mapping):
-        result["input_schema"] = payload.get("schema")
+    payload_map = _mapping(payload)
+    if payload_map is not None:
+        result["input_schema"] = payload_map.get("schema")
         for key in ("source_hash", "evidence_hash", "comparison_hash", "handoff_hash"):
-            if isinstance(payload.get(key), str):
-                result[key] = payload[key]
+            if isinstance(payload_map.get(key), str):
+                result[key] = payload_map[key]
     return result
 
 
 def _validate_coverage(value: Any, errors: list[str]) -> None:
-    if not isinstance(value, Mapping):
+    value_map = _mapping(value)
+    if value_map is None:
         errors.append("Codex evidence coverage must be an object")
         return
-    if value.get("status") not in {"complete", "partial", "unknown"}:
+    if value_map.get("status") not in {"complete", "partial", "unknown"}:
         errors.append("Codex evidence coverage.status is invalid")
-    if not isinstance(value.get("complete"), bool):
+    if not isinstance(value_map.get("complete"), bool):
         errors.append("Codex evidence coverage.complete must be boolean")
-    if not isinstance(value.get("follow_up_complete"), bool):
+    if not isinstance(value_map.get("follow_up_complete"), bool):
         errors.append("Codex evidence coverage.follow_up_complete must be boolean")
     for field in ("scanned_paths", "expected_paths", "covered_match_keys"):
-        if not isinstance(value.get(field), list) or not all(
-            isinstance(item, str) for item in value[field]
+        field_value = value_map.get(field)
+        if not isinstance(field_value, list) or not all(
+            isinstance(item, str) for item in cast(list[Any], field_value)
         ):
             errors.append(f"Codex evidence coverage.{field} must be a string list")
 
@@ -363,7 +386,9 @@ def _path_list(value: Any) -> list[str]:
         value = [value]
     if not isinstance(value, list):
         return []
-    return sorted({_normalize_path(str(item)) for item in value if str(item).strip()})
+    return sorted(
+        {_normalize_path(str(item)) for item in cast(list[Any], value) if str(item).strip()}
+    )
 
 
 def _normalize_path(value: str) -> str:
@@ -384,8 +409,17 @@ def _normal_key(value: str) -> str:
 
 
 def _drop_none_values(value: Any) -> Any:
-    if isinstance(value, Mapping):
-        return {key: _drop_none_values(item) for key, item in value.items() if item is not None}
+    value_map = _mapping(value)
+    if value_map is not None:
+        return {key: _drop_none_values(item) for key, item in value_map.items() if item is not None}
     if isinstance(value, list):
-        return [_drop_none_values(item) for item in value]
+        return [_drop_none_values(item) for item in cast(list[Any], value)]
     return value
+
+
+def _mapping(value: Any) -> Mapping[str, Any] | None:
+    """Narrow JSON-like mappings at adapter boundaries without changing values."""
+
+    if not isinstance(value, Mapping):
+        return None
+    return cast(Mapping[str, Any], value)

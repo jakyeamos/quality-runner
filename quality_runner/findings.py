@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 
 from quality_runner.actionability import ACTIONABILITY_VALUES
 from quality_runner.lifecycle_status import LIFECYCLE_STATUSES
@@ -31,7 +31,7 @@ def require_valid(name: str, result: ValidationResult) -> None:
         return
     errors = result.get("errors")
     if isinstance(errors, list) and errors:
-        message = "; ".join(str(error) for error in errors)
+        message = "; ".join(str(error) for error in cast(list[object], errors))
     else:
         message = "unknown validation error"
     raise ValueError(f"invalid {name}: {message}")
@@ -47,10 +47,11 @@ def validate_audit_report(report: dict[str, Any]) -> ValidationResult:
         errors.append("audit report findings must be a list")
         return {"passed": False, "errors": errors}
 
-    for index, finding in enumerate(findings):
-        if not isinstance(finding, dict):
+    for index, raw_finding in enumerate(cast(list[object], findings)):
+        if not isinstance(raw_finding, dict):
             errors.append(f"finding at index {index} is not an object")
             continue
+        finding = cast(dict[str, Any], raw_finding)
         for field in ("id", "severity", "category", "summary", "recommended_fix"):
             if not _non_empty_string(finding.get(field)):
                 errors.append(f"finding at index {index} field {field} must be a non-empty string")
@@ -84,10 +85,11 @@ def validate_remediation_plan(plan: dict[str, Any]) -> ValidationResult:
         errors.append("remediation plan slices must be a list")
         return {"passed": False, "errors": errors}
 
-    for index, slice_item in enumerate(slices):
-        if not isinstance(slice_item, dict):
+    for index, raw_slice in enumerate(cast(list[object], slices)):
+        if not isinstance(raw_slice, dict):
             errors.append(f"slice at index {index} is not an object")
             continue
+        slice_item = cast(dict[str, Any], raw_slice)
         for field in ("id", "title", "priority"):
             if not _non_empty_string(slice_item.get(field)):
                 errors.append(f"slice at index {index} field {field} must be a non-empty string")
@@ -130,10 +132,13 @@ def validate_agent_handoff(handoff: dict[str, Any]) -> ValidationResult:
     artifact_paths = handoff.get("artifact_paths")
     if not isinstance(artifact_paths, dict):
         errors.append("agent handoff artifact_paths must be an object")
-    elif not all(
-        _non_empty_string(key) and _non_empty_string(value) for key, value in artifact_paths.items()
-    ):
-        errors.append("agent handoff artifact_paths must contain string paths")
+    else:
+        artifact_path_map = cast(dict[object, object], artifact_paths)
+        if not all(
+            _non_empty_string(key) and _non_empty_string(value)
+            for key, value in artifact_path_map.items()
+        ):
+            errors.append("agent handoff artifact_paths must contain string paths")
 
     if not _warning_list(handoff.get("warnings")):
         errors.append("agent handoff warnings must be a list of warning objects")
@@ -196,66 +201,78 @@ def _non_empty_string(value: object) -> bool:
 
 
 def _non_empty_string_list(value: object) -> bool:
-    return (
-        isinstance(value, list) and bool(value) and all(_non_empty_string(item) for item in value)
-    )
+    if not isinstance(value, list):
+        return False
+    items = cast(list[object], value)
+    return bool(items) and all(_non_empty_string(item) for item in items)
 
 
 def _string_list(value: object) -> bool:
-    return isinstance(value, list) and all(isinstance(item, str) for item in value)
+    return isinstance(value, list) and all(
+        isinstance(item, str) for item in cast(list[object], value)
+    )
 
 
 def _non_empty_finding_list(value: object) -> bool:
-    return isinstance(value, list) and bool(value) and all(_finding_item(item) for item in value)
+    if not isinstance(value, list):
+        return False
+    items = cast(list[object], value)
+    return bool(items) and all(_finding_item(item) for item in items)
 
 
 def _finding_item(value: object) -> bool:
-    if not isinstance(value, dict):
+    finding = _mapping(value)
+    if finding is None:
         return False
     return (
         all(
-            _non_empty_string(value.get(field))
+            _non_empty_string(finding.get(field))
             for field in ("id", "severity", "category", "summary")
         )
-        and value.get("severity") in ALLOWED_SEVERITIES
+        and finding.get("severity") in ALLOWED_SEVERITIES
     )
 
 
 def _slice_item(value: object) -> bool:
-    if not isinstance(value, dict):
+    slice_item = _mapping(value)
+    if slice_item is None:
         return False
     return (
-        all(_non_empty_string(value.get(field)) for field in ("id", "title", "priority"))
-        and value.get("priority") in ALLOWED_PRIORITIES
-        and _non_empty_finding_list(value.get("findings"))
-        and _non_empty_string_list(value.get("actions"))
-        and _optional_action_group_list(value.get("action_groups"))
-        and _non_empty_string_list(value.get("verification_gates"))
-        and verification_contract_is_valid(value)
+        all(_non_empty_string(slice_item.get(field)) for field in ("id", "title", "priority"))
+        and slice_item.get("priority") in ALLOWED_PRIORITIES
+        and _non_empty_finding_list(slice_item.get("findings"))
+        and _non_empty_string_list(slice_item.get("actions"))
+        and _optional_action_group_list(slice_item.get("action_groups"))
+        and _non_empty_string_list(slice_item.get("verification_gates"))
+        and verification_contract_is_valid(slice_item)
     )
 
 
 def _gate_verification_summary(value: object) -> bool:
-    if not isinstance(value, dict):
+    summary = _mapping(value)
+    if summary is None:
         return False
+    blockers = summary.get("blockers")
     return (
-        _non_empty_string(value.get("status"))
-        and _non_empty_string(value.get("recommended_classification"))
-        and isinstance(value.get("blockers"), list)
-        and all(_gate_blocker(item) for item in value["blockers"])
+        _non_empty_string(summary.get("status"))
+        and _non_empty_string(summary.get("recommended_classification"))
+        and isinstance(blockers, list)
+        and all(_gate_blocker(item) for item in cast(list[object], blockers))
     )
 
 
 def _gate_blocker(value: object) -> bool:
-    if not isinstance(value, dict):
+    blocker = _mapping(value)
+    if blocker is None:
         return False
-    return _non_empty_string(value.get("id")) and _non_empty_string(value.get("status"))
+    return _non_empty_string(blocker.get("id")) and _non_empty_string(blocker.get("status"))
 
 
 def _skill_review_summary(value: object) -> bool:
-    if not isinstance(value, dict):
+    summary = _mapping(value)
+    if summary is None:
         return False
-    if value.get("status") not in {
+    if summary.get("status") not in {
         "not-run",
         "review-pending",
         "review-required",
@@ -263,96 +280,109 @@ def _skill_review_summary(value: object) -> bool:
         "review-rejected",
     }:
         return False
-    mode = value.get("mode")
+    mode = summary.get("mode")
     if mode is not None and mode not in {"off", "auto", "parallel", "required"}:
         return False
-    automatic = value.get("automatic")
+    automatic = summary.get("automatic")
     if automatic is not None and not isinstance(automatic, bool):
         return False
     for key in ("review_count", "unresolved_count"):
-        count = value.get(key)
+        count = summary.get(key)
         if count is not None and (not isinstance(count, int) or count < 0):
             return False
-    if not _non_empty_string_list(value.get("active_skill_ids")):
+    if not _non_empty_string_list(summary.get("active_skill_ids")):
         return False
-    if not _non_empty_string_list(value.get("review_ids")):
+    if not _non_empty_string_list(summary.get("review_ids")):
         return False
-    unresolved = value.get("unresolved_review_ids")
-    if not isinstance(unresolved, list) or not all(_non_empty_string(item) for item in unresolved):
+    unresolved = summary.get("unresolved_review_ids")
+    if not isinstance(unresolved, list) or not all(
+        _non_empty_string(item) for item in cast(list[object], unresolved)
+    ):
         return False
     return all(
-        _non_empty_string(value.get(key))
+        _non_empty_string(summary.get(key))
         for key in ("packet_json", "packet_markdown")
-        if key in value
+        if key in summary
     ) and all(
-        _non_empty_string(value.get(key))
+        _non_empty_string(summary.get(key))
         for key in ("report_json", "report_source_run_id")
-        if key in value
+        if key in summary
     )
 
 
 def _optional_action_group_list(value: object) -> bool:
     if value is None:
         return True
-    return isinstance(value, list) and all(_action_group(item) for item in value)
+    return isinstance(value, list) and all(
+        _action_group(item) for item in cast(list[object], value)
+    )
 
 
 def _phase_candidate_list(value: object) -> bool:
-    return isinstance(value, list) and all(_phase_candidate(item) for item in value)
+    return isinstance(value, list) and all(
+        _phase_candidate(item) for item in cast(list[object], value)
+    )
 
 
 def _phase_candidate(value: object) -> bool:
-    if not isinstance(value, dict):
+    candidate = _mapping(value)
+    if candidate is None:
         return False
     required_strings = ("id", "domain", "title", "priority", "status")
-    if not all(_non_empty_string(value.get(field)) for field in required_strings):
+    if not all(_non_empty_string(candidate.get(field)) for field in required_strings):
         return False
-    if value.get("priority") not in ALLOWED_PRIORITIES:
+    if candidate.get("priority") not in ALLOWED_PRIORITIES:
         return False
-    if value.get("status") not in {"planned", "review-required"}:
+    if candidate.get("status") not in {"planned", "review-required"}:
         return False
-    if not isinstance(value.get("slice_ids"), list) or not _string_list(value["slice_ids"]):
+    if not isinstance(candidate.get("slice_ids"), list) or not _string_list(candidate["slice_ids"]):
         return False
-    if not isinstance(value.get("finding_ids"), list) or not _string_list(value["finding_ids"]):
+    if not isinstance(candidate.get("finding_ids"), list) or not _string_list(
+        candidate["finding_ids"]
+    ):
         return False
     return (
-        _non_empty_string_list(value.get("actions"))
-        and _non_empty_string_list(value.get("verification_gates"))
-        and isinstance(value.get("slice_count"), int)
-        and isinstance(value.get("finding_count"), int)
+        _non_empty_string_list(candidate.get("actions"))
+        and _non_empty_string_list(candidate.get("verification_gates"))
+        and isinstance(candidate.get("slice_count"), int)
+        and isinstance(candidate.get("finding_count"), int)
     )
 
 
 def _phase_candidate_summary_list(value: object) -> bool:
-    return isinstance(value, list) and all(_phase_candidate_summary(item) for item in value)
+    return isinstance(value, list) and all(
+        _phase_candidate_summary(item) for item in cast(list[object], value)
+    )
 
 
 def _phase_candidate_summary(value: object) -> bool:
-    if not isinstance(value, dict):
+    candidate = _mapping(value)
+    if candidate is None:
         return False
     required_strings = ("id", "domain", "title", "priority", "status")
-    if not all(_non_empty_string(value.get(field)) for field in required_strings):
+    if not all(_non_empty_string(candidate.get(field)) for field in required_strings):
         return False
-    if value.get("priority") not in ALLOWED_PRIORITIES:
+    if candidate.get("priority") not in ALLOWED_PRIORITIES:
         return False
-    if value.get("status") not in {"planned", "review-required"}:
+    if candidate.get("status") not in {"planned", "review-required"}:
         return False
     return all(
-        isinstance(value.get(field), int) and value[field] >= 0
+        isinstance(candidate.get(field), int) and candidate[field] >= 0
         for field in ("slice_count", "finding_count")
     )
 
 
 def _action_group(value: object) -> bool:
-    if not isinstance(value, dict):
+    group = _mapping(value)
+    if group is None:
         return False
     return (
-        _non_empty_string(value.get("class"))
+        _non_empty_string(group.get("class"))
         and (
-            _non_empty_string_list(value.get("gate_ids"))
-            or _non_empty_string_list(value.get("finding_ids"))
+            _non_empty_string_list(group.get("gate_ids"))
+            or _non_empty_string_list(group.get("finding_ids"))
         )
-        and _non_empty_string_list(value.get("actions"))
+        and _non_empty_string_list(group.get("actions"))
     )
 
 
@@ -360,9 +390,15 @@ def _warning_list(value: object) -> bool:
     if not isinstance(value, list):
         return False
     return all(
-        isinstance(item, dict)
+        (item := _mapping(raw_item)) is not None
         and _non_empty_string(item.get("code"))
         and _non_empty_string(item.get("message"))
         and _non_empty_string(item.get("path"))
-        for item in value
+        for raw_item in cast(list[object], value)
     )
+
+
+def _mapping(value: object) -> dict[str, Any] | None:
+    if not isinstance(value, dict):
+        return None
+    return cast(dict[str, Any], value)
