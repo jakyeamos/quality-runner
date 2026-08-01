@@ -135,6 +135,27 @@ def test_fleet_replay_is_deterministic_for_multiple_repositories(tmp_path: Path)
     assert replay["deterministic"] is True
 
 
+def test_fleet_audit_accepts_a_bounded_repository_slice(tmp_path: Path) -> None:
+    projects = tmp_path / "projects"
+    alpha = projects / "alpha"
+    beta = projects / "beta"
+    _init_repo(alpha)
+    _init_repo(beta)
+
+    audit = fleet_audit_payload(
+        projects_root=projects,
+        repository_paths=[alpha],
+        output_dir=tmp_path / "fleet-output",
+        as_of="2026-07-26T17:00:00+00:00",
+    )
+
+    assert audit["repository_count"] == 1
+    assert audit["summary"]["repository_count"] == 1
+    assert audit["summary"]["dynamic_policy"]["changed_only"] is True
+    inventory = json.loads((Path(audit["artifact_root"]) / "inventory.json").read_text())
+    assert inventory["scope"] == "explicit repository paths under the bounded projects root"
+
+
 def test_public_report_contains_aggregates_only(tmp_path: Path) -> None:
     projects = tmp_path / "projects"
     root = projects / "fixture"

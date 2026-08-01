@@ -1,0 +1,68 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://quality-runner.dev/schemas/codex-security-evidence.schema.json",
+  "title": "Quality Runner Codex Security Evidence",
+  "type": "object",
+  "required": [
+    "schema",
+    "contract_schema",
+    "source",
+    "coverage",
+    "findings",
+    "source_hash",
+    "evidence_hash"
+  ],
+  "properties": {
+    "schema": { "const": "quality-runner-codex-security-evidence-v0.1" },
+    "contract_schema": { "const": "quality-evidence-v0.1" },
+    "source": {
+      "type": "object",
+      "required": ["provider"],
+      "properties": { "provider": { "const": "codex-security" } },
+      "additionalProperties": true
+    },
+    "coverage": { "$ref": "#/$defs/coverage" },
+    "coverage_complete": { "type": "boolean" },
+    "findings": { "type": "array", "items": { "$ref": "#/$defs/finding" } },
+    "source_hash": { "$ref": "#/$defs/hash" },
+    "evidence_hash": { "$ref": "#/$defs/hash" }
+  },
+  "additionalProperties": true,
+  "$defs": {
+    "hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "coverage": {
+      "type": "object",
+      "required": [
+        "status",
+        "complete",
+        "follow_up_complete",
+        "scope",
+        "scanned_paths",
+        "expected_paths",
+        "covered_match_keys"
+      ],
+      "properties": {
+        "status": { "enum": ["complete", "partial", "unknown"] },
+        "complete": { "type": "boolean" },
+        "follow_up_complete": { "type": "boolean" },
+        "scope": { "type": "string" },
+        "scanned_paths": { "type": "array", "items": { "type": "string" } },
+        "expected_paths": { "type": "array", "items": { "type": "string" } },
+        "covered_match_keys": { "type": "array", "items": { "type": "string" } }
+      },
+      "additionalProperties": true
+    },
+    "finding": {
+      "type": "object",
+      "required": ["schema", "finding_id", "criterion_id", "level", "summary", "evidence", "match_key", "match_keys", "fingerprint"],
+      "properties": {
+        "schema": { "const": "quality-finding-v0.1" },
+        "match_key": { "type": "string", "minLength": 1 },
+        "match_keys": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "fingerprint": { "type": "string", "minLength": 1 },
+        "evidence": { "type": "array" }
+      },
+      "additionalProperties": true
+    }
+  }
+}

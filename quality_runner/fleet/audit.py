@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
 
@@ -46,6 +47,7 @@ def fleet_audit_payload(
     dynamic_max_age_days: int = DEFAULT_DYNAMIC_MAX_AGE_DAYS,
     timeout_seconds: int = DEFAULT_DYNAMIC_TIMEOUT_SECONDS,
     target_overrides: dict[str, str] | None = None,
+    repository_paths: Sequence[Path] | None = None,
     as_of: str | None = None,
 ) -> dict[str, Any]:
     resolved_as_of = parse_as_of(as_of)
@@ -60,9 +62,10 @@ def fleet_audit_payload(
         dynamic_max_age_days,
         timeout_seconds,
         sorted(overrides.items()),
+        sorted(str(path.expanduser().resolve()) for path in repository_paths or []),
     )
     artifact_root = _artifact_root(output_dir, audit_id)
-    repositories = discover_repositories(root)
+    repositories = _repositories_for_scope(root, repository_paths)
     results: list[dict[str, Any]] = []
     for repository in repositories:
         target_override = overrides.get(str(repository["repo_id"]))
@@ -100,7 +103,11 @@ def fleet_audit_payload(
         "audit_id": audit_id,
         "as_of": resolved_as_of,
         "projects_root": str(root),
-        "scope": "all repository identities under the bounded projects root",
+        "scope": (
+            "explicit repository paths under the bounded projects root"
+            if repository_paths is not None
+            else "all repository identities under the bounded projects root"
+        ),
         "dynamic_policy": {
             "enabled": dynamic,
             "changed_only": changed_only,
@@ -122,6 +129,10 @@ def fleet_audit_payload(
         results=results,
         summary=summary,
     )
+    maturity_feed = {
+        "status": "not_requested",
+        "reason": "immutable snapshot created; run fleet audit feed to update the stable feed",
+    }
     return {
         "schema": FLEET_AUDIT_SCHEMA,
         "status": "completed" if results else "blocked",
@@ -131,9 +142,31 @@ def fleet_audit_payload(
         "artifact_root": str(artifact_root),
         "artifact_paths": artifact_paths,
         "summary": summary,
+        "maturity_feed": maturity_feed,
         "public_projection": public_projection(summary),
         "implementation_allowed": False,
     }
+
+
+def _repositories_for_scope(
+    projects_root: Path,
+    repository_paths: Sequence[Path] | None,
+) -> list[dict[str, Any]]:
+    if repository_paths is None:
+        return discover_repositories(projects_root)
+    root = projects_root.expanduser().resolve()
+    records: dict[str, dict[str, Any]] = {}
+    for path in repository_paths:
+        resolved = path.expanduser().resolve()
+        try:
+            resolved.relative_to(root)
+        except ValueError as error:
+            raise ValueError(
+                f"repository path is outside the bounded projects root: {resolved}"
+            ) from error
+        record = repository_record_for_root(resolved)
+        records[str(record["repo_id"])] = record
+    return [records[repo_id] for repo_id in sorted(records)]
 
 
 def local_environment_audit_payload(

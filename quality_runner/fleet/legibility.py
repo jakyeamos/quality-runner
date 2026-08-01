@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Any
 
 from quality_runner.discovery import inspect_repo
+from quality_runner.fleet.change_matrix import assess_change_surface_coverage
 from quality_runner.fleet.contracts import (
     DIMENSION_LABELS,
     DIMENSIONS,
@@ -19,9 +20,11 @@ from quality_runner.fleet.legibility_evidence import (
     term_evidence,
 )
 from quality_runner.fleet.projection import build_local_projection
+from quality_runner.fleet.skill_contracts import assess_skill_contract_quality
 
 DIMENSION_TERMS: dict[str, tuple[str, ...]] = {
     "architecture_boundaries": ("architecture", "boundary", "ownership", "module", "system design"),
+    "change_surface_coverage": ("change surface", "change matrix", "dependency map"),
     "coding_conventions": ("convention", "style", "strict", "format", "coding standard"),
     "security_constraints": ("security", "credential", "secret", "authentication", "do not commit"),
     "failure_modes": ("failure", "troubleshoot", "recovery", "incident", "common issue"),
@@ -47,6 +50,7 @@ DIMENSION_TERMS: dict[str, tuple[str, ...]] = {
     ),
     "deployment_rollback": ("deploy", "deployment", "rollback", "release", "revert"),
     "context_routing": ("read when", "load when", "routing", "minimum context", "context index"),
+    "skill_contract_quality": ("skill", "trigger", "observable output"),
 }
 
 DEPLOYMENT_MARKERS = (
@@ -210,6 +214,42 @@ def _dimension_finding(
     score = 0
     status = "absent"
     confidence = "medium"
+    if dimension == "change_surface_coverage":
+        assessment = assess_change_surface_coverage(
+            Path(str(repository["primary_path"])).expanduser().resolve(),
+            documents,
+            as_of,
+        )
+        return _finding(
+            repository=repository,
+            dimension=dimension,
+            score=assessment["score"],
+            as_of=as_of,
+            status=assessment["status"],
+            severity="observation",
+            priority="P1",
+            confidence="high" if assessment["status"] != "unknown" else "medium",
+            message=assessment["message"],
+            evidence=assessment["evidence"],
+            validation_commands=["qr fleet audit run --repo-path REPO --json"],
+        )
+    if dimension == "skill_contract_quality":
+        assessment = assess_skill_contract_quality(
+            Path(str(repository["primary_path"])).expanduser().resolve()
+        )
+        return _finding(
+            repository=repository,
+            dimension=dimension,
+            score=assessment["score"],
+            as_of=as_of,
+            status=assessment["status"],
+            severity="observation",
+            priority="P1",
+            confidence="medium",
+            message=assessment["message"],
+            evidence=assessment["evidence"],
+            validation_commands=["qr fleet audit run --repo-path REPO --json"],
+        )
     if dimension == "quality_commands":
         commands = scan.get("quality_commands")
         if isinstance(commands, list) and commands:

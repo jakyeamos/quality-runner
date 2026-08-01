@@ -28,6 +28,7 @@ from quality_runner.cli_remediation import add_remediation_commands
 from quality_runner.cli_repo_hygiene import add_repo_hygiene_commands
 from quality_runner.cli_review import add_review_command
 from quality_runner.cli_rollout import add_rollout_command
+from quality_runner.cli_security import add_security_commands
 from quality_runner.cli_skills import add_skill_commands
 from quality_runner.cli_update import add_update_command
 from quality_runner.cli_workflow_args import (
@@ -64,13 +65,16 @@ Compatibility commands remain available:
 
 Advanced operations:
   refresh, rollout, gate, controller-report, skill, proposal, remediation,
-  plan, phase, candidates, repo-hygiene, release-smoke, and worker handoff tools
+  plan, phase, candidates, repo-hygiene, security, release-smoke, and worker
+  handoff tools
 
 Fleet environment audit:
   fleet audit run --all       static-all audit with optional changed-only dynamic checks
+  fleet audit run --repo-path PATH  bounded audit slice for selected repositories
   fleet audit show --repo-id  inspect a private repository finding and plan
   fleet audit replay          verify deterministic artifact regeneration
   fleet audit report          write an aggregate-only reviewable projection
+  fleet audit feed            publish the validated stable maturity feed
 
 Run '{program_name} <command> --help' for options. Audit, review, verify, and
 runs emit a compact outcome card by default and v2 JSON with --json. Use
@@ -104,6 +108,7 @@ def build_parser(prog: str = CANONICAL_PROGRAM) -> argparse.ArgumentParser:
     add_journey_commands(subparsers)
     add_fleet_commands(subparsers)
     add_candidate_commands(subparsers)
+    add_security_commands(subparsers)
 
     run_parser = subparsers.add_parser("run", help="Inspect a repo and write audit artifacts")
     add_workflow_arguments(run_parser)
@@ -398,6 +403,7 @@ def main(argv: list[str] | None = None) -> int:
             "review-worker",
             "phase-check",
             "exclusions",
+            "security",
         }
         and payload.get("status") == "rejected"
     ):

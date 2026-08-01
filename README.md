@@ -120,6 +120,7 @@ qr audit /path/to/repo --profile environment-legibility --json
 qr fleet audit run --all --projects-root /path/to/projects --json
 qr fleet audit replay --audit-id AUDIT_ID --json
 qr fleet audit report --audit-id AUDIT_ID --json
+qr fleet audit feed --audit-id AUDIT_ID --json
 ```
 
 The fleet audit resolves the documented development branch, preferring `dev`,
@@ -127,6 +128,22 @@ and never selects a branch by commit-count maturity. Dirty, detached, stale,
 prunable, or unverifiable target checkouts receive static findings only. Fleet
 artifacts are private by default; the report command emits an aggregate-only
 projection that remains explicitly review-required before publication.
+
+Quality Runner publishes the validated current fleet maturity feed to the fixed
+private path `~/.quality-runner/fleet-audit/current/maturity.json`. Immutable
+audit snapshots remain under `~/.quality-runner/fleet-audit/<audit-id>/`. The
+feed command replays and validates an existing snapshot before atomically
+replacing the current file. An explicit `--output-dir` publishes only beside
+that isolated test artifact and never updates the production current feed.
+Leverage and Pronto consume the same stable feed; the legacy leverage maturity
+audit is historical and is not imported.
+
+Repository maturity includes `change_surface_coverage`. Repositories that host
+skills also receive `skill_contract_quality`; repositories without skills
+record that dimension as explicitly not applicable. Audits assess only an
+existing repository-owned matrix or validated pointer. They never create or
+infer a matrix, and a missing matrix is an ordinary maturity gap rather than a
+blocker to unrelated checks.
 
 `audit` creates evidence and a remediation plan without editing source files.
 `review` makes a prepared packet visibly `awaiting-evidence`, rather than
