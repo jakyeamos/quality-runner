@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 
 CONFIG_FILE_NAME = ".quality-runner.toml"
 
@@ -11,23 +11,24 @@ def parse_architecture_section(
 ) -> dict[str, Any]:
     if value is None:
         return {}
-    if not isinstance(value, dict):
+    value_map = _dict(value)
+    if value_map is None:
         warnings.append(_warning("quality_runner.architecture must be a table"))
         return {}
 
     result: dict[str, Any] = {}
-    enabled = value.get("enabled")
+    enabled = value_map.get("enabled")
     if enabled is not None:
         if isinstance(enabled, bool):
             result["enabled"] = enabled
         else:
             warnings.append(_warning("quality_runner.architecture.enabled must be a boolean"))
 
-    import_boundaries = _import_boundaries(value.get("import_boundaries"), warnings)
+    import_boundaries = _import_boundaries(value_map.get("import_boundaries"), warnings)
     if import_boundaries:
         result["import_boundaries"] = import_boundaries
 
-    pattern_boundaries = _pattern_boundaries(value.get("pattern_boundaries"), warnings)
+    pattern_boundaries = _pattern_boundaries(value_map.get("pattern_boundaries"), warnings)
     if pattern_boundaries:
         result["pattern_boundaries"] = pattern_boundaries
 
@@ -42,9 +43,7 @@ def _import_boundaries(value: object, warnings: list[dict[str, str]]) -> list[di
         return []
 
     rules: list[dict[str, Any]] = []
-    for item in value:
-        if not isinstance(item, dict):
-            continue
+    for item in _dict_list(cast(object, value)):
         rule_id = _non_empty_string(item.get("id"))
         sources = _string_list(item.get("sources"))
         disallowed = _string_list(item.get("disallowed_imports"))
@@ -80,9 +79,7 @@ def _pattern_boundaries(value: object, warnings: list[dict[str, str]]) -> list[d
         return []
 
     rules: list[dict[str, Any]] = []
-    for item in value:
-        if not isinstance(item, dict):
-            continue
+    for item in _dict_list(cast(object, value)):
         rule_id = _non_empty_string(item.get("id"))
         paths = _string_list(item.get("paths"))
         patterns = _string_list(item.get("disallowed_patterns"))
@@ -115,7 +112,7 @@ def _pattern_boundaries(value: object, warnings: list[dict[str, str]]) -> list[d
 def _string_list(value: object) -> list[str]:
     if not isinstance(value, list):
         return []
-    return [item for item in value if isinstance(item, str) and item]
+    return [item for item in cast(list[Any], value) if isinstance(item, str) and item]
 
 
 def _non_empty_string(value: object) -> str | None:
@@ -130,3 +127,13 @@ def _warning(message: str) -> dict[str, str]:
         "message": message,
         "path": CONFIG_FILE_NAME,
     }
+
+
+def _dict(value: object) -> dict[str, Any] | None:
+    return cast(dict[str, Any], value) if isinstance(value, dict) else None
+
+
+def _dict_list(value: object) -> list[dict[str, Any]]:
+    if not isinstance(value, list):
+        return []
+    return [cast(dict[str, Any], item) for item in cast(list[Any], value) if isinstance(item, dict)]
