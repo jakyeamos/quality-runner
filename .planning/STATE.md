@@ -3,7 +3,7 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: GPT-5.6 modernization
 status: complete
-last_updated: "2026-08-01T19:10:00Z"
+last_updated: "2026-08-01T21:36:21Z"
 progress:
   total_phases: 8
   completed_phases: 8
@@ -27,10 +27,12 @@ they authorize repository changes.
 
 ## Current Position
 
-- Branch: `codex/qr-flexible-scan-scope`
-- Baseline: `dev` at commit `ca2e34b`; implementation commit `4b0c2ab`,
-  instruction audit commit `3952a54`, governed fleet and security evidence
-  commit `6f22555`
+- Branch: `codex/main-fold-v0-7-0` in the isolated worktree
+  `/private/tmp/quality-runner-main-fold-v0-7-0-20260801`
+- Baseline: verified `origin/main` at `9f6c677`; eligible feature history is
+  merged through `189cbb7`, including the full-audit, environment-legibility,
+  governed bug-learning, semantic-invariant, fleet/security, and task-prevention
+  lines.
 - Release metadata and readiness discovery fixes: `e3f5f5f`; PR #5 merged at
   `c6e92cc`, tag `v0.6.0` and PyPI publication are verified.
 - Audit and planning: complete
@@ -81,15 +83,34 @@ they authorize repository changes.
 - Lead new CLI usage with `qr` while retaining `quality-runner` as a visible
   compatibility alias; keep legacy and advanced commands discoverable in root
   help without making them the first-run path.
+- Certify BasedPyright only for its declared package scope in standard mode.
+  Repository-wide strict mode remains a candidate because the combined fold
+  exposes 4,192 existing errors; presence in CI is not certification evidence.
+- Treat `codex/qr-command-surface` as semantically superseded: its useful short
+  `qr` command is already present, while merging its stale six-file tree would
+  delete the current implementation. Preserve the ref rather than merging or
+  pruning it during this fold.
 
 ## Next Step
 
-Publish this source branch for provenance, fold it into the isolated
-`codex/main-fold-v0-7-0` candidate, and keep tag/PyPI publication separate
-until the candidate is on the verified canonical `main`.
+Commit the evidence-backed gate fixes and reconciled release truth, dogfood
+`qr task` on the exact candidate, then publish `codex/main-fold-v0-7-0` for
+exact-head CI and review. Keep the `v0.7.0` tag and PyPI publication separate
+until the candidate is reviewed and promoted to canonical `main`.
 
 ## Recent Progress
 
+- 2026-08-01: The isolated `codex/main-fold-v0-7-0` candidate folds all
+  semantically eligible branch tips through `189cbb7`. The ordinary suite
+  passes 860 tests in 915.22 seconds and the LCOV-instrumented suite passes the
+  same 860 tests in 678.52 seconds; Ruff, format, standard-mode BasedPyright,
+  environment contract, Vulture, dependency audit, build, release smoke, and
+  installed-wheel smoke pass. Timing failures exposed by the combined fold were
+  repaired at their contract boundaries instead of waived.
+- 2026-08-01: The missing public GitHub Release for the existing `v0.6.0` tag
+  was created and verified without moving or recreating the tag; it still peels
+  to `c6e92cc`. Ambiguous dirty worktrees and the stale command-surface branch
+  remain preserved and unpruned.
 - 2026-08-01: `6f22555` adds bounded fleet maturity/change-surface evidence,
   a replay-validated Pronto feed, isolated dependency preparation, and
   coverage-aware Codex Security evidence. The security adapter was split below

@@ -32,6 +32,15 @@ All notable changes to Quality Runner are documented here.
   next actions. The documented cadence uses native checks for established fast
   feedback and QR at baseline, completion, and CI boundaries rather than on
   every save.
+- Added an executable repository environment contract, locked local and
+  CI quality lanes, and explicit prevention-readiness evidence so merely being
+  present in CI does not certify a native gate.
+- Added semantic invariant verification, repository-hygiene evidence, bounded
+  fleet maturity/change-surface reporting, and replay-validated Pronto feed
+  publication.
+- Added coverage-aware Codex Security evidence comparison and handoff contracts,
+  with source evidence split into promoted-size modules and preserved redaction
+  boundaries.
 
 ## 0.6.0 - 2026-07-17
 

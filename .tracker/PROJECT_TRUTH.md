@@ -1,6 +1,6 @@
 # Quality Runner Project Truth
 
-Last updated: 2026-07-22
+Last updated: 2026-08-01
 
 ## Current State
 
@@ -9,7 +9,11 @@ inspects repositories, records evidence, plans remediation, and hands execution
 to separately authorized humans or agents. It does not own autonomous source
 changes or remote review execution.
 
-`main` is the published 0.6.0 release at `c6e92cc`, tagged `v0.6.0`, with
+The published 0.6.0 release remains anchored by the immutable `v0.6.0` tag at
+`c6e92cc`. Canonical `origin/main` has since advanced to `9f6c677`. The missing
+GitHub Release record was reconciled on 2026-08-01 without moving or recreating
+the tag; the public release is
+`https://github.com/jakyeamos/quality-runner/releases/tag/v0.6.0`. The release has
 successful post-merge CI run 32, a successful tag workflow run 13, and a
 verified PyPI distribution. The public
 wheel digest is `34c96cedfbe555033cfbde863e4144c13fd91510d512f1b482428d5181a3c1d9`
@@ -123,6 +127,18 @@ occurred.
 ## Current Position
 
 - Target: a typed v2 core behind CLI, MCP, and compatibility adapters.
+- Active integration: `codex/main-fold-v0-7-0` is isolated from the dirty
+  primary checkout and based on verified `origin/main` at `9f6c677`. Merge
+  commits through `189cbb7` include every semantically eligible feature line:
+  full audit, environment legibility, governed bug learning, semantic
+  invariants, fleet/security evidence, and task prevention.
+- Fold safety: three ambiguous detached dirty worktrees remain untouched. The
+  stale `codex/qr-command-surface` ref is intentionally excluded because its
+  useful `qr` capability is already present and its final tree would delete 292
+  current files. No branch or worktree pruning is part of this fold.
+- Release boundary: the 0.7.0 candidate metadata is aligned, but no `v0.7.0`
+  tag has been created and no registry artifact has been published. Exact-head
+  CI and review on the integration branch precede any canonical promotion.
 - Reviewed integration: canonical `dev` now contains the five-commit
   scan-scope/agent-guidance fold, verified gate stabilization, and the 0.7.0
   release-preparation metadata and formatter remediation at `8157057`.
@@ -154,6 +170,13 @@ occurred.
   citation/plugin docs, upgrade guidance, and release tests; full quality and
   artifact gates passed. The self-audit remains review-pending with zero high
   findings and no confirmed vulnerability.
+- 2026-08-01: The combined candidate passes 860 ordinary tests and the same 860
+  tests under the LCOV runner. Ruff lint/format, standard-mode BasedPyright for
+  the declared package scope, the executable environment contract, Vulture,
+  pip-audit, source/wheel builds, release smoke, and installed-wheel entrypoint
+  smoke pass. Repository-wide strict BasedPyright is explicitly uncertified:
+  enabling it exposes 4,192 existing errors, so it remains a migration
+  candidate rather than a required preventative gate.
 - Agent-instruction audit: live `git ls-remote --heads origin` confirms the
   remote branch set is `main` at `9f6c677`, `dev` at `8157057`, and the current
   follow-up at `8157057`. The older local `codex/ci-warning-cleanup` and
