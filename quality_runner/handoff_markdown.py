@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 
 from quality_runner.adoption import adoption_stage_markdown
 from quality_runner.handoff_gate_summary import action_group_markdown, gate_verification_markdown
@@ -36,18 +36,17 @@ def render_handoff_markdown(handoff: dict[str, Any]) -> str:
     )
 
     artifact_paths = handoff.get("artifact_paths")
-    if isinstance(artifact_paths, dict):
-        for name in sorted(artifact_paths):
-            value = artifact_paths[name]
+    artifact_paths_map = _dict(artifact_paths)
+    if artifact_paths_map is not None:
+        for name in sorted(artifact_paths_map):
+            value = artifact_paths_map[name]
             if isinstance(value, str):
                 lines.append(f"- {name}: {value}")
     lines.extend(["", "## Warnings", ""])
 
     warnings = handoff.get("warnings")
     if isinstance(warnings, list) and warnings:
-        for warning in warnings:
-            if not isinstance(warning, dict):
-                continue
+        for warning in _dict_list(cast(object, warnings)):
             code = warning.get("code")
             message = warning.get("message")
             path = warning.get("path")
@@ -60,9 +59,7 @@ def render_handoff_markdown(handoff: dict[str, Any]) -> str:
 
     missing_gates = handoff.get("missing_repo_owned_gates")
     if isinstance(missing_gates, list) and missing_gates:
-        for gate in missing_gates:
-            if not isinstance(gate, dict):
-                continue
+        for gate in _dict_list(cast(object, missing_gates)):
             gate_id = gate.get("id")
             severity = gate.get("severity")
             suggestion = gate.get("suggested_command")
@@ -82,9 +79,7 @@ def render_handoff_markdown(handoff: dict[str, Any]) -> str:
 
     runner_checks = handoff.get("runner_provided_checks")
     if isinstance(runner_checks, list) and runner_checks:
-        for check in runner_checks:
-            if not isinstance(check, dict):
-                continue
+        for check in _dict_list(cast(object, runner_checks)):
             check_id = check.get("id")
             finding_count = check.get("finding_count")
             description = check.get("description")
@@ -106,9 +101,7 @@ def render_handoff_markdown(handoff: dict[str, Any]) -> str:
     lines.extend(["", "## Domain Phase Candidates", ""])
     phase_candidates = handoff.get("phase_candidates")
     if isinstance(phase_candidates, list) and phase_candidates:
-        for candidate in phase_candidates:
-            if not isinstance(candidate, dict):
-                continue
+        for candidate in _dict_list(cast(object, phase_candidates)):
             lines.extend(
                 [
                     f"### {candidate.get('id')}",
@@ -139,19 +132,20 @@ def render_handoff_markdown(handoff: dict[str, Any]) -> str:
     lines.extend(["", "## Next Slice", ""])
 
     next_slice = handoff.get("next_slice")
-    if isinstance(next_slice, dict):
+    next_slice_map = _dict(next_slice)
+    if next_slice_map is not None:
         lines.extend(
             [
-                f"- ID: {next_slice.get('id')}",
-                f"- Title: {next_slice.get('title')}",
-                f"- Priority: {next_slice.get('priority')}",
-                f"- Verification mode: {next_slice.get('verification_mode', 'command')}",
+                f"- ID: {next_slice_map.get('id')}",
+                f"- Title: {next_slice_map.get('title')}",
+                f"- Priority: {next_slice_map.get('priority')}",
+                f"- Verification mode: {next_slice_map.get('verification_mode', 'command')}",
                 "- Findings:",
-                *_finding_markdown_items(next_slice.get("findings")),
+                *_finding_markdown_items(next_slice_map.get("findings")),
                 "- Actions:",
-                *_markdown_items(next_slice.get("actions")),
-                *action_group_markdown(next_slice.get("action_groups")),
-                *_verification_requirements(next_slice),
+                *_markdown_items(next_slice_map.get("actions")),
+                *action_group_markdown(next_slice_map.get("action_groups")),
+                *_verification_requirements(next_slice_map),
             ]
         )
     else:
@@ -164,7 +158,7 @@ def render_handoff_markdown(handoff: dict[str, Any]) -> str:
 
     slice_ids = handoff.get("slice_ids")
     if isinstance(slice_ids, list) and slice_ids:
-        lines.extend(_markdown_items(slice_ids))
+        lines.extend(_markdown_items(cast(object, slice_ids)))
     else:
         lines.append("No remediation slices are required.")
 
@@ -174,7 +168,7 @@ def render_handoff_markdown(handoff: dict[str, Any]) -> str:
 def _markdown_items(value: object) -> list[str]:
     if not isinstance(value, list):
         return ["- unavailable"]
-    items = [item for item in value if isinstance(item, str) and item]
+    items = [item for item in cast(list[Any], value) if isinstance(item, str) and item]
     if not items:
         return ["- unavailable"]
     return [f"- {item}" for item in items]
@@ -185,9 +179,7 @@ def _finding_markdown_items(value: object) -> list[str]:
         return ["- unavailable"]
 
     items: list[str] = []
-    for finding in value:
-        if not isinstance(finding, dict):
-            continue
+    for finding in _dict_list(cast(object, value)):
         finding_id = finding.get("id")
         summary = finding.get("summary")
         if isinstance(finding_id, str) and finding_id and isinstance(summary, str) and summary:
@@ -208,3 +200,13 @@ def _verification_requirements(slice_item: dict[str, Any]) -> list[str]:
         "- Verification requirements:",
         *_markdown_items(slice_item.get("verification_requirements")),
     ]
+
+
+def _dict(value: object) -> dict[str, Any] | None:
+    return cast(dict[str, Any], value) if isinstance(value, dict) else None
+
+
+def _dict_list(value: object) -> list[dict[str, Any]]:
+    if not isinstance(value, list):
+        return []
+    return [item for raw_item in cast(list[Any], value) if (item := _dict(raw_item)) is not None]
