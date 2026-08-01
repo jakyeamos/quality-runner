@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 
 from quality_runner.adoption import adoption_stage_markdown
 from quality_runner.handoff_gate_summary import action_group_markdown
@@ -27,9 +27,7 @@ def render_plan_markdown(plan: dict[str, Any]) -> str:
 
     phase_candidates = plan.get("phase_candidates")
     if isinstance(phase_candidates, list) and phase_candidates:
-        for candidate in phase_candidates:
-            if not isinstance(candidate, dict):
-                continue
+        for candidate in _dict_list(cast(object, phase_candidates)):
             lines.extend(
                 [
                     f"### {candidate.get('id')}",
@@ -61,9 +59,7 @@ def render_plan_markdown(plan: dict[str, Any]) -> str:
 
     slices = plan.get("slices")
     if isinstance(slices, list) and slices:
-        for slice_item in slices:
-            if not isinstance(slice_item, dict):
-                continue
+        for slice_item in _dict_list(cast(object, slices)):
             lines.extend(
                 [
                     f"### {slice_item.get('id')}",
@@ -91,7 +87,7 @@ def render_plan_markdown(plan: dict[str, Any]) -> str:
 def _markdown_items(value: object) -> list[str]:
     if not isinstance(value, list):
         return ["- unavailable"]
-    items = [item for item in value if isinstance(item, str) and item]
+    items = [item for item in cast(list[Any], value) if isinstance(item, str) and item]
     if not items:
         return ["- unavailable"]
     return [f"- {item}" for item in items]
@@ -102,9 +98,7 @@ def _finding_markdown_items(value: object) -> list[str]:
         return ["- unavailable"]
 
     items: list[str] = []
-    for finding in value:
-        if not isinstance(finding, dict):
-            continue
+    for finding in _dict_list(cast(object, value)):
         finding_id = finding.get("id")
         summary = finding.get("summary")
         if isinstance(finding_id, str) and finding_id and isinstance(summary, str) and summary:
@@ -125,3 +119,9 @@ def _verification_requirements(slice_item: dict[str, Any]) -> list[str]:
         "- Evidence requirements:",
         *_markdown_items(slice_item.get("verification_requirements")),
     ]
+
+
+def _dict_list(value: object) -> list[dict[str, Any]]:
+    if not isinstance(value, list):
+        return []
+    return [cast(dict[str, Any], item) for item in cast(list[Any], value) if isinstance(item, dict)]
