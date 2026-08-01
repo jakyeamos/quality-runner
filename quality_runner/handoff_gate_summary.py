@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 
 from quality_runner.timeout_diagnostics import timeout_diagnostics_markdown
 
@@ -9,8 +9,9 @@ def action_group_markdown(value: object) -> list[str]:
     if not isinstance(value, list) or not value:
         return []
     lines = ["", "### Action Groups", ""]
-    for group in value:
-        if not isinstance(group, dict):
+    for raw_group in cast(list[Any], value):
+        group = _dict(raw_group)
+        if group is None:
             continue
         blocker_class = group.get("class")
         gate_ids = group.get("gate_ids")
@@ -18,9 +19,18 @@ def action_group_markdown(value: object) -> list[str]:
         finding_ids = group.get("finding_ids")
         if not isinstance(blocker_class, str):
             continue
-        ids_source = gate_ids if isinstance(gate_ids, list) else finding_ids
+        if isinstance(gate_ids, list):
+            ids_source: list[Any] | None = cast(list[Any], gate_ids)
+        elif isinstance(finding_ids, list):
+            ids_source = cast(list[Any], finding_ids)
+        else:
+            ids_source = None
         ids = (
-            [gate_id for gate_id in ids_source if isinstance(gate_id, str) and gate_id]
+            [
+                gate_id
+                for gate_id in ids_source
+                if isinstance(gate_id, str) and gate_id
+            ]
             if isinstance(ids_source, list)
             else []
         )
@@ -28,7 +38,7 @@ def action_group_markdown(value: object) -> list[str]:
             continue
         lines.append(f"- {blocker_class}: {', '.join(ids)}")
         if isinstance(actions, list):
-            for action in actions:
+            for action in cast(list[Any], actions):
                 if isinstance(action, str) and action:
                     lines.append(f"  - {action}")
     return lines if len(lines) > 3 else []
@@ -81,8 +91,15 @@ def gate_blocker_slice(gate_summary: dict[str, Any] | None) -> dict[str, Any] | 
         return None
     if gate_summary.get("status") not in {"blocked", "failed"}:
         return None
-    blockers = gate_summary.get("blockers")
-    if not isinstance(blockers, list) or not blockers:
+    blockers_value = gate_summary.get("blockers")
+    if not isinstance(blockers_value, list) or not blockers_value:
+        return None
+    blockers = [
+        blocker
+        for raw_blocker in cast(list[Any], blockers_value)
+        if (blocker := _dict(raw_blocker)) is not None
+    ]
+    if not blockers:
         return None
     primary_blocker_class = _string_or_none(gate_summary.get("primary_blocker_class"))
     return {
@@ -100,8 +117,10 @@ def gate_blocker_slice(gate_summary: dict[str, Any] | None) -> dict[str, Any] | 
 
 
 def gate_verification_markdown(value: object) -> list[str]:
-    if not isinstance(value, dict):
+    value_map = _dict(value)
+    if value_map is None:
         return []
+    value = value_map
     lines = [
         "## Gate Verification",
         "",
@@ -117,19 +136,21 @@ def gate_verification_markdown(value: object) -> list[str]:
     groups = value.get("blocker_groups")
     if isinstance(groups, list) and groups:
         lines.extend(["", "### Gate Blocker Groups", ""])
-        for group in groups:
-            if not isinstance(group, dict):
+        for raw_group in cast(list[Any], groups):
+            group = _dict(raw_group)
+            if group is None:
                 continue
             blocker_class = group.get("class")
             gate_ids = group.get("gate_ids")
             if isinstance(blocker_class, str) and isinstance(gate_ids, list):
-                ids = ", ".join(str(gate_id) for gate_id in gate_ids)
+                ids = ", ".join(str(gate_id) for gate_id in cast(list[Any], gate_ids))
                 lines.append(f"- {blocker_class}: {ids}")
     lines.extend(["", "### Gate Blockers", ""])
     blockers = value.get("blockers")
     if isinstance(blockers, list) and blockers:
-        for gate in blockers:
-            if not isinstance(gate, dict):
+        for raw_gate in cast(list[Any], blockers):
+            gate = _dict(raw_gate)
+            if gate is None:
                 continue
             line = f"- {gate.get('id')}: {gate.get('status')}"
             failure_type = gate.get("failure_type")
@@ -142,8 +163,8 @@ def gate_verification_markdown(value: object) -> list[str]:
             if isinstance(blocked_by, str):
                 line += f"; blocked by {blocked_by}"
             lines.append(line + ".")
-            setup = gate.get("dependency_setup")
-            if isinstance(setup, dict) and isinstance(setup.get("setup_command"), str):
+            setup = _dict(gate.get("dependency_setup"))
+            if setup is not None and isinstance(setup.get("setup_command"), str):
                 lines.append(f"  - Setup: `{setup['setup_command']}`")
             recommended = gate.get("recommended_action")
             if isinstance(recommended, str) and recommended:
@@ -159,8 +180,9 @@ def _gate_summaries(gate_verification: dict[str, Any]) -> list[dict[str, Any]]:
     if not isinstance(gates, list):
         return []
     summaries: list[dict[str, Any]] = []
-    for gate in gates:
-        if not isinstance(gate, dict):
+    for raw_gate in cast(list[Any], gates):
+        gate = _dict(raw_gate)
+        if gate is None:
             continue
         gate_id = _string_or_none(gate.get("id"))
         status = _string_or_none(gate.get("status"))
@@ -184,11 +206,11 @@ def _gate_summaries(gate_verification: dict[str, Any]) -> list[dict[str, Any]]:
 
 
 def _dependency_setup(gate: dict[str, Any]) -> dict[str, str] | None:
-    diagnostics = gate.get("diagnostics")
-    if not isinstance(diagnostics, dict):
+    diagnostics = _dict(gate.get("diagnostics"))
+    if diagnostics is None:
         return None
-    setup = diagnostics.get("dependency_setup")
-    if not isinstance(setup, dict):
+    setup = _dict(diagnostics.get("dependency_setup"))
+    if setup is None:
         return None
     normalized = {
         key: value
@@ -202,7 +224,7 @@ def _dependency_setup(gate: dict[str, Any]) -> dict[str, str] | None:
 
 def _timeout_diagnostics(gate: dict[str, Any]) -> dict[str, Any] | None:
     diagnostics = gate.get("timeout_diagnostics")
-    return diagnostics if isinstance(diagnostics, dict) else None
+    return _dict(diagnostics)
 
 
 def _gate_blockers(gates: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -283,8 +305,8 @@ def _gate_blocker_actions(blockers: list[dict[str, Any]]) -> list[str]:
         gate_id = gate.get("id")
         if not isinstance(gate_id, str) or not gate_id:
             continue
-        setup = gate.get("dependency_setup")
-        if isinstance(setup, dict) and isinstance(setup.get("setup_command"), str):
+        setup = _dict(gate.get("dependency_setup"))
+        if setup is not None and isinstance(setup.get("setup_command"), str):
             actions.append(f"Run dependency setup for {gate_id}: {setup['setup_command']}.")
             continue
         recommended = gate.get("recommended_action")
@@ -403,8 +425,9 @@ def _gate_blocker_action_groups(
     if not isinstance(groups, list) or not groups:
         return []
     action_groups: list[dict[str, Any]] = []
-    for group in groups:
-        if not isinstance(group, dict):
+    for raw_group in cast(list[Any], groups):
+        group = _dict(raw_group)
+        if group is None:
             continue
         blocker_class = group.get("class")
         group_blockers = [
@@ -437,8 +460,8 @@ def _deduped_group_actions(blockers: list[dict[str, Any]]) -> list[str]:
 def _deduped_dependency_setup_actions(blockers: list[dict[str, Any]]) -> list[str]:
     setup_groups: dict[str, list[str]] = {}
     for gate in blockers:
-        setup = gate.get("dependency_setup")
-        if not isinstance(setup, dict):
+        setup = _dict(gate.get("dependency_setup"))
+        if setup is None:
             continue
         setup_command = setup.get("setup_command")
         if not isinstance(setup_command, str) or not setup_command:
@@ -469,11 +492,11 @@ def _display_group_action(*, action: object, gate_ids: object) -> str:
     if (
         action.startswith("Run dependency setup once: ")
         and isinstance(gate_ids, list)
-        and all(isinstance(gate_id, str) for gate_id in gate_ids)
+        and all(isinstance(gate_id, str) for gate_id in cast(list[Any], gate_ids))
     ):
         return action.replace(
             "Run dependency setup once: ",
-            f"Run dependency setup once for {', '.join(gate_ids)}: ",
+            f"Run dependency setup once for {', '.join(cast(list[str], gate_ids))}: ",
             1,
         )
     return action
@@ -497,3 +520,11 @@ def _optional_value(key: str, value: object) -> dict[str, object]:
     if value is None:
         return {}
     return {key: value}
+
+
+def _dict(value: object) -> dict[str, Any] | None:
+    """Narrow JSON-like objects used in handoff projections."""
+
+    if not isinstance(value, dict):
+        return None
+    return cast(dict[str, Any], value)
