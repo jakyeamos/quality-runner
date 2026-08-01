@@ -54,18 +54,18 @@ def test_release_docs_describe_current_release_plan_and_release_history() -> Non
     assert "uv run --locked pip-audit" in release_docs
     assert "quality-runner release-smoke --json" in release_docs
     assert "quality-runner-mcp" in release_docs
-    assert "uv tool install 'quality-runner==0.6.0' --force" in release_docs
+    assert "uv tool install 'quality-runner==0.7.0' --force" in release_docs
     assert "--execute-gates --worktree-mode disposable" in release_docs
     assert "Upgrade and Compatibility Guide" in release_docs
     assert "review --legacy-output" in cli_docs
     assert "review --outcome" not in cli_docs
-    assert "0.7.x" in upgrade_docs
-    assert "0.8.0" in upgrade_docs
+    assert "0.8.x" in upgrade_docs
+    assert "0.9.0" in upgrade_docs
     assert "No artifact conversion is required" in upgrade_docs
     assert "quality_runner_review" in upgrade_docs
     assert "historical runtime-display mismatch" in upgrade_docs
     assert "uv tool list" in upgrade_docs
-    assert "quality-runner review /path/to/repo --mode blind --json" in readme
+    assert "qr review /path/to/repo --mode blind --json" in readme
     assert "older `0.2.0` template" in release_docs
     assert (
         "quality-runner refresh /path/to/repo --run-id-prefix refresh-001 --handoff-output handoff.md --json"
@@ -118,6 +118,31 @@ def test_release_docs_include_example_handoffs() -> None:
         content = (examples_root / name).read_text(encoding="utf-8")
         assert "# Quality Runner Agent Handoff" in content
         assert expected in content
+
+
+def test_agent_instructions_route_current_qr_surfaces() -> None:
+    agent_usage = (ROOT / "docs" / "agent-usage.md").read_text(encoding="utf-8")
+    plugin_skill = (ROOT / "quality_runner" / "plugin" / "SKILL.md").read_text(encoding="utf-8")
+
+    for content in (agent_usage, plugin_skill):
+        for term in (
+            "qr doctor",
+            "qr audit",
+            "qr review",
+            "qr verify",
+            "qr runs",
+            "quality-runner-outcome-v0.2",
+            "--include-path",
+            "--include-ignored-path",
+            "scan_inclusions",
+            "gate-respond",
+            "review-delta",
+            "release-smoke",
+        ):
+            assert term in content
+
+    assert "plan contract prepare" in agent_usage
+    assert "controller-report lint --strict" in agent_usage
 
 
 def test_ci_and_release_workflows_smoke_built_wheel_outcome_and_mcp_surfaces() -> None:

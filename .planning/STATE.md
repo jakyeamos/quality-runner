@@ -3,7 +3,7 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: GPT-5.6 modernization
 status: complete
-last_updated: "2026-07-17T15:14:10Z"
+last_updated: "2026-07-21T18:34:51Z"
 progress:
   total_phases: 8
   completed_phases: 8
@@ -22,12 +22,14 @@ See `.planning/PROJECT.md` for the established product boundary and
 **Core value:** Give developers and agents trustworthy local evidence before
 they authorize repository changes.
 
-**Current focus:** v0.6.0 released; no active implementation phase.
+**Current focus:** v0.6.0 released; explicit scan-scope inclusion follow-up is
+active on `codex/qr-flexible-scan-scope`.
 
 ## Current Position
 
-- Branch: `main`
-- Baseline: `main` at 0.6.0 / commit `c6e92cc`
+- Branch: `codex/qr-flexible-scan-scope`
+- Baseline: `dev` at commit `ca2e34b`; implementation commit `4b0c2ab`,
+  instruction audit commit `3952a54`
 - Release metadata and readiness discovery fixes: `e3f5f5f`; PR #5 merged at
   `c6e92cc`, tag `v0.6.0` and PyPI publication are verified.
 - Audit and planning: complete
@@ -45,15 +47,17 @@ they authorize repository changes.
   guidance; `c71b130` completes the pre-tag gate with dependency-audit and
   untrusted-baseline Git-argument hardening. PR #2 merged, `v0.5.1` is
   published to PyPI, and the GitHub Release is public.
+- Post-release command surface: complete in `9107285`; `qr` is canonical for
+  human-facing help, README quickstart, and packaged entrypoints while
+  `quality-runner` remains a compatible alias with preserved JSON behavior.
 
 ## Active Phase
 
-- **Phase:** release-follow-up
-- **Slug:** release-0.6.0
-- **Status:** Complete
-- **Completion gate:** Met: full pre-tag validation, reviewed promotion to
-  `main`, `v0.6.0` tag, successful PyPI publication, and fresh public-install
-  verification.
+- **Phase:** scan-scope-flexibility
+- **Slug:** explicit-scan-inclusion-controls
+- **Status:** In progress
+- **Completion gate:** Implementation, instruction audit, and verification are
+  complete on `3952a54`; truth-file commit and branch push remain.
 
 ## Key Decisions
 
@@ -72,13 +76,25 @@ they authorize repository changes.
   explicit compatibility projection through the published support window.
 - Derive outcome safety claims from observed branch and execution evidence, not
   from requested flags or planned behavior.
+- Lead new CLI usage with `qr` while retaining `quality-runner` as a visible
+  compatibility alias; keep legacy and advanced commands discoverable in root
+  help without making them the first-run path.
 
 ## Next Step
 
-Start the next scoped follow-up from the released `main`/`dev` baseline.
+Commit the truth-file update and push `codex/qr-flexible-scan-scope`; do not
+merge, tag, publish, or alter canonical release state in this slice.
 
 ## Recent Progress
 
+- 2026-07-21: `3952a54` aligns the packaged skill and detailed agent guide
+  with canonical journeys, v2 outcomes, scan-scope controls, review/gate/
+  planning/worker/rollout/release routes, and cache provenance; six focused
+  documentation tests pass. A live origin refresh confirms the pushed branch
+  alongside `dev` and `main`.
+- 2026-07-21: `4b0c2ab` adds bounded/full-scan inclusion controls, protected
+  path fail-closed behavior, inclusion provenance, and refresh/verify wiring;
+  732 behavioral tests pass.
 - 2026-07-17: `b5a610e` makes release-gate discovery preserve exact CI
   workflow commands; focused tests pass and exact-head GitHub CI is green.
 - 2026-07-17: PR #5 merged v0.6.0 at `c6e92cc`; tag `v0.6.0`, release workflow
@@ -87,6 +103,9 @@ Start the next scoped follow-up from the released `main`/`dev` baseline.
   metadata and installed-wheel release smoke; its exact-head follow-up passes.
 - 2026-07-17: `23da809` prepares v0.6.0 release metadata on the isolated
   release branch; the branch was later promoted and published as v0.6.0.
+- 2026-07-17: `9107285` completes the `qr` command-surface cleanup: packaged
+  alias parity, curated root help, README/CLI quickstart guidance, and focused
+  help/version/JSON contract tests pass; the commit hook quality gate passed.
 - 2026-07-13: v0.5.1 released: PR #2 merged at `a101bd4`, GitHub CI and tag
   release workflow pass, PyPI publishes both artifacts, GitHub Release is
   public, and a disposable PyPI install passes CLI, doctor, smoke, and MCP.
@@ -112,21 +131,3 @@ Start the next scoped follow-up from the released `main`/`dev` baseline.
   and refresh slots are stable, Review v1 output/artifacts retain their frozen
   field shape, and the `ReviewFinding` façade is restored while default v2
   outcomes keep their explicit next action.
-- 2026-07-13: M7 compatibility regression in `dc09ec0`: a default Review
-  outcome's persisted context, manifest, and report still round-trip through
-  the v1 readers.
-- 2026-07-13: M7 guidance in `633b96e`: one upgrade guide now owns candidate,
-  support-window, rollback, and MCP policy; linked docs describe artifact
-  sensitivity and reproducible release evidence without claiming publication.
-- 2026-07-13: M7 cutover in `32e7b26`: Fresh Review defaults to v2 outcomes;
-  `--legacy-output` preserves v1 stdout through 0.7.x, while legacy MCP stays
-  v1 with discovery notices.
-- 2026-07-13: M7 release evidence in `66ce3ef`: a committed uv lock pins the
-  validation tools; CI/release install the wheel, run doctor and release smoke,
-  and discover the v2 MCP tools before publish.
-- 2026-07-13: M7 began in `113f143`: secret-like candidate literals are
-  redacted before fingerprinting or artifact persistence; the normal-run
-  regression scans all generated artifacts for the original marker.
-- 2026-07-13: M6 completed in `0b5ac2e` and `56c94d4`: application owns
-  workflow, outcome, packet, and report execution; root façades preserve v1
-  behavior; 520 tests, wheel, smoke, and three reviews passed.

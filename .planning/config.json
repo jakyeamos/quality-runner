@@ -4,7 +4,14 @@
     "plan_checker_enabled": true,
     "nyquist_validation": false,
     "auto_advance": false,
-    "post_planning_gaps": true
+    "post_planning_gaps": true,
+    "quality_runner_contracts": {
+      "enabled": false,
+      "analysis_mode": "balanced",
+      "cache_mode": "external",
+      "command": "quality-runner",
+      "block_on": ["hard", "stale", "missing_evidence", "plan_coverage"]
+    }
   },
   "commit_docs": true
 }

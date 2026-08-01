@@ -52,7 +52,11 @@ def merge_security_ledger_entries(
             continue
         configured = accepted_by_config.get(fingerprint)
         previous_entry = accepted_by_previous.get(fingerprint)
-        status = "review-required" if candidate.get("requires_agent_review") else "unreviewed"
+        status = (
+            "review-required"
+            if candidate.get("requires_agent_review") or candidate.get("disposition_required")
+            else "unreviewed"
+        )
         reason = ""
         owner = None
         expires = None
@@ -84,6 +88,11 @@ def merge_security_ledger_entries(
                 "expires": expires,
                 "security_candidate_id": candidate.get("id"),
                 "ledger_kind": "security",
+                "disposition_class": candidate.get("disposition_class", "triage"),
+                "disposition_group": candidate.get("disposition_group"),
+                "disposition_required": candidate.get("disposition_required", False),
+                "owner_role": candidate.get("owner_role", "security-maintainer"),
+                "disposition_rationale": candidate.get("disposition_rationale", ""),
             }
         )
         current_fingerprints.add(fingerprint)

@@ -31,7 +31,19 @@ Artifacts are written under:
   category `architecture` when configured in `.quality-runner.toml`. Opt-in
   Quality Skill findings use category `skill:<skill-id>` when configured.
   Partially built or unwired work uses category `integrate`; see
-  [Unwired Work Detection](unwired-work.md).
+  [Unwired Work Detection](unwired-work.md). The `analysis_cache` object records
+  per-file cache hits, misses, invalidation reasons, index state, and whether
+  persistence is enabled. Normal `refresh` inspect/run phases persist this
+  cache under the ignored `.quality-runner/cache/incremental-analysis-v1/`
+  directory; direct read-only analysis and gate-execution refreshes keep it
+  disabled. A normal non-executing `refresh` carries the current `run` analysis
+  into `verify-gates` when the request and Git identity still match, so the
+  verify artifacts reuse the completed evidence instead of rescanning it. The
+  `gate-verification.json` `analysis_reuse` object records whether that handoff
+  was reused or whether verification fell back to a fresh audit. The
+  `semantic_similarity_cache` object records the corresponding whole-report
+  cache state under
+  `.quality-runner/cache/semantic-similarity-v1/`.
 - `package-manager-preflight.json`: detected package-manager state, declared
   `packageManager`, lockfiles, and non-blocking warnings such as mixed lockfiles.
 - `standards.json`: compiled standards packet for the selected profile,
@@ -236,6 +248,70 @@ can still expose sensitive context. Retain or remove artifacts using the target
 repository's normal evidence-retention policy. See the [Threat Model](threat-model.md)
 for the remaining execution boundary.
 
+## Incremental scan cache and retention
+
+Per-file code-quality and security results are cached separately from run output
+under `.quality-runner/cache/incremental-analysis-v1/`. Cache keys include the
+relative source path, source-content digest, Quality Runner version, scanner
+implementation digest, normalized scanner configuration, relevant dependency
+state, and the active analysis context. Each scan artifact records cache hits,
+misses, recomputation counts, and invalidation reasons. Cache entries are
+validated before reuse and written atomically; missing, corrupt, or interrupted
+cache state recomputes the affected file instead of being treated as fresh.
+
+The cache is not a scan input: `.quality-runner/` remains excluded from source
+discovery, and cache entries contain only validated scanner results. Run output
+continues to live under `.quality-runner/runs/<run-id>/`. Direct read-only QR
+planning uses the same analysis code with cache persistence disabled; planning
+and delivery-contract preflight workflows may opt into the external cache mode.
+
+Repository inventory and per-file code-quality/security results are cached
+separately from run output under `.quality-runner/cache/`. Inventory uses
+`.quality-runner/cache/repository-inventory-v1/`; per-file results use
+`.quality-runner/cache/incremental-analysis-v1/`. Cache keys include the
+relative source path, source-content digest, Quality Runner version, scanner
+implementation digest, normalized scanner configuration, relevant dependency
+state, and the active analysis context. Each scan artifact records cache hits,
+misses, recomputation counts, and invalidation reasons. Cache entries are
+validated before reuse and written atomically; missing, corrupt, or interrupted
+cache state recomputes the affected file instead of being treated as fresh.
+
+The cache is not a scan input: `.quality-runner/` remains excluded from source
+discovery, and cache entries contain only validated scanner results. Run output
+continues to live under `.quality-runner/runs/<run-id>/`. Cache persistence is an
+explicit run mode:
+
+- `repo` reads and refreshes the normal target-repository cache under
+  `.quality-runner/cache/`.
+- `external` reads and refreshes a cache outside the target checkout, namespaced
+  by repository identity. This is the default for planning and contract
+  preflight workflows, and leaves no target-repository cache state.
+- `disabled` reads and writes no analysis cache and is reserved for diagnostics.
+
+Each run records the selected mode, cache hits, misses, invalidation reasons,
+recomputed files, index writes, and source bytes read in its machine-readable
+`performance.json` receipt. It also records deferred checks and timeout reasons;
+partial evidence is never presented as a complete assurance scan. Normal
+planning reuses these caches and records inventory plus per-module cache evidence
+in `repo-scan.json`, `security-scan.json`, and `code-quality-scan.json`.
+
+For a small change review, `refresh --changed-only` limits source analysis to the
+baseline and working-tree changed paths. It fails closed when no changed path is
+available rather than silently claiming a focused review.
+
+To bound generated run output, configure one or both limits:
+
+```toml
+[quality_runner.artifacts]
+retention_runs = 12
+retention_days = 30
+```
+
+Completed `refresh` runs apply the configured policy after the final phase while
+preserving the current inspect, run, and verify directories. The explicit
+`prune-artifacts` command remains available for a dry run or an on-demand
+cleanup; deletion requires `--apply`.
+
 ## Gate Verification Artifacts
 
 `quality-runner verify-gates` records discovered command-backed capabilities,
@@ -255,13 +331,21 @@ remain non-executable evidence.
   mutation risk, timeout, and whether execution needs consent.
 - `gate-verification.json`: per-gate command, source, exit code, duration,
   timeout, capability kind, bounded stdout/stderr tail fields, skipped reason,
-  failure type, recommended environment action, and status.
+  failure type, recommended environment action, status, and `analysis_reuse`
+  provenance for the refresh-to-verify audit handoff.
 - `quality-audit.json`
 - `remediation-plan.json`
 - `slice-specs/`
 - `agent-handoff.json`
 - `agent-handoff.md`
 - `run-manifest.json`
+
+Refresh runs also record timeout provenance in `timeout_contract`, including
+the policy/source, baseline id and identity hash, sample count, and the learned
+phase/total budgets. When a complete full run is eligible for calibration, QR
+copies the baseline payload to `timeout-baseline.json` in the verify run and
+updates the local, uncommitted cache at
+`.quality-runner/cache/refresh-timeout-baseline-v1.json`.
 
 Execution requires both `--execute-gates` and `--worktree-mode disposable`.
 The disposable checkout is created at `HEAD`, QR writes artifacts to the
@@ -421,7 +505,13 @@ publication proof.
 Discovery skips common non-product trees by default: `docs`, `fixtures`,
 `corpus`, `generated-corpus`, `generated-corpora`, `vendor`, `vendors`,
 `vendored`, and `third_party`, alongside tool output directories such as
-`.git`, `.quality-runner`, `node_modules`, `dist`, and `build`.
+`.git`, `.quality-runner`, `node_modules`, `dist`, and `build`. Generated preview
+output below `.design-sync/previews/` is excluded while tracked `.design-sync`
+configuration remains inspectable.
+
+Refresh gives inspect and run independent phase budgets through
+`--inspect-timeout-seconds` and `--run-timeout-seconds`; the overall deadline, when
+provided, remains a hard upper bound.
 
 Root `.gitignore` entries are also applied during traversal, so untracked
 ignored dependency, cache, generated, or nested-project directories are pruned
@@ -442,6 +532,11 @@ The active all-module list is written to `repo-scan.json` as
 `scan_exclusions_by_module`. A run-only overlay adds
 `scan_exclusion_preflight` to `repo-scan.json` and `run-manifest.json`, and
 writes `scan-exclusion-overlay.json` without changing `.quality-runner.toml`.
+
+Explicit run-only inclusions are written as `scan_inclusions` in the repository,
+code-quality, and security scan artifacts. `repo-scan.json` also records the
+combined decision under `scan_scope`; this distinguishes a file included
+intentionally from one covered by the default scan surface.
 
 The `exclusions suggest`, `validate`, and `apply` stages write their packet,
 report, result, and manifest under the selected run directory. The apply result

@@ -45,7 +45,7 @@ def _similarity_module_status(
     statuses = set(tools.values())
     if "failed" in statuses or "missing" in statuses:
         return "unavailable"
-    if "executed" in statuses or "enabled" in statuses:
+    if "executed" in statuses or "enabled" in statuses or "cached" in statuses:
         return "enabled"
     if "skipped" in statuses:
         return "disabled"

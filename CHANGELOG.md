@@ -2,6 +2,18 @@
 
 All notable changes to Quality Runner are documented here.
 
+## 0.7.0 - 2026-07-22
+
+- Added delivery contracts, phase contracts, performance evidence, and
+  completion handoffs for planning and release-readiness workflows.
+- Added explicit scan-inclusion/exclusion reporting, disposition controls,
+  source-analysis and semantic-similarity caches, and repository inventory
+  caching for repeatable local runs.
+- Added adaptive refresh timeout baselines, timeout diagnostics, incremental
+  analysis reuse, and read-only verification reuse with preserved evidence.
+- Expanded the canonical `qr` command surface, planning workflows, security
+  review obligations, and packaged schemas and compatibility checks.
+
 ## 0.6.0 - 2026-07-17
 
 - Added Quality Skills corpus classification, canonical selection, append and

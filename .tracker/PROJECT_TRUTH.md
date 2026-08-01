@@ -1,6 +1,6 @@
 # Quality Runner Project Truth
 
-Last updated: 2026-07-17
+Last updated: 2026-07-22
 
 ## Current State
 
@@ -80,20 +80,84 @@ it into `main` at `c6e92cc`. The release-readiness contract recognizes dynamic
 Workflow discovery keeps the exact commands declared by CI, with 49 focused
 regression tests, green exact-head GitHub CI, a passing release profile, and
 verified PyPI publication.
+The P1 exclusion-estimation fix in `4d7f72b` and the incremental analysis/cache
+follow-ups through `dbb892f` are included in the reviewed `dev` fold. They keep
+protected and generated artifact trees out of recursive estimates, preserve
+cache-free read-only planning and authorized fresh gate execution, reuse only
+matching current-refresh analysis, and preserve controller deadlines through
+Git and manifest discovery. The recorded Tenure dogfood completed in 190.647
+seconds with 886 cache hits, zero misses/recomputations, all 11 gates skipped
+for missing consent, and no timeout; Tenure source status remained clean.
+
+The reviewed `codex/dev-fold-qr-adaptive-timeouts` integration at `49c3dda`
+folds the local, identity-bound refresh timeout calibration from `0bc7d37`
+without changing the published release surface.
+
+The follow-up branch `codex/qr-command-surface-quality-runner` at `9107285`
+makes `qr` the canonical human-facing console command while retaining
+`quality-runner` as a compatibility alias. Root help, README quickstart, and
+CLI reference lead with audit, review, verify, runs, and doctor; both scripts
+render their invocation name for help/no-argument guidance and preserve the
+existing version and JSON contracts. No tags, registries, or published
+artifacts were changed.
+
+The short `qr` console command shipped in `fe48b25`. It points to the same CLI
+entrypoint as `quality-runner`, so a one-time editable install from this
+checkout gives local consumers a stable command surface that follows the
+checkout's current code without repeated `--project` invocations or GitHub
+fetches.
+
+The full-audit fold `4d4fd3c` integrates the scan-scope and agent-instruction
+follow-ups into the dev ancestry. The release-preparation candidate now targets
+0.7.0: its version, changelog, citation/plugin metadata, upgrade guidance, and
+release tests are aligned, and the repository-wide Ruff format check passes
+after formatting the 18 files in the folded delta. The candidate passes 734
+tests, Ruff lint/format, Basedpyright, Vulture, pip-audit, source distribution
+and wheel builds, installed-wheel release-smoke, CLI review, legacy projection,
+and MCP discovery. The scan-only self-audit produced 338 observed findings with
+no high-severity findings, plus heuristic security and skill-review obligations;
+those require review evidence before tagging and are not treated as confirmed
+release blockers. No new tag, registry publication, or main promotion has
+occurred.
 
 ## Current Position
 
 - Target: a typed v2 core behind CLI, MCP, and compatibility adapters.
-- Next slice: start the next scoped follow-up from the released `main`/`dev`
-  baseline.
+- Reviewed integration: canonical `dev` now contains the five-commit
+  scan-scope/agent-guidance fold, verified gate stabilization, and the 0.7.0
+  release-preparation metadata and formatter remediation at `8157057`.
+- Active follow-up: complete the self-audit review packet and external trusted
+  publisher/tag/release checks; no new tag, registry publication, or `main`
+  promotion has occurred.
+- Environment-legibility remediation: the clean
+  `codex/full-audit-fold-quality-runner` candidate at `a387a51` now has a
+  compact agent router, eight routed context packets, executable freshness and
+  safety checks, a required Pre-CR adapter, and CI validation. It remains a
+  reviewable fold candidate; no published release surface changed.
 - `codex/release-0.6.0` was merged by PR #5 into `main` at `c6e92cc`; `main`
   and the `v0.6.0` tag are published.
-- `dev` is the canonical integration branch, is published to `origin/dev`, and
-  is synchronized to `c6e92cc`.
+- `dev` is the canonical integration branch, is published to `origin/dev` at
+  `8157057`, and contains the verified 0.7.0 release-preparation fold. The
+  release remains on hold until the self-audit review packet and external
+  publication gates clear.
   The temporary `codex/dev-feature-port` worktree/ref and the superseded
   `quality-skill-corpus-workflow` branch were pruned after the behavioral port
   audit; unrelated active branches remain separate.
 - Canonical planning documents: `docs/modernization/`.
+- Combined fold verification: 133 focused tests, Ruff, formatting, Basedpyright,
+  Vulture, source-size, and diff checks pass; the full suite has 687 behavioral
+  passes and one network-blocked packaged-build check.
+- Scan-scope fold verification: 734 behavioral tests, Ruff lint and format,
+  Basedpyright, Vulture, pip-audit, source/wheel builds, installed-wheel smoke,
+  release-smoke, review projections, and MCP discovery pass.
+- 2026-07-22: 0.7.0 release preparation aligned version metadata, changelog,
+  citation/plugin docs, upgrade guidance, and release tests; full quality and
+  artifact gates passed. The self-audit remains review-pending with zero high
+  findings and no confirmed vulnerability.
+- Agent-instruction audit: live `git ls-remote --heads origin` confirms the
+  remote branch set is `main` at `9f6c677`, `dev` at `8157057`, and the current
+  follow-up at `8157057`. The older local `codex/ci-warning-cleanup` and
+  `codex/qr-command-surface` refs are not additional current remote branches.
 - Public compatibility: retain `quality_evidence_contract` and
   `repo_quality_certifier` during a published transition window.
 
@@ -113,6 +177,15 @@ verified PyPI publication.
   the tag release workflow pass; the public PyPI wheel and source archive are
   verified by digest, and an isolated PyPI install passes CLI, doctor,
   release-smoke, and MCP checks.
+- `49c3dda` integrates `0bc7d37`, which adds candidate/active local timeout
+  baselines, exclusion-bound identity validation, phase budgets, explicit
+  overrides, and 86 focused regression tests; Ruff, formatting, Basedpyright,
+  Vulture, and the full suite's 666 behavioral tests pass. The packaged build
+  check needs network access to resolve uncached uv dependencies.
+- `a66850d` combines that timeout fold with the incremental analysis, semantic
+  reuse, exclusion-estimation, and verification-deadline work; 133 focused
+  tests and all static gates pass, while the full suite has 687 behavioral
+  passes and the packaged build remains network-blocked.
 - `c71b130` passes the full 556-test pytest suite, Ruff lint/format,
   Basedpyright, Vulture, lock validation, pip-audit, release smoke, build, and
   installed-wheel smoke checks. GitHub CI and the tag release workflow pass;
@@ -173,6 +246,9 @@ verified PyPI publication.
   focused regression tests pass, exact-head GitHub CI is green, and the release
   profile passes on the promoted release candidate.
 
+- `5217270` passes the full 669-test suite, Ruff lint/format, Basedpyright,
+  Vulture, and the source-size guard; no QR gate was invoked.
+
 ## Risks
 
 - Generated evidence can contain target-repository output; it remains local and
@@ -191,9 +267,46 @@ verified PyPI publication.
 - The release profile intentionally blocks without current CI provenance,
   repo-local release evidence, disposable execution where required, and owner
   acceptance; it does not infer release readiness from configured commands.
+- Refresh timeout baselines remain local under `.quality-runner/cache` and are
+  invalidated by repository-surface, exclusion, policy, version, or gate-plan
+  changes; they are not release evidence.
+- `fa291c2` passes 41 focused cache/exclusion/artifact tests, 103 broader
+  code-quality/security/config/artifact tests, Ruff, BasedPyright, and Vulture;
+  Quality Runner gate execution was not invoked.
+- The normal commit hook for `5217270` completed successfully in 301 seconds;
+  it retained the existing `tests/test_cli.py` oversized-source warning.
+- The `a66850d` integration commit's 90-second Pre-CR guard timed out and
+  recorded the existing weak-test and oversized-test warnings; no bypass flag
+  was used.
 
 ## Recent Progress
 
+- 2026-07-21: `3952a54` aligns the detailed agent guide and packaged skill
+  with current `qr` journeys, v2 outcomes, scan-scope controls, review/gate/
+  planning/worker/rollout/release routes, and cache provenance; six focused
+  documentation tests pass. The subsequent live origin refresh confirms the
+  pushed branch alongside `dev` and `main`.
+- 2026-07-21: `4b0c2ab` adds explicit bounded and full-scan inclusion
+  controls, protected-path fail-closed behavior, inclusion provenance, and
+  refresh/verify propagation; 732 behavioral tests pass.
+- 2026-07-19: `a66850d` combines the adaptive-timeout and incremental-artifact
+  folds; 133 focused tests and static checks pass, with 687 full-suite
+  behavioral passes and one network-blocked packaged-build check.
+- 2026-07-18: `dbb892f` preserves verification deadlines through Git discovery
+  and keeps timeout artifacts attributable to the verification mode.
+- 2026-07-18: `f99fec1` completes read-only verify-gates analysis reuse and
+  execution-consent-safe fallback behavior; Tenure dogfood completed without
+  timeout or gate execution, with all 11 discovered gates skipped.
+- 2026-07-18: `5217270` completes refresh cache wiring, semantic cache reuse,
+  cache evidence, and warm-prefix regression coverage; 669 tests passed.
+- 2026-07-18: `fa291c2` integrates the local P1 excluded-artifact estimate fix
+  with safe incremental scan caching and refresh artifact retention in an
+  isolated revision; no push, publish, release, or gate execution occurred.
+- 2026-07-18: `81d560d` makes read-only planning cache-free, records disabled
+  cache evidence, and verifies the full relevant suite without gate execution.
+- 2026-07-17: `4d7f72b` stops recursive estimates for protected/generated/
+  excluded artifact directories, adds 10,000-file inspect/preflight regression
+  coverage, and distinguishes actual scan work in timeout diagnostics.
 - 2026-07-17: `b5a610e` makes release-gate discovery execute the exact commands
   declared by CI, including scoped Vulture coverage; focused tests pass and
   exact-head GitHub CI is green.
@@ -209,47 +322,8 @@ verified PyPI publication.
   local self-update, progress, resolution-aware planning, phase candidates,
   read-only integrity, verification contracts, skill decomposition, UI quality,
   starter packs, and 650 passing tests.
-- 2026-07-17: canonical `dev` receives the architecture-preserving port and is
-  published to `origin/dev`; the completed port branch and superseded source
-  branch are pruned, while unrelated active branches remain untouched.
-- 2026-07-17: `b193900` ports release-profile readiness with provenance,
-  repo-local evidence validation, aggregate coverage, artifact/read-only gates,
-  publication review triggers, CLI/refresh propagation, and 621 passing tests.
-- 2026-07-17: `287fe95` adds remediation-context packets and readiness
-  validation to run/verify artifacts while keeping source changes external and
-  preserving the v0.5.1 application/compatibility seams.
-- 2026-07-17: `74e368a` adds scan-exclusion preflight and module-aware run-only
-  overlays while preserving security coverage for structural/code-quality
-  exclusions and retaining the current application/compatibility façades.
-- 2026-07-17: `546122e` reduces remediation-delta implementation noise while
-  preserving its fingerprints, package evidence, and recommendation payload.
-- 2026-07-17: `960d094` adds the native QR phase lifecycle and domain-aware
-  `plan auto` workflow under `.planning/quality-runner/`; it remains advisory,
-  idempotent, and separate from source changes, commits, pushes, and root GSD.
-- 2026-07-17: `87d81f8` adds remediation delta evidence and the explicit
-  `remediation-delta` command, preserving the boundary between QR evidence and
-  project planning systems.
-- 2026-07-17: `831d9a4` completes the skill corpus command surface for
-  classify/append/sync and makes selected-skill review coverage explicit.
-- 2026-07-17: `f292a1e` routes rollout provenance and consumer invocation
-  through a checkout-aware source-first runner, with local and refreshed
-  latest modes documented for downstream repositories.
-- 2026-07-17: `f75c431` ports artifact privacy/retention and gate-response
-  redaction into the current application architecture, with an explicit
-  `prune-artifacts` command that never deletes unless `--apply` is supplied.
-- 2026-07-17: `94b2d42` ports the canonical skill corpus and selection layer,
-  QR-native similarity, and module-status observability into the isolated
-  canonical-dev port branch; the application façade remains intact.
-- 2026-07-17: `da79745` ports the first Quality Skills contract batch into
-  canonical `dev` while retaining the application workflow façades and
-  evidence-redaction boundary.
-
-- 2026-07-13: v0.5.1 released: PR #2 merged at `a101bd4`, tag workflow and
-  six-job CI passed, PyPI publishes wheel/sdist, GitHub Release is public, and
-  a disposable PyPI install passes CLI, doctor, release-smoke, and MCP checks.
-- 2026-07-13: `c71b130` adds a pinned Python dependency audit, upgrades pytest
-  to 9.0.3, and prevents untrusted baseline manifests from injecting Git diff
-  options; all pre-tag gates and installed-wheel smoke checks pass.
-- 2026-07-13: `948107f` prepares v0.5.1 metadata and the main README release
-  guidance; final pre-tag checks, PR merge, tag, PyPI publication, and GitHub
-  Release creation remain in sequence.
+- 2026-07-22: `a387a51` adds the repository environment contract; 739 tests,
+  Ruff lint/format, BasedPyright, Vulture, pip-audit, package build, and the
+  environment-aware Pre-CR gate pass. The build required authorized network
+  access to resolve `setuptools`; no target repository or publication surface
+  changed.

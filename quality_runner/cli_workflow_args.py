@@ -45,6 +45,31 @@ def add_workflow_arguments(parser: argparse.ArgumentParser) -> None:
         ),
     )
     parser.add_argument(
+        "--include-path",
+        action="append",
+        default=[],
+        metavar="PATH",
+        help=(
+            "Restrict this QR run to a repo-relative path and explicitly include it even "
+            "when normally excluded; repeat for multiple paths"
+        ),
+    )
+    parser.add_argument(
+        "--include-ignored-path",
+        action="append",
+        default=[],
+        metavar="PATH",
+        help=(
+            "Include a normally ignored or excluded repo-relative path without narrowing "
+            "the rest of the scan; repeat for multiple paths"
+        ),
+    )
+    parser.add_argument(
+        "--phase-contract",
+        default=None,
+        help="Load scan paths from a validated QR/GSD phase contract JSON file",
+    )
+    parser.add_argument(
         "--checkout-most-advanced-branch",
         action="store_true",
         help="Switch to the local branch with the highest commit count before scanning",
@@ -59,6 +84,29 @@ def add_workflow_arguments(parser: argparse.ArgumentParser) -> None:
         choices=["off", "auto", "parallel", "required"],
         default=None,
         help="Agent skill-review policy for this run",
+    )
+    parser.add_argument(
+        "--analysis-mode",
+        choices=["balanced", "full"],
+        default="full",
+        help="Use the fast planning loop or the explicit full assurance scan",
+    )
+    parser.add_argument(
+        "--cache-mode",
+        choices=["repo", "external", "disabled"],
+        default="repo",
+        help="Choose repository, external, or disabled analysis-cache persistence",
+    )
+    parser.add_argument(
+        "--cache-dir",
+        default=None,
+        help="External cache root; used with --cache-mode external",
+    )
+    parser.add_argument(
+        "--performance-budget-seconds",
+        type=float,
+        default=None,
+        help="Record a bounded partial receipt when this analysis budget is exceeded",
     )
     add_intent_cli_arguments(parser)
     parser.add_argument(

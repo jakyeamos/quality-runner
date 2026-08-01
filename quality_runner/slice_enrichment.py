@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from quality_runner.evidence_excerpts import enrich_finding_evidence
+from quality_runner.evidence_excerpts import SourceExcerptReader, enrich_finding_evidence
 from quality_runner.finding_quality import compute_finding_quality, compute_leverage
 
 
@@ -14,9 +14,13 @@ def enrich_remediation_slices(
     git_state: dict[str, Any] | None,
     code_quality_scan: dict[str, Any] | None,
     run_id: str | None,
+    excerpt_reader: SourceExcerptReader | None = None,
 ) -> list[dict[str, Any]]:
     raw_by_id = _raw_findings_by_id(code_quality_scan)
     planned_at = _planned_at(git_state)
+    source_reader = excerpt_reader
+    if source_reader is None and repo_root is not None:
+        source_reader = SourceExcerptReader(repo_root)
     enriched: list[dict[str, Any]] = []
     for slice_item in slices:
         item = dict(slice_item)
@@ -27,6 +31,7 @@ def enrich_remediation_slices(
                     finding,
                     repo_root=repo_root,
                     raw_by_id=raw_by_id,
+                    excerpt_reader=source_reader,
                 )
                 for finding in findings
                 if isinstance(finding, dict)
@@ -57,12 +62,13 @@ def _enrich_slice_finding(
     *,
     repo_root: Path | None,
     raw_by_id: dict[str, dict[str, Any]],
+    excerpt_reader: SourceExcerptReader | None,
 ) -> dict[str, Any]:
     item = dict(finding)
     raw = raw_by_id.get(str(item.get("id") or ""))
     raw_group = [raw] if raw else None
     item.update(compute_finding_quality(item, raw_findings=raw_group))
-    excerpt = enrich_finding_evidence(repo_root, item)
+    excerpt = enrich_finding_evidence(repo_root, item, excerpt_reader=excerpt_reader)
     if excerpt is not None:
         item["evidence_excerpt"] = excerpt
     return item

@@ -595,6 +595,7 @@ def test_workflow_applies_configured_scan_exclusions(tmp_path: Path) -> None:
         ".continue",
         ".cursor",
         ".planning",
+        ".design-sync/previews/**",
         ".superpowers",
         ".tracker",
         "docs",

@@ -143,6 +143,8 @@ def phase_candidate_summaries(candidates: list[dict[str, Any]]) -> list[dict[str
         "actions",
         "verification_gates",
         "verification_modes",
+        "disposition_groups",
+        "bulk_review_eligible_count",
         "status",
     )
     return [
@@ -161,6 +163,11 @@ def _build_candidate(domain: str, slices: list[dict[str, Any]]) -> dict[str, Any
         str(item.get("workstream"))
         for item in ordered
         if isinstance(item.get("workstream"), str) and item["workstream"]
+    )
+    disposition_groups = Counter(
+        str(finding.get("disposition_group"))
+        for finding in finding_items
+        if isinstance(finding.get("disposition_group"), str)
     )
     verification_gates = _unique_strings(
         gate
@@ -201,6 +208,11 @@ def _build_candidate(domain: str, slices: list[dict[str, Any]]) -> dict[str, Any
             0,
             "Resolve the linked human or external-evidence review items before treating this domain as complete.",
         )
+    if disposition_groups:
+        actions.insert(
+            1,
+            "Review disposition groups in bulk; escalate only slices marked human-review or exceptions.",
+        )
 
     return {
         "id": f"phase-{_slug(domain)}",
@@ -225,6 +237,14 @@ def _build_candidate(domain: str, slices: list[dict[str, Any]]) -> dict[str, Any
         "verification_gate_count": len(verification_gates),
         "verification_gate_truncated": bool(truncated_gate_count),
         "verification_modes": verification_modes,
+        "disposition_groups": dict(sorted(disposition_groups.items())),
+        "bulk_review_eligible_count": sum(
+            1
+            for item in ordered
+            for finding in item.get("findings", [])
+            if isinstance(finding, dict)
+            and finding.get("disposition_class") == "bulk-review-eligible"
+        ),
     }
 
 
