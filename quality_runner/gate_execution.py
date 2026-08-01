@@ -48,22 +48,39 @@ def verify_gate(
         mutations_isolated=mutations_isolated,
     )
     if skipped is not None:
-        return skipped
+        return _with_invariant_policy(skipped, capability)
     assert isinstance(command, str) and command
     risk = mutating_risk(capability_id=capability_id, capability=capability)
-    return _execute_gate(
-        repo_root=repo_root,
-        capability=capability,
-        capability_id=capability_id,
-        capability_kind=capability_kind,
-        command=command,
-        source=source,
-        risk=risk,
-        timeout_seconds=timeout_seconds,
-        read_only_gates=read_only_gates,
-        allow_mutating_gates=allow_mutating_gates,
-        mutations_isolated=mutations_isolated,
+    return _with_invariant_policy(
+        _execute_gate(
+            repo_root=repo_root,
+            capability=capability,
+            capability_id=capability_id,
+            capability_kind=capability_kind,
+            command=command,
+            source=source,
+            risk=risk,
+            timeout_seconds=timeout_seconds,
+            read_only_gates=read_only_gates,
+            allow_mutating_gates=allow_mutating_gates,
+            mutations_isolated=mutations_isolated,
+        ),
+        capability,
     )
+
+
+def _with_invariant_policy(
+    result: dict[str, Any], capability: dict[str, Any]
+) -> dict[str, Any]:
+    if capability.get("capability_kind") != "semantic_invariant":
+        return result
+    return {
+        **result,
+        "enforcement": capability.get("enforcement", "advisory"),
+        "description": capability.get("description"),
+        "owner": capability.get("owner"),
+        "surfaces": capability.get("surfaces", []),
+    }
 
 
 def _skipped_gate(
@@ -335,7 +352,14 @@ def _completed_result(
 
 def _capability_kind(capability: dict[str, Any]) -> str:
     kind = capability.get("capability_kind")
-    if kind in {"local_command", "ci_only", "evidence_file", "agent_review", "evidence"}:
+    if kind in {
+        "local_command",
+        "semantic_invariant",
+        "ci_only",
+        "evidence_file",
+        "agent_review",
+        "evidence",
+    }:
         return str(kind)
     if capability.get("local_execution") == "ci-only":
         return "ci_only"

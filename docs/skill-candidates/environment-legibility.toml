@@ -1,6 +1,6 @@
 id = "environment-legibility"
 name = "Environment Legibility"
-version = "0.1.0"
+version = "0.2.0"
 description = "Review machine-legible repository context, verified quality commands, protected execution boundaries, and evidence-safe handoff."
 
 [[deterministic_rules]]

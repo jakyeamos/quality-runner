@@ -32,6 +32,7 @@ from quality_runner.gate_verification import (
 )
 from quality_runner.git_branches import prepare_scan_branch
 from quality_runner.incremental_analysis_identity import configuration_identity
+from quality_runner.invariants import apply_invariant_status, build_invariant_report
 from quality_runner.manifest import git_state_for_repo
 from quality_runner.progress import ProgressCallback, emit_progress
 from quality_runner.readiness import evaluate_readiness
@@ -80,11 +81,19 @@ def run_gate_verification(
         resolved_worktree_mode=resolved_worktree_mode,
         analysis_reuse=analysis_reuse,
     )
+    invariant_report = build_invariant_report(
+        repo_root=request.repo_root,
+        config=_legacy_payload(analysis.config),
+        gate_verification=_legacy_payload(gate_verification),
+    )
     gate_verification = _audit_payload(
-        {
-            **_legacy_payload(gate_verification),
-            "analysis_reuse": analysis_reuse,
-        }
+        apply_invariant_status(
+            {
+                **_legacy_payload(gate_verification),
+                "analysis_reuse": analysis_reuse,
+            },
+            invariant_report,
+        )
     )
     verified_capability_map = _audit_payload(
         apply_gate_verification(
@@ -144,6 +153,7 @@ def run_gate_verification(
         artifact_paths=artifact_paths,
         gate_execution_plan=gate_execution_plan,
         gate_verification=gate_verification,
+        invariant_report=_audit_payload(invariant_report),
         verified_capability_map=verified_capability_map,
         code_quality_scan=code_quality_scan,
         planned_audit=planned_audit,

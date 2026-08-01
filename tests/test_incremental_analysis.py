@@ -465,6 +465,8 @@ def test_refresh_retention_preserves_all_current_phase_runs(tmp_path: Path) -> N
         "refresh-current-inspect",
         "refresh-current-run",
         "refresh-current-verify",
+        "refresh-old-1-verify",
+        "refresh-old-2-verify",
     ]
     artifact = json.loads(
         (

@@ -77,6 +77,7 @@ def build_gate_execution_plan(
                 "cwd": str(cwd),
                 "source": _string_or_none(capability.get("source")),
                 "capability_kind": _capability_kind(capability),
+                **_optional_field("enforcement", capability.get("enforcement")),
                 "package_manager": package_manager_for_command(command_text),
                 "mutating_risk": risk,
                 "local_execution_status": local_execution_status(
@@ -219,6 +220,10 @@ def gate_cwd(*, repo_root: Path, capability: dict[str, Any]) -> Path:
     return repo_root
 
 
+def _optional_field(key: str, value: object) -> dict[str, Any]:
+    return {} if value is None else {key: value}
+
+
 def package_manager_for_command(command: str | None) -> str | None:
     if command is None:
         return None
@@ -300,7 +305,14 @@ def _gate_cost_key(capability: dict[str, Any]) -> tuple[int, str]:
 
 def _capability_kind(capability: dict[str, Any]) -> str:
     kind = capability.get("capability_kind")
-    if kind in {"local_command", "ci_only", "evidence_file", "agent_review", "evidence"}:
+    if kind in {
+        "local_command",
+        "semantic_invariant",
+        "ci_only",
+        "evidence_file",
+        "agent_review",
+        "evidence",
+    }:
         return str(kind)
     if capability.get("local_execution") == "ci-only":
         return "ci_only"

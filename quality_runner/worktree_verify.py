@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import signal
 import subprocess
 from collections.abc import Iterator
 from contextlib import contextmanager, suppress
 from dataclasses import dataclass
 from pathlib import Path
+from time import monotonic
 from typing import Any
 
 from quality_runner.artifacts import validate_run_id
@@ -118,10 +120,27 @@ def _open_disposable_worktree(
 
 
 def _close_disposable_worktree(*, repo_root: Path, worktree_path: Path) -> None:
-    _remove_worktree_if_registered(repo_root, worktree_path)
-    if worktree_path.exists():
-        _remove_worktree_path(worktree_path)
-    _git_optional(repo_root, "worktree", "prune")
+    with _cleanup_signal_shield():
+        _remove_worktree_if_registered(repo_root, worktree_path)
+        if worktree_path.exists():
+            _remove_worktree_path(worktree_path)
+        _git_optional(repo_root, "worktree", "prune")
+
+
+@contextmanager
+def _cleanup_signal_shield() -> Iterator[None]:
+    previous_handler = signal.getsignal(signal.SIGALRM)
+    previous_timer = signal.setitimer(signal.ITIMER_REAL, 0)
+    started_at = monotonic()
+    signal.signal(signal.SIGALRM, signal.SIG_IGN)
+    try:
+        yield
+    finally:
+        signal.setitimer(signal.ITIMER_REAL, 0)
+        signal.signal(signal.SIGALRM, previous_handler)
+        remaining_seconds = previous_timer[0] - (monotonic() - started_at)
+        if remaining_seconds > 0:
+            signal.setitimer(signal.ITIMER_REAL, remaining_seconds, previous_timer[1])
 
 
 def _clean_failed_worktree_add(*, repo_root: Path, worktree_path: Path) -> None:

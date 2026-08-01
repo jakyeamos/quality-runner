@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://quality-runner.dev/schemas/candidate-fleet.schema.json",
+  "title": "Quality Runner Reusable Candidate Fleet Evidence",
+  "type": "object",
+  "required": [
+    "schema",
+    "status",
+    "as_of",
+    "projects_root",
+    "repository_count",
+    "registry_count",
+    "candidate_occurrence_count",
+    "invalid_registries",
+    "candidates",
+    "provenance_hash"
+  ],
+  "properties": {
+    "schema": { "const": "quality-runner-candidate-fleet-v0.1" },
+    "status": { "enum": ["completed", "blocked"] },
+    "as_of": { "type": "string", "format": "date-time" },
+    "projects_root": { "type": "string", "minLength": 1 },
+    "repository_count": { "type": "integer", "minimum": 0 },
+    "registry_count": { "type": "integer", "minimum": 0 },
+    "candidate_occurrence_count": { "type": "integer", "minimum": 0 },
+    "invalid_registries": { "type": "array", "items": { "type": "object" } },
+    "candidates": { "type": "array", "items": { "type": "object" } },
+    "provenance_hash": { "type": "string", "minLength": 1 }
+  },
+  "additionalProperties": false
+}

@@ -208,19 +208,22 @@ def _available_capabilities(capability_map: dict[str, Any]) -> list[dict[str, An
 
 
 def _status(gates: list[dict[str, Any]]) -> str:
+    blocking_gates = [gate for gate in gates if gate.get("enforcement") != "advisory"]
     if any(
         gate.get("failure_type")
         in {"environment-restricted", "dependency-setup-blocker", "read-only-mutation"}
         or gate.get("skip_type") in {"mutating-gate-not-run", "execution-consent-required"}
-        for gate in gates
+        for gate in blocking_gates
     ):
         return "blocked"
-    if any(gate.get("status") == "failed" for gate in gates):
+    if any(gate.get("status") == "failed" for gate in blocking_gates):
         return "failed"
-    if any(gate.get("status") == "passed" for gate in gates):
+    if any(gate.get("status") == "passed" for gate in blocking_gates):
         return "passed"
-    if gates and all(gate.get("status") == "skipped" for gate in gates):
+    if blocking_gates and all(gate.get("status") == "skipped" for gate in blocking_gates):
         return "skipped-nonlocal"
+    if gates and not blocking_gates:
+        return "passed"
     return "blocked"
 
 

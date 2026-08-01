@@ -16,12 +16,14 @@ from quality_runner.application.journey_outcomes import (
 from quality_runner.application.outcome_projection import LegacyPayload
 from quality_runner.application.verification_workflows import verify_gates_payload
 from quality_runner.cli_artifacts import prune_artifacts_payload
+from quality_runner.cli_candidates import candidate_command_payload
 from quality_runner.cli_controller_reports import (
     controller_report_command_payload,
     controller_report_from_summary_payload,
     load_controller_report_json,
 )
 from quality_runner.cli_fix_proposals import propose_fix_command_payload
+from quality_runner.cli_fleet import fleet_command_payload
 from quality_runner.cli_gate import (
     gate_command_payload,
     gate_respond_command_payload,
@@ -32,6 +34,7 @@ from quality_runner.cli_phase import phase_command_payload
 from quality_runner.cli_planning import planning_command_payload
 from quality_runner.cli_refresh import refresh_command_payload
 from quality_runner.cli_remediation import remediation_delta_command_payload
+from quality_runner.cli_repo_hygiene import repo_hygiene_payload
 from quality_runner.cli_review import review_command_payload
 from quality_runner.cli_rollout import rollout_command_payload
 from quality_runner.cli_skills import skill_command_payload
@@ -46,6 +49,7 @@ from quality_runner.exclusion_preflight import (
     normalize_run_only_exclusion_overlay,
     run_exclusion_preflight_command,
 )
+from quality_runner.fleet.audit import local_environment_audit_payload
 from quality_runner.intent import workflow_intent_from_cli_args
 from quality_runner.phase_contract import load_phase_contract, scan_include_paths
 from quality_runner.progress import ProgressCallback
@@ -66,6 +70,10 @@ def payload_for_args(
 ) -> dict[str, Any]:
     if args.command == "doctor":
         return doctor_payload(include_environment=True)
+    if args.command == "fleet":
+        return fleet_command_payload(args)
+    if args.command == "candidates":
+        return candidate_command_payload(args)
     if args.command == "phase-check":
         return phase_command_payload(args)
     if args.command == "self-update":
@@ -158,6 +166,14 @@ def payload_for_args(
         )
     if args.command == "audit":
         repo_root = _validated_repo_path(args.repo_path)
+        if args.profile == "environment-legibility":
+            return local_environment_audit_payload(
+                repo_path=repo_root,
+                output_dir=Path(args.output_dir).expanduser().resolve()
+                if args.output_dir
+                else None,
+                as_of=args.as_of,
+            )
         return _result_payload(
             audit_journey_outcome(
                 repo_root=repo_root,
@@ -313,7 +329,10 @@ def payload_for_args(
         return prune_artifacts_payload(
             repo_root=_validated_repo_path(args.repo_path),
             apply=args.apply,
+            preserve_run_ids=set(args.preserve_run_id),
         )
+    if args.command == "repo-hygiene":
+        return repo_hygiene_payload(args, validated_repo_path=_validated_repo_path)
     raise ValueError(f"unsupported command: {args.command}")
 
 

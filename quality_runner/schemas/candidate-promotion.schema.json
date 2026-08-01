@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://quality-runner.dev/schemas/candidate-promotion.schema.json",
+  "title": "Quality Runner Reusable Candidate Promotion Decision",
+  "type": "object",
+  "required": [
+    "schema",
+    "candidate_id",
+    "decision",
+    "decided_by",
+    "decided_at",
+    "reason",
+    "fleet_provenance_hash"
+  ],
+  "properties": {
+    "schema": {
+      "const": "quality-runner-candidate-promotion-decision-v0.1"
+    },
+    "candidate_id": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+    },
+    "decision": { "enum": ["approved", "deferred", "rejected"] },
+    "decided_by": { "type": "string", "minLength": 1 },
+    "decided_at": { "type": "string", "format": "date-time" },
+    "reason": { "type": "string", "minLength": 1 },
+    "fleet_provenance_hash": { "type": "string", "minLength": 1 }
+  },
+  "additionalProperties": false
+}

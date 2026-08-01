@@ -8,14 +8,16 @@ from pathlib import Path
 from typing import Any
 
 DEFAULT_REDACTION_REPLACEMENT = "[REDACTED]"
+DEFAULT_RETENTION_RUNS = 3
+DEFAULT_RETENTION_DAYS = 14
 
 
 @dataclass(frozen=True)
 class ArtifactPolicy:
     redact_patterns: tuple[str, ...] = ()
     redact_replacement: str = DEFAULT_REDACTION_REPLACEMENT
-    retention_runs: int | None = None
-    retention_days: int | None = None
+    retention_runs: int | None = DEFAULT_RETENTION_RUNS
+    retention_days: int | None = DEFAULT_RETENTION_DAYS
 
     @classmethod
     def from_config(cls, config: dict[str, Any]) -> ArtifactPolicy:
@@ -24,8 +26,22 @@ class ArtifactPolicy:
             return cls()
         patterns = section.get("redact_patterns")
         replacement = section.get("redact_replacement")
-        retention_runs = section.get("retention_runs")
-        retention_days = section.get("retention_days")
+        has_retention_runs = "retention_runs" in section
+        has_retention_days = "retention_days" in section
+        retention_runs = (
+            section.get("retention_runs")
+            if has_retention_runs
+            else DEFAULT_RETENTION_RUNS
+            if not has_retention_days
+            else None
+        )
+        retention_days = (
+            section.get("retention_days")
+            if has_retention_days
+            else DEFAULT_RETENTION_DAYS
+            if not has_retention_runs
+            else None
+        )
         return cls(
             redact_patterns=tuple(item for item in patterns if isinstance(item, str) and item)
             if isinstance(patterns, list)
@@ -206,10 +222,11 @@ def cleanup_artifacts(
         result["skipped_entries"] = [str(runs_dir)]
         return result
 
-    current_time = now if now is not None else _current_time()
-    preserved = preserve_run_ids or set()
     entries = [entry for entry in runs_dir.iterdir() if entry.is_dir() and not entry.is_symlink()]
     entries.sort(key=lambda entry: (entry.stat().st_mtime_ns, entry.name), reverse=True)
+    current_time = now if now is not None else _current_time()
+    preserved = set(preserve_run_ids or set()) | _auto_preserved_run_ids(entries)
+    result["preserved_run_ids"] = sorted(preserved)
     retained_by_count = (
         {entry.name for entry in entries[: policy.retention_runs]}
         if policy.retention_runs is not None
@@ -242,6 +259,46 @@ def cleanup_artifacts(
     else:
         result["status"] = "retained"
     return result
+
+
+def _auto_preserved_run_ids(entries: list[Path]) -> set[str]:
+    preserved: set[str] = set()
+    for entry in entries:
+        if entry.name in {"active", "blocked", "current", "preserved"}:
+            preserved.add(entry.name)
+            continue
+        for filename in (
+            "run-summary.json",
+            "agent-handoff.json",
+            "gate-verification.json",
+            "run-manifest.json",
+        ):
+            path = entry / filename
+            try:
+                payload = json.loads(path.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError):
+                continue
+            if not isinstance(payload, dict):
+                continue
+            if payload.get("preserved") is True or payload.get("retain") is True:
+                preserved.add(entry.name)
+            retention = payload.get("retention")
+            if isinstance(retention, dict) and retention.get("preserve") is True:
+                preserved.add(entry.name)
+            statuses = {
+                value
+                for value in (
+                    payload.get("status"),
+                    payload.get("lifecycle_status"),
+                    payload.get("gate_verification_status"),
+                )
+                if isinstance(value, str)
+            }
+            if statuses & {"active", "blocked", "current", "preserved"}:
+                preserved.add(entry.name)
+        if entry.name in preserved:
+            continue
+    return preserved
 
 
 def _redact_content(path: Path, content: str) -> str:

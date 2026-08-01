@@ -1,0 +1,204 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://quality-runner.dev/schemas/candidate-registry.schema.json",
+  "title": "Quality Runner Reusable Candidate Registry",
+  "type": "object",
+  "required": ["schema", "repository", "regressions", "candidates"],
+  "properties": {
+    "schema": { "const": "quality-runner-candidate-registry-v0.1" },
+    "repository": { "type": "string", "minLength": 1 },
+    "regressions": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/regression" }
+    },
+    "candidates": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/candidate" }
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+    },
+    "stringList": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "type": "string", "minLength": 1 },
+      "uniqueItems": true
+    },
+    "regression": {
+      "type": "object",
+      "required": [
+        "id",
+        "summary",
+        "regression_test",
+        "command",
+        "confirmed_at",
+        "provenance"
+      ],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "summary": { "type": "string", "minLength": 1 },
+        "regression_test": { "type": "string", "minLength": 1 },
+        "command": { "type": "string", "minLength": 1 },
+        "confirmed_at": { "type": "string", "format": "date-time" },
+        "provenance": { "type": "object", "minProperties": 1 }
+      },
+      "additionalProperties": false
+    },
+    "candidate": {
+      "type": "object",
+      "required": [
+        "id",
+        "originating_regressions",
+        "failure_pattern",
+        "cause",
+        "producer_surfaces",
+        "consumer_surfaces",
+        "detection_signal",
+        "likely_false_positives",
+        "remediation",
+        "owner",
+        "provenance",
+        "status",
+        "fixtures",
+        "observations",
+        "transitions"
+      ],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "originating_regressions": { "$ref": "#/$defs/stringList" },
+        "failure_pattern": { "type": "string", "minLength": 1 },
+        "cause": { "type": "string", "minLength": 1 },
+        "producer_surfaces": { "$ref": "#/$defs/stringList" },
+        "consumer_surfaces": { "$ref": "#/$defs/stringList" },
+        "detection_signal": {
+          "type": "object",
+          "required": ["kind", "description"],
+          "properties": {
+            "kind": { "type": "string", "minLength": 1 },
+            "description": { "type": "string", "minLength": 1 },
+            "command": { "type": "string", "minLength": 1 }
+          },
+          "additionalProperties": false
+        },
+        "likely_false_positives": { "$ref": "#/$defs/stringList" },
+        "remediation": { "type": "string", "minLength": 1 },
+        "owner": { "type": "string", "minLength": 1 },
+        "provenance": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "object", "minProperties": 1 }
+        },
+        "status": {
+          "enum": [
+            "repository-regression",
+            "reusable-candidate",
+            "quality-runner-advisory",
+            "fleet-observation",
+            "required-gate",
+            "repository-only",
+            "duplicate",
+            "not-detectable"
+          ]
+        },
+        "disposition": {
+          "type": "object",
+          "required": ["kind", "rationale", "decided_by", "decided_at"],
+          "properties": {
+            "kind": {
+              "enum": ["repository-only", "duplicate", "not-detectable"]
+            },
+            "rationale": { "type": "string", "minLength": 1 },
+            "decided_by": { "type": "string", "minLength": 1 },
+            "decided_at": { "type": "string", "format": "date-time" },
+            "duplicate_of": { "$ref": "#/$defs/id" }
+          },
+          "additionalProperties": false
+        },
+        "fixtures": {
+          "type": "object",
+          "required": ["positive", "negative"],
+          "properties": {
+            "positive": { "$ref": "#/$defs/stringList" },
+            "negative": { "$ref": "#/$defs/stringList" }
+          },
+          "additionalProperties": false
+        },
+        "observations": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/observation" }
+        },
+        "transitions": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/transition" }
+        },
+        "promotion_receipt": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": { "status": { "const": "required-gate" } },
+            "required": ["status"]
+          },
+          "then": { "required": ["promotion_receipt"] }
+        }
+      ]
+    },
+    "observation": {
+      "type": "object",
+      "required": [
+        "id",
+        "observed_at",
+        "result",
+        "classification",
+        "duration_ms",
+        "evidence"
+      ],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "observed_at": { "type": "string", "format": "date-time" },
+        "result": { "enum": ["detected", "not-detected", "blocked"] },
+        "classification": {
+          "enum": [
+            "true-positive",
+            "true-negative",
+            "false-positive",
+            "false-negative",
+            "unclassified"
+          ]
+        },
+        "duration_ms": { "type": "integer", "minimum": 0 },
+        "evidence": {
+          "type": "object",
+          "required": ["reference"],
+          "properties": {
+            "reference": { "type": "string", "minLength": 1 },
+            "digest": { "type": "string", "minLength": 1 }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "transition": {
+      "type": "object",
+      "required": ["from", "to", "at", "actor", "reason", "evidence"],
+      "properties": {
+        "from": {
+          "type": ["string", "null"]
+        },
+        "to": { "type": "string", "minLength": 1 },
+        "at": { "type": "string", "format": "date-time" },
+        "actor": { "type": "string", "minLength": 1 },
+        "reason": { "type": "string", "minLength": 1 },
+        "evidence": { "$ref": "#/$defs/stringList" }
+      },
+      "additionalProperties": false
+    }
+  }
+}

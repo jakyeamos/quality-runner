@@ -1,0 +1,80 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://quality-runner.dev/schemas/invariant-verification.schema.json",
+  "title": "Quality Runner Semantic Invariant Verification",
+  "type": "object",
+  "required": ["schema", "checked_at", "status", "summary", "invariants"],
+  "properties": {
+    "schema": { "const": "quality-runner-invariant-verification-v0.1" },
+    "checked_at": { "type": "string", "format": "date-time" },
+    "status": {
+      "enum": ["passed", "failed", "blocked", "unknown", "stale"]
+    },
+    "summary": {
+      "type": "object",
+      "required": ["total", "passed", "failed", "blocked", "unknown", "stale"],
+      "properties": {
+        "total": { "type": "integer", "minimum": 0 },
+        "passed": { "type": "integer", "minimum": 0 },
+        "failed": { "type": "integer", "minimum": 0 },
+        "blocked": { "type": "integer", "minimum": 0 },
+        "unknown": { "type": "integer", "minimum": 0 },
+        "stale": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": false
+    },
+    "invariants": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/invariant" }
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "invariant": {
+      "type": "object",
+      "required": [
+        "id",
+        "description",
+        "owner",
+        "enforcement",
+        "surfaces",
+        "status"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+        },
+        "description": { "type": "string", "minLength": 1 },
+        "owner": { "type": "string", "minLength": 1 },
+        "candidate_id": {
+          "type": "string",
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+        },
+        "enforcement": { "enum": ["advisory", "required"] },
+        "surfaces": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 },
+          "uniqueItems": true
+        },
+        "status": {
+          "enum": ["passed", "failed", "blocked", "unknown", "stale"]
+        },
+        "source": { "type": "string", "minLength": 1 },
+        "reason": { "type": "string", "minLength": 1 },
+        "failure_type": { "type": "string", "minLength": 1 },
+        "evidence_status": {
+          "enum": ["passed", "failed", "blocked"]
+        },
+        "evidence_checked_at": { "type": "string", "format": "date-time" },
+        "missing_surfaces": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "uniqueItems": true
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

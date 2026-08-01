@@ -19,6 +19,16 @@ def add_journey_commands(subparsers: argparse._SubParsersAction[argparse.Argumen
     )
     add_workflow_arguments(audit_parser)
     audit_parser.add_argument(
+        "--output-dir",
+        default=None,
+        help="Runtime-owned output directory for the environment-legibility profile",
+    )
+    audit_parser.add_argument(
+        "--as-of",
+        default=None,
+        help="Fixed ISO-8601 timestamp for the environment-legibility profile",
+    )
+    audit_parser.add_argument(
         "--inspect-only",
         action="store_true",
         help="Inspect repository evidence without preparing a remediation plan",

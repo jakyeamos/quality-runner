@@ -107,7 +107,26 @@ qr audit /path/to/repo --run-id baseline-001 --json
 qr review /path/to/repo --mode blind --json
 qr verify /path/to/repo --run-id baseline-001-verify --json
 qr runs /path/to/repo --json
+qr repo-hygiene check /path/to/repo --json
 ```
+
+For the cross-repository environment contract, QR owns both the review profile
+and the bounded fleet scanner. Static inspection covers every identity under a
+bounded projects root; dynamic commands are opt-in and run only in QR-owned
+disposable worktrees for changed or incomplete evidence:
+
+```bash
+qr audit /path/to/repo --profile environment-legibility --json
+qr fleet audit run --all --projects-root /path/to/projects --json
+qr fleet audit replay --audit-id AUDIT_ID --json
+qr fleet audit report --audit-id AUDIT_ID --json
+```
+
+The fleet audit resolves the documented development branch, preferring `dev`,
+and never selects a branch by commit-count maturity. Dirty, detached, stale,
+prunable, or unverifiable target checkouts receive static findings only. Fleet
+artifacts are private by default; the report command emits an aggregate-only
+projection that remains explicitly review-required before publication.
 
 `audit` creates evidence and a remediation plan without editing source files.
 `review` makes a prepared packet visibly `awaiting-evidence`, rather than
@@ -130,6 +149,20 @@ qr verify /path/to/repo \
 Disposable execution protects the ordinary source checkout from normal gate
 mutations; it is not a sandbox for arbitrary commands. See the
 [CLI Reference](docs/cli.md) for the full execution and dirty-worktree contract.
+
+`repo-hygiene check` emits the versioned `repo-hygiene-v1` contract. It detects
+tracked confirmed generated output, missing ignore coverage, JavaScript package
+manager conflicts, clear workspace candidates, CI coverage, and ownership
+blocks. It deliberately preserves ambiguous `build/` and `data/` paths unless
+stronger generated-file evidence exists. `repo-hygiene apply --apply` is the
+only command that can add confirmed ignore rules, and it fails closed for dirty,
+recent, or multi-worktree repositories. Repositories with their own CI can
+call `.github/workflows/repo-hygiene-reusable.yml` by exact Quality Runner
+commit SHA and pass that same SHA as `quality-runner-ref`; repositories without
+CI remain covered by the central projects sweep. A repository that intentionally
+preserves fixture or upstream package-manager diversity may document
+`[quality_runner.repo_hygiene] package_manager_exception = "..."`; the result
+is an explicit exception rather than a blind lockfile migration.
 
 Legacy `inspect`, `run`, `verify-gates`, `status`, and orchestration commands
 remain available for compatibility. Use `refresh` when a controller needs its
@@ -365,6 +398,25 @@ See [Standards Profiles](docs/standards-profiles.md) for the full profile and
 repo-policy reference. For opt-in layer-boundary rules, see
 [Architecture Contracts](docs/architecture-contracts.md). For opt-in user-defined
 standards packs, see [Quality Skills](docs/quality-skills.md).
+
+## Semantic Invariants
+
+Repositories can promote a reproduced behavior regression into a named,
+owned, executable contract with `[[quality_runner.invariants]]`. Invariants
+start as advisory, run through the normal disposable gate boundary, and write
+`invariant-verification.json` with honest `passed`, `failed`, `blocked`,
+`unknown`, or `stale` status. Promote one to `required` only when its proof is
+stable enough to block integration. See
+[Semantic Invariants](docs/semantic-invariants.md) for the config and promotion
+contract.
+
+Confirmed bug lessons use the separate repository-owned
+`quality-runner-candidates.json` registry. `qr candidates validate` enforces
+that every declared regression receives a candidate or documented disposition;
+`qr candidates aggregate` preserves fleet observation history; and
+`qr candidates promotion-check` requires both passing evidence criteria and an
+explicit human decision before a candidate-linked invariant can become
+required. See [Bug-learning lifecycle](docs/bug-learning.md).
 
 ## Scan Exclusions
 

@@ -8,12 +8,14 @@ from typing import Any, cast
 
 from quality_runner import __version__
 from quality_runner.cli_artifacts import add_artifact_commands
+from quality_runner.cli_candidates import add_candidate_commands
 from quality_runner.cli_controller_reports import (
     add_controller_report_command,
     add_controller_report_summary_arguments,
     has_rejected_self_check,
 )
 from quality_runner.cli_fix_proposals import add_fix_proposal_command
+from quality_runner.cli_fleet import add_fleet_commands
 from quality_runner.cli_gate import add_gate_commands
 from quality_runner.cli_handoff import add_handoff_commands
 from quality_runner.cli_human_summary import human_summary
@@ -23,6 +25,7 @@ from quality_runner.cli_payload import payload_for_args
 from quality_runner.cli_phase import add_phase_commands
 from quality_runner.cli_planning import add_planning_commands
 from quality_runner.cli_remediation import add_remediation_commands
+from quality_runner.cli_repo_hygiene import add_repo_hygiene_commands
 from quality_runner.cli_review import add_review_command
 from quality_runner.cli_rollout import add_rollout_command
 from quality_runner.cli_skills import add_skill_commands
@@ -61,7 +64,13 @@ Compatibility commands remain available:
 
 Advanced operations:
   refresh, rollout, gate, controller-report, skill, proposal, remediation,
-  plan, phase, release-smoke, and worker handoff tools
+  plan, phase, candidates, repo-hygiene, release-smoke, and worker handoff tools
+
+Fleet environment audit:
+  fleet audit run --all       static-all audit with optional changed-only dynamic checks
+  fleet audit show --repo-id  inspect a private repository finding and plan
+  fleet audit replay          verify deterministic artifact regeneration
+  fleet audit report          write an aggregate-only reviewable projection
 
 Run '{program_name} <command> --help' for options. Audit, review, verify, and
 runs emit a compact outcome card by default and v2 JSON with --json. Use
@@ -93,6 +102,8 @@ def build_parser(prog: str = CANONICAL_PROGRAM) -> argparse.ArgumentParser:
     subparsers = parser.add_subparsers(dest="command")
 
     add_journey_commands(subparsers)
+    add_fleet_commands(subparsers)
+    add_candidate_commands(subparsers)
 
     run_parser = subparsers.add_parser("run", help="Inspect a repo and write audit artifacts")
     add_workflow_arguments(run_parser)
@@ -299,6 +310,7 @@ def build_parser(prog: str = CANONICAL_PROGRAM) -> argparse.ArgumentParser:
     add_fix_proposal_command(subparsers)
 
     add_artifact_commands(subparsers)
+    add_repo_hygiene_commands(subparsers)
 
     add_handoff_commands(subparsers)
 
@@ -401,6 +413,14 @@ def main(argv: list[str] | None = None) -> int:
     if parsed.command == "self-update" and payload.get("status") in {"blocked", "failed"}:
         return 1
     if parsed.command == "plan" and payload.get("status") == "blocked":
+        return 1
+    if parsed.command == "repo-hygiene" and payload.get("status") in {"fail", "blocked"}:
+        return 1
+    if parsed.command == "candidates" and payload.get("status") not in {
+        "passed",
+        "completed",
+        "supported",
+    }:
         return 1
     return 0
 

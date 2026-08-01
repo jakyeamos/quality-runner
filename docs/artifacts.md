@@ -182,6 +182,16 @@ an external agent or human applies changes and reruns Quality Runner.
   finding ids accepted through `gate-respond record-disposition` and links
   back to gate-run history.
 - `resolution-ledger.md`: human-readable resolution ledger summary.
+- `quality-runner-candidates.json`: optional repository-owned, tracked bug
+  lesson registry. It is source input rather than `.quality-runner/` runtime
+  output and must disposition every declared confirmed regression.
+- `candidate-fleet.json`: private output from `candidates aggregate`, stored at
+  the caller's explicit path. It groups independent repository occurrences,
+  merges classified observation history, records precision, false positives,
+  cost and freshness, and computes fail-closed promotion criteria.
+- `quality-runner-candidate-promotion-receipt-v0.1`: output from
+  `candidates promotion-check`. Repositories may track a supported receipt and
+  link it from a candidate-governed required invariant.
 - `security-scan.json`: opt-in security capability discovery, candidate
   findings, and agent-review gate metadata when
   `[quality_runner.security]` is configured. For secret-like source evidence,

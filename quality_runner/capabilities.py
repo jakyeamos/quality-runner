@@ -4,6 +4,7 @@ from typing import Any
 
 from quality_runner.capability_exceptions import active_exception as _active_exception
 from quality_runner.capability_state import matching_ci_status, verification_state
+from quality_runner.invariants import add_invariant_capabilities
 from quality_runner.readiness import (
     add_readiness_capabilities,
     canonical_readiness_command_id,
@@ -96,6 +97,12 @@ def detect_capabilities(
         scan=scan,
         standards_packet=standards_packet,
         quality_commands=quality_commands,
+        available=available,
+        missing=missing,
+    )
+    add_invariant_capabilities(
+        scan=scan,
+        standards_packet=standards_packet,
         available=available,
         missing=missing,
     )

@@ -2,7 +2,7 @@
 
 All notable changes to Quality Runner are documented here.
 
-## 0.7.0 - 2026-07-22
+## 0.7.0 - 2026-08-01
 
 - Added delivery contracts, phase contracts, performance evidence, and
   completion handoffs for planning and release-readiness workflows.
@@ -13,6 +13,13 @@ All notable changes to Quality Runner are documented here.
   analysis reuse, and read-only verification reuse with preserved evidence.
 - Expanded the canonical `qr` command surface, planning workflows, security
   review obligations, and packaged schemas and compatibility checks.
+- Added repository-owned reusable bug-candidate registries, governed lifecycle
+  transitions and dispositions, durable fleet observation aggregation, and
+  fail-closed human-approved promotion receipts for candidate-linked required
+  invariants.
+- Added `qr candidates validate`, `aggregate`, and `promotion-check` with
+  packaged JSON schemas, machine-readable receipts, deterministic architectural
+  fixtures, and backward-compatible advisory invariant adoption.
 
 ## 0.6.0 - 2026-07-17
 

@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "quality-runner-environment-legibility-plan-v0.1",
+  "type": "object",
+  "required": ["schema", "plan_id", "repo_id", "status", "tasks", "provenance_hash"],
+  "properties": {
+    "schema": {"const": "quality-runner-environment-legibility-plan-v0.1"},
+    "plan_id": {"type": "string", "minLength": 1},
+    "repo_id": {"type": "string", "minLength": 1},
+    "status": {"type": "string", "minLength": 1},
+    "tasks": {"type": "object"},
+    "provenance_hash": {"type": "string", "minLength": 16}
+  },
+  "additionalProperties": true
+}
