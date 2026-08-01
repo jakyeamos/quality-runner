@@ -3,8 +3,9 @@ from __future__ import annotations
 import hashlib
 import json
 import subprocess
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from quality_runner.artifacts import artifact_dir, write_json, write_text
 from quality_runner.schema_constants import REMEDIATION_DELTA_SCHEMA
@@ -142,12 +143,9 @@ def persist_remediation_delta(
 
 
 def render_remediation_delta_markdown(payload: dict[str, Any]) -> str:
-    findings = payload.get("findings")
-    findings = findings if isinstance(findings, dict) else {}
-    slices = payload.get("slices")
-    slices = slices if isinstance(slices, dict) else {}
-    package_evidence = payload.get("package_evidence")
-    package_evidence = package_evidence if isinstance(package_evidence, dict) else {}
+    findings = _dict(payload.get("findings")) or {}
+    slices = _dict(payload.get("slices")) or {}
+    package_evidence = _dict(payload.get("package_evidence")) or {}
     lines = [
         "# Quality Runner Remediation Delta",
         "",
@@ -161,15 +159,13 @@ def render_remediation_delta_markdown(payload: dict[str, Any]) -> str:
         "",
     ]
     for key, title in (("new", "New"), ("persisted", "Persisted"), ("resolved", "Resolved")):
-        items = findings.get(key)
-        items = items if isinstance(items, list) else []
+        items = _dict_list(findings.get(key))
         lines.append(f"### {title} ({len(items)})")
         lines.append("")
         if items:
             lines.extend(
                 f"- `{item.get('fingerprint')}`: {item.get('summary', 'Quality Runner finding')}"
                 for item in items
-                if isinstance(item, dict)
             )
         else:
             lines.append("- None")
@@ -177,24 +173,23 @@ def render_remediation_delta_markdown(payload: dict[str, Any]) -> str:
 
     lines.extend(["## Remediation Clusters", ""])
     for key, title in (("added", "Added"), ("persisted", "Persisted"), ("removed", "Removed")):
-        items = slices.get(key)
-        items = items if isinstance(items, list) else []
+        items = _dict_list(slices.get(key))
         lines.append(f"### {title} ({len(items)})")
         lines.append("")
         if items:
             for item in items:
-                if not isinstance(item, dict):
-                    continue
                 current = item.get("current")
-                if isinstance(current, dict):
-                    item = current
+                item = _dict(current) or item
                 lines.append(f"- `{item.get('id')}`: {item.get('title', 'Untitled cluster')}")
         else:
             lines.append("- None")
         lines.append("")
 
-    changed_paths = package_evidence.get("changed_paths")
-    changed_paths = changed_paths if isinstance(changed_paths, list) else []
+    changed_paths = (
+        cast(list[Any], package_evidence.get("changed_paths"))
+        if isinstance(package_evidence.get("changed_paths"), list)
+        else []
+    )
     lines.extend(["## Package Evidence", ""])
     lines.append(f"- Changed: `{package_evidence.get('changed', False)}`")
     lines.append(f"- Package or lockfile paths: {len(changed_paths)}")
@@ -203,7 +198,9 @@ def render_remediation_delta_markdown(payload: dict[str, Any]) -> str:
     lines.extend(["", "## Recommendations", ""])
     recommendations = payload.get("recommendations")
     if isinstance(recommendations, list) and recommendations:
-        lines.extend(f"- {item}" for item in recommendations if isinstance(item, str))
+        lines.extend(
+            f"- {item}" for item in cast(list[Any], recommendations) if isinstance(item, str)
+        )
     else:
         lines.append("- No plan update is indicated by this comparison.")
     lines.append("")
@@ -216,7 +213,7 @@ def _load_json(path: Path) -> dict[str, Any]:
     payload = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(payload, dict):
         raise ValueError(f"QR artifact must contain a JSON object: {path}")
-    return payload
+    return cast(dict[str, Any], payload)
 
 
 def _load_optional_json(path: Path) -> dict[str, Any]:
@@ -227,9 +224,7 @@ def _load_optional_json(path: Path) -> dict[str, Any]:
 
 def _findings(audit: dict[str, Any]) -> list[dict[str, Any]]:
     findings = audit.get("findings")
-    if not isinstance(findings, list):
-        return []
-    return [_normalize_finding(item) for item in findings if isinstance(item, dict)]
+    return [_normalize_finding(item) for item in _dict_list(findings)]
 
 
 def _normalize_finding(finding: dict[str, Any]) -> dict[str, Any]:
@@ -251,7 +246,11 @@ def _index_by_fingerprint(findings: list[dict[str, Any]]) -> dict[str, dict[str,
 
 
 def _finding_refs(findings: Any) -> list[dict[str, Any]]:
-    return [_finding_ref(item) for item in findings]
+    return [
+        _finding_ref(cast(dict[str, Any], item))
+        for item in cast(Iterable[object], findings)
+        if isinstance(item, dict)
+    ]
 
 
 def _finding_ref(finding: dict[str, Any]) -> dict[str, Any]:
@@ -276,21 +275,15 @@ def _finding_path(finding: dict[str, Any]) -> str | None:
 
 def _slices(plan: dict[str, Any]) -> dict[str, dict[str, Any]]:
     slices = plan.get("slices")
-    if not isinstance(slices, list):
-        return {}
     result: dict[str, dict[str, Any]] = {}
-    for item in slices:
-        if not isinstance(item, dict) or not isinstance(item.get("id"), str):
+    for item in _dict_list(slices):
+        if not isinstance(item.get("id"), str):
             continue
         findings = item.get("findings")
-        finding_ids = (
-            sorted(
-                str(finding.get("id"))
-                for finding in findings
-                if isinstance(finding, dict) and finding.get("id") is not None
-            )
-            if isinstance(findings, list)
-            else []
+        finding_ids = sorted(
+            str(finding.get("id"))
+            for finding in _dict_list(findings)
+            if finding.get("id") is not None
         )
         result[item["id"]] = {
             "id": item["id"],
@@ -338,10 +331,8 @@ def _capability_states(payload: dict[str, Any]) -> dict[str, str]:
     values: dict[str, str] = {}
     for key in ("available", "missing"):
         items = payload.get(key)
-        if not isinstance(items, list):
-            continue
-        for item in items:
-            if isinstance(item, dict) and item.get("id"):
+        for item in _dict_list(items):
+            if item.get("id"):
                 values[str(item["id"])] = key
     return values
 
@@ -432,10 +423,20 @@ def _run_head_sha(run_dir: Path) -> str | None:
     manifest_path = run_dir / "run-manifest.json"
     if not manifest_path.exists():
         return None
-    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    git_state = manifest.get("git") if isinstance(manifest, dict) else None
-    head_sha = git_state.get("head_sha") if isinstance(git_state, dict) else None
+    manifest = _dict(json.loads(manifest_path.read_text(encoding="utf-8")))
+    git_state = _dict(manifest.get("git")) if manifest else None
+    head_sha = git_state.get("head_sha") if git_state else None
     return head_sha if isinstance(head_sha, str) and head_sha else None
+
+
+def _dict(value: object) -> dict[str, Any] | None:
+    return cast(dict[str, Any], value) if isinstance(value, dict) else None
+
+
+def _dict_list(value: object) -> list[dict[str, Any]]:
+    if not isinstance(value, list):
+        return []
+    return [cast(dict[str, Any], item) for item in cast(list[Any], value) if isinstance(item, dict)]
 
 
 def _is_package_path(path: str) -> bool:
