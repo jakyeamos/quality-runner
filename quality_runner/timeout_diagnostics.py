@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 
 DATA_CACHE_HINTS = ("cache", "data", "dataset", "external", "corpus", "generated")
 
@@ -17,13 +17,9 @@ def timeout_diagnostics_payload(scan_progress: dict[str, Any]) -> dict[str, Any]
 
 
 def concise_timeout_diagnostics(payload: dict[str, Any]) -> dict[str, Any]:
-    diagnostics = payload.get("diagnostics")
-    if not isinstance(diagnostics, dict):
-        diagnostics = {}
-    scan_progress = diagnostics.get("scan_progress")
-    if not isinstance(scan_progress, dict):
-        scan_progress = {}
-    result = {
+    diagnostics = _dict(payload.get("diagnostics")) or {}
+    scan_progress = _dict(diagnostics.get("scan_progress")) or {}
+    result: dict[str, Any] = {
         **_optional_string("timeout_scope", payload.get("timeout_scope")),
         **_optional_string("reason", payload.get("reason")),
         **_optional_int("timeout_seconds", payload.get("timeout_seconds")),
@@ -58,10 +54,11 @@ def timeout_recommended_action(*, timeout_seconds: int, diagnostics: dict[str, A
 
 
 def timeout_diagnostics_markdown(value: object) -> list[str]:
-    if not isinstance(value, dict):
+    mapping = _dict(value)
+    if mapping is None:
         return []
     lines: list[str] = []
-    activity = _scan_activity(value)
+    activity = _scan_activity(mapping)
     if activity:
         kind = activity.get("kind")
         path = activity.get("path")
@@ -74,44 +71,42 @@ def timeout_diagnostics_markdown(value: object) -> list[str]:
                 "path-traversal": "actual repository traversal",
             }.get(kind, kind)
             lines.append(f"  - Scan activity: {label} at `{path}`")
-    last_directory = value.get("last_directory")
+    last_directory = mapping.get("last_directory")
     if isinstance(last_directory, str) and last_directory:
         lines.append(f"  - Last traversal directory: `{last_directory}`")
-    visited_paths = value.get("visited_paths")
-    skipped_paths = value.get("skipped_paths")
+    visited_paths = mapping.get("visited_paths")
+    skipped_paths = mapping.get("skipped_paths")
     if isinstance(visited_paths, int) or isinstance(skipped_paths, int):
         visited = visited_paths if isinstance(visited_paths, int) else 0
         skipped = skipped_paths if isinstance(skipped_paths, int) else 0
         lines.append(f"  - Scan progress: {visited} visited paths, {skipped} skipped paths")
-    recommendations = value.get("pruning_recommendations")
-    if isinstance(recommendations, list):
-        for recommendation in recommendations:
-            if not isinstance(recommendation, dict):
-                continue
-            pattern = recommendation.get("pattern")
-            reason = recommendation.get("reason")
-            if isinstance(pattern, str) and pattern:
-                line = f"  - Suggested scan exclusion: `{pattern}`"
-                if isinstance(reason, str) and reason:
-                    line += f" ({reason})"
-                lines.append(line)
+    recommendations = _recommendations(mapping.get("pruning_recommendations"))
+    for recommendation in recommendations:
+        pattern = recommendation.get("pattern")
+        reason = recommendation.get("reason")
+        if isinstance(pattern, str) and pattern:
+            line = f"  - Suggested scan exclusion: `{pattern}`"
+            if isinstance(reason, str) and reason:
+                line += f" ({reason})"
+            lines.append(line)
     return lines
 
 
 def _scan_activity(value: object) -> dict[str, str]:
-    if not isinstance(value, dict):
+    mapping = _dict(value)
+    if mapping is None:
         return {}
-    nested = value.get("scan_activity")
-    if isinstance(nested, dict):
+    nested = _dict(mapping.get("scan_activity"))
+    if nested is not None:
         nested_activity = _scan_activity(nested)
         if nested_activity:
             return nested_activity
-    kind = value.get("last_activity_kind")
-    path = value.get("last_activity_path")
+    kind = mapping.get("last_activity_kind")
+    path = mapping.get("last_activity_path")
     if not isinstance(kind, str) or not kind:
-        kind = value.get("kind")
+        kind = mapping.get("kind")
     if not isinstance(path, str) or not path:
-        path = value.get("path")
+        path = mapping.get("path")
     activity: dict[str, str] = {}
     if isinstance(kind, str) and kind:
         activity["kind"] = kind
@@ -147,23 +142,20 @@ def _looks_like_data_cache_path(path: str) -> bool:
 
 
 def _recommendations(value: object) -> list[dict[str, Any]]:
-    if not isinstance(value, list):
-        return []
-    return [dict(item) for item in value if isinstance(item, dict)]
+    return _dict_list(value)
 
 
 def _string_int_dict(value: object) -> dict[str, int]:
-    if not isinstance(value, dict):
+    mapping = _dict(value)
+    if mapping is None:
         return {}
-    return {
-        key: item for key, item in value.items() if isinstance(key, str) and isinstance(item, int)
-    }
+    return {key: item for key, item in mapping.items() if isinstance(item, int)}
 
 
 def _string_list(value: object) -> list[str]:
     if not isinstance(value, list):
         return []
-    return [item for item in value if isinstance(item, str) and item]
+    return [item for item in cast(list[Any], value) if isinstance(item, str) and item]
 
 
 def _optional_string(key: str, value: object) -> dict[str, str]:
@@ -180,3 +172,13 @@ def _optional_float(key: str, value: object) -> dict[str, float]:
 
 def _int_or_zero(value: object) -> int:
     return value if isinstance(value, int) else 0
+
+
+def _dict(value: object) -> dict[str, Any] | None:
+    return cast(dict[str, Any], value) if isinstance(value, dict) else None
+
+
+def _dict_list(value: object) -> list[dict[str, Any]]:
+    if not isinstance(value, list):
+        return []
+    return [cast(dict[str, Any], item) for item in cast(list[Any], value) if isinstance(item, dict)]
