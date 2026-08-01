@@ -4,7 +4,7 @@ import json
 import tomllib
 from collections.abc import Callable
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from quality_runner.artifacts import (
     existing_directory,
@@ -511,7 +511,7 @@ def _read_json(path: Path) -> dict[str, Any]:
         loaded = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         return {}
-    return loaded if isinstance(loaded, dict) else {}
+    return _dict(loaded) or {}
 
 
 def _read_toml(path: Path) -> dict[str, Any]:
@@ -519,7 +519,7 @@ def _read_toml(path: Path) -> dict[str, Any]:
         loaded = tomllib.loads(path.read_text(encoding="utf-8"))
     except (OSError, tomllib.TOMLDecodeError):
         return {}
-    return loaded if isinstance(loaded, dict) else {}
+    return _dict(loaded) or {}
 
 
 def _relative(path: Path, repo_root: Path) -> str:
@@ -542,20 +542,17 @@ def _matching_files(repo_root: Path, patterns: tuple[str, ...]) -> list[str]:
 
 def _package_scripts(repo_root: Path) -> dict[str, str]:
     package = _read_json(repo_root / "package.json")
-    scripts = package.get("scripts")
-    if not isinstance(scripts, dict):
+    scripts = _dict(package.get("scripts"))
+    if scripts is None:
         return {}
     return {
-        str(name): str(command)
-        for name, command in scripts.items()
-        if isinstance(name, str) and isinstance(command, str)
+        str(name): str(command) for name, command in scripts.items() if isinstance(command, str)
     }
 
 
 def _pyproject_tools(repo_root: Path) -> dict[str, Any]:
     pyproject = _read_toml(repo_root / "pyproject.toml")
-    tool = pyproject.get("tool")
-    return tool if isinstance(tool, dict) else {}
+    return _dict(pyproject.get("tool")) or {}
 
 
 def _quality_contract(repo_root: Path) -> dict[str, Any]:
@@ -567,7 +564,11 @@ def _declared_quality_gates(contract: dict[str, Any]) -> set[str]:
     for field in ("preCommitGates", "fullGates"):
         value = contract.get(field)
         if isinstance(value, list):
-            gates.update(str(item) for item in value if isinstance(item, str) and item.strip())
+            gates.update(
+                str(item)
+                for item in cast(list[Any], value)
+                if isinstance(item, str) and item.strip()
+            )
     return gates
 
 
@@ -905,31 +906,26 @@ def _quality_profile_match_keys(repo_root: Path, contract: dict[str, Any]) -> se
 
 def _quality_pipeline_project_profile(repo_root: Path, contract: dict[str, Any]) -> dict[str, Any]:
     config = _load_quality_pipeline_config()
-    standard = config.get("standard")
-    standard = standard if isinstance(standard, dict) else {}
-    projects = config.get("projects")
-    projects = projects if isinstance(projects, list) else []
+    standard = _dict(config.get("standard")) or {}
+    projects_value = config.get("projects")
+    projects = cast(list[Any], projects_value) if isinstance(projects_value, list) else []
     keys = _quality_profile_match_keys(repo_root, contract)
     selected: dict[str, Any] = {}
-    for row in projects:
-        if not isinstance(row, dict):
+    for raw_row in projects:
+        row = _dict(raw_row)
+        if row is None:
             continue
         project_id = str(row.get("project_id", "")).strip()
         if project_id in keys or project_id.lower() in keys:
             selected = row
             break
-    classes = standard.get("classes")
-    classes = classes if isinstance(classes, dict) else {}
+    classes = _dict(standard.get("classes")) or {}
     repo_class = str(selected.get("repo_class", "")).strip() if selected else ""
-    class_config = classes.get(repo_class)
-    class_config = class_config if isinstance(class_config, dict) else {}
-    gates = selected.get("gates") if selected else {}
-    gates = gates if isinstance(gates, dict) else {}
-    required_gates = class_config.get("required_gates")
-    if not isinstance(required_gates, list):
-        required_gates = []
-    applies_to = selected.get("applies_to") if selected else []
-    applies_to = applies_to if isinstance(applies_to, list) else []
+    class_config = _dict(classes.get(repo_class)) or {}
+    gates = _dict(selected.get("gates")) if selected else None
+    gates = gates or {}
+    required_gates = _as_string_list(class_config.get("required_gates"))
+    applies_to = _as_string_list(selected.get("applies_to")) if selected else []
     profile_status = "matched" if selected else "not_found"
     return {
         "status": profile_status,
@@ -941,16 +937,14 @@ def _quality_pipeline_project_profile(repo_root: Path, contract: dict[str, Any])
         "configured_gates": sorted(str(key) for key in gates),
         "gate_commands": {
             str(key): {
-                "command": str(value.get("command", "")) if isinstance(value, dict) else "",
-                "working_directory": (
-                    str(value.get("working_directory", "")) if isinstance(value, dict) else ""
-                ),
+                "command": _profile_gate_field(value, "command"),
+                "working_directory": _profile_gate_field(value, "working_directory"),
             }
             for key, value in gates.items()
         },
         "strict_readiness_status": selected.get("strict_readiness_status") if selected else None,
         "maturation_blockers": [
-            str(item) for item in selected.get("maturation_blockers", []) if isinstance(item, str)
+            str(item) for item in _as_string_list(selected.get("maturation_blockers"))
         ]
         if selected
         else [],
@@ -1044,12 +1038,12 @@ def _quality_profile_gate_command(
     quality_profile: dict[str, Any],
     gate_id: str,
 ) -> tuple[str, dict[str, str]] | None:
-    gate_commands = quality_profile.get("gate_commands")
-    if not isinstance(gate_commands, dict):
+    gate_commands = _dict(quality_profile.get("gate_commands"))
+    if gate_commands is None:
         return None
     for profile_gate_id in _gate_profile_keys(gate_id):
-        command = gate_commands.get(profile_gate_id)
-        if not isinstance(command, dict):
+        command = _dict(gate_commands.get(profile_gate_id))
+        if command is None:
             continue
         raw_command = str(command.get("command", "")).strip()
         if _looks_like_placeholder_command(raw_command):
@@ -1215,23 +1209,28 @@ def _gate_enforcement(gate_id: str, scan: dict[str, Any]) -> str:
     }
     contract = scan.get("quality_contract")
     declared_gates: set[str] = set()
-    if isinstance(contract, dict):
+    contract_map = _dict(contract)
+    if contract_map is not None:
         declared_gates.update(
-            str(item) for item in contract.get("pre_commit_gates", []) if isinstance(item, str)
+            str(item)
+            for item in cast(list[Any], contract_map.get("pre_commit_gates", []))
+            if isinstance(item, str)
         )
         declared_gates.update(
-            str(item) for item in contract.get("full_gates", []) if isinstance(item, str)
+            str(item)
+            for item in cast(list[Any], contract_map.get("full_gates", []))
+            if isinstance(item, str)
         )
     declared_aliases = contract_gate_aliases.get(gate_id, {gate_id})
     if declared_gates & declared_aliases:
         return "hard"
-    quality_profile = scan.get("quality_profile")
-    if isinstance(quality_profile, dict) and _quality_profile_gate_command(
-        quality_profile, gate_id
+    quality_profile_map = _dict(scan.get("quality_profile"))
+    if quality_profile_map is not None and _quality_profile_gate_command(
+        quality_profile_map, gate_id
     ):
         return "soft"
-    gate_evidence = scan.get("gate_evidence")
-    if isinstance(gate_evidence, dict):
+    gate_evidence = _dict(scan.get("gate_evidence"))
+    if gate_evidence is not None:
         local_hook_evidence = gate_evidence.get("local_hook")
         ci_evidence = gate_evidence.get("ci")
         if (
@@ -1256,17 +1255,19 @@ def _maturity(status: str, enforcement: str) -> str:
 
 
 def build_gate_matrix(*, scan: dict[str, Any], run_id: str) -> dict[str, Any]:
-    raw_evidence = scan.get("gate_evidence")
-    gate_evidence = raw_evidence if isinstance(raw_evidence, dict) else {}
-    quality_profile = scan.get("quality_profile")
-    quality_profile = quality_profile if isinstance(quality_profile, dict) else {}
+    gate_evidence = _dict(scan.get("gate_evidence")) or {}
+    quality_profile = _dict(scan.get("quality_profile")) or {}
     required_profile_gates = {
-        str(item) for item in quality_profile.get("required_gates", []) if isinstance(item, str)
+        str(item)
+        for item in cast(list[Any], quality_profile.get("required_gates", []))
+        if isinstance(item, str)
     }
     gates: list[dict[str, Any]] = []
     for gate_id in CORE_GATE_IDS:
         evidence = gate_evidence.get(gate_id)
-        evidence_items = [str(item) for item in evidence] if isinstance(evidence, list) else []
+        evidence_items = (
+            [str(item) for item in cast(list[Any], evidence)] if isinstance(evidence, list) else []
+        )
         profile_command = _quality_profile_gate_command(quality_profile, gate_id)
         skip_reason = _gate_skip_reason(gate_id, quality_profile)
         status = _gate_status(gate_id, evidence_items)
@@ -1432,9 +1433,7 @@ def _tmcp_relevant_terms(gate_matrix: dict[str, Any]) -> set[str]:
     }
     gates = gate_matrix.get("gates")
     if isinstance(gates, list):
-        for gate in gates:
-            if not isinstance(gate, dict):
-                continue
+        for gate in _as_dict_list(cast(object, gates)):
             terms.add(str(gate.get("id", "")).replace("_", "-"))
             terms.add(str(gate.get("label", "")).lower())
     return {term for term in terms if term}
@@ -1453,13 +1452,11 @@ def _scan_files_present(scan: dict[str, Any]) -> list[str]:
 
 
 def _scan_package_scripts(scan: dict[str, Any]) -> dict[str, str]:
-    scripts = scan.get("package_scripts")
-    if not isinstance(scripts, dict):
+    scripts = _dict(scan.get("package_scripts"))
+    if scripts is None:
         return {}
     return {
-        str(name): str(command)
-        for name, command in scripts.items()
-        if isinstance(name, str) and isinstance(command, str)
+        str(name): str(command) for name, command in scripts.items() if isinstance(command, str)
     }
 
 
@@ -1489,12 +1486,9 @@ def _broad_known_evidence(
     files = _scan_files_present(scan)
     scripts = _scan_package_scripts(scan)
     gates_by_id = _gate_rows_by_id(gate_matrix)
-    classification = scan.get("classification")
-    classification = classification if isinstance(classification, dict) else {}
-    quality_profile = scan.get("quality_profile")
-    quality_profile = quality_profile if isinstance(quality_profile, dict) else {}
-    visual_route = scan.get("visual_proof_route")
-    visual_route = visual_route if isinstance(visual_route, dict) else {}
+    classification = _dict(scan.get("classification")) or {}
+    quality_profile = _dict(scan.get("quality_profile")) or {}
+    visual_route = _dict(scan.get("visual_proof_route")) or {}
     evidence_by_rubric = {
         "build_package_integrity": [
             *_gate_evidence_items(gates_by_id, ("build", "package", "install")),
@@ -1769,19 +1763,14 @@ def _gate_accepted_exceptions(gate: dict[str, Any]) -> list[str]:
 
 
 def _tmcp_source_score(packet: dict[str, Any], relevant_terms: set[str]) -> dict[str, Any]:
-    selected_nodes = [str(node) for node in packet.get("selected_nodes", [])]
-    source_skill_nodes = [
-        item for item in packet.get("source_skill_nodes", []) if isinstance(item, dict)
-    ]
-    source_hashes = packet.get("source_hashes")
-    behavior_atoms = [str(atom) for atom in packet.get("behavior_atoms", [])]
-    graph_metadata = packet.get("graph_metadata")
-    graph_metadata = graph_metadata if isinstance(graph_metadata, dict) else {}
-    warnings = [str(item) for item in graph_metadata.get("warnings", []) if str(item)]
-    candidate_scores = packet.get("candidate_scores")
-    candidate_scores = candidate_scores if isinstance(candidate_scores, dict) else {}
-    source_scores = candidate_scores.get("source_skills")
-    source_scores = source_scores if isinstance(source_scores, dict) else {}
+    selected_nodes = _as_string_list(packet.get("selected_nodes"))
+    source_skill_nodes = _as_dict_list(packet.get("source_skill_nodes"))
+    source_hashes = _dict(packet.get("source_hashes"))
+    behavior_atoms = _as_string_list(packet.get("behavior_atoms"))
+    graph_metadata = _dict(packet.get("graph_metadata")) or {}
+    warnings = _as_string_list(graph_metadata.get("warnings"))
+    candidate_scores = _dict(packet.get("candidate_scores")) or {}
+    source_scores = _dict(candidate_scores.get("source_skills")) or {}
     best_source_score = max(
         (float(score) for score in source_scores.values() if isinstance(score, (int, float))),
         default=0.0,
@@ -1933,17 +1922,13 @@ def build_rubric_pack(
 ) -> dict[str, Any]:
     repo_path = str(gate_matrix.get("repo_path") or scan.get("repo_path") or "")
     project_kind = str(gate_matrix.get("project_kind") or scan.get("project_kind") or "unknown")
-    quality_profile = gate_matrix.get("quality_profile")
-    quality_profile = quality_profile if isinstance(quality_profile, dict) else {}
+    quality_profile = _dict(gate_matrix.get("quality_profile")) or {}
     required_profile_gates = {
         str(item) for item in quality_profile.get("required_gates", []) if isinstance(item, str)
     }
-    gate_commands = quality_profile.get("gate_commands")
-    gate_commands = gate_commands if isinstance(gate_commands, dict) else {}
-    classification = gate_matrix.get("classification")
-    classification = classification if isinstance(classification, dict) else {}
-    visual_route = gate_matrix.get("visual_proof_route")
-    visual_route = visual_route if isinstance(visual_route, dict) else {}
+    gate_commands = _dict(quality_profile.get("gate_commands")) or {}
+    classification = _dict(gate_matrix.get("classification")) or {}
+    visual_route = _dict(gate_matrix.get("visual_proof_route")) or {}
     broad_rubrics: list[dict[str, Any]] = []
     for rubric_id in BROAD_RUBRIC_IDS:
         definition = BROAD_RUBRIC_DEFINITIONS[rubric_id]
@@ -1994,19 +1979,13 @@ def build_rubric_pack(
             }
         )
 
-    raw_gates = gate_matrix.get("gates")
-    gates = (
-        [gate for gate in raw_gates if isinstance(gate, dict)]
-        if isinstance(raw_gates, list)
-        else []
-    )
+    gates = _as_dict_list(gate_matrix.get("gates"))
     gate_specific_rubrics: list[dict[str, Any]] = []
     for gate in gates:
         gate_id = str(gate.get("id", ""))
         label = str(gate.get("label", gate_id))
-        profile_command = gate.get("quality_profile_command")
-        profile_command = profile_command if isinstance(profile_command, dict) else {}
-        known_evidence = [str(item) for item in gate.get("evidence", [])]
+        profile_command = _dict(gate.get("quality_profile_command")) or {}
+        known_evidence = _as_string_list(gate.get("evidence"))
         if str(gate.get("status", "")) == "skipped":
             skip_reason = str(gate.get("skip_reason", "")).strip()
             known_evidence = [
@@ -2045,11 +2024,11 @@ def build_rubric_pack(
                 "quality_profile_command": profile_command
                 or next(
                     (
-                        gate_commands[profile_gate_id]
+                        _dict(gate_commands[profile_gate_id]) or {}
                         for profile_gate_id in _gate_profile_keys(gate_id)
                         if profile_gate_id in gate_commands
                     ),
-                    {},
+                    cast(dict[str, Any], {}),
                 ),
                 "required_evidence": [
                     "latest configured command result or explicit no-command blocker",
@@ -2161,8 +2140,7 @@ def _phase_actions_for_gate(gate: dict[str, Any]) -> list[str]:
         )
     ]
     setup_actions = gate.get("setup_actions")
-    if isinstance(setup_actions, list):
-        actions.extend(str(action) for action in setup_actions if str(action).strip())
+    actions.extend(action for action in _as_string_list(setup_actions) if action.strip())
     actions.append(
         "Write the remediation phase in the target repo and cite the generated rubric audit and implementation docs."
     )
@@ -2270,9 +2248,7 @@ def build_gate_rollout_plan(
     rubric_pack: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     gates = gate_matrix.get("gates")
-    gate_rows = (
-        [gate for gate in gates if isinstance(gate, dict)] if isinstance(gates, list) else []
-    )
+    gate_rows = _as_dict_list(gates)
     repo_path = str(gate_matrix.get("repo_path", ""))
     rubric_detail_documents: list[dict[str, Any]] = []
     if rubric_pack:
@@ -2345,7 +2321,7 @@ def validate_gate_matrix(matrix: dict[str, Any]) -> ValidationResult:
     gates = matrix.get("gates")
     gate_ids: set[str] = set()
     if isinstance(gates, list):
-        gate_ids = {str(gate.get("id")) for gate in gates if isinstance(gate, dict)}
+        gate_ids = {str(gate.get("id")) for gate in _as_dict_list(cast(object, gates))}
     core_gate_ids: set[str] = set(CORE_GATE_IDS)
     missing = sorted(core_gate_ids - gate_ids)
     if missing:
@@ -2361,7 +2337,7 @@ def validate_rubric_pack(pack: dict[str, Any]) -> ValidationResult:
     if not isinstance(broad, list) or not broad:
         issues.append("Rubric pack is missing broad rubrics")
     else:
-        broad_ids = {str(item.get("id")) for item in broad if isinstance(item, dict)}
+        broad_ids = {str(item.get("id")) for item in _as_dict_list(cast(object, broad))}
         broad_rubric_ids: set[str] = set(BROAD_RUBRIC_IDS)
         missing_broad = sorted(broad_rubric_ids - broad_ids)
         if missing_broad:
@@ -2412,8 +2388,9 @@ def validate_gate_rollout_plan(plan: dict[str, Any]) -> ValidationResult:
         issues.append("Gate rollout plan has no phases")
     else:
         has_final_certification = False
-        for phase in phases:
-            if not isinstance(phase, dict):
+        for raw_phase in cast(list[Any], phases):
+            phase = _dict(raw_phase)
+            if phase is None:
                 issues.append("Gate rollout phase is invalid")
                 continue
             if phase.get("phase_location") != "target_repo":
@@ -2422,6 +2399,7 @@ def validate_gate_rollout_plan(plan: dict[str, Any]) -> ValidationResult:
             if not isinstance(source_gate_ids, list):
                 issues.append(f"{phase.get('id', 'phase')} is missing source_gate_ids")
                 source_gate_ids = []
+            source_gate_ids = _as_string_list(cast(object, source_gate_ids))
             if len(source_gate_ids) > 1 and not str(phase.get("cluster_rationale", "")).strip():
                 issues.append(
                     f"{phase.get('id', 'phase')} clusters gates without an explicit rationale"
@@ -2450,10 +2428,8 @@ def render_gate_matrix_markdown(matrix: dict[str, Any]) -> str:
         "| Gate | Status | Enforcement | Maturity | Evidence |",
         "| --- | --- | --- | --- | --- |",
     ]
-    for gate in matrix.get("gates", []):
-        if not isinstance(gate, dict):
-            continue
-        evidence = ", ".join(str(item) for item in gate.get("evidence", [])) or "none"
+    for gate in _as_dict_list(matrix.get("gates")):
+        evidence = ", ".join(_as_string_list(gate.get("evidence"))) or "none"
         lines.append(
             "| "
             + " | ".join(
@@ -2471,13 +2447,9 @@ def render_gate_matrix_markdown(matrix: dict[str, Any]) -> str:
 
 
 def render_rubric_pack_markdown(pack: dict[str, Any]) -> str:
-    enrichment = pack.get("tmcp_expert_enrichment")
-    tmcp_status = (
-        str(enrichment.get("status", "unknown")) if isinstance(enrichment, dict) else "unknown"
-    )
-    tmcp_fallback = (
-        str(enrichment.get("fallback", "none")) if isinstance(enrichment, dict) else "unknown"
-    )
+    enrichment = _dict(pack.get("tmcp_expert_enrichment")) or {}
+    tmcp_status = str(enrichment.get("status", "unknown"))
+    tmcp_fallback = str(enrichment.get("fallback", "none"))
     lines = [
         f"# Repo Quality Rubric Pack: {pack.get('run_id', '')}",
         "",
@@ -2500,16 +2472,14 @@ def render_rubric_pack_markdown(pack: dict[str, Any]) -> str:
             "| --- | --- | --- |",
         ]
     )
-    for rubric in pack.get("broad_rubrics", []):
-        if not isinstance(rubric, dict):
-            continue
+    for rubric in _as_dict_list(pack.get("broad_rubrics")):
         lines.append(
             "| "
             + " | ".join(
                 [
                     str(rubric.get("title", "")),
                     str(rubric.get("command_gate_caveat", "")),
-                    "; ".join(str(item) for item in rubric.get("required_evidence", [])),
+                    "; ".join(_as_string_list(rubric.get("required_evidence"))),
                 ]
             )
             + " |"
@@ -2523,9 +2493,7 @@ def render_rubric_pack_markdown(pack: dict[str, Any]) -> str:
             "| --- | --- | --- | --- | --- |",
         ]
     )
-    for rubric in pack.get("gate_specific_rubrics", []):
-        if not isinstance(rubric, dict):
-            continue
+    for rubric in _as_dict_list(pack.get("gate_specific_rubrics")):
         lines.append(
             "| "
             + " | ".join(
@@ -2534,7 +2502,7 @@ def render_rubric_pack_markdown(pack: dict[str, Any]) -> str:
                     str(rubric.get("current_status", "")),
                     str(rubric.get("current_enforcement", "")),
                     str(rubric.get("phase_cluster", "")),
-                    "; ".join(str(item) for item in rubric.get("required_evidence", [])),
+                    "; ".join(_as_string_list(rubric.get("required_evidence"))),
                 ]
             )
             + " |"
@@ -2544,10 +2512,8 @@ def render_rubric_pack_markdown(pack: dict[str, Any]) -> str:
 
 
 def render_tmcp_expert_enrichment_markdown(enrichment: dict[str, Any]) -> str:
-    sufficiency = enrichment.get("sufficiency")
-    sufficiency = sufficiency if isinstance(sufficiency, dict) else {}
-    packet_summary = enrichment.get("packet_summary")
-    packet_summary = packet_summary if isinstance(packet_summary, dict) else {}
+    sufficiency = _dict(enrichment.get("sufficiency")) or {}
+    packet_summary = _dict(enrichment.get("packet_summary")) or {}
     lines = [
         f"# TMCP Expert Enrichment: {enrichment.get('run_id', '')}",
         "",
@@ -2560,21 +2526,30 @@ def render_tmcp_expert_enrichment_markdown(enrichment: dict[str, Any]) -> str:
         "## Selected Nodes",
         "",
     ]
-    for node in packet_summary.get("selected_nodes", []):
+    for node in _as_string_list(packet_summary.get("selected_nodes")):
         lines.append(f"- `{node}`")
     lines.extend(["", "## Matched Terms", ""])
-    for term in sufficiency.get("matched_terms", []):
+    for term in _as_string_list(sufficiency.get("matched_terms")):
         lines.append(f"- `{term}`")
     lines.extend(["", "## Policy", "", str(enrichment.get("policy", ""))])
     return "\n".join(lines).rstrip() + "\n"
 
 
 def _as_string_list(value: object) -> list[str]:
-    return [str(item) for item in value] if isinstance(value, list) else []
+    return [str(item) for item in cast(list[Any], value)] if isinstance(value, list) else []
 
 
 def _as_dict_list(value: object) -> list[dict[str, Any]]:
-    return [item for item in value if isinstance(item, dict)] if isinstance(value, list) else []
+    return (
+        [item for raw_item in cast(list[Any], value) if (item := _dict(raw_item)) is not None]
+        if isinstance(value, list)
+        else []
+    )
+
+
+def _profile_gate_field(value: object, field: str) -> str:
+    value_map = _dict(value)
+    return str(value_map.get(field, "")) if value_map is not None else ""
 
 
 def _rubric_rows(pack: dict[str, Any]) -> list[dict[str, Any]]:
@@ -2582,7 +2557,7 @@ def _rubric_rows(pack: dict[str, Any]) -> list[dict[str, Any]]:
     for key in ("broad_rubrics", "gate_specific_rubrics"):
         value = pack.get(key)
         if isinstance(value, list):
-            rows.extend(item for item in value if isinstance(item, dict))
+            rows.extend(_as_dict_list(cast(object, value)))
     return rows
 
 
@@ -2675,8 +2650,7 @@ def build_rubric_implementation_document(
     audit = build_rubric_audit_document(rubric, pack)
     phase_cluster = str(audit.get("phase_cluster") or "foundational_broad_standard")
     known_evidence = _as_string_list(audit.get("known_evidence"))
-    visual_route = audit.get("visual_proof_route")
-    visual_route = visual_route if isinstance(visual_route, dict) else {}
+    visual_route = _dict(audit.get("visual_proof_route")) or {}
     visual_steps = _as_string_list(visual_route.get("recommended_evidence"))
     recommended_phase_type = (
         "gate_specific_phase"
@@ -2925,9 +2899,7 @@ def render_rubric_detail_manifest_markdown(manifest: dict[str, Any]) -> str:
     ]
     documents = manifest.get("documents")
     if isinstance(documents, list):
-        for row in documents:
-            if not isinstance(row, dict):
-                continue
+        for row in _as_dict_list(cast(object, documents)):
             lines.append(
                 "| "
                 + " | ".join(
@@ -3022,8 +2994,9 @@ def evaluate_adoption_doc_quality(output_dir: Path) -> dict[str, Any]:
             }
         )
         documents = []
-    for row in documents:
-        if not isinstance(row, dict):
+    for raw_row in cast(list[Any], documents):
+        row = _dict(raw_row)
+        if row is None:
             continue
         rubric_id = str(row.get("rubric_id", "unknown"))
         try:
@@ -3119,8 +3092,7 @@ def evaluate_adoption_doc_quality(output_dir: Path) -> dict[str, Any]:
                     }
                 )
             if rubric_id == "ui_visual_runtime_verification" and kind == "implementation":
-                visual_route = payload.get("visual_proof_route")
-                visual_route = visual_route if isinstance(visual_route, dict) else {}
+                visual_route = _dict(payload.get("visual_proof_route")) or {}
                 if not visual_route.get("route"):
                     blockers.append(
                         {
@@ -3175,8 +3147,7 @@ def render_adoption_doc_quality_markdown(report: dict[str, Any]) -> str:
                 f"- `{row.get('code', 'phase_blocker')}` "
                 f"({row.get('count', 1)}): {row.get('message', '')}"
             )
-            for row in phase_blockers
-            if isinstance(row, dict)
+            for row in _as_dict_list(cast(object, phase_blockers))
         )
     else:
         lines.append("- none")
@@ -3191,8 +3162,7 @@ def render_adoption_doc_quality_markdown(report: dict[str, Any]) -> str:
     if isinstance(blockers, list) and blockers:
         lines.extend(
             f"- `{row.get('code', 'blocker')}`: {row.get('message', '')}"
-            for row in blockers
-            if isinstance(row, dict)
+            for row in _as_dict_list(cast(object, blockers))
         )
     else:
         lines.append("- none")
@@ -3201,8 +3171,7 @@ def render_adoption_doc_quality_markdown(report: dict[str, Any]) -> str:
     if isinstance(warnings, list) and warnings:
         lines.extend(
             f"- `{row.get('code', 'warning')}`: {row.get('message', '')}"
-            for row in warnings
-            if isinstance(row, dict)
+            for row in _as_dict_list(cast(object, warnings))
         )
     else:
         lines.append("- none")
@@ -3223,8 +3192,7 @@ def write_adoption_doc_quality_report(output_dir: Path) -> dict[str, Path]:
 
 
 def render_gate_rollout_markdown(plan: dict[str, Any]) -> str:
-    cluster_policy = plan.get("cluster_policy")
-    cluster_policy = cluster_policy if isinstance(cluster_policy, dict) else {}
+    cluster_policy = _dict(plan.get("cluster_policy")) or {}
     lines = [
         f"# Repo Gate Adoption Plan: {plan.get('run_id', '')}",
         "",
@@ -3243,14 +3211,11 @@ def render_gate_rollout_markdown(plan: dict[str, Any]) -> str:
         "## Repo-Local Phases",
         "",
     ]
-    for phase in plan.get("phases", []):
-        if not isinstance(phase, dict):
-            continue
-        source_gate_ids = phase.get("source_gate_ids", [])
-        source_gate_text = ", ".join(str(item) for item in source_gate_ids)
-        blocked_by = phase.get("blocked_by", [])
-        blocked_by_text = "; ".join(str(item) for item in blocked_by) if blocked_by else "none"
-        acceptance_criteria = phase.get("acceptance_criteria", [])
+    for phase in _as_dict_list(plan.get("phases")):
+        source_gate_text = ", ".join(_as_string_list(phase.get("source_gate_ids")))
+        blocked_by = _as_string_list(phase.get("blocked_by"))
+        blocked_by_text = "; ".join(blocked_by) if blocked_by else "none"
+        acceptance_criteria = _as_string_list(phase.get("acceptance_criteria"))
         lines.extend(
             [
                 f"## {phase.get('id')}: {phase.get('title')}",
@@ -3259,9 +3224,9 @@ def render_gate_rollout_markdown(plan: dict[str, Any]) -> str:
                 f"- Phase type: `{phase.get('phase_type', '')}`",
                 "- Source gates: " + source_gate_text,
                 f"- Cluster rationale: {phase.get('cluster_rationale') or 'none'}",
-                "- Actions: " + "; ".join(str(item) for item in phase.get("actions", [])),
-                "- Verification: " + "; ".join(str(item) for item in phase.get("verification", [])),
-                "- Acceptance criteria: " + "; ".join(str(item) for item in acceptance_criteria),
+                "- Actions: " + "; ".join(_as_string_list(phase.get("actions"))),
+                "- Verification: " + "; ".join(_as_string_list(phase.get("verification"))),
+                "- Acceptance criteria: " + "; ".join(acceptance_criteria),
                 "- Blocked by: " + blocked_by_text,
                 "",
             ]
@@ -3269,9 +3234,7 @@ def render_gate_rollout_markdown(plan: dict[str, Any]) -> str:
         rubric_docs = phase.get("rubric_detail_documents")
         if isinstance(rubric_docs, list) and rubric_docs:
             lines.extend(["Rubric detail documents:", ""])
-            for row in rubric_docs:
-                if not isinstance(row, dict):
-                    continue
+            for row in _as_dict_list(cast(object, rubric_docs)):
                 lines.append(
                     "- "
                     + str(row.get("rubric_id", ""))
@@ -3311,8 +3274,7 @@ def write_gate_adoption_artifacts(
     _json_dump(paths["repo_scan_json"], repo_scan)
     _json_dump(paths["gate_matrix_json"], gate_matrix)
     write_text(paths["gate_matrix_markdown"], render_gate_matrix_markdown(gate_matrix))
-    tmcp_enrichment = rubric_pack.get("tmcp_expert_enrichment")
-    tmcp_enrichment = tmcp_enrichment if isinstance(tmcp_enrichment, dict) else {}
+    tmcp_enrichment = _dict(rubric_pack.get("tmcp_expert_enrichment")) or {}
     _json_dump(paths["tmcp_expert_enrichment_json"], tmcp_enrichment)
     write_text(
         paths["tmcp_expert_enrichment_markdown"],
@@ -3332,3 +3294,11 @@ def write_gate_adoption_artifacts(
     _json_dump(paths["rollout_plan_json"], rollout_plan)
     write_text(paths["rollout_plan_markdown"], render_gate_rollout_markdown(rollout_plan))
     return paths
+
+
+def _dict(value: object) -> dict[str, Any] | None:
+    """Narrow decoded JSON/TOML objects at the certifier boundary."""
+
+    if not isinstance(value, dict):
+        return None
+    return cast(dict[str, Any], value)
