@@ -42,6 +42,7 @@ def test_task_check_schema_supports_all_cli_outcomes_and_canonical_evidence() ->
         "prevention_readiness",
         "gate_results",
         "blockers",
+        "next_action",
         "analysis",
         "evidence",
     } <= set(payload["properties"])

@@ -108,6 +108,10 @@ Then evaluate tracked edits, tracked deletions, and untracked non-ignored files:
 qr task check /path/to/repo --task-id feature-123 --json
 ```
 
+Run this as the authoritative completion checkpoint and after correcting a
+violation or blocker. It is not a continuous-save or editor-hook command. Use
+applicable mature native checks for faster implementation-time feedback.
+
 The check status and process exit code are:
 
 - `pass` / `0`: no new enforced findings and all required certified gates pass
@@ -115,6 +119,10 @@ The check status and process exit code are:
 - invalid invocation or configuration / `2`
 - `blocked` / `3`: coverage, matching, prerequisites, readiness, or workspace
   evidence is incomplete or unverifiable
+
+Every task-check result includes a status-specific `next_action`.
+`task-check.json` is canonical; `task-check.md` is the derived human projection.
+A `pass` still requires any other repository-required checks to pass.
 
 Persisted legacy findings remain visible and are non-blocking. A finding can be
 reported as resolved only when follow-up coverage is complete and comparable;

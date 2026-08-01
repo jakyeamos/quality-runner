@@ -70,6 +70,7 @@ def test_task_clean_check_passes_and_writes_canonical_artifacts(tmp_path: Path) 
     assert check.returncode == 0
     payload = json.loads(check.stdout)
     assert payload["status"] == "pass"
+    assert "remaining repository-required checks" in payload["next_action"]
     assert payload["delta"]["counts"]["new_enforced"] == 0
     assert payload["analysis"]["analysis_mode"] == "full"
     assert payload["analysis"]["cache_mode"] == "external"
@@ -93,6 +94,7 @@ def test_task_new_promoted_finding_is_violation(tmp_path: Path) -> None:
 
     assert check.returncode == 1
     assert payload["status"] == "violation"
+    assert "rerun `qr task check`" in payload["next_action"]
     assert payload["delta"]["counts"]["new_enforced"] == 1
 
 
@@ -131,6 +133,7 @@ def test_task_required_uncertified_gate_is_blocked(tmp_path: Path) -> None:
 
     assert check.returncode == 3
     assert payload["status"] == "blocked"
+    assert "Resolve every blocker" in payload["next_action"]
     assert {item["code"] for item in payload["blockers"]} >= {"required_gate_not_ready"}
 
 
@@ -170,7 +173,9 @@ def test_task_missing_record_is_invalid_invocation(tmp_path: Path) -> None:
     check = _qr(repo, "check", "--task-id", "missing")
 
     assert check.returncode == 2
-    assert json.loads(check.stdout)["status"] == "invalid"
+    payload = json.loads(check.stdout)
+    assert payload["status"] == "invalid"
+    assert "Correct the task invocation" in payload["next_action"]
 
 
 def test_task_rebaseline_is_explicit_and_preserves_lineage(tmp_path: Path) -> None:

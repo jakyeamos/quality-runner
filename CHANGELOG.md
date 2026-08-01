@@ -12,6 +12,10 @@ All notable changes to Quality Runner are documented here.
 - Added canonical task, snapshot, normalized-finding, and readiness schemas,
   plus a non-authoritative CI dogfood pilot. Existing refresh, verify, and
   review-delta surfaces retain their prior behavior.
+- Added the packaged agent completion contract and status-specific task-check
+  next actions. The documented cadence uses native checks for established fast
+  feedback and QR at baseline, completion, and CI boundaries rather than on
+  every save.
 
 ## 0.6.0 - 2026-07-17
 

@@ -12,6 +12,27 @@ TASK_ANALYSIS_MODE = "full"
 TASK_CACHE_MODE = "external"
 
 
+def task_next_action(status: str) -> str:
+    actions = {
+        "pass": (
+            "Quality Runner evidence passes. Complete any remaining repository-required "
+            "checks before declaring the implementation complete."
+        ),
+        "violation": (
+            "Fix every new enforced finding and failed certified gate, or record an eligible "
+            "exact-fingerprint disposition, then rerun `qr task check`."
+        ),
+        "blocked": (
+            "Resolve every blocker, using `qr task rebaseline` with an explicit reason only "
+            "when the evidence contract changed, then rerun `qr task check`."
+        ),
+        "invalid": (
+            "Correct the task invocation or prevention configuration, then rerun the task command."
+        ),
+    }
+    return actions.get(status, actions["invalid"])
+
+
 def contract_hashes(repo_root: Path, config: dict[str, Any]) -> dict[str, str]:
     config_path = repo_root / CONFIG_FILE_NAME
     config_content = config_path.read_bytes() if config_path.is_file() else b"<absent>"
@@ -67,6 +88,10 @@ def render_task_check_markdown(payload: dict[str, Any]) -> str:
         f"- Baseline: `{payload['baseline_run_id']}`",
         f"- Check run: `{payload['run_id']}`",
         f"- Changed paths: {len(cast(list[str], payload['changed_paths']))}",
+        "",
+        "## Next action",
+        "",
+        str(payload["next_action"]),
         "",
         "## Finding delta",
         "",

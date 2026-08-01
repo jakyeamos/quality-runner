@@ -31,6 +31,7 @@ from quality_runner.task_contract import (
     deduplicate_blockers,
     drift_blockers,
     render_task_check_markdown,
+    task_next_action,
 )
 from quality_runner.task_findings import (
     compare_findings,
@@ -246,6 +247,7 @@ def check_task(repo_root: Path, *, task_id: str) -> dict[str, Any]:
     payload = {
         "schema": TASK_CHECK_SCHEMA,
         "status": decision,
+        "next_action": task_next_action(decision),
         "task_id": task_id,
         "run_id": run_id,
         "baseline_run_id": baseline_run_id,
@@ -466,6 +468,7 @@ def _invalid_config(config: dict[str, Any]) -> dict[str, Any]:
     return {
         "schema": TASK_CHECK_SCHEMA,
         "status": "invalid",
+        "next_action": task_next_action("invalid"),
         "error": {
             "code": "invalid_prevention_configuration",
             "message": "Quality Runner configuration contains warnings",
@@ -478,6 +481,7 @@ def _error_payload(status: str, code: str, message: str) -> dict[str, Any]:
     return {
         "schema": TASK_CHECK_SCHEMA,
         "status": status,
+        "next_action": task_next_action(status),
         "error": {"code": code, "message": message},
     }
 

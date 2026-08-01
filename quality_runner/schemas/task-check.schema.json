@@ -7,6 +7,7 @@
   "properties": {
     "schema": { "const": "quality-runner-task-check-v0.1" },
     "status": { "enum": ["pass", "violation", "blocked", "invalid"] },
+    "next_action": { "type": "string", "minLength": 1 },
     "task_id": { "type": "string" },
     "run_id": { "type": "string" },
     "baseline_run_id": { "type": "string" },

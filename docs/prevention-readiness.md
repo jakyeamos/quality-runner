@@ -8,6 +8,21 @@ Repositories may explicitly mark a proposed gate `blocked` or `unavailable`
 with a concrete blocker; readiness preserves that state instead of presenting
 the gate as a usable candidate.
 
+Prevention uses a hybrid feedback model:
+
+- Agent guidance requires a task baseline and an authoritative completion
+  check, and explains how to respond to each result.
+- Mature repository-native checks provide faster feedback during editing.
+- QR independently verifies the exact workspace, task-relative finding delta,
+  comparable coverage, policy hashes, and certified gate evidence.
+
+Static agent rules are not evidence that a check ran and cannot distinguish
+legacy debt from a new occurrence, incomplete coverage from resolution, or a
+violation from an evidence blocker. Conversely, QR is not intended to run on
+every save. The supported cadence is baseline, implementation-time native
+feedback where mature, QR completion check, and PR CI; full scans remain an
+audit/nightly boundary.
+
 The first Quality Runner certification covers the locked development environment
 created by `uv sync --locked --all-groups --python 3.13`:
 

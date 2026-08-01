@@ -23,7 +23,10 @@ def add_task_commands(subparsers: argparse._SubParsersAction[argparse.ArgumentPa
         help="Optional task-intent file whose digest is recorded with the baseline",
     )
 
-    check = actions.add_parser("check", help="Check the exact current workspace against baseline")
+    check = actions.add_parser(
+        "check",
+        help="Run the authoritative completion check for the exact current workspace",
+    )
     _common_arguments(check)
 
     rebaseline = actions.add_parser(

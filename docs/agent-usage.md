@@ -14,6 +14,25 @@ quality-runner ...` for a specific checkout.
 
 ## Prevent Findings During Implementation
 
+Use the task workflow at meaningful evidence boundaries:
+
+| Boundary | Required behavior |
+| --- | --- |
+| Before source edits | Capture one task baseline. |
+| During editing | Use applicable repository-native checks whose current maturity is established. |
+| Before completion | Run the authoritative `qr task check`. |
+| After a violation or blocker | Correct the cause and rerun the task check. |
+| Pull request | Use an immutable target revision as the baseline. |
+| Nightly or rule-pack change | Run the full repository audit for debt visibility and reconciliation. |
+
+The task check is deliberately not required on every save. Agent instructions
+guide implementation behavior; they do not replace QR's baseline, coverage,
+matching, readiness, or policy evidence. Do not translate every advisory
+finding into a static prohibition. Promote a repeatedly trusted deterministic
+finding into a behavior-verified QR rule or a faster native checker, with
+positive, negative, ambiguous, local, and CI evidence appropriate to that
+capability.
+
 For ordinary implementation work, capture the task baseline before editing:
 
 ```bash
@@ -32,6 +51,11 @@ configuration, rule packs, promoted policy, the toolchain, or the QR version
 changes, review that change and use `task rebaseline --reason ...`; never
 silently enlarge the baseline. PR-target tasks preserve the originally resolved
 target SHA across rebaseline.
+
+Read `task-check.json` as the canonical result and `task-check.md` as its human
+projection. The emitted `next_action` explains the required response for
+`pass`, `violation`, `blocked`, or `invalid`; a passing QR result still does not
+waive other repository-required checks.
 
 Do not assume a fast native check is mature enough for this loop. QR executes
 only gates whose prevention configuration includes the required bootstrap,
