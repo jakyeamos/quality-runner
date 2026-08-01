@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import tomllib
 from pathlib import Path
-from typing import Any, TypeGuard
+from typing import Any, TypeGuard, cast
 
 CONFIG_FILE_NAME = ".quality-runner.toml"
 DISPOSITION_FILE_NAME = ".quality-runner-dispositions.toml"
@@ -30,17 +30,18 @@ def parse_inline_dispositions(
         return []
 
     accepted: list[dict[str, Any]] = []
-    for index, item in enumerate(value):
-        if not isinstance(item, dict):
+    for index, item in enumerate(cast(list[Any], value)):
+        item_map = _dict(item)
+        if item_map is None:
             _inline_disposition_warning(index, warnings)
             continue
-        fingerprint = item.get("fingerprint")
-        status = item.get("status")
-        reason = item.get("reason")
-        owner = item.get("owner")
-        expires = item.get("expires")
-        source_run_id = item.get("source_run_id")
-        review_evidence = item.get("review_evidence")
+        fingerprint = item_map.get("fingerprint")
+        status = item_map.get("status")
+        reason = item_map.get("reason")
+        owner = item_map.get("owner")
+        expires = item_map.get("expires")
+        source_run_id = item_map.get("source_run_id")
+        review_evidence = item_map.get("review_evidence")
         if _valid_disposition_fields(
             fingerprint,
             status,
@@ -91,8 +92,8 @@ def load_grouped_dispositions(
                 path=DISPOSITION_FILE_NAME,
             )
         ]
-    section = payload.get("quality_runner")
-    groups = section.get("accepted_disposition_groups") if isinstance(section, dict) else None
+    section = _dict(payload.get("quality_runner"))
+    groups = section.get("accepted_disposition_groups") if section is not None else None
     if not isinstance(groups, list):
         return [], [
             _warning(
@@ -102,7 +103,7 @@ def load_grouped_dispositions(
             )
         ]
     schema = payload.get("schema")
-    if schema is None and isinstance(section, dict):
+    if schema is None and section is not None:
         schema = section.get("schema")
     if schema != DISPOSITION_SCHEMA:
         warnings.append(
@@ -114,20 +115,21 @@ def load_grouped_dispositions(
         )
     accepted: list[dict[str, Any]] = []
     seen: set[str] = set()
-    for index, group in enumerate(groups):
-        if not isinstance(group, dict):
+    for index, group in enumerate(cast(list[Any], groups)):
+        group_map = _dict(group)
+        if group_map is None:
             _group_disposition_warning(index, warnings)
             continue
-        fingerprints = group.get("fingerprints")
+        fingerprints = group_map.get("fingerprints")
         if not _valid_fingerprint_list(fingerprints) or any(item in seen for item in fingerprints):
             _group_disposition_warning(index, warnings)
             continue
-        status = group.get("status")
-        reason = group.get("reason")
-        owner = group.get("owner")
-        expires = group.get("expires")
-        source_run_id = group.get("source_run_id")
-        review_evidence = group.get("review_evidence")
+        status = group_map.get("status")
+        reason = group_map.get("reason")
+        owner = group_map.get("owner")
+        expires = group_map.get("expires")
+        source_run_id = group_map.get("source_run_id")
+        review_evidence = group_map.get("review_evidence")
         if not _valid_disposition_fields(
             None,
             status,
@@ -164,11 +166,10 @@ def load_grouped_dispositions(
 
 
 def _valid_fingerprint_list(value: object) -> TypeGuard[list[str]]:
-    return (
-        isinstance(value, list)
-        and bool(value)
-        and all(isinstance(item, str) and item for item in value)
-    )
+    if not isinstance(value, list):
+        return False
+    typed_value = cast(list[Any], value)
+    return bool(typed_value) and all(isinstance(item, str) and item for item in typed_value)
 
 
 def _valid_disposition_fields(
@@ -194,7 +195,7 @@ def _valid_disposition_fields(
             review_evidence is None
             or (
                 isinstance(review_evidence, list)
-                and all(isinstance(item, str) and item for item in review_evidence)
+                and all(isinstance(item, str) and item for item in cast(list[Any], review_evidence))
             )
         )
     )
@@ -221,3 +222,7 @@ def _group_disposition_warning(index: int, warnings: list[dict[str, str]]) -> No
 
 def _warning(code: str, message: str, *, path: str = CONFIG_FILE_NAME) -> dict[str, str]:
     return {"code": code, "message": message, "path": path}
+
+
+def _dict(value: object) -> dict[str, Any] | None:
+    return cast(dict[str, Any], value) if isinstance(value, dict) else None
