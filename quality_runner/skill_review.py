@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from quality_runner.code_quality_architecture import _path_matches_any
 from quality_runner.code_quality_findings import _finding
@@ -75,15 +75,13 @@ def render_skill_review_packet_markdown(packet: dict[str, Any]) -> str:
 
     reviews = packet.get("reviews")
     if isinstance(reviews, list):
-        for review in reviews:
-            if not isinstance(review, dict):
-                continue
+        for review in _dict_list(cast(object, reviews)):
             lines.extend(
                 [
                     f"### {review.get('skill_id')}/{review.get('review_id')}",
                     "",
                     f"- Skill: {review.get('skill_name')}",
-                    f"- Paths: {', '.join(review.get('paths', []))}",
+                    f"- Paths: {', '.join(_string_list(review.get('paths')))}",
                     "",
                     "#### Rubric",
                     "",
@@ -95,7 +93,7 @@ def render_skill_review_packet_markdown(packet: dict[str, Any]) -> str:
             if isinstance(focus, list) and focus:
                 lines.append("#### Focus")
                 lines.append("")
-                for item in focus:
+                for item in cast(list[Any], focus):
                     lines.append(f"- {item}")
                 lines.append("")
 
@@ -143,10 +141,7 @@ def validate_skill_review_report(
         return _validation_result(errors=errors, accepted=[], rejected=[])
 
     accepted: list[dict[str, Any]] = []
-    for index, finding in enumerate(findings):
-        if not isinstance(finding, dict):
-            rejected.append({"index": index, "reason": "finding must be an object"})
-            continue
+    for index, finding in enumerate(_dict_list(cast(object, findings))):
         rejection = _validate_report_finding(
             finding,
             active_reviews=active_reviews,
@@ -179,11 +174,11 @@ def review_report_findings(
     review_categories = {
         (str(skill["id"]), str(review["id"])): str(review.get("category", ""))
         for skill in skills
-        for review in skill.get("agent_reviews", [])
-        if isinstance(review, dict) and isinstance(review.get("id"), str)
+        for review in _dict_list(skill.get("agent_reviews", []))
+        if isinstance(review.get("id"), str)
     }
     findings: list[dict[str, Any]] = []
-    for item in accepted:
+    for item in _dict_list(cast(object, accepted)):
         skill_id = str(item["skill_id"])
         skill_name = skill_names.get(skill_id, skill_id)
         severity = str(item["severity"])
@@ -215,9 +210,7 @@ def _active_reviews(skills: list[dict[str, Any]]) -> list[dict[str, Any]]:
     for skill in skills:
         skill_id = str(skill["id"])
         skill_name = str(skill["name"])
-        for review in skill.get("agent_reviews", []):
-            if not isinstance(review, dict):
-                continue
+        for review in _dict_list(skill.get("agent_reviews", [])):
             review_id = review.get("id")
             paths = review.get("paths")
             rubric = review.get("rubric")
@@ -232,9 +225,9 @@ def _active_reviews(skills: list[dict[str, Any]]) -> list[dict[str, Any]]:
                     "skill_id": skill_id,
                     "skill_name": skill_name,
                     "review_id": review_id,
-                    "paths": [item for item in paths if isinstance(item, str)],
+                    "paths": _string_list(cast(object, paths)),
                     "rubric": rubric.strip(),
-                    "focus": [item for item in review.get("focus", []) if isinstance(item, str)],
+                    "focus": _string_list(review.get("focus")),
                     "severity": review.get("severity")
                     if review.get("severity") in ACCEPTED_SEVERITIES
                     else "observation",
@@ -249,7 +242,7 @@ def _included_files(
 ) -> list[dict[str, Any]]:
     path_patterns: list[str] = []
     for review in reviews:
-        path_patterns.extend(review.get("paths", []))
+        path_patterns.extend(_string_list(review.get("paths")))
 
     included: list[dict[str, Any]] = []
     for item in scanned_files:
@@ -257,7 +250,7 @@ def _included_files(
         if not _path_matches_any(relative_path, path_patterns):
             continue
         lines = item.get("lines")
-        line_count = len(lines) if isinstance(lines, list) else 0
+        line_count = len(cast(list[Any], lines)) if isinstance(lines, list) else 0
         included.append({"path": relative_path, "line_count": line_count})
     return sorted(included, key=lambda item: item["path"])
 
@@ -266,8 +259,8 @@ def _review_index(skills: list[dict[str, Any]]) -> set[tuple[str, str]]:
     return {
         (str(skill["id"]), str(review["id"]))
         for skill in skills
-        for review in skill.get("agent_reviews", [])
-        if isinstance(review, dict) and isinstance(review.get("id"), str)
+        for review in _dict_list(skill.get("agent_reviews", []))
+        if isinstance(review.get("id"), str)
     }
 
 
@@ -387,14 +380,28 @@ def _validate_review_coverage(
     active_reviews: set[tuple[str, str]],
     errors: list[str],
 ) -> None:
-    if not isinstance(value, list) or not all(isinstance(item, str) and item for item in value):
+    if not isinstance(value, list) or not all(
+        isinstance(item, str) and item for item in cast(list[Any], value)
+    ):
         errors.append("reviewed_review_ids must be a list of active skill/review ids")
         return
     expected = {f"{skill_id}/{review_id}" for skill_id, review_id in active_reviews}
-    received = set(value)
+    received = set(cast(list[str], value))
     missing = sorted(expected - received)
     unknown = sorted(received - expected)
     if missing:
         errors.append(f"review report is missing review coverage: {', '.join(missing)}")
     if unknown:
         errors.append(f"review report contains unknown review coverage: {', '.join(unknown)}")
+
+
+def _dict_list(value: object) -> list[dict[str, Any]]:
+    if not isinstance(value, list):
+        return []
+    return [cast(dict[str, Any], item) for item in cast(list[Any], value) if isinstance(item, dict)]
+
+
+def _string_list(value: object) -> list[str]:
+    if not isinstance(value, list):
+        return []
+    return [item for item in cast(list[Any], value) if isinstance(item, str)]
