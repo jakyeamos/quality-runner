@@ -20,6 +20,16 @@ _SUMMARY_KEYS = ("summary", "title", "message", "description", "detail", "name")
 _SEVERITY_KEYS = ("severity", "level", "severity_hint", "priority", "risk")
 _STATUS_KEYS = ("status", "state", "resolution", "disposition")
 
+# Public adapter aliases keep the shared evidence contract consumable without
+# exposing private implementation names across security provider modules.
+HEX_64 = _HEX_64
+ID_KEYS = _ID_KEYS
+FINGERPRINT_KEYS = _FINGERPRINT_KEYS
+RULE_KEYS = _RULE_KEYS
+SUMMARY_KEYS = _SUMMARY_KEYS
+SEVERITY_KEYS = _SEVERITY_KEYS
+STATUS_KEYS = _STATUS_KEYS
+
 
 def canonical_json(value: Any) -> str:
     """Return the one JSON representation used for all adapter hashes."""
@@ -423,3 +433,22 @@ def _mapping(value: Any) -> Mapping[str, Any] | None:
     if not isinstance(value, Mapping):
         return None
     return cast(Mapping[str, Any], value)
+
+
+# Public aliases are the stable import surface for provider adapters.
+drop_none_values = _drop_none_values
+evidence_items = _evidence_items
+evidence_summary = _evidence_summary
+first_text = _first_text
+metadata = _metadata
+normal_key = _normal_key
+normal_text = _normal_text
+normalize_coverage = _normalize_coverage
+normalize_locations = _normalize_locations
+normalize_repository = _normalize_repository
+normalize_revision = _normalize_revision
+normalize_source = _normalize_source
+quality_level = _quality_level
+raw_coverage = _raw_coverage
+validate_coverage = _validate_coverage
+validation_result = _validation_result

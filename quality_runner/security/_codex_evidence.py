@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Mapping, Sequence
-from typing import Any
+from typing import Any, cast
 
 from quality_runner.evidence_contract import (
     QUALITY_EVIDENCE_SCHEMA,
@@ -13,31 +13,33 @@ from quality_runner.evidence_contract import (
 )
 from quality_runner.schema_constants import CODEX_SECURITY_EVIDENCE_SCHEMA
 from quality_runner.security._codex_common import (
-    _FINGERPRINT_KEYS,
-    _HEX_64,
-    _ID_KEYS,
-    _RULE_KEYS,
-    _SEVERITY_KEYS,
-    _STATUS_KEYS,
-    _SUMMARY_KEYS,
-    _drop_none_values,
-    _evidence_items,
-    _evidence_summary,
-    _first_text,
-    _metadata,
-    _normal_key,
-    _normal_text,
-    _normalize_coverage,
-    _normalize_locations,
-    _normalize_repository,
-    _normalize_revision,
-    _normalize_source,
-    _quality_level,
-    _raw_coverage,
-    _validate_coverage,
-    _validation_result,
+    FINGERPRINT_KEYS,
+    HEX_64,
+    ID_KEYS,
+    RULE_KEYS,
+    SEVERITY_KEYS,
+    STATUS_KEYS,
+    SUMMARY_KEYS,
     canonical_hash,
     canonical_json,
+    drop_none_values,
+    evidence_items,
+    evidence_summary,
+    first_text,
+    normal_key,
+    normal_text,
+    normalize_coverage,
+    normalize_locations,
+    normalize_repository,
+    normalize_revision,
+    normalize_source,
+    quality_level,
+    raw_coverage,
+    validate_coverage,
+    validation_result,
+)
+from quality_runner.security._codex_common import (
+    metadata as metadata_for,
 )
 
 
@@ -53,7 +55,7 @@ def import_codex_evidence(source: Mapping[str, Any] | Sequence[Any]) -> dict[str
     raw: dict[str, Any]
     if isinstance(source, Mapping):
         raw = json.loads(canonical_json(source))
-    elif isinstance(source, Sequence) and not isinstance(source, (str, bytes, bytearray)):
+    elif not isinstance(source, (str, bytes, bytearray)):
         raw = {"findings": json.loads(canonical_json(list(source)))}
     else:
         raise ValueError("Codex Security input must be a JSON object or finding list")
@@ -64,55 +66,57 @@ def import_codex_evidence(source: Mapping[str, Any] | Sequence[Any]) -> dict[str
     if len(primary_keys) != len(set(primary_keys)):
         raise ValueError("Codex Security input contains duplicate deterministic finding keys")
 
-    coverage = _normalize_coverage(_raw_coverage(raw))
-    repository = _normalize_repository(raw)
-    revision = _normalize_revision(raw)
-    source_descriptor = _normalize_source(raw)
+    coverage = normalize_coverage(raw_coverage(raw))
+    repository = normalize_repository(raw)
+    revision = normalize_revision(raw)
+    source_descriptor = normalize_source(raw)
     artifact: dict[str, Any] = {
         "schema": CODEX_SECURITY_EVIDENCE_SCHEMA,
         "contract_schema": QUALITY_EVIDENCE_SCHEMA,
         "source": source_descriptor,
         "repository": repository,
         "revision": revision,
-        "run_id": _first_text(raw, ("run_id", "scan_id", "report_id")),
+        "run_id": first_text(raw, ("run_id", "scan_id", "report_id")),
         "coverage": coverage,
         "coverage_complete": coverage["complete"],
         "findings": sorted(findings, key=lambda finding: str(finding["match_key"])),
-        "summary": _evidence_summary(findings, coverage),
+        "summary": evidence_summary(findings, coverage),
     }
-    artifact = _drop_none_values(artifact)
+    artifact = drop_none_values(artifact)
     artifact["source_hash"] = canonical_hash(raw)
     artifact["evidence_hash"] = canonical_hash(artifact, exclude=("source_hash", "evidence_hash"))
     return artifact
 
 
-def validate_codex_evidence(payload: Mapping[str, Any]) -> dict[str, Any]:
+def validate_codex_evidence(payload: object) -> dict[str, Any]:
     """Validate one normalized Codex evidence artifact."""
 
     errors: list[str] = []
     warnings: list[str] = []
     if not isinstance(payload, Mapping):
         errors.append("Codex evidence must be a JSON object")
-        return _validation_result(payload, errors=errors, warnings=warnings)
+        return validation_result(payload, errors=errors, warnings=warnings)
+    payload = cast(Mapping[str, Any], payload)
     if payload.get("schema") != CODEX_SECURITY_EVIDENCE_SCHEMA:
         errors.append("Codex evidence schema is invalid")
     if payload.get("contract_schema") != QUALITY_EVIDENCE_SCHEMA:
         errors.append("Codex evidence contract_schema must be quality-evidence-v0.1")
     if not isinstance(payload.get("source"), Mapping):
         errors.append("Codex evidence source descriptor is required")
-    elif payload["source"].get("provider") != "codex-security":
+    elif cast(Mapping[str, Any], payload["source"]).get("provider") != "codex-security":
         errors.append("Codex evidence source provider must be codex-security")
-    _validate_coverage(payload.get("coverage"), errors)
+    validate_coverage(payload.get("coverage"), errors)
 
     findings = payload.get("findings")
     primary_keys: list[str] = []
     if not isinstance(findings, list):
         errors.append("Codex evidence findings must be a list")
         findings = []
-    for index, finding in enumerate(findings):
+    for index, finding in enumerate(cast(list[Any], findings)):
         if not isinstance(finding, dict):
             errors.append(f"finding {index} must be an object")
             continue
+        finding = cast(dict[str, Any], finding)
         quality_result = validate_quality_finding(finding)
         errors.extend(f"finding {index}: {issue}" for issue in quality_result["issues"])
         match_key = finding.get("match_key")
@@ -121,7 +125,9 @@ def validate_codex_evidence(payload: Mapping[str, Any]) -> dict[str, Any]:
         else:
             primary_keys.append(match_key)
         aliases = finding.get("match_keys")
-        if not isinstance(aliases, list) or not all(isinstance(item, str) for item in aliases):
+        if not isinstance(aliases, list) or not all(
+            isinstance(item, str) for item in cast(list[Any], aliases)
+        ):
             errors.append(f"finding {index}: match_keys must be a string list")
         if not isinstance(finding.get("fingerprint"), str):
             errors.append(f"finding {index}: fingerprint is required")
@@ -130,7 +136,7 @@ def validate_codex_evidence(payload: Mapping[str, Any]) -> dict[str, Any]:
 
     for field in ("source_hash", "evidence_hash"):
         value = payload.get(field)
-        if not isinstance(value, str) or not _HEX_64.fullmatch(value):
+        if not isinstance(value, str) or not HEX_64.fullmatch(value):
             errors.append(f"Codex evidence {field} must be a lowercase SHA-256 hash")
     if isinstance(payload.get("evidence_hash"), str):
         expected = canonical_hash(payload, exclude=("source_hash", "evidence_hash"))
@@ -139,17 +145,17 @@ def validate_codex_evidence(payload: Mapping[str, Any]) -> dict[str, Any]:
 
     if payload.get("coverage_complete") is not None:
         coverage = payload.get("coverage")
-        if isinstance(coverage, Mapping) and payload["coverage_complete"] != coverage.get(
-            "complete"
-        ):
+        if isinstance(coverage, Mapping) and payload["coverage_complete"] != cast(
+            Mapping[str, Any], coverage
+        ).get("complete"):
             errors.append("Codex evidence coverage_complete disagrees with coverage.complete")
     if (
         not primary_keys
         and isinstance(payload.get("coverage"), Mapping)
-        and payload["coverage"].get("complete") is False
+        and cast(Mapping[str, Any], payload["coverage"]).get("complete") is False
     ):
         warnings.append("empty Codex evidence has incomplete coverage")
-    return _validation_result(payload, errors=errors, warnings=warnings)
+    return validation_result(payload, errors=errors, warnings=warnings)
 
 
 def deterministic_finding_key(finding: Mapping[str, Any]) -> str:
@@ -164,36 +170,44 @@ def deterministic_finding_key(finding: Mapping[str, Any]) -> str:
 def _extract_findings(raw: Mapping[str, Any]) -> list[dict[str, Any]]:
     if isinstance(raw.get("runs"), list):
         findings: list[dict[str, Any]] = []
-        for run in raw["runs"]:
-            if not isinstance(run, Mapping) or not isinstance(run.get("results"), list):
+        for run in cast(list[Any], raw["runs"]):
+            if not isinstance(run, Mapping):
                 continue
-            for result in run["results"]:
+            run_map = cast(Mapping[str, Any], run)
+            if not isinstance(run_map.get("results"), list):
+                continue
+            for result in cast(list[Any], run_map["results"]):
                 if isinstance(result, Mapping):
-                    findings.append(_sarif_finding(result))
+                    findings.append(_sarif_finding(cast(Mapping[str, Any], result)))
         return findings
     for key in ("findings", "vulnerabilities", "issues", "alerts", "results", "evidence"):
         value = raw.get(key)
         if isinstance(value, list):
             return [
-                dict(item) if isinstance(item, Mapping) else {"summary": str(item)}
-                for item in value
+                dict(cast(Mapping[str, Any], item))
+                if isinstance(item, Mapping)
+                else {"summary": str(item)}
+                for item in cast(list[Any], value)
             ]
         if value is not None:
             raise ValueError(f"Codex Security {key} must be a list")
-    if any(key in raw for key in (*_RULE_KEYS, *_SUMMARY_KEYS)):
+    if any(key in raw for key in (*RULE_KEYS, *SUMMARY_KEYS)):
         return [dict(raw)]
     return []
 
 
 def _sarif_finding(result: Mapping[str, Any]) -> dict[str, Any]:
     message = result.get("message")
-    summary = message.get("text") if isinstance(message, Mapping) else message
+    summary = (
+        cast(Mapping[str, Any], message).get("text") if isinstance(message, Mapping) else message
+    )
     fingerprints = result.get("fingerprints") or result.get("partialFingerprints")
     fingerprint = None
     if isinstance(fingerprints, Mapping):
-        for key in sorted(fingerprints):
-            if str(fingerprints[key]).strip():
-                fingerprint = str(fingerprints[key])
+        fingerprints_map = cast(Mapping[str, Any], fingerprints)
+        for key in sorted(fingerprints_map):
+            if str(fingerprints_map[key]).strip():
+                fingerprint = str(fingerprints_map[key])
                 break
     locations = result.get("locations")
     return {
@@ -210,12 +224,12 @@ def _sarif_finding(result: Mapping[str, Any]) -> dict[str, Any]:
 
 def _normalize_finding(raw: Mapping[str, Any]) -> dict[str, Any]:
     source = dict(raw)
-    provider_id = _first_text(source, _ID_KEYS)
-    fingerprint = _first_text(source, _FINGERPRINT_KEYS)
-    rule_id = _first_text(source, _RULE_KEYS) or "codex-security"
-    summary = _first_text(source, _SUMMARY_KEYS) or f"Codex Security finding for {rule_id}"
-    severity = _first_text(source, _SEVERITY_KEYS) or "unknown"
-    locations = _normalize_locations(source)
+    provider_id = first_text(source, ID_KEYS)
+    fingerprint = first_text(source, FINGERPRINT_KEYS)
+    rule_id = first_text(source, RULE_KEYS) or "codex-security"
+    summary = first_text(source, SUMMARY_KEYS) or f"Codex Security finding for {rule_id}"
+    severity = first_text(source, SEVERITY_KEYS) or "unknown"
+    locations = normalize_locations(source)
     aliases = _finding_aliases(
         {
             "provider_finding_id": provider_id,
@@ -227,7 +241,7 @@ def _normalize_finding(raw: Mapping[str, Any]) -> dict[str, Any]:
     )
     match_key = aliases[0]
     finding_id = provider_id or match_key
-    metadata = _metadata(source)
+    metadata = metadata_for(source)
     metadata.update(
         {
             "provider": "codex-security",
@@ -240,11 +254,11 @@ def _normalize_finding(raw: Mapping[str, Any]) -> dict[str, Any]:
     normalized = normalize_quality_finding(
         finding_id=finding_id,
         criterion_id=rule_id,
-        criterion_title=_first_text(source, ("criterion_title", "title", "name")) or rule_id,
+        criterion_title=first_text(source, ("criterion_title", "title", "name")) or rule_id,
         criterion_scope="security",
-        level=_quality_level(source),
+        level=quality_level(source),
         summary=summary,
-        evidence=_evidence_items(source, summary, locations),
+        evidence=evidence_items(source, summary, locations),
         metadata=metadata,
         source="codex-security",
     )
@@ -257,35 +271,35 @@ def _normalize_finding(raw: Mapping[str, Any]) -> dict[str, Any]:
             "match_keys": aliases,
             "locations": locations,
             "severity": severity,
-            "status": _first_text(source, _STATUS_KEYS) or "open",
+            "status": first_text(source, STATUS_KEYS) or "open",
         }
     )
-    return _drop_none_values(normalized)
+    return drop_none_values(normalized)
 
 
 def _finding_aliases(finding: Mapping[str, Any]) -> list[str]:
-    explicit_key = _first_text(finding, ("match_key", "stable_key", "stable_id"))
-    fingerprint = _first_text(finding, ("fingerprint",))
-    provider_id = _first_text(
+    explicit_key = first_text(finding, ("match_key", "stable_key", "stable_id"))
+    fingerprint = first_text(finding, ("fingerprint",))
+    provider_id = first_text(
         finding, ("provider_finding_id", "finding_id", "alert_id", "uuid", "id")
     )
     semantic = canonical_hash(
         {
-            "rule": _normal_text(_first_text(finding, _RULE_KEYS) or "codex-security"),
-            "summary": _normal_text(_first_text(finding, _SUMMARY_KEYS) or ""),
+            "rule": normal_text(first_text(finding, RULE_KEYS) or "codex-security"),
+            "summary": normal_text(first_text(finding, SUMMARY_KEYS) or ""),
             "paths": sorted(
                 str(location.get("file", ""))
-                for location in _normalize_locations(finding)
+                for location in normalize_locations(finding)
                 if location.get("file")
             ),
         }
     )[:32]
     aliases: list[str] = []
     if explicit_key:
-        aliases.append(f"key:{_normal_key(explicit_key)}")
+        aliases.append(f"key:{normal_key(explicit_key)}")
     if fingerprint:
-        aliases.append(f"fingerprint:{_normal_key(fingerprint)}")
+        aliases.append(f"fingerprint:{normal_key(fingerprint)}")
     if provider_id:
-        aliases.append(f"provider:{_normal_key(provider_id)}")
+        aliases.append(f"provider:{normal_key(provider_id)}")
     aliases.append(f"semantic:{semantic}")
     return list(dict.fromkeys(aliases))
