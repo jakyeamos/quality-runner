@@ -6,7 +6,7 @@ import tomllib
 from datetime import UTC, datetime, timedelta
 from hashlib import sha256
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from quality_runner.schema_constants import RELEASE_EVIDENCE_SCHEMA
 
@@ -43,42 +43,44 @@ def load_release_evidence(repo_root: Path, path: Path) -> tuple[dict[str, Any] |
         return None, f"release evidence file could not be read: {error}"
     if not isinstance(payload, dict):
         return None, "release evidence file must contain a JSON object"
-    errors = validate_release_evidence(payload)
-    return (payload, None) if not errors else (None, "; ".join(errors))
+    payload_map = cast(dict[str, Any], payload)
+    errors = validate_release_evidence(payload_map)
+    return (payload_map, None) if not errors else (None, "; ".join(errors))
 
 
 def validate_release_evidence(payload: object) -> list[str]:
-    if not isinstance(payload, dict):
+    payload_map = _dict(payload)
+    if payload_map is None:
         return ["release evidence file must contain a JSON object"]
-    if payload.get("schema") != RELEASE_EVIDENCE_SCHEMA:
+    if payload_map.get("schema") != RELEASE_EVIDENCE_SCHEMA:
         return [f"release evidence schema must be {RELEASE_EVIDENCE_SCHEMA}"]
     errors: list[str] = []
-    target = payload.get("target")
-    if not isinstance(target, dict):
+    target = _dict(payload_map.get("target"))
+    if target is None:
         errors.append("release evidence target is missing")
     else:
         for field in ("head_sha", "ref"):
             if not non_empty_string(target.get(field)):
                 errors.append(f"release evidence target.{field} is required")
-    if not non_empty_string(payload.get("release_version")):
+    if not non_empty_string(payload_map.get("release_version")):
         errors.append("release evidence release_version is required")
-    owner = payload.get("owner")
-    if not isinstance(owner, dict):
+    owner = _dict(payload_map.get("owner"))
+    if owner is None:
         errors.append("release evidence owner is missing")
     else:
         for field in ("name", "role"):
             if not non_empty_string(owner.get(field)):
                 errors.append(f"release evidence owner.{field} is required")
-    acceptance = payload.get("acceptance")
+    acceptance = payload_map.get("acceptance")
     if not isinstance(acceptance, list):
         errors.append("release evidence acceptance must be an array")
     else:
         if not acceptance:
             errors.append("release evidence acceptance must contain at least one decision")
-        for index, item in enumerate(acceptance):
+        for index, item in enumerate(cast(list[Any], acceptance)):
             errors.extend(_decision_errors("acceptance", index, item, "accepted"))
-    artifact = payload.get("artifact")
-    if not isinstance(artifact, dict):
+    artifact = _dict(payload_map.get("artifact"))
+    if artifact is None:
         errors.append("release evidence artifact is missing")
     else:
         for field in ("version", "source_head"):
@@ -88,13 +90,13 @@ def validate_release_evidence(payload: object) -> list[str]:
             errors.append("release evidence artifact.digest must be a SHA-256 digest")
         if "path" in artifact and not non_empty_string(artifact.get("path")):
             errors.append("release evidence artifact.path must be a non-empty string")
-    errors.extend(_proof_collection_errors(payload, "migration", MIGRATION_PROOFS))
-    errors.extend(_proof_collection_errors(payload, "publication", PUBLICATION_PROOFS))
-    external_checks = payload.get("external_checks")
+    errors.extend(_proof_collection_errors(payload_map, "migration", MIGRATION_PROOFS))
+    errors.extend(_proof_collection_errors(payload_map, "publication", PUBLICATION_PROOFS))
+    external_checks = payload_map.get("external_checks")
     if external_checks is not None and not isinstance(external_checks, list):
         errors.append("release evidence external_checks must be an array")
     elif isinstance(external_checks, list):
-        for index, item in enumerate(external_checks):
+        for index, item in enumerate(cast(list[Any], external_checks)):
             errors.extend(_decision_errors("external_checks", index, item, "passed"))
     return errors
 
@@ -106,10 +108,11 @@ PUBLICATION_PROOFS = ("authorization", "sanitization", "immutability", "media_ac
 def _proof_collection_errors(
     payload: dict[str, Any], collection: str, required_fields: tuple[str, ...]
 ) -> list[str]:
-    value = payload.get(collection)
-    if value is None:
+    raw_value = payload.get(collection)
+    if raw_value is None:
         return []
-    if not isinstance(value, dict):
+    value = _dict(raw_value)
+    if value is None:
         return [f"release evidence {collection} must be an object"]
     errors: list[str] = []
     for field in required_fields:
@@ -126,13 +129,15 @@ def _proof_collection_errors(
 def _valid_proof(value: object) -> bool:
     if isinstance(value, str) and value in {"passed", "blocked", "pending"}:
         return True
-    if not isinstance(value, dict) or value.get("status") not in {"passed", "blocked", "pending"}:
+    value_map = _dict(value)
+    if value_map is None or value_map.get("status") not in {"passed", "blocked", "pending"}:
         return False
-    evidence = value.get("evidence")
+    evidence = value_map.get("evidence")
+    evidence_items = cast(list[Any], evidence) if isinstance(evidence, list) else []
     return (
         isinstance(evidence, list)
-        and bool(evidence)
-        and all(non_empty_string(item) for item in evidence)
+        and bool(evidence_items)
+        and all(non_empty_string(item) for item in evidence_items)
     )
 
 
@@ -143,19 +148,20 @@ def _decision_errors(
     accepted_status: str,
 ) -> list[str]:
     prefix = f"release evidence {collection}[{index}]"
-    if not isinstance(item, dict):
+    item_map = _dict(item)
+    if item_map is None:
         return [f"{prefix} must be an object"]
     errors: list[str] = []
-    if not non_empty_string(item.get("id")):
+    if not non_empty_string(item_map.get("id")):
         errors.append(f"{prefix}.id is required")
     statuses = {accepted_status, "blocked", "pending"}
-    if item.get("status") not in statuses:
+    if item_map.get("status") not in statuses:
         errors.append(f"{prefix}.status must be {', '.join(sorted(statuses))}")
-    evidence = item.get("evidence")
+    evidence = item_map.get("evidence")
     if (
         not isinstance(evidence, list)
         or not evidence
-        or not all(non_empty_string(value) for value in evidence)
+        or not all(non_empty_string(value) for value in cast(list[Any], evidence))
     ):
         errors.append(f"{prefix}.evidence must be a non-empty string array")
     return errors
@@ -174,8 +180,8 @@ def detected_versions(repo_root: Path) -> dict[str, str]:
             payload = tomllib.loads(path.read_text(encoding="utf-8"))
         except (OSError, tomllib.TOMLDecodeError):
             continue
-        section_value = payload.get(section) if isinstance(payload, dict) else None
-        if isinstance(section_value, dict) and isinstance(section_value.get(key), str):
+        section_value = _dict(payload.get(section))
+        if section_value is not None and isinstance(section_value.get(key), str):
             versions[f"{filename}:{section}.{key}"] = section_value[key]
     package_json = repo_root / "package.json"
     if package_json.is_file():
@@ -183,8 +189,9 @@ def detected_versions(repo_root: Path) -> dict[str, str]:
             payload = json.loads(package_json.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError):
             payload = {}
-        if isinstance(payload, dict) and isinstance(payload.get("version"), str):
-            versions["package.json:version"] = payload["version"]
+        payload_map = _dict(cast(object, payload))
+        if payload_map is not None and isinstance(payload_map.get("version"), str):
+            versions["package.json:version"] = cast(str, payload_map["version"])
     init_file = repo_root / "quality_runner" / "__init__.py"
     if init_file.is_file():
         try:
@@ -238,3 +245,7 @@ def file_digest(path: Path) -> str | None:
         return sha256(path.read_bytes()).hexdigest()
     except OSError:
         return None
+
+
+def _dict(value: object) -> dict[str, Any] | None:
+    return cast(dict[str, Any], value) if isinstance(value, dict) else None
