@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from quality_runner.adoption import build_adoption_stage, handoff_adoption_stage, stopping_criteria
 from quality_runner.core.audit_contracts import TextScanScope
@@ -224,9 +224,7 @@ def _missing_repo_owned_gates(capability_map: dict[str, Any] | None) -> list[dic
         return []
 
     gates: list[dict[str, str]] = []
-    for capability in missing:
-        if not isinstance(capability, dict):
-            continue
+    for capability in _dict_list(cast(object, missing)):
         capability_id = capability.get("id")
         reason = capability.get("reason")
         language = capability.get("language")
@@ -265,9 +263,7 @@ def _findings(audit_report: dict[str, Any]) -> list[dict[str, Any]]:
         return []
 
     normalized: list[dict[str, Any]] = []
-    for finding in findings:
-        if not isinstance(finding, dict):
-            continue
+    for finding in _dict_list(cast(object, findings)):
         finding_id = finding.get("id")
         severity = finding.get("severity")
         category = finding.get("category")
@@ -287,7 +283,7 @@ def _findings(audit_report: dict[str, Any]) -> list[dict[str, Any]]:
             and isinstance(recommended_fix, str)
             and recommended_fix
             and isinstance(verification, list)
-            and all(isinstance(item, str) and item for item in verification)
+            and all(isinstance(item, str) and item for item in cast(list[Any], verification))
         ):
             normalized.append(
                 {
@@ -296,7 +292,7 @@ def _findings(audit_report: dict[str, Any]) -> list[dict[str, Any]]:
                     "category": category,
                     "summary": summary,
                     "recommended_fix": recommended_fix,
-                    "verification": verification,
+                    "verification": cast(list[Any], verification),
                     "score": score if isinstance(score, int) else _default_score(severity),
                     **_optional_actionability(finding),
                     **_optional_disposition(finding),
@@ -311,10 +307,8 @@ def _slices(plan: dict[str, Any]) -> list[dict[str, str]]:
         return []
     return [
         {"id": slice_item["id"]}
-        for slice_item in slices
-        if isinstance(slice_item, dict)
-        and isinstance(slice_item.get("id"), str)
-        and slice_item["id"]
+        for slice_item in _dict_list(cast(object, slices))
+        if isinstance(slice_item.get("id"), str) and slice_item["id"]
     ]
 
 
@@ -322,16 +316,17 @@ def _phase_candidates(plan: dict[str, Any]) -> list[dict[str, Any]]:
     candidates = plan.get("phase_candidates")
     if not isinstance(candidates, list):
         return []
-    return [candidate for candidate in candidates if isinstance(candidate, dict)]
+    return _dict_list(cast(object, candidates))
 
 
 def _next_slice(plan: dict[str, Any]) -> dict[str, Any] | None:
     slices = plan.get("slices")
     if not isinstance(slices, list) or not slices:
         return None
-    first = slices[0]
-    if not isinstance(first, dict):
+    typed_slices = _dict_list(cast(object, slices))
+    if not typed_slices:
         return None
+    first = typed_slices[0]
     return _copy_next_slice(first)
 
 
@@ -339,9 +334,7 @@ def _author_decision_slice(plan: dict[str, Any]) -> dict[str, Any] | None:
     slices = plan.get("slices")
     if not isinstance(slices, list):
         return None
-    for slice_item in slices:
-        if not isinstance(slice_item, dict):
-            continue
+    for slice_item in _dict_list(cast(object, slices)):
         if slice_item.get("disposition_required") is True or _slice_needs_author_decision(
             slice_item
         ):
@@ -393,8 +386,8 @@ def _slice_needs_author_decision(slice_item: dict[str, Any]) -> bool:
     if not isinstance(findings, list):
         return False
     return any(
-        isinstance(finding, dict) and finding.get("actionability") == "needs-author-decision"
-        for finding in findings
+        finding.get("actionability") == "needs-author-decision"
+        for finding in _dict_list(cast(object, findings))
     )
 
 
@@ -404,7 +397,7 @@ def _slice_verification_gates(slice_item: dict[str, Any] | None) -> list[str]:
     verification_gates = slice_item.get("verification_gates")
     if not isinstance(verification_gates, list):
         return []
-    return [gate for gate in verification_gates if isinstance(gate, str)]
+    return [gate for gate in cast(list[Any], verification_gates) if isinstance(gate, str)]
 
 
 def _warnings(payload: dict[str, Any]) -> list[dict[str, str]]:
@@ -413,9 +406,7 @@ def _warnings(payload: dict[str, Any]) -> list[dict[str, str]]:
         return []
 
     normalized: list[dict[str, str]] = []
-    for warning in warnings:
-        if not isinstance(warning, dict):
-            continue
+    for warning in _dict_list(cast(object, warnings)):
         code = warning.get("code")
         message = warning.get("message")
         path = warning.get("path")
@@ -464,11 +455,15 @@ def _intent_docs_from_scan(repo_scan: dict[str, Any] | None) -> list[dict[str, s
     if not isinstance(intent_docs, list):
         return None
     normalized: list[dict[str, str]] = []
-    for doc in intent_docs:
-        if not isinstance(doc, dict):
-            continue
+    for doc in _dict_list(cast(object, intent_docs)):
         doc_type = doc.get("type")
         path = doc.get("path")
         if isinstance(doc_type, str) and isinstance(path, str) and doc_type and path:
             normalized.append({"type": doc_type, "path": path})
     return normalized or None
+
+
+def _dict_list(value: object) -> list[dict[str, Any]]:
+    if not isinstance(value, list):
+        return []
+    return [cast(dict[str, Any], item) for item in cast(list[Any], value) if isinstance(item, dict)]
