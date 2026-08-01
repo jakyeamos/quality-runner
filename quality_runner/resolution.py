@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections import Counter
-from typing import Any
+from typing import Any, cast
 
 RESOLVED_STATUSES = frozenset(
     {
@@ -30,9 +30,7 @@ def apply_audit_resolutions(
     entries = _ledger_entries(resolution_ledger)
     dispositions = _finding_dispositions(resolution_ledger)
     annotated: list[dict[str, Any]] = []
-    for finding in findings:
-        if not isinstance(finding, dict):
-            continue
+    for finding in _dict_list(cast(object, findings)):
         annotated.append(
             {
                 **finding,
@@ -75,19 +73,19 @@ def filter_resolved_code_quality_scan(
 
     active_findings = [
         finding
-        for finding in findings
+        for finding in _dict_list(cast(object, findings))
         if not (
-            isinstance(finding, dict)
-            and isinstance(finding.get("fingerprint"), str)
+            isinstance(finding.get("fingerprint"), str)
             and _status_is_resolved(by_fingerprint.get(finding["fingerprint"], {}).get("status"))
         )
     ]
-    if len(active_findings) == len(findings):
+    finding_count = len(cast(list[Any], findings))
+    if len(active_findings) == finding_count:
         return code_quality_scan
     summary = code_quality_scan.get("summary")
-    filtered_summary = dict(summary) if isinstance(summary, dict) else {}
+    filtered_summary = _dict(summary) or {}
     filtered_summary["total_findings"] = len(active_findings)
-    filtered_summary["resolved_findings_excluded"] = len(findings) - len(active_findings)
+    filtered_summary["resolved_findings_excluded"] = finding_count - len(active_findings)
     return {**code_quality_scan, "summary": filtered_summary, "findings": active_findings}
 
 
@@ -97,8 +95,8 @@ def unresolved_audit_report(report: dict[str, Any]) -> dict[str, Any]:
         return report
     active_findings = [
         finding
-        for finding in findings
-        if isinstance(finding, dict) and not _finding_is_resolved(finding.get("resolution"))
+        for finding in _dict_list(cast(object, findings))
+        if not _finding_is_resolved(finding.get("resolution"))
     ]
     return {
         **report,
@@ -190,9 +188,7 @@ def _audit_finding_fingerprints(
         code_quality_scan.get("findings") if isinstance(code_quality_scan, dict) else None
     )
     if isinstance(raw_findings, list):
-        for raw in raw_findings:
-            if not isinstance(raw, dict):
-                continue
+        for raw in _dict_list(cast(object, raw_findings)):
             category = raw.get("category")
             rule_id = raw.get("rule_id")
             fingerprint = raw.get("fingerprint")
@@ -207,9 +203,7 @@ def _audit_finding_fingerprints(
     candidates = security_scan.get("candidates") if isinstance(security_scan, dict) else None
     if isinstance(candidates, list) and finding_id.startswith("security-candidate-"):
         candidate_key = finding_id.removeprefix("security-candidate-").lower()
-        for candidate in candidates:
-            if not isinstance(candidate, dict):
-                continue
+        for candidate in _dict_list(cast(object, candidates)):
             candidate_id = candidate.get("id")
             fingerprint = candidate.get("fingerprint")
             if (
@@ -229,13 +223,14 @@ def _resolution_summary(findings: list[dict[str, Any]]) -> dict[str, Any]:
         resolution = finding.get("resolution")
         if not isinstance(resolution, dict):
             continue
-        status = resolution.get("status")
+        resolution_map = cast(dict[str, Any], resolution)
+        status = resolution_map.get("status")
         if isinstance(status, str) and status:
             finding_status_counts[status] += 1
-        by_status = resolution.get("by_status")
-        if isinstance(by_status, dict):
+        by_status = _dict(resolution_map.get("by_status"))
+        if by_status is not None:
             for status, count in by_status.items():
-                if isinstance(status, str) and isinstance(count, int) and count > 0:
+                if isinstance(count, int) and count > 0:
                     entry_status_counts[status] += count
     resolved_count = sum(_finding_is_resolved(finding.get("resolution")) for finding in findings)
     unresolved_count = len(findings) - resolved_count
@@ -270,12 +265,15 @@ def _disposition_applies(record: dict[str, Any], current_fingerprints: set[str])
     if not isinstance(fingerprints, list) or not fingerprints:
         return True
     return bool(
-        current_fingerprints.intersection(item for item in fingerprints if isinstance(item, str))
+        current_fingerprints.intersection(
+            item for item in _any_list(cast(object, fingerprints)) if isinstance(item, str)
+        )
     )
 
 
 def _finding_is_resolved(value: object) -> bool:
-    return isinstance(value, dict) and value.get("resolved") is True
+    value_map = _dict(value)
+    return value_map is not None and value_map.get("resolved") is True
 
 
 def _status_is_resolved(status: object) -> bool:
@@ -288,7 +286,7 @@ def _ledger_entries(ledger: dict[str, Any] | None) -> list[dict[str, Any]]:
     entries = ledger.get("entries")
     if not isinstance(entries, list):
         return []
-    return [entry for entry in entries if isinstance(entry, dict)]
+    return _dict_list(cast(object, entries))
 
 
 def _entries_by_fingerprint(ledger: dict[str, Any] | None) -> dict[str, dict[str, Any]]:
@@ -306,10 +304,22 @@ def _finding_dispositions(ledger: dict[str, Any] | None) -> dict[str, dict[str, 
     if not isinstance(records, list):
         return {}
     indexed: dict[str, dict[str, Any]] = {}
-    for record in records:
-        if not isinstance(record, dict):
-            continue
+    for record in _dict_list(cast(object, records)):
         finding_id = record.get("finding_id")
         if isinstance(finding_id, str) and finding_id:
             indexed[finding_id] = record
     return indexed
+
+
+def _dict(value: object) -> dict[str, Any] | None:
+    return cast(dict[str, Any], value) if isinstance(value, dict) else None
+
+
+def _dict_list(value: object) -> list[dict[str, Any]]:
+    if not isinstance(value, list):
+        return []
+    return [cast(dict[str, Any], item) for item in cast(list[Any], value) if isinstance(item, dict)]
+
+
+def _any_list(value: object) -> list[Any]:
+    return cast(list[Any], value) if isinstance(value, list) else []
