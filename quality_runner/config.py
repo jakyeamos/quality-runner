@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import tomllib
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from quality_runner.architecture_config_parse import parse_architecture_section
 from quality_runner.artifact_config_parse import parse_artifacts_section
@@ -51,8 +51,9 @@ def load_repo_config(repo_root: Path) -> dict[str, Any]:
             ],
         )
 
-    section = payload.get("quality_runner")
-    if not isinstance(section, dict):
+    payload_map = payload
+    section = _table(payload_map.get("quality_runner"))
+    if section is None:
         return _empty_config(path=CONFIG_FILE_NAME, warnings=[])
 
     warnings: list[dict[str, str]] = []
@@ -201,8 +202,10 @@ def _string_value(value: object, field: str, warnings: list[dict[str, str]]) -> 
 def _string_list(value: object, field: str, warnings: list[dict[str, str]]) -> list[str]:
     if value is None:
         return []
-    if isinstance(value, list) and all(isinstance(item, str) and item for item in value):
-        return value
+    if isinstance(value, list) and all(
+        isinstance(item, str) and item for item in cast(list[Any], value)
+    ):
+        return cast(list[str], value)
     warnings.append(
         _warning(
             "invalid_quality_runner_config_field",
@@ -221,9 +224,9 @@ def _string_mapping(
         return {}
     if isinstance(value, dict) and all(
         isinstance(key, str) and key and isinstance(item, str) and item
-        for key, item in value.items()
+        for key, item in cast(dict[Any, Any], value).items()
     ):
-        return dict(value)
+        return dict(cast(dict[str, str], value))
     warnings.append(
         _warning(
             "invalid_quality_runner_config_field",
@@ -242,9 +245,9 @@ def _positive_int_mapping(
         return {}
     if isinstance(value, dict) and all(
         isinstance(key, str) and key and isinstance(item, int) and item > 0
-        for key, item in value.items()
+        for key, item in cast(dict[Any, Any], value).items()
     ):
-        return dict(value)
+        return dict(cast(dict[str, int], value))
     warnings.append(
         _warning(
             "invalid_quality_runner_config_field",
@@ -267,8 +270,9 @@ def _profiles(value: object, warnings: list[dict[str, str]]) -> dict[str, dict[s
         return {}
 
     profiles: dict[str, dict[str, Any]] = {}
-    for name, item in value.items():
-        if not isinstance(name, str) or not name or not isinstance(item, dict):
+    for name, raw_item in cast(dict[Any, Any], value).items():
+        item = _table(raw_item)
+        if not isinstance(name, str) or not name or item is None:
             _profile_warning(str(name), warnings)
             continue
         extends = item.get("extends")
@@ -314,8 +318,9 @@ def _gates(value: object, warnings: list[dict[str, str]]) -> list[dict[str, Any]
         return []
 
     gates: list[dict[str, Any]] = []
-    for index, item in enumerate(value):
-        if not isinstance(item, dict):
+    for index, raw_item in enumerate(cast(list[Any], value)):
+        item = _table(raw_item)
+        if item is None:
             _gate_warning(index, warnings)
             continue
         capability_id = item.get("id")
@@ -381,8 +386,9 @@ def _accepted_exceptions(value: object, warnings: list[dict[str, str]]) -> list[
         return []
 
     accepted: list[dict[str, str]] = []
-    for index, item in enumerate(value):
-        if not isinstance(item, dict):
+    for index, raw_item in enumerate(cast(list[Any], value)):
+        item = _table(raw_item)
+        if item is None:
             _accepted_exception_warning(index, warnings)
             continue
         capability = item.get("capability")
@@ -418,3 +424,11 @@ def _accepted_exception_warning(index: int, warnings: list[dict[str, str]]) -> N
 
 def _warning(code: str, message: str, *, path: str = CONFIG_FILE_NAME) -> dict[str, str]:
     return dict(code=code, message=message, path=path)
+
+
+def _table(value: object) -> dict[str, Any] | None:
+    """Narrow TOML tables at the configuration boundary."""
+
+    if not isinstance(value, dict):
+        return None
+    return cast(dict[str, Any], value)
