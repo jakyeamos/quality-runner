@@ -3,6 +3,8 @@ from __future__ import annotations
 import json
 import subprocess
 import sys
+from collections.abc import Iterator
+from contextlib import contextmanager
 from pathlib import Path
 from typing import cast
 
@@ -13,6 +15,19 @@ from quality_runner.core.verification_contracts import GateExecutionPolicy, Veri
 from quality_runner.intent import build_intent_packet
 from quality_runner.refresh_timeout import workflow_deadline
 from quality_runner.workflow import verify_gates_payload
+
+
+@contextmanager
+def _without_runtime_trace() -> Iterator[None]:
+    tracer = sys.gettrace()
+    if tracer is None:
+        yield
+        return
+    sys.settrace(None)
+    try:
+        yield
+    finally:
+        sys.settrace(tracer)
 
 
 def test_verification_service_preserves_v1_intent_artifact_projection(tmp_path: Path) -> None:
@@ -47,10 +62,13 @@ def test_verification_service_preserves_v1_intent_artifact_projection(tmp_path: 
     context = _json(result.artifact_paths["remediation_context_json"])
     handoff_artifact_paths = _object(handoff["artifact_paths"])
     manifest_artifact_paths = _object(manifest["artifact_paths"])
+    remediation_context = _object(handoff["remediation_context"])
+    artifact_path = remediation_context["artifact_path"]
 
     assert "intent_json" in result.artifact_paths
     assert context["schema"] == "quality-runner-remediation-context-v0.1"
-    assert handoff["remediation_context"]["artifact_path"].endswith("remediation-context.json")
+    assert isinstance(artifact_path, str)
+    assert artifact_path.endswith("remediation-context.json")
     assert "intent_json" in manifest_artifact_paths
     assert "intent_json" not in handoff_artifact_paths
 
@@ -90,14 +108,18 @@ def test_interrupted_disposable_verification_cleans_worktree_and_registration(
     _commit_all(tmp_path, "Add slow gate fixture")
     worktree_path = tmp_path / ".quality-runner" / "worktrees" / "interrupted-disposable"
 
-    with pytest.raises(TimeoutError, match="M3 test deadline"):
-        with workflow_deadline(seconds=1, reason="M3 test deadline"):
-            verify_gates_payload(
-                repo_root=tmp_path,
-                run_id="interrupted-disposable",
-                execute_discovered_gates=True,
-                worktree_mode="disposable",
-            )
+    # Signal delivery inside Python's line tracer can land in an unrelated
+    # destructor and become an unraisable exception. Exercise the actual
+    # deadline/cleanup behavior without instrumentation, then restore tracing.
+    with _without_runtime_trace():
+        with pytest.raises(TimeoutError, match="M3 test deadline"):
+            with workflow_deadline(seconds=1, reason="M3 test deadline"):
+                verify_gates_payload(
+                    repo_root=tmp_path,
+                    run_id="interrupted-disposable",
+                    execute_discovered_gates=True,
+                    worktree_mode="disposable",
+                )
 
     registrations = subprocess.run(
         ["git", "worktree", "list", "--porcelain"],

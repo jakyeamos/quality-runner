@@ -11,7 +11,9 @@ from quality_runner.application.audit_v1_artifacts import (
 )
 from quality_runner.application.read_only_audit import analyze_read_only_audit
 from quality_runner.artifacts import prepare_artifact_dir
+from quality_runner.cache_modes import CacheMode
 from quality_runner.core.audit_contracts import (
+    AnalysisMode,
     AuditPayload,
     AuditRequest,
     AuditWarning,
@@ -36,7 +38,15 @@ def inspect_payload(
     intent: AuditPayload | None = None,
     agent_review_mode: str | None = None,
     scan_exclusion_overlay: ScanExclusionOverlay | None = None,
+    analysis_cache_root: Path | None = None,
+    focus_paths: list[str] | None = None,
+    analysis_mode: str = "full",
+    cache_mode: CacheMode | str | None = None,
+    cache_root: Path | None = None,
+    performance_budget_seconds: float | None = None,
+    include_paths: tuple[str, ...] = (),
     progress: ProgressCallback | None = None,
+    refresh_context: dict[str, object] | None = None,
 ) -> dict[str, Any]:
     resolved_run_id = generated_run_id() if run_id is None else run_id
     branch_warnings = prepare_scan_branch(
@@ -55,10 +65,18 @@ def inspect_payload(
             skill_review_report=skill_review_report,
             agent_review_mode=agent_review_mode,
             scan_exclusion_overlay=scan_exclusion_overlay,
+            include_paths=include_paths,
             intent=intent,
+            analysis_cache_root=analysis_cache_root,
+            focus_paths=focus_paths,
+            analysis_mode=analysis_mode,
+            cache_mode=cache_mode,
+            cache_root=cache_root,
+            performance_budget_seconds=performance_budget_seconds,
         ),
         progress=progress,
     )
+    _record_refresh_analysis(refresh_context, analysis, source="current-refresh-inspect")
     artifact_paths = write_inspect_v1_artifacts(analysis, run_dir=run_dir)
     skill_review = _skill_review_from_analysis(analysis, artifact_paths)
 
@@ -88,7 +106,15 @@ def run_payload(
     intent: AuditPayload | None = None,
     agent_review_mode: str | None = None,
     scan_exclusion_overlay: ScanExclusionOverlay | None = None,
+    analysis_cache_root: Path | None = None,
+    focus_paths: list[str] | None = None,
+    analysis_mode: str = "full",
+    cache_mode: CacheMode | str | None = None,
+    cache_root: Path | None = None,
+    performance_budget_seconds: float | None = None,
+    include_paths: tuple[str, ...] = (),
     progress: ProgressCallback | None = None,
+    refresh_context: dict[str, object] | None = None,
 ) -> dict[str, Any]:
     resolved_run_id = generated_run_id() if run_id is None else run_id
     branch_warnings = prepare_scan_branch(
@@ -107,10 +133,18 @@ def run_payload(
             skill_review_report=skill_review_report,
             agent_review_mode=agent_review_mode,
             scan_exclusion_overlay=scan_exclusion_overlay,
+            include_paths=include_paths,
             intent=intent,
+            analysis_cache_root=analysis_cache_root,
+            focus_paths=focus_paths,
+            analysis_mode=analysis_mode,
+            cache_mode=cache_mode,
+            cache_root=cache_root,
+            performance_budget_seconds=performance_budget_seconds,
         ),
         progress=progress,
     )
+    _record_refresh_analysis(refresh_context, analysis, source="current-refresh-run")
     planned, artifact_paths = plan_and_write_run_v1_artifacts(analysis, run_dir=run_dir)
     skill_review = _skill_review_from_analysis(analysis, artifact_paths)
 
@@ -141,6 +175,13 @@ def _audit_request(
     agent_review_mode: str | None,
     scan_exclusion_overlay: ScanExclusionOverlay | None,
     intent: AuditPayload | None,
+    analysis_cache_root: Path | None,
+    focus_paths: list[str] | None,
+    analysis_mode: str,
+    cache_mode: CacheMode | str | None,
+    cache_root: Path | None,
+    performance_budget_seconds: float | None,
+    include_paths: tuple[str, ...],
 ) -> AuditRequest:
     return AuditRequest(
         repo_root=repo_root,
@@ -152,8 +193,21 @@ def _audit_request(
         branch_warnings=tuple(_audit_warning(warning) for warning in branch_warnings),
         skill_review_report=skill_review_report,
         intent=intent,
+        analysis_cache_root=analysis_cache_root,
         scan_exclusion_overlay=scan_exclusion_overlay,
         agent_review_mode=agent_review_mode,
+        focus_paths=tuple(sorted(set(focus_paths or []))),
+        analysis_mode=cast(
+            AnalysisMode,
+            analysis_mode if analysis_mode in {"balanced", "full"} else "full",
+        ),
+        cache_mode=cast(
+            CacheMode | None,
+            cache_mode if cache_mode in {"repo", "external", "disabled"} else None,
+        ),
+        cache_root=cache_root,
+        performance_budget_seconds=performance_budget_seconds,
+        include_paths=include_paths,
     )
 
 
@@ -204,3 +258,15 @@ def _optional_field(key: str, value: object) -> dict[str, Any]:
 def _agent_review_mode(analysis: Any) -> AgentReviewMode:
     mode = getattr(getattr(analysis, "request", None), "agent_review_mode", None)
     return cast(AgentReviewMode, mode) if mode in AGENT_REVIEW_MODES else "auto"
+
+
+def _record_refresh_analysis(
+    refresh_context: dict[str, object] | None,
+    analysis: Any,
+    *,
+    source: str,
+) -> None:
+    if refresh_context is None:
+        return
+    refresh_context["audit_analysis"] = analysis
+    refresh_context["analysis_source"] = source

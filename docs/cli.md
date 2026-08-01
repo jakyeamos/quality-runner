@@ -1,9 +1,10 @@
 # CLI Reference
 
-Quality Runner provides a primary console script and its short local command:
+Quality Runner provides a canonical short console script and a compatibility
+alias:
 
-- `quality-runner`
-- `qr` (short alias for `quality-runner`)
+- `qr` (canonical human-facing command)
+- `quality-runner` (compatibility alias)
 - `quality-runner-mcp`
 
 It also packages compatibility console scripts for existing Repo Quality
@@ -14,17 +15,47 @@ Certifier callers:
 
 ## Outcome-first journeys
 
-New users and integrations should start with `audit`, `review`, `verify`, and
-`runs`. All four render a compact outcome card by default. Their v2 JSON uses
-`quality-runner-outcome-v0.2` and leads with state, assessment, evidence
-confidence, writes, safety, and the safest next action.
+New users and integrations should start with `audit`, `review`, `verify`, `runs`,
+and `doctor` through `qr`. The first four render a compact outcome card by
+default. Their v2 JSON uses `quality-runner-outcome-v0.2` and leads with state,
+assessment, evidence confidence, writes, safety, and the safest next action.
 
 ```bash
-quality-runner audit /path/to/repo --json
-quality-runner review /path/to/repo --mode blind --json
-quality-runner verify /path/to/repo --json
-quality-runner runs /path/to/repo --json
+qr audit /path/to/repo --json
+qr review /path/to/repo --mode blind --json
+qr verify /path/to/repo --json
+qr runs /path/to/repo --json
+qr doctor --json
 ```
+
+Existing callers can use `quality-runner` in place of `qr` with the same help,
+version, and JSON behavior.
+
+## `quality-runner candidates`
+
+The candidate workflow captures every declared confirmed bug lesson without
+automatically creating a scanner rule:
+
+```bash
+quality-runner candidates validate /path/to/repo --json
+quality-runner candidates aggregate \
+  --projects-root /path/to/projects \
+  --output /private/path/candidate-fleet.json \
+  --json
+quality-runner candidates promotion-check /path/to/repo \
+  --candidate-id candidate-id \
+  --fleet-evidence /private/path/candidate-fleet.json \
+  --decision /path/to/repo/promotion-decision.json \
+  --output /path/to/repo/promotion-receipt.json \
+  --json
+```
+
+Validation is read-only. Aggregation and promotion checks write only their
+explicit output paths; aggregation merges prior observation history there.
+Unsupported transitions, uncovered regressions, invalid registries, incomplete
+fleet evidence, failed precision/cost/freshness/fixture criteria, or missing
+human approval return a non-zero CLI status. See
+[Bug-learning lifecycle](bug-learning.md) for the schemas and thresholds.
 
 `inspect`, `run`, and `verify-gates` remain supported v1 compatibility commands.
 `review --legacy-output` provides the established v1 review JSON field shape
@@ -75,6 +106,73 @@ Returns:
 - status: `ready`
 - package version
 - local Python/platform details
+
+## `quality-runner task`
+
+`task` is the preventative implementation-loop contract. It compares the exact
+post-edit workspace with a pre-edit baseline, runs only native gates that have
+been certified for preventative use, and never edits repository source.
+
+Start before editing:
+
+```bash
+qr task start /path/to/repo --task-id feature-123 --json
+```
+
+For CI or pull-request evaluation, bind the baseline to an immutable revision:
+
+```bash
+qr task start /path/to/repo \
+  --task-id pr-123 \
+  --baseline-ref "$TARGET_SHA" \
+  --json
+```
+
+Then evaluate tracked edits, tracked deletions, and untracked non-ignored files:
+
+```bash
+qr task check /path/to/repo --task-id feature-123 --json
+```
+
+Run this as the authoritative completion checkpoint and after correcting a
+violation or blocker. It is not a continuous-save or editor-hook command. Use
+applicable mature native checks for faster implementation-time feedback.
+
+The check status and process exit code are:
+
+- `pass` / `0`: no new enforced findings and all required certified gates pass
+- `violation` / `1`: a new enforced finding or certified gate failure
+- invalid invocation or configuration / `2`
+- `blocked` / `3`: coverage, matching, prerequisites, readiness, or workspace
+  evidence is incomplete or unverifiable
+
+Every task-check result includes a status-specific `next_action`.
+`task-check.json` is canonical; `task-check.md` is the derived human projection.
+A `pass` still requires any other repository-required checks to pass.
+
+Persisted legacy findings remain visible and are non-blocking. A finding can be
+reported as resolved only when follow-up coverage is complete and comparable;
+otherwise it is `unknown`. Matching is deterministic and never guesses through
+ambiguity.
+
+Configuration, promoted-policy, rule-pack, toolchain, or QR-version drift
+requires an explicit lineage-preserving rebaseline:
+
+```bash
+qr task rebaseline /path/to/repo \
+  --task-id feature-123 \
+  --reason "Reviewed rule-pack upgrade" \
+  --json
+```
+
+For a task started from `--baseline-ref`, rebaseline rescans the original
+resolved target SHA with the new policy; it does not silently switch a PR task
+to the current workspace.
+
+The prevention policy lives under `[quality_runner.prevention]`. Native gates
+do not become certified merely because their commands are discoverable or
+already appear in CI. See [Prevention Readiness](prevention-readiness.md) for
+the promotion, gate-certification, waiver, and evidence requirements.
 
 ## `quality-runner self-update`
 
@@ -183,6 +281,10 @@ arguments where they apply:
 - `--profile`: standards profile override
 - `--run-id`: stable run id (refresh uses `--run-id-prefix` instead)
 - `--interactive`: prompt before excluding expensive default-ignored scan paths
+- `--include-path PATH`: restrict the run to a path and explicitly re-include it
+  when it would normally be excluded; repeat for multiple paths
+- `--include-ignored-path PATH`: re-include a normally ignored path without
+  narrowing the rest of the scan; repeat for multiple paths
 - `--scan-exclusion DIR`: exclude this repo-relative directory for this run
   only; repeat for multiple directories. This is a global overlay and changes
   security scan coverage without editing repository configuration.
@@ -191,6 +293,8 @@ arguments where they apply:
   Structural and code-quality overlays preserve security coverage.
 - `--checkout-most-advanced-branch`: switch to the local most-advanced branch first
 - `--skill-review-report`: merge a validated agent skill review report into findings
+- `--only-gate GATE_ID`: for `verify` and `verify-gates`, restrict execution and
+  evidence to selected discovered executable gate ids; repeat for multiple gates
 - `--json`: emit machine-readable CLI output
 
 Intent is optional. When supplied, QR writes `intent.json` and embeds the packet
@@ -366,7 +470,15 @@ through the detected package manager.
 quality-runner verify-gates /path/to/repo --run-id verify-001 --json
 quality-runner verify-gates /path/to/repo --timeout-seconds 300 --json
 quality-runner verify-gates /path/to/repo --execute-gates --worktree-mode disposable --json
+quality-runner verify-gates /path/to/repo --only-gate lint \
+  --execute-gates --worktree-mode disposable --json
 ```
+
+`--only-gate` is an execution scope, not a readiness claim. The selected ids
+must be discovered as executable gates or the command fails closed. The gate
+artifact records `only_gate_ids`, and the canonical `verify` outcome remains
+limited because other discovered gates were not run. Omit the flag to retain
+the default all-discovered-gates behavior.
 
 Repos can override individual gate timeouts in `.quality-runner.toml`:
 
@@ -417,6 +529,20 @@ quality-runner refresh /path/to/repo --run-id-prefix refresh-001 --total-timeout
 quality-runner refresh /path/to/repo --run-id-prefix refresh-001 --execute-gates --worktree-mode disposable --json
 ```
 
+Refresh timeout calibration is local to the target repository. A complete
+full refresh with `--execute-gates` writes a candidate to
+`.quality-runner/cache/refresh-timeout-baseline-v1.json`; the third matching
+successful run activates separate inspect, run, and verify budgets plus a total
+budget. The identity includes the QR version, profile, configuration,
+`.gitignore`, effective module exclusions, scan policy, included-file inventory,
+and discovered gate plan. Timed-out, partial, changed-only, cache-ambiguous,
+run-only-overlay, or unvalidated custom-exclusion runs never update it.
+
+Use `--inspect-timeout-seconds`, `--run-timeout-seconds`,
+`--verify-timeout-seconds`, or `--total-timeout-seconds` to override the learned
+value for that invocation. Missing, malformed, or stale baselines use the
+existing fixed timeout defaults.
+
 Use `--handoff-output` for the normal single-repo workflow where the scan and
 the human remediation plan should be produced together. Refresh still writes the
 canonical `agent-handoff.md` under `.quality-runner/runs/<prefix>-verify/`;
@@ -428,6 +554,8 @@ Timeout flags are explicit about scope:
 - `--verify-timeout-seconds` caps the `verify-gates` phase.
 - `--workflow-timeout-seconds` is a backward-compatible alias for
   `--verify-timeout-seconds`.
+- `--inspect-timeout-seconds` caps the `inspect` phase for one invocation.
+- `--run-timeout-seconds` caps the `run` phase for one invocation.
 - `--total-timeout-seconds` is optional and caps the full refresh across
   inspect, run, and verify.
 - `--workflow-timeout-reason` records why the verify-phase deadline exists.
@@ -437,7 +565,9 @@ Refresh JSON includes `timeout_contract` and `phase_timings` so controllers can
 distinguish a deliberate full-evidence run from a hard end-to-end deadline.
 When a timeout fires, `workflow-timeout.json`, the verify result, and
 `gate-verification.json` include `timeout_scope` as either `verify-phase` or
-`total-refresh`.
+`total-refresh`. The nested timeout diagnostics also identify whether the
+deadline was in `gate-command-execution` or `read-only-gate-discovery` and
+whether the audit came from the current refresh run or a fresh fallback audit.
 
 Agent handoffs from refresh use `quality-runner-agent-handoff-v0.2` and route
 verified gate outcomes with `gates-clean`, `gates-blocked`, and `gates-failed`.
@@ -789,3 +919,27 @@ Review emits the v2 journey projection by default. Packet-only review is
 existing CLI consumer requires the frozen v1 field shape; it emits a versioned
 stderr notice. The [Upgrade and Compatibility Guide](upgrade.md) defines the
 support window and rollback path.
+
+## Planning delivery contracts
+
+The additive contract commands are designed for fast planning and execution
+loops:
+
+```bash
+quality-runner plan contract prepare REPO [options]
+quality-runner plan contract refresh REPO --contract CONTRACT [options]
+quality-runner plan preflight REPO --contract CONTRACT --plan-file PLAN
+quality-runner plan reconcile REPO --contract CONTRACT --result-file RESULT
+```
+
+Contract preparation and refresh default to balanced analysis with an external
+cache and a 30-second performance budget. Preflight reads saved artifacts and
+the native plan only; it does not trigger a QR scan. Reconciliation consumes a
+structured result and the current QR delta. Use the MCP equivalent
+`quality_runner_delivery_contract` for tool callers.
+
+For planning loops, pass `--analysis-mode balanced` and
+`--cache-mode external`. Use `--analysis-mode full` at phase, release, or audit
+boundaries. `--cache-mode disabled` is diagnostic only. See
+[Planning and Delivery Contracts](planning-contracts.md) for the receipt fields
+and blocker rules.

@@ -99,6 +99,28 @@ Classification is advisory lexical evidence, not an automatic merge. Assign a
 candidate to an existing pack when it fits; create a new pack only when it has a
 meaningfully different domain or adoption boundary.
 
+The repository includes the versioned environment-legibility candidate at
+`docs/skill-candidates/environment-legibility.toml`. The candidate remains a
+review-only skill and is not appended to the personal corpus automatically.
+Quality Runner now owns the command-backed profile and fleet orchestration:
+
+```bash
+qr audit /path/to/repo --profile environment-legibility --json
+qr fleet audit run --all --projects-root /path/to/projects --json
+qr fleet audit feed --audit-id AUDIT_ID --json
+```
+
+The fleet feed is a versioned, private handoff at
+`~/.quality-runner/fleet-audit/current/maturity.json`. It is generated only
+from a complete, replay-valid fleet snapshot and contains redacted maturity
+projections for local consumers. Immutable source artifacts remain in the
+audit-specific directory. `--output-dir` is safe for isolated tests and cannot
+replace the production current feed.
+
+The profile uses QR's read-only audit and disposable-worktree contracts. Do not
+pass `environment-legibility` to `--only-gate`; that selector remains reserved
+for executable repository gates such as `lint` or `tests`.
+
 ```bash
 # Recommend existing packs.
 quality-runner skill classify /tmp/new-skill.toml \

@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "quality-runner-fleet-checkout-v0.1",
+  "type": "object",
+  "required": ["schema", "checkout_id", "repo_id", "path", "exists", "provenance_hash"],
+  "properties": {
+    "schema": {"const": "quality-runner-fleet-checkout-v0.1"},
+    "checkout_id": {"type": "string", "minLength": 1},
+    "repo_id": {"type": "string", "minLength": 1},
+    "path": {"type": "string", "minLength": 1},
+    "exists": {"type": "boolean"},
+    "branch": {"type": ["string", "null"]},
+    "head": {"type": ["string", "null"]},
+    "detached": {"type": "boolean"},
+    "dirty": {"type": ["boolean", "null"]},
+    "prunable": {"type": "boolean"},
+    "provenance_hash": {"type": "string", "minLength": 16}
+  },
+  "additionalProperties": true
+}

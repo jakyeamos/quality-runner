@@ -49,8 +49,10 @@ cd quality-runner
 uv tool install --editable . --force
 ```
 
-The editable install exposes both `quality-runner` and the shorter `qr`
-command. After the one-time install, run QR against a local repository without
+`qr` is the canonical human-facing command. The full `quality-runner` name
+remains a compatibility alias for existing callers and accepts the same
+commands, options, and JSON contracts. The editable install exposes both
+commands; after the one-time install, run QR against a local repository without
 passing `--project`:
 
 ```bash
@@ -60,10 +62,10 @@ qr refresh /path/to/repo --json
 Verify the installed commands:
 
 ```bash
-quality-runner --version
 qr --version
+qr doctor --json
+quality-runner --version  # compatibility alias
 quality-runner-mcp --version
-quality-runner doctor --json
 ```
 
 When Quality Runner is installed from this checkout in editable mode, refresh
@@ -77,6 +79,12 @@ For an explicit local checkout, pass `--source /path/to/quality-runner`.
 Without an editable checkout, the command falls back to `uv tool upgrade
 quality-runner`.
 
+The repository itself is guarded by an executable environment contract:
+`python3 scripts/check_environment_contract.py` runs through `.pre-cr.json`,
+CI, and release checks, and is also a required blocker gate in
+`.quality-runner.toml`. It verifies routed context, certified type-checking
+configuration, locked commands, workflow coverage, and secret-file ignores.
+
 Quality Runner also carries compatibility surfaces for the two smaller extracted
 packages it supersedes publicly:
 
@@ -84,25 +92,65 @@ packages it supersedes publicly:
   finding schema normalization.
 - `repo-quality-certifier`, `repo-quality-certifier-mcp`, and
   `repo_quality_certifier` remain available for existing gate-certification
-  callers while new work should lead with `quality-runner`.
+  callers while new work should lead with `qr`.
 
 ## Quickstart
 
-Start with the outcome-first journeys. Each result names the state, the strength
-of the evidence, what was written, the safety mode, and one next action.
+Start with the stable journeys. Use `qr doctor` first to confirm the local
+installation, then choose the audit, review, verify, or runs journey. Each
+outcome result names the state, the strength of the evidence, what was written,
+the safety mode, and one next action.
 
 ```bash
-quality-runner audit /path/to/repo --run-id baseline-001 --json
-quality-runner review /path/to/repo --mode blind --json
-quality-runner verify /path/to/repo --run-id baseline-001-verify --json
-quality-runner runs /path/to/repo --json
+qr doctor --json
+qr audit /path/to/repo --run-id baseline-001 --json
+qr review /path/to/repo --mode blind --json
+qr verify /path/to/repo --run-id baseline-001-verify --json
+qr runs /path/to/repo --json
+qr repo-hygiene check /path/to/repo --json
 ```
+
+For the cross-repository environment contract, QR owns both the review profile
+and the bounded fleet scanner. Static inspection covers every identity under a
+bounded projects root; dynamic commands are opt-in and run only in QR-owned
+disposable worktrees for changed or incomplete evidence:
+
+```bash
+qr audit /path/to/repo --profile environment-legibility --json
+qr fleet audit run --all --projects-root /path/to/projects --json
+qr fleet audit replay --audit-id AUDIT_ID --json
+qr fleet audit report --audit-id AUDIT_ID --json
+qr fleet audit feed --audit-id AUDIT_ID --json
+```
+
+The fleet audit resolves the documented development branch, preferring `dev`,
+and never selects a branch by commit-count maturity. Dirty, detached, stale,
+prunable, or unverifiable target checkouts receive static findings only. Fleet
+artifacts are private by default; the report command emits an aggregate-only
+projection that remains explicitly review-required before publication.
+
+Quality Runner publishes the validated current fleet maturity feed to the fixed
+private path `~/.quality-runner/fleet-audit/current/maturity.json`. Immutable
+audit snapshots remain under `~/.quality-runner/fleet-audit/<audit-id>/`. The
+feed command replays and validates an existing snapshot before atomically
+replacing the current file. An explicit `--output-dir` publishes only beside
+that isolated test artifact and never updates the production current feed.
+Leverage and Pronto consume the same stable feed; the legacy leverage maturity
+audit is historical and is not imported.
+
+Repository maturity includes `change_surface_coverage`. Repositories that host
+skills also receive `skill_contract_quality`; repositories without skills
+record that dimension as explicitly not applicable. Audits assess only an
+existing repository-owned matrix or validated pointer. They never create or
+infer a matrix, and a missing matrix is an ordinary maturity gap rather than a
+blocker to unrelated checks.
 
 `audit` creates evidence and a remediation plan without editing source files.
 `review` makes a prepared packet visibly `awaiting-evidence`, rather than
 treating the absence of a packet-bound local response as clean. `verify`
 records discovered gates by default; `runs` reads history without adding a
-summary file. All four journeys emit the v2 outcome by default.
+summary file. These four journeys emit the v2 outcome by default; `doctor`
+returns the install-readiness contract.
 Fresh Review is deliberately two-phase: prepare a packet first, then submit a
 response that is bound to that packet. The [CLI Reference](docs/cli.md#quality-runner-review)
 explains the boundary and handoff model.
@@ -111,7 +159,7 @@ To authorize discovered commands after reviewing their evidence, use a disposabl
 checkout explicitly:
 
 ```bash
-quality-runner verify /path/to/repo \
+qr verify /path/to/repo \
   --execute-gates --worktree-mode disposable --json
 ```
 
@@ -119,12 +167,26 @@ Disposable execution protects the ordinary source checkout from normal gate
 mutations; it is not a sandbox for arbitrary commands. See the
 [CLI Reference](docs/cli.md) for the full execution and dirty-worktree contract.
 
+`repo-hygiene check` emits the versioned `repo-hygiene-v1` contract. It detects
+tracked confirmed generated output, missing ignore coverage, JavaScript package
+manager conflicts, clear workspace candidates, CI coverage, and ownership
+blocks. It deliberately preserves ambiguous `build/` and `data/` paths unless
+stronger generated-file evidence exists. `repo-hygiene apply --apply` is the
+only command that can add confirmed ignore rules, and it fails closed for dirty,
+recent, or multi-worktree repositories. Repositories with their own CI can
+call `.github/workflows/repo-hygiene-reusable.yml` by exact Quality Runner
+commit SHA and pass that same SHA as `quality-runner-ref`; repositories without
+CI remain covered by the central projects sweep. A repository that intentionally
+preserves fixture or upstream package-manager diversity may document
+`[quality_runner.repo_hygiene] package_manager_exception = "..."`; the result
+is an explicit exception rather than a blind lockfile migration.
+
 Legacy `inspect`, `run`, `verify-gates`, `status`, and orchestration commands
 remain available for compatibility. Use `refresh` when a controller needs its
 established combined v1 workflow and handoff export:
 
 ```bash
-quality-runner refresh /path/to/repo \
+qr refresh /path/to/repo \
   --run-id-prefix baseline-001 \
   --handoff-output /path/to/repo/.quality-runner/exports/baseline-001-handoff.md \
   --json
@@ -133,6 +195,29 @@ quality-runner refresh /path/to/repo \
 The [Upgrade and Compatibility Guide](docs/upgrade.md) defines the v2 command
 mappings, v1 support window, and non-destructive rollback procedure. Use
 `review --legacy-output` only when an existing CLI consumer requires v1 JSON.
+
+For preventative use during implementation, start a task before editing and
+check the exact dirty workspace before declaring completion:
+
+```bash
+qr task start /path/to/repo --task-id feature-123 --json
+# edit externally
+qr task check /path/to/repo --task-id feature-123 --json
+```
+
+Use repository-native checks for fast feedback during editing only after their
+current applicability and maturity have been established. `qr task check` is
+the authoritative completion and CI checkpoint, not a continuous-save or
+editor-hook loop. Re-run it after correcting a violation or blocker.
+
+The result is `pass`, `violation`, or `blocked`. Existing findings remain
+visible without blocking unrelated work; only behavior-verified promoted rules
+and certified native gates can enforce policy. QR does not assume that a
+discovered or CI-listed command is mature. Each check includes a status-specific
+`next_action`; `task-check.json` remains canonical and `task-check.md` is its
+human projection. See
+[Prevention Readiness](docs/prevention-readiness.md) and the
+[`task` CLI contract](docs/cli.md#quality-runner-task).
 
 Quality Runner writes artifacts under the target repo:
 
@@ -178,15 +263,20 @@ The normal workflow is:
 See [Agent Usage](docs/agent-usage.md) for the copy-paste phase and batch
 templates agents should follow.
 
+Planning-loop contracts, performance receipts, explicit cache modes, and the
+GSD/Terrace integration boundary are documented in
+[Planning and Delivery Contracts](docs/planning-contracts.md).
+
 ## Commands
 
-For new work, begin with the four outcome-first commands:
+For new work, begin with the five stable journeys:
 
 ```bash
-quality-runner audit /path/to/repo --json
-quality-runner review /path/to/repo --mode blind --json
-quality-runner verify /path/to/repo --json
-quality-runner runs /path/to/repo --json
+qr audit /path/to/repo --json
+qr review /path/to/repo --mode blind --json
+qr verify /path/to/repo --json
+qr runs /path/to/repo --json
+qr doctor --json
 ```
 
 Their JSON payload uses `quality-runner-outcome-v0.2`; the detailed definitions
@@ -195,35 +285,38 @@ commands below remain callable as supported v1 compatibility paths; see the
 [Upgrade and Compatibility Guide](docs/upgrade.md) before migrating automation.
 
 ```bash
-quality-runner doctor
-quality-runner init /path/to/repo --json
-quality-runner status /path/to/repo --json
-quality-runner inspect /path/to/repo --json
-quality-runner run /path/to/repo --json
-quality-runner verify-gates /path/to/repo --json
-quality-runner exclusions suggest /path/to/repo --json
-quality-runner refresh /path/to/repo --run-id-prefix refresh-001 --handoff-output handoff.md --json
-quality-runner refresh /path/to/repo --run-id-prefix task-001-pass-1 \
+qr doctor
+qr init /path/to/repo --json
+qr status /path/to/repo --json
+qr inspect /path/to/repo --json
+qr run /path/to/repo --json
+qr verify-gates /path/to/repo --json
+qr exclusions suggest /path/to/repo --json
+qr refresh /path/to/repo --run-id-prefix refresh-001 --handoff-output handoff.md --json
+qr refresh /path/to/repo --run-id-prefix task-001-pass-1 \
   --intent "Implement the requested task" --review-cycle-id task-001 \
   --review-iteration 1 --json
-quality-runner release-smoke --json
-quality-runner validate-report worker-report.json --json
-quality-runner validate-handoff handoff.json --json
-quality-runner validate-remediation-context remediation-context.json --remediation-plan remediation-plan.json --json
-quality-runner validate-slice-spec slice-spec.md --json
-quality-runner review-worker /path/to/repo --baseline-run-id before --final-run-id after --worker-report worker-report.json --json
-quality-runner controller-report lint worker-report.json --strict --json
-quality-runner export-handoff /path/to/repo
-quality-runner export-slice-specs /path/to/repo --run-id run-001 --json
-quality-runner remediation-delta /path/to/repo --run-id current --baseline-run-id baseline --json
-quality-runner plan init /path/to/repo --json
-quality-runner plan status /path/to/repo --json
-quality-runner plan auto /path/to/repo --run-id baseline-001-run --json
-quality-runner phase next /path/to/repo --phase 1 --json
-quality-runner phase record-batch /path/to/repo --phase 1 --plan 1 --result-file batch.json --json
-quality-runner phase update /path/to/repo --phase 1 --baseline-run-id before --run-id after --json
-quality-runner phase verify /path/to/repo --phase 1 --run-id after --json
-quality-runner phase close /path/to/repo --phase 1 --run-id after --json
+qr release-smoke --json
+qr validate-report worker-report.json --json
+qr validate-handoff handoff.json --json
+qr validate-remediation-context remediation-context.json --remediation-plan remediation-plan.json --json
+qr validate-slice-spec slice-spec.md --json
+qr review-worker /path/to/repo --baseline-run-id before --final-run-id after --worker-report worker-report.json --json
+qr controller-report lint worker-report.json --strict --json
+qr export-handoff /path/to/repo
+qr export-slice-specs /path/to/repo --run-id run-001 --json
+qr remediation-delta /path/to/repo --run-id current --baseline-run-id baseline --json
+qr plan init /path/to/repo --json
+qr plan status /path/to/repo --json
+qr plan auto /path/to/repo --run-id baseline-001-run --json
+qr plan contract prepare /path/to/repo --phase-id phase-1 --plan-id plan-1 --json
+qr plan preflight /path/to/repo --contract contract.json --plan-file PLAN.md --json
+qr plan reconcile /path/to/repo --contract contract.json --result-file delivery-result.json --json
+qr phase next /path/to/repo --phase 1 --json
+qr phase record-batch /path/to/repo --phase 1 --plan 1 --result-file batch.json --json
+qr phase update /path/to/repo --phase 1 --baseline-run-id before --run-id after --json
+qr phase verify /path/to/repo --phase 1 --run-id after --json
+qr phase close /path/to/repo --phase 1 --run-id after --json
 quality-runner-mcp
 repo-quality-certifier plan --repo-root /path/to/repo --json
 repo-quality-certifier-mcp
@@ -260,7 +353,7 @@ calls `refresh` again with the previous verify run as `--baseline-run-id` until
 the delta recommends `stop`. Quality Runner remains read-only; unrelated
 findings are retained as `out_of_scope` without blocking the task.
 
-Before release, run `quality-runner release-smoke --json` to verify the public
+Before release, run `qr release-smoke --json` to verify the public
 doctor contract, v2 audit outcome, handoff export, report compatibility, and
 the packaged `quality_evidence_contract` / `repo_quality_certifier` surfaces.
 
@@ -321,7 +414,7 @@ The built-in profiles are `default` and `release`. Repos can also save custom pr
 `.quality-runner.toml`:
 
 ```bash
-quality-runner init /path/to/repo --json
+qr init /path/to/repo --json
 ```
 
 ```toml
@@ -338,13 +431,32 @@ After saving the config, the custom profile is selected automatically by
 `default_profile`, or explicitly with:
 
 ```bash
-quality-runner run /path/to/repo --profile team --json
+qr run /path/to/repo --profile team --json
 ```
 
 See [Standards Profiles](docs/standards-profiles.md) for the full profile and
 repo-policy reference. For opt-in layer-boundary rules, see
 [Architecture Contracts](docs/architecture-contracts.md). For opt-in user-defined
 standards packs, see [Quality Skills](docs/quality-skills.md).
+
+## Semantic Invariants
+
+Repositories can promote a reproduced behavior regression into a named,
+owned, executable contract with `[[quality_runner.invariants]]`. Invariants
+start as advisory, run through the normal disposable gate boundary, and write
+`invariant-verification.json` with honest `passed`, `failed`, `blocked`,
+`unknown`, or `stale` status. Promote one to `required` only when its proof is
+stable enough to block integration. See
+[Semantic Invariants](docs/semantic-invariants.md) for the config and promotion
+contract.
+
+Confirmed bug lessons use the separate repository-owned
+`quality-runner-candidates.json` registry. `qr candidates validate` enforces
+that every declared regression receives a candidate or documented disposition;
+`qr candidates aggregate` preserves fleet observation history; and
+`qr candidates promotion-check` requires both passing evidence criteria and an
+explicit human decision before a candidate-linked invariant can become
+required. See [Bug-learning lifecycle](docs/bug-learning.md).
 
 ## Scan Exclusions
 
@@ -367,13 +479,30 @@ Use `quality-runner exclusions suggest` to produce a deterministic review
 packet before changing configuration. Only `exclusions apply --apply` can
 mutate `.quality-runner.toml`.
 
+Agents can make an explicit, run-only inclusion decision when a repository-owned
+source or policy file lives under one of those defaults:
+
+```bash
+qr inspect /path/to/repo --include-path docs/infrastructure.md --json
+qr inspect /path/to/repo --include-ignored-path docs/infrastructure.md --json
+```
+
+`--include-path` narrows the scan and re-includes the requested ordinary path;
+`--include-ignored-path` re-includes it while preserving the rest of the scan.
+Both decisions are recorded as `scan_inclusions` in the run artifacts. Protected
+runtime and artifact paths such as `.git`, `.quality-runner`, `node_modules`,
+`build`, and `dist` remain excluded.
+
 ## Safety Boundary
 
 Quality Runner may create or update files under
-`.quality-runner/runs/<run-id>/` in the target repository. It does not edit
+`.quality-runner/runs/<run-id>/` or `.quality-runner/tasks/<task-id>/` in the
+target repository. It does not edit
 source files, install dependencies, create commits, call remote services, or
 execute remediation. Discovered gate commands are evidence-only unless the
-caller explicitly requests disposable execution.
+caller explicitly requests disposable execution; `qr task check` executes only
+the gates explicitly certified by repository prevention policy, against its
+isolated workspace snapshot.
 
 Every generated remediation slice includes verification guidance, but a separate
 coding agent must receive user approval before implementation.
@@ -391,7 +520,7 @@ uv run --locked basedpyright
 uv run --locked vulture quality_runner quality_evidence_contract repo_quality_certifier tests scripts --min-confidence 70
 uv run --locked pip-audit
 uv run --locked python scripts/run_pytest_with_lcov.py
-uv run --locked quality-runner release-smoke --json
+uv run --locked qr release-smoke --json
 pre-cr run --workspace . --json  # changed-line readiness; expects changed files
 ```
 

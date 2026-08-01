@@ -46,6 +46,13 @@ def _candidate_findings(security_scan: dict[str, Any]) -> list[dict[str, Any]]:
         findings.append(
             {
                 "id": f"security-candidate-{candidate_id.lower()}",
+                "detector": "security",
+                "rule_id": category,
+                "fingerprint": candidate.get("fingerprint"),
+                "file": candidate.get("file"),
+                "line": candidate.get("line"),
+                "confidence": candidate.get("confidence"),
+                "coverage_ref": "security",
                 "severity": _audit_severity(severity_hint),
                 "category": f"security:{category}",
                 "summary": (
@@ -69,6 +76,11 @@ def _candidate_findings(security_scan: dict[str, Any]) -> list[dict[str, Any]]:
                 ],
                 "owner": None,
                 "score": _severity_score(severity_hint),
+                "disposition_class": candidate.get("disposition_class"),
+                "disposition_group": candidate.get("disposition_group"),
+                "disposition_required": candidate.get("disposition_required", False),
+                "owner_role": candidate.get("owner_role", "security-maintainer"),
+                "disposition_rationale": candidate.get("disposition_rationale"),
             }
         )
     return findings

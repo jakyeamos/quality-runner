@@ -1,0 +1,5 @@
+{
+  "record_id": "workflow-001",
+  "derived_classification": "human-only",
+  "derivation": "infer from queue placement"
+}

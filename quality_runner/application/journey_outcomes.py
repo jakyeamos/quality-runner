@@ -34,6 +34,7 @@ def audit_journey_outcome(
     agent_review_mode: str | None = None,
     scan_exclusion_overlay: ScanExclusionOverlay | None = None,
     readiness_evidence_file: Path | None = None,
+    include_paths: tuple[str, ...] = (),
 ) -> JourneyOutcome:
     branch_before = checked_out_branch(repo_root)
     payload = (
@@ -48,6 +49,7 @@ def audit_journey_outcome(
             skill_review_report=skill_review_report,
             agent_review_mode=agent_review_mode,
             scan_exclusion_overlay=scan_exclusion_overlay,
+            include_paths=include_paths,
             intent=intent,
         )
         if inspect_only
@@ -62,6 +64,7 @@ def audit_journey_outcome(
             skill_review_report=skill_review_report,
             agent_review_mode=agent_review_mode,
             scan_exclusion_overlay=scan_exclusion_overlay,
+            include_paths=include_paths,
             intent=intent,
         )
     )
@@ -89,6 +92,9 @@ def verify_journey_outcome(
     skill_review_report: LegacyPayload | None,
     intent: LegacyPayload | None,
     agent_review_mode: str | None = None,
+    include_ignored_paths: list[str] | None = None,
+    include_paths: tuple[str, ...] = (),
+    only_gate_ids: tuple[str, ...] = (),
     scan_exclusion_overlay: ScanExclusionOverlay | None = None,
     readiness_evidence_file: Path | None = None,
 ) -> JourneyOutcome:
@@ -106,9 +112,12 @@ def verify_journey_outcome(
         allow_mutating_gates=allow_mutating_gates,
         worktree_mode=worktree_mode,
         allow_dirty_worktree_verify=allow_dirty_worktree_verify,
+        only_gate_ids=only_gate_ids,
         skill_review_report=skill_review_report,
         intent=intent,
         agent_review_mode=agent_review_mode,
+        include_ignored_paths=include_ignored_paths,
+        include_paths=include_paths,
         scan_exclusion_overlay=scan_exclusion_overlay,
     )
     legacy_payload = _payload_mapping(payload)

@@ -409,7 +409,7 @@ def _warnings(payload: dict[str, Any]) -> list[dict[str, str]]:
 
 
 def _severity_for_capability(capability_id: str) -> str:
-    if capability_id in {"formatter", "lint", "typecheck", "tests", "dead_code", "truth_file"}:
+    if capability_id in {"formatter", "lint", "typecheck", "tests", "dead_code"}:
         return "blocker"
     return "warning"
 
@@ -453,7 +453,6 @@ def _recommended_fix(capability_id: str, language: str) -> str:
         "runtime_smoke": "Add a smoke-test command for runtime verification.",
         "pre_pr": "Add a pre-PR check command or document the equivalent release gate.",
         "pre_cr": "Add a Pre-CR script or configuration.",
-        "truth_file": "Create and maintain .tracker/PROJECT_TRUTH.md.",
         "security_secrets_scan": "Add a secrets scan gate such as gitleaks detect --source .",
         "security_dependency_audit": "Add a dependency audit gate such as pnpm audit --audit-level high.",
         "security_static_analysis": "Add a static security analysis gate such as semgrep --config auto.",

@@ -57,6 +57,23 @@ def actionability_for_finding(finding: dict[str, Any]) -> tuple[str, str]:
             "Agent-reviewed security findings require explicit author or security-owner judgment.",
         )
     if category.startswith("security:"):
+        disposition_class = str(finding.get("disposition_class") or "")
+        if disposition_class == "human-review" or finding.get("disposition_required") is True:
+            return (
+                "needs-author-decision",
+                str(
+                    finding.get("disposition_rationale")
+                    or "High-signal security candidates need explicit owner judgment."
+                ),
+            )
+        if disposition_class in {"triage", "bulk-review-eligible"}:
+            return (
+                "needs-triage",
+                str(
+                    finding.get("disposition_rationale")
+                    or "Group similar candidates and escalate only exceptions."
+                ),
+            )
         if severity in {"critical", "blocker"}:
             return (
                 "needs-author-decision",

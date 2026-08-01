@@ -8,7 +8,9 @@ from quality_runner.schema_constants import STANDARDS_PACKET_SCHEMA
 
 DEFAULT_PROFILE = "default"
 RELEASE_PROFILE = "release"
-SUPPORTED_PROFILES = {DEFAULT_PROFILE, RELEASE_PROFILE}
+ENVIRONMENT_LEGIBILITY_PROFILE = "environment-legibility"
+ENVIRONMENT_LEGIBILITY_PROFILE_VERSION = "0.2.0"
+SUPPORTED_PROFILES = {DEFAULT_PROFILE, RELEASE_PROFILE, ENVIRONMENT_LEGIBILITY_PROFILE}
 BUILTIN_PROFILE_CONFIGS: dict[str, dict[str, Any]] = {
     RELEASE_PROFILE: {
         "extends": DEFAULT_PROFILE,
@@ -22,7 +24,16 @@ BUILTIN_PROFILE_CONFIGS: dict[str, dict[str, Any]] = {
             "aggregate_coverage",
         ],
         "allowed_package_managers": [],
-    }
+    },
+    ENVIRONMENT_LEGIBILITY_PROFILE: {
+        "extends": DEFAULT_PROFILE,
+        "version": ENVIRONMENT_LEGIBILITY_PROFILE_VERSION,
+        "source": "docs/skill-candidates/environment-legibility.toml",
+        "execution": "quality-runner-fleet-read-only",
+        "required_capabilities_configured": True,
+        "required_capabilities": ["environment_legibility", "evidence_provenance"],
+        "allowed_package_managers": [],
+    },
 }
 
 
@@ -64,9 +75,6 @@ def _sources(scan: dict[str, Any], profile: str, config: dict[str, Any]) -> list
             if isinstance(path, str) and path:
                 sources.append({"type": "agent_instructions", "path": path})
 
-    truth_file = scan.get("truth_file")
-    if isinstance(truth_file, str) and truth_file:
-        sources.append({"type": "truth_file", "path": truth_file})
 
     intent_docs = scan.get("intent_docs")
     if isinstance(intent_docs, list):
@@ -95,11 +103,6 @@ def _requirements(
             "id": "quality_ladder",
             "level": "hard",
             "description": "Run lint, type checking, tests, and dead-code checks before completion.",
-        },
-        {
-            "id": "truth_file_current",
-            "level": "hard",
-            "description": "Maintain .tracker/PROJECT_TRUTH.md when the repo has a truth file.",
         },
         {
             "id": "audit_and_plan_only",

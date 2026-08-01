@@ -16,6 +16,11 @@
     "execute_discovered_gates": { "type": "boolean" },
     "read_only_gates": { "type": "boolean" },
     "allow_mutating_gates": { "type": "boolean" },
+    "only_gate_ids": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "uniqueItems": true
+    },
     "failure_type": { "enum": ["workflow-timeout"] },
     "timeout_scope": { "enum": ["verify-phase", "total-refresh"] },
     "phase": { "type": "string", "minLength": 1 },
@@ -27,6 +32,18 @@
     },
     "provenance": { "$ref": "#/$defs/provenance" },
     "readiness": { "type": "object" },
+    "invariant_verification": {
+      "type": "object",
+      "required": ["schema", "status", "summary"],
+      "properties": {
+        "schema": { "const": "quality-runner-invariant-verification-v0.1" },
+        "status": {
+          "enum": ["passed", "failed", "blocked", "unknown", "stale"]
+        },
+        "summary": { "type": "object" }
+      },
+      "additionalProperties": false
+    },
     "execution_plan": {
       "type": "array",
       "items": { "$ref": "#/$defs/executionPlanItem" }
@@ -55,7 +72,14 @@
       "properties": {
         "id": { "type": "string", "minLength": 1 },
         "status": { "enum": ["passed", "failed", "blocked", "skipped"] },
-        "capability_kind": { "enum": ["local_command", "ci_only", "evidence_file", "evidence", "agent_review", "integrity"] },
+        "capability_kind": { "enum": ["local_command", "semantic_invariant", "ci_only", "evidence_file", "evidence", "agent_review", "integrity"] },
+        "enforcement": { "enum": ["advisory", "required"] },
+        "description": { "type": "string", "minLength": 1 },
+        "owner": { "type": "string", "minLength": 1 },
+        "surfaces": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
         "command": { "type": "string", "minLength": 1 },
         "source": { "type": ["string", "null"] },
         "cwd": { "type": "string", "minLength": 1 },
@@ -114,7 +138,8 @@
         "command": { "type": ["string", "null"] },
         "cwd": { "type": "string", "minLength": 1 },
         "source": { "type": ["string", "null"] },
-        "capability_kind": { "enum": ["local_command", "ci_only", "evidence_file", "evidence", "agent_review", "integrity"] },
+        "capability_kind": { "enum": ["local_command", "semantic_invariant", "ci_only", "evidence_file", "evidence", "agent_review", "integrity"] },
+        "enforcement": { "enum": ["advisory", "required"] },
         "package_manager": { "type": ["string", "null"] },
         "mutating_risk": { "enum": ["safe", "unknown", "mutating"] },
         "local_execution_status": {

@@ -23,6 +23,7 @@ class GateExecutionPolicy:
     allow_mutating_gates: bool
     worktree_mode: WorktreeMode | str
     allow_dirty_worktree_verify: bool
+    only_gate_ids: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -36,6 +37,8 @@ class VerificationRequest:
     skill_review_report: AuditPayload | None
     intent: AuditPayload | None
     scan_exclusion_overlay: ScanExclusionOverlay | None = None
+    include_ignored_paths: tuple[str, ...] = ()
+    include_paths: tuple[str, ...] = ()
     agent_review_mode: str | None = None
     readiness_evidence_file: Path | None = None
 

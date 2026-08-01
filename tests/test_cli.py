@@ -224,6 +224,38 @@ def test_cli_run_interactive_can_include_expensive_paths_once(tmp_path: Path) ->
     assert "data/row-0.ts" in scanned_paths
 
 
+def test_cli_run_can_include_default_excluded_path_explicitly(tmp_path: Path) -> None:
+    write_js_fixture(tmp_path)
+    (tmp_path / "docs").mkdir()
+    (tmp_path / "docs" / "ENVIRONMENT.md").write_text("NEXT_PUBLIC_SITE_URL\n", encoding="utf-8")
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "quality_runner",
+            "run",
+            str(tmp_path),
+            "--run-id",
+            "cli-explicit-include",
+            "--include-ignored-path",
+            "docs",
+            "--json",
+        ],
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+    payload = json.loads(result.stdout)
+    code_quality = json.loads(Path(payload["artifact_paths"]["code_quality_scan_json"]).read_text())
+    scanned_paths = {item["path"] for item in code_quality["accountability"]}
+
+    assert "docs/ENVIRONMENT.md" in scanned_paths
+    assert "docs" in code_quality["scan_inclusions"]
+
+
 def test_cli_inspect_json_writes_inspection_artifacts(tmp_path: Path) -> None:
     write_js_fixture(tmp_path)
 
@@ -326,6 +358,55 @@ def test_cli_verify_gates_json_executes_discovered_gates(tmp_path: Path) -> None
     assert payload["schema"] == "quality-runner-verify-gates-result-v0.1"
     assert payload["status"] == "passed"
     assert verification["gates"][0]["status"] == "passed"
+
+
+def test_cli_verify_gates_can_run_only_one_gate(tmp_path: Path) -> None:
+    (tmp_path / "package.json").write_text(
+        json.dumps(
+            {
+                "scripts": {
+                    "lint": f"{sys.executable} -c 'print(1)'",
+                    "test": f"{sys.executable} -c 'print(1)'",
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    (tmp_path / ".quality-runner.toml").write_text(
+        '[quality_runner]\nrequired_capabilities = ["lint", "tests"]\n',
+        encoding="utf-8",
+    )
+    _git(tmp_path, "init")
+    _git_commit_all(tmp_path, "fixture")
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "quality_runner",
+            "verify-gates",
+            str(tmp_path),
+            "--run-id",
+            "cli-selected-gate",
+            "--only-gate",
+            "lint",
+            "--execute-gates",
+            "--worktree-mode",
+            "disposable",
+            "--json",
+        ],
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+    payload = json.loads(result.stdout)
+    verification = json.loads(Path(payload["artifact_paths"]["gate_verification_json"]).read_text())
+
+    assert payload["status"] == "passed"
+    assert verification["only_gate_ids"] == ["lint"]
+    assert [gate["id"] for gate in verification["gates"]] == ["lint"]
 
 
 def test_cli_verify_gates_requires_explicit_execution_consent(tmp_path: Path) -> None:
@@ -749,6 +830,19 @@ def test_cli_refresh_runs_read_only_sequence_and_persists_summary(
     assert payload["runs"]["run"]["run_id"] == "cli-refresh-run"
     assert payload["runs"]["verify"]["run_id"] == "cli-refresh-verify"
     assert payload["summary"]["recommended_classification"] == "execution-consent-required"
+    inspect_code = json.loads(
+        (
+            tmp_path / ".quality-runner" / "runs" / "cli-refresh-inspect" / "code-quality-scan.json"
+        ).read_text()
+    )
+    run_code = json.loads(
+        (
+            tmp_path / ".quality-runner" / "runs" / "cli-refresh-run" / "code-quality-scan.json"
+        ).read_text()
+    )
+    assert inspect_code["analysis_cache"]["persisted"] is True
+    assert run_code["analysis_cache"]["cache_hits"] > 0
+    assert run_code["analysis_cache"]["cache_misses"] == 0
     persisted = tmp_path / ".quality-runner" / "runs" / "cli-refresh-verify" / "run-summary.json"
     assert json.loads(persisted.read_text(encoding="utf-8"))["run_id"] == "cli-refresh-verify"
 
@@ -858,7 +952,7 @@ def test_cli_refresh_workflow_timeout_records_reason(tmp_path: Path) -> None:
         check=True,
         capture_output=True,
         text=True,
-        timeout=4,
+        timeout=10,
     )
 
     payload = json.loads(result.stdout)

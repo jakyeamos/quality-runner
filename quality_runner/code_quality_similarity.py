@@ -16,14 +16,11 @@ from quality_runner.code_quality_native_similarity import (
 )
 from quality_runner.code_quality_paths import _verification_for_path
 from quality_runner.code_quality_similarity_parse import parse_similarity_output
+from quality_runner.semantic_similarity_policy import (
+    DEFAULT_SIMILARITY_BACKEND,
+)
+from quality_runner.semantic_similarity_workflow import cached_semantic_similarity_scan
 
-DEFAULT_SIMILARITY_ENABLED = True
-DEFAULT_SIMILARITY_BACKEND = "native"
-DEFAULT_SIMILARITY_THRESHOLD = 0.87
-DEFAULT_SIMILARITY_MIN_LINES = 8
-DEFAULT_SIMILARITY_MAX_PAIRS = 25
-DEFAULT_SIMILARITY_TIMEOUT_SECONDS = 30
-DEFAULT_SIMILARITY_INCLUDE_TESTS = False
 NATIVE_SIMILARITY_ENGINE = "quality-runner-native"
 
 SIMILARITY_CLUSTER_ID_PREFIX = "SIM"
@@ -45,39 +42,6 @@ EXCLUDED_PATH_PARTS = {
 }
 
 
-def similarity_policy_defaults(policy: dict[str, Any]) -> dict[str, Any]:
-    similarity_enabled = policy.get("similarity_enabled")
-    similarity_backend = policy.get("similarity_backend")
-    similarity_threshold = policy.get("similarity_threshold")
-    similarity_min_lines = policy.get("similarity_min_lines")
-    similarity_max_pairs = policy.get("similarity_max_pairs")
-    similarity_timeout_seconds = policy.get("similarity_timeout_seconds")
-    similarity_include_tests = policy.get("similarity_include_tests")
-    return {
-        "similarity_enabled": similarity_enabled
-        if isinstance(similarity_enabled, bool)
-        else DEFAULT_SIMILARITY_ENABLED,
-        "similarity_backend": similarity_backend
-        if similarity_backend in {"native", "external"}
-        else DEFAULT_SIMILARITY_BACKEND,
-        "similarity_threshold": similarity_threshold
-        if isinstance(similarity_threshold, (int, float)) and 0 <= float(similarity_threshold) <= 1
-        else DEFAULT_SIMILARITY_THRESHOLD,
-        "similarity_min_lines": similarity_min_lines
-        if isinstance(similarity_min_lines, int) and similarity_min_lines > 0
-        else DEFAULT_SIMILARITY_MIN_LINES,
-        "similarity_max_pairs": similarity_max_pairs
-        if isinstance(similarity_max_pairs, int) and similarity_max_pairs > 0
-        else DEFAULT_SIMILARITY_MAX_PAIRS,
-        "similarity_timeout_seconds": similarity_timeout_seconds
-        if isinstance(similarity_timeout_seconds, int) and similarity_timeout_seconds > 0
-        else DEFAULT_SIMILARITY_TIMEOUT_SECONDS,
-        "similarity_include_tests": similarity_include_tests
-        if isinstance(similarity_include_tests, bool)
-        else DEFAULT_SIMILARITY_INCLUDE_TESTS,
-    }
-
-
 def collect_deduplicate_scan(
     repo_root: Path,
     *,
@@ -85,9 +49,25 @@ def collect_deduplicate_scan(
     scanned_files: Sequence[Mapping[str, object]] | None = None,
     policy: dict[str, Any],
     disabled_groups: set[str],
-) -> tuple[list[dict[str, Any]], list[dict[str, Any]], int, dict[str, str]]:
+    persist_cache: bool = True,
+    cache_root: Path | None = None,
+) -> tuple[
+    list[dict[str, Any]],
+    list[dict[str, Any]],
+    int,
+    dict[str, str],
+    dict[str, Any],
+]:
     if "deduplicate" in disabled_groups:
-        return [], [], 0, {}
+        similarity_result = semantic_similarity_scan(
+            repo_root,
+            scanned_files=scanned_files,
+            policy=policy,
+            disabled_groups=disabled_groups,
+            persist_cache=persist_cache,
+            cache_root=cache_root,
+        )
+        return [], [], 0, {}, similarity_result["cache_evidence"]
 
     duplicate_clusters = _duplicate_clusters(extracted_functions)
     findings: list[dict[str, Any]] = []
@@ -116,6 +96,8 @@ def collect_deduplicate_scan(
         scanned_files=scanned_files,
         policy=policy,
         disabled_groups=disabled_groups,
+        persist_cache=persist_cache,
+        cache_root=cache_root,
     )
     duplicate_clusters.extend(similarity_result["clusters"])
     findings.extend(similarity_result["findings"])
@@ -129,6 +111,7 @@ def collect_deduplicate_scan(
         findings,
         len(similarity_result["clusters"]),
         semantic_similarity_tools,
+        similarity_result["cache_evidence"],
     )
 
 
@@ -138,16 +121,48 @@ def semantic_similarity_scan(
     scanned_files: Sequence[Mapping[str, object]] | None = None,
     policy: dict[str, Any],
     disabled_groups: set[str],
+    persist_cache: bool = True,
+    cache_root: Path | None = None,
 ) -> dict[str, Any]:
-    backend = policy.get("similarity_backend", DEFAULT_SIMILARITY_BACKEND)
-    if backend == "native":
-        native_report = native_similarity_scan(
+    return cached_semantic_similarity_scan(
+        repo_root,
+        scanned_files=scanned_files,
+        policy=policy,
+        disabled_groups=disabled_groups,
+        persist_cache=persist_cache,
+        cache_root=cache_root,
+        implementation_paths=(Path(__file__), Path(native_similarity_scan.__code__.co_filename)),
+        excluded_path_parts=EXCLUDED_PATH_PARTS,
+        supported_extensions=TS_EXTENSIONS | PY_EXTENSIONS | RS_EXTENSIONS,
+        scan=lambda: _uncached_semantic_similarity_scan(
             repo_root,
             scanned_files=scanned_files,
             policy=policy,
             disabled_groups=disabled_groups,
+        ),
+        materialize=_materialize_similarity_report,
+    )
+
+
+def _uncached_semantic_similarity_scan(
+    repo_root: Path,
+    *,
+    scanned_files: Sequence[Mapping[str, object]] | None,
+    policy: dict[str, Any],
+    disabled_groups: set[str],
+) -> dict[str, Any]:
+    if "deduplicate" in disabled_groups or policy.get("similarity_enabled") is False:
+        return _skipped_result(repo_root, reason="disabled")
+    backend = policy.get("similarity_backend", DEFAULT_SIMILARITY_BACKEND)
+    if backend == "native":
+        return _materialize_similarity_report(
+            native_similarity_scan(
+                repo_root,
+                scanned_files=scanned_files,
+                policy=policy,
+                disabled_groups=disabled_groups,
+            )
         )
-        return _materialize_similarity_report(native_report)
     return _external_similarity_scan(repo_root, policy=policy, disabled_groups=disabled_groups)
 
 

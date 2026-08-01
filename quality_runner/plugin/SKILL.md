@@ -1,17 +1,21 @@
 ---
 name: quality-runner
-description: Run standalone audit-and-plan quality orchestration for a repository, producing evidence-backed remediation plans without modifying source files.
+description: Run standalone audit, planning, and task-scoped prevention for a repository, producing authoritative quality evidence without modifying source files.
 ---
 
 # Quality Runner
 
-Use this skill when the user asks to audit a repository against quality standards, run Quality Runner, inspect available quality gates, or produce a remediation plan.
+Use this skill when the user asks to audit a repository against quality
+standards, run Quality Runner, inspect available quality gates, produce a
+remediation plan, or prevent new trusted findings during implementation.
 
-Quality Runner's preferred journeys are outcome-first. They write local
-`.quality-runner/` evidence as needed but do not modify target source files.
-Discovered gates remain evidence-only unless a user explicitly authorizes
-`--execute-gates --worktree-mode disposable`; that runs local commands in a
-disposable checkout, not a sandbox.
+Quality Runner's preferred journeys are outcome-first. The canonical executable
+is `qr`; `quality-runner` remains a compatible alias. Confirm the install with
+`qr doctor --json`, then choose `audit`, `review`, `verify`, or `runs`. They
+write local `.quality-runner/` evidence as needed but do not modify target
+source files. Discovered gates remain evidence-only unless a user explicitly
+authorizes `--execute-gates --worktree-mode disposable`; that runs local
+commands in a disposable checkout, not a sandbox.
 
 Preferred MCP tools:
 
@@ -22,6 +26,46 @@ Preferred MCP tools:
 
 Use the legacy MCP tools only when an existing client requires their v1 payloads.
 
+## Implementation completion contract
+
+For an implementation task, capture the baseline before source edits:
+
+```bash
+qr task start /path/to/repo --task-id <stable-task-id> --json
+```
+
+During editing, use only repository-native checks whose current applicability
+and maturity are established by repository evidence. Do not infer that a
+command is preventative merely because it appears in a manifest or CI file.
+Candidate QR gates remain advisory and are not executed by `qr task check`.
+
+After editing, run the authoritative QR checkpoint before declaring the
+implementation complete:
+
+```bash
+qr task check /path/to/repo --task-id <stable-task-id> --json
+```
+
+Interpret the result as follows:
+
+- `pass` permits completion only after any other repository-required checks pass.
+- `violation` requires fixing or explicitly disposing every new enforced
+  finding and failed certified gate, followed by another task check.
+- `blocked` is unknown evidence, never a pass. Resolve its blockers and rerun.
+- `invalid` requires correcting the invocation or prevention configuration.
+
+Read the emitted `task-check.json` as the authority and `task-check.md` as its
+human projection. Persisted legacy and advisory findings remain visible but do
+not become task failures. Do not copy every QR finding into static agent rules;
+promote a repeatedly trusted deterministic finding into a behavior-verified QR
+rule or a faster native checker with its own maturity evidence.
+
+This is a baseline and completion/CI checkpoint, not a continuous-save or
+editor-hook workflow. Re-run it after correcting violations or blockers. Use
+`qr task rebaseline --reason ...` only when configuration, policy, rule-pack,
+QR version, or toolchain evidence genuinely changed; never enlarge a baseline
+silently.
+
 Fresh Review is two phase: first prepare the packet, then submit a locally
 supplied response bound to that packet. A packet-ready outcome is not a clean
 review. Select findings explicitly before giving its fixer prompts to a separate
@@ -30,12 +74,47 @@ agent; Quality Runner does not apply those fixes.
 CLI fallback:
 
 ```bash
-quality-runner audit /path/to/repo --run-id qr-<date-or-task> --json
-quality-runner verify /path/to/repo --run-id qr-<date-or-task>-verify --json
-quality-runner runs /path/to/repo --json
+qr doctor --json
+qr audit /path/to/repo --run-id qr-<date-or-task> --json
+qr review /path/to/repo --mode blind --run-id review-<date-or-task> --json
+qr verify /path/to/repo --run-id qr-<date-or-task>-verify --json
+qr runs /path/to/repo --json
 ```
 
-Agent workflow:
+For the four journey commands, read the
+`quality-runner-outcome-v0.2` fields (`state`, `assessment`, evidence, writes,
+safety, and `next_action`) instead of treating exit code `0` as a clean result.
+When a task names a file below QR's default exclusions, use
+`--include-path` for a bounded scan or `--include-ignored-path` to preserve the
+rest of the scan, then inspect `scan_inclusions`. Use module-scoped
+`--scan-exclusion-module` when security coverage must remain; protected paths
+stay fail-closed.
+
+Use `refresh` for the combined inspect/run/verify/handoff workflow and its
+intent/review-cycle delta loop; read the resulting `review-delta.json` and
+`review-delta.md`. Use `gate`/`gate-status`/`gate-respond` for controller
+decisions, `review-worker` plus strict report validation for worker handoffs,
+`plan`/`phase` or delivery contracts for bounded planning, `rollout` for
+isolated multi-repository runs, and `release-smoke` before release. The full
+agent protocol is in `docs/agent-usage.md`.
+
+For planning and execution loops, use the additive delivery contract surface:
+
+```bash
+qr plan contract prepare /path/to/repo --phase-id phase-1 --plan-id plan-1 --json
+qr plan contract refresh /path/to/repo --contract CONTRACT --json
+qr plan preflight /path/to/repo --contract CONTRACT --plan-file PLAN.md --json
+qr plan reconcile /path/to/repo --contract CONTRACT --result-file delivery-result.json --json
+```
+
+Contract preparation and refresh use balanced analysis with an external cache by
+default. Preflight reads existing contract and plan artifacts without rescanning;
+reconcile consumes one structured result per execution plan or batch. Use full
+analysis at phase, release, or audit boundaries. Hard obligations, stale source
+fingerprints, missing mandatory evidence, uncovered plan obligations, and
+deferred hard checks block reconciliation; advisory obligations remain visible.
+
+Audit and remediation workflow:
 
 1. Run QR before editing source.
 2. Read `.quality-runner/runs/qr-<date-or-task>/agent-handoff.md` and the referenced artifacts from that run.

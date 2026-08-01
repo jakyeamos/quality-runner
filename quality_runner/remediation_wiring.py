@@ -133,7 +133,7 @@ def _slice_for_wiring_group(*, file: str, findings: list[dict[str, Any]]) -> dic
                 "finding_ids": finding_ids,
                 "actions": [
                     "Remove the partial surface area intentionally only after confirming it is out of scope.",
-                    "Document why the scope was cut in the relevant handoff, issue, or truth file.",
+                    "Document why the scope was cut in the relevant handoff, issue, or planning state file.",
                 ],
             },
             {
@@ -141,7 +141,7 @@ def _slice_for_wiring_group(*, file: str, findings: list[dict[str, Any]]) -> dic
                 "finding_ids": finding_ids,
                 "actions": [
                     "Record an accepted-intentional disposition with owner, reason, and optional expiry.",
-                    "Ensure the WIP is visible through an issue link, handoff note, or truth-file note.",
+                    "Ensure the WIP is visible through an issue link, handoff note, or planning-state note.",
                 ],
             },
         ],

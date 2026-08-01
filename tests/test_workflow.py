@@ -24,6 +24,13 @@ def _capability_finding_enrichment() -> dict[str, str]:
 
 def _git_commit(repo_root: Path) -> str:
     subprocess.run(["git", "init"], cwd=repo_root, check=True, capture_output=True, text=True)
+    excludes_file = repo_root / ".git" / "info" / "quality-runner-test-excludes"
+    excludes_file.write_text("", encoding="utf-8")
+    subprocess.run(
+        ["git", "config", "core.excludesfile", str(excludes_file)],
+        cwd=repo_root,
+        check=True,
+    )
     (repo_root / "tracked.txt").write_text("tracked\n", encoding="utf-8")
     subprocess.run(["git", "add", "tracked.txt"], cwd=repo_root, check=True)
     subprocess.run(
@@ -67,10 +74,13 @@ def test_run_payload_writes_audit_plan_and_handoff(tmp_path: Path) -> None:
         "repo_scan_json",
         "code_quality_scan_json",
         "security_scan_json",
+        "security_review_obligations_json",
         "package_manager_preflight_json",
         "standards_json",
         "capability_matrix_json",
+        "invariant_verification_json",
         "run_manifest_json",
+        "performance_json",
         "quality_audit_json",
         "remediation_plan_json",
         "remediation_context_json",
@@ -94,6 +104,7 @@ def test_run_payload_writes_audit_plan_and_handoff(tmp_path: Path) -> None:
     assert Path(artifact_paths["run_manifest_json"]).exists()
     assert Path(artifact_paths["quality_audit_json"]).exists()
     assert Path(artifact_paths["code_quality_scan_json"]).exists()
+    assert Path(artifact_paths["security_review_obligations_json"]).exists()
     assert Path(artifact_paths["package_manager_preflight_json"]).exists()
     assert Path(artifact_paths["resolution_ledger_json"]).exists()
     assert Path(artifact_paths["resolution_ledger_md"]).exists()
@@ -395,7 +406,7 @@ def test_run_payload_records_missing_capability_findings(tmp_path: Path) -> None
     finding_ids = {finding["id"] for finding in audit_report["findings"]}
     assert "missing-lint" in finding_ids
     assert "missing-tests" in finding_ids
-    assert "missing-truth-file" not in finding_ids
+    assert "missing-state-file" not in finding_ids
 
 
 def test_run_payload_does_not_false_positive_python_quality_gates(tmp_path: Path) -> None:
@@ -419,7 +430,7 @@ def test_run_payload_does_not_false_positive_python_quality_gates(tmp_path: Path
     assert "missing-dead-code" not in finding_ids
     assert "missing-runtime-smoke" not in finding_ids
     assert "missing-pre-pr" not in finding_ids
-    assert "missing-truth-file" not in finding_ids
+    assert "missing-state-file" not in finding_ids
     available = {item["id"]: item for item in capability_map["available"]}
     assert available["dead_code"]["source"] == ".github/workflows"
     assert available["runtime_smoke"]["command"] == "quality-runner doctor --json"

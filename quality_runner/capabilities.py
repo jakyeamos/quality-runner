@@ -4,6 +4,7 @@ from typing import Any
 
 from quality_runner.capability_exceptions import active_exception as _active_exception
 from quality_runner.capability_state import matching_ci_status, verification_state
+from quality_runner.invariants import add_invariant_capabilities
 from quality_runner.readiness import (
     add_readiness_capabilities,
     canonical_readiness_command_id,
@@ -27,7 +28,7 @@ SCRIPT_CAPABILITIES = {
     "pre_pr": ("pre-pr", "prepr"),
 }
 PRE_CR_SCRIPT_NAMES = ("pre-cr", "precr", "pre-cr:run")
-FILE_CAPABILITIES = {"pre_cr", "truth_file"}
+FILE_CAPABILITIES = {"pre_cr"}
 
 
 def detect_capabilities(
@@ -90,14 +91,18 @@ def detect_capabilities(
     # fmt: off
     if "pre_cr" in required_capabilities:
         _record_file_capability(available=available, missing=missing, accepted_exceptions=accepted_exceptions, standards_packet=standards_packet, scan=scan, scripts=scripts, quality_commands=quality_commands, capability_id="pre_cr", script_names=PRE_CR_SCRIPT_NAMES, path=scan.get("pre_cr_config"), reason="no Pre-CR script or configuration found", language=_primary_language(scan), required_by=required_by.get("pre_cr", "profile"))
-    if "truth_file" in required_capabilities:
-        _record_file_capability(available=available, missing=missing, accepted_exceptions=accepted_exceptions, standards_packet=standards_packet, scan=scan, scripts=scripts, quality_commands=quality_commands, capability_id="truth_file", script_names=(), path=scan.get("truth_file"), reason="no project truth file found", language=_primary_language(scan), required_by=required_by.get("truth_file", "profile"))
     # fmt: on
 
     readiness = add_readiness_capabilities(
         scan=scan,
         standards_packet=standards_packet,
         quality_commands=quality_commands,
+        available=available,
+        missing=missing,
+    )
+    add_invariant_capabilities(
+        scan=scan,
+        standards_packet=standards_packet,
         available=available,
         missing=missing,
     )
@@ -359,8 +364,6 @@ def _required_capabilities(scan: dict[str, Any], standards_packet: dict[str, Any
                         capability_id in SCRIPT_CAPABILITIES or capability_id in FILE_CAPABILITIES
                     ):
                         required.add(capability_id)
-    if _truth_file_required(scan):
-        required.add("truth_file")
     return required
 
 
@@ -400,21 +403,6 @@ def _required_by(standards_packet: dict[str, Any]) -> dict[str, str]:
         if isinstance(capability, str)
         and (capability in SCRIPT_CAPABILITIES or capability in FILE_CAPABILITIES)
     }
-
-
-def _truth_file_required(scan: dict[str, Any]) -> bool:
-    if isinstance(scan.get("truth_file"), str) and scan["truth_file"]:
-        return True
-    instruction_files = scan.get("agent_instruction_files")
-    if not isinstance(instruction_files, list):
-        return False
-    quality_contract = scan.get("quality_contract")
-    if not isinstance(quality_contract, dict):
-        return False
-    required_terms = quality_contract.get("required_terms")
-    if not isinstance(required_terms, dict):
-        return False
-    return required_terms.get("truth_file") is True
 
 
 def _primary_language(scan: dict[str, Any]) -> str:

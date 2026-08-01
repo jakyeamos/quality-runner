@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://quality-runner.dev/schemas/candidate-promotion-receipt.schema.json",
+  "title": "Quality Runner Reusable Candidate Promotion Receipt",
+  "type": "object",
+  "required": [
+    "schema",
+    "status",
+    "candidate_id",
+    "decision",
+    "decided_by",
+    "decided_at",
+    "decision_reason",
+    "registry_provenance_hash",
+    "candidate_contract_hash",
+    "fleet_provenance_hash",
+    "promotion_criteria",
+    "errors",
+    "provenance_hash"
+  ],
+  "properties": {
+    "schema": {
+      "const": "quality-runner-candidate-promotion-receipt-v0.1"
+    },
+    "status": { "enum": ["supported", "blocked"] },
+    "candidate_id": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+    },
+    "decision": { "type": ["string", "null"] },
+    "decided_by": { "type": ["string", "null"] },
+    "decided_at": { "type": ["string", "null"] },
+    "decision_reason": { "type": ["string", "null"] },
+    "registry_provenance_hash": { "type": ["string", "null"] },
+    "candidate_contract_hash": { "type": ["string", "null"] },
+    "fleet_provenance_hash": { "type": ["string", "null"] },
+    "promotion_criteria": { "type": "object" },
+    "errors": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "provenance_hash": { "type": "string", "minLength": 1 }
+  },
+  "additionalProperties": false
+}

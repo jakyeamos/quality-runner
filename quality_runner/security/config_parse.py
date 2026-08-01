@@ -37,6 +37,18 @@ def parse_security_section(value: object, warnings: list[dict[str, str]]) -> dic
         agent_review = value.get("agent_review_gates")
         if isinstance(agent_review, bool):
             result["agent_review_gates"] = agent_review
+    owner_role = value.get("owner_role")
+    if owner_role is not None:
+        if isinstance(owner_role, str) and owner_role.strip():
+            result["owner_role"] = owner_role.strip()
+        else:
+            warnings.append(
+                {
+                    "code": "invalid_quality_runner_config_field",
+                    "message": "quality_runner.security.owner_role must be a non-empty string",
+                    "path": ".quality-runner.toml",
+                }
+            )
     required = _string_list(value.get("required_capabilities"))
     if required:
         result["required_capabilities"] = required

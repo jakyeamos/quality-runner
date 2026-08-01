@@ -16,23 +16,28 @@ from quality_runner.application.journey_outcomes import (
 from quality_runner.application.outcome_projection import LegacyPayload
 from quality_runner.application.verification_workflows import verify_gates_payload
 from quality_runner.cli_artifacts import prune_artifacts_payload
+from quality_runner.cli_candidates import candidate_command_payload
 from quality_runner.cli_controller_reports import (
     controller_report_command_payload,
     controller_report_from_summary_payload,
     load_controller_report_json,
 )
 from quality_runner.cli_fix_proposals import propose_fix_command_payload
+from quality_runner.cli_fleet import fleet_command_payload
 from quality_runner.cli_gate import (
     gate_command_payload,
     gate_respond_command_payload,
     gate_status_command_payload,
 )
 from quality_runner.cli_handoff import handoff_command_payload
+from quality_runner.cli_phase import phase_command_payload
 from quality_runner.cli_planning import planning_command_payload
 from quality_runner.cli_refresh import refresh_command_payload
 from quality_runner.cli_remediation import remediation_delta_command_payload
+from quality_runner.cli_repo_hygiene import repo_hygiene_payload
 from quality_runner.cli_review import review_command_payload
 from quality_runner.cli_rollout import rollout_command_payload
+from quality_runner.cli_security import security_command_payload
 from quality_runner.cli_skills import skill_command_payload
 from quality_runner.cli_status import export_handoff_payload, status_payload
 from quality_runner.cli_update import update_command_payload
@@ -45,10 +50,13 @@ from quality_runner.exclusion_preflight import (
     normalize_run_only_exclusion_overlay,
     run_exclusion_preflight_command,
 )
+from quality_runner.fleet.audit import local_environment_audit_payload
 from quality_runner.intent import workflow_intent_from_cli_args
+from quality_runner.phase_contract import load_phase_contract, scan_include_paths
 from quality_runner.progress import ProgressCallback
 from quality_runner.release_smoke import release_smoke_payload
 from quality_runner.run_summary import build_run_summary
+from quality_runner.task_prevention import task_command_payload
 from quality_runner.workflow_skills import load_skill_review_report_json
 
 INIT_RESULT_SCHEMA = "quality-runner-init-result-v0.1"
@@ -64,6 +72,16 @@ def payload_for_args(
 ) -> dict[str, Any]:
     if args.command == "doctor":
         return doctor_payload(include_environment=True)
+    if args.command == "fleet":
+        return fleet_command_payload(args)
+    if args.command == "candidates":
+        return candidate_command_payload(args)
+    if args.command == "security":
+        return security_command_payload(args)
+    if args.command == "task":
+        return task_command_payload(args)
+    if args.command == "phase-check":
+        return phase_command_payload(args)
     if args.command == "self-update":
         return update_command_payload(args.source)
     if args.command == "release-smoke":
@@ -139,16 +157,29 @@ def payload_for_args(
                 if args.readiness_evidence_file
                 else None
             ),
-            include_ignored_paths=_interactive_include_ignored_paths(args, repo_root),
+            include_ignored_paths=_include_ignored_paths_from_args(args, repo_root),
             scan_exclusion_overlay=_scan_exclusion_overlay(args, repo_root),
+            include_paths=_include_paths_from_args(args),
             checkout_most_advanced_branch=args.checkout_most_advanced_branch,
             skill_review_report=_optional_skill_review_report(args),
             agent_review_mode=args.agent_review_mode,
+            analysis_mode=args.analysis_mode,
+            cache_mode=args.cache_mode,
+            cache_root=_cache_root(args),
+            performance_budget_seconds=args.performance_budget_seconds,
             progress=progress,
             intent=workflow_intent_from_cli_args(args, repo_root=repo_root, run_id=args.run_id),
         )
     if args.command == "audit":
         repo_root = _validated_repo_path(args.repo_path)
+        if args.profile == "environment-legibility":
+            return local_environment_audit_payload(
+                repo_path=repo_root,
+                output_dir=Path(args.output_dir).expanduser().resolve()
+                if args.output_dir
+                else None,
+                as_of=args.as_of,
+            )
         return _result_payload(
             audit_journey_outcome(
                 repo_root=repo_root,
@@ -160,10 +191,11 @@ def payload_for_args(
                     if args.readiness_evidence_file
                     else None
                 ),
-                include_ignored_paths=_interactive_include_ignored_paths(args, repo_root),
+                include_ignored_paths=_include_ignored_paths_from_args(args, repo_root),
                 checkout_most_advanced_branch=args.checkout_most_advanced_branch,
                 skill_review_report=_legacy_payload(_optional_skill_review_report(args)),
                 agent_review_mode=args.agent_review_mode,
+                include_paths=_include_paths_from_args(args),
                 scan_exclusion_overlay=_scan_exclusion_overlay(args, repo_root),
                 intent=_legacy_payload(
                     workflow_intent_from_cli_args(args, repo_root=repo_root, run_id=args.run_id)
@@ -183,11 +215,16 @@ def payload_for_args(
                 if args.readiness_evidence_file
                 else None
             ),
-            include_ignored_paths=_interactive_include_ignored_paths(args, repo_root),
+            include_ignored_paths=_include_ignored_paths_from_args(args, repo_root),
             scan_exclusion_overlay=_scan_exclusion_overlay(args, repo_root),
             checkout_most_advanced_branch=args.checkout_most_advanced_branch,
             skill_review_report=_optional_skill_review_report(args),
             agent_review_mode=args.agent_review_mode,
+            analysis_mode=args.analysis_mode,
+            cache_mode=args.cache_mode,
+            cache_root=_cache_root(args),
+            performance_budget_seconds=args.performance_budget_seconds,
+            include_paths=_include_paths_from_args(args),
             progress=progress,
             intent=workflow_intent_from_cli_args(args, repo_root=repo_root, run_id=args.run_id),
         )
@@ -210,8 +247,11 @@ def payload_for_args(
             allow_mutating_gates=args.allow_mutating_gates,
             worktree_mode=args.worktree_mode,
             allow_dirty_worktree_verify=args.allow_dirty_worktree_verify,
+            only_gate_ids=tuple(args.only_gate),
             skill_review_report=_optional_skill_review_report(args),
             agent_review_mode=args.agent_review_mode,
+            include_ignored_paths=_include_ignored_paths_from_args(args, repo_root),
+            include_paths=_include_paths_from_args(args),
             scan_exclusion_overlay=_scan_exclusion_overlay(args, repo_root),
             progress=progress,
             intent=workflow_intent_from_cli_args(args, repo_root=repo_root, run_id=args.run_id),
@@ -236,8 +276,11 @@ def payload_for_args(
                 allow_mutating_gates=args.allow_mutating_gates,
                 worktree_mode=args.worktree_mode,
                 allow_dirty_worktree_verify=args.allow_dirty_worktree_verify,
+                only_gate_ids=tuple(args.only_gate),
                 skill_review_report=_legacy_payload(_optional_skill_review_report(args)),
                 agent_review_mode=args.agent_review_mode,
+                include_ignored_paths=_include_ignored_paths_from_args(args, repo_root),
+                include_paths=_include_paths_from_args(args),
                 scan_exclusion_overlay=_scan_exclusion_overlay(args, repo_root),
                 intent=_legacy_payload(
                     workflow_intent_from_cli_args(args, repo_root=repo_root, run_id=args.run_id)
@@ -292,7 +335,10 @@ def payload_for_args(
         return prune_artifacts_payload(
             repo_root=_validated_repo_path(args.repo_path),
             apply=args.apply,
+            preserve_run_ids=set(args.preserve_run_id),
         )
+    if args.command == "repo-hygiene":
+        return repo_hygiene_payload(args, validated_repo_path=_validated_repo_path)
     raise ValueError(f"unsupported command: {args.command}")
 
 
@@ -356,6 +402,20 @@ def _validated_repo_path(repo_path: str) -> Path:
     return root
 
 
+def _cache_root(args: argparse.Namespace) -> Path | None:
+    value = getattr(args, "cache_dir", None)
+    return Path(value).expanduser().resolve() if isinstance(value, str) and value else None
+
+
+def _include_paths_from_args(args: argparse.Namespace) -> tuple[str, ...]:
+    explicit = tuple(getattr(args, "include_path", []) or [])
+    contract_path = getattr(args, "phase_contract", None)
+    if explicit or not contract_path:
+        return explicit
+    contract = load_phase_contract(Path(contract_path).expanduser().resolve())
+    return scan_include_paths(contract)
+
+
 def _interactive_include_ignored_paths(args: argparse.Namespace, repo_root: Path) -> list[str]:
     if not _should_prompt_for_ignored_paths(args):
         return []
@@ -381,6 +441,15 @@ def _interactive_include_ignored_paths(args: argparse.Namespace, repo_root: Path
         return paths
     print("Keeping these paths excluded for this run.", file=sys.stderr)
     return []
+
+
+def _include_ignored_paths_from_args(args: argparse.Namespace, repo_root: Path) -> list[str]:
+    explicit = [
+        item
+        for item in (getattr(args, "include_ignored_path", []) or [])
+        if isinstance(item, str) and item
+    ]
+    return _unique_strings([*explicit, *_interactive_include_ignored_paths(args, repo_root)])
 
 
 def _should_prompt_for_ignored_paths(args: argparse.Namespace) -> bool:

@@ -2,7 +2,7 @@
 
 Quality Runner publishes Python distributions from the `Release` GitHub
 Actions workflow when a `v*.*.*` tag is pushed. For the current release cut,
-the selected version is `0.6.0`; future releases must choose a new version
+the selected version is `0.7.0`; future releases must choose a new version
 instead of reusing an existing tag or package release. For tag-triggered
 publication, the workflow verifies that the tagged commit is an ancestor of
 `main` before it can publish.
@@ -54,7 +54,7 @@ choosing a new version; never reuse a tag, including `v0.5.0` or `v0.5.1`.
 7. Verify the published artifact:
 
    ```bash
-   uv tool install 'quality-runner==0.6.0' --force
+   uv tool install 'quality-runner==0.7.0' --force
    quality-runner --version
    quality-runner doctor --json
    quality-runner release-smoke --json

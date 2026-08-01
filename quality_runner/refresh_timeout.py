@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import signal
 import time
-from collections.abc import Iterator
+from collections.abc import Iterator, Mapping
 from contextlib import contextmanager
 from pathlib import Path
 from types import FrameType
@@ -40,6 +40,9 @@ def resolve_refresh_timeout_contract(
     workflow_timeout_reason: str | None,
     total_timeout_seconds: int | None,
     total_timeout_reason: str | None,
+    inspect_timeout_seconds: int | None = None,
+    run_timeout_seconds: int | None = None,
+    adaptive: Mapping[str, object] | None = None,
 ) -> dict[str, Any]:
     if (
         workflow_timeout_seconds is not None
@@ -49,21 +52,66 @@ def resolve_refresh_timeout_contract(
         raise ValueError(
             "--workflow-timeout-seconds and --verify-timeout-seconds must match when both are set"
         )
+    adaptive_status = adaptive.get("status") if adaptive is not None else None
+    adaptive_active = adaptive_status == "active"
+    adaptive_timeouts = (
+        _integer_timeouts(adaptive.get("timeouts"))
+        if adaptive is not None and adaptive_active
+        else {}
+    )
+    adaptive_verify_timeout = adaptive_timeouts.get("verify")
     resolved_verify_timeout = (
         verify_timeout_seconds
         if verify_timeout_seconds is not None
         else workflow_timeout_seconds
         if workflow_timeout_seconds is not None
+        else adaptive_verify_timeout
+        if adaptive_verify_timeout is not None
         else default_workflow_timeout_seconds(per_gate_timeout_seconds)
+    )
+    fixed_phase_timeout = default_workflow_timeout_seconds(per_gate_timeout_seconds)
+    resolved_inspect_timeout = (
+        inspect_timeout_seconds
+        if inspect_timeout_seconds is not None
+        else adaptive_timeouts.get("inspect", fixed_phase_timeout)
+        if adaptive_active
+        else fixed_phase_timeout
+    )
+    resolved_run_timeout = (
+        run_timeout_seconds
+        if run_timeout_seconds is not None
+        else adaptive_timeouts.get("run", fixed_phase_timeout)
+        if adaptive_active
+        else fixed_phase_timeout
+    )
+    resolved_total_timeout = (
+        total_timeout_seconds
+        if total_timeout_seconds is not None
+        else adaptive_timeouts.get("total")
+        if adaptive_timeouts
+        else None
     )
     resolved_total_reason = (
         total_timeout_reason
         if total_timeout_reason is not None
         else (
-            f"refresh exceeded {total_timeout_seconds} seconds across inspect, run, and verify"
-            if total_timeout_seconds is not None
+            f"refresh exceeded {resolved_total_timeout} seconds across inspect, run, and verify"
+            if resolved_total_timeout is not None
             else None
         )
+    )
+    any_explicit = any(
+        value is not None
+        for value in (
+            workflow_timeout_seconds,
+            verify_timeout_seconds,
+            inspect_timeout_seconds,
+            run_timeout_seconds,
+            total_timeout_seconds,
+        )
+    )
+    source = (
+        "explicit" if any_explicit else "adaptive-baseline" if adaptive_active else "fixed-default"
     )
     return {
         "per_gate_timeout_seconds": per_gate_timeout_seconds,
@@ -71,12 +119,60 @@ def resolve_refresh_timeout_contract(
         "verify_timeout_source": (
             "explicit"
             if verify_timeout_seconds is not None or workflow_timeout_seconds is not None
+            else "adaptive"
+            if adaptive_active
             else "default"
         ),
         "verify_timeout_reason": workflow_timeout_reason
         or timeout_reason(phase="verify-gates", timeout_seconds=resolved_verify_timeout),
-        "total_timeout_seconds": total_timeout_seconds,
+        "inspect_timeout_seconds": resolved_inspect_timeout,
+        "inspect_timeout_source": (
+            "explicit"
+            if inspect_timeout_seconds is not None
+            else "adaptive"
+            if adaptive_active
+            else "default"
+        ),
+        "run_timeout_seconds": resolved_run_timeout,
+        "run_timeout_source": (
+            "explicit"
+            if run_timeout_seconds is not None
+            else "adaptive"
+            if adaptive_active
+            else "default"
+        ),
+        "total_timeout_seconds": resolved_total_timeout,
+        "total_timeout_source": (
+            "explicit"
+            if total_timeout_seconds is not None
+            else "adaptive"
+            if adaptive_active
+            else "unset"
+        ),
         "total_timeout_reason": resolved_total_reason,
+        "timeout_policy": "adaptive",
+        "source": source,
+        "baseline_status": adaptive.get("status") if adaptive is not None else "fallback",
+        "baseline_reason": adaptive.get("reason") if adaptive is not None else None,
+        "baseline_id": adaptive.get("baseline_id") if adaptive is not None else None,
+        "baseline_path": adaptive.get("baseline_path") if adaptive is not None else None,
+        "baseline_identity_sha256": (
+            adaptive.get("identity_sha256") if adaptive is not None else None
+        ),
+        "baseline_sample_count": (adaptive.get("sample_count", 0) if adaptive is not None else 0),
+        "expected_gate_plan_sha256": (
+            adaptive.get("expected_gate_plan_sha256") if adaptive is not None else None
+        ),
+    }
+
+
+def _integer_timeouts(value: object) -> dict[str, int]:
+    if not isinstance(value, Mapping):
+        return {}
+    return {
+        key: item
+        for key, item in value.items()
+        if key in {"inspect", "run", "verify", "total"} and isinstance(item, int) and item > 0
     }
 
 
@@ -118,6 +214,64 @@ def timeout_refresh_phase(
     }
 
 
+def build_skipped_verify_artifacts(
+    *,
+    repo_root: Path,
+    run_id: str,
+    reason: str,
+) -> dict[str, Any]:
+    run_dir = prepare_artifact_dir(repo_root, run_id)
+    verification = {
+        "schema": GATE_VERIFICATION_SCHEMA,
+        "run_id": run_id,
+        "status": "blocked",
+        "skip_type": "execution-consent-required",
+        "reason": reason,
+        "execution_authorized": False,
+        "verification_context": {"execution_authorized": False, "worktree_mode": "in-place"},
+        "gates": [
+            {
+                "id": "refresh-execution-consent",
+                "status": "blocked",
+                "skip_type": "execution-consent-required",
+                "reason": reason,
+            }
+        ],
+    }
+    artifact_paths = {
+        "gate_execution_plan_json": str(run_dir / "gate-execution-plan.json"),
+        "gate_verification_json": str(run_dir / "gate-verification.json"),
+        "run_manifest_json": str(run_dir / "run-manifest.json"),
+        "agent_handoff_md": str(run_dir / "agent-handoff.md"),
+    }
+    write_text(run_dir / "gate-execution-plan.json", "[]\n")
+    write_json(run_dir / "gate-verification.json", verification)
+    write_text(
+        run_dir / "agent-handoff.md",
+        "# Quality Runner Agent Handoff\n\n"
+        "Verification was not started because explicit gate-execution consent was not provided.\n"
+        "Inspect/run evidence remains available in the sibling refresh artifacts.\n",
+    )
+    write_json(
+        run_dir / "run-manifest.json",
+        build_run_manifest(
+            repo_root=repo_root,
+            run_id=run_id,
+            mode="verify-gates",
+            artifact_paths=artifact_paths,
+        ),
+    )
+    return {
+        "schema": "quality-runner-verify-gates-result-v0.1",
+        "status": "blocked",
+        "implementation_allowed": False,
+        "run_id": run_id,
+        "skip_type": "execution-consent-required",
+        "reason": reason,
+        "artifact_paths": artifact_paths,
+    }
+
+
 @contextmanager
 def workflow_deadline(*, seconds: int | float, reason: str) -> Iterator[None]:
     if seconds <= 0:
@@ -152,13 +306,14 @@ def build_timeout_verify_artifacts(
     baseline_run_id: str | None,
     timeout_scope: str = "verify-phase",
     phase_elapsed_seconds: float | None = None,
+    timeout_context: dict[str, str] | None = None,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     run_dir = prepare_artifact_dir(repo_root, run_id)
     plan_path = run_dir / "gate-execution-plan.json"
     verification_path = run_dir / "gate-verification.json"
     existing_plan = _existing_plan(plan_path)
     existing_verification = _existing_verification(verification_path)
-    diagnostics = _timeout_diagnostics()
+    diagnostics = _timeout_diagnostics(timeout_context=timeout_context)
     timeout_payload = {
         "schema": WORKFLOW_TIMEOUT_ARTIFACT_SCHEMA,
         "status": "blocked",
@@ -299,8 +454,11 @@ def _timeout_capability_map() -> dict[str, Any]:
     }
 
 
-def _timeout_diagnostics() -> dict[str, Any]:
-    return timeout_diagnostics_payload(scan_progress_snapshot())
+def _timeout_diagnostics(*, timeout_context: dict[str, str] | None) -> dict[str, Any]:
+    diagnostics = timeout_diagnostics_payload(scan_progress_snapshot())
+    if timeout_context is not None:
+        diagnostics["verification"] = timeout_context
+    return diagnostics
 
 
 def _existing_plan(path: Path) -> list[Any]:

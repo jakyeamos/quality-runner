@@ -316,6 +316,8 @@ def test_refresh_payload_preserves_partial_verify_artifacts_when_timeout_finaliz
         run_id_prefix="refresh-timeout-preserve",
         workflow_timeout_seconds=30,
         workflow_timeout_reason="controller deadline exceeded while verifying gates",
+        execute_discovered_gates=True,
+        worktree_mode="disposable",
     )
     run_dir = tmp_path / ".quality-runner" / "runs" / "refresh-timeout-preserve-verify"
     gate_plan = json.loads((run_dir / "gate-execution-plan.json").read_text())
@@ -373,15 +375,18 @@ def test_refresh_payload_records_timeout_contract_and_phase_timings(
         verify_timeout_seconds=17,
         total_timeout_seconds=45,
         total_timeout_reason="controller full refresh budget",
+        execute_discovered_gates=True,
+        worktree_mode="disposable",
     )
 
-    assert payload["timeout_contract"] == {
-        "per_gate_timeout_seconds": 9,
-        "verify_timeout_seconds": 17,
-        "verify_timeout_source": "explicit",
-        "total_timeout_seconds": 45,
-        "total_timeout_reason": "controller full refresh budget",
-    }
+    assert payload["timeout_contract"]["per_gate_timeout_seconds"] == 9
+    assert payload["timeout_contract"]["verify_timeout_seconds"] == 17
+    assert payload["timeout_contract"]["verify_timeout_source"] == "explicit"
+    assert payload["timeout_contract"]["total_timeout_seconds"] == 45
+    assert payload["timeout_contract"]["total_timeout_reason"] == "controller full refresh budget"
+    assert payload["timeout_contract"]["source"] == "explicit"
+    assert payload["timeout_contract"]["timeout_policy"] == "adaptive"
+    assert payload["timeout_contract"]["baseline_status"] == "fallback"
     assert payload["phase_timings"].keys() == {"inspect", "run", "verify"}
     assert all(timing["elapsed_seconds"] >= 0 for timing in payload["phase_timings"].values())
 
@@ -406,6 +411,8 @@ def test_refresh_payload_total_timeout_finalizes_when_run_phase_is_interrupted(
         workflow_timeout_seconds=60,
         total_timeout_seconds=30,
         total_timeout_reason="controller full refresh budget",
+        execute_discovered_gates=True,
+        worktree_mode="disposable",
     )
     run_dir = tmp_path / ".quality-runner" / "runs" / "refresh-total-timeout-verify"
     gate_verification = json.loads((run_dir / "gate-verification.json").read_text())
@@ -450,6 +457,8 @@ def test_refresh_payload_total_timeout_scope_is_distinct_from_verify_phase(
         workflow_timeout_seconds=60,
         total_timeout_seconds=30,
         total_timeout_reason="controller full refresh budget",
+        execute_discovered_gates=True,
+        worktree_mode="disposable",
     )
     run_dir = tmp_path / ".quality-runner" / "runs" / "refresh-total-scope-verify"
     gate_verification = json.loads((run_dir / "gate-verification.json").read_text())
@@ -585,15 +594,12 @@ def test_verify_gates_skips_ci_only_pseudo_gates(tmp_path: Path) -> None:
 def test_verify_gates_does_not_block_on_file_evidence_capabilities(tmp_path: Path) -> None:
     from quality_runner.workflow import verify_gates_payload
 
-    tracker = tmp_path / ".tracker"
-    tracker.mkdir()
-    (tracker / "PROJECT_TRUTH.md").write_text("# Truth\n", encoding="utf-8")
     (tmp_path / "package.json").write_text(
         json.dumps({"scripts": {"test": f"{sys.executable} -c 'import sys; sys.exit(0)'"}}),
         encoding="utf-8",
     )
     (tmp_path / ".quality-runner.toml").write_text(
-        '[quality_runner]\nrequired_capabilities = ["tests", "truth_file"]\n',
+        '[quality_runner]\nrequired_capabilities = ["tests"]\n',
         encoding="utf-8",
     )
 
@@ -609,12 +615,7 @@ def test_verify_gates_does_not_block_on_file_evidence_capabilities(tmp_path: Pat
     assert payload["status"] == "passed"
     assert [(gate["id"], gate["status"]) for gate in verification["gates"]] == [
         ("tests", "passed"),
-        ("truth_file", "skipped"),
     ]
-    assert verification["gates"][1]["capability_kind"] == "evidence_file"
-    assert (
-        verification["gates"][1]["reason"] == "capability is file evidence, not an executable gate"
-    )
 
 
 def test_verify_gates_classifies_environment_restricted_failures(tmp_path: Path) -> None:
@@ -782,6 +783,63 @@ def test_verify_gates_runs_cheap_gates_before_expensive_gates(tmp_path: Path) ->
         "typecheck",
         "build",
     ]
+
+
+def test_verify_gates_can_select_only_discovered_gate_ids(tmp_path: Path) -> None:
+    from quality_runner.gate_verification import verify_discovered_gates
+
+    capability_map = {
+        "available": [
+            {
+                "id": "lint",
+                "type": "script",
+                "command": f"{sys.executable} -c \"print('lint')\"",
+                "source": "package.json",
+            },
+            {
+                "id": "tests",
+                "type": "script",
+                "command": f"{sys.executable} -c \"print('tests')\"",
+                "source": "package.json",
+            },
+        ]
+    }
+    execution_root = tmp_path / "isolated"
+    execution_root.mkdir()
+
+    verification = verify_discovered_gates(
+        repo_root=tmp_path,
+        capability_map=capability_map,
+        run_id="selected-gate",
+        execute_discovered_gates=True,
+        execution_root=execution_root,
+        mutations_isolated=True,
+        only_gate_ids=("tests",),
+    )
+
+    assert verification["only_gate_ids"] == ["tests"]
+    assert [gate["id"] for gate in verification["gates"]] == ["tests"]
+    assert [gate["id"] for gate in verification["execution_plan"]] == ["tests"]
+    assert verification["status"] == "passed"
+
+
+def test_verify_gates_rejects_unknown_selected_gate_ids(tmp_path: Path) -> None:
+    from quality_runner.gate_verification import verify_discovered_gates
+
+    with pytest.raises(ValueError, match="not discovered as executable gates"):
+        verify_discovered_gates(
+            repo_root=tmp_path,
+            capability_map={
+                "available": [
+                    {
+                        "id": "lint",
+                        "type": "script",
+                        "command": "python -c 'print(\"lint\")'",
+                    }
+                ]
+            },
+            only_gate_ids=("environment-legibility",),
+        )
 
 
 def test_verify_gates_streams_partial_results_after_each_gate(tmp_path: Path) -> None:

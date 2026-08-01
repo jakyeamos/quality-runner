@@ -1,0 +1,37 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://quality-runner.dev/schemas/repo-hygiene-v1.schema.json",
+  "title": "Quality Runner repository hygiene result",
+  "type": "object",
+  "required": [
+    "schema",
+    "status",
+    "repo_root",
+    "generated_paths",
+    "violations",
+    "missing_ignore_rules",
+    "exceptions",
+    "package_manager",
+    "workspace",
+    "ci",
+    "ownership",
+    "blocked_ownership_state",
+    "implementation_allowed"
+  ],
+  "properties": {
+    "schema": {"const": "repo-hygiene-v1"},
+    "status": {"enum": ["pass", "fail", "blocked", "preview", "applied", "no-op"]},
+    "repo_root": {"type": "string"},
+    "generated_paths": {"type": "array", "items": {"type": "object"}},
+    "violations": {"type": "array", "items": {"type": "object"}},
+    "missing_ignore_rules": {"type": "array", "items": {"type": "object"}},
+    "exceptions": {"type": "array", "items": {"type": "object"}},
+    "package_manager": {"type": "object"},
+    "workspace": {"type": "object"},
+    "ci": {"type": "object"},
+    "ownership": {"type": "object"},
+    "blocked_ownership_state": {"type": ["object", "null"]},
+    "implementation_allowed": {"type": "boolean"}
+  },
+  "additionalProperties": true
+}

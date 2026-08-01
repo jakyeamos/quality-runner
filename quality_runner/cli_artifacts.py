@@ -20,11 +20,19 @@ def add_artifact_commands(subparsers: argparse._SubParsersAction[argparse.Argume
         action="store_true",
         help="Delete runs selected by retention policy; default is a dry run",
     )
+    parser.add_argument(
+        "--preserve-run-id",
+        action="append",
+        default=[],
+        help="Explicitly preserve a run id; can be repeated",
+    )
     parser.add_argument("--json", action="store_true", help="Emit JSON output")
 
 
-def prune_artifacts_payload(*, repo_root: Path, apply: bool) -> dict[str, Any]:
-    result = cleanup_artifacts(repo_root, apply=apply)
+def prune_artifacts_payload(
+    *, repo_root: Path, apply: bool, preserve_run_ids: set[str] | None = None
+) -> dict[str, Any]:
+    result = cleanup_artifacts(repo_root, apply=apply, preserve_run_ids=preserve_run_ids)
     return {
         "schema": PRUNE_ARTIFACTS_RESULT_SCHEMA,
         "status": result["status"],

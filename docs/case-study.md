@@ -25,7 +25,7 @@ The backend pipeline is intentionally boring and inspectable:
 
 1. `discovery` reads repository facts, language signals, package scripts,
    Python project metadata, recursive workspace manifests, mature-codebase
-   surfaces, CI workflow command evidence, Pre-CR config, and truth-file
+   surfaces, CI workflow command evidence, and Pre-CR config
    presence while applying scan exclusions.
 2. `standards` compiles the selected profile and local config into a standards
    packet.
@@ -53,7 +53,7 @@ manifest captures git state so handoffs can be tied back to a concrete checkout.
 
 The original self-audit exposed a platform-quality issue: Quality Runner passed
 its real Python ladder, but its own audit reported missing formatter, lint,
-typecheck, tests, build, dead-code, smoke, pre-PR, and truth-file gates because
+typecheck, tests, build, dead-code, smoke, and pre-PR gates because
 capability detection only trusted JavaScript package scripts.
 
 The release-ready version adds language-aware command evidence:
@@ -66,7 +66,7 @@ The release-ready version adds language-aware command evidence:
 - CI command evidence from GitHub workflow text
 - Pre-CR `testCommand` evidence from `.pre-cr.json`
 - JavaScript package-script evidence preserved for JS repositories
-- truth-file required only when present, configured, or demanded by local policy
+- planning notes are optional and never a runner capability requirement
 
 The result is a more credible backend platform: findings now reflect actual repo
 evidence rather than assumptions about one ecosystem.

@@ -2,6 +2,46 @@
 
 All notable changes to Quality Runner are documented here.
 
+## 0.7.0 - 2026-08-01
+
+- Added delivery contracts, phase contracts, performance evidence, and
+  completion handoffs for planning and release-readiness workflows.
+- Added explicit scan-inclusion/exclusion reporting, disposition controls,
+  source-analysis and semantic-similarity caches, and repository inventory
+  caching for repeatable local runs.
+- Added adaptive refresh timeout baselines, timeout diagnostics, incremental
+  analysis reuse, and read-only verification reuse with preserved evidence.
+- Expanded the canonical `qr` command surface, planning workflows, security
+  review obligations, and packaged schemas and compatibility checks.
+- Added repository-owned reusable bug-candidate registries, governed lifecycle
+  transitions and dispositions, durable fleet observation aggregation, and
+  fail-closed human-approved promotion receipts for candidate-linked required
+  invariants.
+- Added `qr candidates validate`, `aggregate`, and `promotion-check` with
+  packaged JSON schemas, machine-readable receipts, deterministic architectural
+  fixtures, and backward-compatible advisory invariant adoption.
+- Added the evidence-backed `qr task start`, `check`, and `rebaseline`
+  implementation loop, including exact dirty-workspace snapshots, normalized
+  occurrence and coverage contracts, deterministic finding deltas, promoted
+  prevention policies, expiring fingerprint waivers, and certified native-gate
+  readiness evidence.
+- Added canonical task, snapshot, normalized-finding, and readiness schemas,
+  plus a non-authoritative CI dogfood pilot. Existing refresh, verify, and
+  review-delta surfaces retain their prior behavior.
+- Added the packaged agent completion contract and status-specific task-check
+  next actions. The documented cadence uses native checks for established fast
+  feedback and QR at baseline, completion, and CI boundaries rather than on
+  every save.
+- Added an executable repository environment contract, locked local and
+  CI quality lanes, and explicit prevention-readiness evidence so merely being
+  present in CI does not certify a native gate.
+- Added semantic invariant verification, repository-hygiene evidence, bounded
+  fleet maturity/change-surface reporting, and replay-validated Pronto feed
+  publication.
+- Added coverage-aware Codex Security evidence comparison and handoff contracts,
+  with source evidence split into promoted-size modules and preserved redaction
+  boundaries.
+
 ## 0.6.0 - 2026-07-17
 
 - Added Quality Skills corpus classification, canonical selection, append and

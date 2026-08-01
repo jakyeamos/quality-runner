@@ -17,8 +17,8 @@ def test_load_repo_config_reads_default_profile_required_capabilities_and_except
                 'required_capabilities = ["lint", "tests"]',
                 "",
                 "[[quality_runner.accepted_exceptions]]",
-                'capability = "truth_file"',
-                'reason = "Fixture repo has no project truth file."',
+                'capability = "unused_capability"',
+                'reason = "Fixture repo has an unused capability."',
                 'owner = "platform"',
                 'expires = "2999-01-01"',
                 "",
@@ -40,19 +40,96 @@ def test_load_repo_config_reads_default_profile_required_capabilities_and_except
         "scan_exclusions": [],
         "accepted_exceptions": [
             {
-                "capability": "truth_file",
-                "reason": "Fixture repo has no project truth file.",
+                "capability": "unused_capability",
+                "reason": "Fixture repo has an unused capability.",
                 "owner": "platform",
                 "expires": "2999-01-01",
             }
         ],
         "accepted_dispositions": [],
         "gates": [],
+        "invariants": [],
         "gate_timeouts": {},
         "severity_overrides": {},
         "structural_scan": {},
         "warnings": [],
     }
+
+
+def test_load_repo_config_reads_explicit_prevention_policy(tmp_path) -> None:
+    from quality_runner.config import load_repo_config
+
+    (tmp_path / ".quality-runner.toml").write_text(
+        "\n".join(
+            [
+                "[quality_runner.prevention]",
+                'required_modules = ["code_quality"]',
+                'environment_paths = [".venv/bin"]',
+                'snapshot_include_paths = ["dist/declared.json"]',
+                "",
+                "[[quality_runner.prevention.rules]]",
+                'detector = "code_quality"',
+                'rule_id = "large-source-file"',
+                'state = "behavior-verified"',
+                'owner = "quality"',
+                'rationale = "Large files increase review risk."',
+                'evidence_refs = ["positive:large.py", "negative:small.py", "ambiguous:generated.py"]',
+                'paths = ["src/**"]',
+                "confidence_threshold = 1.0",
+                "",
+                "[[quality_runner.prevention.gates]]",
+                'id = "lint"',
+                'command = "ruff check ."',
+                'state = "certified"',
+                "required = true",
+                'owner = "quality"',
+                'rationale = "Deterministic lint."',
+                'bootstrap = "uv sync --frozen"',
+                'mutation_risk = "read-only"',
+                'scope = "Python source"',
+                "timeout_seconds = 60",
+                'evidence_refs = ["failure-fixture:lint.py", "repeat-pass:lint.json", "local:run.json", "ci:ci.yml"]',
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    prevention = load_repo_config(tmp_path)["prevention"]
+
+    assert prevention["required_modules"] == ["code_quality"]
+    assert prevention["environment_paths"] == [".venv/bin"]
+    assert prevention["snapshot_include_paths"] == ["dist/declared.json"]
+    assert prevention["rules"][0]["state"] == "behavior-verified"
+    assert prevention["gates"][0]["state"] == "certified"
+
+
+def test_load_repo_config_preserves_declared_unavailable_gate(tmp_path) -> None:
+    from quality_runner.config import load_repo_config
+
+    (tmp_path / ".quality-runner.toml").write_text(
+        "\n".join(
+            [
+                "[[quality_runner.prevention.gates]]",
+                'id = "smoke"',
+                'command = "pnpm smoke"',
+                'state = "unavailable"',
+                "required = false",
+                'owner = "quality"',
+                'rationale = "The script is not defined."',
+                'bootstrap = "pnpm install --frozen-lockfile"',
+                'mutation_risk = "isolated-only"',
+                'blocker = "package.json has no smoke script"',
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    config = load_repo_config(tmp_path)
+
+    assert config["warnings"] == []
+    assert config["prevention"]["gates"][0]["state"] == "unavailable"
+    assert config["prevention"]["gates"][0]["blocker"] == "package.json has no smoke script"
 
 
 def test_load_repo_config_reads_gates_and_severity_overrides(tmp_path) -> None:
@@ -228,6 +305,86 @@ def test_load_repo_config_reads_structural_scan_policy_and_accepted_dispositions
     ]
 
 
+def test_load_repo_config_reads_compact_grouped_dispositions_without_local_config(tmp_path) -> None:
+    from quality_runner.config import load_repo_config
+
+    (tmp_path / ".quality-runner-dispositions.toml").write_text(
+        "\n".join(
+            [
+                'schema = "quality-runner-dispositions-v1"',
+                "",
+                "[[quality_runner.accepted_disposition_groups]]",
+                'status = "accepted-false-positive"',
+                'reason = "Safe fixture values."',
+                'owner = "security"',
+                'expires = "2999-01-01"',
+                'source_run_id = "qr-test"',
+                'review_evidence = ["evidence.md"]',
+                'fingerprints = ["sec-one", "sec-two"]',
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    config = load_repo_config(tmp_path)
+
+    assert config["path"] == ".quality-runner-dispositions.toml"
+    assert config["warnings"] == []
+    assert config["accepted_dispositions"] == [
+        {
+            "fingerprint": "sec-one",
+            "status": "accepted-false-positive",
+            "reason": "Safe fixture values.",
+            "owner": "security",
+            "expires": "2999-01-01",
+            "source_run_id": "qr-test",
+            "review_evidence": ["evidence.md"],
+        },
+        {
+            "fingerprint": "sec-two",
+            "status": "accepted-false-positive",
+            "reason": "Safe fixture values.",
+            "owner": "security",
+            "expires": "2999-01-01",
+            "source_run_id": "qr-test",
+            "review_evidence": ["evidence.md"],
+        },
+    ]
+
+
+def test_load_repo_config_rejects_duplicate_grouped_fingerprints(tmp_path) -> None:
+    from quality_runner.config import load_repo_config
+
+    (tmp_path / ".quality-runner-dispositions.toml").write_text(
+        "\n".join(
+            [
+                'schema = "quality-runner-dispositions-v1"',
+                "",
+                "[[quality_runner.accepted_disposition_groups]]",
+                'status = "accepted-false-positive"',
+                'reason = "First."',
+                'owner = "security"',
+                'fingerprints = ["sec-duplicate"]',
+                "",
+                "[[quality_runner.accepted_disposition_groups]]",
+                'status = "accepted-false-positive"',
+                'reason = "Second."',
+                'owner = "security"',
+                'fingerprints = ["sec-duplicate"]',
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    config = load_repo_config(tmp_path)
+
+    assert len(config["accepted_dispositions"]) == 1
+    assert config["accepted_dispositions"][0]["reason"] == "First."
+    assert config["warnings"][0]["code"] == "invalid_quality_runner_dispositions"
+
+
 def test_load_repo_config_reads_integrate_policy(tmp_path) -> None:
     from quality_runner.config import load_repo_config
 
@@ -305,6 +462,7 @@ def test_load_repo_config_reports_missing_invalid_and_malformed_values(tmp_path)
         "accepted_exceptions": [],
         "accepted_dispositions": [],
         "gates": [],
+        "invariants": [],
         "gate_timeouts": {},
         "severity_overrides": {},
         "structural_scan": {},
@@ -444,11 +602,11 @@ def test_detect_capabilities_applies_required_capabilities_and_active_exceptions
         "\n".join(
             [
                 "[quality_runner]",
-                'required_capabilities = ["lint", "tests", "truth_file"]',
+                'required_capabilities = ["lint", "tests"]',
                 "",
                 "[[quality_runner.accepted_exceptions]]",
-                'capability = "truth_file"',
-                'reason = "Truth file will be added after bootstrap."',
+                'capability = "state_file"',
+                'reason = "Planning context is optional."',
                 'owner = "platform"',
                 'expires = "2999-01-01"',
                 "",
@@ -471,14 +629,7 @@ def test_detect_capabilities_applies_required_capabilities_and_active_exceptions
             "required_by": "config",
         }
     ]
-    assert capability_map["accepted_exceptions"] == [
-        {
-            "capability": "truth_file",
-            "reason": "Truth file will be added after bootstrap.",
-            "owner": "platform",
-            "expires": "2999-01-01",
-        }
-    ]
+    assert capability_map["accepted_exceptions"] == []
 
 
 def test_configured_gates_satisfy_capabilities_and_policy_metadata_reaches_audit(
@@ -556,9 +707,6 @@ def test_detect_capabilities_handles_file_sources_and_inactive_exceptions(tmp_pa
     from quality_runner.discovery import inspect_repo
     from quality_runner.standards import compile_standards
 
-    tracker = tmp_path / ".tracker"
-    tracker.mkdir()
-    (tracker / "PROJECT_TRUTH.md").write_text("# Truth\n", encoding="utf-8")
     (tmp_path / "package.json").write_text(
         json.dumps({"scripts": {"pre-cr": "pre-cr run"}}),
         encoding="utf-8",
@@ -567,7 +715,7 @@ def test_detect_capabilities_handles_file_sources_and_inactive_exceptions(tmp_pa
         "\n".join(
             [
                 "[quality_runner]",
-                'required_capabilities = ["pre_cr", "truth_file", "tests", "not_real"]',
+                'required_capabilities = ["pre_cr", "tests", "not_real"]',
                 "",
                 "[[quality_runner.accepted_exceptions]]",
                 'capability = "tests"',
@@ -601,18 +749,6 @@ def test_detect_capabilities_handles_file_sources_and_inactive_exceptions(tmp_pa
             "required_by": "config",
             "verification_state": {
                 "discovery": "command-discovered",
-                "execution": "not-run",
-                "result": "unknown",
-            },
-        },
-        {
-            "id": "truth_file",
-            "type": "file",
-            "capability_kind": "evidence_file",
-            "source": ".tracker/PROJECT_TRUTH.md",
-            "required_by": "config",
-            "verification_state": {
-                "discovery": "file-discovered",
                 "execution": "not-run",
                 "result": "unknown",
             },
@@ -748,6 +884,11 @@ def test_packaged_schema_files_are_parseable() -> None:
         "package-manager-preflight.schema.json",
         "gate-verification.schema.json",
         "gate-verification-v0.2.schema.json",
+        "invariant-verification.schema.json",
+        "candidate-registry.schema.json",
+        "candidate-fleet.schema.json",
+        "candidate-promotion.schema.json",
+        "candidate-promotion-receipt.schema.json",
         "quality-audit.schema.json",
         "remediation-plan.schema.json",
         "agent-handoff.schema.json",
@@ -770,6 +911,9 @@ def test_packaged_schema_files_are_parseable() -> None:
         "phase-batch-result.schema.json",
         "phase-verification.schema.json",
         "outcome.schema.json",
+        "performance.schema.json",
+        "delivery-contract.schema.json",
+        "delivery-result.schema.json",
     }
 
     loaded = {}

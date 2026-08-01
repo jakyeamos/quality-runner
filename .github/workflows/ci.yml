@@ -9,6 +9,59 @@ permissions:
   contents: read
 
 jobs:
+  repo-hygiene:
+    name: Repository hygiene contract
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7.0.0
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v8.2.0
+
+      - name: Set up Python
+        uses: actions/setup-python@v6.3.0
+        with:
+          python-version: "3.13"
+
+      - name: Install locked development environment
+        run: uv sync --locked --all-groups --python 3.13
+
+      - name: Run repo-hygiene-v1
+        run: uv run --locked quality-runner repo-hygiene check "$GITHUB_WORKSPACE" --json
+
+  prevention:
+    name: Task prevention pilot
+    if: github.event_name == 'pull_request'
+    continue-on-error: true
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository with PR history
+        uses: actions/checkout@v7.0.0
+        with:
+          fetch-depth: 0
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v8.2.0
+        with:
+          cache-dependency-glob: uv.lock
+          cache-suffix: prevention
+
+      - name: Set up Python
+        uses: actions/setup-python@v6.3.0
+        with:
+          python-version: "3.13"
+
+      - name: Install locked development environment
+        run: uv sync --locked --all-groups --python 3.13
+
+      - name: Capture PR target baseline
+        run: uv run --locked qr task start "$GITHUB_WORKSPACE" --task-id ci-pr --baseline-ref "${{ github.event.pull_request.base.sha }}" --json
+
+      - name: Check exact PR workspace
+        run: uv run --locked qr task check "$GITHUB_WORKSPACE" --task-id ci-pr --json
+
   quality:
     name: Python ${{ matrix.python-version }}
     runs-on: ${{ matrix.os }}
@@ -35,6 +88,9 @@ jobs:
 
       - name: Install locked development environment
         run: uv sync --locked --all-groups --python ${{ matrix.python-version }}
+
+      - name: Validate repository environment contract
+        run: python3 scripts/check_environment_contract.py
 
       - name: Run tests
         run: uv run --locked pytest -q
