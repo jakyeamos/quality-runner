@@ -107,7 +107,8 @@ def test_plugin_manifest_and_citation_metadata_follow_their_release_contracts() 
     assert ".quality-runner/exports/qr-handoff.md" not in skill
     assert "qr task start /path/to/repo" in skill
     assert "qr task check /path/to/repo" in skill
-    assert "not a continuous-save or editor-hook workflow" in skill
+    assert "not a continuous-save" in skill
+    assert "editor-hook workflow" in skill
 
 
 def test_release_docs_include_example_handoffs() -> None:

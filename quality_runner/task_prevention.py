@@ -464,19 +464,6 @@ def _validate_task_id(task_id: str) -> None:
         raise ValueError("task_id must not end with a period")
 
 
-def _invalid_config(config: dict[str, Any]) -> dict[str, Any]:
-    return {
-        "schema": TASK_CHECK_SCHEMA,
-        "status": "invalid",
-        "next_action": task_next_action("invalid"),
-        "error": {
-            "code": "invalid_prevention_configuration",
-            "message": "Quality Runner configuration contains warnings",
-        },
-        "warnings": config.get("warnings", []),
-    }
-
-
 def _error_payload(status: str, code: str, message: str) -> dict[str, Any]:
     return {
         "schema": TASK_CHECK_SCHEMA,
@@ -484,6 +471,16 @@ def _error_payload(status: str, code: str, message: str) -> dict[str, Any]:
         "next_action": task_next_action(status),
         "error": {"code": code, "message": message},
     }
+
+
+def _invalid_config(config: dict[str, Any]) -> dict[str, Any]:
+    payload = _error_payload(
+        "invalid",
+        "invalid_prevention_configuration",
+        "Quality Runner configuration contains warnings",
+    )
+    payload["warnings"] = config.get("warnings", [])
+    return payload
 
 
 def _repository_blockers(
