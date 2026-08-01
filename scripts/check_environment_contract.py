@@ -33,6 +33,7 @@ REQUIRED_FILES = (
     "CONTRIBUTING.md",
     "SECURITY.md",
     "pyproject.toml",
+    "pyrightconfig.strict.json",
     "uv.lock",
     ".pre-cr.json",
     ".quality-runner.toml",
@@ -40,6 +41,7 @@ REQUIRED_FILES = (
     ".github/workflows/ci.yml",
     ".github/workflows/release.yml",
     "scripts/check_environment_contract.py",
+    "scripts/check_strict_baseline.py",
 )
 QUALITY_COMMANDS = (
     "uv run --locked pytest -q",
@@ -189,6 +191,16 @@ def _check_pyproject(root: Path, errors: list[str]) -> None:
         errors.append("basedpyright must remain at the certified standard repository scope")
 
 
+def _check_strict_config(root: Path, errors: list[str]) -> None:
+    try:
+        config = json.loads((root / "pyrightconfig.strict.json").read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as error:
+        errors.append(f"invalid pyrightconfig.strict.json: {error.__class__.__name__}")
+        return
+    if not isinstance(config, dict) or config.get("typeCheckingMode") != "strict":
+        errors.append("pyrightconfig.strict.json must remain the advisory strict configuration")
+
+
 def _check_pre_cr(root: Path, errors: list[str]) -> None:
     pre_cr = _load_pre_cr(root, errors)
     commands = pre_cr.get("qualityCommands", [])
@@ -284,6 +296,7 @@ def validate(root: Path, as_of: date | None = None) -> list[str]:
     effective_as_of = as_of or date.today()
     _check_context(root, errors, effective_as_of)
     _check_pyproject(root, errors)
+    _check_strict_config(root, errors)
     _check_pre_cr(root, errors)
     _check_workflow(root / ".github/workflows/ci.yml", "CI", errors)
     _check_workflow(root / ".github/workflows/release.yml", "release", errors)
