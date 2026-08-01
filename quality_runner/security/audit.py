@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 
 SEVERITY_RANK = {"critical": 0, "high": 1, "blocker": 2, "warning": 3, "observation": 4}
 
@@ -11,7 +11,8 @@ def security_audit_findings(
 ) -> list[dict[str, Any]]:
     if not isinstance(security_scan, dict):
         return []
-    if security_scan.get("settings", {}).get("enabled") is False:
+    settings = _dict(security_scan.get("settings")) or {}
+    if settings.get("enabled") is False:
         return []
 
     findings: list[dict[str, Any]] = []
@@ -26,7 +27,7 @@ def _explicit_security_requirements(security_config: dict[str, Any] | None) -> b
     if not isinstance(security_config, dict):
         return False
     required = security_config.get("required_capabilities")
-    return isinstance(required, list) and bool(required)
+    return isinstance(required, list) and bool(cast(list[Any], required))
 
 
 def _candidate_findings(security_scan: dict[str, Any]) -> list[dict[str, Any]]:
@@ -35,9 +36,7 @@ def _candidate_findings(security_scan: dict[str, Any]) -> list[dict[str, Any]]:
         return []
 
     findings: list[dict[str, Any]] = []
-    for candidate in candidates:
-        if not isinstance(candidate, dict):
-            continue
+    for candidate in _dict_list(cast(object, candidates)):
         candidate_id = candidate.get("id")
         category = candidate.get("category")
         if not isinstance(candidate_id, str) or not isinstance(category, str):
@@ -92,9 +91,7 @@ def _missing_capability_findings(security_scan: dict[str, Any]) -> list[dict[str
         return []
 
     findings: list[dict[str, Any]] = []
-    for capability in missing:
-        if not isinstance(capability, dict):
-            continue
+    for capability in _dict_list(cast(object, missing)):
         capability_id = capability.get("id")
         if not isinstance(capability_id, str):
             continue
@@ -129,16 +126,16 @@ def _agent_review_findings(security_scan: dict[str, Any]) -> list[dict[str, Any]
         return []
 
     findings: list[dict[str, Any]] = []
-    for gate in gates:
-        if not isinstance(gate, dict):
-            continue
+    for gate in _dict_list(cast(object, gates)):
         gate_id = gate.get("id")
         if not isinstance(gate_id, str):
             continue
-        scope = gate.get("scope")
+        scope = _dict(gate.get("scope"))
         categories = []
-        if isinstance(scope, dict) and isinstance(scope.get("categories"), list):
-            categories = [item for item in scope["categories"] if isinstance(item, str)]
+        if scope is not None:
+            categories = [
+                item for item in _any_list(scope.get("categories")) if isinstance(item, str)
+            ]
         findings.append(
             {
                 "id": f"security-review-{gate_id.replace('_', '-')}",
@@ -152,7 +149,7 @@ def _agent_review_findings(security_scan: dict[str, Any]) -> list[dict[str, Any]
                 "recommended_fix": (
                     "Complete the agent-review gate instructions and disposition all related candidates."
                 ),
-                "verification": list(gate.get("completion_criteria") or [])
+                "verification": list(_any_list(gate.get("completion_criteria")))
                 or ["Disposition all related security candidates."],
                 "owner": None,
                 "score": 700,
@@ -194,3 +191,17 @@ def _missing_capability_severity(capability: dict[str, Any]) -> str:
     if required_by == "config":
         return "blocker"
     return "warning"
+
+
+def _dict(value: object) -> dict[str, Any] | None:
+    return cast(dict[str, Any], value) if isinstance(value, dict) else None
+
+
+def _dict_list(value: object) -> list[dict[str, Any]]:
+    if not isinstance(value, list):
+        return []
+    return [cast(dict[str, Any], item) for item in cast(list[Any], value) if isinstance(item, dict)]
+
+
+def _any_list(value: object) -> list[Any]:
+    return cast(list[Any], value) if isinstance(value, list) else []
