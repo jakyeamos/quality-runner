@@ -4,7 +4,7 @@ import json
 import re
 from datetime import UTC, datetime, timedelta
 from pathlib import Path, PurePosixPath
-from typing import Any
+from typing import Any, cast
 
 from quality_runner.bug_learning import required_promotion_blocker
 
@@ -28,9 +28,10 @@ def parse_invariants(value: object, warnings: list[dict[str, str]]) -> list[dict
         warnings.append(_warning("quality_runner.invariants must be a list of tables"))
         return []
 
+    typed_value = cast(list[Any], value)
     invariants: list[dict[str, Any]] = []
     seen_ids: set[str] = set()
-    for index, item in enumerate(value):
+    for index, item in enumerate(typed_value):
         parsed = _parse_invariant(item, index=index, warnings=warnings)
         if parsed is None:
             continue
@@ -117,13 +118,13 @@ def add_invariant_capabilities(
 
 
 def configured_invariants(standards_packet: dict[str, Any]) -> list[dict[str, Any]]:
-    config = standards_packet.get("config")
-    if not isinstance(config, dict):
+    config = _dict(standards_packet.get("config"))
+    if config is None:
         return []
     invariants = config.get("invariants")
     if not isinstance(invariants, list):
         return []
-    return [item for item in invariants if isinstance(item, dict)]
+    return _dict_list(cast(object, invariants))
 
 
 def build_invariant_report(
@@ -136,7 +137,7 @@ def build_invariant_report(
     checked_at = _utc_now(now)
     gates = _gate_results(gate_verification)
     configured = config.get("invariants")
-    invariants = configured if isinstance(configured, list) else []
+    invariants = _dict_list(cast(object, configured))
     results = [
         _invariant_result(
             repo_root=repo_root,
@@ -145,7 +146,6 @@ def build_invariant_report(
             checked_at=checked_at,
         )
         for invariant in invariants
-        if isinstance(invariant, dict)
     ]
     counts = {
         status: sum(1 for result in results if result["status"] == status)
@@ -167,8 +167,8 @@ def apply_invariant_status(
     status = gate_verification.get("status")
     required = [
         item
-        for item in invariant_report.get("invariants", [])
-        if isinstance(item, dict) and item.get("enforcement") == "required"
+        for item in _dict_list(invariant_report.get("invariants", []))
+        if item.get("enforcement") == "required"
     ]
     if any(item.get("status") == "failed" for item in required):
         status = "failed"
@@ -192,22 +192,23 @@ def _parse_invariant(
     warnings: list[dict[str, str]],
 ) -> dict[str, Any] | None:
     field = f"quality_runner.invariants[{index}]"
-    if not isinstance(value, dict):
+    value_map = _dict(value)
+    if value_map is None:
         warnings.append(_warning(f"{field} must be a table"))
         return None
 
-    invariant_id = value.get("id")
-    description = value.get("description")
-    owner = value.get("owner")
-    surfaces = value.get("surfaces")
-    command = value.get("command")
-    evidence_file = value.get("evidence_file")
-    enforcement = value.get("enforcement", "advisory")
-    ecosystem = value.get("ecosystem", "repository")
-    mutating_risk = value.get("mutating_risk", "unknown")
-    freshness_days = value.get("freshness_days", 30)
-    candidate_id = value.get("candidate_id")
-    promotion_receipt = value.get("promotion_receipt")
+    invariant_id = value_map.get("id")
+    description = value_map.get("description")
+    owner = value_map.get("owner")
+    surfaces = value_map.get("surfaces")
+    command = value_map.get("command")
+    evidence_file = value_map.get("evidence_file")
+    enforcement = value_map.get("enforcement", "advisory")
+    ecosystem = value_map.get("ecosystem", "repository")
+    mutating_risk = value_map.get("mutating_risk", "unknown")
+    freshness_days = value_map.get("freshness_days", 30)
+    candidate_id = value_map.get("candidate_id")
+    promotion_receipt = value_map.get("promotion_receipt")
 
     valid = True
     if not isinstance(invariant_id, str) or not INVARIANT_ID_RE.fullmatch(invariant_id):
@@ -258,7 +259,7 @@ def _parse_invariant(
         )
         return None
 
-    assert isinstance(surfaces, list)
+    surfaces = cast(list[str], surfaces)
     return {
         "id": invariant_id,
         "description": description,
@@ -357,20 +358,24 @@ def _evidence_result(
             "source": relative,
             "reason": "configured invariant evidence file is unreadable or invalid JSON",
         }
-    if not isinstance(payload, dict):
+    payload_map = _dict(payload)
+    if payload_map is None:
         return {
             "status": "unknown",
             "source": relative,
             "reason": "configured invariant evidence file must contain an object",
         }
-    if payload.get("schema") != INVARIANT_EVIDENCE_SCHEMA or payload.get("id") != invariant["id"]:
+    if (
+        payload_map.get("schema") != INVARIANT_EVIDENCE_SCHEMA
+        or payload_map.get("id") != invariant["id"]
+    ):
         return {
             "status": "unknown",
             "source": relative,
             "reason": "configured invariant evidence schema or id does not match",
         }
-    evidence_status = payload.get("status")
-    evidence_time = _parse_timestamp(payload.get("checked_at"))
+    evidence_status = payload_map.get("status")
+    evidence_time = _parse_timestamp(payload_map.get("checked_at"))
     if evidence_status not in EVIDENCE_STATUSES or evidence_time is None:
         return {
             "status": "unknown",
@@ -399,7 +404,7 @@ def _missing_surfaces(repo_root: Path, invariant: dict[str, Any]) -> list[str]:
         return []
     return [
         surface
-        for surface in surfaces
+        for surface in cast(list[Any], surfaces)
         if isinstance(surface, str) and not (repo_root / surface).exists()
     ]
 
@@ -412,8 +417,8 @@ def _gate_results(gate_verification: dict[str, Any] | None) -> dict[str, dict[st
         return {}
     return {
         str(gate["id"]): gate
-        for gate in gates
-        if isinstance(gate, dict) and isinstance(gate.get("id"), str)
+        for gate in _dict_list(cast(object, gates))
+        if isinstance(gate.get("id"), str)
     }
 
 
@@ -438,10 +443,11 @@ def _repo_root(scan: dict[str, Any], standards_packet: dict[str, Any]) -> Path:
 
 
 def _relative_path_list(value: object) -> bool:
-    return (
-        isinstance(value, list)
-        and bool(value)
-        and all(isinstance(item, str) and _safe_relative_path(item) for item in value)
+    if not isinstance(value, list):
+        return False
+    typed_value = cast(list[Any], value)
+    return bool(typed_value) and all(
+        isinstance(item, str) and _safe_relative_path(item) for item in typed_value
     )
 
 
@@ -460,6 +466,16 @@ def _parse_timestamp(value: object) -> datetime | None:
     if parsed.tzinfo is None:
         return None
     return parsed.astimezone(UTC)
+
+
+def _dict(value: object) -> dict[str, Any] | None:
+    return cast(dict[str, Any], value) if isinstance(value, dict) else None
+
+
+def _dict_list(value: object) -> list[dict[str, Any]]:
+    if not isinstance(value, list):
+        return []
+    return [cast(dict[str, Any], item) for item in cast(list[Any], value) if isinstance(item, dict)]
 
 
 def _utc_now(value: datetime | None) -> datetime:
