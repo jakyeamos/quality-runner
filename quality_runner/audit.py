@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 
 from quality_runner.actionability import enrich_audit_findings
 from quality_runner.code_quality_findings import CATEGORY_ORDER
@@ -20,8 +20,8 @@ def build_audit_report(
     security_scan: dict[str, Any] | None = None,
     resolution_ledger: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    config = standards_packet.get("config")
-    security_config = config.get("security") if isinstance(config, dict) else None
+    config = _dict(standards_packet.get("config"))
+    security_config = _dict(config.get("security")) if config is not None else None
     findings = [
         *_missing_capability_findings(capability_map, standards_packet),
         *_standards_requirement_findings(standards_packet, scan),
@@ -63,9 +63,7 @@ def render_audit_markdown(report: dict[str, Any]) -> str:
 
     findings = report.get("findings")
     if isinstance(findings, list) and findings:
-        for finding in findings:
-            if not isinstance(finding, dict):
-                continue
+        for finding in _dict_list(cast(object, findings)):
             lines.extend(
                 [
                     f"### {finding.get('id')}",
@@ -95,27 +93,29 @@ def render_audit_markdown(report: dict[str, Any]) -> str:
 
 
 def _resolution_markdown(value: object) -> list[str]:
-    if not isinstance(value, dict):
+    value_map = _dict(value)
+    if value_map is None:
         return []
     return [
         "## Resolution",
         "",
-        f"- Status: {value.get('status')}",
-        f"- Findings: {value.get('total_findings')}",
-        f"- Resolved: {value.get('resolved_findings')}",
-        f"- Unresolved: {value.get('unresolved_findings')}",
+        f"- Status: {value_map.get('status')}",
+        f"- Findings: {value_map.get('total_findings')}",
+        f"- Resolved: {value_map.get('resolved_findings')}",
+        f"- Unresolved: {value_map.get('unresolved_findings')}",
         "",
     ]
 
 
 def _finding_resolution_markdown(value: object) -> list[str]:
-    if not isinstance(value, dict):
+    value_map = _dict(value)
+    if value_map is None:
         return []
     lines = [
-        f"- Resolution: {value.get('status')} ({'resolved' if value.get('resolved') else 'unresolved'})"
+        f"- Resolution: {value_map.get('status')} ({'resolved' if value_map.get('resolved') else 'unresolved'})"
     ]
-    reason = value.get("reason")
-    owner = value.get("owner")
+    reason = value_map.get("reason")
+    owner = value_map.get("owner")
     if isinstance(reason, str) and reason:
         lines.append(f"- Resolution reason: {reason}")
     if isinstance(owner, str) and owner:
@@ -132,9 +132,7 @@ def _missing_capability_findings(
         return []
 
     findings: list[dict[str, Any]] = []
-    for capability in missing:
-        if not isinstance(capability, dict):
-            continue
+    for capability in _dict_list(cast(object, missing)):
         capability_id = capability.get("id")
         reason = capability.get("reason")
         capability_type = capability.get("type")
@@ -207,9 +205,7 @@ def _standards_requirement_findings(
         return []
 
     findings: list[dict[str, Any]] = []
-    for requirement in requirements:
-        if not isinstance(requirement, dict):
-            continue
+    for requirement in _dict_list(cast(object, requirements)):
         requirement_id = requirement.get("id")
         if requirement_id == "package_manager_mismatch":
             detected = _string_or_default(scan.get("package_manager"), "unknown")
@@ -244,9 +240,7 @@ def _code_quality_findings(code_quality_scan: dict[str, Any] | None) -> list[dic
         return []
 
     groups: dict[tuple[str, str], list[dict[str, Any]]] = {}
-    for finding in findings:
-        if not isinstance(finding, dict):
-            continue
+    for finding in _dict_list(cast(object, findings)):
         category = finding.get("category")
         rule_id = finding.get("rule_id")
         if isinstance(category, str) and category and isinstance(rule_id, str) and rule_id:
@@ -379,7 +373,7 @@ def _structural_severity(group: list[dict[str, Any]]) -> str:
 
 
 def _structural_evidence(group: list[dict[str, Any]]) -> list[str]:
-    evidence = []
+    evidence: list[str] = []
     for finding in group[:5]:
         file = _string_or_default(finding.get("file"), "unknown")
         line = finding.get("line")
@@ -397,9 +391,7 @@ def _warnings(payload: dict[str, Any]) -> list[dict[str, str]]:
         return []
 
     normalized: list[dict[str, str]] = []
-    for warning in warnings:
-        if not isinstance(warning, dict):
-            continue
+    for warning in _dict_list(cast(object, warnings)):
         code = warning.get("code")
         message = warning.get("message")
         path = warning.get("path")
@@ -420,10 +412,10 @@ def _effective_severity(
     finding_id: str,
     standards_packet: dict[str, Any],
 ) -> str:
-    config = standards_packet.get("config")
-    if isinstance(config, dict):
-        overrides = config.get("severity_overrides")
-        if isinstance(overrides, dict):
+    config = _dict(standards_packet.get("config"))
+    if config is not None:
+        overrides = _dict(config.get("severity_overrides"))
+        if overrides is not None:
             for key in (finding_id, capability_id):
                 value = overrides.get(key)
                 if isinstance(value, str) and value:
@@ -464,7 +456,7 @@ def _recommended_fix(capability_id: str, language: str) -> str:
 def _markdown_items(value: object) -> list[str]:
     if not isinstance(value, list):
         return ["  - unavailable"]
-    items = [item for item in value if isinstance(item, str) and item]
+    items = [item for item in cast(list[Any], value) if isinstance(item, str) and item]
     if not items:
         return ["  - unavailable"]
     return [f"  - {item}" for item in items]
@@ -476,3 +468,13 @@ def _string_or_none(value: object) -> str | None:
 
 def _string_or_default(value: object, default: str) -> str:
     return value if isinstance(value, str) and value else default
+
+
+def _dict(value: object) -> dict[str, Any] | None:
+    return cast(dict[str, Any], value) if isinstance(value, dict) else None
+
+
+def _dict_list(value: object) -> list[dict[str, Any]]:
+    if not isinstance(value, list):
+        return []
+    return [cast(dict[str, Any], item) for item in cast(list[Any], value) if isinstance(item, dict)]
