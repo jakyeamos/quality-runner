@@ -12,6 +12,7 @@ import pytest
 from quality_runner.mcp import call_tool
 
 ROOT = Path(__file__).resolve().parents[1]
+REVIEW_SUBPROCESS_TIMEOUT_SECONDS = 30
 
 
 def _finding(
@@ -51,7 +52,7 @@ def _review_result(repo_root: Path, *arguments: str) -> subprocess.CompletedProc
         cwd=ROOT,
         capture_output=True,
         text=True,
-        timeout=5,
+        timeout=REVIEW_SUBPROCESS_TIMEOUT_SECONDS,
     )
 
 

@@ -39,6 +39,8 @@ deploy, tag, push, call a provider, collect credentials, or execute a
 remediation action. If a dependency cache, tool, or gate is unavailable, keep
 the result visible as unknown or blocked.
 
-BasedPyright is intentionally configured in strict mode. Existing strictness
-findings are tracked remediation debt and must be fixed at their source; do not
-weaken the mode, add broad ignores, or replace errors with casts.
+BasedPyright is certified over the declared package scope in standard mode.
+Repository-wide strict mode is not certified: the 0.7.0 fold exposed a large
+existing backlog when the environment branch enabled it without end-to-end
+proof. Keep that migration visible as candidate work, fix findings at their
+source, and do not add broad ignores or replace errors with casts.

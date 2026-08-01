@@ -73,15 +73,10 @@ def test_required_invariant_with_missing_proof_surface_is_reported_missing(
     scan = inspect_repo(tmp_path, run_id="invariant-missing-proof")
     packet = compile_standards(repo_root=tmp_path, scan=scan, profile="default")
     capability_map = detect_capabilities(scan=scan, standards_packet=packet)
-    missing = {
-        item["id"]: item
-        for item in _objects(capability_map["missing"])
-    }
+    missing = {item["id"]: item for item in _objects(capability_map["missing"])}
 
     assert missing["human-only-review-not-reusable"]["type"] == "invariant"
-    assert "queue-ui.mjs" in str(
-        missing["human-only-review-not-reusable"]["reason"]
-    )
+    assert "queue-ui.mjs" in str(missing["human-only-review-not-reusable"]["reason"])
 
 
 def test_invalid_and_duplicate_invariants_fail_closed_with_config_warnings(
@@ -123,9 +118,7 @@ def test_invalid_and_duplicate_invariants_fail_closed_with_config_warnings(
     config = load_repo_config(tmp_path)
 
     assert [item["id"] for item in _objects(config["invariants"])] == ["valid-invariant"]
-    warning_messages = [
-        str(item["message"]) for item in _objects(config["warnings"])
-    ]
+    warning_messages = [str(item["message"]) for item in _objects(config["warnings"])]
     assert any("duplicates 'valid-invariant'" in message for message in warning_messages)
     assert any("kebab-case id" in message for message in warning_messages)
 
@@ -150,18 +143,24 @@ def test_invariant_report_distinguishes_pass_fail_block_unknown_and_stale(
     now = datetime(2026, 7, 29, tzinfo=UTC)
 
     assert _status(tmp_path, config, {"status": "passed"}, now) == "passed"
-    assert _status(
-        tmp_path,
-        config,
-        {"status": "failed", "failure_type": "command-failed"},
-        now,
-    ) == "failed"
-    assert _status(
-        tmp_path,
-        config,
-        {"status": "failed", "failure_type": "environment-restricted"},
-        now,
-    ) == "blocked"
+    assert (
+        _status(
+            tmp_path,
+            config,
+            {"status": "failed", "failure_type": "command-failed"},
+            now,
+        )
+        == "failed"
+    )
+    assert (
+        _status(
+            tmp_path,
+            config,
+            {"status": "failed", "failure_type": "environment-restricted"},
+            now,
+        )
+        == "blocked"
+    )
     assert _status(tmp_path, config, None, now) == "unknown"
 
     evidence = tmp_path / "invariant-evidence.json"

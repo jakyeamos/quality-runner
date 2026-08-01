@@ -37,9 +37,7 @@ def parse_invariants(value: object, warnings: list[dict[str, str]]) -> list[dict
         invariant_id = parsed["id"]
         if invariant_id in seen_ids:
             warnings.append(
-                _warning(
-                    f"quality_runner.invariants[{index}].id duplicates {invariant_id!r}"
-                )
+                _warning(f"quality_runner.invariants[{index}].id duplicates {invariant_id!r}")
             )
             continue
         seen_ids.add(invariant_id)
@@ -234,7 +232,11 @@ def _parse_invariant(
         valid = False
     if mutating_risk not in MUTATING_RISK_VALUES:
         valid = False
-    if not isinstance(freshness_days, int) or isinstance(freshness_days, bool) or freshness_days <= 0:
+    if (
+        not isinstance(freshness_days, int)
+        or isinstance(freshness_days, bool)
+        or freshness_days <= 0
+    ):
         valid = False
     if candidate_id is not None and (
         not isinstance(candidate_id, str) or not INVARIANT_ID_RE.fullmatch(candidate_id)
@@ -311,11 +313,7 @@ def _invariant_result(
         if gate_status == "passed":
             return {**base, "status": "passed", "source": "current-run"}
         if gate_status == "failed":
-            status = (
-                "blocked"
-                if gate.get("failure_type") in BLOCKING_FAILURE_TYPES
-                else "failed"
-            )
+            status = "blocked" if gate.get("failure_type") in BLOCKING_FAILURE_TYPES else "failed"
             return {
                 **base,
                 "status": status,

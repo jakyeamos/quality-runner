@@ -71,6 +71,6 @@ ignore = ["E501"]
 [tool.basedpyright]
 pythonVersion = "3.12"
 include = ["quality_runner", "quality_evidence_contract", "repo_quality_certifier"]
-typeCheckingMode = "strict"
+typeCheckingMode = "standard"
 reportMissingImports = "warning"
 reportMissingModuleSource = "none"

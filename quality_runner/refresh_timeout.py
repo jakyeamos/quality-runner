@@ -69,19 +69,20 @@ def resolve_refresh_timeout_contract(
         if adaptive_verify_timeout is not None
         else default_workflow_timeout_seconds(per_gate_timeout_seconds)
     )
+    fixed_phase_timeout = default_workflow_timeout_seconds(per_gate_timeout_seconds)
     resolved_inspect_timeout = (
         inspect_timeout_seconds
         if inspect_timeout_seconds is not None
-        else adaptive_timeouts.get("inspect", resolved_verify_timeout)
+        else adaptive_timeouts.get("inspect", fixed_phase_timeout)
         if adaptive_active
-        else resolved_verify_timeout
+        else fixed_phase_timeout
     )
     resolved_run_timeout = (
         run_timeout_seconds
         if run_timeout_seconds is not None
-        else adaptive_timeouts.get("run", resolved_verify_timeout)
+        else adaptive_timeouts.get("run", fixed_phase_timeout)
         if adaptive_active
-        else resolved_verify_timeout
+        else fixed_phase_timeout
     )
     resolved_total_timeout = (
         total_timeout_seconds

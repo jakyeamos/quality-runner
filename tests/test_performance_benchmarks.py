@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import sys
 import time
 from pathlib import Path
 
@@ -60,8 +61,12 @@ def test_balanced_tenure_sized_fixture_is_incremental(tmp_path: Path) -> None:
         cache_root=cache,
     )
 
-    assert cold_seconds < 120
-    assert warm_seconds < 30
+    # The LCOV script uses Python's line tracer, which deliberately changes
+    # runtime cost. Preserve native-speed budgets in ordinary test execution;
+    # traced runs still prove cache behavior and artifact correctness below.
+    if sys.gettrace() is None:
+        assert cold_seconds < 120
+        assert warm_seconds < 30
     assert cold["findings"] == warm["findings"]
     assert warm["analysis_cache"]["cache_hits"] == TENURE_FILE_COUNT  # type: ignore[index]
     assert warm["analysis_cache"]["recomputed_files"] == 0  # type: ignore[index]

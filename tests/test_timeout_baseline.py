@@ -312,6 +312,21 @@ def test_invalid_baseline_falls_back(tmp_path: Path) -> None:
     assert contract["total_timeout_seconds"] is None
 
 
+def test_explicit_verify_timeout_does_not_narrow_inspect_or_run() -> None:
+    contract = resolve_refresh_timeout_contract(
+        per_gate_timeout_seconds=30,
+        workflow_timeout_seconds=None,
+        verify_timeout_seconds=1,
+        workflow_timeout_reason="intentional verify timeout",
+        total_timeout_seconds=None,
+        total_timeout_reason=None,
+    )
+
+    assert contract["verify_timeout_seconds"] == 1
+    assert contract["inspect_timeout_seconds"] == 90
+    assert contract["run_timeout_seconds"] == 90
+
+
 def test_custom_exclusions_require_a_matching_validated_preflight(tmp_path: Path) -> None:
     (tmp_path / ".quality-runner.toml").write_text(
         '[quality_runner]\nscan_exclusions = ["generated-output/**"]\n',

@@ -37,7 +37,7 @@ contain sensitive repository details; it remains local unless a human reviews
 and explicitly publishes a redacted projection.
 
 The executable environment contract validates this index's links and freshness,
-the strict type-checking setting, the locked quality ladder, CI and release
+the certified type-checking setting, the locked quality ladder, CI and release
 coverage, Quality Runner blocker gates, and secret-file ignore protections.
 Refresh this index when command, quality-adapter, or release-boundary behavior
 changes. Strict type-checking findings are remediation work; they must remain

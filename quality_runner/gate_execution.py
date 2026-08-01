@@ -69,9 +69,7 @@ def verify_gate(
     )
 
 
-def _with_invariant_policy(
-    result: dict[str, Any], capability: dict[str, Any]
-) -> dict[str, Any]:
+def _with_invariant_policy(result: dict[str, Any], capability: dict[str, Any]) -> dict[str, Any]:
     if capability.get("capability_kind") != "semantic_invariant":
         return result
     return {

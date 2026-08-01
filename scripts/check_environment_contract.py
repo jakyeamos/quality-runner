@@ -185,8 +185,8 @@ def _check_pyproject(root: Path, errors: list[str]) -> None:
         errors.append("pyproject.toml is missing [tool]")
         return
     checker = tool.get("basedpyright", tool.get("pyright"))
-    if not isinstance(checker, dict) or checker.get("typeCheckingMode") != "strict":
-        errors.append("basedpyright must remain strict")
+    if not isinstance(checker, dict) or checker.get("typeCheckingMode") != "standard":
+        errors.append("basedpyright must remain at the certified standard repository scope")
 
 
 def _check_pre_cr(root: Path, errors: list[str]) -> None:

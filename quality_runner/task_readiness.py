@@ -21,6 +21,7 @@ BLOCKED_OUTPUT_MARKERS = {
     "operation not permitted",
     "permission denied",
 }
+MINIMUM_BOOTSTRAP_TIMEOUT_SECONDS = 15
 
 
 def evaluate_readiness(
@@ -177,7 +178,16 @@ def _run_bootstrap(
             "stdout": "",
             "stderr": "bootstrap command did not provide verifiable version output",
         }
-    timeout = min(int(gate.get("timeout_seconds") or 120), 300)
+    # The gate timeout measures the check itself. A deliberately short gate
+    # timeout (for example, a timeout-behaviour fixture) must not accidentally
+    # turn ordinary interpreter/bootstrap startup into the evidence result.
+    timeout = min(
+        max(
+            int(gate.get("timeout_seconds") or 120),
+            MINIMUM_BOOTSTRAP_TIMEOUT_SECONDS,
+        ),
+        300,
+    )
     try:
         result = subprocess.run(
             argv,

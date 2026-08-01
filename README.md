@@ -82,7 +82,7 @@ quality-runner`.
 The repository itself is guarded by an executable environment contract:
 `python3 scripts/check_environment_contract.py` runs through `.pre-cr.json`,
 CI, and release checks, and is also a required blocker gate in
-`.quality-runner.toml`. It verifies routed context, strict type-checking
+`.quality-runner.toml`. It verifies routed context, certified type-checking
 configuration, locked commands, workflow coverage, and secret-file ignores.
 
 Quality Runner also carries compatibility surfaces for the two smaller extracted

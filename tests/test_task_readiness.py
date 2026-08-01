@@ -165,6 +165,7 @@ def test_certified_gate_timeout_is_unknown_evidence(tmp_path: Path) -> None:
     )
 
     assert results[0]["status"] == "timeout"
+    assert results[0]["bootstrap"]["status"] == "passed"
     assert blockers[0]["code"] == "gate_evidence_unknown"
 
 

@@ -33,6 +33,13 @@ created by `uv sync --locked --all-groups --python 3.13`:
 | Ruff format | 0.15.10 | `ruff format --check .` | `uv run --locked ruff format --check .` |
 | BasedPyright | 1.39.0 | `basedpyright` | `uv run --locked basedpyright` |
 
+The certified BasedPyright command covers the declared package scope in
+standard mode. Repository-wide strict mode is a migration candidate, not a
+certified gate: the combined 0.7.0 fold proved that enabling it produces a
+large existing backlog. It must not become required until that debt is fixed
+and repeat-pass, intentional-failure, local, and CI evidence is refreshed for
+the expanded mode.
+
 `tests/test_prevention_policy.py` supplies repeat-pass and intentional-failure
 fixtures for each gate. `.github/workflows/ci.yml` runs the equivalent pinned
 commands on Python 3.12, 3.13, and 3.14 on Ubuntu and macOS. `qr task` resolves
@@ -42,7 +49,9 @@ commands run, QR executes each distinct certified bootstrap once in the
 snapshot, records the bootstrap executable, version, output, and status, then
 prefers the tools installed into the snapshot's `.venv`. A failed, missing,
 unversioned, or timed-out bootstrap blocks the check instead of being treated as
-a policy violation. Gate subprocesses do not inherit user or system Git
+a policy violation. Bootstrap startup receives a 15-second minimum budget so a
+deliberately short gate timeout measures the gate rather than interpreter or
+installer startup. Gate subprocesses do not inherit user or system Git
 configuration, caller-selected Python import paths, UV Python, or virtual
 environments, so global ignore rules, hooks, and launcher state cannot make
 local evidence differ from CI. The documented `uv` cache may be reused, but the
