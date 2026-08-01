@@ -36,6 +36,7 @@ from quality_runner.cli_remediation import remediation_delta_command_payload
 from quality_runner.cli_repo_hygiene import repo_hygiene_payload
 from quality_runner.cli_review import review_command_payload
 from quality_runner.cli_rollout import rollout_command_payload
+from quality_runner.cli_security import security_command_payload
 from quality_runner.cli_skills import skill_command_payload
 from quality_runner.cli_status import export_handoff_payload, status_payload
 from quality_runner.cli_update import update_command_payload
@@ -71,6 +72,8 @@ def payload_for_args(
         return doctor_payload(include_environment=True)
     if args.command == "fleet":
         return fleet_command_payload(args)
+    if args.command == "security":
+        return security_command_payload(args)
     if args.command == "phase-check":
         return phase_command_payload(args)
     if args.command == "self-update":

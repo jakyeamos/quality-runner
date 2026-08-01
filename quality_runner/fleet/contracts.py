@@ -17,6 +17,7 @@ FLEET_REPORT_SCHEMA = "quality-runner-fleet-report-v0.1"
 
 DIMENSIONS = (
     "architecture_boundaries",
+    "change_surface_coverage",
     "quality_commands",
     "coding_conventions",
     "security_constraints",
@@ -26,10 +27,12 @@ DIMENSIONS = (
     "approval_gated_paths",
     "deployment_rollback",
     "context_routing",
+    "skill_contract_quality",
 )
 
 DIMENSION_LABELS = {
     "architecture_boundaries": "architecture and boundaries",
+    "change_surface_coverage": "change-surface coverage",
     "quality_commands": "build, test, lint, and quality commands",
     "coding_conventions": "coding conventions",
     "security_constraints": "security and credential constraints",
@@ -39,6 +42,7 @@ DIMENSION_LABELS = {
     "approval_gated_paths": "forbidden and approval-gated paths",
     "deployment_rollback": "deployment and rollback",
     "context_routing": "context routing and minimum context",
+    "skill_contract_quality": "skill contract quality",
 }
 
 FRESHNESS_DAYS = 90

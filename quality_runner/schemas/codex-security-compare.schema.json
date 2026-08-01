@@ -1,0 +1,37 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://quality-runner.dev/schemas/codex-security-compare.schema.json",
+  "title": "Quality Runner Codex Security Comparison",
+  "type": "object",
+  "required": [
+    "schema",
+    "contract_schema",
+    "baseline",
+    "current",
+    "baseline_hash",
+    "current_hash",
+    "input_hashes",
+    "matches",
+    "summary",
+    "comparison_hash",
+    "implementation_allowed"
+  ],
+  "properties": {
+    "schema": { "const": "quality-runner-codex-security-compare-v0.1" },
+    "contract_schema": { "const": "quality-evidence-v0.1" },
+    "baseline": { "type": "object" },
+    "current": { "type": "object" },
+    "baseline_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "current_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "input_hashes": {
+      "type": "object",
+      "required": ["baseline", "current"],
+      "additionalProperties": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+    },
+    "matches": { "type": "array", "items": { "type": "object" } },
+    "summary": { "type": "object" },
+    "comparison_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "implementation_allowed": { "const": false }
+  },
+  "additionalProperties": true
+}

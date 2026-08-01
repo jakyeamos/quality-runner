@@ -107,7 +107,15 @@ Quality Runner now owns the command-backed profile and fleet orchestration:
 ```bash
 qr audit /path/to/repo --profile environment-legibility --json
 qr fleet audit run --all --projects-root /path/to/projects --json
+qr fleet audit feed --audit-id AUDIT_ID --json
 ```
+
+The fleet feed is a versioned, private handoff at
+`~/.quality-runner/fleet-audit/current/maturity.json`. It is generated only
+from a complete, replay-valid fleet snapshot and contains redacted maturity
+projections for local consumers. Immutable source artifacts remain in the
+audit-specific directory. `--output-dir` is safe for isolated tests and cannot
+replace the production current feed.
 
 The profile uses QR's read-only audit and disposable-worktree contracts. Do not
 pass `environment-legibility` to `--only-gate`; that selector remains reserved

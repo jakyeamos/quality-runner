@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://quality-runner.dev/schemas/codex-security-handoff.schema.json",
+  "title": "Quality Runner Codex Security Handoff",
+  "type": "object",
+  "required": [
+    "schema",
+    "contract_schema",
+    "source",
+    "status",
+    "implementation_allowed",
+    "baseline_evidence_hash",
+    "current_evidence_hash",
+    "comparison_hash",
+    "input_hashes",
+    "findings",
+    "comparison",
+    "handoff_hash"
+  ],
+  "properties": {
+    "schema": { "const": "quality-runner-codex-security-handoff-v0.1" },
+    "contract_schema": { "const": "quality-evidence-v0.1" },
+    "source": { "const": "codex-security" },
+    "status": { "enum": ["clean", "review-required", "unknown"] },
+    "implementation_allowed": { "const": false },
+    "baseline_evidence_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "current_evidence_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "comparison_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "input_hashes": {
+      "type": "object",
+      "required": ["baseline", "current", "comparison"],
+      "additionalProperties": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+    },
+    "findings": { "type": "array", "items": { "type": "object" } },
+    "comparison": { "type": "object" },
+    "handoff_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+  },
+  "additionalProperties": true
+}

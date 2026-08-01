@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "quality-runner-maturity-feed-v1",
+  "type": "object",
+  "required": [
+    "schema",
+    "status",
+    "feed_timestamp",
+    "source",
+    "replay",
+    "repository_count",
+    "repositories",
+    "provenance_hash",
+    "privacy"
+  ],
+  "properties": {
+    "schema": {"const": "quality-runner-maturity-feed/v1"},
+    "status": {"enum": ["completed", "complete_with_blockers"]},
+    "feed_timestamp": {"type": "string", "minLength": 1},
+    "generated_at": {"type": "string", "minLength": 1},
+    "source": {
+      "type": "object",
+      "required": ["audit_id", "as_of", "projects_root", "artifact_schema", "summary_hash"]
+    },
+    "replay": {
+      "type": "object",
+      "required": ["status", "deterministic"],
+      "properties": {
+        "status": {"const": "passed"},
+        "deterministic": {"const": true}
+      }
+    },
+    "repository_count": {"type": "integer", "minimum": 1},
+    "checkout_count": {"type": "integer", "minimum": 0},
+    "mean_maturity": {"type": ["number", "null"], "minimum": 0, "maximum": 4},
+    "repositories": {"type": "array", "minItems": 1, "items": {"type": "object"}},
+    "provenance_hash": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "privacy": {"type": "object"}
+  },
+  "additionalProperties": true
+}

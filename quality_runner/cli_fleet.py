@@ -10,6 +10,7 @@ from quality_runner.fleet.audit import (
     fleet_report_payload,
     fleet_show_payload,
 )
+from quality_runner.fleet.feed import fleet_feed_payload
 
 
 def add_fleet_commands(subparsers: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
@@ -24,11 +25,25 @@ def add_fleet_commands(subparsers: argparse._SubParsersAction[argparse.ArgumentP
     )
     audit_actions = audit_parser.add_subparsers(dest="audit_action", required=True)
 
-    run_parser = audit_actions.add_parser("run", help="Run static-all and optional dynamic fleet audit")
-    run_parser.add_argument("--all", action="store_true", help="Audit every repository identity under the bounded root")
+    run_parser = audit_actions.add_parser(
+        "run", help="Run static-all and optional dynamic fleet audit"
+    )
+    run_parser.add_argument(
+        "--all", action="store_true", help="Audit every repository identity under the bounded root"
+    )
+    run_parser.add_argument(
+        "--repo-path",
+        action="append",
+        default=[],
+        help="Audit one explicit repository path under --projects-root; repeat for a bounded slice",
+    )
     run_parser.add_argument("--projects-root", default=str(Path.home() / "projects"))
-    run_parser.add_argument("--output-dir", default=None, help="Runtime-owned audit directory override")
-    run_parser.add_argument("--dynamic", action="store_true", help="Run selected dynamic checks in disposable worktrees")
+    run_parser.add_argument(
+        "--output-dir", default=None, help="Runtime-owned audit directory override"
+    )
+    run_parser.add_argument(
+        "--dynamic", action="store_true", help="Run selected dynamic checks in disposable worktrees"
+    )
     run_parser.add_argument(
         "--changed-only",
         action=argparse.BooleanOptionalAction,
@@ -44,32 +59,49 @@ def add_fleet_commands(subparsers: argparse._SubParsersAction[argparse.ArgumentP
         metavar="REPO_ID=BRANCH",
         help="Override the documented development branch for one repository identity",
     )
-    run_parser.add_argument("--as-of", default=None, help="Fixed ISO-8601 timestamp for deterministic replay")
+    run_parser.add_argument(
+        "--as-of", default=None, help="Fixed ISO-8601 timestamp for deterministic replay"
+    )
     run_parser.add_argument("--json", action="store_true", help="Emit JSON output")
 
-    show_parser = audit_actions.add_parser("show", help="Show one private repository finding and plan")
+    show_parser = audit_actions.add_parser(
+        "show", help="Show one private repository finding and plan"
+    )
     show_parser.add_argument("--repo-id", required=True)
     show_parser.add_argument("--audit-id", default=None)
     show_parser.add_argument("--output-dir", default=None)
     show_parser.add_argument("--json", action="store_true")
 
-    replay_parser = audit_actions.add_parser("replay", help="Replay a persisted fleet audit deterministically")
+    replay_parser = audit_actions.add_parser(
+        "replay", help="Replay a persisted fleet audit deterministically"
+    )
     replay_parser.add_argument("--audit-id", default=None)
     replay_parser.add_argument("--output-dir", default=None)
     replay_parser.add_argument("--json", action="store_true")
 
-    report_parser = audit_actions.add_parser("report", help="Render an aggregate-only reviewable report")
+    report_parser = audit_actions.add_parser(
+        "report", help="Render an aggregate-only reviewable report"
+    )
     report_parser.add_argument("--audit-id", default=None)
     report_parser.add_argument("--output-dir", default=None)
     report_parser.add_argument("--json", action="store_true")
+
+    feed_parser = audit_actions.add_parser(
+        "feed", help="Validate and publish one fleet audit as the stable maturity feed"
+    )
+    feed_parser.add_argument("--audit-id", default=None)
+    feed_parser.add_argument("--output-dir", default=None)
+    feed_parser.add_argument("--json", action="store_true")
 
 
 def fleet_command_payload(args: argparse.Namespace) -> dict[str, Any]:
     if args.fleet_action != "audit":
         raise ValueError(f"unsupported fleet action: {args.fleet_action}")
     if args.audit_action == "run":
-        if not args.all:
-            raise ValueError("fleet audit run requires --all for explicit bounded fleet scope")
+        if not args.all and not args.repo_path:
+            raise ValueError("fleet audit run requires --all or at least one --repo-path")
+        if args.all and args.repo_path:
+            raise ValueError("fleet audit run accepts --all or --repo-path, not both")
         return fleet_audit_payload(
             projects_root=Path(args.projects_root),
             output_dir=Path(args.output_dir) if args.output_dir else None,
@@ -78,6 +110,7 @@ def fleet_command_payload(args: argparse.Namespace) -> dict[str, Any]:
             dynamic_max_age_days=args.dynamic_max_age_days,
             timeout_seconds=args.timeout_seconds,
             target_overrides=_target_overrides(args.target_override),
+            repository_paths=[Path(path) for path in args.repo_path] if args.repo_path else None,
             as_of=args.as_of,
         )
     if args.audit_action == "show":
@@ -93,6 +126,11 @@ def fleet_command_payload(args: argparse.Namespace) -> dict[str, Any]:
         )
     if args.audit_action == "report":
         return fleet_report_payload(
+            audit_id=args.audit_id,
+            output_dir=Path(args.output_dir) if args.output_dir else None,
+        )
+    if args.audit_action == "feed":
+        return fleet_feed_payload(
             audit_id=args.audit_id,
             output_dir=Path(args.output_dir) if args.output_dir else None,
         )

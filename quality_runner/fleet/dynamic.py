@@ -9,8 +9,25 @@ from typing import Any
 
 from quality_runner.artifacts import prepare_safe_directory
 from quality_runner.fleet.contracts import digest, hash_text, redact_text
+from quality_runner.fleet.dependencies import (
+    _remove_runtime_path,
+)
+from quality_runner.fleet.dependencies import (
+    prepare_dynamic_dependencies as _prepare_dependency_tree,
+)
 from quality_runner.fleet.discovery import checkout_fingerprint
 from quality_runner.process_runner import run_shell_command
+
+
+def _prepare_dynamic_dependencies(
+    *, worktree: Path, source: Path | None = None, timeout_seconds: int
+) -> dict[str, Any]:
+    return _prepare_dependency_tree(
+        worktree=worktree,
+        source=source,
+        timeout_seconds=timeout_seconds,
+        run_command=run_shell_command,
+    )
 
 
 def dynamic_result(
@@ -161,8 +178,24 @@ def _execute_dynamic(
         result["source_integrity_after"] = after
         result["source_unchanged"] = before == after
         return result
+    dependency_cleanup_paths: list[Path] = []
     try:
         statuses: list[str] = []
+        dependency_setup = _prepare_dynamic_dependencies(
+            worktree=worktree,
+            source=source,
+            timeout_seconds=timeout_seconds,
+        )
+        dependency_cleanup_paths = [
+            Path(path) for path in dependency_setup.pop("_cleanup_paths", [])
+        ]
+        result["dependency_setup"] = dependency_setup
+        if dependency_setup["status"] not in {"passed", "not_required"}:
+            result["status"] = str(dependency_setup["status"])
+            result["reason"] = str(
+                dependency_setup.get("reason", "dependency setup did not complete")
+            )
+            return result
         for command in commands:
             if not _safe_dynamic_command(command):
                 command_result = {
@@ -196,6 +229,8 @@ def _execute_dynamic(
         }
         if worktree.exists():
             shutil.rmtree(worktree, ignore_errors=True)
+        for path in reversed(dependency_cleanup_paths):
+            _remove_runtime_path(path)
     after = checkout_fingerprint(source)
     result["source_integrity_before"] = before
     result["source_integrity_after"] = after
@@ -232,10 +267,18 @@ def _run_dynamic_command(
         }
     stdout = str(result.get("stdout", ""))
     stderr = str(result.get("stderr", ""))
-    return {
+    unavailable_reason = _missing_runtime_requirement(command_text, stdout, stderr)
+    command_status = (
+        "passed"
+        if result.get("returncode") == 0
+        else "unavailable"
+        if unavailable_reason
+        else "failed"
+    )
+    command_result = {
         "command_id": command.get("id"),
         "capability": command.get("id"),
-        "status": "passed" if result.get("returncode") == 0 else "failed",
+        "status": command_status,
         "returncode": result.get("returncode"),
         "command_hash": hash_text(command_text),
         "stdout_hash": hash_text(stdout),
@@ -243,6 +286,20 @@ def _run_dynamic_command(
         "stdout_length": len(stdout),
         "stderr_length": len(stderr),
     }
+    if unavailable_reason:
+        command_result["reason"] = unavailable_reason
+    return command_result
+
+
+def _missing_runtime_requirement(command: str, stdout: str, stderr: str) -> str | None:
+    combined = f"{stdout}\n{stderr}".lower()
+    if "golangci-lint" in combined and "no such file or directory" in combined:
+        return "required executable golangci-lint is unavailable in the bounded runtime"
+    if "command not found" in combined or "executable file not found" in combined:
+        return "a required executable is unavailable in the bounded runtime"
+    if "public agent-config engine not found" in combined:
+        return "the documented public agent-config sibling runtime is unavailable"
+    return None
 
 
 def apply_dynamic_quality_evidence(result: dict[str, Any]) -> None:
