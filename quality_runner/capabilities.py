@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 
 from quality_runner.capability_exceptions import active_exception as _active_exception
 from quality_runner.capability_state import matching_ci_status, verification_state
@@ -120,13 +120,11 @@ def detect_capabilities(
 
 
 def _scripts(scan: dict[str, Any]) -> dict[str, str]:
-    scripts = scan.get("scripts")
-    if not isinstance(scripts, dict):
+    scripts = _dict(scan.get("scripts"))
+    if scripts is None:
         return {}
     return {
-        name: command
-        for name, command in scripts.items()
-        if isinstance(name, str) and isinstance(command, str) and command
+        name: command for name, command in scripts.items() if isinstance(command, str) and command
     }
 
 
@@ -135,8 +133,9 @@ def _quality_commands(scan: dict[str, Any]) -> list[dict[str, str]]:
     if not isinstance(commands, list):
         return []
     normalized: list[dict[str, str]] = []
-    for command in commands:
-        if not isinstance(command, dict):
+    for raw_command in cast(list[Any], commands):
+        command = _dict(raw_command)
+        if command is None:
             continue
         capability_id = command.get("id")
         command_text = command.get("command")
@@ -174,16 +173,17 @@ def _quality_commands(scan: dict[str, Any]) -> list[dict[str, str]]:
 
 
 def _configured_quality_commands(standards_packet: dict[str, Any]) -> list[dict[str, str]]:
-    config = standards_packet.get("config")
-    if not isinstance(config, dict):
+    config = _dict(standards_packet.get("config"))
+    if config is None:
         return []
     gates = config.get("gates")
     if not isinstance(gates, list):
         return []
 
     commands: list[dict[str, str]] = []
-    for index, gate in enumerate(gates):
-        if not isinstance(gate, dict) or gate.get("required") is not True:
+    for index, raw_gate in enumerate(cast(list[Any], gates)):
+        gate = _dict(raw_gate)
+        if gate is None or gate.get("required") is not True:
             continue
         capability_id = gate.get("id")
         command = gate.get("command")
@@ -327,38 +327,29 @@ def _required_capabilities(scan: dict[str, Any], standards_packet: dict[str, Any
     if release_required is not None:
         return release_required
 
-    config = standards_packet.get("config")
-    if isinstance(config, dict):
+    config = _dict(standards_packet.get("config"))
+    if config is not None:
         required_capabilities = config.get("required_capabilities")
         if config.get("required_capabilities_configured") is True and isinstance(
             required_capabilities, list
         ):
-            return {
-                capability
-                for capability in required_capabilities
-                if isinstance(capability, str)
-                and (capability in SCRIPT_CAPABILITIES or capability in FILE_CAPABILITIES)
-            }
+            return _known_capabilities(cast(object, required_capabilities))
 
-    profile_config = standards_packet.get("profile_config")
-    if isinstance(profile_config, dict):
+    profile_config = _dict(standards_packet.get("profile_config"))
+    if profile_config is not None:
         required_capabilities = profile_config.get("required_capabilities")
         if profile_config.get("required_capabilities_configured") is True and isinstance(
             required_capabilities, list
         ):
-            return {
-                capability
-                for capability in required_capabilities
-                if isinstance(capability, str)
-                and (capability in SCRIPT_CAPABILITIES or capability in FILE_CAPABILITIES)
-            }
+            return _known_capabilities(cast(object, required_capabilities))
 
     required = {*SCRIPT_CAPABILITIES, "pre_cr"}
-    if isinstance(config, dict):
+    if config is not None:
         gates = config.get("gates")
         if isinstance(gates, list):
-            for gate in gates:
-                if isinstance(gate, dict) and gate.get("required") is True:
+            for raw_gate in cast(list[Any], gates):
+                gate = _dict(raw_gate)
+                if gate is not None and gate.get("required") is True:
                     capability_id = gate.get("id")
                     if isinstance(capability_id, str) and (
                         capability_id in SCRIPT_CAPABILITIES or capability_id in FILE_CAPABILITIES
@@ -375,8 +366,8 @@ def _required_by(standards_packet: dict[str, Any]) -> dict[str, str]:
     if release_by is not None:
         return release_by
 
-    config = standards_packet.get("config")
-    if not isinstance(config, dict):
+    config = _dict(standards_packet.get("config"))
+    if config is None:
         return {}
     required_capabilities = config.get("required_capabilities")
     if config.get("required_capabilities_configured") is True and isinstance(
@@ -384,13 +375,11 @@ def _required_by(standards_packet: dict[str, Any]) -> dict[str, str]:
     ):
         return {
             capability: "config"
-            for capability in required_capabilities
-            if isinstance(capability, str)
-            and (capability in SCRIPT_CAPABILITIES or capability in FILE_CAPABILITIES)
+            for capability in _known_capabilities(cast(object, required_capabilities))
         }
 
-    profile_config = standards_packet.get("profile_config")
-    if not isinstance(profile_config, dict):
+    profile_config = _dict(standards_packet.get("profile_config"))
+    if profile_config is None:
         return {}
     profile_capabilities = profile_config.get("required_capabilities")
     if profile_config.get("required_capabilities_configured") is not True or not isinstance(
@@ -399,17 +388,15 @@ def _required_by(standards_packet: dict[str, Any]) -> dict[str, str]:
         return {}
     return {
         capability: "profile"
-        for capability in profile_capabilities
-        if isinstance(capability, str)
-        and (capability in SCRIPT_CAPABILITIES or capability in FILE_CAPABILITIES)
+        for capability in _known_capabilities(cast(object, profile_capabilities))
     }
 
 
 def _primary_language(scan: dict[str, Any]) -> str:
     languages = scan.get("languages")
     if isinstance(languages, list):
-        for language in languages:
-            if isinstance(language, str) and language:
+        for language in _as_string_list(cast(object, languages)):
+            if language:
                 return language
     return "unknown"
 
@@ -454,8 +441,9 @@ def _warnings(scan: dict[str, Any]) -> list[dict[str, str]]:
         return []
 
     normalized: list[dict[str, str]] = []
-    for warning in warnings:
-        if not isinstance(warning, dict):
+    for raw_warning in cast(list[Any], warnings):
+        warning = _dict(raw_warning)
+        if warning is None:
             continue
         code = warning.get("code")
         message = warning.get("message")
@@ -477,3 +465,19 @@ def _combined_warnings(
             combined.append(warning)
             seen.add(key)
     return combined
+
+
+def _dict(value: object) -> dict[str, Any] | None:
+    return cast(dict[str, Any], value) if isinstance(value, dict) else None
+
+
+def _as_string_list(value: object) -> list[str]:
+    return [item for item in cast(list[Any], value) if isinstance(item, str)] if isinstance(value, list) else []
+
+
+def _known_capabilities(value: object) -> set[str]:
+    return {
+        capability
+        for capability in _as_string_list(value)
+        if capability in SCRIPT_CAPABILITIES or capability in FILE_CAPABILITIES
+    }
