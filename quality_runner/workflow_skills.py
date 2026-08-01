@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from quality_runner.agent_review_policy import (
     AgentReviewMode,
@@ -47,12 +47,8 @@ def create_code_quality_scan_with_skills(
         cache_root=cache_root,
         cache_namespace_root=cache_namespace_root,
     )
-    selection = code_quality_scan.get("skill_selection")
-    skill_warnings = (
-        [item for item in selection.get("warnings", []) if isinstance(item, dict)]
-        if isinstance(selection, dict)
-        else []
-    )
+    selection = _dict(code_quality_scan.get("skill_selection"))
+    skill_warnings = _dict_list(selection.get("warnings")) if selection is not None else []
     return code_quality_scan, skill_warnings
 
 
@@ -61,9 +57,7 @@ def append_warnings(scan: dict[str, Any], extra: list[dict[str, str]]) -> dict[s
         return scan
     merged = dict(scan)
     existing = merged.get("warnings")
-    warnings = (
-        [item for item in existing if isinstance(item, dict)] if isinstance(existing, list) else []
-    )
+    warnings = _dict_list(existing)
     warnings.extend(extra)
     merged["warnings"] = warnings
     return merged
@@ -82,19 +76,21 @@ def write_skill_review_artifacts(
 ) -> dict[str, str]:
     selection = code_quality_scan.get("skill_selection")
     accountability = code_quality_scan.get("accountability")
-    scanned_files = []
+    scanned_files: list[dict[str, Any]] = []
     if isinstance(accountability, list):
-        for item in accountability:
-            if not isinstance(item, dict):
+        for raw_item in cast(list[Any], accountability):
+            item = _dict(raw_item)
+            if item is None:
                 continue
             path = item.get("path")
             line_count = item.get("line_count")
             if isinstance(path, str) and isinstance(line_count, int):
                 scanned_files.append({"path": path, "lines": [""] * line_count})
 
+    selection = _dict(selection)
     diagnostic_signals = (
-        selection.get("repo_signals")
-        if isinstance(selection, dict) and isinstance(selection.get("repo_signals"), list)
+        _string_list(selection.get("repo_signals"))
+        if selection is not None and isinstance(selection.get("repo_signals"), list)
         else None
     )
     repo_signals = (
@@ -163,8 +159,8 @@ def skill_review_summary(
 
     reviews = [
         item
-        for item in coverage
-        if isinstance(item, dict) and item.get("rule_type") == "agent_review"
+        for item in _dict_list(cast(object, coverage))
+        if item.get("rule_type") == "agent_review"
     ]
     if not reviews:
         return None
@@ -221,6 +217,7 @@ def skill_review_summary(
 def skill_review_markdown(value: object) -> list[str]:
     if not isinstance(value, dict):
         return []
+    value = cast(dict[str, Any], value)
 
     lines = ["", "## Active Skill Reviews", ""]
     lines.append(f"- Mode: {value.get('mode', 'auto')}")
@@ -229,13 +226,13 @@ def skill_review_markdown(value: object) -> list[str]:
         lines.append("- Execution: automatic supervising-agent review")
     active_skill_ids = value.get("active_skill_ids")
     if isinstance(active_skill_ids, list) and active_skill_ids:
-        lines.append(f"- Active packs: {', '.join(str(item) for item in active_skill_ids)}")
+        lines.append(f"- Active packs: {', '.join(_string_list(cast(object, active_skill_ids)))}")
     review_ids = value.get("review_ids")
     if isinstance(review_ids, list) and review_ids:
-        lines.append(f"- Reviews: {', '.join(str(item) for item in review_ids)}")
+        lines.append(f"- Reviews: {', '.join(_string_list(cast(object, review_ids)))}")
     unresolved = value.get("unresolved_review_ids")
     if isinstance(unresolved, list) and unresolved:
-        lines.append(f"- Unresolved reviews: {', '.join(str(item) for item in unresolved)}")
+        lines.append(f"- Unresolved reviews: {', '.join(_string_list(cast(object, unresolved)))}")
 
     packet_json = value.get("packet_json")
     packet_markdown = value.get("packet_markdown")
@@ -295,7 +292,7 @@ def load_skill_review_report_json(path: Path) -> dict[str, Any]:
     payload = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(payload, dict):
         raise ValueError("skill review report must be a JSON object")
-    return payload
+    return cast(dict[str, Any], payload)
 
 
 def quality_skill_identities(code_quality_scan: dict[str, Any]) -> list[dict[str, Any]]:
@@ -304,9 +301,8 @@ def quality_skill_identities(code_quality_scan: dict[str, Any]) -> list[dict[str
         return []
     return [
         item
-        for item in skills
-        if isinstance(item, dict)
-        and all(
+        for item in _dict_list(cast(object, skills))
+        if all(
             isinstance(item.get(field), str) and item.get(field)
             for field in (
                 "id",
@@ -316,3 +312,19 @@ def quality_skill_identities(code_quality_scan: dict[str, Any]) -> list[dict[str
             )
         )
     ]
+
+
+def _dict(value: object) -> dict[str, Any] | None:
+    return cast(dict[str, Any], value) if isinstance(value, dict) else None
+
+
+def _dict_list(value: object) -> list[dict[str, Any]]:
+    if not isinstance(value, list):
+        return []
+    return [item for raw_item in cast(list[Any], value) if (item := _dict(raw_item)) is not None]
+
+
+def _string_list(value: object) -> list[str]:
+    if not isinstance(value, list):
+        return []
+    return [item for item in cast(list[Any], value) if isinstance(item, str)]
