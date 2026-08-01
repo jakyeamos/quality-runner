@@ -1,0 +1,37 @@
+id = "environment-legibility"
+name = "Environment Legibility"
+version = "0.1.0"
+description = "Review machine-legible repository context, verified quality commands, protected execution boundaries, and evidence-safe handoff."
+
+[[deterministic_rules]]
+id = "context-index-without-minimum-route"
+type = "trigger_without_required"
+category = "environment-legibility-routing"
+severity = "observation"
+confidence = "medium"
+paths = ["AGENTS.md", "**/AGENTS.md", "CLAUDE.md", "**/CLAUDE.md", ".agents/context/README.md", "**/.agents/context/README.md", ".context/README.md", "**/.context/README.md"]
+trigger_patterns = ['(?i)\b(?:context|instructions?|routing|read when|load)\b']
+required_patterns = ['(?i)\b(?:when|commands?|truth|architecture|do not|read)\b']
+message = "An instruction or context surface may not provide a minimum route for an agent."
+risk = "An agent may load too much context, miss current truth, or follow stale instructions."
+expected = "Provide a concise read-when route, command pointers, ownership boundaries, and a live-truth reference."
+verification = "Review the index and linked files, then rerun quality-runner with a fixed repository snapshot."
+
+[[agent_reviews]]
+id = "environment-contract"
+category = "environment-legibility"
+severity = "observation"
+paths = ["*.md", "**/*.md", "AGENTS.md", "**/AGENTS.md", "CLAUDE.md", "**/CLAUDE.md", "**/*.toml", "**/*.json", "**/*.yml", "**/*.yaml", "**/*.py", "**/*.js", "**/*.ts", "**/*.tsx", "**/*.sh"]
+focus = ["architecture boundaries", "verified build test lint commands", "security constraints", "failure recovery", "definition of done", "approval-gated paths", "deployment rollback", "context routing", "evidence freshness"]
+rubric = """
+Review the repository as an execution environment for a coding agent.
+
+Report only evidence-backed gaps in architecture or ownership boundaries,
+build/test/lint/quality command discoverability and verification, coding
+conventions, security and credential constraints, common failure recovery,
+good implementation examples, definition of done, forbidden or approval-gated
+paths, deployment and rollback, or minimum-context routing. Distinguish absent,
+stale, blocked, and verified evidence. Cite the exact file and line or command
+surface. Do not treat documentation presence as proof of executable behavior,
+and do not request a document when an equivalent maintained contract exists.
+"""

@@ -1,31 +1,30 @@
-# Quality Runner agent router
+# Agent operating contract
 
-Read this router first, then use [the context index](.agents/context/README.md)
-to load only the packet that matches the task.
+Read `.agents/context/README.md` before non-trivial work, then load only the
+packet that matches the task.
 
-## Invariants
+- Quality Runner is a local-first audit-and-plan orchestrator. It may write
+  `.quality-runner/runs/<run-id>/` evidence in a target repository, but it must
+  not edit source files, install dependencies, create commits, call providers,
+  use remote services, or execute remediation.
+- Use the locked `uv` environment and the commands in
+  `.agents/context/commands.md`. Keep quality results evidence-backed; an
+  unavailable or stale gate is `unknown` or `blocked`, never green.
+- Preserve public contracts, schemas, fixtures, redaction boundaries, and
+  compatibility surfaces. Do not put credentials, raw prompts, transcripts,
+  private paths, or unpublished evidence in tracked files.
+- Release, tagging, PyPI publication, Homebrew changes, and remote mutations
+  require explicit human approval. Roll back with `git revert` or a prior
+  published version; never rewrite release history.
+- Keep source changes behavior-focused and add tests for public CLI, MCP,
+  workflow, artifact, or schema behavior. Do not weaken a gate to remove a
+  finding.
+- `.quality-runner.toml` owns the repository's required blocker gates for the
+  dependency audit and environment contract. Keep the checker in CI and the
+  release workflow. BasedPyright remains strict; fix its findings at source
+  rather than weakening configuration or adding broad suppressions.
 
-- Quality Runner is local-first: audit and planning may read target repositories,
-  but must not edit, merge, push, deploy, publish, or contact a remote service
-  without explicit approval.
-- Preserve target checkout state, generated artifacts, caches, and unrelated
-  work. Use a disposable copy for any command that needs mutation.
-- Treat JSON artifacts and provenance as canonical. Never invent evidence from
-  documentation alone; distinguish absent, stale, blocked, and verified.
-- Do not load or transmit credentials, prompts, transcripts, private diffs, or
-  whole repositories. Redact sensitive evidence before persistence.
-- Release, schema, compatibility, CI, registry, and publication changes need
-  explicit approval and review. No history rewrites or verification bypasses.
-
-## Routing
-
-- Architecture or ownership: `architecture.md`.
-- Commands, gates, or setup: `commands.md`.
-- Python style or compatibility: `conventions.md`.
-- Secrets, artifacts, or network behavior: `security.md`.
-- A failed or stale run: `failure-modes.md`.
-- A design or implementation example: `examples.md`.
-- Completion or review criteria: `done.md`.
-- Release, publication, or rollback: `deployment.md`.
-
-The live project snapshot is [PROJECT_TRUTH.md](.tracker/PROJECT_TRUTH.md).
+The environment contract is executable through
+`python3 scripts/check_environment_contract.py` and is required by
+`.pre-cr.json`. Always-loaded instructions remain boundaries and routing
+pointers; detailed procedures live in the context packets.

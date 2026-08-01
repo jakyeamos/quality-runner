@@ -1,11 +1,9 @@
-# Commands and quality gates
+# Canonical commands and quality gates
 
-last_reviewed: 2026-07-22
+Run from the repository root with the locked development environment:
 
-Use the locked development environment and run gates from the repository root.
-
-```text
-uv sync --locked --all-groups --python 3.14
+```sh
+uv sync --locked --all-groups
 uv run --locked pytest -q
 uv run --locked ruff check .
 uv run --locked ruff format --check .
@@ -13,12 +11,34 @@ uv run --locked basedpyright
 uv run --locked vulture quality_runner quality_evidence_contract repo_quality_certifier tests scripts --min-confidence 70
 uv run --locked pip-audit
 uv build
-python scripts/check_environment_contract.py
+python3 scripts/check_environment_contract.py
 ```
 
-For a focused change, run the narrowest relevant test first and then the full
-suite. `qr doctor --json` is a read-only readiness check. The exact CLI
-journeys are documented in [docs/cli.md](../../docs/cli.md), and recovery
-guidance is in [docs/troubleshooting.md](../../docs/troubleshooting.md).
+For the complete pre-release path, also run:
 
-The Pre-CR adapter is required; do not remove it to make a gate green.
+```sh
+uv run --locked python scripts/run_pytest_with_lcov.py
+uv run --locked qr release-smoke --json
+```
+
+`pre-cr run --workspace . --json` is a changed-line readiness check. It is
+expected to report `no-changes` on an unchanged checkout; it is not a
+replacement for the full ladder above. CI and release workflows are the
+authoritative remote declarations of the same gates.
+
+`.quality-runner.toml` declares the security dependency audit and environment
+contract as required blocker gates. The local checker and both remote workflows
+must remain in agreement with that declaration.
+
+The repository commit hook uses `hookTimeoutSeconds: 360` in `.pre-cr.json`.
+This budget covers the traced changed-line runner on this repository; lower it
+only after a measured replacement run establishes a smaller safe bound.
+
+Quality commands must be bounded and offline-capable. They must not publish,
+deploy, tag, push, call a provider, collect credentials, or execute a
+remediation action. If a dependency cache, tool, or gate is unavailable, keep
+the result visible as unknown or blocked.
+
+BasedPyright is intentionally configured in strict mode. Existing strictness
+findings are tracked remediation debt and must be fixed at their source; do not
+weaken the mode, add broad ignores, or replace errors with casts.

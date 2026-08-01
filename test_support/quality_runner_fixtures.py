@@ -26,11 +26,6 @@ def write_js_fixture(repo: Path) -> None:
     )
     (repo / "pnpm-lock.yaml").write_text("lockfileVersion: '9.0'\n", encoding="utf-8")
     (repo / ".pre-cr.json").write_text("{}", encoding="utf-8")
-    (repo / ".tracker").mkdir()
-    (repo / ".tracker" / "PROJECT_TRUTH.md").write_text(
-        "---\nprojectName: Fixture\n---\n",
-        encoding="utf-8",
-    )
 
 
 def write_complete_js_fixture(repo: Path) -> None:
@@ -57,11 +52,6 @@ def write_complete_js_fixture(repo: Path) -> None:
         encoding="utf-8",
     )
     (repo / "pnpm-lock.yaml").write_text("lockfileVersion: '9.0'\n", encoding="utf-8")
-    (repo / ".tracker").mkdir()
-    (repo / ".tracker" / "PROJECT_TRUTH.md").write_text(
-        "---\nprojectName: Complete Fixture\n---\n",
-        encoding="utf-8",
-    )
 
 
 def write_python_quality_fixture(repo: Path) -> None:

@@ -23,6 +23,7 @@ class GateExecutionPolicy:
     allow_mutating_gates: bool
     worktree_mode: WorktreeMode | str
     allow_dirty_worktree_verify: bool
+    only_gate_ids: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)

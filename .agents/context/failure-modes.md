@@ -1,21 +1,21 @@
 # Common failure modes and recovery
 
-last_reviewed: 2026-07-22
-
-- Dirty, detached, stale, or prunable target worktrees: stop execution and
-  capture the state; use a verified disposable copy rather than cleaning the
-  user checkout.
-- Missing consent or unavailable gates: record `blocked` or `unavailable`; do
-  not silently downgrade to a passing result.
-- Stale manifests, packets, or evidence: refresh from the current checkout and
-  regenerate the dependent artifact with a new provenance hash.
-- Dependency or network failures: distinguish local cache/setup failures from
-  provider or registry access; retry only after checking the relevant gate.
-- Malformed or incompatible artifacts: validate the schema and migration path;
-  retain the original artifact and report the transform failure.
-- Cache identity mismatch: discard only the scoped cache through the supported
-  command and rerun from a current refresh; do not delete broad directories.
-
-Use [docs/troubleshooting.md](../../docs/troubleshooting.md) and
-[docs/agent-usage.md](../../docs/agent-usage.md) for the supported recovery
-surfaces.
+- **Locked environment unavailable:** restore the documented `uv sync --locked
+  --all-groups` environment. Do not replace locked commands with an unpinned
+  install or claim a partial run is equivalent.
+- **Pre-CR reports `no-changes`:** this is expected on an unchanged checkout;
+  use the full ladder for baseline evidence and run Pre-CR only after a real
+  changed-line slice exists.
+- **Dirty target or unsafe worktree:** preserve the checkout and use an
+  explicitly disposable worktree. Never clean or reset a user tree to make a
+  gate run.
+- **Gate timeout or unavailable tool:** retain the timeout/availability result,
+  identify the missing prerequisite, and rerun only after the environment is
+  repaired. Do not turn a timeout into a pass.
+- **Artifact validation or redaction failure:** keep the raw result private,
+  repair the smallest owning transform, and add a regression fixture before
+  retrying.
+- **Schema or compatibility snapshot changes:** inspect the contract diff,
+  update versioned snapshots deliberately, and run the compatibility suite.
+- **Release smoke failure:** keep the built artifact and diagnostics, fix the
+  smallest owned surface, and repeat the full release ladder before publishing.

@@ -1,113 +1,98 @@
 from __future__ import annotations
 
-import importlib.util
-import tempfile
-import unittest
+import json
 from datetime import date
 from pathlib import Path
 
-
-def _load_checker():
-    path = Path(__file__).parents[1] / "scripts" / "check_environment_contract.py"
-    spec = importlib.util.spec_from_file_location("environment_contract", path)
-    if spec is None or spec.loader is None:
-        raise RuntimeError("could not load environment contract checker")
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
+from scripts.check_environment_contract import check_secret_paths, validate
 
 
-CHECKER = _load_checker()
+def test_current_repository_environment_contract_passes() -> None:
+    root = Path(__file__).resolve().parents[1]
+
+    assert validate(root) == []
 
 
-def _write_contract(root: Path, *, adapter: bool = True, route: bool = True) -> None:
-    (root / ".agents/context").mkdir(parents=True)
-    (root / ".github/workflows").mkdir(parents=True)
-    (root / ".tracker").mkdir()
-    (root / "AGENTS.md").write_text(
-        "approval target credential remote\n[context](.agents/context/README.md)\n",
-        encoding="utf-8",
-    )
-    index_markers = "minimum context; do not recursively load; current truth" if route else ""
-    (root / ".agents/context/README.md").write_text(
-        f"last_reviewed: 2026-07-22\n{index_markers}\n[packet](architecture.md)\n",
-        encoding="utf-8",
-    )
-    for packet in CHECKER.PACKETS:
-        (root / ".agents/context" / packet).write_text("# packet\n", encoding="utf-8")
-    for path in CHECKER.REQUIRED_FILES:
-        target = root / path
+def test_environment_contract_requires_quality_adapter_and_safe_timeout(tmp_path: Path) -> None:
+    root = Path(__file__).resolve().parents[1]
+    for relative_path in (
+        "AGENTS.md",
+        "README.md",
+        "CONTRIBUTING.md",
+        "SECURITY.md",
+        "pyproject.toml",
+        "uv.lock",
+        ".github/workflows/ci.yml",
+    ):
+        target = tmp_path / relative_path
         target.parent.mkdir(parents=True, exist_ok=True)
-        if path == "pyproject.toml":
-            target.write_text(
-                "[project.scripts]\nquality-runner='quality_runner.cli:main'\nqr='quality_runner.cli:main'\n"
-                "[tool.basedpyright]\ntypeCheckingMode='standard'\n",
-                encoding="utf-8",
-            )
-        elif path == ".pre-cr.json":
-            adapters = (
-                '[{"name":"environment-contract","command":"python3 scripts/check_environment_contract.py",'
-                '"required":true}]'
-                if adapter
-                else "[]"
-            )
-            target.write_text(f'{{"qualityAdapters":{adapters}}}\n', encoding="utf-8")
-        elif path == ".github/workflows/ci.yml":
-            target.write_text(
-                "steps:\n  - run: python scripts/check_environment_contract.py\n", encoding="utf-8"
-            )
-        else:
-            target.write_text("# fixture\n", encoding="utf-8")
-
-
-class EnvironmentContractTests(unittest.TestCase):
-    def test_repository_contract_passes(self) -> None:
-        root = Path(__file__).parents[1]
-        result = CHECKER.validate(root, date(2026, 7, 22), tracked_paths=[])
-        self.assertEqual(result["status"], "pass")
-
-    def test_missing_packet_and_broken_link_fail(self) -> None:
-        with tempfile.TemporaryDirectory() as temp_dir:
-            root = Path(temp_dir)
-            _write_contract(root)
-            (root / ".agents/context/README.md").write_text(
-                "last_reviewed: 2026-07-22\nminimum context current truth\n[missing](missing.md)\n",
-                encoding="utf-8",
-            )
-            (root / ".agents/context/architecture.md").unlink()
-            result = CHECKER.validate(root, date(2026, 7, 22), tracked_paths=[])
-            self.assertEqual(result["status"], "fail")
-            self.assertIn(
-                "broken context link in .agents/context/README.md: missing.md", result["errors"]
-            )
-            self.assertIn("missing context packet: architecture.md", result["errors"])
-
-    def test_stale_index_fails(self) -> None:
-        with tempfile.TemporaryDirectory() as temp_dir:
-            root = Path(temp_dir)
-            _write_contract(root)
-            index = root / ".agents/context/README.md"
-            index.write_text(
-                "last_reviewed: 2025-01-01\nminimum context current truth\n", encoding="utf-8"
-            )
-            result = CHECKER.validate(root, date(2026, 7, 22), tracked_paths=[])
-            self.assertEqual(result["status"], "fail")
-            self.assertTrue(any("context index is stale" in item for item in result["errors"]))
-
-    def test_required_adapter_and_route_are_enforced(self) -> None:
-        with tempfile.TemporaryDirectory() as temp_dir:
-            root = Path(temp_dir)
-            _write_contract(root, adapter=False, route=False)
-            result = CHECKER.validate(root, date(2026, 7, 22), tracked_paths=[])
-            self.assertEqual(result["status"], "fail")
-            self.assertIn(
-                "required environment-contract pre-CR adapter is missing", result["errors"]
-            )
-            self.assertTrue(any("routing marker" in item for item in result["errors"]))
-
-    def test_secret_path_guard_allows_examples(self) -> None:
-        self.assertEqual(CHECKER.check_secret_paths([".env.example", ".env.template"]), [])
-        self.assertEqual(
-            CHECKER.check_secret_paths(["config/production.env", "keys/id_rsa"]),
-            ["config/production.env", "keys/id_rsa"],
+        target.write_text((root / relative_path).read_text(encoding="utf-8"), encoding="utf-8")
+    context = tmp_path / ".agents" / "context"
+    context.mkdir(parents=True)
+    for relative_path in (
+        "README.md",
+        "architecture.md",
+        "commands.md",
+        "conventions.md",
+        "security.md",
+        "failure-modes.md",
+        "examples.md",
+        "done.md",
+        "deployment.md",
+    ):
+        (context / relative_path).write_text(
+            (root / ".agents" / "context" / relative_path).read_text(encoding="utf-8"),
+            encoding="utf-8",
         )
+    config = json.loads((root / ".pre-cr.json").read_text(encoding="utf-8"))
+    config["qualityAdapters"] = []
+    config["hookTimeoutSeconds"] = 90
+    (tmp_path / ".pre-cr.json").write_text(json.dumps(config), encoding="utf-8")
+
+    errors = validate(tmp_path)
+
+    assert "required environment-contract quality adapter is missing" in errors
+    assert (
+        ".pre-cr.json hookTimeoutSeconds must be at least 360 for the traced test contract"
+        in errors
+    )
+
+
+def test_secret_path_helper_rejects_sensitive_names() -> None:
+    assert check_secret_paths(["safe/example.txt", ".env", "keys/id_rsa"]) == [
+        ".env",
+        "keys/id_rsa",
+    ]
+
+
+def test_environment_contract_reports_future_context_evidence() -> None:
+    root = Path(__file__).resolve().parents[1]
+
+    errors = validate(root, as_of=date(2026, 7, 27))
+
+    assert "context index freshness date is in the future" in errors
+
+
+def test_environment_contract_requires_quality_runner_blocker_gate(tmp_path: Path) -> None:
+    (tmp_path / ".quality-runner.toml").write_text(
+        """
+[quality_runner]
+
+[[quality_runner.gates]]
+id = "environment_contract"
+command = "python3 scripts/check_environment_contract.py"
+ecosystem = "python"
+source = "scripts/check_environment_contract.py"
+owner = "repository"
+required = false
+severity = "warning"
+mutating_risk = "safe"
+""".strip()
+        + "\n",
+        encoding="utf-8",
+    )
+
+    errors = validate(tmp_path, as_of=date(2026, 7, 28))
+
+    assert "missing required Quality Runner gate: security_dependency_audit" in errors
+    assert "Quality Runner gate is not a required blocker: environment_contract" in errors

@@ -6,6 +6,12 @@ __pycache__/
 .tmcp/
 .pre-cr/
 *.egg-info/
+.env
+.env.*
+!.env.example
+!.env.template
+build/
+dist/
 
 # Generated / cache / audit output
 .turbo/

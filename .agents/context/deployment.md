@@ -1,17 +1,16 @@
-# Deployment and rollback
+# Packaging, deployment, and rollback
 
-last_reviewed: 2026-07-22
+Quality Runner is a Python package and CLI, not a hosted service. CI builds the
+wheel and sdist, runs the locked quality ladder, smoke-tests installed console
+scripts, and audits dependencies. Release workflow publication uses PyPI
+trusted publishing from a reviewed `v*.*.*` tag on `main`; ordinary tests must
+not publish or tag.
 
-Normal development lands on the canonical `dev` branch. `main`, tags, PyPI,
-Homebrew, and other publication surfaces are release-managed and require
-explicit review.
+Before release, update version metadata, changelog, plugin manifests, citation
+metadata, and compatibility fixtures as applicable. Build the package and
+inspect it in a fresh virtual environment before publication.
 
-Before release, run the documented test, static-analysis, build, installed-wheel
-smoke, compatibility, and release-profile checks. Record artifact hashes and
-the source revision. Do not publish from a dirty or unverifiable checkout.
-
-Rollback is a forward, reviewed release to the last verified artifact or a
-consumer pin to that artifact. Do not rewrite history or delete evidence.
-Follow [docs/release.md](../../docs/release.md),
-[docs/upgrade.md](../../docs/upgrade.md), and the
-[release workflow](../../.github/workflows/release.yml).
+Rollback before publication is a normal `git revert`. After publication,
+select the prior known-good package version or release a corrective patch.
+Never rewrite release history, delete compatibility fixtures, or lower a gate
+to force a release through.

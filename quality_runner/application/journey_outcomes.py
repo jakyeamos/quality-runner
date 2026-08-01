@@ -94,6 +94,7 @@ def verify_journey_outcome(
     agent_review_mode: str | None = None,
     include_ignored_paths: list[str] | None = None,
     include_paths: tuple[str, ...] = (),
+    only_gate_ids: tuple[str, ...] = (),
     scan_exclusion_overlay: ScanExclusionOverlay | None = None,
     readiness_evidence_file: Path | None = None,
 ) -> JourneyOutcome:
@@ -111,6 +112,7 @@ def verify_journey_outcome(
         allow_mutating_gates=allow_mutating_gates,
         worktree_mode=worktree_mode,
         allow_dirty_worktree_verify=allow_dirty_worktree_verify,
+        only_gate_ids=only_gate_ids,
         skill_review_report=skill_review_report,
         intent=intent,
         agent_review_mode=agent_review_mode,

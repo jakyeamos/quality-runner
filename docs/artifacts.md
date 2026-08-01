@@ -18,7 +18,7 @@ Artifacts are written under:
   `CONTEXT.md`, `docs/adr/*.md`), language-aware quality commands, mature repo
   surfaces, nested workspaces, active scan exclusions, ecosystems,
   generated-code markers, local CI checks, aggregate command coverage, git/CI
-  provenance, Pre-CR config, project truth file presence, and branch selection
+  provenance, Pre-CR config, and branch selection
   warnings when the checked-out branch is neither
   `main` nor the local most-advanced branch.
 - `code-quality-scan.json`: deterministic structural/code-quality findings,
@@ -48,7 +48,7 @@ Artifacts are written under:
   `packageManager`, lockfiles, and non-blocking warnings such as mixed lockfiles.
 - `standards.json`: compiled standards packet for the selected profile,
   including saved custom profile settings when a repo-defined profile is used.
-  `sources` includes profile/config paths, agent instruction files, truth file,
+  `sources` includes profile/config paths and agent instruction files,
   and discovered intent docs as `intent:<type>` entries.
 - `capability-matrix.json`: available and missing repo-owned quality gates.
   Available command-backed capabilities include the command, source, detected

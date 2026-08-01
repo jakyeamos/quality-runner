@@ -148,6 +148,37 @@ def test_verify_disposable_success_is_confirmed() -> None:
     assert outcome["safety"]["commands_executed"] is True
 
 
+def test_verify_selected_gate_success_remains_scoped_and_limited() -> None:
+    outcome = project_verify_outcome(
+        _payload(
+            schema="quality-runner-verify-gates-result-v0.1",
+            status="passed",
+            run_id="verify-selected",
+        ),
+        repo_root=Path("/repo"),
+        verification=_payload(
+            schema="quality-runner-gate-verification-v0.2",
+            status="passed",
+            timeout_seconds=120,
+            execute_discovered_gates=True,
+            only_gate_ids=["tests"],
+            verification_context={
+                "execution_authorized": True,
+                "worktree_mode": "disposable",
+                "mutations_isolated": True,
+            },
+            gates=[{"id": "tests", "status": "passed"}],
+        ),
+    )
+
+    assert outcome["state"] == "awaiting-evidence"
+    assert outcome["assessment"] == "evidence-incomplete"
+    assert outcome["confidence"]["level"] == "limited"
+    assert outcome["confidence"]["limitations"] == [
+        "Verification was scoped to selected gate(s): tests; other discovered gates were not run."
+    ]
+
+
 def test_verify_execution_without_disposable_proof_stays_limited() -> None:
     outcome = project_verify_outcome(
         _payload(

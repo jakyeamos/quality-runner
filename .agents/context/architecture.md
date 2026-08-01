@@ -1,20 +1,32 @@
 # Architecture and boundaries
 
-last_reviewed: 2026-07-22
+Quality Runner inspects a target repository, compiles standards, discovers
+available quality gates, normalizes evidence-backed findings, and writes a
+remediation plan. It is an orchestrator for evidence, not an implementation
+agent.
 
-Quality Runner is a read-only audit, evidence, planning, and handoff tool. It
-does not own source remediation or remote review execution.
+The main boundaries are:
 
-- `quality_runner/` owns the CLI, audit workflows, artifacts, gates, skills,
-  review packets, and outcome projections.
-- `quality_evidence_contract/` owns evidence schema and verification contracts.
-- `repo_quality_certifier/` is a compatibility-facing certification surface.
-- `tests/` owns behavioral and contract regression coverage.
-- `fixtures/` owns bounded test repositories and must not be treated as live
-  customer projects.
-- `.quality-runner/` contains generated local runs and caches; it is not source.
-- `.tracker/PROJECT_TRUTH.md` is the live project snapshot, not a changelog.
+- `quality_runner/discovery.py` and `quality_runner/scan_scope.py` discover
+  repository facts and bounded scan inputs;
+- `quality_runner/standards.py`, `quality_runner/capabilities.py`, and the
+  code-quality modules compile standards and available gates;
+- `quality_runner/audit.py`, `quality_runner/findings.py`, and
+  `quality_runner/remediation_*.py` normalize findings and bounded slices;
+- `quality_runner/gate_execution.py`, `quality_runner/verification_contract.py`,
+  and `quality_runner/worktree_verify.py` enforce evidence-only or explicitly
+  disposable execution modes;
+- `quality_runner/cli*.py` and `quality_runner/mcp.py` expose human and MCP
+  interfaces; `repo_quality_certifier/` preserves the compatibility surface;
+- `.quality-runner/runs/<run-id>/` is the target artifact boundary. Source
+  repositories are inputs, not write destinations for remediation.
 
-Read [architecture contracts](../../docs/architecture-contracts.md) and
-[integration boundaries](../../docs/integration-boundaries.md) before changing
-cross-package contracts or compatibility exports.
+The data flow is:
+
+`bounded repository inputs -> standards/capabilities -> audit findings ->
+remediation slices and handoff -> optional verified evidence`
+
+The package must not call model providers, collect credentials, publish
+artifacts, create commits, or silently execute discovered commands. Any
+future integration must preserve explicit consent, disposable worktrees, and
+provenance in the output contract.

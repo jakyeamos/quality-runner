@@ -1,21 +1,18 @@
-# Good implementation examples
+# Canonical implementation examples
 
-last_reviewed: 2026-07-22
+- `quality_runner/verification_contract.py` and
+  `quality_runner/gate_provenance.py` show how gate results retain explicit
+  evidence and execution-mode metadata.
+- `quality_runner/source_evidence_redaction.py` and
+  `quality_runner/evidence_redaction_contract.py` show the boundary between
+  evidence collection and persisted redacted output.
+- `quality_runner/core/*_contracts.py` and `quality_runner/schemas/` are the
+  references for versioned artifact shapes.
+- `tests/test_cli.py`, `tests/test_workflow.py`, and the gate-preflight tests
+  are the canonical examples for public behavior and safety contracts.
+- `scripts/run_pytest_with_lcov.py` is the reference for a bounded, local
+  quality helper that writes only its declared `.pre-cr/` output.
 
-Use existing implementations as the local pattern before adding a new helper.
-
-- `quality_runner/application/read_only_audit.py` keeps audit orchestration
-  separate from source mutation.
-- `quality_runner/application/outcome_projection.py` exposes bounded, truthful
-  outcomes without hiding unresolved evidence.
-- `quality_runner/evidence_redaction.py` and
-  `quality_runner/evidence_redaction_contract.py` centralize sensitive-evidence
-  handling before persistence.
-- `quality_runner/core/` contains typed contracts that are shared deliberately.
-- `docs/examples/developer-experience.toml` shows the local Quality Skill
-  format and review boundaries.
-
-Compare a proposed change with these patterns and the relevant tests before
-creating a parallel abstraction. The [architecture examples](../../docs/examples/architecture-maintainability.toml)
-and [skill documentation](../../docs/quality-skills.md) show the supported
-configuration shape.
+Examples and fixtures must remain synthetic or public-safe. New examples should
+show the smallest valid contract and must not embed local paths, credentials,
+raw prompts, or unpublished repository evidence.

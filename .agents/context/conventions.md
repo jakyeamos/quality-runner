@@ -1,18 +1,17 @@
-# Coding and compatibility conventions
+# Coding and artifact conventions
 
-last_reviewed: 2026-07-22
-
-- Target Python 3.12+ and keep the Ruff line length at 100.
-- Keep public JSON schemas, CLI projections, MCP contracts, and compatibility
-  packages stable unless the change includes an explicit migration path.
-- Prefer typed application services over adding behavior to CLI or MCP adapters.
-- Keep read-only discovery separate from commands that execute gates.
-- Preserve redaction and provenance before storing source-derived evidence.
-- Add a regression test for contract, artifact, boundary, or safety behavior;
-  avoid tests that only restate a static presentation detail.
-- Keep generated artifacts and caches out of source changes unless the artifact
-  is intentionally versioned and its provenance is recorded.
-
-See [CONTRIBUTING.md](../../CONTRIBUTING.md) and the
-[architecture guide](../../docs/architecture-contracts.md) before changing
-shared types or package ownership.
+- Target Python 3.12 or newer and preserve the locked `uv` environment.
+- Add explicit public return types and typed boundaries for new production
+  code. Fix real type errors; do not add broad ignores or casts that hide them.
+- Keep BasedPyright in strict mode. Treat the current strictness backlog as
+  source-level remediation work, not a reason to weaken the repository policy.
+- Keep CLI, MCP, artifact, and schema contracts deterministic. Sort emitted
+  collections where order is not semantically meaningful.
+- Preserve evidence provenance, run IDs, schema versions, and redaction
+  metadata when transforming artifacts. Never invent missing gate results.
+- Keep target-repository writes under `.quality-runner/runs/<run-id>/` and make
+  execution mode explicit in every result.
+- Prefer behavior-focused tests for public commands, workflow contracts,
+  artifact schemas, safety boundaries, and confirmed regressions.
+- Keep compatibility aliases working until their documented removal condition
+  is reached. Update the CLI and artifact documentation with contract changes.

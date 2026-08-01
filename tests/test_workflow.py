@@ -398,7 +398,7 @@ def test_run_payload_records_missing_capability_findings(tmp_path: Path) -> None
     finding_ids = {finding["id"] for finding in audit_report["findings"]}
     assert "missing-lint" in finding_ids
     assert "missing-tests" in finding_ids
-    assert "missing-truth-file" not in finding_ids
+    assert "missing-state-file" not in finding_ids
 
 
 def test_run_payload_does_not_false_positive_python_quality_gates(tmp_path: Path) -> None:
@@ -422,7 +422,7 @@ def test_run_payload_does_not_false_positive_python_quality_gates(tmp_path: Path
     assert "missing-dead-code" not in finding_ids
     assert "missing-runtime-smoke" not in finding_ids
     assert "missing-pre-pr" not in finding_ids
-    assert "missing-truth-file" not in finding_ids
+    assert "missing-state-file" not in finding_ids
     available = {item["id"]: item for item in capability_map["available"]}
     assert available["dead_code"]["source"] == ".github/workflows"
     assert available["runtime_smoke"]["command"] == "quality-runner doctor --json"

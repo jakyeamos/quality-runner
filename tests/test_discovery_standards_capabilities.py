@@ -18,7 +18,7 @@ def test_inspect_repo_detects_js_quality_surfaces(tmp_path: Path) -> None:
     assert scan["languages"] == ["javascript"]
     assert scan["scripts"]["lint"] == "eslint ."
     assert scan["pre_cr_config"] == ".pre-cr.json"
-    assert scan["truth_file"] == ".tracker/PROJECT_TRUTH.md"
+    assert "state_file" not in scan
 
 
 def test_inspect_repo_detects_python_quality_commands(tmp_path: Path) -> None:
@@ -177,7 +177,7 @@ def test_inspect_repo_detects_lockfile_languages_and_truth_policy(tmp_path: Path
     (tmp_path / "Package.swift").write_text("// swift\n", encoding="utf-8")
     (tmp_path / "go.mod").write_text("module example.com/fixture\n", encoding="utf-8")
     (tmp_path / "AGENTS.md").write_text(
-        "Maintain .tracker/PROJECT_TRUTH.md after every change.\n",
+        "Maintain stable planning notes after every change.\n",
         encoding="utf-8",
     )
 
@@ -185,7 +185,7 @@ def test_inspect_repo_detects_lockfile_languages_and_truth_policy(tmp_path: Path
 
     assert scan["package_manager"] == "yarn"
     assert scan["languages"] == ["javascript", "swift", "go"]
-    assert scan["quality_contract"]["required_terms"]["truth_file"] is True
+    assert "state_file" not in scan["quality_contract"]["required_terms"]
     commands = {command["id"]: command for command in scan["quality_commands"]}
     assert commands["formatter"]["source"] == "package.json:scripts.fmt"
     assert commands["typecheck"]["source"] == "package.json:scripts.check-types"
@@ -853,7 +853,7 @@ def test_compile_standards_preserves_profile_and_local_provenance(tmp_path: Path
     assert "AGENTS.md" in sources
     requirement_ids = {requirement["id"] for requirement in packet["requirements"]}
     assert "use_pnpm" in requirement_ids
-    assert "truth_file_current" in requirement_ids
+    assert "state_file_current" not in requirement_ids
 
 
 def test_compile_standards_rejects_unsupported_profiles(tmp_path: Path) -> None:
@@ -918,7 +918,7 @@ def test_detect_capabilities_records_missing_expected_surfaces(tmp_path: Path) -
     missing_ids = {item["id"] for item in capability_map["missing"]}
     assert "lint" in missing_ids
     assert "tests" in missing_ids
-    assert "truth_file" not in missing_ids
+    assert "state_file" not in missing_ids
 
 
 def test_detect_capabilities_accepts_python_quality_commands(tmp_path: Path) -> None:
@@ -945,7 +945,7 @@ def test_detect_capabilities_accepts_python_quality_commands(tmp_path: Path) -> 
         "pre_pr",
         "pre_cr",
     }.issubset(available)
-    assert "truth_file" not in missing_ids
+    assert "state_file" not in missing_ids
     assert available["lint"] == {
         "id": "lint",
         "type": "command",
@@ -1044,7 +1044,7 @@ def test_detect_capabilities_ignores_malformed_quality_commands_and_requires_tru
     from quality_runner.standards import compile_standards
 
     (tmp_path / "AGENTS.md").write_text(
-        "Maintain project truth before completion.\n",
+        "Maintain planning notes before completion.\n",
         encoding="utf-8",
     )
     scan = inspect_repo(tmp_path, run_id="malformed-quality-command-001")
@@ -1064,10 +1064,4 @@ def test_detect_capabilities_ignores_malformed_quality_commands_and_requires_tru
         "language": "unknown",
         "required_by": "profile",
     }
-    assert missing["truth_file"] == {
-        "id": "truth_file",
-        "type": "file",
-        "reason": "no project truth file found",
-        "language": "unknown",
-        "required_by": "profile",
-    }
+    assert "state_file" not in missing

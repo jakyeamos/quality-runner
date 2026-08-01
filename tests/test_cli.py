@@ -360,6 +360,55 @@ def test_cli_verify_gates_json_executes_discovered_gates(tmp_path: Path) -> None
     assert verification["gates"][0]["status"] == "passed"
 
 
+def test_cli_verify_gates_can_run_only_one_gate(tmp_path: Path) -> None:
+    (tmp_path / "package.json").write_text(
+        json.dumps(
+            {
+                "scripts": {
+                    "lint": f"{sys.executable} -c 'print(1)'",
+                    "test": f"{sys.executable} -c 'print(1)'",
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    (tmp_path / ".quality-runner.toml").write_text(
+        '[quality_runner]\nrequired_capabilities = ["lint", "tests"]\n',
+        encoding="utf-8",
+    )
+    _git(tmp_path, "init")
+    _git_commit_all(tmp_path, "fixture")
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "quality_runner",
+            "verify-gates",
+            str(tmp_path),
+            "--run-id",
+            "cli-selected-gate",
+            "--only-gate",
+            "lint",
+            "--execute-gates",
+            "--worktree-mode",
+            "disposable",
+            "--json",
+        ],
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+    payload = json.loads(result.stdout)
+    verification = json.loads(Path(payload["artifact_paths"]["gate_verification_json"]).read_text())
+
+    assert payload["status"] == "passed"
+    assert verification["only_gate_ids"] == ["lint"]
+    assert [gate["id"] for gate in verification["gates"]] == ["lint"]
+
+
 def test_cli_verify_gates_requires_explicit_execution_consent(tmp_path: Path) -> None:
     sentinel = tmp_path / "sentinel.txt"
     program = f"from pathlib import Path; Path({str(sentinel)!r}).write_text('ran')"

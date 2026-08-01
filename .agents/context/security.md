@@ -1,21 +1,20 @@
-# Security and privacy constraints
+# Security and approval constraints
 
-last_reviewed: 2026-07-22
+Quality Runner is local-first. It may read bounded repository files and write
+`.quality-runner/runs/<run-id>/` artifacts in a target repository. It must not
+call remote services, contact model providers, collect credentials, edit target
+source, create commits, push, publish, or execute remediation by default.
 
-Quality Runner is local-first. Target repositories are read-only inputs by
-default; providers, deployments, remotes, and publication are outside the
-normal audit path.
+Generated evidence can contain sensitive repository details. Secret-like
+literals must be redacted before persistence, but artifacts are not a promise
+that every possible secret is removed. Do not commit `.env` files, keys,
+credentials, raw prompts, transcripts, private paths, or unpublished evidence.
 
-- Never read, persist, or transmit credentials, tokens, private prompts,
-  transcripts, raw diffs, or unrelated repository content.
-- Treat run artifacts as potentially sensitive even after redaction; keep them
-  local and inspect before sharing.
-- Redact secret-like evidence before fingerprinting or persisting it.
-- Do not add `.env`, private keys, credential files, or machine-specific paths
-  to the repository.
-- Release, PyPI, GitHub, and external security-reporting actions require
-  explicit human review.
+Discovered quality commands are evidence-only unless the caller explicitly
+authorizes disposable execution. Disposable worktrees must be isolated,
+verified, and disposable; the ordinary source checkout is protected. A missing
+credential, unavailable network, stale baseline, failed redaction, or missing
+provenance is an explicit unknown or blocked result, never a successful gate.
 
-The canonical policy is [SECURITY.md](../../SECURITY.md). Threat assumptions
-and review obligations live in [docs/threat-model.md](../../docs/threat-model.md)
-and [docs/security-review-obligations.md](../../docs/security-review-obligations.md).
+Release publication, tagging, trusted publishing, Homebrew changes, and remote
+workflow changes require human review and the release checklist.

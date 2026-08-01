@@ -1,19 +1,22 @@
 # Definition of done
 
-last_reviewed: 2026-07-22
+A Quality Runner change is complete only when:
 
-A change is complete when:
+- the affected CLI, MCP, workflow, artifact, schema, and documentation
+  surfaces agree;
+- behavior-focused tests cover the changed public contract or confirmed
+  regression;
+- locked pytest, Ruff lint, Ruff format, strict BasedPyright, Vulture,
+  dependency audit, package build, and the environment contract pass;
+- if strict BasedPyright is not yet green, the remaining findings are named,
+  reproducible remediation debt and have not been suppressed or downgraded;
+- safety boundaries still refuse unauthorized source mutation, remote calls,
+  credential collection, and remediation execution;
+- generated evidence contains provenance and redaction metadata and no private
+  values entered the public diff;
+- the change is one coherent concern, reviewed, committed, and pushed to an
+  explicitly selected branch.
 
-- the affected contract and ownership boundary are documented;
-- focused regression tests cover changed behavior and safety boundaries;
-- `pytest`, Ruff lint/format, BasedPyright, Vulture, and relevant security or
-  build gates pass, or their exact failures are recorded;
-- generated artifacts are either reproducible and ignored or intentionally
-  versioned with provenance;
-- no target checkout, remote, provider, deployment, or publication changed
-  without explicit authorization;
-- `.tracker/PROJECT_TRUTH.md` records the current state and next step.
-
-Use [CONTRIBUTING.md](../../CONTRIBUTING.md), the
-[release profile](../../docs/release.md), and the current
-[project truth](../../.tracker/PROJECT_TRUTH.md) for scope-specific acceptance.
+A passing local gate does not prove the quality of a target repository,
+benchmark validity, provider behavior, or PyPI publication. Those claims need
+separate evidence.

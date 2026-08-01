@@ -13,8 +13,6 @@ def required_capabilities(
     if standards_packet.get("profile") != "release":
         return None
     required = {*script_capabilities, "pre_cr"}
-    if _truth_file_required(scan):
-        required.add("truth_file")
     config = standards_packet.get("config")
     if not isinstance(config, dict):
         return required
@@ -45,19 +43,5 @@ def required_by(
     if profile != "release":
         return None
     return {capability_id: "profile" for capability_id in script_capabilities} | {
-        "pre_cr": "profile",
-        "truth_file": "profile",
+        "pre_cr": "profile"
     }
-
-
-def _truth_file_required(scan: dict[str, Any]) -> bool:
-    if isinstance(scan.get("truth_file"), str) and scan["truth_file"]:
-        return True
-    instruction_files = scan.get("agent_instruction_files")
-    if not isinstance(instruction_files, list):
-        return False
-    quality_contract = scan.get("quality_contract")
-    if not isinstance(quality_contract, dict):
-        return False
-    required_terms = quality_contract.get("required_terms")
-    return isinstance(required_terms, dict) and required_terms.get("truth_file") is True

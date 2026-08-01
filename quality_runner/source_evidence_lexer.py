@@ -288,6 +288,8 @@ def ambiguous_literal_range(source: str, start: int, limit: int) -> tuple[int, i
 
 
 def ambiguous_literal_targets(source: str) -> set[tuple[int, int]]:
+    if not any(marker in source for marker in "`fFrR"):
+        return set()
     targets: set[tuple[int, int]] = set()
     index = 0
     while index < len(source):

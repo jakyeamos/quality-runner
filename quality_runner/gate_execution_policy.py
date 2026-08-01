@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import subprocess
+from collections.abc import Iterable
 from pathlib import Path
 from typing import Any
 
@@ -58,10 +59,12 @@ def build_gate_execution_plan(
     read_only_gates: bool = False,
     allow_mutating_gates: bool = False,
     mutations_isolated: bool = False,
+    only_gate_ids: Iterable[str] | None = None,
 ) -> list[dict[str, Any]]:
     resolved_gate_timeouts = valid_gate_timeouts(gate_timeouts)
+    selected_capability_map = select_gate_capabilities(capability_map, only_gate_ids)
     plan: list[dict[str, Any]] = []
-    for capability in ordered_capabilities(capability_map):
+    for capability in ordered_capabilities(selected_capability_map):
         capability_id = str(capability.get("id") or "unknown")
         command = capability.get("command")
         command_text = command if isinstance(command, str) else None
@@ -93,6 +96,47 @@ def build_gate_execution_plan(
 
 def ordered_capabilities(capability_map: dict[str, Any]) -> list[dict[str, Any]]:
     return sorted(_available_capabilities(capability_map), key=_gate_cost_key)
+
+
+def normalize_gate_ids(gate_ids: Iterable[str] | None) -> tuple[str, ...]:
+    if gate_ids is None:
+        return ()
+    normalized: set[str] = set()
+    for gate_id in gate_ids:
+        if not isinstance(gate_id, str) or not gate_id.strip():
+            raise ValueError("gate ids must be non-empty strings")
+        normalized.add(gate_id.strip())
+    return tuple(sorted(normalized))
+
+
+def select_gate_capabilities(
+    capability_map: dict[str, Any], only_gate_ids: Iterable[str] | None = None
+) -> dict[str, Any]:
+    requested = normalize_gate_ids(only_gate_ids)
+    if not requested:
+        return capability_map
+
+    available = _available_capabilities(capability_map)
+    available_ids = {
+        str(capability.get("id"))
+        for capability in available
+        if isinstance(capability.get("id"), str) and capability.get("id")
+    }
+    unknown = sorted(set(requested) - available_ids)
+    if unknown:
+        available_text = ", ".join(sorted(available_ids)) or "<none>"
+        raise ValueError(
+            "requested gate(s) were not discovered as executable gates: "
+            f"{', '.join(unknown)}; available executable gates: {available_text}"
+        )
+
+    requested_ids = set(requested)
+    return {
+        **capability_map,
+        "available": [
+            capability for capability in available if str(capability.get("id")) in requested_ids
+        ],
+    }
 
 
 def failure_type(*, command: str, stdout: str, stderr: str, timed_out: bool) -> str:

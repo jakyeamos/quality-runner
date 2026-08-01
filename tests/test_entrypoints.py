@@ -14,6 +14,16 @@ from quality_runner import __version__
 ROOT = Path(__file__).resolve().parents[1]
 
 
+def _uv_executable() -> str:
+    resolved = shutil.which("uv")
+    if resolved is not None:
+        return resolved
+    for candidate in (Path("/opt/homebrew/bin/uv"), Path("/usr/local/bin/uv")):
+        if candidate.is_file():
+            return str(candidate)
+    raise AssertionError("uv executable is required for packaged entrypoint verification")
+
+
 def test_package_imports_without_aios() -> None:
     code = (
         "import sys; "
@@ -100,37 +110,14 @@ def test_scaffold_entrypoint_functions_import_and_return_success(monkeypatch) ->
 def test_packaged_console_script_invokes_cli(tmp_path: Path) -> None:
     dist_dir = tmp_path / "dist"
     build_command = [
-        "uv",
-        "run",
-        "--offline",
-        "--with",
-        "setuptools",
-        "--with",
-        "wheel",
-        "uv",
+        _uv_executable(),
         "build",
         "--wheel",
-        "--no-build-isolation",
         "--out-dir",
         str(dist_dir),
     ]
     try:
-        result = subprocess.run(
-            build_command,
-            cwd=ROOT,
-            check=False,
-            capture_output=True,
-            text=True,
-        )
-        if result.returncode != 0:
-            online_command = [part for part in build_command if part != "--offline"]
-            subprocess.run(
-                online_command,
-                cwd=ROOT,
-                check=True,
-                capture_output=True,
-                text=True,
-            )
+        subprocess.run(build_command, cwd=ROOT, check=True, capture_output=True, text=True)
     finally:
         shutil.rmtree(ROOT / "build", ignore_errors=True)
         shutil.rmtree(ROOT / "quality_runner.egg-info", ignore_errors=True)

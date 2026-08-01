@@ -1,33 +1,44 @@
+---
+id: quality-runner.repo-context
+title: Quality Runner Repository Context
+tier: project
+status: active
+last_reviewed: 2026-07-28
+applies_when:
+  - repo_context
+tags:
+  - python
+  - quality-orchestration
+  - local-first
+---
+
 # Quality Runner context index
 
-last_reviewed: 2026-07-22
+Read this index before non-trivial repository work. Route to the smallest
+packet that matches the task; do not load the whole repository or generated
+`.quality-runner/` artifacts into context.
 
-Read this index after [AGENTS.md](../../AGENTS.md). Load one packet for the
-task; do not recursively load the repository or every context packet.
-
-## Stable references
-
-- [Project README](../../README.md): product purpose and user-facing journeys.
-- [Project truth](../../.tracker/PROJECT_TRUTH.md): current branch, release,
-  verification, and known risks.
-- [Contribution guide](../../CONTRIBUTING.md): contributor expectations.
-- [Security policy](../../SECURITY.md): artifact and disclosure boundaries.
-
-## Route by task
-
-| When the task involves | Read |
+| Task evidence | Read |
 | --- | --- |
-| package boundaries or ownership | [architecture.md](architecture.md) |
-| setup, commands, or quality gates | [commands.md](commands.md) |
-| Python style or compatibility | [conventions.md](conventions.md) |
-| credentials, network, or sensitive artifacts | [security.md](security.md) |
-| failure recovery or stale evidence | [failure-modes.md](failure-modes.md) |
-| examples or reusable patterns | [examples.md](examples.md) |
-| definition of done or acceptance | [done.md](done.md) |
-| release, deployment, or rollback | [deployment.md](deployment.md) |
+| Architecture and ownership boundaries | [architecture](architecture.md) |
+| Commands and quality gates | [commands](commands.md) |
+| Python and artifact conventions | [conventions](conventions.md) |
+| Security, credentials, and approval gates | [security](security.md) |
+| Failure diagnosis and recovery | [failure modes](failure-modes.md) |
+| Canonical implementation examples | [examples](examples.md) |
+| Definition of done | [done](done.md) |
+| Packaging, release, and rollback | [deployment](deployment.md) |
+| Public CLI or MCP behavior | `docs/cli.md`, `quality_runner/cli.py`, `quality_runner/mcp.py` |
+| Quality-gate execution behavior | `docs/cli.md`, `quality_runner/gate_execution.py`, `quality_runner/verification_contract.py` |
+| Artifact or schema changes | `docs/artifacts.md`, `quality_runner/schemas/`, `tests/` |
 
-## Minimum context
+The runner is provider-neutral and AIOS-independent. Generated evidence may
+contain sensitive repository details; it remains local unless a human reviews
+and explicitly publishes a redacted projection.
 
-Start with the relevant packet and current truth. Read source modules only after
-the packet identifies the owner and boundary. If evidence is missing or stale,
-report that state and repair the evidence contract before making a claim.
+The executable environment contract validates this index's links and freshness,
+the strict type-checking setting, the locked quality ladder, CI and release
+coverage, Quality Runner blocker gates, and secret-file ignore protections.
+Refresh this index when command, quality-adapter, or release-boundary behavior
+changes. Strict type-checking findings are remediation work; they must remain
+visible rather than being suppressed.
