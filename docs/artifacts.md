@@ -9,6 +9,53 @@ Artifacts are written under:
 `run-id` must be a single path segment. Absolute paths, separators, `.` and
 `..` are rejected.
 
+## Task Prevention Artifacts
+
+`qr task start` and `qr task check` keep task evidence separate from audit runs:
+
+```text
+<repo>/.quality-runner/tasks/<task-id>.json
+<repo>/.quality-runner/runs/<baseline-run-id>/
+  task-baseline.json
+  workspace-snapshot.json
+  normalized-findings.json
+  prevention-readiness.json
+<repo>/.quality-runner/runs/<check-run-id>/
+  task-check.json
+  task-check.md
+  workspace-snapshot.json
+  normalized-findings.json
+  prevention-readiness.json
+```
+
+The task record preserves the active baseline and its complete rebaseline
+lineage. A rebaseline creates a new baseline directory and never overwrites the
+prior baseline.
+
+`workspace-snapshot.json` hashes normalized repository-relative paths, content,
+executable modes, and symlink targets. It represents tracked modifications,
+tracked deletions, and untracked non-ignored files without substituting `HEAD`.
+Every default or configured exclusion is recorded; unreadable or unsafe source
+entries block the task.
+
+`normalized-findings.json` contains occurrence-level module evidence rather
+than grouped audit summaries. Each occurrence retains detector, stable rule ID,
+source fingerprint, deterministic occurrence fingerprint, path and location,
+severity, confidence, coverage reference, and enforcement eligibility.
+Repeated detector fingerprints are disambiguated by repository path and stable
+same-file order. Indistinguishable duplicates at the same location remain
+ambiguous and block matching.
+
+`prevention-readiness.json` records every proposed native gate as `candidate`,
+`certified`, `blocked`, or `unavailable`, including resolved command path and
+version, bootstrap strategy, owner, scope, timeout, mutation risk, and local,
+CI, repeatability, and intentional-failure evidence.
+
+`task-check.json` is canonical. Its derived Markdown renders the same status,
+blockers, gates, coverage, and finding buckets:
+`new_enforced`, `persisted`, `resolved`, `waived`, `advisory`,
+`out_of_scope`, and `unknown`.
+
 ## Inspect Artifacts
 
 `quality-runner inspect` writes:

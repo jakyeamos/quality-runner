@@ -46,6 +46,13 @@ def _candidate_findings(security_scan: dict[str, Any]) -> list[dict[str, Any]]:
         findings.append(
             {
                 "id": f"security-candidate-{candidate_id.lower()}",
+                "detector": "security",
+                "rule_id": category,
+                "fingerprint": candidate.get("fingerprint"),
+                "file": candidate.get("file"),
+                "line": candidate.get("line"),
+                "confidence": candidate.get("confidence"),
+                "coverage_ref": "security",
                 "severity": _audit_severity(severity_hint),
                 "category": f"security:{category}",
                 "summary": (

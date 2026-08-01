@@ -56,6 +56,82 @@ def test_load_repo_config_reads_default_profile_required_capabilities_and_except
     }
 
 
+def test_load_repo_config_reads_explicit_prevention_policy(tmp_path) -> None:
+    from quality_runner.config import load_repo_config
+
+    (tmp_path / ".quality-runner.toml").write_text(
+        "\n".join(
+            [
+                "[quality_runner.prevention]",
+                'required_modules = ["code_quality"]',
+                'environment_paths = [".venv/bin"]',
+                'snapshot_include_paths = ["dist/declared.json"]',
+                "",
+                "[[quality_runner.prevention.rules]]",
+                'detector = "code_quality"',
+                'rule_id = "large-source-file"',
+                'state = "behavior-verified"',
+                'owner = "quality"',
+                'rationale = "Large files increase review risk."',
+                'evidence_refs = ["positive:large.py", "negative:small.py", "ambiguous:generated.py"]',
+                'paths = ["src/**"]',
+                "confidence_threshold = 1.0",
+                "",
+                "[[quality_runner.prevention.gates]]",
+                'id = "lint"',
+                'command = "ruff check ."',
+                'state = "certified"',
+                "required = true",
+                'owner = "quality"',
+                'rationale = "Deterministic lint."',
+                'bootstrap = "uv sync --frozen"',
+                'mutation_risk = "read-only"',
+                'scope = "Python source"',
+                "timeout_seconds = 60",
+                'evidence_refs = ["failure-fixture:lint.py", "repeat-pass:lint.json", "local:run.json", "ci:ci.yml"]',
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    prevention = load_repo_config(tmp_path)["prevention"]
+
+    assert prevention["required_modules"] == ["code_quality"]
+    assert prevention["environment_paths"] == [".venv/bin"]
+    assert prevention["snapshot_include_paths"] == ["dist/declared.json"]
+    assert prevention["rules"][0]["state"] == "behavior-verified"
+    assert prevention["gates"][0]["state"] == "certified"
+
+
+def test_load_repo_config_preserves_declared_unavailable_gate(tmp_path) -> None:
+    from quality_runner.config import load_repo_config
+
+    (tmp_path / ".quality-runner.toml").write_text(
+        "\n".join(
+            [
+                "[[quality_runner.prevention.gates]]",
+                'id = "smoke"',
+                'command = "pnpm smoke"',
+                'state = "unavailable"',
+                "required = false",
+                'owner = "quality"',
+                'rationale = "The script is not defined."',
+                'bootstrap = "pnpm install --frozen-lockfile"',
+                'mutation_risk = "isolated-only"',
+                'blocker = "package.json has no smoke script"',
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    config = load_repo_config(tmp_path)
+
+    assert config["warnings"] == []
+    assert config["prevention"]["gates"][0]["state"] == "unavailable"
+    assert config["prevention"]["gates"][0]["blocker"] == "package.json has no smoke script"
+
+
 def test_load_repo_config_reads_gates_and_severity_overrides(tmp_path) -> None:
     from quality_runner.config import load_repo_config
 

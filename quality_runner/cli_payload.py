@@ -56,6 +56,7 @@ from quality_runner.phase_contract import load_phase_contract, scan_include_path
 from quality_runner.progress import ProgressCallback
 from quality_runner.release_smoke import release_smoke_payload
 from quality_runner.run_summary import build_run_summary
+from quality_runner.task_prevention import task_command_payload
 from quality_runner.workflow_skills import load_skill_review_report_json
 
 INIT_RESULT_SCHEMA = "quality-runner-init-result-v0.1"
@@ -77,6 +78,8 @@ def payload_for_args(
         return candidate_command_payload(args)
     if args.command == "security":
         return security_command_payload(args)
+    if args.command == "task":
+        return task_command_payload(args)
     if args.command == "phase-check":
         return phase_command_payload(args)
     if args.command == "self-update":

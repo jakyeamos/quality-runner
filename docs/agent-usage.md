@@ -14,6 +14,61 @@ should use the source-first contract in [Consumer Tooling](consumer-tooling.md):
 quality-runner ...` for latest QR, or `uv run --project /path/to/quality-runner
 quality-runner ...` for a specific checkout.
 
+## Prevent findings during implementation
+
+Use the task workflow at meaningful evidence boundaries:
+
+| Boundary | Required behavior |
+| --- | --- |
+| Before source edits | Capture one task baseline. |
+| During editing | Use applicable repository-native checks whose current maturity is established. |
+| Before completion | Run the authoritative `qr task check`. |
+| After a violation or blocker | Correct the cause and rerun the task check. |
+| Pull request | Use an immutable target revision as the baseline. |
+| Nightly or rule-pack change | Run the full repository audit for debt visibility and reconciliation. |
+
+The task check is deliberately not required on every save. Agent instructions
+guide implementation behavior; they do not replace QR's baseline, coverage,
+matching, readiness, or policy evidence. Do not translate every advisory
+finding into a static prohibition. Promote a repeatedly trusted deterministic
+finding into a behavior-verified QR rule or a faster native checker, with
+positive, negative, ambiguous, local, and CI evidence appropriate to that
+capability.
+
+For ordinary implementation work, capture the task baseline before editing:
+
+```bash
+qr task start /path/to/repo --task-id <stable-task-id> --json
+```
+
+After editing and before declaring the implementation complete:
+
+```bash
+qr task check /path/to/repo --task-id <stable-task-id> --json
+```
+
+Fix new enforced findings and failed certified gates. Do not treat persisted
+legacy debt as a task failure, and do not interpret `blocked` as a pass. When
+configuration, rule packs, promoted policy, the toolchain, or the QR version
+changes, review that change and use `task rebaseline --reason ...`; never
+silently enlarge the baseline. PR-target tasks preserve the originally resolved
+target SHA across rebaseline.
+
+Read `task-check.json` as the canonical result and `task-check.md` as its human
+projection. The emitted `next_action` explains the required response for
+`pass`, `violation`, `blocked`, or `invalid`; a passing QR result still does not
+waive other repository-required checks.
+
+Do not assume a fast native check is mature enough for this loop. QR executes
+only gates whose prevention configuration includes the required bootstrap,
+tool provenance, repeatability, intentional-failure, local, and CI evidence.
+Required but uncertified or unavailable gates block the check. Candidate gates
+stay advisory.
+
+QR owns evidence and policy evaluation only. The implementing agent still owns
+source changes and decides how to correct a violation; QR does not edit code,
+drive the agent, install prerequisites, commit, or push.
+
 ## Choose the QR journey
 
 Use the canonical `qr` command for new work. `quality-runner` is a compatible

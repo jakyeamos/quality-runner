@@ -30,6 +30,7 @@ from quality_runner.cli_review import add_review_command
 from quality_runner.cli_rollout import add_rollout_command
 from quality_runner.cli_security import add_security_commands
 from quality_runner.cli_skills import add_skill_commands
+from quality_runner.cli_task import add_task_commands
 from quality_runner.cli_update import add_update_command
 from quality_runner.cli_workflow_args import (
     add_verify_arguments,
@@ -64,7 +65,7 @@ Compatibility commands remain available:
   inspect, run, verify-gates, status, summarize-run, export-handoff
 
 Advanced operations:
-  refresh, rollout, gate, controller-report, skill, proposal, remediation,
+  task, refresh, rollout, gate, controller-report, skill, proposal, remediation,
   plan, phase, candidates, repo-hygiene, security, release-smoke, and worker
   handoff tools
 
@@ -109,6 +110,7 @@ def build_parser(prog: str = CANONICAL_PROGRAM) -> argparse.ArgumentParser:
     add_fleet_commands(subparsers)
     add_candidate_commands(subparsers)
     add_security_commands(subparsers)
+    add_task_commands(subparsers)
 
     run_parser = subparsers.add_parser("run", help="Inspect a repo and write audit artifacts")
     add_workflow_arguments(run_parser)
@@ -418,6 +420,13 @@ def main(argv: list[str] | None = None) -> int:
         return 1
     if parsed.command == "self-update" and payload.get("status") in {"blocked", "failed"}:
         return 1
+    if parsed.command == "task":
+        if payload.get("status") == "violation":
+            return 1
+        if payload.get("status") == "invalid":
+            return 2
+        if payload.get("status") == "blocked":
+            return 3
     if parsed.command == "plan" and payload.get("status") == "blocked":
         return 1
     if parsed.command == "repo-hygiene" and payload.get("status") in {"fail", "blocked"}:

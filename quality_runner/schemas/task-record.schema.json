@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://quality-runner.dev/schemas/task-record.schema.json",
+  "title": "Quality Runner Task Record",
+  "type": "object",
+  "required": ["schema", "task_id", "repository", "baseline_run_id", "lineage", "checks"],
+  "properties": {
+    "schema": { "const": "quality-runner-task-record-v0.1" },
+    "task_id": { "type": "string", "minLength": 1 },
+    "repository": { "type": "object" },
+    "baseline_run_id": { "type": "string", "minLength": 1 },
+    "lineage": { "type": "array", "items": { "type": "string" }, "minItems": 1 },
+    "checks": { "type": "array", "items": { "type": "string" } },
+    "last_status": { "enum": ["pass", "violation", "blocked"] }
+  }
+}

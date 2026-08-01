@@ -20,6 +20,18 @@ All notable changes to Quality Runner are documented here.
 - Added `qr candidates validate`, `aggregate`, and `promotion-check` with
   packaged JSON schemas, machine-readable receipts, deterministic architectural
   fixtures, and backward-compatible advisory invariant adoption.
+- Added the evidence-backed `qr task start`, `check`, and `rebaseline`
+  implementation loop, including exact dirty-workspace snapshots, normalized
+  occurrence and coverage contracts, deterministic finding deltas, promoted
+  prevention policies, expiring fingerprint waivers, and certified native-gate
+  readiness evidence.
+- Added canonical task, snapshot, normalized-finding, and readiness schemas,
+  plus a non-authoritative CI dogfood pilot. Existing refresh, verify, and
+  review-delta surfaces retain their prior behavior.
+- Added the packaged agent completion contract and status-specific task-check
+  next actions. The documented cadence uses native checks for established fast
+  feedback and QR at baseline, completion, and CI boundaries rather than on
+  every save.
 
 ## 0.6.0 - 2026-07-17
 

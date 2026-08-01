@@ -35,6 +35,8 @@ def inspect_repo(
     config: dict[str, Any] | None = None,
     cache_mode: CacheMode | str = "repo",
     cache_root: Path | None = None,
+    cache_namespace_root: Path | None = None,
+    cache_context_identity: str | None = None,
 ) -> dict[str, Any]:
     payload = load_or_build_inventory(
         repo_root,
@@ -43,6 +45,8 @@ def inspect_repo(
         extra_warnings=extra_warnings,
         cache_mode=cache_mode,
         cache_root=cache_root,
+        cache_namespace_root=cache_namespace_root,
+        cache_context_identity=cache_context_identity,
         build=lambda: _inspect_repo_uncached(
             repo_root,
             run_id,
@@ -51,6 +55,7 @@ def inspect_repo(
             config=config,
         ),
     )
+    payload["repo_root"] = str(repo_root.expanduser().resolve())
     payload["run_id"] = run_id
     for key in ("git_provenance", "provenance"):
         provenance = payload.get(key)

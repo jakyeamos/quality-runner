@@ -107,6 +107,73 @@ Returns:
 - package version
 - local Python/platform details
 
+## `quality-runner task`
+
+`task` is the preventative implementation-loop contract. It compares the exact
+post-edit workspace with a pre-edit baseline, runs only native gates that have
+been certified for preventative use, and never edits repository source.
+
+Start before editing:
+
+```bash
+qr task start /path/to/repo --task-id feature-123 --json
+```
+
+For CI or pull-request evaluation, bind the baseline to an immutable revision:
+
+```bash
+qr task start /path/to/repo \
+  --task-id pr-123 \
+  --baseline-ref "$TARGET_SHA" \
+  --json
+```
+
+Then evaluate tracked edits, tracked deletions, and untracked non-ignored files:
+
+```bash
+qr task check /path/to/repo --task-id feature-123 --json
+```
+
+Run this as the authoritative completion checkpoint and after correcting a
+violation or blocker. It is not a continuous-save or editor-hook command. Use
+applicable mature native checks for faster implementation-time feedback.
+
+The check status and process exit code are:
+
+- `pass` / `0`: no new enforced findings and all required certified gates pass
+- `violation` / `1`: a new enforced finding or certified gate failure
+- invalid invocation or configuration / `2`
+- `blocked` / `3`: coverage, matching, prerequisites, readiness, or workspace
+  evidence is incomplete or unverifiable
+
+Every task-check result includes a status-specific `next_action`.
+`task-check.json` is canonical; `task-check.md` is the derived human projection.
+A `pass` still requires any other repository-required checks to pass.
+
+Persisted legacy findings remain visible and are non-blocking. A finding can be
+reported as resolved only when follow-up coverage is complete and comparable;
+otherwise it is `unknown`. Matching is deterministic and never guesses through
+ambiguity.
+
+Configuration, promoted-policy, rule-pack, toolchain, or QR-version drift
+requires an explicit lineage-preserving rebaseline:
+
+```bash
+qr task rebaseline /path/to/repo \
+  --task-id feature-123 \
+  --reason "Reviewed rule-pack upgrade" \
+  --json
+```
+
+For a task started from `--baseline-ref`, rebaseline rescans the original
+resolved target SHA with the new policy; it does not silently switch a PR task
+to the current workspace.
+
+The prevention policy lives under `[quality_runner.prevention]`. Native gates
+do not become certified merely because their commands are discoverable or
+already appear in CI. See [Prevention Readiness](prevention-readiness.md) for
+the promotion, gate-certification, waiver, and evidence requirements.
+
 ## `quality-runner self-update`
 
 Refreshes the installed Quality Runner tool. An editable installation is

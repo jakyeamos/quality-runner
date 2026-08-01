@@ -1,11 +1,13 @@
 ---
 name: quality-runner
-description: Run standalone audit-and-plan quality orchestration for a repository, producing evidence-backed remediation plans without modifying source files.
+description: Run standalone audit, planning, and task-scoped prevention for a repository, producing authoritative quality evidence without modifying source files.
 ---
 
 # Quality Runner
 
-Use this skill when the user asks to audit a repository against quality standards, run Quality Runner, inspect available quality gates, or produce a remediation plan.
+Use this skill when the user asks to audit a repository against quality
+standards, run Quality Runner, inspect available quality gates, produce a
+remediation plan, or prevent new trusted findings during implementation.
 
 Quality Runner's preferred journeys are outcome-first. The canonical executable
 is `qr`; `quality-runner` remains a compatible alias. Confirm the install with
@@ -23,6 +25,46 @@ Preferred MCP tools:
 - `quality_runner_runs_outcome` to read persisted run history without writing a summary.
 
 Use the legacy MCP tools only when an existing client requires their v1 payloads.
+
+## Implementation completion contract
+
+For an implementation task, capture the baseline before source edits:
+
+```bash
+qr task start /path/to/repo --task-id <stable-task-id> --json
+```
+
+During editing, use only repository-native checks whose current applicability
+and maturity are established by repository evidence. Do not infer that a
+command is preventative merely because it appears in a manifest or CI file.
+Candidate QR gates remain advisory and are not executed by `qr task check`.
+
+After editing, run the authoritative QR checkpoint before declaring the
+implementation complete:
+
+```bash
+qr task check /path/to/repo --task-id <stable-task-id> --json
+```
+
+Interpret the result as follows:
+
+- `pass` permits completion only after any other repository-required checks pass.
+- `violation` requires fixing or explicitly disposing every new enforced
+  finding and failed certified gate, followed by another task check.
+- `blocked` is unknown evidence, never a pass. Resolve its blockers and rerun.
+- `invalid` requires correcting the invocation or prevention configuration.
+
+Read the emitted `task-check.json` as the authority and `task-check.md` as its
+human projection. Persisted legacy and advisory findings remain visible but do
+not become task failures. Do not copy every QR finding into static agent rules;
+promote a repeatedly trusted deterministic finding into a behavior-verified QR
+rule or a faster native checker with its own maturity evidence.
+
+This is a baseline and completion/CI checkpoint, not a continuous-save or
+editor-hook workflow. Re-run it after correcting violations or blockers. Use
+`qr task rebaseline --reason ...` only when configuration, policy, rule-pack,
+QR version, or toolchain evidence genuinely changed; never enlarge a baseline
+silently.
 
 Fresh Review is two phase: first prepare the packet, then submit a locally
 supplied response bound to that packet. A packet-ready outcome is not a clean
@@ -72,7 +114,7 @@ analysis at phase, release, or audit boundaries. Hard obligations, stale source
 fingerprints, missing mandatory evidence, uncovered plan obligations, and
 deferred hard checks block reconciliation; advisory obligations remain visible.
 
-Agent workflow:
+Audit and remediation workflow:
 
 1. Run QR before editing source.
 2. Read `.quality-runner/runs/qr-<date-or-task>/agent-handoff.md` and the referenced artifacts from that run.

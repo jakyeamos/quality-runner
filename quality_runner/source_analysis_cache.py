@@ -25,10 +25,16 @@ class SourceAnalysisCache:
         *,
         cache_mode: CacheMode | str = "repo",
         cache_root: Path | None = None,
+        cache_namespace_root: Path | None = None,
     ) -> None:
         self._repo_root = repo_root.expanduser().resolve()
         self._cache_mode = resolve_cache_mode(cache_mode)
         self._cache_root = cache_root.expanduser().resolve() if cache_root is not None else None
+        self._cache_namespace_root = (
+            cache_namespace_root.expanduser().resolve()
+            if cache_namespace_root is not None
+            else None
+        )
         self._redacted_by_hash: dict[str, list[str]] = {}
 
     def redacted_lines_for_source(
@@ -75,6 +81,7 @@ class SourceAnalysisCache:
             self._repo_root,
             mode=resolve_cache_mode(self._cache_mode),
             cache_root=self._cache_root,
+            namespace_root=self._cache_namespace_root,
             component=_CACHE_DIRECTORY,
         )
 

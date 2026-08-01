@@ -24,6 +24,13 @@ def _capability_finding_enrichment() -> dict[str, str]:
 
 def _git_commit(repo_root: Path) -> str:
     subprocess.run(["git", "init"], cwd=repo_root, check=True, capture_output=True, text=True)
+    excludes_file = repo_root / ".git" / "info" / "quality-runner-test-excludes"
+    excludes_file.write_text("", encoding="utf-8")
+    subprocess.run(
+        ["git", "config", "core.excludesfile", str(excludes_file)],
+        cwd=repo_root,
+        check=True,
+    )
     (repo_root / "tracked.txt").write_text("tracked\n", encoding="utf-8")
     subprocess.run(["git", "add", "tracked.txt"], cwd=repo_root, check=True)
     subprocess.run(

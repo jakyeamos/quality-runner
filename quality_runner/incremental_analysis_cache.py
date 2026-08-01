@@ -1,9 +1,7 @@
 from __future__ import annotations
 
 import json
-from collections import Counter
 from collections.abc import Callable, Mapping
-from dataclasses import dataclass, field
 from pathlib import Path
 from typing import cast
 
@@ -33,6 +31,7 @@ from quality_runner.incremental_analysis_cache_io import (
 from quality_runner.incremental_analysis_cache_io import (
     source_signature as _source_signature,
 )
+from quality_runner.incremental_analysis_cache_stats import CacheStats
 from quality_runner.incremental_analysis_identity import (
     configuration_identity,
     dependency_state_identity,
@@ -50,20 +49,6 @@ AnalysisResultFactory = Callable[[], AnalysisResult]
 AnalysisResultFromSourceFactory = Callable[[str], AnalysisResult]
 
 
-@dataclass
-class _CacheStats:
-    considered_files: int = 0
-    cache_hits: int = 0
-    cache_misses: int = 0
-    recomputed_files: int = 0
-    write_failures: int = 0
-    pruned_entries: int = 0
-    invalidation_reasons: Counter[str] = field(default_factory=Counter)
-    recomputed_paths: list[str] = field(default_factory=list)
-    index_writes: int = 0
-    source_bytes_read: int = 0
-
-
 class IncrementalAnalysisCache:
     """Persist validated per-file scanner results with fail-closed invalidation."""
 
@@ -76,6 +61,7 @@ class IncrementalAnalysisCache:
         context: Mapping[str, object] | None = None,
         cache_mode: CacheMode | str = "repo",
         cache_root: Path | None = None,
+        cache_namespace_root: Path | None = None,
         persist: bool | None = None,
     ) -> None:
         self._repo_root = repo_root.expanduser().resolve()
@@ -86,11 +72,17 @@ class IncrementalAnalysisCache:
         self._cache_mode = resolved_cache_mode
         self._persist = self._cache_mode != "disabled"
         self._cache_root = cache_root.expanduser().resolve() if cache_root is not None else None
+        self._cache_namespace_root = (
+            cache_namespace_root.expanduser().resolve()
+            if cache_namespace_root is not None
+            else None
+        )
+        self._identity_root = self._cache_namespace_root or self._repo_root
         self._context_identity = _json_hash(context or {})
         self._configuration_identity = configuration_identity(self._repo_root, config)
         self._dependency_state_identity = dependency_state_identity(self._repo_root)
         self._scanner_implementation_identity = scanner_implementation_identity()
-        self._stats = _CacheStats()
+        self._stats = CacheStats()
         self._index: dict[str, dict[str, object]] = {}
         self._index_loaded = False
         self._index_status = "unloaded"
@@ -103,6 +95,7 @@ class IncrementalAnalysisCache:
             self._repo_root,
             mode=resolve_cache_mode(self._cache_mode),
             cache_root=self._cache_root,
+            namespace_root=self._cache_namespace_root,
             component=INCREMENTAL_ANALYSIS_CACHE_DIRECTORY,
         )
 
@@ -264,7 +257,7 @@ class IncrementalAnalysisCache:
                 "configuration_sha256": self._configuration_identity,
                 "dependency_state_sha256": self._dependency_state_identity,
                 "analysis_context_sha256": self._context_identity,
-                "repository_root_sha256": _sha256_text(str(self._repo_root)),
+                "repository_root_sha256": _sha256_text(str(self._identity_root)),
             },
             "key_fields": [
                 "relative_path",
@@ -316,7 +309,7 @@ class IncrementalAnalysisCache:
             "configuration_sha256": self._configuration_identity,
             "dependency_state_sha256": self._dependency_state_identity,
             "analysis_context_sha256": self._context_identity,
-            "repository_root_sha256": _sha256_text(str(self._repo_root)),
+            "repository_root_sha256": _sha256_text(str(self._identity_root)),
             "source_signature": source_signature,
         }
 

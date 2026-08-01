@@ -20,6 +20,10 @@
       "command": "quality-runner",
       "args": ["runs"]
     },
+    "task": {
+      "command": "quality-runner",
+      "args": ["task"]
+    },
     "inspect": {
       "command": "quality-runner",
       "args": ["inspect"]

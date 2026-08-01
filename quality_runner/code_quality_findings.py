@@ -63,6 +63,8 @@ def _finding(
 
 
 def _fingerprint(rule_id: str, file: str, evidence: str) -> str:
+    if rule_id == "large-source-file":
+        return hashlib.sha256(f"{rule_id}:{file}:file-occurrence".encode()).hexdigest()[:16]
     normalized = " ".join(evidence.strip().split())
     return hashlib.sha256(f"{rule_id}:{file}:{normalized}".encode()).hexdigest()[:16]
 

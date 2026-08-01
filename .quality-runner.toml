@@ -19,3 +19,96 @@ owner = "repository"
 required = true
 severity = "blocker"
 mutating_risk = "safe"
+
+[quality_runner.structural_scan]
+similarity_enabled = false
+
+[quality_runner.prevention]
+required_modules = ["code_quality", "security"]
+environment_paths = [".venv/bin"]
+
+[[quality_runner.prevention.rules]]
+detector = "code_quality"
+rule_id = "large-source-file"
+state = "behavior-verified"
+owner = "quality-runner-maintainers"
+rationale = "Large source files increase review cost and concentrate change risk."
+paths = ["quality_runner/**/*.py", "quality_runner/*.py", "quality_evidence_contract/**/*.py", "repo_quality_certifier/**/*.py"]
+confidence_threshold = 1.0
+evidence_refs = [
+  "positive:tests/test_prevention_policy.py::test_large_source_file_positive_promotion_fixture",
+  "negative:tests/test_prevention_policy.py::test_large_source_file_negative_promotion_fixture",
+  "ambiguous:tests/test_prevention_policy.py::test_large_source_file_ambiguous_test_scope_fixture_is_not_enforced",
+]
+
+[[quality_runner.prevention.gates]]
+id = "pytest"
+command = "pytest -q"
+state = "certified"
+required = true
+owner = "quality-runner-maintainers"
+rationale = "The test suite is deterministic in the locked development environment."
+bootstrap = "uv sync --locked --all-groups --python 3.13"
+mutation_risk = "isolated-only"
+scope = "Repository test suite"
+timeout_seconds = 900
+evidence_refs = [
+  "failure-fixture:tests/test_prevention_policy.py::test_pytest_gate_certification_has_repeatable_pass_and_failure_fixture",
+  "repeat-pass:tests/test_prevention_policy.py::test_pytest_gate_certification_has_repeatable_pass_and_failure_fixture",
+  "local:docs/prevention-readiness.md",
+  "ci:.github/workflows/ci.yml",
+]
+
+[[quality_runner.prevention.gates]]
+id = "ruff-lint"
+command = "ruff check ."
+state = "certified"
+required = true
+owner = "quality-runner-maintainers"
+rationale = "Ruff lint is pinned and non-mutating in check mode."
+bootstrap = "uv sync --locked --all-groups --python 3.13"
+mutation_risk = "isolated-only"
+scope = "Python source and tests"
+timeout_seconds = 180
+evidence_refs = [
+  "failure-fixture:tests/test_prevention_policy.py::test_static_gate_certification_has_repeatable_pass_and_failure_fixture",
+  "repeat-pass:tests/test_prevention_policy.py::test_static_gate_certification_has_repeatable_pass_and_failure_fixture",
+  "local:docs/prevention-readiness.md",
+  "ci:.github/workflows/ci.yml",
+]
+
+[[quality_runner.prevention.gates]]
+id = "ruff-format"
+command = "ruff format --check ."
+state = "certified"
+required = true
+owner = "quality-runner-maintainers"
+rationale = "Ruff formatting is pinned and uses its non-mutating check mode."
+bootstrap = "uv sync --locked --all-groups --python 3.13"
+mutation_risk = "isolated-only"
+scope = "Python source and tests"
+timeout_seconds = 180
+evidence_refs = [
+  "failure-fixture:tests/test_prevention_policy.py::test_static_gate_certification_has_repeatable_pass_and_failure_fixture",
+  "repeat-pass:tests/test_prevention_policy.py::test_static_gate_certification_has_repeatable_pass_and_failure_fixture",
+  "local:docs/prevention-readiness.md",
+  "ci:.github/workflows/ci.yml",
+]
+
+[[quality_runner.prevention.gates]]
+id = "basedpyright"
+command = "basedpyright"
+state = "certified"
+required = true
+owner = "quality-runner-maintainers"
+rationale = "BasedPyright is pinned and checks the declared Python package scope."
+bootstrap = "uv sync --locked --all-groups --python 3.13"
+mutation_risk = "isolated-only"
+scope = "Typed Python package source"
+timeout_seconds = 300
+evidence_refs = [
+  "failure-fixture:tests/test_prevention_policy.py::test_static_gate_certification_has_repeatable_pass_and_failure_fixture",
+  "repeat-pass:tests/test_prevention_policy.py::test_static_gate_certification_has_repeatable_pass_and_failure_fixture",
+  "local:docs/prevention-readiness.md",
+  "ci:.github/workflows/ci.yml",
+]

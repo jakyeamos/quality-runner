@@ -81,6 +81,7 @@ def test_plugin_manifest_and_citation_metadata_follow_their_release_contracts() 
     )
     assert manifest["version"] == __version__
     assert manifest["commands"]["review"]["args"] == ["review"]
+    assert manifest["commands"]["task"]["args"] == ["task"]
     citation = (ROOT / "CITATION.cff").read_text(encoding="utf-8")
     citation_version = re.search(r'^version: "(?P<version>[^\"]+)"$', citation, re.MULTILINE)
     citation_date = re.search(
@@ -104,6 +105,10 @@ def test_plugin_manifest_and_citation_metadata_follow_their_release_contracts() 
     skill = (ROOT / "quality_runner" / "plugin" / "SKILL.md").read_text(encoding="utf-8")
     assert ".quality-runner/runs/qr-<date-or-task>/agent-handoff.md" in skill
     assert ".quality-runner/exports/qr-handoff.md" not in skill
+    assert "qr task start /path/to/repo" in skill
+    assert "qr task check /path/to/repo" in skill
+    assert "not a continuous-save" in skill
+    assert "editor-hook workflow" in skill
 
 
 def test_release_docs_include_example_handoffs() -> None:

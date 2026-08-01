@@ -94,6 +94,40 @@ def test_editing_one_source_file_recomputes_only_that_file(tmp_path: Path, monke
     assert all(finding["file"] != "src/changed.ts" for finding in result["findings"])
 
 
+def test_external_cache_namespace_reuses_validated_results_across_snapshots(
+    tmp_path: Path,
+) -> None:
+    from quality_runner.code_quality import create_code_quality_scan
+
+    first_root = tmp_path / "snapshot-one"
+    second_root = tmp_path / "snapshot-two"
+    namespace_root = tmp_path / "canonical-repository"
+    cache_root = tmp_path / "external-cache"
+    _write(first_root / "src" / "stable.ts", "const stable: any = {};\n")
+    _write(second_root / "src" / "stable.ts", "const stable: any = {};\n")
+
+    first = create_code_quality_scan(
+        first_root,
+        scan={"run_id": "first"},
+        config={},
+        cache_mode="external",
+        cache_root=cache_root,
+        cache_namespace_root=namespace_root,
+    )
+    second = create_code_quality_scan(
+        second_root,
+        scan={"run_id": "second"},
+        config={},
+        cache_mode="external",
+        cache_root=cache_root,
+        cache_namespace_root=namespace_root,
+    )
+
+    assert first["analysis_cache"]["cache_misses"] == 1
+    assert second["analysis_cache"]["cache_hits"] == 1
+    assert first["findings"] == second["findings"]
+
+
 def test_scanner_configuration_and_version_changes_invalidate_entries(
     tmp_path: Path, monkeypatch
 ) -> None:
