@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 
 def controller_command_environment(repo_path: str) -> dict[str, str]:
@@ -16,11 +16,12 @@ def normalized_controller_command_environment(
     report: dict[str, Any], *, repo_path: str
 ) -> dict[str, str]:
     environment = report.get("controller_command_environment")
-    if isinstance(environment, dict):
+    environment_map = _dict(environment)
+    if environment_map is not None:
         return {
-            str(key): str(value)
-            for key, value in environment.items()
-            if isinstance(key, str) and isinstance(value, str) and key and value
+            key: value
+            for key, value in environment_map.items()
+            if isinstance(value, str) and key and value
         }
     return controller_command_environment(repo_path or ".")
 
@@ -32,9 +33,10 @@ def normalized_controller_status_recommendation(
     final_qr: dict[str, Any],
 ) -> dict[str, str]:
     recommendation = report.get("controller_status_recommendation")
-    if isinstance(recommendation, dict):
-        raw_status = recommendation.get("status")
-        reason = recommendation.get("reason")
+    recommendation_map = _dict(recommendation)
+    if recommendation_map is not None:
+        raw_status = recommendation_map.get("status")
+        reason = recommendation_map.get("reason")
         if isinstance(raw_status, str) and isinstance(reason, str) and raw_status:
             return {"status": raw_status, "reason": reason}
     classification = first_string(final_qr.get("classification"))
@@ -132,21 +134,22 @@ def inferred_blockers(final_qr: dict[str, Any]) -> list[str]:
 
 
 def workflow_timeout_blockers(timeout_diagnostics: object) -> list[str]:
-    if not isinstance(timeout_diagnostics, dict):
+    diagnostics = _dict(timeout_diagnostics)
+    if diagnostics is None:
         return []
     blockers: list[str] = []
-    timeout_scope = first_string(timeout_diagnostics.get("timeout_scope"))
-    last_directory = first_string(timeout_diagnostics.get("last_directory"))
-    visited_paths = timeout_diagnostics.get("visited_paths")
-    scan_activity = timeout_diagnostics.get("scan_activity")
+    timeout_scope = first_string(diagnostics.get("timeout_scope"))
+    last_directory = first_string(diagnostics.get("last_directory"))
+    visited_paths = diagnostics.get("visited_paths")
+    scan_activity = _dict(diagnostics.get("scan_activity"))
     activity_path = (
         scan_activity.get("path")
-        if isinstance(scan_activity, dict) and isinstance(scan_activity.get("path"), str)
+        if scan_activity is not None and isinstance(scan_activity.get("path"), str)
         else None
     )
     if timeout_scope and isinstance(visited_paths, int) and (last_directory or activity_path):
         if (
-            isinstance(scan_activity, dict)
+            scan_activity is not None
             and scan_activity.get("kind") == "excluded-directory-estimation"
             and activity_path
         ):
@@ -160,14 +163,11 @@ def workflow_timeout_blockers(timeout_diagnostics: object) -> list[str]:
                 f"Workflow timeout: {timeout_scope} timed out at {last_directory or activity_path} "
                 f"after {visited_paths} visited paths."
             )
-    recommendations = timeout_diagnostics.get("pruning_recommendations")
-    if isinstance(recommendations, list):
-        for recommendation in recommendations:
-            if not isinstance(recommendation, dict):
-                continue
-            pattern = recommendation.get("pattern")
-            if isinstance(pattern, str) and pattern:
-                blockers.append(f"Suggested scan exclusion: {pattern}.")
+    recommendations = diagnostics.get("pruning_recommendations")
+    for recommendation in _dict_list(cast(object, recommendations)):
+        pattern = recommendation.get("pattern")
+        if isinstance(pattern, str) and pattern:
+            blockers.append(f"Suggested scan exclusion: {pattern}.")
     return blockers
 
 
@@ -216,11 +216,12 @@ def dirty_state_groups(
 
 
 def final_qr_clean(final_qr: object) -> bool:
-    if not isinstance(final_qr, dict):
+    final_qr_map = _dict(final_qr)
+    if final_qr_map is None:
         return False
-    status = str(final_qr.get("status") or "")
+    status = str(final_qr_map.get("status") or "")
     classification = str(
-        final_qr.get("classification") or final_qr.get("recommended_classification") or ""
+        final_qr_map.get("classification") or final_qr_map.get("recommended_classification") or ""
     )
     return status in {"clean", "passed"} or classification == "clean"
 
@@ -234,7 +235,7 @@ def first_string(*values: object) -> str:
 
 def string_values(value: object) -> list[str]:
     return (
-        [item for item in value if isinstance(item, str) and item]
+        [item for item in cast(list[Any], value) if isinstance(item, str) and item]
         if isinstance(value, list)
         else []
     )
@@ -249,9 +250,7 @@ def gate_descriptions(
     if not isinstance(value, list):
         return []
     descriptions: list[str] = []
-    for gate in value:
-        if not isinstance(gate, dict):
-            continue
+    for gate in _dict_list(cast(object, value)):
         status = first_string(gate.get("status"))
         skip_type = first_string(gate.get("skip_type"))
         if statuses is not None and status not in statuses:
@@ -279,3 +278,13 @@ def git_status_path(line: str) -> str:
 
 def compact(payload: dict[str, Any]) -> dict[str, Any]:
     return {key: value for key, value in payload.items() if value not in (None, "", [])}
+
+
+def _dict(value: object) -> dict[str, Any] | None:
+    return cast(dict[str, Any], value) if isinstance(value, dict) else None
+
+
+def _dict_list(value: object) -> list[dict[str, Any]]:
+    if not isinstance(value, list):
+        return []
+    return [cast(dict[str, Any], item) for item in cast(list[Any], value) if isinstance(item, dict)]
