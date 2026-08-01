@@ -4,7 +4,7 @@ import hashlib
 import re
 import tomllib
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from quality_runner.verification_contract import VERIFICATION_MODE_VALUES
 
@@ -32,8 +32,8 @@ def load_active_skills(
     repo_root: Path,
     config: dict[str, Any],
 ) -> tuple[list[dict[str, Any]], list[dict[str, str]]]:
-    section = config.get("skills")
-    if not isinstance(section, dict) or section.get("enabled") is not True:
+    section = _dict(config.get("skills"))
+    if section is None or section.get("enabled") is not True:
         return [], []
 
     root = repo_root.expanduser().resolve()
@@ -45,8 +45,9 @@ def load_active_skills(
     skills: list[dict[str, Any]] = []
     warnings: list[dict[str, str]] = []
 
-    for entry in local_entries:
-        if not isinstance(entry, dict):
+    for raw_entry in cast(list[Any], local_entries):
+        entry = _dict(raw_entry)
+        if entry is None:
             continue
         skill_id = entry.get("id")
         skill_path = entry.get("path")
@@ -77,14 +78,14 @@ def load_active_skills(
         if isinstance(validation_warnings, list):
             warnings.extend(
                 warning
-                for warning in validation_warnings
-                if isinstance(warning, dict)
+                for raw_warning in cast(list[Any], validation_warnings)
+                if (warning := _dict(raw_warning)) is not None
                 and all(isinstance(warning.get(key), str) for key in ("code", "message", "path"))
             )
 
         applies_to = entry.get("applies_to")
         if isinstance(applies_to, list):
-            patterns = [item for item in applies_to if isinstance(item, str) and item]
+            patterns = _string_list(cast(object, applies_to))
             if patterns:
                 skill_pack["applies_to"] = patterns
 
@@ -99,7 +100,7 @@ def _active_skill_ids(section: dict[str, Any]) -> set[str] | None:
         return None
     if not isinstance(active, list):
         return set()
-    return {item for item in active if isinstance(item, str) and item}
+    return set(_string_list(cast(object, active)))
 
 
 def _resolve_skill_path(
@@ -129,9 +130,6 @@ def _load_skill_pack(
         payload = tomllib.loads(content)
     except (OSError, tomllib.TOMLDecodeError) as error:
         return None, _skill_warning(configured_id, f"skill file could not be parsed: {error}")
-
-    if not isinstance(payload, dict):
-        return None, _skill_warning(configured_id, "skill file must be a TOML table")
 
     for field in FORBIDDEN_SKILL_FIELDS:
         if field in payload:
@@ -191,8 +189,9 @@ def _parse_deterministic_rules(
 
     rules: list[dict[str, Any]] = []
     warnings: list[dict[str, str]] = []
-    for index, item in enumerate(value):
-        if not isinstance(item, dict):
+    for index, raw_item in enumerate(cast(list[Any], value)):
+        item = _dict(raw_item)
+        if item is None:
             warnings.append(
                 _skill_warning(skill_id, f"deterministic_rules[{index}] must be a table")
             )
@@ -380,8 +379,9 @@ def _parse_agent_reviews(
 
     reviews: list[dict[str, Any]] = []
     warnings: list[dict[str, str]] = []
-    for index, item in enumerate(value):
-        if not isinstance(item, dict):
+    for index, raw_item in enumerate(cast(list[Any], value)):
+        item = _dict(raw_item)
+        if item is None:
             warnings.append(_skill_warning(skill_id, f"agent_reviews[{index}] must be a table"))
             continue
         review_id = item.get("id")
@@ -435,8 +435,9 @@ def _parse_sources(
     sources: list[dict[str, Any]] = []
     warnings: list[dict[str, str]] = []
     seen_ids: set[str] = set()
-    for index, item in enumerate(value):
-        if not isinstance(item, dict):
+    for index, raw_item in enumerate(cast(list[Any], value)):
+        item = _dict(raw_item)
+        if item is None:
             warnings.append(_skill_warning(skill_id, f"sources[{index}] must be a table"))
             continue
         source_id = item.get("id")
@@ -459,7 +460,11 @@ def _parse_sources(
 def _string_list(value: object) -> list[str]:
     if not isinstance(value, list):
         return []
-    return [item for item in value if isinstance(item, str) and item]
+    return [item for item in cast(list[Any], value) if isinstance(item, str) and item]
+
+
+def _dict(value: object) -> dict[str, Any] | None:
+    return cast(dict[str, Any], value) if isinstance(value, dict) else None
 
 
 def _skill_warning(
