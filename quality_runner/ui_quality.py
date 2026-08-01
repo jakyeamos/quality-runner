@@ -6,8 +6,8 @@ from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import cast
 
-from quality_runner.code_quality_findings import _finding
-from quality_runner.ui_quality_helpers import _cue_type, _mapping, _stable, _strings, _text
+from quality_runner.code_quality_findings import make_finding
+from quality_runner.ui_quality_helpers import cue_type, mapping, stable, strings, text
 
 UI_QUALITY_REPORT_SCHEMA = "quality-runner-ui-quality-report-v0.1"
 _THEMES = ("light", "dark")
@@ -41,15 +41,15 @@ def build_ui_quality_report(
 ) -> dict[str, object]:
     """Evaluate one UI contract fixture without activating a source scan or corpus entry."""
 
-    run = _text(run_id, "run_id")
-    fixture_id = _text(fixture.get("fixture_id"), "fixture_id")
-    path = _text(fixture_path, "fixture_path")
-    tokens = _mapping(fixture.get("tokens"), "tokens")
-    primitives = _mapping(tokens.get("primitives"), "tokens.primitives")
-    roles = _mapping(tokens.get("semantic_roles"), "tokens.semantic_roles")
-    components = _mapping(fixture.get("components"), "components")
-    modifiers = _mapping(fixture.get("modifiers"), "modifiers")
-    states = _mapping(fixture.get("states"), "states")
+    run = text(run_id, "run_id")
+    fixture_id = text(fixture.get("fixture_id"), "fixture_id")
+    path = text(fixture_path, "fixture_path")
+    tokens = mapping(fixture.get("tokens"), "tokens")
+    primitives = mapping(tokens.get("primitives"), "tokens.primitives")
+    roles = mapping(tokens.get("semantic_roles"), "tokens.semantic_roles")
+    components = mapping(fixture.get("components"), "components")
+    modifiers = mapping(fixture.get("modifiers"), "modifiers")
+    states = mapping(fixture.get("states"), "states")
 
     findings: list[Finding] = []
     findings.extend(_ownership(path, primitives, roles, components))
@@ -76,7 +76,7 @@ def build_ui_quality_report(
     }
     validation = validate_ui_quality_report(report)
     if validation["passed"] is not True:
-        raise ValueError("invalid UI quality report: " + "; ".join(_strings(validation["errors"])))
+        raise ValueError("invalid UI quality report: " + "; ".join(strings(validation["errors"])))
     return report
 
 
@@ -92,7 +92,7 @@ def validate_ui_quality_report(report: Mapping[str, object]) -> dict[str, object
         and isinstance(findings, list)
         and report.get("result") == ("passed" if not findings else "findings")
     )
-    count = len(findings) if isinstance(findings, list) else 0
+    count = len(cast(list[object], findings)) if isinstance(findings, list) else 0
     return {
         "passed": valid,
         "errors": [] if valid else ["invalid UI quality report"],
@@ -108,17 +108,18 @@ def _ownership(
 ) -> list[Finding]:
     findings: list[Finding] = []
     for role_name, raw_role in sorted(roles.items()):
-        if not isinstance(raw_role, Mapping):
+        raw_role_map = _map(raw_role)
+        if raw_role_map is None:
             continue
         for theme in _THEMES:
-            if theme not in raw_role:
+            if theme not in raw_role_map:
                 findings.append(
                     _issue(
                         path, "ui-theme-role-missing-theme", f"semantic.{role_name} has no {theme}"
                     )
                 )
                 continue
-            value = raw_role.get(theme)
+            value = raw_role_map.get(theme)
             if not isinstance(value, str) or not value.startswith(("primitive.", "semantic.")):
                 findings.append(
                     _issue(
@@ -147,9 +148,10 @@ def _ownership(
                 )
 
     for component_name, raw_component in sorted(components.items()):
-        if not isinstance(raw_component, Mapping):
+        raw_component_map = _map(raw_component)
+        if raw_component_map is None:
             continue
-        role_refs = raw_component.get("role_refs")
+        role_refs = raw_component_map.get("role_refs")
         if not isinstance(role_refs, list) or not role_refs:
             findings.append(
                 _issue(
@@ -159,7 +161,7 @@ def _ownership(
                 )
             )
             continue
-        for reference in role_refs:
+        for reference in _list(cast(object, role_refs)):
             rule = "ui-token-ownership-component-bypass"
             if (
                 isinstance(reference, str)
@@ -180,24 +182,27 @@ def _contrast(
     if not isinstance(raw_pairs, list) or not raw_pairs:
         return [_issue(path, "ui-contrast-missing-pairs", "contrast_pairs is empty")]
     findings: list[Finding] = []
-    for index, raw_pair in enumerate(raw_pairs, start=1):
-        if not isinstance(raw_pair, Mapping):
+    for index, raw_pair in enumerate(_list(cast(object, raw_pairs)), start=1):
+        raw_pair_map = _map(raw_pair)
+        if raw_pair_map is None:
             findings.append(_issue(path, "ui-contrast-invalid-pair", f"contrast pair {index}"))
             continue
-        pair_id = str(raw_pair.get("id") or f"pair-{index}")
-        kind = raw_pair.get("kind")
+        pair_id = str(raw_pair_map.get("id") or f"pair-{index}")
+        kind = raw_pair_map.get("kind")
         if kind not in {"text", "ui"}:
             findings.append(_issue(path, "ui-contrast-invalid-pair", f"{pair_id}: kind={kind!r}"))
             continue
         threshold = (
-            3.0 if kind == "ui" or str(raw_pair.get("size", "normal")).lower() == "large" else 4.5
+            3.0
+            if kind == "ui" or str(raw_pair_map.get("size", "normal")).lower() == "large"
+            else 4.5
         )
-        for theme in _pair_themes(raw_pair.get("themes")):
+        for theme in _pair_themes(raw_pair_map.get("themes")):
             foreground, foreground_error = _contrast_endpoint(
-                raw_pair.get("foreground"), theme, primitives, roles
+                raw_pair_map.get("foreground"), theme, primitives, roles
             )
             background, background_error = _contrast_endpoint(
-                raw_pair.get("background"), theme, primitives, roles
+                raw_pair_map.get("background"), theme, primitives, roles
             )
             if foreground_error or background_error:
                 detail = "; ".join(item for item in (foreground_error, background_error) if item)
@@ -243,10 +248,11 @@ def _modifiers(
         ]
     findings: list[Finding] = []
     for name, raw_modifier in sorted(modifiers.items()):
-        if not isinstance(raw_modifier, Mapping):
+        raw_modifier_map = _map(raw_modifier)
+        if raw_modifier_map is None:
             continue
-        for requirement in _strings(raw_modifier.get("requires")):
-            if not isinstance(requirement, str) or requirement not in modifiers:
+        for requirement in strings(raw_modifier_map.get("requires")):
+            if requirement not in modifiers:
                 findings.append(
                     _issue(
                         path,
@@ -255,11 +261,12 @@ def _modifiers(
                     )
                 )
 
-    for index, raw_composition in enumerate(raw_compositions, start=1):
-        if not isinstance(raw_composition, Mapping):
+    for index, raw_composition in enumerate(_list(cast(object, raw_compositions)), start=1):
+        raw_composition_map = _map(raw_composition)
+        if raw_composition_map is None:
             continue
-        composition_id = str(raw_composition.get("id") or f"composition-{index}")
-        names = _strings(raw_composition.get("modifiers"))
+        composition_id = str(raw_composition_map.get("id") or f"composition-{index}")
+        names = strings(raw_composition_map.get("modifiers"))
         if not names:
             findings.append(
                 _issue(
@@ -271,7 +278,8 @@ def _modifiers(
         merged: dict[str, object] = {}
         for name in names:
             raw_modifier = modifiers.get(name)
-            if not isinstance(raw_modifier, Mapping):
+            raw_modifier_map = _map(raw_modifier)
+            if raw_modifier_map is None:
                 findings.append(
                     _issue(
                         path, "ui-modifier-unknown-composed", f"{composition_id} includes {name}"
@@ -287,8 +295,8 @@ def _modifiers(
                         f"{composition_id} omits {', '.join(missing)}",
                     )
                 )
-            properties = raw_modifier.get("properties", {})
-            if not isinstance(properties, Mapping):
+            properties = _map(raw_modifier_map.get("properties", {}))
+            if properties is None:
                 continue
             for property_name, value in properties.items():
                 if property_name in merged and merged[property_name] != value:
@@ -300,8 +308,8 @@ def _modifiers(
                         )
                     )
                 merged[property_name] = value
-        expected = raw_composition.get("expected_properties")
-        if not isinstance(expected, Mapping):
+        expected = _map(raw_composition_map.get("expected_properties"))
+        if expected is None:
             findings.append(
                 _issue(
                     path, "ui-modifier-missing-expectation", f"{composition_id} expected_properties"
@@ -312,7 +320,7 @@ def _modifiers(
                 _issue(
                     path,
                     "ui-modifier-composition-mismatch",
-                    f"{composition_id}: {_stable(dict(expected))} != {_stable(merged)}",
+                    f"{composition_id}: {stable(dict(expected))} != {stable(merged)}",
                 )
             )
     return findings
@@ -323,13 +331,15 @@ def _states(path: str, states: Mapping[str, object]) -> list[Finding]:
         return [_issue(path, "ui-state-missing-catalog", "states is empty")]
     findings: list[Finding] = []
     for name, raw_state in sorted(states.items()):
-        cues = raw_state.get("cues") if isinstance(raw_state, Mapping) else []
-        if not isinstance(cues, list):
-            cues = []
-        if not any(_cue_type(cue) not in {None, "color", "colour"} for cue in cues):
+        raw_state_map = _map(raw_state)
+        cues: object = raw_state_map.get("cues") if raw_state_map is not None else []
+        cue_values = _list(cast(object, cues))
+        if not any(cue_type(cue) not in {None, "color", "colour"} for cue in cue_values):
             findings.append(
                 _issue(
-                    path, "ui-state-missing-non-color-cue", f"state {name}: cues={_stable(cues)}"
+                    path,
+                    "ui-state-missing-non-color-cue",
+                    f"state {name}: cues={stable(cue_values)}",
                 )
             )
     return findings
@@ -346,9 +356,10 @@ def _resolve_role(
     if marker in stack:
         return None, "semantic alias cycle"
     role = roles.get(name)
-    if not isinstance(role, Mapping):
+    role_map = _map(role)
+    if role_map is None:
         return None, "role mapping is missing"
-    value = role.get(theme)
+    value = role_map.get(theme)
     if not isinstance(value, str):
         return None, f"{theme} mapping is missing or not a string"
     if value.startswith("primitive."):
@@ -384,9 +395,10 @@ def _dependencies(name: str, modifiers: Mapping[str, object]) -> set[str]:
     dependencies: set[str] = set()
     while pending:
         raw_modifier = modifiers.get(pending.pop())
-        if not isinstance(raw_modifier, Mapping):
+        raw_modifier_map = _map(raw_modifier)
+        if raw_modifier_map is None:
             continue
-        for requirement in _strings(raw_modifier.get("requires")):
+        for requirement in strings(raw_modifier_map.get("requires")):
             if requirement not in seen:
                 seen.add(requirement)
                 dependencies.add(requirement)
@@ -395,7 +407,7 @@ def _dependencies(name: str, modifiers: Mapping[str, object]) -> set[str]:
 
 
 def _pair_themes(value: object) -> list[str]:
-    themes = [item for item in value if item in _THEMES] if isinstance(value, list) else []
+    themes = [item for item in _list(value) if isinstance(item, str) and item in _THEMES]
     return themes or list(_THEMES)
 
 
@@ -439,13 +451,10 @@ def _check_summaries(findings: list[Finding]) -> list[dict[str, object]]:
 def _summary(checks: Sequence[object], findings: Sequence[object]) -> dict[str, int]:
     return {
         "check_count": len(checks),
-        "passed_check_count": sum(
-            isinstance(item, Mapping) and item.get("status") == "passed" for item in checks
-        ),
+        "passed_check_count": sum(_mapping_equals(item, "status", "passed") for item in checks),
         "finding_count": len(findings),
         "deterministic_check_count": sum(
-            isinstance(item, Mapping) and item.get("enforceability") == "deterministic"
-            for item in checks
+            _mapping_equals(item, "enforceability", "deterministic") for item in checks
         ),
         "judgment_only_check_count": 0,
     }
@@ -463,7 +472,7 @@ def _issue(
 ) -> Finding:
     return cast(
         Finding,
-        _finding(
+        make_finding(
             category="ui_structural",
             severity=severity,
             confidence=confidence,
@@ -477,3 +486,16 @@ def _issue(
             remediation_bucket="UI design-system quality",
         ),
     )
+
+
+def _map(value: object) -> Mapping[str, object] | None:
+    return cast(Mapping[str, object], value) if isinstance(value, Mapping) else None
+
+
+def _list(value: object) -> list[object]:
+    return cast(list[object], value) if isinstance(value, list) else []
+
+
+def _mapping_equals(value: object, key: str, expected: object) -> bool:
+    mapped = _map(value)
+    return mapped is not None and mapped.get(key) == expected

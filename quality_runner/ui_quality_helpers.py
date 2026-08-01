@@ -2,12 +2,13 @@ from __future__ import annotations
 
 import json
 from collections.abc import Mapping
+from typing import Any, cast
 
 
 def _mapping(value: object, field: str) -> Mapping[str, object]:
     if not isinstance(value, Mapping):
         raise ValueError(f"{field} must be an object")
-    return value
+    return cast(Mapping[str, object], value)
 
 
 def _text(value: object, field: str) -> str:
@@ -20,7 +21,7 @@ def _cue_type(value: object) -> str | None:
     value = (
         value
         if isinstance(value, str)
-        else value.get("type")
+        else cast(Mapping[str, object], value).get("type")
         if isinstance(value, Mapping)
         else None
     )
@@ -32,4 +33,13 @@ def _stable(value: object) -> str:
 
 
 def _strings(value: object) -> list[str]:
-    return [item for item in value if isinstance(item, str)] if isinstance(value, list) else []
+    if not isinstance(value, list):
+        return []
+    return [item for item in cast(list[Any], value) if isinstance(item, str)]
+
+
+mapping = _mapping
+text = _text
+cue_type = _cue_type
+stable = _stable
+strings = _strings

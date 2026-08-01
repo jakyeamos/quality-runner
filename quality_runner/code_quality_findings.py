@@ -62,6 +62,10 @@ def _finding(
     return finding
 
 
+def make_finding(**kwargs: Any) -> dict[str, Any]:
+    return _finding(**kwargs)
+
+
 def _fingerprint(rule_id: str, file: str, evidence: str) -> str:
     if rule_id == "large-source-file":
         return hashlib.sha256(f"{rule_id}:{file}:file-occurrence".encode()).hexdigest()[:16]
