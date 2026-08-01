@@ -33,6 +33,7 @@ def normalize_controller_report(report: dict[str, Any]) -> dict[str, Any]:
     final_qr = _normalized_final_qr(report)
     blockers = _normalized_blockers(report.get("blockers"))
     status = _normalized_status(report=report, final_qr=final_qr, blockers=blockers)
+    files_changed = _normalized_files_changed(report.get("files_changed"))
     repo_path = _first_string(
         report.get("repo_path"),
         _nested(report, "target", "repo_path"),
@@ -61,7 +62,7 @@ def normalize_controller_report(report: dict[str, Any]) -> dict[str, Any]:
         ),
         "baseline_artifact_path": _normalized_baseline_artifact_path(report, repo_path),
         "final_qr": final_qr,
-        "files_changed": _normalized_files_changed(report.get("files_changed")),
+        "files_changed": files_changed,
         "verification": _normalized_verification(report),
         "commit_hash": _normalized_commit_hash(report),
         "target_head": _normalized_target_head(report),
@@ -81,7 +82,7 @@ def normalize_controller_report(report: dict[str, Any]) -> dict[str, Any]:
         normalized["batch_scope"] = batch_scope
         evaluation = evaluate_batch_scope(
             batch_scope=batch_scope,
-            files_changed=normalized["files_changed"],
+            files_changed=files_changed,
         )
         normalized["unrelated_files_changed"] = evaluation["unrelated_files_changed"]
         normalized["scope_violation"] = evaluation["scope_violation"]
@@ -103,8 +104,8 @@ def lint_controller_report(report: dict[str, Any], *, strict: bool = False) -> d
 
 
 def _normalized_final_qr(report: dict[str, Any]) -> dict[str, Any]:
-    final_qr = report.get("final_qr")
-    if isinstance(final_qr, dict):
+    final_qr = _dict(report.get("final_qr"))
+    if final_qr is not None:
         return dict(final_qr)
     for value in (
         report.get("final_quality_runner_status"),
@@ -113,32 +114,33 @@ def _normalized_final_qr(report: dict[str, Any]) -> dict[str, Any]:
         report.get("refresh_result"),
         report.get("refresh"),
     ):
-        if isinstance(value, dict):
+        value_map = _dict(value)
+        if value_map is not None:
             return _compact(
                 {
                     "run_id": _first_string(
-                        value.get("run_id"),
-                        value.get("final_run_id"),
+                        value_map.get("run_id"),
+                        value_map.get("final_run_id"),
                         _nested(report, "quality_runner_result", "final_run_id"),
                     ),
                     "status": _first_string(
-                        value.get("status"),
-                        value.get("final_status"),
+                        value_map.get("status"),
+                        value_map.get("final_status"),
                         _nested(report, "quality_runner_result", "final_status"),
                     ),
                     "classification": _first_string(
-                        value.get("classification"),
-                        value.get("recommended_classification"),
+                        value_map.get("classification"),
+                        value_map.get("recommended_classification"),
                         _nested(report, "quality_runner_result", "final_classification"),
                     ),
-                    "gate_verification_status": value.get("gate_verification_status"),
-                    "audit_status": value.get("audit_status"),
+                    "gate_verification_status": value_map.get("gate_verification_status"),
+                    "audit_status": value_map.get("audit_status"),
                     "findings_total": _first_value(
-                        value.get("findings_total"),
-                        _nested(value, "finding_counts", "total"),
+                        value_map.get("findings_total"),
+                        _nested(value_map, "finding_counts", "total"),
                         _nested(report, "quality_runner_result", "summary", "final_findings_total"),
                     ),
-                    "missing_capabilities": value.get("missing_capabilities", []),
+                    "missing_capabilities": value_map.get("missing_capabilities", []),
                 }
             )
     return {}
@@ -192,7 +194,8 @@ def _baseline_path(*, repo_path: str, baseline_run_id: str | None) -> str | None
 def _normalized_files_changed(value: object) -> list[str]:
     if _string_list(value):
         return list(cast(list[str], value))
-    if not isinstance(value, dict):
+    value_map = _dict(value)
+    if value_map is None:
         return []
     for key in (
         "tracked",
@@ -200,7 +203,7 @@ def _normalized_files_changed(value: object) -> list[str]:
         "by_this_task",
         "tracked_repo_files_modified_after_run",
     ):
-        nested = value.get(key)
+        nested = value_map.get(key)
         if _string_list(nested):
             return list(cast(list[str], nested))
     return []
@@ -214,8 +217,8 @@ def _normalized_verification(report: dict[str, Any]) -> list[dict[str, str]]:
                 "command": str(item.get("command")),
                 "result": str(item.get("result")),
             }
-            for item in verification
-            if isinstance(item, dict)
+            for raw_item in cast(list[Any], verification)
+            if (item := _dict(raw_item)) is not None
             and item.get("command") is not None
             and item.get("result") is not None
         ]
@@ -225,7 +228,7 @@ def _normalized_verification(report: dict[str, Any]) -> list[dict[str, str]]:
     if isinstance(argv, list) and argv:
         return [
             {
-                "command": " ".join(str(part) for part in argv),
+                "command": " ".join(str(part) for part in cast(list[Any], argv)),
                 "result": str(_nested(report, "command", "exit_code")),
             }
         ]
@@ -303,7 +306,9 @@ def _normalized_git_status_short(report: dict[str, Any]) -> str:
         _nested(report, "target", "post_status"),
     ):
         if isinstance(value, list):
-            return "\n".join(str(item) for item in value if _looks_like_git_status_line(item))
+            return "\n".join(
+                str(item) for item in cast(list[Any], value) if _looks_like_git_status_line(item)
+            )
     return ""
 
 
@@ -321,14 +326,15 @@ def _default_ignored_generated_artifacts(git_status: str) -> list[str]:
 
 def _normalized_repo_state(report: dict[str, Any]) -> dict[str, Any]:
     repo_state = report.get("repo_state")
-    if isinstance(repo_state, dict):
-        normalized = dict(repo_state)
+    repo_state_map = _dict(repo_state)
+    if repo_state_map is not None:
+        normalized = dict(repo_state_map)
         normalized.setdefault(
             "dirty_state",
             dirty_state_groups(
-                pre_git_status_short=_first_string(repo_state.get("pre_git_status_short")),
+                pre_git_status_short=_first_string(repo_state_map.get("pre_git_status_short")),
                 post_git_status_short=_first_string(
-                    repo_state.get("post_git_status_short"),
+                    repo_state_map.get("post_git_status_short"),
                     _normalized_git_status_short(report),
                 ),
             ),
@@ -369,10 +375,11 @@ def _normalized_blockers(value: object) -> list[str]:
     if not isinstance(value, list):
         return []
     blockers: list[str] = []
-    for item in value:
-        if isinstance(item, str) and item:
-            blockers.append(item)
-        elif isinstance(item, dict):
+    for raw_item in cast(list[Any], value):
+        item = _dict(raw_item)
+        if isinstance(raw_item, str) and raw_item:
+            blockers.append(raw_item)
+        elif item is not None:
             detail = _first_string(
                 item.get("detail"), item.get("summary"), item.get("id"), item.get("class")
             )
@@ -392,12 +399,12 @@ def _strict_errors(*, raw: dict[str, Any], normalized: dict[str, Any]) -> list[s
         errors.append("complete reports must set commit_created_by_task true")
     if _head_changed_without_note(normalized):
         errors.append("reports with target HEAD changes must include an explicit concurrency note")
-    batch_scope = normalized.get("batch_scope")
-    if isinstance(batch_scope, dict) and batch_scope:
+    batch_scope = _dict(normalized.get("batch_scope"))
+    if batch_scope:
         errors.extend(
             batch_scope_strict_errors(
                 batch_scope=batch_scope,
-                files_changed=normalized.get("files_changed", []),
+                files_changed=cast(list[str], normalized.get("files_changed", [])),
             )
         )
     return errors
@@ -405,20 +412,22 @@ def _strict_errors(*, raw: dict[str, Any], normalized: dict[str, Any]) -> list[s
 
 def _head_changed_without_note(report: dict[str, Any]) -> bool:
     observed = _nested(report, "target", "concurrent_head_change_observed")
-    if isinstance(observed, dict):
-        if observed.get("observed") is not True:
+    observed_map = _dict(observed)
+    if observed_map is not None:
+        if observed_map.get("observed") is not True:
             return False
         return not _first_string(
-            observed.get("note"), observed.get("detail"), observed.get("reason")
+            observed_map.get("note"), observed_map.get("detail"), observed_map.get("reason")
         )
     repo_state = report.get("repo_state")
-    if not isinstance(repo_state, dict):
+    repo_state_map = _dict(repo_state)
+    if repo_state_map is None:
         return False
-    before = _first_string(repo_state.get("pre_head"), repo_state.get("before_head"))
-    after = _first_string(repo_state.get("post_head"), repo_state.get("after_head"))
+    before = _first_string(repo_state_map.get("pre_head"), repo_state_map.get("before_head"))
+    after = _first_string(repo_state_map.get("post_head"), repo_state_map.get("after_head"))
     if not before or not after or before == after:
         return False
-    return not _first_string(repo_state.get("concurrency_note"), repo_state.get("note"))
+    return not _first_string(repo_state_map.get("concurrency_note"), repo_state_map.get("note"))
 
 
 def _looks_like_git_status_line(value: object) -> bool:
@@ -432,9 +441,10 @@ def _looks_like_git_status_line(value: object) -> bool:
 def _nested(payload: dict[str, Any], *keys: str) -> object:
     current: object = payload
     for key in keys:
-        if not isinstance(current, dict):
+        current_map = _dict(current)
+        if current_map is None:
             return None
-        current = current.get(key)
+        current = current_map.get(key)
     return current
 
 
@@ -454,3 +464,9 @@ def _first_value(*values: object) -> object:
 
 def _compact(payload: dict[str, Any]) -> dict[str, Any]:
     return {key: value for key, value in payload.items() if value not in (None, "", [])}
+
+
+def _dict(value: object) -> dict[str, Any] | None:
+    if not isinstance(value, dict):
+        return None
+    return cast(dict[str, Any], value)
