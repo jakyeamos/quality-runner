@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 
 from quality_runner.capability_state import matching_ci_status
 from quality_runner.security.capability_catalog import (
@@ -281,9 +281,7 @@ def _matching_security_ci_status(
     checks = scan.get("ci_checks")
     if not isinstance(checks, list):
         return matching_ci_status(scan, capability_id)
-    for check in checks:
-        if not isinstance(check, dict):
-            continue
+    for check in _dict_list(cast(object, checks)):
         name = check.get("name")
         if not isinstance(name, str):
             continue
@@ -325,14 +323,11 @@ def _configured_gate_command(
     capability_id: str,
 ) -> dict[str, str] | None:
     config = standards_packet.get("config")
-    if not isinstance(config, dict):
+    config_map = _dict(config)
+    if config_map is None:
         return None
-    gates = config.get("gates")
-    if not isinstance(gates, list):
-        return None
+    gates = _dict_list(config_map.get("gates"))
     for index, gate in enumerate(gates):
-        if not isinstance(gate, dict):
-            continue
         gate_id = gate.get("id")
         command = gate.get("command")
         ecosystem = gate.get("ecosystem")
@@ -350,31 +345,34 @@ def _required_security_capabilities(
     standards_packet: dict[str, Any],
 ) -> set[str]:
     required = set(settings["required_capabilities"])
-    config = standards_packet.get("config")
-    if isinstance(config, dict):
-        security = config.get("security")
-        if isinstance(security, dict):
+    config = _dict(standards_packet.get("config"))
+    if config is not None:
+        security = _dict(config.get("security"))
+        if security is not None:
             explicit = security.get("required_capabilities")
-            if isinstance(explicit, list):
-                required.update(item for item in explicit if isinstance(item, str))
+            required.update(
+                item for item in _any_list(cast(object, explicit)) if isinstance(item, str)
+            )
     return required
 
 
 def _has_dependency_manifest(scan: dict[str, Any]) -> bool:
     languages = scan.get("languages")
     if isinstance(languages, list):
-        return "javascript" in languages or "python" in languages
+        language_values = _any_list(cast(object, languages))
+        return "javascript" in language_values or "python" in language_values
     ecosystems = scan.get("ecosystems")
     if isinstance(ecosystems, list):
-        return bool(ecosystems)
+        return bool(_any_list(cast(object, ecosystems)))
     return False
 
 
 def _has_client_framework(scan: dict[str, Any]) -> bool:
     scripts = scan.get("scripts")
-    if not isinstance(scripts, dict):
+    scripts_map = _dict(scripts)
+    if scripts_map is None:
         return False
-    for command in scripts.values():
+    for command in scripts_map.values():
         if isinstance(command, str) and any(
             marker in command.lower() for marker in ("next", "nuxt", "vite", "react", "svelte")
         ):
@@ -385,23 +383,21 @@ def _has_client_framework(scan: dict[str, Any]) -> bool:
 
 def _scripts(scan: dict[str, Any]) -> dict[str, str]:
     scripts = scan.get("scripts")
-    if not isinstance(scripts, dict):
+    scripts_map = _dict(scripts)
+    if scripts_map is None:
         return {}
     return {
         name: command
-        for name, command in scripts.items()
-        if isinstance(name, str) and isinstance(command, str) and command
+        for name, command in scripts_map.items()
+        if isinstance(command, str) and command
     }
 
 
 def _quality_commands(scan: dict[str, Any]) -> list[dict[str, str]]:
     commands = scan.get("quality_commands")
-    if not isinstance(commands, list):
-        return []
+    command_maps = _dict_list(commands)
     normalized: list[dict[str, str]] = []
-    for command in commands:
-        if not isinstance(command, dict):
-            continue
+    for command in command_maps:
         capability_id = command.get("id")
         command_text = command.get("command")
         source = command.get("source")
@@ -424,9 +420,7 @@ def _quality_commands(scan: dict[str, Any]) -> list[dict[str, str]]:
                     ),
                 }
             )
-    for command in commands:
-        if not isinstance(command, dict):
-            continue
+    for command in command_maps:
         capability_id = command.get("id")
         command_text = command.get("command")
         source = command.get("source")
@@ -470,7 +464,7 @@ def _first_quality_command(
 def _primary_language(scan: dict[str, Any]) -> str:
     languages = scan.get("languages")
     if isinstance(languages, list):
-        for language in languages:
+        for language in _any_list(cast(object, languages)):
             if isinstance(language, str) and language:
                 return language
     return "unknown"
@@ -478,3 +472,17 @@ def _primary_language(scan: dict[str, Any]) -> str:
 
 def _optional_string(value: object) -> str | None:
     return value if isinstance(value, str) and value else None
+
+
+def _dict(value: object) -> dict[str, Any] | None:
+    return cast(dict[str, Any], value) if isinstance(value, dict) else None
+
+
+def _dict_list(value: object) -> list[dict[str, Any]]:
+    if not isinstance(value, list):
+        return []
+    return [cast(dict[str, Any], item) for item in cast(list[Any], value) if isinstance(item, dict)]
+
+
+def _any_list(value: object) -> list[Any]:
+    return cast(list[Any], value) if isinstance(value, list) else []
