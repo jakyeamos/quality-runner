@@ -219,6 +219,48 @@ The profile uses QR's read-only audit and disposable-worktree contracts. Do not
 pass `environment-legibility` to `--only-gate`; that selector remains reserved
 for executable repository gates such as `lint` or `tests`.
 
+### Structured maturity evidence
+
+Documentation terms alone are discoverable evidence and remain capped at 2/4.
+Eight repository-specific dimensions can provide stronger evidence through a
+repository-owned contract at `.agents/environment-legibility.json` (or the
+equivalent `.context/`, `docs/`, or repository-root path):
+
+```json
+{
+  "schema_version": "quality-runner-environment-legibility/v1",
+  "owner": "repository-owner",
+  "last_reviewed": "2026-08-01",
+  "dimensions": {
+    "architecture_boundaries": {
+      "evidence": ["docs/architecture.md"],
+      "validation": [
+        {
+          "path": "tests/test_architecture.py",
+          "contains": ["test_architecture_boundary"]
+        }
+      ],
+      "automation": [
+        {
+          "path": ".github/workflows/ci.yml",
+          "contains": ["pytest tests/test_architecture.py"]
+        }
+      ]
+    }
+  }
+}
+```
+
+The supported dimensions are architecture boundaries, coding conventions,
+security constraints, failure modes, implementation examples, definition of
+done, approval-gated paths, and deployment/rollback. QR verifies every local
+path and every literal `contains` assertion without executing repository code.
+A current contract with evidence and validation scores 3/4. It scores 4/4 only
+when its automation assertions also match a recognized CI, pre-commit, or
+CODEOWNERS enforcement surface. Stale contracts, invalid JSON, path traversal,
+symlinks, missing files, and unmatched assertions fail closed at 2/4. Repeating
+prose in the contract cannot increase a score.
+
 ```bash
 # Recommend existing packs.
 quality-runner skill classify /tmp/new-skill.toml \

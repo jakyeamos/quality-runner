@@ -23,6 +23,10 @@ from quality_runner.fleet.contracts import (
 from quality_runner.fleet.documentation_visibility import assess_developer_legibility
 from quality_runner.fleet.error_codes import stable_error_code_finding_arguments
 from quality_runner.fleet.legibility_contract import maintained_control
+from quality_runner.fleet.dimension_evidence import (
+    assess_dimension_evidence,
+    load_dimension_evidence,
+)
 from quality_runner.fleet.legibility_evidence import (
     collect_documents,
     collect_freshness_evidence,
@@ -91,12 +95,14 @@ def audit_repository(
         if standard is None
         else {}
     )
+    dimension_evidence = load_dimension_evidence(root, as_of)
     findings = [
         _dimension_finding(
             repository=repository,
             scan=scan,
             documents=documents,
             link_evidence=link_evidence,
+            dimension_evidence=dimension_evidence,
             dimension=dimension,
             as_of=as_of,
             config=config,
@@ -243,18 +249,19 @@ def _dimension_finding(
     scan: dict[str, Any],
     documents: dict[str, str],
     link_evidence: dict[str, Any],
+    dimension_evidence: dict[str, Any],
     dimension: str,
     as_of: str,
     config: dict[str, Any],
     maturity_assessments: dict[str, dict[str, Any]],
     long_running_task_assessments: dict[str, dict[str, Any]],
 ) -> dict[str, Any]:
+    root = Path(str(repository["primary_path"])).expanduser().resolve()
     combined = "\n".join(documents.values()).lower()
     evidence: list[dict[str, str]] = []
     score = 0
     status = "absent"
     confidence = "medium"
-    root = Path(str(repository["primary_path"])).expanduser().resolve()
     if dimension == "developer_legibility":
         assessment = assess_developer_legibility(root, documents, link_evidence, as_of)
         score = assessment["score"]
@@ -307,12 +314,9 @@ def _dimension_finding(
             validation_commands=list(assessment["validation_commands"]),
             applicability=str(assessment["applicability"]),
         )
+    assessment_message: str | None = None
     if dimension == "change_surface_coverage":
-        assessment = assess_change_surface_coverage(
-            Path(str(repository["primary_path"])).expanduser().resolve(),
-            documents,
-            as_of,
-        )
+        assessment = assess_change_surface_coverage(root, documents, as_of)
         return _finding(
             repository=repository,
             dimension=dimension,
@@ -348,9 +352,7 @@ def _dimension_finding(
             )
         )
     if dimension == "skill_contract_quality":
-        assessment = assess_skill_contract_quality(
-            Path(str(repository["primary_path"])).expanduser().resolve()
-        )
+        assessment = assess_skill_contract_quality(root)
         return _finding(
             repository=repository,
             dimension=dimension,
@@ -482,6 +484,12 @@ def _dimension_finding(
             evidence = [
                 {"path": ".", "detail": f"No evidence for {DIMENSION_LABELS[dimension]} was found."}
             ]
+        assessment = assess_dimension_evidence(root, dimension_evidence, dimension)
+        if assessment is not None and int(assessment["score"]) >= score:
+            score = int(assessment["score"])
+            status = str(assessment["status"])
+            assessment_message = str(assessment["message"])
+            evidence.extend(assessment["evidence"])
 
     freshness = collect_freshness_evidence(documents, as_of)
     if dimension == "context_routing":
@@ -512,11 +520,17 @@ def _dimension_finding(
                 "detail": "One or more relative context/document links are invalid.",
             }
         )
-    if freshness.get("status") == "stale" and dimension in {
-        "context_routing",
-        "definition_of_done",
-        "quality_commands",
-    }:
+    structured_fresh = status in {"validated", "maintained"}
+    if (
+        freshness.get("stale_paths")
+        and dimension
+        in {
+            "context_routing",
+            "definition_of_done",
+            "quality_commands",
+        }
+        and not structured_fresh
+    ):
         status = "stale"
         confidence = "high"
         score = min(score, 2)
@@ -526,11 +540,16 @@ def _dimension_finding(
                 "detail": "Last-reviewed marker is older than the freshness window.",
             }
         )
-    elif freshness.get("status") == "unknown" and dimension in {
-        "context_routing",
-        "definition_of_done",
-        "quality_commands",
-    }:
+    elif (
+        freshness.get("status") == "unknown"
+        and dimension
+        in {
+            "context_routing",
+            "definition_of_done",
+            "quality_commands",
+        }
+        and not structured_fresh
+    ):
         status = "unknown"
         score = min(score, 2)
         evidence.append(
@@ -544,7 +563,7 @@ def _dimension_finding(
         and score < 2
         else "P1"
     )
-    message = (
+    message = assessment_message or (
         f"{DIMENSION_LABELS[dimension]} are below the QR full-potential contract."
         if score < 4
         else f"{DIMENSION_LABELS[dimension]} are fully evidenced."
@@ -562,75 +581,6 @@ def _dimension_finding(
         evidence=evidence[:16],
         validation_commands=_validation_commands(dimension, scan),
     )
-
-
-def _finding(
-    *,
-    repository: dict[str, Any],
-    dimension: str,
-    score: int | None,
-    as_of: str,
-    status: str,
-    severity: str,
-    priority: str,
-    confidence: str,
-    message: str,
-    evidence: list[dict[str, str]],
-    validation_commands: list[str],
-) -> dict[str, Any]:
-    return {
-        "schema": FLEET_FINDING_SCHEMA,
-        "finding_id": digest([repository["repo_id"], dimension, status, evidence])[:16],
-        "repo_id": repository["repo_id"],
-        "as_of": as_of,
-        "dimension": dimension,
-        "label": DIMENSION_LABELS[dimension],
-        "applicable": status != "not_applicable",
-        "score": score,
-        "status": status,
-        "severity": severity,
-        "priority": priority,
-        "confidence": confidence,
-        "message": message,
-        "evidence": evidence,
-        "validation_commands": validation_commands,
-        "provenance_hash": digest(
-            {"repo_id": repository["repo_id"], "dimension": dimension, "evidence": evidence}
-        ),
-    }
-
-
-def _scan_projection(scan: dict[str, Any]) -> dict[str, Any]:
-    keys = (
-        "schema",
-        "package_manager",
-        "languages",
-        "ecosystems",
-        "scripts",
-        "quality_commands",
-        "agent_instruction_files",
-        "ci_files",
-        "quality_contract",
-        "warnings",
-        "git_provenance",
-    )
-    return {key: scan[key] for key in keys if key in scan}
-
-
-def _validation_commands(dimension: str, scan: dict[str, Any]) -> list[str]:
-    quality_commands = scan.get("quality_commands", [])
-    commands = (
-        [
-            str(cast(dict[str, Any], item).get("command"))
-            for item in cast(list[Any], quality_commands)
-            if isinstance(item, dict) and isinstance(cast(dict[str, Any], item).get("command"), str)
-        ]
-        if isinstance(quality_commands, list)
-        else []
-    )
-    if dimension == "quality_commands" and commands:
-        return commands[:6]
-    return ["qr audit REPO --profile environment-legibility --json"]
 
 
 def _has_deployment_surface(repository: dict[str, Any], scan: dict[str, Any], text: str) -> bool:
