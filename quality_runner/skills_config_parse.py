@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 
 from quality_runner.agent_review_policy import AGENT_REVIEW_MODES
 
@@ -14,25 +14,26 @@ def parse_skills_section(value: object, warnings: list[dict[str, str]]) -> dict[
         warnings.append(_warning("quality_runner.skills must be a table"))
         return {}
 
+    config = cast(dict[str, Any], value)
     result: dict[str, Any] = {}
-    enabled = value.get("enabled")
+    enabled = config.get("enabled")
     if enabled is not None:
         if isinstance(enabled, bool):
             result["enabled"] = enabled
         else:
             warnings.append(_warning("quality_runner.skills.enabled must be a boolean"))
 
-    global_enabled = value.get("global_enabled")
+    global_enabled = config.get("global_enabled")
     if global_enabled is not None:
         if isinstance(global_enabled, bool):
             result["global_enabled"] = global_enabled
         else:
             warnings.append(_warning("quality_runner.skills.global_enabled must be a boolean"))
 
-    global_exclude = value.get("global_exclude")
+    global_exclude = config.get("global_exclude")
     if global_exclude is not None:
         if isinstance(global_exclude, list) and all(
-            isinstance(item, str) and item for item in global_exclude
+            isinstance(item, str) and item for item in cast(list[object], global_exclude)
         ):
             result["global_exclude"] = global_exclude
         else:
@@ -40,10 +41,10 @@ def parse_skills_section(value: object, warnings: list[dict[str, str]]) -> dict[
                 _warning("quality_runner.skills.global_exclude must be a list of strings")
             )
 
-    global_always = value.get("global_always")
+    global_always = config.get("global_always")
     if global_always is not None:
         if isinstance(global_always, list) and all(
-            isinstance(item, str) and item for item in global_always
+            isinstance(item, str) and item for item in cast(list[object], global_always)
         ):
             result["global_always"] = global_always
         else:
@@ -51,7 +52,7 @@ def parse_skills_section(value: object, warnings: list[dict[str, str]]) -> dict[
                 _warning("quality_runner.skills.global_always must be a list of strings")
             )
 
-    agent_review_mode = value.get("agent_review_mode")
+    agent_review_mode = config.get("agent_review_mode")
     if agent_review_mode is not None:
         if isinstance(agent_review_mode, str) and agent_review_mode in AGENT_REVIEW_MODES:
             result["agent_review_mode"] = agent_review_mode
@@ -62,11 +63,11 @@ def parse_skills_section(value: object, warnings: list[dict[str, str]]) -> dict[
                 )
             )
 
-    active = _string_list(value.get("active"))
+    active = _string_list(config.get("active"))
     if active:
         result["active"] = active
 
-    local_skills = _local_skills(value.get("local"), warnings)
+    local_skills = _local_skills(config.get("local"), warnings)
     if local_skills:
         result["local"] = local_skills
 
@@ -81,9 +82,10 @@ def _local_skills(value: object, warnings: list[dict[str, str]]) -> list[dict[st
         return []
 
     skills: list[dict[str, Any]] = []
-    for index, item in enumerate(value):
-        if not isinstance(item, dict):
+    for index, raw_item in enumerate(cast(list[object], value)):
+        if not isinstance(raw_item, dict):
             continue
+        item = cast(dict[str, Any], raw_item)
         skill_id = _non_empty_string(item.get("id"))
         path = _non_empty_string(item.get("path"))
         if not skill_id or not path:
@@ -102,7 +104,7 @@ def _local_skills(value: object, warnings: list[dict[str, str]]) -> list[dict[st
 def _string_list(value: object) -> list[str]:
     if not isinstance(value, list):
         return []
-    return [item for item in value if isinstance(item, str) and item]
+    return [item for item in cast(list[object], value) if isinstance(item, str) and item]
 
 
 def _non_empty_string(value: object) -> str | None:

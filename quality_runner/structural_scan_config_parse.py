@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 
 
 def parse_structural_scan_section(
@@ -18,58 +18,59 @@ def parse_structural_scan_section(
         )
         return {}
 
+    config = cast(dict[str, Any], value)
     disabled = _string_list(
-        value.get("disabled_rule_groups"),
+        config.get("disabled_rule_groups"),
         "quality_runner.structural_scan.disabled_rule_groups",
         warnings,
     )
     include_ignored_paths = _string_list(
-        value.get("include_ignored_paths"),
+        config.get("include_ignored_paths"),
         "quality_runner.structural_scan.include_ignored_paths",
         warnings,
     )
     large_file_lines = _positive_int(
-        value.get("large_file_lines"),
+        config.get("large_file_lines"),
         "quality_runner.structural_scan.large_file_lines",
         warnings,
     )
     fat_router_lines = _positive_int(
-        value.get("fat_router_lines"),
+        config.get("fat_router_lines"),
         "quality_runner.structural_scan.fat_router_lines",
         warnings,
     )
     max_text_files = _positive_int(
-        value.get("max_text_files"),
+        config.get("max_text_files"),
         "quality_runner.structural_scan.max_text_files",
         warnings,
     )
     similarity_enabled = _bool_value(
-        value.get("similarity_enabled"),
+        config.get("similarity_enabled"),
         "quality_runner.structural_scan.similarity_enabled",
         warnings,
     )
     similarity_threshold = _unit_interval(
-        value.get("similarity_threshold"),
+        config.get("similarity_threshold"),
         "quality_runner.structural_scan.similarity_threshold",
         warnings,
     )
     similarity_min_lines = _positive_int(
-        value.get("similarity_min_lines"),
+        config.get("similarity_min_lines"),
         "quality_runner.structural_scan.similarity_min_lines",
         warnings,
     )
     similarity_max_pairs = _positive_int(
-        value.get("similarity_max_pairs"),
+        config.get("similarity_max_pairs"),
         "quality_runner.structural_scan.similarity_max_pairs",
         warnings,
     )
     similarity_timeout_seconds = _positive_int(
-        value.get("similarity_timeout_seconds"),
+        config.get("similarity_timeout_seconds"),
         "quality_runner.structural_scan.similarity_timeout_seconds",
         warnings,
     )
     similarity_include_tests = _bool_value(
-        value.get("similarity_include_tests"),
+        config.get("similarity_include_tests"),
         "quality_runner.structural_scan.similarity_include_tests",
         warnings,
     )
@@ -100,8 +101,10 @@ def parse_structural_scan_section(
 def _string_list(value: object, field: str, warnings: list[dict[str, str]]) -> list[str]:
     if value is None:
         return []
-    if isinstance(value, list) and all(isinstance(item, str) and item for item in value):
-        return list(value)
+    if isinstance(value, list) and all(
+        isinstance(item, str) and item for item in cast(list[object], value)
+    ):
+        return [item for item in cast(list[object], value) if isinstance(item, str)]
     warnings.append(
         _warning(
             "invalid_quality_runner_config_field", f"{field} must be a list of non-empty strings"
