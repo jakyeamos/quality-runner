@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from quality_runner.config import load_repo_config
 from quality_runner.schema_constants import STANDARDS_PACKET_SCHEMA
@@ -71,16 +71,17 @@ def _sources(scan: dict[str, Any], profile: str, config: dict[str, Any]) -> list
 
     instruction_files = scan.get("agent_instruction_files")
     if isinstance(instruction_files, list):
-        for path in instruction_files:
+        for path in cast(list[object], instruction_files):
             if isinstance(path, str) and path:
                 sources.append({"type": "agent_instructions", "path": path})
 
 
     intent_docs = scan.get("intent_docs")
     if isinstance(intent_docs, list):
-        for doc in intent_docs:
-            if not isinstance(doc, dict):
+        for doc_value in cast(list[object], intent_docs):
+            if not isinstance(doc_value, dict):
                 continue
+            doc = cast(dict[str, Any], doc_value)
             doc_type = doc.get("type")
             path = doc.get("path")
             if isinstance(doc_type, str) and isinstance(path, str) and doc_type and path:
@@ -127,8 +128,8 @@ def _profile_config(config: dict[str, Any], profile: str) -> dict[str, Any] | No
     profiles = config.get("profiles")
     if not isinstance(profiles, dict):
         return None
-    configured = profiles.get(profile)
-    return configured if isinstance(configured, dict) else None
+    configured = cast(dict[str, Any], profiles).get(profile)
+    return cast(dict[str, Any], configured) if isinstance(configured, dict) else None
 
 
 def _allowed_package_managers(
@@ -137,11 +138,15 @@ def _allowed_package_managers(
 ) -> set[str]:
     configured = config.get("allowed_package_managers")
     if isinstance(configured, list) and configured:
-        return {item for item in configured if isinstance(item, str) and item}
+        return {item for item in cast(list[object], configured) if isinstance(item, str) and item}
     if isinstance(profile_config, dict):
         profile_configured = profile_config.get("allowed_package_managers")
         if isinstance(profile_configured, list) and profile_configured:
-            return {item for item in profile_configured if isinstance(item, str) and item}
+            return {
+                item
+                for item in cast(list[object], profile_configured)
+                if isinstance(item, str) and item
+            }
     return {"pnpm"}
 
 
@@ -151,9 +156,10 @@ def _warnings(scan: dict[str, Any]) -> list[dict[str, str]]:
         return []
 
     normalized: list[dict[str, str]] = []
-    for warning in warnings:
-        if not isinstance(warning, dict):
+    for warning_value in cast(list[object], warnings):
+        if not isinstance(warning_value, dict):
             continue
+        warning = cast(dict[str, Any], warning_value)
         code = warning.get("code")
         message = warning.get("message")
         path = warning.get("path")
