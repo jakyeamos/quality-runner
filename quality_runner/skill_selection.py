@@ -5,7 +5,7 @@ import re
 import tomllib
 from collections.abc import Iterable
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from quality_runner.schema_constants import GLOBAL_SKILL_CONFIG_SCHEMA, SKILL_SELECTION_SCHEMA
 from quality_runner.skill_config import load_active_skills, sanitize_skill_id
@@ -97,11 +97,12 @@ def load_selected_skills(
     selection["warnings"] = list(local_warnings)
 
     repo_skills = config.get("skills")
-    if isinstance(repo_skills, dict) and repo_skills.get("enabled") is False:
+    repo_skills_map = cast(dict[str, Any], repo_skills) if isinstance(repo_skills, dict) else None
+    if repo_skills_map is not None and repo_skills_map.get("enabled") is False:
         selection["status"] = "disabled"
         selection["source"] = "repository"
         return [], local_warnings, selection
-    if isinstance(repo_skills, dict) and repo_skills.get("global_enabled") is False:
+    if repo_skills_map is not None and repo_skills_map.get("global_enabled") is False:
         selection["status"] = "disabled"
         selection["source"] = "repository"
         return local_skills, local_warnings, selection
@@ -159,17 +160,23 @@ def load_selected_skills(
     }
     global_section = global_config
     global_excluded = _configured_ids(global_section, "exclude")
-    repo_excluded = _configured_ids(repo_skills, "global_exclude")
+    repo_excluded = _configured_ids(
+        repo_skills_map,
+        "global_exclude",
+    )
     excluded = set(global_excluded) | set(repo_excluded)
     always = set(_configured_ids(global_section, "always")) | set(
-        _configured_ids(repo_skills, "global_always")
+        _configured_ids(
+            repo_skills_map,
+            "global_always",
+        )
     )
     configured_active = _configured_ids(global_section, "active")
     corpus_active = _configured_ids(corpus, "active")
     eligible_ids = (
         set(configured_active or corpus_active)
         if (configured_active or corpus_active)
-        else {str(item["id"]) for item in corpus["packs"] if isinstance(item, dict)}
+        else {str(item["id"]) for item in cast(list[dict[str, Any]], corpus["packs"])}
     )
     selection.update(
         {
@@ -270,12 +277,17 @@ def load_global_skill_config(
         raw = tomllib.loads(path.read_text(encoding="utf-8"))
     except (OSError, tomllib.TOMLDecodeError) as error:
         return None, [_global_warning(path, f"global skill config could not be parsed: {error}")]
-    if not isinstance(raw, dict) or raw.get("schema") != GLOBAL_SKILL_CONFIG_SCHEMA:
+    if raw.get("schema") != GLOBAL_SKILL_CONFIG_SCHEMA:
         return None, [_global_warning(path, f"config schema must be {GLOBAL_SKILL_CONFIG_SCHEMA}")]
-    quality_runner = raw.get("quality_runner")
-    skills_section = quality_runner.get("skills") if isinstance(quality_runner, dict) else None
+    raw_map = raw
+    quality_runner = raw_map.get("quality_runner")
+    quality_runner_map = (
+        cast(dict[str, Any], quality_runner) if isinstance(quality_runner, dict) else None
+    )
+    skills_section = quality_runner_map.get("skills") if quality_runner_map is not None else None
     if not isinstance(skills_section, dict):
         return None, [_global_warning(path, "config must include [quality_runner.skills]")]
+    skills_section = cast(dict[str, Any], skills_section)
 
     warnings: list[dict[str, str]] = []
     enabled = skills_section.get("enabled", True)
@@ -338,7 +350,7 @@ def repository_skill_signals(
     root = repo_root.expanduser().resolve()
     values: list[str] = []
     for item in scanned_files:
-        path = item.get("path") if isinstance(item, dict) else None
+        path = item.get("path")
         if not isinstance(path, str):
             continue
         values.append(path)
@@ -402,11 +414,11 @@ def _discover_global_config_path(requested_path: Path | None) -> Path | None:
 def _configured_ids(section: object, key: str) -> list[str]:
     if not isinstance(section, dict):
         return []
-    value = section.get(key)
+    value = cast(dict[str, Any], section).get(key)
     if not isinstance(value, list):
         return []
     normalized: list[str] = []
-    for item in value:
+    for item in cast(list[object], value):
         skill_id = sanitize_skill_id(item) if isinstance(item, str) else None
         if skill_id is not None and skill_id not in normalized:
             normalized.append(skill_id)
@@ -425,7 +437,7 @@ def _config_ids(
         warnings.append(_global_warning(path, f"quality_runner.skills.{key} must be a list"))
         return []
     normalized: list[str] = []
-    for item in value:
+    for item in cast(list[object], value):
         skill_id = sanitize_skill_id(item) if isinstance(item, str) else None
         if skill_id is None:
             warnings.append(
@@ -441,8 +453,9 @@ def _pack_score(pack_entry: dict[str, Any], signals: set[str]) -> tuple[float, l
     pack = pack_entry.get("pack")
     if not isinstance(pack, dict):
         return 0.0, []
-    focus = _tokens(" ".join(str(item) for item in pack_entry.get("focus", [])))
-    terms = _pack_terms(pack)
+    focus_value = pack_entry.get("focus", [])
+    focus = _tokens(" ".join(str(item) for item in cast(list[object], focus_value)))
+    terms = _pack_terms(cast(dict[str, Any], pack))
     selection_terms = focus or terms
     match_terms = sorted(signals & selection_terms)
     denominator = max(1, min(len(selection_terms), 8))
@@ -460,15 +473,17 @@ def _pack_terms(pack: dict[str, Any]) -> set[str]:
         collection = pack.get(collection_key)
         if not isinstance(collection, list):
             continue
-        for item in collection:
+        for item in cast(list[object], collection):
             if not isinstance(item, dict):
                 continue
-            for value in item.values():
+            for value in cast(dict[str, Any], item).values():
                 if isinstance(value, str):
                     values.append(value)
                 elif isinstance(value, list):
                     values.extend(
-                        str(item_value) for item_value in value if isinstance(item_value, str)
+                        str(item_value)
+                        for item_value in cast(list[object], value)
+                        if isinstance(item_value, str)
                     )
     return {token for value in values for token in _tokens(value)}
 
