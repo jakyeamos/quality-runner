@@ -206,8 +206,9 @@ def analyze_read_only_audit(
             cache_root=cache_root,
             cache_namespace_root=request.cache_namespace_root,
         )
-    for deferred in code_quality_scan.get("deferred_checks", []):
-        if isinstance(deferred, dict):
+    deferred_checks = code_quality_scan.get("deferred_checks", [])
+    if isinstance(deferred_checks, list):
+        for deferred in cast(list[dict[str, Any]], deferred_checks):
             check = deferred.get("check")
             reason = deferred.get("reason")
             severity = deferred.get("severity", "advisory")
@@ -238,16 +239,17 @@ def analyze_read_only_audit(
     for cache_payload in (security_scan, code_quality_scan):
         cache_evidence = cache_payload.get("analysis_cache")
         if isinstance(cache_evidence, dict):
-            cache_hits = _non_negative_int(cache_evidence.get("cache_hits"))
-            cache_misses = _non_negative_int(cache_evidence.get("cache_misses"))
+            cache_map = cast(dict[str, Any], cache_evidence)
+            cache_hits = _non_negative_int(cache_map.get("cache_hits"))
+            cache_misses = _non_negative_int(cache_map.get("cache_misses"))
             recorder.counters(
                 {
                     "cache_hits": cache_hits,
                     "cache_misses": cache_misses,
-                    "recomputed_files": _non_negative_int(cache_evidence.get("recomputed_files")),
-                    "cache_index_writes": _non_negative_int(cache_evidence.get("index_writes")),
-                    "cache_write_failures": _non_negative_int(cache_evidence.get("write_failures")),
-                    "source_bytes_read": _non_negative_int(cache_evidence.get("source_bytes_read")),
+                    "recomputed_files": _non_negative_int(cache_map.get("recomputed_files")),
+                    "cache_index_writes": _non_negative_int(cache_map.get("index_writes")),
+                    "cache_write_failures": _non_negative_int(cache_map.get("write_failures")),
+                    "source_bytes_read": _non_negative_int(cache_map.get("source_bytes_read")),
                 }
             )
     performance = recorder.receipt(
@@ -413,7 +415,7 @@ def build_audit_plan(
             collection = remediation_plan.get(collection_name)
             if isinstance(collection, list):
                 remediation_plan[collection_name] = attach_context_refs(
-                    [item for item in collection if isinstance(item, dict)],
+                    [item for item in cast(list[dict[str, Any]], collection)],
                     remediation_context,
                 )
         remediation_plan["remediation_context"] = remediation_context_ref
@@ -485,4 +487,4 @@ def _legacy_optional_payload(payload: AuditPayload | None) -> dict[str, Any] | N
 
 def _agent_review_mode(analysis: AuditAnalysis) -> AgentReviewMode:
     mode = analysis.request.agent_review_mode
-    return cast(AgentReviewMode, mode) if mode in AGENT_REVIEW_MODES else "auto"
+    return mode if mode in AGENT_REVIEW_MODES else "auto"
