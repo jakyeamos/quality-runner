@@ -37,7 +37,7 @@ def contract_hashes(repo_root: Path, config: dict[str, Any]) -> dict[str, str]:
     config_path = repo_root / CONFIG_FILE_NAME
     config_content = config_path.read_bytes() if config_path.is_file() else b"<absent>"
     prevention = config.get("prevention")
-    prevention = prevention if isinstance(prevention, dict) else {}
+    prevention = cast(dict[str, Any], prevention) if isinstance(prevention, dict) else {}
     return {
         "quality_runner_version": __version__,
         "configuration_hash": hashlib.sha256(config_content).hexdigest(),

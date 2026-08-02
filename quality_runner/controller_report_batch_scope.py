@@ -12,19 +12,20 @@ def load_batch_scope_file(path: Path) -> dict[str, Any]:
     payload = json.loads(resolved.read_text(encoding="utf-8"))
     if not isinstance(payload, dict):
         raise ValueError("batch scope JSON must contain an object")
-    return normalize_batch_scope(payload)
+    return normalize_batch_scope(cast(dict[str, Any], payload))
 
 
 def normalize_batch_scope(value: object) -> dict[str, Any]:
     if not isinstance(value, dict):
         return {}
     normalized: dict[str, Any] = {}
+    typed_value = cast(dict[str, Any], value)
     for field in ("cluster_id", "intent_ref"):
-        item = value.get(field)
+        item = typed_value.get(field)
         if isinstance(item, str) and item:
             normalized[field] = item
     for field in ("finding_ids", "fingerprint_prefixes", "allowed_files"):
-        items = value.get(field)
+        items = typed_value.get(field)
         if _string_list(items):
             normalized[field] = sorted(set(cast(list[str], items)))
     return normalized
@@ -86,4 +87,6 @@ def _path_allowed(path: str, allowed_paths: set[str]) -> bool:
 
 
 def _string_list(value: object) -> bool:
-    return isinstance(value, list) and all(isinstance(item, str) and item for item in value)
+    return isinstance(value, list) and all(
+        isinstance(item, str) and item for item in cast(list[Any], value)
+    )

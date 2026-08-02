@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from collections.abc import Mapping
 from pathlib import Path
+from typing import cast
 
 from quality_runner.application.audit_workflows import inspect_payload, run_payload
 from quality_runner.application.outcome_projection import (
@@ -154,7 +155,7 @@ def _gate_verification(repo_root: Path, payload: LegacyPayload) -> LegacyPayload
         loaded = json.loads(path.read_text(encoding="utf-8"))
     except (FileNotFoundError, OSError, ValueError, json.JSONDecodeError):
         return None
-    return _payload_mapping(loaded) if isinstance(loaded, dict) else None
+    return _payload_mapping(cast(Mapping[str, object], loaded)) if isinstance(loaded, dict) else None
 
 
 def _payload_mapping(payload: Mapping[str, object]) -> LegacyPayload:

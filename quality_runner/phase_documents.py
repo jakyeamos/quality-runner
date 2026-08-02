@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from quality_runner.schema_constants import PHASE_BATCH_RESULT_SCHEMA
 
@@ -113,12 +113,12 @@ def load_batch_result(path: Path) -> dict[str, Any]:
     if not isinstance(payload["summary"], str) or not payload["summary"].strip():
         raise ValueError("batch result summary must be a non-empty string")
     if not isinstance(payload["verification"], list) or not all(
-        isinstance(item, dict) for item in payload["verification"]
+        isinstance(item, dict) for item in cast(list[Any], payload["verification"])
     ):
         raise ValueError("batch result verification must be a list of objects")
     for field in ("remaining_findings", "blockers"):
         if not isinstance(payload[field], list) or not all(
-            isinstance(item, str) for item in payload[field]
+            isinstance(item, str) for item in cast(list[Any], payload[field])
         ):
             raise ValueError(f"batch result {field} must be a string list")
     return payload
@@ -130,4 +130,4 @@ def _load_json(path: Path) -> dict[str, Any]:
     payload = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(payload, dict):
         raise ValueError(f"JSON artifact must contain an object: {path}")
-    return payload
+    return cast(dict[str, Any], payload)

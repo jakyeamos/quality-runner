@@ -13,7 +13,7 @@ from quality_runner.bug_learning import (
 
 
 def add_candidate_commands(
-    subparsers: argparse._SubParsersAction[argparse.ArgumentParser],
+    subparsers: Any,
 ) -> None:
     parser = subparsers.add_parser(
         "candidates",

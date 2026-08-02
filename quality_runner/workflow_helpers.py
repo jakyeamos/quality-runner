@@ -23,7 +23,7 @@ def config_with_include_overrides(
     merged = dict(config)
     raw_structural_scan = merged.get("structural_scan")
     structural_scan = (
-        cast(dict[str, object], raw_structural_scan)
+        dict(cast(dict[str, object], raw_structural_scan))
         if isinstance(raw_structural_scan, dict)
         else {}
     )

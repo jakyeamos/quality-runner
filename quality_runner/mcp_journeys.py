@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from pathlib import Path
+from typing import Any, cast
 
 from quality_runner.application.journey_outcomes import (
     audit_journey_outcome,
@@ -230,7 +231,7 @@ def _review_argument_names() -> frozenset[str]:
     properties = _review_input_schema().get("properties")
     if not isinstance(properties, dict):
         raise RuntimeError("review MCP input schema is missing properties")
-    return frozenset(key for key in properties if isinstance(key, str))
+    return frozenset(cast(dict[str, Any], properties))
 
 
 def _workflow_intent(
@@ -276,9 +277,11 @@ def _optional_path(arguments: Mapping[str, object], key: str) -> Path | None:
 
 def _string_list(arguments: Mapping[str, object], key: str) -> list[str]:
     value = arguments.get(key, [])
-    if not isinstance(value, list) or not all(isinstance(item, str) and item for item in value):
+    if not isinstance(value, list) or not all(
+        isinstance(item, str) and item for item in cast(list[Any], value)
+    ):
         raise ValueError(f"{key} must be an array of non-empty strings")
-    return value
+    return cast(list[str], value)
 
 
 def _bool_or_default(arguments: Mapping[str, object], key: str, default: bool) -> bool:

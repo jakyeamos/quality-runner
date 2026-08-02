@@ -3,13 +3,13 @@ from __future__ import annotations
 import json
 import re
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
-from quality_runner.code_quality_findings import _finding
+from quality_runner.code_quality_findings import finding
 from quality_runner.code_quality_paths import (
-    _is_javascript_source_file,
-    _is_test_file,
-    _verification_for_path,
+    is_javascript_source_file,
+    is_test_file,
+    verification_for_path,
 )
 
 COMMON_ENV_VARS = {
@@ -51,11 +51,11 @@ def _single_implementation_abstractions(
 ) -> list[dict[str, Any]]:
     declarations: list[dict[str, Any]] = []
     code_text = "\n".join(
-        str(item["text"]) for item in scanned_files if _is_javascript_source_file(str(item["path"]))
+        str(item["text"]) for item in scanned_files if is_javascript_source_file(str(item["path"]))
     )
     for item in scanned_files:
         relative_path = str(item["path"])
-        if not _is_javascript_source_file(relative_path) or _is_test_file(relative_path):
+        if not is_javascript_source_file(relative_path) or is_test_file(relative_path):
             continue
         for index, line in enumerate(_lines(item), start=1):
             match = re.search(
@@ -102,7 +102,7 @@ def _single_product_factories(scanned_files: list[dict[str, Any]]) -> list[dict[
     findings: list[dict[str, Any]] = []
     for item in scanned_files:
         relative_path = str(item["path"])
-        if not _is_javascript_source_file(relative_path) or _is_test_file(relative_path):
+        if not is_javascript_source_file(relative_path) or is_test_file(relative_path):
             continue
         text = str(item["text"])
         symbol = re.search(
@@ -138,7 +138,7 @@ def _pass_through_wrappers(scanned_files: list[dict[str, Any]]) -> list[dict[str
     findings: list[dict[str, Any]] = []
     for item in scanned_files:
         relative_path = str(item["path"])
-        if not _is_javascript_source_file(relative_path) or _is_test_file(relative_path):
+        if not is_javascript_source_file(relative_path) or is_test_file(relative_path):
             continue
         lines = _lines(item)
         for start, end, name in _function_blocks(lines):
@@ -173,7 +173,7 @@ def _undocumented_env_flags(scanned_files: list[dict[str, Any]]) -> list[dict[st
     )
     for item in scanned_files:
         relative_path = str(item["path"])
-        if _is_test_file(relative_path):
+        if is_test_file(relative_path):
             continue
         for index, line in enumerate(_lines(item), start=1):
             for env_name in _env_names(line):
@@ -212,7 +212,7 @@ def _single_use_trivial_dependencies(
     imports: dict[str, list[dict[str, Any]]] = {}
     for item in scanned_files:
         relative_path = str(item["path"])
-        if not _is_javascript_source_file(relative_path) or _is_test_file(relative_path):
+        if not is_javascript_source_file(relative_path) or is_test_file(relative_path):
             continue
         for index, line in enumerate(_lines(item), start=1):
             package_name = _imported_package(line)
@@ -250,9 +250,9 @@ def _hand_rolled_native_helpers(scanned_files: list[dict[str, Any]]) -> list[dic
     findings: list[dict[str, Any]] = []
     for item in scanned_files:
         relative_path = str(item["path"])
-        if _is_test_file(relative_path):
+        if is_test_file(relative_path):
             continue
-        is_javascript_source = _is_javascript_source_file(relative_path)
+        is_javascript_source = is_javascript_source_file(relative_path)
         lines = _lines(item)
         text = str(item["text"])
         for index, line in enumerate(lines, start=1):
@@ -336,7 +336,7 @@ def _ponytail_finding(
     expected: str,
     risk: str,
 ) -> dict[str, Any]:
-    return _finding(
+    return finding(
         category="ponytail",
         severity="observation",
         confidence="medium",
@@ -346,14 +346,19 @@ def _ponytail_finding(
         evidence=f"{tag}: {evidence}",
         expected_improvement=expected,
         risk=risk,
-        verification=_verification_for_path(file),
+        verification=verification_for_path(file),
         remediation_bucket=f"Ponytail debt: {tag}",
     )
 
 
 def _lines(item: dict[str, Any]) -> list[str]:
     lines = item.get("lines")
-    return lines if isinstance(lines, list) and all(isinstance(line, str) for line in lines) else []
+    return (
+        [line for line in cast(list[Any], lines) if isinstance(line, str)]
+        if isinstance(lines, list)
+        and all(isinstance(line, str) for line in cast(list[Any], lines))
+        else []
+    )
 
 
 def _function_blocks(lines: list[str]) -> list[tuple[int, int, str]]:
@@ -405,9 +410,9 @@ def _package_dependencies(scanned_files: list[dict[str, Any]]) -> set[str]:
             except json.JSONDecodeError:
                 continue
             for section in ("dependencies", "devDependencies", "optionalDependencies"):
-                values = payload.get(section)
+                values = cast(dict[str, Any], payload).get(section) if isinstance(payload, dict) else None
                 if isinstance(values, dict):
-                    dependencies.update(key for key in values if isinstance(key, str))
+                    dependencies.update(str(key) for key in cast(dict[str, Any], values))
     return dependencies
 
 

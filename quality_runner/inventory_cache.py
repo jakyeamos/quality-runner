@@ -6,7 +6,7 @@ import os
 import subprocess
 import tempfile
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from quality_runner import __version__
 from quality_runner.cache_modes import CacheMode, cache_directory, resolve_cache_mode
@@ -138,9 +138,10 @@ def _read(path: Path) -> dict[str, Any] | None:
         payload = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, UnicodeDecodeError, json.JSONDecodeError):
         return None
-    return (
-        payload if isinstance(payload, dict) and payload.get("schema") == REPO_SCAN_SCHEMA else None
-    )
+    if not isinstance(payload, dict):
+        return None
+    typed_payload = cast(dict[str, Any], payload)
+    return typed_payload if typed_payload.get("schema") == REPO_SCAN_SCHEMA else None
 
 
 def _write(path: Path, payload: dict[str, Any]) -> None:

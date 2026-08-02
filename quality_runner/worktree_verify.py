@@ -10,7 +10,9 @@ from time import monotonic
 from typing import Any
 
 from quality_runner.artifacts import validate_run_id
-from quality_runner.read_only_git import _is_git_worktree
+from quality_runner.read_only_git import is_git_worktree
+
+_is_git_worktree = is_git_worktree
 
 WORKTREE_MODES = frozenset({"in-place", "disposable"})
 

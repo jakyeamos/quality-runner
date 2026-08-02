@@ -7,7 +7,7 @@ import shutil
 import signal
 import subprocess
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 LOCAL_COMMAND_ENV_ALLOWLIST = (
     "PATH",
@@ -132,7 +132,7 @@ def _declared_package_manager(cwd: Path) -> tuple[str, str] | None:
         return None
     if not isinstance(payload, dict):
         return None
-    declaration = payload.get("packageManager")
+    declaration = cast(dict[str, Any], payload).get("packageManager")
     if not isinstance(declaration, str):
         return None
     manager, separator, version = declaration.partition("@")

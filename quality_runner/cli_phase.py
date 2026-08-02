@@ -8,7 +8,7 @@ from quality_runner.phase_closure import phase_closure_payload
 from quality_runner.phase_contract import load_phase_contract
 
 
-def add_phase_commands(subparsers: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
+def add_phase_commands(subparsers: Any) -> None:
     parser = subparsers.add_parser(
         "phase-check",
         help="Evaluate a GSD phase contract against two QR runs",

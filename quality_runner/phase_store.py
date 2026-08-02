@@ -4,7 +4,7 @@ import json
 import re
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from quality_runner.schema_constants import (
     PLAN_CONFIG_SCHEMA,
@@ -138,9 +138,9 @@ def phase_by_number(roadmap: dict[str, Any], phase_number: int) -> dict[str, Any
     phases = roadmap.get("phases")
     if not isinstance(phases, list):
         raise ValueError("QR roadmap phases must be a list")
-    for phase in phases:
-        if isinstance(phase, dict) and phase.get("number") == phase_number:
-            return phase
+    for phase in cast(list[Any], phases):
+        if isinstance(phase, dict) and cast(dict[str, Any], phase).get("number") == phase_number:
+            return cast(dict[str, Any], phase)
     raise FileNotFoundError(f"QR phase does not exist: {phase_number:02d}")
 
 
@@ -218,18 +218,18 @@ def _load_machine_document(path: Path, marker: str, schema: str) -> dict[str, An
     if match is None:
         raise ValueError(f"QR planning file is missing its machine block: {path}")
     payload = json.loads(match.group("body"))
-    if not isinstance(payload, dict) or payload.get("schema") != schema:
+    if not isinstance(payload, dict) or cast(dict[str, Any], payload).get("schema") != schema:
         raise ValueError(f"QR planning file has an invalid schema: {path}")
-    return payload
+    return cast(dict[str, Any], payload)
 
 
 def _load_json(path: Path, schema: str) -> dict[str, Any]:
     if not path.exists():
         raise FileNotFoundError(f"QR planning file does not exist: {path}")
     payload = json.loads(path.read_text(encoding="utf-8"))
-    if not isinstance(payload, dict) or payload.get("schema") != schema:
+    if not isinstance(payload, dict) or cast(dict[str, Any], payload).get("schema") != schema:
         raise ValueError(f"QR planning file has an invalid schema: {path}")
-    return payload
+    return cast(dict[str, Any], payload)
 
 
 def _write_json(path: Path, payload: dict[str, Any]) -> None:

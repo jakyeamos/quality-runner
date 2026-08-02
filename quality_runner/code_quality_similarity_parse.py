@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import re
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
-from quality_runner.code_quality_paths import _is_generated_file, _is_test_file
+from quality_runner.code_quality_paths import is_generated_file, is_test_file
 
 EXCLUDED_PATH_PARTS = {
     ".quality-runner",
@@ -255,21 +255,25 @@ def _build_cluster(
 
 
 def _cluster_allowed(cluster: dict[str, Any], *, include_tests: bool) -> bool:
-    candidates = cluster.get("candidates")
-    if not isinstance(candidates, list) or len(candidates) < 2:
+    typed_cluster: dict[str, object] = cluster
+    raw_candidates = typed_cluster.get("candidates")
+    if not isinstance(raw_candidates, list):
+        return False
+    candidates = cast(list[dict[str, Any]], raw_candidates)
+    if len(candidates) < 2:
         return False
     for candidate in candidates:
         file_path = str(candidate.get("file", ""))
         if _should_skip_path(file_path):
             return False
-        if not include_tests and _is_test_file(file_path):
+        if not include_tests and is_test_file(file_path):
             return False
     return True
 
 
 def _should_skip_path(relative_path: str) -> bool:
     normalized = relative_path.strip("/")
-    if not normalized or _is_generated_file(normalized):
+    if not normalized or is_generated_file(normalized):
         return True
     parts = Path(normalized).parts
     return any(part in EXCLUDED_PATH_PARTS for part in parts)

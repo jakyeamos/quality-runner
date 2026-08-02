@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 import argparse
+from typing import Any
 
 from quality_runner.application.run_history import DEFAULT_HISTORY_LIMIT
 from quality_runner.cli_workflow_args import add_verify_arguments, add_workflow_arguments
 
 
-def add_journey_commands(subparsers: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
+def add_journey_commands(subparsers: Any) -> None:
     audit_parser = subparsers.add_parser(
         "audit",
         help="Inspect a repository and prepare its remediation outcome",

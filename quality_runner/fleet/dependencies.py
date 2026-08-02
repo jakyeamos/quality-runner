@@ -7,7 +7,7 @@ import subprocess
 from collections.abc import Callable
 from contextlib import suppress
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from quality_runner.fleet.contracts import hash_text, redact_text
 
@@ -160,8 +160,9 @@ def _has_declared_dependencies(package_json: Path) -> bool:
         return False
     if not isinstance(payload, dict):
         return False
+    typed_payload = cast(dict[str, Any], payload)
     return any(
-        isinstance(payload.get(key), dict) and bool(payload[key])
+        isinstance(typed_payload.get(key), dict) and bool(typed_payload[key])
         for key in ("dependencies", "devDependencies", "optionalDependencies")
     )
 
@@ -248,11 +249,12 @@ def _copy_local_file_dependencies(
         return {"status": "unavailable", "reason": "package manifest could not be read"}, []
     if not isinstance(payload, dict):
         return {"status": "unavailable", "reason": "package manifest is not an object"}, []
+    typed_payload = cast(dict[str, Any], payload)
     specs = [
         value
         for key in ("dependencies", "devDependencies", "optionalDependencies")
-        if isinstance(payload.get(key), dict)
-        for value in payload[key].values()
+        if isinstance(typed_payload.get(key), dict)
+        for value in cast(dict[str, Any], typed_payload[key]).values()
         if isinstance(value, str) and value.startswith(("file:", "link:"))
     ]
     created: list[Path] = []
@@ -322,7 +324,7 @@ def _package_manager_declaration(worktree: Path) -> tuple[str, str, str] | None:
         return None
     if not isinstance(payload, dict):
         return None
-    declaration = payload.get("packageManager")
+    declaration = cast(dict[str, Any], payload).get("packageManager")
     if not isinstance(declaration, str) or "@" not in declaration:
         return None
     manager, version = declaration.split("@", maxsplit=1)

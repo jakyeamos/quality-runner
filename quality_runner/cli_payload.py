@@ -313,7 +313,7 @@ def payload_for_args(
         if legacy_output:
             return payload
         return _result_payload(
-            review_journey_outcome(cast(LegacyPayload, payload), repo_root=repo_root)
+            review_journey_outcome(payload, repo_root=repo_root)
         )
     if args.command == "gate":
         return gate_command_payload(args, repo_root=_validated_repo_path(args.repo_path))

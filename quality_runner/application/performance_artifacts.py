@@ -14,7 +14,7 @@ def write_performance_artifact(
     artifact_paths: AuditArtifactPaths,
 ) -> AuditArtifactPaths:
     started = time.monotonic()
-    performance = analysis.performance
+    performance: object = analysis.performance
     if not isinstance(performance, dict):
         performance = {
             "schema": "quality-runner-performance-v0.1",

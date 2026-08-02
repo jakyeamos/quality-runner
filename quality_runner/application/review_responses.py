@@ -4,7 +4,7 @@ import hashlib
 import json
 from collections.abc import Mapping, Sequence
 from datetime import datetime
-from typing import cast
+from typing import Any, cast
 
 from quality_runner.application.review_reporting import build_review_report
 from quality_runner.core.review_contracts import (
@@ -270,14 +270,20 @@ def _object(payload: Mapping[str, object], key: str) -> Mapping[str, object]:
     value = payload.get(key)
     if not isinstance(value, Mapping):
         raise ValueError(f"{key} must be an object")
-    return value
+    return cast(Mapping[str, object], value)
 
 
 def _objects(payload: Mapping[str, object], key: str) -> list[Mapping[str, object]]:
     value = payload.get(key)
-    if not isinstance(value, list) or not all(isinstance(item, Mapping) for item in value):
+    if not isinstance(value, list) or not all(
+        isinstance(item, Mapping) for item in cast(list[Any], value)
+    ):
         raise ValueError(f"{key} must be an array of objects")
-    return [item for item in value if isinstance(item, Mapping)]
+    return [
+        cast(Mapping[str, object], item)
+        for item in cast(list[Any], value)
+        if isinstance(item, Mapping)
+    ]
 
 
 def _findings(payload: Mapping[str, object]) -> list[Mapping[str, object]]:
@@ -290,10 +296,10 @@ def _findings(payload: Mapping[str, object]) -> list[Mapping[str, object]]:
 def _strings(payload: Mapping[str, object], key: str) -> list[str]:
     value = payload.get(key)
     if not isinstance(value, list) or not all(
-        isinstance(item, str) and item.strip() for item in value
+        isinstance(item, str) and item.strip() for item in cast(list[Any], value)
     ):
         raise ValueError(f"{key} must be an array of non-empty strings")
-    return [item.strip() for item in value]
+    return [item.strip() for item in cast(list[str], value)]
 
 
 def _text(payload: Mapping[str, object], key: str) -> str:

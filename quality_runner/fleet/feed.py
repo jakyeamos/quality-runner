@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from quality_runner.fleet.audit import _resolve_artifact_root, fleet_replay_payload
+from quality_runner.fleet.audit import fleet_replay_payload, resolve_artifact_root
 from quality_runner.fleet.maturity_feed import (
     DEFAULT_FLEET_ROOT as MATURITY_FEED_FLEET_ROOT,
 )
@@ -23,7 +23,7 @@ def fleet_feed_payload(
         raise MaturityFeedError(
             "an explicit --output-dir may not point at the production fleet feed root"
         )
-    artifact_root = _resolve_artifact_root(output_dir, audit_id)
+    artifact_root = resolve_artifact_root(output_dir, audit_id)
     replay = fleet_replay_payload(output_dir=artifact_root)
     if replay.get("status") != "passed":
         raise MaturityFeedError("fleet audit replay failed; maturity feed was not published")

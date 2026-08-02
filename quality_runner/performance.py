@@ -5,7 +5,7 @@ from collections import Counter
 from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, cast
 
 from quality_runner.schema_constants import PERFORMANCE_SCHEMA
 
@@ -110,6 +110,6 @@ class PerformanceRecorder:
 
 
 def performance_from_payload(payload: object) -> dict[str, Any] | None:
-    if not isinstance(payload, dict) or payload.get("schema") != PERFORMANCE_SCHEMA:
+    if not isinstance(payload, dict) or cast(dict[str, Any], payload).get("schema") != PERFORMANCE_SCHEMA:
         return None
-    return dict(payload)
+    return cast(dict[str, Any], payload)

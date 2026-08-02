@@ -5,6 +5,7 @@ import os
 import stat
 from collections.abc import Mapping
 from pathlib import Path
+from typing import cast
 
 from quality_runner.artifacts import safe_child_file
 
@@ -46,7 +47,7 @@ def read_local_adapter_response(
         raise ReviewAdapterResponseError(f"adapter output is not readable JSON: {error}") from error
     if not isinstance(payload, Mapping):
         raise ReviewAdapterResponseError("adapter output must be a JSON object")
-    return dict(payload)
+    return cast(dict[str, object], payload)
 
 
 def read_regular_text_file(path: Path, *, maximum_bytes: int) -> str:

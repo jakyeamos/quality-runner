@@ -35,7 +35,7 @@ def verification_provenance(
         (
             gate.get("artifact_digest")
             for gate in gates
-            if isinstance(gate, dict) and isinstance(gate.get("artifact_digest"), str)
+            if isinstance(gate.get("artifact_digest"), str)
         ),
         None,
     )

@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from quality_runner.fleet.contracts import digest
 
@@ -59,11 +59,12 @@ def prior_observations(path: Path) -> dict[str, list[dict[str, Any]]]:
         payload = json.loads(path.read_text(encoding="utf-8"))
     except (FileNotFoundError, OSError, json.JSONDecodeError):
         return {}
-    if not isinstance(payload, dict) or payload.get("schema") != CANDIDATE_FLEET_SCHEMA:
+    if not isinstance(payload, dict) or cast(dict[str, Any], payload).get("schema") != CANDIDATE_FLEET_SCHEMA:
         return {}
+    typed_payload = cast(dict[str, Any], payload)
     return {
         str(candidate["id"]): _objects(candidate.get("observations"))
-        for candidate in _objects(payload.get("candidates"))
+        for candidate in _objects(typed_payload.get("candidates"))
         if isinstance(candidate.get("id"), str)
     }
 
@@ -269,17 +270,17 @@ def _criterion(passed: bool, *, actual: object, required: object) -> dict[str, A
 def _objects(value: object) -> list[dict[str, Any]]:
     if not isinstance(value, list):
         return []
-    return [item for item in value if isinstance(item, dict)]
+    return [cast(dict[str, Any], item) for item in cast(list[Any], value) if isinstance(item, dict)]
 
 
 def _object(value: object) -> dict[str, Any]:
-    return value if isinstance(value, dict) else {}
+    return cast(dict[str, Any], value) if isinstance(value, dict) else {}
 
 
 def _strings(value: object) -> list[str]:
     if not isinstance(value, list):
         return []
-    return [item for item in value if isinstance(item, str) and item]
+    return [item for item in cast(list[Any], value) if isinstance(item, str) and item]
 
 
 def _nonempty_string(value: object) -> bool:

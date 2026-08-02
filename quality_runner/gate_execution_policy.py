@@ -3,7 +3,7 @@ from __future__ import annotations
 import subprocess
 from collections.abc import Iterable
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 ENVIRONMENT_RESTRICTED_MARKERS = (
     "eperm",
@@ -104,7 +104,7 @@ def normalize_gate_ids(gate_ids: Iterable[str] | None) -> tuple[str, ...]:
         return ()
     normalized: set[str] = set()
     for gate_id in gate_ids:
-        if not isinstance(gate_id, str) or not gate_id.strip():
+        if not gate_id.strip():
             raise ValueError("gate ids must be non-empty strings")
         normalized.add(gate_id.strip())
     return tuple(sorted(normalized))
@@ -240,7 +240,7 @@ def valid_gate_timeouts(gate_timeouts: dict[str, int] | None) -> dict[str, int]:
     return {
         gate_id: seconds
         for gate_id, seconds in gate_timeouts.items()
-        if isinstance(gate_id, str) and gate_id and isinstance(seconds, int) and seconds > 0
+        if gate_id and seconds > 0
     }
 
 
@@ -268,9 +268,9 @@ def _available_capabilities(capability_map: dict[str, Any]) -> list[dict[str, An
     if not isinstance(available, list):
         return []
     return [
-        capability
-        for capability in available
-        if isinstance(capability, dict) and _is_executable_capability(capability)
+        cast(dict[str, Any], capability)
+        for capability in cast(list[Any], available)
+        if isinstance(capability, dict) and _is_executable_capability(cast(dict[str, Any], capability))
     ]
 
 

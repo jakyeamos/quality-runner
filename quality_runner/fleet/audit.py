@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from collections.abc import Sequence
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from quality_runner.artifacts import prepare_safe_directory, write_json, write_text
 from quality_runner.fleet.contracts import (
@@ -325,8 +325,9 @@ def _build_summary(
                 unresolved.append(f"{result.get('repo_id')}:{dimension}:{status}")
         dynamic_result = result.get("dynamic")
         if isinstance(dynamic_result, dict):
-            state = str(dynamic_result.get("status", "unknown"))
-            if dynamic_result.get("selected") is True:
+            typed_dynamic = cast(dict[str, object], dynamic_result)
+            state = str(typed_dynamic.get("status", "unknown"))
+            if typed_dynamic.get("selected") is True:
                 dynamic_counts["selected"] += 1
             if state == "reused":
                 dynamic_counts["reused"] += 1
@@ -466,6 +467,9 @@ def _resolve_artifact_root(output_dir: Path | None, audit_id: str | None) -> Pat
         if local.is_dir():
             return local
     return _latest_audit(base)
+
+
+resolve_artifact_root = _resolve_artifact_root
 
 
 def _latest_audit(root: Path) -> Path:

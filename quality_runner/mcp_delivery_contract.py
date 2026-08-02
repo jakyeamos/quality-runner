@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from quality_runner.delivery_contract import (
     preflight_delivery_contract,
@@ -126,9 +126,11 @@ def _required_path_arg(arguments: dict[str, Any], key: str) -> Path:
 
 def _string_list(arguments: dict[str, Any], key: str) -> list[str]:
     value = arguments.get(key, [])
-    if not isinstance(value, list) or not all(isinstance(item, str) and item for item in value):
+    if not isinstance(value, list) or not all(
+        isinstance(item, str) and item for item in cast(list[Any], value)
+    ):
         raise ValueError(f"{key} must be an array of strings")
-    return list(value)
+    return list(cast(list[str], value))
 
 
 def _number_arg(arguments: dict[str, Any], key: str, default: float) -> float:

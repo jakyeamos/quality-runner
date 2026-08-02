@@ -5,16 +5,12 @@ from typing import cast
 
 from quality_runner.application.review_v1_serializers import REVIEW_REPORT_SCHEMA
 from quality_runner.core.review_contracts import (
-    AdapterStatus,
     ReviewBreadth,
-    ReviewClassification,
-    ReviewConfidence,
     ReviewFinding,
     ReviewMode,
     ReviewReport,
     ReviewScope,
     ReviewSections,
-    ReviewSeverity,
     SeverityCounts,
 )
 
@@ -53,7 +49,7 @@ def build_review_report(
     resolved_mode = cast(ReviewMode, mode)
     resolved_scope = cast(ReviewScope, scope)
     resolved_breadth = cast(ReviewBreadth, breadth)
-    resolved_status = cast(AdapterStatus, adapter_status)
+    resolved_status = adapter_status
     if resolved_mode in {"task", "combined"} and not task_provenance:
         raise ValueError("task provenance is required for task and combined reports")
     normalized = [_normalize_finding(finding) for finding in findings]
@@ -128,9 +124,9 @@ def _normalize_finding(finding: Mapping[str, object]) -> ReviewFinding:
     return {
         "id": values["id"],
         "fingerprint": values["fingerprint"],
-        "severity": cast(ReviewSeverity, severity),
-        "classification": cast(ReviewClassification, classification),
-        "confidence": cast(ReviewConfidence, confidence),
+        "severity": severity,
+        "classification": classification,
+        "confidence": confidence,
         "summary": values["summary"],
         "why_it_matters": values["why_it_matters"],
         "recommended_fix": values["recommended_fix"],
@@ -176,10 +172,10 @@ def _sections(findings: Sequence[ReviewFinding], *, mode: ReviewMode) -> ReviewS
 
 def _string_list(value: object, field: str) -> list[str]:
     if not isinstance(value, list) or not all(
-        isinstance(item, str) and item.strip() for item in value
+        isinstance(item, str) and item.strip() for item in cast(list[object], value)
     ):
         raise ValueError(f"finding requires non-empty string list for {field}")
-    return [item.strip() for item in value]
+    return [item.strip() for item in cast(list[str], value)]
 
 
 def _clean_strings(values: Sequence[str]) -> list[str]:

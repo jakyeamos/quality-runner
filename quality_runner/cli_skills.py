@@ -16,7 +16,7 @@ from quality_runner.skill_selection import load_selected_skills
 from quality_runner.workflow_skills import load_skill_review_report_json
 
 
-def add_skill_commands(subparsers: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
+def add_skill_commands(subparsers: Any) -> None:
     skill_parser = subparsers.add_parser("skill", help="Quality Skill management")
     skill_subparsers = skill_parser.add_subparsers(dest="skill_command")
 

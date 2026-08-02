@@ -5,7 +5,7 @@ import json
 import re
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 FLEET_AUDIT_SCHEMA = "quality-runner-fleet-audit-v0.1"
 FLEET_INVENTORY_SCHEMA = "quality-runner-fleet-inventory-v0.1"
@@ -128,9 +128,9 @@ def public_projection(payload: dict[str, Any]) -> dict[str, Any]:
         "unresolved_measurement_gaps",
         "methodology",
     }
-    projection = {key: summary[key] for key in sorted(allowed) if key in summary}
+    projection: dict[str, Any] = {key: summary[key] for key in sorted(allowed) if key in summary}
     projection["unresolved_measurement_gaps"] = _aggregate_public_gaps(
-        summary.get("unresolved_measurement_gaps")
+        cast(dict[str, Any], summary).get("unresolved_measurement_gaps")
     )
     projection["privacy"] = {
         "aggregate_only": True,
@@ -148,7 +148,7 @@ def public_projection(payload: dict[str, Any]) -> dict[str, Any]:
 def _aggregate_public_gaps(value: object) -> list[str]:
     counts: dict[str, int] = {}
     if isinstance(value, list):
-        for item in value:
+        for item in cast(list[Any], value):
             if not isinstance(item, str):
                 continue
             parts = item.split(":")

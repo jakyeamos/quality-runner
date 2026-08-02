@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from quality_runner.bug_learning_fleet import (
     PROMOTION_CRITERIA_KEYS,
@@ -18,7 +18,8 @@ PROMOTION_RECEIPT_SCHEMA = "quality-runner-candidate-promotion-receipt-v0.1"
 def candidate_by_id(payload: object, candidate_id: str) -> dict[str, Any] | None:
     if not isinstance(payload, dict):
         return None
-    for candidate in _objects(payload.get("candidates")):
+    typed_payload = cast(dict[str, Any], payload)
+    for candidate in _objects(typed_payload.get("candidates")):
         if candidate.get("id") == candidate_id:
             return candidate
     return None
@@ -36,7 +37,7 @@ def read_object(path: Path, errors: list[str], *, label: str) -> dict[str, Any] 
     if not isinstance(payload, dict):
         errors.append(f"{label} must be a JSON object")
         return None
-    return payload
+    return cast(dict[str, Any], payload)
 
 
 def promotion_decision_errors(
@@ -90,12 +91,14 @@ def supported_receipt_errors(
     if _parse_timestamp(receipt.get("decided_at")) is None:
         errors.append("promotion receipt decided_at must be timezone-aware ISO-8601")
     criteria = receipt.get("promotion_criteria")
+    typed_criteria = cast(dict[str, Any], criteria) if isinstance(criteria, dict) else {}
     if (
         not isinstance(criteria, dict)
-        or set(criteria) != PROMOTION_CRITERIA_KEYS
+        or set(typed_criteria) != PROMOTION_CRITERIA_KEYS
         or any(
-            not isinstance(value, dict) or value.get("passed") is not True
-            for value in criteria.values()
+            not isinstance(value, dict)
+            or cast(dict[str, Any], value).get("passed") is not True
+            for value in typed_criteria.values()
         )
     ):
         errors.append("promotion receipt criteria are missing or failed")
@@ -109,7 +112,11 @@ def supported_receipt_errors(
 def _objects(value: object) -> list[dict[str, Any]]:
     if not isinstance(value, list):
         return []
-    return [item for item in value if isinstance(item, dict)]
+    return [
+        cast(dict[str, Any], item)
+        for item in cast(list[Any], value)
+        if isinstance(item, dict)
+    ]
 
 
 def _nonempty_string(value: object) -> bool:

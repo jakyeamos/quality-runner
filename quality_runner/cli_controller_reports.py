@@ -4,7 +4,7 @@ import argparse
 import json
 import subprocess
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from quality_runner.artifacts import write_json
 from quality_runner.controller_reports import (
@@ -91,7 +91,7 @@ def add_controller_report_summary_arguments(parser: argparse.ArgumentParser) -> 
 
 
 def add_controller_report_command(
-    subparsers: argparse._SubParsersAction[argparse.ArgumentParser],
+    subparsers: Any,
 ) -> None:
     controller_parser = subparsers.add_parser(
         "controller-report", help="Normalize or lint controller thread reports"
@@ -197,13 +197,14 @@ def load_controller_report_json(path: Path) -> dict[str, Any]:
         raise ValueError(f"controller report is not valid JSON: {path}") from error
     if not isinstance(payload, dict):
         raise ValueError("controller report JSON must contain an object")
-    return payload
+    return cast(dict[str, Any], payload)
 
 
 def has_rejected_self_check(payload: dict[str, Any]) -> bool:
     checks = payload.get("self_checks")
     return isinstance(checks, list) and any(
-        isinstance(check, dict) and check.get("status") == "rejected" for check in checks
+        isinstance(check, dict) and cast(dict[str, Any], check).get("status") == "rejected"
+        for check in cast(list[Any], checks)
     )
 
 

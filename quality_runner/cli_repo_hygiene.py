@@ -7,7 +7,7 @@ from quality_runner.repo_hygiene import apply_confirmed_ignore_rules, check_repo
 
 
 def add_repo_hygiene_commands(
-    subparsers: argparse._SubParsersAction[argparse.ArgumentParser],
+    subparsers: Any,
 ) -> None:
     parser = subparsers.add_parser(
         "repo-hygiene",

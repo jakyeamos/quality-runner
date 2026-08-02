@@ -9,9 +9,9 @@ import time
 import tomllib
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
-from typing import Any
+from typing import Any, cast
 
-from .repo_hygiene_package import _package_manager_state
+from .repo_hygiene_package import package_manager_state
 
 REPO_HYGIENE_SCHEMA = "repo-hygiene-v1"
 RECENT_COMMIT_SECONDS = 24 * 60 * 60
@@ -79,11 +79,10 @@ def check_repo_hygiene(repo_path: Path) -> dict[str, Any]:
                     "reason": "confirmed generated output is not covered by Git ignore rules",
                 },
             )
-            paths = missing["paths"]
-            if isinstance(paths, list):
-                paths.append(relative)
+            paths = cast(list[str], missing["paths"])
+            paths.append(relative)
 
-    package_manager = _package_manager_state(repo_root, tracked_paths, languages, config)
+    package_manager = package_manager_state(repo_root, tracked_paths, languages, config)
     violations: list[dict[str, Any]] = [
         {
             "code": "tracked-generated-output",
@@ -159,8 +158,8 @@ def apply_confirmed_ignore_rules(repo_path: Path, *, apply: bool) -> dict[str, A
     if not apply:
         result["status"] = "preview"
         return result
-    ownership = report["ownership"]
-    if not isinstance(ownership, dict) or ownership.get("status") != "clear":
+    ownership = cast(dict[str, Any], report["ownership"])
+    if ownership.get("status") != "clear":
         result["status"] = "blocked"
         result["implementation_allowed"] = False
         return result
@@ -414,8 +413,8 @@ def _repo_hygiene_config(root: Path) -> dict[str, Any]:
     quality_runner = document.get("quality_runner")
     if not isinstance(quality_runner, dict):
         return {}
-    section = quality_runner.get("repo_hygiene")
-    return section if isinstance(section, dict) else {}
+    section = cast(dict[str, Any], quality_runner).get("repo_hygiene")
+    return cast(dict[str, Any], section) if isinstance(section, dict) else {}
 
 
 def _configured_exceptions(config: dict[str, Any]) -> list[dict[str, Any]]:
@@ -443,7 +442,7 @@ def _configured_exceptions(config: dict[str, Any]) -> list[dict[str, Any]]:
 
 def _string_list(value: object) -> list[str]:
     return (
-        [item for item in value if isinstance(item, str) and item]
+        [item for item in cast(list[Any], value) if isinstance(item, str) and item]
         if isinstance(value, list)
         else []
     )

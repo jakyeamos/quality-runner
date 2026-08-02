@@ -132,7 +132,7 @@ def restore_if_changed(
         "restored": restored,
         "allowed_paths": list(ALLOWED_MUTATION_PATHS),
         "scan_exclusions": sorted(
-            item for item in (scan_exclusions or []) if isinstance(item, str) and item
+            item for item in (scan_exclusions or []) if item
         ),
         **({"restore_error": restore_error} if restore_error else {}),
     }
@@ -164,6 +164,9 @@ def _is_git_worktree(repo_root: Path) -> bool:
         check=False,
     )
     return result.returncode == 0 and result.stdout.strip() == "true"
+
+
+is_git_worktree = _is_git_worktree
 
 
 def _git(repo_root: Path, *args: str) -> str:

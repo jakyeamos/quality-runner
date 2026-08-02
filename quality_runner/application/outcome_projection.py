@@ -36,32 +36,12 @@ from quality_runner.core.outcome_contracts import (
     OutcomeHistoryRun,
 )
 
-# Keep the established local helper names while importing the public adapter
-# projections above; this removes private cross-module coupling.
-_authorize_verification_command = authorize_verification_command
-_command = command
 _confidence = confidence
-_execution_details = execution_details
-_handoff_command = handoff_command
-_history_safety = history_safety
-_history_writes = history_writes
-_next_action = next_action
-_object_list = object_list
-_outcome = outcome
-_requires_verification_authorization = requires_verification_authorization
-_review_finding_count = review_finding_count
-_run_command = run_command
 _run_id = run_id
 _safety = safety
 _status = status
-_string = string
-_string_list = string_list
 _usable_verification = usable_verification
-_verification_matches_result = verification_matches_result
-_verify_confidence = verify_confidence
-_warning_messages = warning_messages
 _writes = writes
-
 
 def project_audit_outcome(
     payload: LegacyPayload,
@@ -70,7 +50,7 @@ def project_audit_outcome(
     inspect_only: bool,
     branch_switched: bool,
 ) -> JourneyOutcome:
-    warnings = _warning_messages(payload)
+    warnings = warning_messages(payload)
     confidence = _confidence(
         level="limited" if warnings else "observed",
         basis=["local repository analysis"],
@@ -90,31 +70,31 @@ def project_audit_outcome(
     )
     run_id = _run_id(payload)
     if inspect_only:
-        return _outcome(
+        return outcome(
             journey="audit",
             state="complete",
             assessment="inspection-only",
             confidence=confidence,
             writes=writes,
             safety=safety,
-            next_action=_next_action(
+            next_action=next_action(
                 kind="start-audit",
                 summary="Prepare a remediation plan when you are ready to act on this evidence.",
-                command=_command("audit", repo_root),
+                command=command("audit", repo_root),
             ),
             summary="Repository inspection completed; no remediation plan was prepared.",
             payload=payload,
             run_id=run_id,
         )
     if _status(payload) == "clean":
-        return _outcome(
+        return outcome(
             journey="audit",
             state="complete",
             assessment="clean",
             confidence=confidence,
             writes=writes,
             safety=safety,
-            next_action=_next_action(
+            next_action=next_action(
                 kind="none",
                 summary="Audit evidence is clean; no remediation action is recommended.",
             ),
@@ -122,23 +102,22 @@ def project_audit_outcome(
             payload=payload,
             run_id=run_id,
         )
-    return _outcome(
+    return outcome(
         journey="audit",
         state="action-required",
         assessment="findings",
         confidence=confidence,
         writes=writes,
         safety=safety,
-        next_action=_next_action(
+        next_action=next_action(
             kind="read-handoff",
             summary="Read the remediation handoff before authorizing implementation work.",
-            command=_handoff_command(repo_root, run_id),
+            command=handoff_command(repo_root, run_id),
         ),
         summary="Audit completed with remediation evidence that needs a decision.",
         payload=payload,
         run_id=run_id,
     )
-
 
 def project_review_outcome(payload: LegacyPayload, *, repo_root: Path) -> JourneyOutcome:
     status = _status(payload)
@@ -150,9 +129,9 @@ def project_review_outcome(payload: LegacyPayload, *, repo_root: Path) -> Journe
         note="Review reads local evidence and may write review artifacts; it does not edit source files.",
     )
     run_id = _run_id(payload)
-    next_summary = _string(payload.get("next_action"))
+    next_summary = string(payload.get("next_action"))
     if status == "review-not-run":
-        return _outcome(
+        return outcome(
             journey="review",
             state="awaiting-evidence",
             assessment="packet-ready",
@@ -163,7 +142,7 @@ def project_review_outcome(payload: LegacyPayload, *, repo_root: Path) -> Journe
             ),
             writes=writes,
             safety=safety,
-            next_action=_next_action(
+            next_action=next_action(
                 kind="provide-review-output",
                 summary=next_summary
                 or "Provide a packet-bound local review response for this prepared packet.",
@@ -173,7 +152,7 @@ def project_review_outcome(payload: LegacyPayload, *, repo_root: Path) -> Journe
             run_id=run_id,
         )
     if status in {"malformed-output", "permission-denied"}:
-        return _outcome(
+        return outcome(
             journey="review",
             state="blocked",
             assessment="review-unavailable",
@@ -184,7 +163,7 @@ def project_review_outcome(payload: LegacyPayload, *, repo_root: Path) -> Journe
             ),
             writes=writes,
             safety=safety,
-            next_action=_next_action(
+            next_action=next_action(
                 kind="provide-review-output",
                 summary=next_summary
                 or "Resolve the review adapter issue before relying on review evidence.",
@@ -193,18 +172,18 @@ def project_review_outcome(payload: LegacyPayload, *, repo_root: Path) -> Journe
             payload=payload,
             run_id=run_id,
         )
-    limitations = _string_list(payload.get("evidence_unavailable"))
+    limitations = string_list(payload.get("evidence_unavailable"))
     confidence = _review_confidence(limitations)
-    finding_count = _review_finding_count(payload)
+    finding_count = review_finding_count(payload)
     if finding_count:
-        return _outcome(
+        return outcome(
             journey="review",
             state="action-required",
             assessment="findings",
             confidence=confidence,
             writes=writes,
             safety=safety,
-            next_action=_next_action(
+            next_action=next_action(
                 kind="inspect-run",
                 summary=next_summary
                 or "Inspect the saved review report before selecting remediation work.",
@@ -213,14 +192,14 @@ def project_review_outcome(payload: LegacyPayload, *, repo_root: Path) -> Journe
             payload=payload,
             run_id=run_id,
         )
-    return _outcome(
+    return outcome(
         journey="review",
         state="complete",
         assessment="review-complete",
         confidence=confidence,
         writes=writes,
         safety=safety,
-        next_action=_next_action(
+        next_action=next_action(
             kind="none",
             summary="Review completed without recorded findings.",
         ),
@@ -228,7 +207,6 @@ def project_review_outcome(payload: LegacyPayload, *, repo_root: Path) -> Journe
         payload=payload,
         run_id=run_id,
     )
-
 
 def project_verify_outcome(
     payload: LegacyPayload,
@@ -240,10 +218,10 @@ def project_verify_outcome(
     status = _status(payload)
     run_id = _run_id(payload)
     usable_verification = _usable_verification(verification)
-    if not _verification_matches_result(status, usable_verification):
+    if not verification_matches_result(status, usable_verification):
         usable_verification = None
-    execution = _execution_details(usable_verification)
-    requires_authorization = _requires_verification_authorization(usable_verification)
+    execution = execution_details(usable_verification)
+    requires_authorization = requires_verification_authorization(usable_verification)
     safety_note = (
         "Authorized commands ran in a disposable checkout; this is not a host sandbox."
         if execution.isolated
@@ -262,49 +240,49 @@ def project_verify_outcome(
     )
     writes = _writes(payload, branch_switched=branch_switched)
     if usable_verification is None:
-        return _outcome(
+        return outcome(
             journey="verify",
             state="awaiting-evidence",
             assessment="evidence-incomplete",
-            confidence=_verify_confidence(execution, usable_verification),
+            confidence=verify_confidence(execution, usable_verification),
             writes=writes,
             safety=safety,
-            next_action=_next_action(
+            next_action=next_action(
                 kind="inspect-run",
                 summary="Restore or inspect inconsistent gate verification evidence before drawing a conclusion.",
-                command=_run_command(repo_root, run_id),
+                command=run_command(repo_root, run_id),
             ),
             summary="Verification result exists, but its gate evidence is unavailable or inconsistent.",
             payload=payload,
             run_id=run_id,
         )
     if status == "passed":
-        confidence = _verify_confidence(execution, usable_verification)
+        confidence = verify_confidence(execution, usable_verification)
         if confidence["level"] != "confirmed":
-            return _outcome(
+            return outcome(
                 journey="verify",
                 state="awaiting-evidence",
                 assessment="evidence-incomplete",
                 confidence=confidence,
                 writes=writes,
                 safety=safety,
-                next_action=_next_action(
+                next_action=next_action(
                     kind="inspect-run",
                     summary="Inspect the skipped gate evidence before treating verification as complete.",
-                    command=_run_command(repo_root, run_id),
+                    command=run_command(repo_root, run_id),
                 ),
                 summary="Executed gates passed, but remaining evidence is incomplete.",
                 payload=payload,
                 run_id=run_id,
             )
-        return _outcome(
+        return outcome(
             journey="verify",
             state="complete",
             assessment="gates-passed",
             confidence=confidence,
             writes=writes,
             safety=safety,
-            next_action=_next_action(
+            next_action=next_action(
                 kind="none",
                 summary="Configured verification evidence is complete.",
             ),
@@ -313,91 +291,90 @@ def project_verify_outcome(
             run_id=run_id,
         )
     if status == "passed-with-findings":
-        return _outcome(
+        return outcome(
             journey="verify",
             state="action-required",
             assessment="gates-passed-with-findings",
-            confidence=_verify_confidence(execution, usable_verification),
+            confidence=verify_confidence(execution, usable_verification),
             writes=writes,
             safety=safety,
-            next_action=_next_action(
+            next_action=next_action(
                 kind="read-handoff",
                 summary="Gate evidence passed; read the remediation handoff for remaining findings.",
-                command=_handoff_command(repo_root, run_id),
+                command=handoff_command(repo_root, run_id),
             ),
             summary="Verification passed, but audit findings still need a decision.",
             payload=payload,
             run_id=run_id,
         )
     if status == "failed":
-        return _outcome(
+        return outcome(
             journey="verify",
             state="failed",
             assessment="gates-failed",
-            confidence=_verify_confidence(execution, usable_verification),
+            confidence=verify_confidence(execution, usable_verification),
             writes=writes,
             safety=safety,
-            next_action=_next_action(
+            next_action=next_action(
                 kind="inspect-gate-failure",
                 summary="Inspect the recorded gate failure before retrying verification.",
-                command=_run_command(repo_root, run_id),
+                command=run_command(repo_root, run_id),
             ),
             summary="Verification ran and one or more gates failed.",
             payload=payload,
             run_id=run_id,
         )
     if status == "blocked":
-        return _outcome(
+        return outcome(
             journey="verify",
             state="blocked",
             assessment="evidence-incomplete",
-            confidence=_verify_confidence(execution, usable_verification),
+            confidence=verify_confidence(execution, usable_verification),
             writes=writes,
             safety=safety,
             next_action=(
-                _next_action(
+                next_action(
                     kind="authorize-verification",
                     summary="Authorize disposable execution to replace evidence-only gate records.",
-                    command=_authorize_verification_command(repo_root, run_id),
+                    command=authorize_verification_command(repo_root, run_id),
                     requires_authorization=True,
                 )
                 if requires_authorization
-                else _next_action(
+                else next_action(
                     kind="inspect-gate-failure",
                     summary="Inspect blocked gate evidence before changing verification policy.",
-                    command=_run_command(repo_root, run_id),
+                    command=run_command(repo_root, run_id),
                 )
             ),
             summary="Verification evidence is blocked or incomplete.",
             payload=payload,
             run_id=run_id,
         )
-    return _outcome(
+    return outcome(
         journey="verify",
         state="awaiting-evidence",
         assessment="evidence-incomplete",
-        confidence=_verify_confidence(execution, usable_verification),
+        confidence=verify_confidence(execution, usable_verification),
         writes=writes,
         safety=safety,
-        next_action=_next_action(
+        next_action=next_action(
             kind="inspect-run",
             summary="Inspect the recorded verification evidence before drawing a conclusion.",
-            command=_run_command(repo_root, run_id),
+            command=run_command(repo_root, run_id),
         ),
         summary="Verification produced non-local or incomplete evidence.",
         payload=payload,
         run_id=run_id,
     )
 
-
 def project_runs_outcome(history: HistoryPayload, *, repo_root: Path) -> JourneyOutcome:
-    runs = _object_list(history.get("runs"))
-    unavailable = _string_list(history.get("unavailable_run_ids"))
-    selected_run_id = _string(history.get("selected_run_id"))
+    runs = object_list(history.get("runs"))
+    unavailable = string_list(history.get("unavailable_run_ids"))
+    selected_run_id = string(history.get("selected_run_id"))
     history_snapshot = _history_snapshot(history, runs, unavailable, selected_run_id)
     if not runs:
         if unavailable:
-            return _outcome(
+            return outcome(
                 journey="runs",
                 state="awaiting-evidence",
                 assessment="evidence-incomplete",
@@ -406,12 +383,12 @@ def project_runs_outcome(history: HistoryPayload, *, repo_root: Path) -> Journey
                     basis=["local Quality Runner artifact directory"],
                     limitations=unavailable,
                 ),
-                writes=_history_writes(),
-                safety=_history_safety(),
-                next_action=_next_action(
+                writes=history_writes(),
+                safety=history_safety(),
+                next_action=next_action(
                     kind="inspect-run",
                     summary="Inspect available run history before replacing unreadable evidence.",
-                    command=_command("runs", repo_root),
+                    command=command("runs", repo_root),
                 ),
                 summary=(
                     "The selected run is unavailable or unreadable; no clean history conclusion is available."
@@ -423,7 +400,7 @@ def project_runs_outcome(history: HistoryPayload, *, repo_root: Path) -> Journey
                 run_id=selected_run_id,
                 history=history_snapshot,
             )
-        return _outcome(
+        return outcome(
             journey="runs",
             state="empty",
             assessment="no-history",
@@ -432,12 +409,12 @@ def project_runs_outcome(history: HistoryPayload, *, repo_root: Path) -> Journey
                 basis=["local Quality Runner artifact directory"],
                 limitations=unavailable,
             ),
-            writes=_history_writes(),
-            safety=_history_safety(),
-            next_action=_next_action(
+            writes=history_writes(),
+            safety=history_safety(),
+            next_action=next_action(
                 kind="start-audit",
                 summary="Start an audit to create the first evidence run.",
-                command=_command("audit", repo_root),
+                command=command("audit", repo_root),
             ),
             summary="No readable Quality Runner runs were found.",
             legacy_schema="quality-runner-run-summary-v0.1",
@@ -445,14 +422,14 @@ def project_runs_outcome(history: HistoryPayload, *, repo_root: Path) -> Journey
             history=history_snapshot,
         )
     latest = runs[0]
-    latest_run_id = _string(latest.get("run_id"))
-    latest_status = _string(latest.get("status")) or "unknown"
+    latest_run_id = string(latest.get("run_id"))
+    latest_status = string(latest.get("status")) or "unknown"
     limitations = list(unavailable)
     if latest_status == "unknown":
         limitations.append(
             "The newest run did not contain a readable audit or verification status."
         )
-    return _outcome(
+    return outcome(
         journey="runs",
         state="awaiting-evidence" if latest_status == "unknown" else "complete",
         assessment="history",
@@ -461,12 +438,12 @@ def project_runs_outcome(history: HistoryPayload, *, repo_root: Path) -> Journey
             basis=["persisted local run artifacts"],
             limitations=limitations,
         ),
-        writes=_history_writes(),
-        safety=_history_safety(),
-        next_action=_next_action(
+        writes=history_writes(),
+        safety=history_safety(),
+        next_action=next_action(
             kind="inspect-run",
             summary="Inspect the newest run before acting on its historical status.",
-            command=_run_command(repo_root, selected_run_id or latest_run_id),
+            command=run_command(repo_root, selected_run_id or latest_run_id),
         ),
         summary=(
             f"Showing {len(runs)} readable run(s); newest status is {latest_status}."
@@ -479,14 +456,12 @@ def project_runs_outcome(history: HistoryPayload, *, repo_root: Path) -> Journey
         history=history_snapshot,
     )
 
-
 def _review_confidence(limitations: list[str]) -> OutcomeConfidence:
     return _confidence(
         level="limited" if limitations else "confirmed",
         basis=["validated packet-bound local response"],
         limitations=limitations,
     )
-
 
 def _history_snapshot(
     history: HistoryPayload,
@@ -496,14 +471,14 @@ def _history_snapshot(
 ) -> OutcomeHistory:
     snapshots: list[OutcomeHistoryRun] = []
     for run in runs:
-        run_id = _string(run.get("run_id"))
+        run_id = string(run.get("run_id"))
         if run_id is None:
             continue
         snapshot: OutcomeHistoryRun = {
             "run_id": run_id,
-            "status": _string(run.get("status")) or "unknown",
+            "status": string(run.get("status")) or "unknown",
         }
-        lifecycle_status = _string(run.get("lifecycle_status"))
+        lifecycle_status = string(run.get("lifecycle_status"))
         if lifecycle_status:
             snapshot["lifecycle_status"] = lifecycle_status
         snapshots.append(snapshot)

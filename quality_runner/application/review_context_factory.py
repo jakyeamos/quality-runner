@@ -18,10 +18,7 @@ from quality_runner.core.review_contracts import (
     EvidenceReference,
     FreshnessPolicy,
     NormalizedReviewOptions,
-    ReviewBreadth,
-    ReviewMode,
     ReviewPacket,
-    ReviewScope,
     TaskReviewPacket,
 )
 
@@ -64,9 +61,9 @@ def normalize_review_options(
         prior_review_documents = ()
         include_known_issues = False
     options: NormalizedReviewOptions = {
-        "mode": cast(ReviewMode, mode),
-        "scope": cast(ReviewScope, scope),
-        "breadth": cast(ReviewBreadth, resolved_breadth),
+        "mode": mode,
+        "scope": scope,
+        "breadth": resolved_breadth,
         "exclusions": _clean_strings(exclusions),
         "evidence": list(evidence),
         "known_issues": _clean_strings(known_issues),

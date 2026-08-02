@@ -287,14 +287,14 @@ def _run_artifact_paths(run_dir: Path) -> AuditArtifactPaths:
 
 def _slices(plan: dict[str, Any]) -> list[dict[str, Any]]:
     slices = plan.get("slices")
-    return slices if isinstance(slices, list) else []
+    return cast(list[dict[str, Any]], slices) if isinstance(slices, list) else []
 
 
 def _intent_docs(scan: dict[str, Any]) -> list[dict[str, str]] | None:
     intent_docs = scan.get("intent_docs")
     if not isinstance(intent_docs, list):
         return None
-    return [item for item in intent_docs if isinstance(item, dict)]
+    return [cast(dict[str, str], item) for item in cast(list[Any], intent_docs) if isinstance(item, dict)]
 
 
 def _legacy_payload(payload: AuditPayload) -> dict[str, Any]:
@@ -309,9 +309,9 @@ def _legacy_optional_payload(payload: AuditPayload | None) -> dict[str, Any] | N
 
 def _scan_exclusion_metadata(scan: dict[str, Any]) -> dict[str, Any] | None:
     metadata = scan.get("scan_exclusion_preflight")
-    return metadata if isinstance(metadata, dict) else None
+    return cast(dict[str, Any], metadata) if isinstance(metadata, dict) else None
 
 
 def _agent_review_mode(analysis: AuditAnalysis) -> AgentReviewMode:
     mode = analysis.request.agent_review_mode
-    return cast(AgentReviewMode, mode) if mode in AGENT_REVIEW_MODES else "auto"
+    return mode if mode in AGENT_REVIEW_MODES else "auto"

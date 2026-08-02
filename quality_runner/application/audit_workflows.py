@@ -231,8 +231,8 @@ def _module_status_from_artifacts(artifact_paths: dict[str, str]) -> dict[str, A
         payload = json.loads(Path(path).read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         return {}
-    module_status = payload.get("module_status") if isinstance(payload, dict) else None
-    return module_status if isinstance(module_status, dict) else {}
+    module_status = cast(dict[str, Any], payload).get("module_status") if isinstance(payload, dict) else None
+    return cast(dict[str, Any], module_status) if isinstance(module_status, dict) else {}
 
 
 def _skill_review_from_analysis(
@@ -257,7 +257,7 @@ def _optional_field(key: str, value: object) -> dict[str, Any]:
 
 def _agent_review_mode(analysis: Any) -> AgentReviewMode:
     mode = getattr(getattr(analysis, "request", None), "agent_review_mode", None)
-    return cast(AgentReviewMode, mode) if mode in AGENT_REVIEW_MODES else "auto"
+    return mode if mode in AGENT_REVIEW_MODES else "auto"
 
 
 def _record_refresh_analysis(

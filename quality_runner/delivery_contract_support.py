@@ -81,11 +81,9 @@ def obligation_covered(obligation: dict[str, Any], plan: str) -> bool:
     if isinstance(obligation_id, str) and obligation_id in plan:
         return True
     scope = obligation.get("scope")
-    return (
-        isinstance(scope, list)
-        and bool(scope)
-        and all(isinstance(path, str) and path in plan for path in scope)
-    )
+    if not isinstance(scope, list) or not scope:
+        return False
+    return all(isinstance(path, str) and path in plan for path in cast(list[object], scope))
 
 
 def deferred_checks(contract: dict[str, Any]) -> list[dict[str, Any]]:
@@ -122,7 +120,7 @@ def git_baseline(repo_scan: dict[str, Any]) -> dict[str, Any]:
 def summary(value: object) -> dict[str, Any] | None:
     payload = dict_value(value)
     summary_value = payload.get("summary")
-    return dict(summary_value) if isinstance(summary_value, dict) else None
+    return cast(dict[str, Any], summary_value) if isinstance(summary_value, dict) else None
 
 
 def load_json(path: Path) -> dict[str, Any]:
@@ -136,18 +134,20 @@ def load_json(path: Path) -> dict[str, Any]:
 
 
 def dict_value(value: object) -> dict[str, Any]:
-    return dict(value) if isinstance(value, dict) else {}
+    return cast(dict[str, Any], value) if isinstance(value, dict) else {}
 
 
 def list_of_dicts(value: object) -> list[dict[str, Any]]:
     return (
-        [dict(item) for item in value if isinstance(item, dict)] if isinstance(value, list) else []
+        [cast(dict[str, Any], item) for item in cast(list[Any], value) if isinstance(item, dict)]
+        if isinstance(value, list)
+        else []
     )
 
 
 def string_list(value: object) -> list[str]:
     return (
-        [item for item in value if isinstance(item, str) and item]
+        [item for item in cast(list[Any], value) if isinstance(item, str) and item]
         if isinstance(value, list)
         else []
     )

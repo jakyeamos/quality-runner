@@ -19,7 +19,7 @@ from quality_runner.security.codex import (
 
 
 def add_security_commands(
-    subparsers: argparse._SubParsersAction[argparse.ArgumentParser],
+    subparsers: Any,
 ) -> None:
     security = subparsers.add_parser(
         "security",

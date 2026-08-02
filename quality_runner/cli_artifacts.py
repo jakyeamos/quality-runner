@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import argparse
 from pathlib import Path
 from typing import Any
 
@@ -9,7 +8,7 @@ from quality_runner.artifacts import cleanup_artifacts
 PRUNE_ARTIFACTS_RESULT_SCHEMA = "quality-runner-prune-artifacts-result-v0.1"
 
 
-def add_artifact_commands(subparsers: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
+def add_artifact_commands(subparsers: Any) -> None:
     parser = subparsers.add_parser(
         "prune-artifacts",
         help="Preview or delete persisted Quality Runner runs using repo retention policy",

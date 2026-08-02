@@ -8,7 +8,7 @@ from quality_runner.rollout import rollout_payload
 
 
 def add_rollout_command(
-    subparsers: argparse._SubParsersAction[argparse.ArgumentParser],
+    subparsers: Any,
 ) -> None:
     rollout_parser = subparsers.add_parser(
         "rollout",

@@ -31,7 +31,7 @@ def response_template(context: ReviewPacket) -> dict[str, object]:
     """Create a strict local-file response template for one validated packet."""
     validate_prepared_packet(context)
     if context["mode"] == "combined":
-        combined = cast(CombinedReviewPacket, context)
+        combined = context
         return {
             "schema": COMBINED_REVIEW_ADAPTER_RESPONSE_SCHEMA,
             "run_id": combined["run_id"],
@@ -62,7 +62,7 @@ def _single_template(context: ReviewPacket) -> dict[str, object]:
 
 def _validate_packet_shape(context: ReviewPacket) -> None:
     freshness = context.get("freshness")
-    if not isinstance(freshness, Mapping) or (
+    if (
         freshness.get("new_invocation_required") is not True
         or freshness.get("prior_review_context_included") is not False
         or freshness.get("hidden_reasoning_included") is not False
@@ -91,7 +91,7 @@ def _validate_packet_shape(context: ReviewPacket) -> None:
     if any(field in combined for field in forbidden_parent_fields):
         raise ValueError("combined review parent must not contain child-only context")
     packets = combined.get("packets")
-    if not isinstance(packets, list) or [packet.get("mode") for packet in packets] != [
+    if [packet.get("mode") for packet in packets] != [
         "task",
         "blind",
     ]:
@@ -115,7 +115,7 @@ def _validate_packet_shape(context: ReviewPacket) -> None:
         if any(packet.get(field) != combined.get(field) for field in shared_fields):
             raise ValueError("combined review child packet does not match shared parent fields")
         child_freshness = packet.get("freshness")
-        if not isinstance(child_freshness, Mapping) or any(
+        if any(
             child_freshness.get(field) != parent_freshness.get(field) for field in freshness_fields
         ):
             raise ValueError("combined review child packet does not match shared freshness")
@@ -123,9 +123,7 @@ def _validate_packet_shape(context: ReviewPacket) -> None:
 
 
 def _validate_packet_hashes(context: ReviewPacket) -> None:
-    input_hashes = context.get("input_hashes")
-    if not isinstance(input_hashes, Mapping):
-        raise ValueError("prepared review context requires input hashes")
+    input_hashes = context["input_hashes"]
     mode = context["mode"]
     if mode == "combined":
         combined = cast(CombinedReviewPacket, context)

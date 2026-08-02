@@ -4,7 +4,7 @@ import gzip
 from pathlib import Path
 from typing import cast
 
-from quality_runner.code_quality_findings import _finding
+from quality_runner.code_quality_findings import finding
 
 DEFAULT_GZIPPED_JS_BUNDLE_BYTES = 200_000
 JS_BUNDLE_DIRS = (
@@ -32,7 +32,7 @@ def bundle_budget_findings(root: Path) -> list[Finding]:
             findings.append(
                 cast(
                     Finding,
-                    _finding(
+        finding(
                         category="speed",
                         severity="observation",
                         confidence="medium",

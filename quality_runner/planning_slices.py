@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 
 from quality_runner.verification_contract import verification_contract_fields
 
@@ -50,7 +50,7 @@ def slice_sort_key(slice_item: dict[str, Any]) -> tuple[int, int, float, int, st
     findings = slice_item.get("findings")
     category = None
     if isinstance(findings, list) and findings and isinstance(findings[0], dict):
-        category = findings[0].get("category")
+        category = cast(dict[str, Any], cast(list[Any], findings)[0]).get("category")
     security_rank = 0 if isinstance(category, str) and category.startswith("security:") else 1
     priority = str(slice_item.get("priority") or "")
     score = slice_item.get("score")
@@ -58,7 +58,7 @@ def slice_sort_key(slice_item: dict[str, Any]) -> tuple[int, int, float, int, st
     leverage_rank = 0.0
     leverage = slice_item.get("leverage")
     if isinstance(leverage, dict):
-        rank = leverage.get("rank")
+        rank = cast(dict[str, Any], leverage).get("rank")
         if isinstance(rank, (int, float)):
             leverage_rank = float(rank)
     return (

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from quality_runner.scan_exclusions import SCAN_EXCLUSION_MODULES, normalize_scan_exclusion_module
+from typing import Any, cast
 
 
 def parse_scan_exclusions_by_module(
@@ -12,8 +13,8 @@ def parse_scan_exclusions_by_module(
         return {}, [_warning("quality_runner.scan_exclusions_by_module must be a table")]
     parsed: dict[str, list[str]] = {}
     warnings: list[dict[str, str]] = []
-    for raw_module, raw_patterns in value.items():
-        if not isinstance(raw_module, str) or not raw_module:
+    for raw_module, raw_patterns in cast(dict[str, Any], value).items():
+        if not raw_module:
             warnings.append(
                 _warning("quality_runner.scan_exclusions_by_module keys must be module names")
             )
@@ -47,8 +48,10 @@ def _string_list(
     field: str,
     warnings: list[dict[str, str]],
 ) -> list[str]:
-    if isinstance(value, list) and all(isinstance(item, str) and item for item in value):
-        return value
+    if isinstance(value, list) and all(
+        isinstance(item, str) and item for item in cast(list[Any], value)
+    ):
+        return cast(list[str], value)
     warnings.append(_warning(f"{field} must be a list of non-empty strings"))
     return []
 

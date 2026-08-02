@@ -384,16 +384,16 @@ def _analysis_evidence(analysis: Any) -> dict[str, Any]:
 
 def _required_readiness_blockers(readiness: dict[str, Any]) -> list[dict[str, str]]:
     blockers: list[dict[str, str]] = []
-    for gate in readiness.get("gates", []):
-        if (
-            isinstance(gate, dict)
-            and gate.get("required") is True
-            and gate.get("state") != "certified"
-        ):
+    for gate in cast(list[Any], readiness.get("gates", [])):
+        if isinstance(gate, dict):
+            typed_gate = cast(dict[str, Any], gate)
+        else:
+            continue
+        if typed_gate.get("required") is True and typed_gate.get("state") != "certified":
             blockers.append(
                 {
                     "code": "required_gate_not_ready",
-                    "message": f"required gate {gate.get('id')} is {gate.get('state')}",
+                    "message": f"required gate {typed_gate.get('id')} is {typed_gate.get('state')}",
                 }
             )
     return blockers
@@ -401,7 +401,7 @@ def _required_readiness_blockers(readiness: dict[str, Any]) -> list[dict[str, st
 
 def _prevention(config: dict[str, Any]) -> dict[str, Any]:
     value = config.get("prevention")
-    return value if isinstance(value, dict) else {}
+    return cast(dict[str, Any], value) if isinstance(value, dict) else {}
 
 
 def _overlay_config(repo_root: Path, snapshot_root: Path) -> None:

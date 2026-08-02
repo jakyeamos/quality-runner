@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any, cast
 
 
 def discover_intent_docs(repo_root: Path) -> list[dict[str, str]]:
@@ -22,11 +23,12 @@ def intent_docs_markdown_lines(intent_docs: object) -> list[str]:
     if not isinstance(intent_docs, list) or not intent_docs:
         return []
     lines = ["## Relevant Repo Intent Docs", ""]
-    for doc in intent_docs:
+    for doc in cast(list[Any], intent_docs):
         if not isinstance(doc, dict):
             continue
-        doc_type = doc.get("type")
-        path = doc.get("path")
+        typed_doc = cast(dict[str, Any], doc)
+        doc_type = typed_doc.get("type")
+        path = typed_doc.get("path")
         if isinstance(doc_type, str) and isinstance(path, str) and doc_type and path:
             lines.append(f"- {doc_type}: `{path}`")
     lines.append("")

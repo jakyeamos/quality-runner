@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from quality_runner.artifacts import write_json
 from quality_runner.bug_learning_fleet import (
@@ -60,8 +60,7 @@ def aggregate_candidate_fleet(
                 }
             )
             continue
-        registry = validation["registry"]
-        assert isinstance(registry, dict)
+        registry = cast(dict[str, Any], validation["registry"])
         for candidate in objects(registry.get("candidates")):
             occurrences.append(
                 {
@@ -131,13 +130,13 @@ def check_candidate_promotion(
         errors.extend(promotion_decision_errors(decision, candidate_id, fleet))
 
     raw_criteria = group.get("promotion_criteria") if isinstance(group, dict) else None
-    criteria: dict[str, Any] = raw_criteria if isinstance(raw_criteria, dict) else {}
+    criteria: dict[str, Any] = cast(dict[str, Any], raw_criteria) if isinstance(raw_criteria, dict) else {}
     if set(criteria) != PROMOTION_CRITERIA_KEYS:
         errors.append("promotion criteria are missing, extra, or unsupported")
     failed_criteria = sorted(
         key
         for key, value in criteria.items()
-        if not isinstance(value, dict) or value.get("passed") is not True
+        if not isinstance(value, dict) or cast(dict[str, Any], value).get("passed") is not True
     )
     if failed_criteria:
         errors.append(f"promotion criteria failed: {', '.join(failed_criteria)}")

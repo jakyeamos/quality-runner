@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import os
 from pathlib import Path, PurePosixPath
-from typing import Any
+from typing import Any, cast
 
 EXPECTED_PNPM_VERSION = "11.9.0"
 
@@ -33,7 +33,7 @@ _LOCKFILE_NAMES = frozenset(
 )
 
 
-def _package_manager_state(
+def package_manager_state(
     root: Path,
     tracked_paths: list[str],
     languages: set[str],
@@ -63,8 +63,9 @@ def _package_manager_state(
         if not isinstance(document, dict):
             parse_errors.append(f"{relative}: package.json must contain an object")
             continue
-        package_documents[relative] = document
-        package_manager = document.get("packageManager")
+        typed_document = cast(dict[str, Any], document)
+        package_documents[relative] = typed_document
+        package_manager = typed_document.get("packageManager")
         if isinstance(package_manager, str) and package_manager:
             package_values.append({"path": relative, "value": package_manager})
 
@@ -174,7 +175,11 @@ def _nested_package_root_state(root: Path, path: Path) -> dict[str, Any]:
         document = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         document = {}
-    package_manager = document.get("packageManager") if isinstance(document, dict) else None
+    package_manager = (
+        cast(dict[str, Any], document).get("packageManager")
+        if isinstance(document, dict)
+        else None
+    )
     lockfiles = sorted(
         candidate.name
         for candidate in path.parent.iterdir()
@@ -208,7 +213,7 @@ def _workspace_state(
     relative_paths = sorted(documents)
     workspace_file = root / "pnpm-workspace.yaml"
     root_document = documents.get("package.json", {})
-    declared = root_document.get("workspaces") if isinstance(root_document, dict) else None
+    declared = root_document.get("workspaces")
     product_paths = [
         path
         for path in relative_paths

@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import argparse
+from typing import Any, cast
 import json
 from pathlib import Path
-from typing import Any
 
 from quality_runner.findings import validate_agent_handoff
 from quality_runner.handoff_lint import validate_handoff_quality, validate_slice_spec_content
@@ -12,7 +12,7 @@ from quality_runner.review_worker import review_worker_payload
 from quality_runner.slice_specs import export_slice_specs_payload
 
 
-def add_handoff_commands(subparsers: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
+def add_handoff_commands(subparsers: Any) -> None:
     export_slice_specs = subparsers.add_parser(
         "export-slice-specs",
         help="Write improve-style cold-executor slice specs for a run",
@@ -150,4 +150,4 @@ def _load_json(path: Path) -> dict[str, Any]:
     payload = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(payload, dict):
         raise ValueError(f"JSON object required: {path}")
-    return payload
+    return cast(dict[str, Any], payload)

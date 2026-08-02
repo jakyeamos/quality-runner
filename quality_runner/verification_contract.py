@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 
 VERIFICATION_MODE_VALUES = frozenset({"command", "evidence"})
 
@@ -98,7 +98,7 @@ def verification_contract_is_valid(payload: dict[str, Any]) -> bool:
 def _has_command_verification(value: object) -> bool:
     if not isinstance(value, list):
         return False
-    for item in value:
+    for item in cast(list[Any], value):
         if not isinstance(item, str) or not item:
             continue
         lowered = item.lower()
@@ -123,13 +123,11 @@ def _string_values(value: object) -> list[str]:
     if isinstance(value, str) and value:
         return [value]
     if isinstance(value, list):
-        return [item for item in value if isinstance(item, str) and item]
+        return [item for item in cast(list[Any], value) if isinstance(item, str) and item]
     return []
 
 
 def _non_empty_string_list(value: object) -> bool:
-    return (
-        isinstance(value, list)
-        and bool(value)
-        and all(isinstance(item, str) and item for item in value)
-    )
+    if not isinstance(value, list) or not value:
+        return False
+    return all(isinstance(item, str) and item for item in cast(list[object], value))

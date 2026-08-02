@@ -13,7 +13,7 @@ from quality_runner.fleet.audit import (
 from quality_runner.fleet.feed import fleet_feed_payload
 
 
-def add_fleet_commands(subparsers: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
+def add_fleet_commands(subparsers: Any) -> None:
     fleet_parser = subparsers.add_parser(
         "fleet",
         help="Run bounded fleet audits without modifying repository checkouts",

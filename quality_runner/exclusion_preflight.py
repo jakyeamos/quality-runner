@@ -58,7 +58,6 @@ def build_exclusion_packet(repo_root: Path, run_id: str) -> dict[str, object]:
     configured_by_module = {
         module: string_list(patterns)
         for module, patterns in dict_value(config.get("scan_exclusions_by_module")).items()
-        if isinstance(module, str)
     }
     candidates, traversal = inventory_candidates(
         root,
@@ -113,7 +112,7 @@ def normalize_run_only_exclusion_paths(repo_root: Path, paths: list[str] | None)
     root = repo_root.expanduser().resolve()
     normalized: list[str] = []
     for raw_value in paths or []:
-        if not isinstance(raw_value, str) or not raw_value.strip():
+        if not raw_value.strip():
             raise ValueError("--scan-exclusion values must be non-empty repo-relative paths")
         value = raw_value.strip()
         error = relative_path_error(value)
@@ -149,7 +148,7 @@ def normalize_run_only_exclusion_overlay(
     normalized_global = normalize_run_only_exclusion_paths(repo_root, paths)
     normalized_modules: dict[str, list[str]] = {}
     for raw_value in module_values or []:
-        if not isinstance(raw_value, str) or "=" not in raw_value:
+        if "=" not in raw_value:
             raise ValueError("--scan-exclusion-module values must use MODULE=DIR syntax")
         raw_module, raw_path = raw_value.split("=", 1)
         module = normalize_scan_exclusion_module(raw_module)
@@ -200,7 +199,6 @@ def build_run_only_overlay(
     configured_by_module = {
         module: string_list(values)
         for module, values in dict_value(base_config.get("scan_exclusions_by_module")).items()
-        if isinstance(module, str)
     }
     base_config["scan_exclusions_by_module"] = configured_by_module
     if overlay_patterns:

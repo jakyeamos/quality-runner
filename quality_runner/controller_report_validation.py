@@ -62,7 +62,12 @@ def validate_controller_report(report: dict[str, Any]) -> dict[str, Any]:
 
 
 def _string_list(value: object) -> bool:
-    return isinstance(value, list) and all(isinstance(item, str) and item for item in value)
+    return isinstance(value, list) and all(
+        isinstance(item, str) and item for item in cast(list[Any], value)
+    )
+
+
+string_list = _string_list
 
 
 def _non_empty_string(value: object) -> bool:

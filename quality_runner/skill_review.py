@@ -3,8 +3,8 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, cast
 
-from quality_runner.code_quality_architecture import _path_matches_any
-from quality_runner.code_quality_findings import _finding
+from quality_runner.code_quality_architecture import path_matches_any
+from quality_runner.code_quality_findings import finding as build_finding
 from quality_runner.schema_constants import SKILL_REVIEW_PACKET_SCHEMA, SKILL_REVIEW_REPORT_SCHEMA
 from quality_runner.verification_contract import verification_contract_fields
 
@@ -184,7 +184,7 @@ def review_report_findings(
         severity = str(item["severity"])
         confidence = str(item["confidence"])
         file = str(item["file"])
-        finding = _finding(
+        finding = build_finding(
             category=f"skill:{skill_id}",
             severity=severity,
             confidence=confidence,
@@ -247,7 +247,7 @@ def _included_files(
     included: list[dict[str, Any]] = []
     for item in scanned_files:
         relative_path = str(item["path"])
-        if not _path_matches_any(relative_path, path_patterns):
+        if not path_matches_any(relative_path, path_patterns):
             continue
         lines = item.get("lines")
         line_count = len(cast(list[Any], lines)) if isinstance(lines, list) else 0

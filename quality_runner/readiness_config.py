@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 
 
 def parse_readiness_section(
@@ -12,7 +12,7 @@ def parse_readiness_section(
     if not isinstance(value, dict):
         warnings.append(_warning("quality_runner.readiness must be a table"))
         return {}
-    evidence_file = value.get("evidence_file")
+    evidence_file = cast(dict[str, Any], value).get("evidence_file")
     if evidence_file is not None and (not isinstance(evidence_file, str) or not evidence_file):
         warnings.append(
             _warning("quality_runner.readiness.evidence_file must be a non-empty string")

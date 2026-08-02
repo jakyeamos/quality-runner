@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-import argparse
 import importlib.metadata
 import json
 import subprocess
 import tomllib
 from pathlib import Path
+from typing import Any
 from urllib.parse import unquote, urlparse
 
 PACKAGE_NAME = "quality-runner"
@@ -14,7 +14,7 @@ SelfUpdatePayload = dict[str, object]
 
 
 def add_update_command(
-    subparsers: argparse._SubParsersAction[argparse.ArgumentParser],
+    subparsers: Any,
 ) -> None:
     parser = subparsers.add_parser(
         "self-update",

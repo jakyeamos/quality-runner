@@ -14,7 +14,7 @@ from quality_runner.gate_controller import (
 )
 
 
-def add_gate_commands(subparsers: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
+def add_gate_commands(subparsers: Any) -> None:
     gate_parser = subparsers.add_parser(
         "gate",
         help="Create a driveable gate run from an existing Quality Runner run",

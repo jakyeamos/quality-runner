@@ -11,7 +11,7 @@ from quality_runner.remediation_delta import (
 
 
 def add_remediation_commands(
-    subparsers: argparse._SubParsersAction[argparse.ArgumentParser],
+    subparsers: Any,
 ) -> None:
     parser = subparsers.add_parser(
         "remediation-delta",

@@ -6,7 +6,7 @@ import stat
 import subprocess
 from collections.abc import Mapping
 from pathlib import Path
-from typing import cast
+from typing import Any, cast
 
 from quality_runner.application.fresh_review import (
     complete_fresh_review,
@@ -18,7 +18,6 @@ from quality_runner.application.review_v1_reports import review_report_to_v1
 from quality_runner.core.review_contracts import (
     EvidenceReference,
     FreshReviewExecution,
-    NormalizedReviewOptions,
     ReviewLoopStop,
 )
 from quality_runner.review_response_files import (
@@ -80,9 +79,11 @@ def review_mcp_payload(
 ) -> dict[str, object]:
     def strings(key: str) -> list[str]:
         value = arguments.get(key, [])
-        if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
+        if not isinstance(value, list) or not all(
+            isinstance(item, str) for item in cast(list[Any], value)
+        ):
             raise ValueError(f"{key} must be an array of strings")
-        return value
+        return cast(list[str], value)
 
     args = argparse.Namespace(
         command="review",
@@ -114,7 +115,7 @@ def review_mcp_payload(
     )
 
 
-def add_review_command(subparsers: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
+def add_review_command(subparsers: Any) -> None:
     parser = subparsers.add_parser("review", help="Run a fresh, read-only review")
     parser.add_argument("repo_path", help="Target repository path")
     parser.add_argument("--run-id", default=None, help="Stable review run id")
@@ -238,7 +239,7 @@ def review_command_payload(
     execution = prepare_fresh_review(
         repo_root=repo_root,
         run_id=run_id,
-        options=cast(NormalizedReviewOptions, options),
+        options=options,
         repository_state={"detail": "full" if args.detail == "expanded" else args.detail},
         changed_files=_changed_files(repo_root),
         omitted_evidence=omitted,

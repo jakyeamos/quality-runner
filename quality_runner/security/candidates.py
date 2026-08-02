@@ -15,7 +15,7 @@ from quality_runner.evidence_redaction import (
 from quality_runner.security.disposition import classify_security_candidate
 from quality_runner.security.taxonomy import SECURITY_TAXONOMY_CATEGORIES
 
-_CANDIDATE_ID = 0
+_candidate_id_counter = 0
 
 SECRET_PATTERNS: tuple[tuple[str, str, str, str], ...] = (
     (
@@ -105,7 +105,7 @@ def scan_security_candidates(
     surfaces: dict[str, bool],
     owner_role: str = "security-maintainer",
 ) -> list[dict[str, Any]]:
-    global _CANDIDATE_ID
+    global _candidate_id_counter
     candidates: list[dict[str, Any]] = []
     disabled = set(disabled_groups)
     additional_candidates: list[tuple[str, str, str, str, int, str, str]] = []
@@ -245,7 +245,7 @@ def scan_security_candidates(
             )
         )
 
-    _CANDIDATE_ID = 0
+    _candidate_id_counter = 0
     return _dedupe_candidates(candidates)
 
 
@@ -261,9 +261,9 @@ def _candidate(
     requires_agent_review: bool,
     owner_role: str = "security-maintainer",
 ) -> dict[str, Any]:
-    global _CANDIDATE_ID
-    _CANDIDATE_ID += 1
-    candidate_id = f"SEC-{category.replace('-', '_')}-{_CANDIDATE_ID:04d}"
+    global _candidate_id_counter
+    _candidate_id_counter += 1
+    candidate_id = f"SEC-{category.replace('-', '_')}-{_candidate_id_counter:04d}"
     disposition = classify_security_candidate(
         category=category,
         confidence=confidence,

@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import argparse
+from typing import Any
 
 
-def add_task_commands(subparsers: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
+def add_task_commands(subparsers: Any) -> None:
     task_parser = subparsers.add_parser(
         "task",
         help="Capture and enforce a task-scoped preventative quality baseline",

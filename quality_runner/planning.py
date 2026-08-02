@@ -198,10 +198,6 @@ def build_agent_handoff(
     }
 
 
-def _slice_for_finding(finding: dict[str, Any]) -> dict[str, Any]:
-    return slice_for_finding(finding)
-
-
 def _include_finding_slice(
     finding: dict[str, Any],
     *,

@@ -6,6 +6,7 @@ import sys
 import tomllib
 from collections.abc import Sequence
 from pathlib import Path
+from typing import Any, cast
 
 QUALITY_RUNNER_GIT_URL = "git+https://github.com/jakyeamos/quality-runner.git"
 QUALITY_RUNNER_PROJECT = "quality-runner"
@@ -58,4 +59,4 @@ def _is_quality_runner_checkout(path: Path) -> bool:
     except (OSError, tomllib.TOMLDecodeError):
         return False
     project = document.get("project")
-    return isinstance(project, dict) and project.get("name") == QUALITY_RUNNER_PROJECT
+    return isinstance(project, dict) and cast(dict[str, Any], project).get("name") == QUALITY_RUNNER_PROJECT

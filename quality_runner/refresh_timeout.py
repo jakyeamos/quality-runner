@@ -7,7 +7,7 @@ from collections.abc import Iterator, Mapping
 from contextlib import contextmanager
 from pathlib import Path
 from types import FrameType
-from typing import Any
+from typing import Any, cast
 
 from quality_runner.artifacts import prepare_artifact_dir, write_json, write_text
 from quality_runner.manifest import build_run_manifest
@@ -169,9 +169,10 @@ def resolve_refresh_timeout_contract(
 def _integer_timeouts(value: object) -> dict[str, int]:
     if not isinstance(value, Mapping):
         return {}
+    typed_value = cast(Mapping[str, object], value)
     return {
         key: item
-        for key, item in value.items()
+        for key, item in typed_value.items()
         if key in {"inspect", "run", "verify", "total"} and isinstance(item, int) and item > 0
     }
 
@@ -385,7 +386,7 @@ def build_timeout_verify_artifacts(
     )
     write_json(run_dir / "agent-handoff.json", handoff)
     write_text(run_dir / "agent-handoff.md", render_handoff_markdown(handoff))
-    verify_result = {
+    verify_result: dict[str, Any] = {
         "schema": "quality-runner-verify-gates-result-v0.1",
         "status": "blocked",
         "implementation_allowed": False,
@@ -463,17 +464,17 @@ def _timeout_diagnostics(*, timeout_context: dict[str, str] | None) -> dict[str,
 
 def _existing_plan(path: Path) -> list[Any]:
     payload = _read_existing_json(path)
-    return payload if isinstance(payload, list) else []
+    return cast(list[Any], payload) if isinstance(payload, list) else []
 
 
 def _existing_verification(path: Path) -> dict[str, Any]:
     payload = _read_existing_json(path)
-    return payload if isinstance(payload, dict) else {}
+    return cast(dict[str, Any], payload) if isinstance(payload, dict) else {}
 
 
 def _existing_gates(verification: dict[str, Any]) -> list[Any]:
     gates = verification.get("gates")
-    return gates if isinstance(gates, list) else []
+    return cast(list[Any], gates) if isinstance(gates, list) else []
 
 
 def _read_existing_json(path: Path) -> object:

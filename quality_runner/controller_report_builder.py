@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 
 from quality_runner.controller_report_defaults import (
     controller_command_environment,
@@ -156,4 +156,4 @@ def _default_ignored_generated_artifacts(git_status: str) -> list[str]:
 
 def _nested(payload: dict[str, Any], key: str, nested_key: str) -> object:
     value = payload.get(key)
-    return value.get(nested_key) if isinstance(value, dict) else None
+    return cast(dict[str, Any], value).get(nested_key) if isinstance(value, dict) else None

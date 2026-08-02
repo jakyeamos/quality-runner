@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 
 
 def handoff_status(
@@ -45,7 +45,11 @@ def _available_capabilities(capability_map: dict[str, Any] | None) -> list[dict[
     available = capability_map.get("available")
     if not isinstance(available, list):
         return []
-    return [capability for capability in available if isinstance(capability, dict)]
+    return [
+        cast(dict[str, Any], capability)
+        for capability in cast(list[Any], available)
+        if isinstance(capability, dict)
+    ]
 
 
 def _capability_execution_results(capability_map: dict[str, Any] | None) -> list[str]:
@@ -54,8 +58,9 @@ def _capability_execution_results(capability_map: dict[str, Any] | None) -> list
         state = capability.get("verification_state")
         if not isinstance(state, dict):
             continue
-        execution = state.get("execution")
-        result = state.get("result")
+        typed_state = cast(dict[str, Any], state)
+        execution = typed_state.get("execution")
+        result = typed_state.get("result")
         if execution in {"ci-executed", "local-executed"} and isinstance(result, str):
             results.append(result)
     return results
@@ -66,9 +71,9 @@ def _slices(plan: dict[str, Any]) -> list[dict[str, str]]:
     if not isinstance(slices, list):
         return []
     return [
-        {"id": slice_item["id"]}
-        for slice_item in slices
+        {"id": cast(dict[str, Any], slice_item)["id"]}
+        for slice_item in cast(list[Any], slices)
         if isinstance(slice_item, dict)
-        and isinstance(slice_item.get("id"), str)
-        and slice_item["id"]
+        and isinstance(cast(dict[str, Any], slice_item).get("id"), str)
+        and cast(dict[str, Any], slice_item)["id"]
     ]

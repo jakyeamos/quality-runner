@@ -18,8 +18,6 @@ ACTIONABILITY_VALUES = {
 def enrich_audit_findings(findings: list[dict[str, Any]]) -> list[dict[str, Any]]:
     enriched: list[dict[str, Any]] = []
     for finding in findings:
-        if not isinstance(finding, dict):
-            continue
         actionability, rationale = actionability_for_finding(finding)
         enriched.append(
             {

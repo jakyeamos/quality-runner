@@ -7,6 +7,7 @@ import tempfile
 from collections.abc import Callable, Sequence
 from contextlib import suppress
 from pathlib import Path
+from typing import Any, cast
 
 from quality_runner.cache_modes import CacheMode, cache_directory, resolve_cache_mode
 
@@ -97,16 +98,17 @@ class SourceAnalysisCache:
             return None
         if not isinstance(payload, dict):
             return None
-        if payload.get("schema") != SOURCE_ANALYSIS_CACHE_SCHEMA:
+        typed_payload = cast(dict[str, Any], payload)
+        if typed_payload.get("schema") != SOURCE_ANALYSIS_CACHE_SCHEMA:
             return None
-        if payload.get("content_sha256") != content_sha256:
+        if typed_payload.get("content_sha256") != content_sha256:
             return None
-        redacted_lines = payload.get("redacted_lines")
+        redacted_lines = typed_payload.get("redacted_lines")
         if not isinstance(redacted_lines, list) or not all(
-            isinstance(line, str) for line in redacted_lines
+            isinstance(line, str) for line in cast(list[Any], redacted_lines)
         ):
             return None
-        return list(redacted_lines)
+        return list(cast(list[str], redacted_lines))
 
     def _store(self, content_sha256: str, redacted_lines: Sequence[str]) -> None:
         if self._cache_mode == "disabled" or not self._safe_cache_tree():

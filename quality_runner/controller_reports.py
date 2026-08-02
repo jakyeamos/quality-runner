@@ -15,10 +15,7 @@ from quality_runner.controller_report_defaults import (
     normalized_controller_command_environment,
     normalized_controller_status_recommendation,
 )
-from quality_runner.controller_report_validation import (
-    _string_list,
-    validate_controller_report,
-)
+from quality_runner.controller_report_validation import string_list, validate_controller_report
 
 CONTROLLER_REPORT_LINT_SCHEMA = "quality-runner-controller-report-lint-v0.1"
 CONTROLLER_REPORT_SCHEMA = "quality-runner-controller-report-v0.1"
@@ -192,7 +189,7 @@ def _baseline_path(*, repo_path: str, baseline_run_id: str | None) -> str | None
 
 
 def _normalized_files_changed(value: object) -> list[str]:
-    if _string_list(value):
+    if string_list(value):
         return list(cast(list[str], value))
     value_map = _dict(value)
     if value_map is None:
@@ -204,7 +201,7 @@ def _normalized_files_changed(value: object) -> list[str]:
         "tracked_repo_files_modified_after_run",
     ):
         nested = value_map.get(key)
-        if _string_list(nested):
+        if string_list(nested):
             return list(cast(list[str], nested))
     return []
 
@@ -314,7 +311,7 @@ def _normalized_git_status_short(report: dict[str, Any]) -> str:
 
 def _normalized_ignored_generated_artifacts(report: dict[str, Any]) -> list[str]:
     ignored = report.get("ignored_generated_artifacts")
-    if _string_list(ignored):
+    if string_list(ignored):
         return list(cast(list[str], ignored))
     git_status = _normalized_git_status_short(report)
     return _default_ignored_generated_artifacts(git_status)

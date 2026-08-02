@@ -24,7 +24,6 @@ from quality_runner.artifacts import (
     safe_child_file,
 )
 from quality_runner.core.review_contracts import (
-    CombinedReviewPacket,
     CombinedReviewResponseProvenance,
     ReviewHandoff,
     ReviewManifest,
@@ -240,7 +239,7 @@ def _write_agent_packets(
     if context["mode"] != "combined":
         _atomic_write_text(paths["review_agent_packet_md"], render_agent_packet(context_payload))
         return
-    combined = cast(CombinedReviewPacket, context)
+    combined = context
     task_packet, blind_packet = combined["packets"]
     _atomic_write_text(paths["review_agent_packet_md"], render_combined_agent_packet_guide())
     _atomic_write_text(paths["review_agent_task_packet_md"], render_agent_packet(dict(task_packet)))
@@ -317,7 +316,7 @@ def _validate_prepared_execution(payload: Mapping[str, object], context: ReviewP
     if payload.get("run_id") != context["run_id"] or payload.get("mode") != context["mode"]:
         raise ValueError("review execution state does not match the prepared context")
     input_hashes = payload.get("input_hashes")
-    if not isinstance(input_hashes, Mapping) or dict(input_hashes) != context["input_hashes"]:
+    if not isinstance(input_hashes, Mapping) or dict(cast(Mapping[str, object], input_hashes)) != context["input_hashes"]:
         raise ValueError("review execution state does not match the prepared context hashes")
 
 
@@ -348,7 +347,7 @@ def _load_json(path: Path) -> dict[str, object]:
         raise ValueError(f"review artifact is not readable JSON: {error}") from error
     if not isinstance(payload, Mapping):
         raise ValueError("review artifact must be a JSON object")
-    return dict(payload)
+    return cast(dict[str, object], payload)
 
 
 @contextmanager
@@ -379,10 +378,6 @@ def _finalization_lock(run_dir: Path) -> Iterator[None]:
                 fcntl.flock(descriptor, fcntl.LOCK_UN)
             os.close(descriptor)
         os.close(directory_descriptor)
-
-
-def _string_paths(paths: Mapping[str, Path]) -> dict[str, str]:
-    return {name: str(path) for name, path in paths.items()}
 
 
 def _existing_string_paths(paths: Mapping[str, Path]) -> dict[str, str]:

@@ -348,7 +348,7 @@ def run_refresh_payload(
         )
     )
     timeout_contract["baseline_recording"] = baseline_recording
-    if isinstance(baseline_recording, dict) and baseline_recording.get("status") == "recorded":
+    if baseline_recording.get("status") == "recorded":
         timeout_contract["baseline_id"] = baseline_recording.get("baseline_id")
         timeout_contract["baseline_sample_count"] = baseline_recording.get("sample_count", 0)
         timeout_contract["baseline_status"] = baseline_recording.get("state")
