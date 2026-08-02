@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 from collections import Counter
 from collections.abc import Iterable
-from typing import Any
+from typing import Any, cast
 
 DOMAIN_ORDER = (
     "security",
@@ -172,7 +172,7 @@ def _build_candidate(domain: str, slices: list[dict[str, Any]]) -> dict[str, Any
     verification_gates = _unique_strings(
         gate
         for item in ordered
-        for gate in item.get("verification_gates", [])
+        for gate in cast(list[object], item.get("verification_gates", []))
         if isinstance(gate, str) and gate
     )
     verification_modes = sorted(
@@ -241,9 +241,9 @@ def _build_candidate(domain: str, slices: list[dict[str, Any]]) -> dict[str, Any
         "bulk_review_eligible_count": sum(
             1
             for item in ordered
-            for finding in item.get("findings", [])
+            for finding in cast(list[object], item.get("findings", []))
             if isinstance(finding, dict)
-            and finding.get("disposition_class") == "bulk-review-eligible"
+            and cast(dict[str, Any], finding).get("disposition_class") == "bulk-review-eligible"
         ),
     }
 
@@ -254,11 +254,11 @@ def _categories(slice_item: dict[str, Any]) -> list[str]:
         return []
     return sorted(
         {
-            str(finding["category"]).lower()
-            for finding in findings
+            str(cast(dict[str, Any], finding)["category"]).lower()
+            for finding in cast(list[object], findings)
             if isinstance(finding, dict)
-            and isinstance(finding.get("category"), str)
-            and finding["category"]
+            and isinstance(cast(dict[str, Any], finding).get("category"), str)
+            and cast(dict[str, Any], finding)["category"]
         }
     )
 
@@ -270,12 +270,13 @@ def _slice_text(slice_item: dict[str, Any]) -> str:
         if isinstance(value, str):
             values.append(value)
         elif isinstance(value, list):
-            values.extend(item for item in value if isinstance(item, str))
+            values.extend(item for item in cast(list[object], value) if isinstance(item, str))
     findings = slice_item.get("findings")
     if isinstance(findings, list):
-        for finding in findings:
-            if not isinstance(finding, dict):
+        for raw_finding in cast(list[object], findings):
+            if not isinstance(raw_finding, dict):
                 continue
+            finding = cast(dict[str, Any], raw_finding)
             for key in ("category", "summary", "actionability"):
                 value = finding.get(key)
                 if isinstance(value, str):
@@ -346,9 +347,10 @@ def _unique_findings(slices: list[dict[str, Any]]) -> list[dict[str, Any]]:
         findings = slice_item.get("findings")
         if not isinstance(findings, list):
             continue
-        for finding in findings:
-            if not isinstance(finding, dict):
+        for raw_finding in cast(list[object], findings):
+            if not isinstance(raw_finding, dict):
                 continue
+            finding = cast(dict[str, Any], raw_finding)
             finding_id = finding.get("id")
             if isinstance(finding_id, str) and finding_id and finding_id not in by_id:
                 by_id[finding_id] = dict(finding)
@@ -374,18 +376,19 @@ def _representative_paths(slices: list[dict[str, Any]]) -> list[str]:
     for slice_item in slices:
         findings = slice_item.get("findings")
         if isinstance(findings, list):
-            for finding in findings:
-                if not isinstance(finding, dict):
+            for raw_finding in cast(list[object], findings):
+                if not isinstance(raw_finding, dict):
                     continue
+                finding = cast(dict[str, Any], raw_finding)
                 for key in ("file", "path"):
                     value = finding.get(key)
                     if isinstance(value, str) and value:
                         paths[value] += 1
         scope = slice_item.get("scope")
         if isinstance(scope, dict):
-            in_scope = scope.get("in_scope")
+            in_scope = cast(dict[str, Any], scope).get("in_scope")
             if isinstance(in_scope, list):
-                for value in in_scope:
+                for value in cast(list[object], in_scope):
                     if isinstance(value, str) and value and "/" in value:
                         paths[value] += 1
     return [path for path, _ in sorted(paths.items(), key=lambda item: (-item[1], item[0]))][
@@ -399,14 +402,15 @@ def _slice_requires_review(slice_item: dict[str, Any]) -> bool:
     findings = slice_item.get("findings")
     if not isinstance(findings, list):
         return False
-    return any(
-        isinstance(finding, dict)
-        and (
-            finding.get("actionability") == "needs-author-decision"
-            or str(finding.get("category") or "").startswith("security:agent-review")
-        )
-        for finding in findings
-    )
+    for raw_finding in cast(list[object], findings):
+        if not isinstance(raw_finding, dict):
+            continue
+        finding = cast(dict[str, Any], raw_finding)
+        if finding.get("actionability") == "needs-author-decision" or str(
+            finding.get("category") or ""
+        ).startswith("security:agent-review"):
+            return True
+    return False
 
 
 def _aggregate_priority(slices: list[dict[str, Any]]) -> str:
