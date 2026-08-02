@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from quality_runner.gate_execution_policy import (
     gate_cwd,
@@ -48,7 +48,7 @@ def dependency_setup_skipped_gate(
         "reason": "skipped because an earlier gate hit the same dependency setup blocker",
         "blocked_by": str(blocked_by.get("id") or "unknown"),
         "diagnostics": {"dependency_setup": dependency_setup},
-        **dependency_setup_recommended_action(dependency_setup),
+        **dependency_setup_recommended_action(cast(dict[str, Any], dependency_setup)),
     }
 
 
@@ -130,7 +130,7 @@ def dependency_setup_action(diagnostics: dict[str, Any] | None) -> dict[str, str
     setup = diagnostics.get("dependency_setup")
     if not isinstance(setup, dict):
         return {}
-    return dependency_setup_recommended_action(setup)
+    return dependency_setup_recommended_action(cast(dict[str, Any], setup))
 
 
 _PNPM_NO_TTY_REINSTALL_CAUSE = (
@@ -192,17 +192,22 @@ def _pnpm_no_tty_reinstall(*, stdout: str, stderr: str) -> bool:
 
 
 def _dependency_setup_diagnostics_from(gate: dict[str, Any]) -> dict[str, str | None] | None:
-    diagnostics = gate.get("diagnostics")
+    gate_data = cast(dict[str, object], gate)
+    diagnostics = gate_data.get("diagnostics")
     if not isinstance(diagnostics, dict):
         return None
-    dependency_setup = diagnostics.get("dependency_setup")
+    dependency_setup = cast(dict[str, object], diagnostics).get("dependency_setup")
     if not isinstance(dependency_setup, dict):
         return None
     return {
-        "package_manager": _string_or_none(dependency_setup.get("package_manager")),
-        "cwd": _string_or_none(dependency_setup.get("cwd")),
-        "setup_command": _string_or_none(dependency_setup.get("setup_command")),
-        "cause": _string_or_none(dependency_setup.get("cause")),
+        "package_manager": _string_or_none(
+            cast(dict[str, object], dependency_setup).get("package_manager")
+        ),
+        "cwd": _string_or_none(cast(dict[str, object], dependency_setup).get("cwd")),
+        "setup_command": _string_or_none(
+            cast(dict[str, object], dependency_setup).get("setup_command")
+        ),
+        "cause": _string_or_none(cast(dict[str, object], dependency_setup).get("cause")),
     }
 
 
