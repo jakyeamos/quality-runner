@@ -189,9 +189,10 @@ def write_security_review_slice_specs(
         return {}
     specs_dir = prepare_directory(run_dir, "security-review-slice-specs")
     paths: dict[str, str] = {}
-    for obligation in obligations:
-        if not isinstance(obligation, dict):
+    for raw_obligation in cast(list[object], obligations):
+        if not isinstance(raw_obligation, dict):
             continue
+        obligation = cast(dict[str, Any], raw_obligation)
         obligation_id = obligation.get("id")
         if not isinstance(obligation_id, str) or not obligation_id:
             continue
@@ -208,7 +209,7 @@ def write_security_review_slice_specs(
             "",
             *[
                 f"- {item}"
-                for item in obligation.get("review_instructions", [])
+                for item in cast(list[object], obligation.get("review_instructions", []))
                 if isinstance(item, str)
             ],
             "",
@@ -216,9 +217,10 @@ def write_security_review_slice_specs(
             "",
         ]
         if isinstance(refs, list) and refs:
-            for ref in refs:
-                if not isinstance(ref, dict):
+            for raw_ref in cast(list[object], refs):
+                if not isinstance(raw_ref, dict):
                     continue
+                ref = cast(dict[str, Any], raw_ref)
                 file = ref.get("file")
                 line = ref.get("line")
                 location = (
@@ -234,7 +236,7 @@ def write_security_review_slice_specs(
         lines.extend(["", "## Completion criteria", ""])
         lines.extend(
             f"- {item}"
-            for item in obligation.get("completion_criteria", [])
+            for item in cast(list[object], obligation.get("completion_criteria", []))
             if isinstance(item, str)
         )
         target = safe_child_file(specs_dir, f"{slice_id}.md")
@@ -266,14 +268,26 @@ def _artifact_paths(run_dir: Path) -> AuditArtifactPaths:
 
 def _slices(plan: dict[str, Any]) -> list[dict[str, Any]]:
     slices = plan.get("slices")
-    return slices if isinstance(slices, list) else []
+    return (
+        [
+            cast(dict[str, Any], item)
+            for item in cast(list[object], slices)
+            if isinstance(item, dict)
+        ]
+        if isinstance(slices, list)
+        else []
+    )
 
 
 def _intent_docs(scan: dict[str, Any]) -> list[dict[str, str]] | None:
     intent_docs = scan.get("intent_docs")
     if not isinstance(intent_docs, list):
         return None
-    return [item for item in intent_docs if isinstance(item, dict)]
+    return [
+        cast(dict[str, str], item)
+        for item in cast(list[object], intent_docs)
+        if isinstance(item, dict)
+    ]
 
 
 def _legacy_payload(payload: AuditPayload | GateVerificationPayload) -> dict[str, Any]:
@@ -288,9 +302,9 @@ def _legacy_optional_payload(payload: AuditPayload | None) -> dict[str, Any] | N
 
 def _scan_exclusion_metadata(scan: dict[str, Any]) -> dict[str, Any] | None:
     metadata = scan.get("scan_exclusion_preflight")
-    return metadata if isinstance(metadata, dict) else None
+    return cast(dict[str, Any], metadata) if isinstance(metadata, dict) else None
 
 
 def _agent_review_mode(analysis: AuditAnalysis) -> AgentReviewMode:
     mode = analysis.request.agent_review_mode
-    return cast(AgentReviewMode, mode) if mode in AGENT_REVIEW_MODES else "auto"
+    return mode if mode in AGENT_REVIEW_MODES else "auto"
