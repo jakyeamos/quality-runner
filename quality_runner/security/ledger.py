@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
-from quality_runner.code_quality_findings import _counts
+from quality_runner.code_quality_findings import counts
 from quality_runner.security.taxonomy import SECURITY_RESOLUTION_STATUSES
 
 SECURITY_ACCEPTED_STATUSES = {
@@ -24,7 +24,8 @@ def merge_security_ledger_entries(
     repo_root: Path,
     run_id: str,
 ) -> dict[str, Any]:
-    if security_scan.get("settings", {}).get("enabled") is False:
+    settings = _mapping(security_scan.get("settings")) or {}
+    if settings.get("enabled") is False:
         return ledger
 
     candidates = security_scan.get("candidates")
@@ -39,13 +40,14 @@ def merge_security_ledger_entries(
         if entry.get("fingerprint") and entry.get("status") in SECURITY_ACCEPTED_STATUSES
     }
 
-    entries = list(ledger.get("entries", []))
+    entries = list(_mappings(ledger.get("entries", [])))
     current_fingerprints = {
         entry.get("fingerprint") for entry in entries if entry.get("fingerprint")
     }
 
-    for candidate in candidates:
-        if not isinstance(candidate, dict):
+    for candidate_value in cast(list[object], candidates):
+        candidate = _mapping(candidate_value)
+        if candidate is None:
             continue
         fingerprint = candidate.get("fingerprint")
         if not isinstance(fingerprint, str) or fingerprint in current_fingerprints:
@@ -114,10 +116,8 @@ def merge_security_ledger_entries(
     entries.sort(
         key=lambda item: (str(item.get("status")), str(item.get("file")), str(item.get("line")))
     )
-    summary = ledger.get("summary")
-    if not isinstance(summary, dict):
-        summary = {}
-    by_status = _counts(entries, "status", sorted(SECURITY_RESOLUTION_STATUSES))
+    summary = _mapping(ledger.get("summary")) or {}
+    by_status = counts(entries, "status", sorted(SECURITY_RESOLUTION_STATUSES))
     return {
         **ledger,
         "summary": {
@@ -163,8 +163,8 @@ def _latest_security_entries(repo_root: Path, run_id: str) -> list[dict[str, Any
             continue
         return [
             entry
-            for entry in entries
-            if isinstance(entry, dict) and entry.get("ledger_kind") == "security"
+            for entry in _mappings(cast(list[object], entries))
+            if entry.get("ledger_kind") == "security"
         ]
     return []
 
@@ -174,8 +174,9 @@ def _security_accepted_dispositions(config: dict[str, Any]) -> dict[str, dict[st
     if not isinstance(dispositions, list):
         return {}
     accepted: dict[str, dict[str, str]] = {}
-    for item in dispositions:
-        if not isinstance(item, dict):
+    for item_value in cast(list[object], dispositions):
+        item = _mapping(item_value)
+        if item is None:
             continue
         fingerprint = item.get("fingerprint")
         status = item.get("status")
@@ -200,3 +201,13 @@ def _security_accepted_dispositions(config: dict[str, Any]) -> dict[str, dict[st
                 **({"expires": expires} if isinstance(expires, str) and expires else {}),
             }
     return accepted
+
+
+def _mapping(value: object) -> dict[str, Any] | None:
+    return cast(dict[str, Any], value) if isinstance(value, dict) else None
+
+
+def _mappings(value: object) -> list[dict[str, Any]]:
+    if not isinstance(value, list):
+        return []
+    return [item for item in cast(list[object], value) if isinstance(item, dict)]

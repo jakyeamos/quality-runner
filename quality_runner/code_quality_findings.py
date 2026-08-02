@@ -98,3 +98,6 @@ def _counts(items: list[dict[str, Any]], field: str, keys: list[str]) -> dict[st
         if isinstance(value, str):
             counts[value] = counts.get(value, 0) + 1
     return counts
+
+
+counts = _counts
