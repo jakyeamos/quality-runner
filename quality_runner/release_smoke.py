@@ -4,7 +4,7 @@ import tempfile
 from collections.abc import Mapping
 from importlib.resources import files
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from quality_runner.application.journey_outcomes import audit_journey_outcome
 from quality_runner.artifacts import prepare_safe_directory
@@ -155,6 +155,7 @@ def _record_check(
 
 def _doctor_contract_passed(payload: Mapping[str, object]) -> bool:
     environment = payload.get("environment")
+    typed_environment = cast(dict[str, Any], environment) if isinstance(environment, dict) else {}
     return (
         payload.get("schema") == DOCTOR_RESULT_SCHEMA
         and payload.get("status") == "ready"
@@ -162,7 +163,7 @@ def _doctor_contract_passed(payload: Mapping[str, object]) -> bool:
         and payload.get("implementation_allowed") is False
         and isinstance(environment, dict)
         and all(
-            isinstance(environment.get(key), str) and bool(environment[key])
+            isinstance(typed_environment.get(key), str) and bool(typed_environment[key])
             for key in ("cwd", "platform", "python_executable", "python_version")
         )
     )
@@ -172,22 +173,32 @@ def _outcome_contract_passed(outcome: Mapping[str, object]) -> bool:
     writes = outcome.get("writes")
     safety = outcome.get("safety")
     next_action = outcome.get("next_action")
-    artifact_paths = writes.get("artifact_paths") if isinstance(writes, dict) else None
+    typed_writes = cast(dict[str, Any], writes) if isinstance(writes, dict) else {}
+    artifact_paths_value = typed_writes.get("artifact_paths")
+    artifact_paths = (
+        cast(dict[str, Any], artifact_paths_value)
+        if isinstance(artifact_paths_value, dict)
+        else {}
+    )
+    typed_safety = cast(dict[str, Any], safety) if isinstance(safety, dict) else {}
+    typed_next_action = cast(dict[str, Any], next_action) if isinstance(next_action, dict) else {}
     return (
         outcome.get("schema") == "quality-runner-outcome-v0.2"
         and outcome.get("journey") == "audit"
         and outcome.get("state") == "complete"
         and outcome.get("assessment") == "inspection-only"
         and isinstance(writes, dict)
-        and writes.get("state") == "artifacts-written"
+        and typed_writes.get("state") == "artifacts-written"
         and isinstance(safety, dict)
-        and safety.get("mode") == "scan-only"
-        and safety.get("commands_executed") is False
+        and typed_safety.get("mode") == "scan-only"
+        and typed_safety.get("commands_executed") is False
         and isinstance(next_action, dict)
-        and next_action.get("kind") == "start-audit"
-        and isinstance(artifact_paths, dict)
+        and typed_next_action.get("kind") == "start-audit"
         and bool(artifact_paths)
-        and all(isinstance(path, str) and Path(path).is_file() for path in artifact_paths.values())
+        and all(
+            isinstance(path, str) and Path(path).is_file()
+            for path in list(artifact_paths.values())
+        )
     )
 
 

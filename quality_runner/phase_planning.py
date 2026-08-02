@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from quality_runner.phase_builder import build_phase_plan, ordered_slices, wave_by_slice
 from quality_runner.phase_documents import (
@@ -67,9 +67,11 @@ def plan_status(repo_root: Path) -> dict[str, Any]:
     roadmap = load_roadmap(repo_root)
     state = load_state(repo_root)
     phases: list[dict[str, Any]] = []
-    for phase in roadmap.get("phases", []):
-        if not isinstance(phase, dict):
+    phases_value = roadmap.get("phases", [])
+    for phase_value in cast(list[Any], phases_value) if isinstance(phases_value, list) else []:
+        if not isinstance(phase_value, dict):
             continue
+        phase = cast(dict[str, Any], phase_value)
         plans = load_phase_plans(repo_root, int(phase["number"]))
         phases.append(
             {
@@ -107,15 +109,20 @@ def add_phase(
     phases = roadmap.get("phases")
     if not isinstance(phases, list):
         raise ValueError("QR roadmap phases must be a list")
+    typed_phases = cast(list[Any], phases)
     number = (
         max(
-            (int(item.get("number", 0)) for item in phases if isinstance(item, dict)),
+            (
+                int(cast(dict[str, Any], item).get("number", 0))
+                for item in typed_phases
+                if isinstance(item, dict)
+            ),
             default=0,
         )
         + 1
     )
     phase_slug = slug(title)
-    phase = {
+    phase: dict[str, Any] = {
         "number": number,
         "slug": phase_slug,
         "title": title,
@@ -128,8 +135,8 @@ def add_phase(
         phase["source_candidate_id"] = source_candidate_id
     if automatic:
         phase["planning_mode"] = "automatic"
-    phases.append(phase)
-    roadmap["phases"] = phases
+    typed_phases.append(phase)
+    roadmap["phases"] = typed_phases
     save_roadmap(repo_root, roadmap)
     directory = phase_directory(repo_root, number)
     directory.mkdir(parents=True, exist_ok=True)
@@ -238,9 +245,10 @@ def next_plan(repo_root: Path, phase_number: int | None = None) -> dict[str, Any
     if not isinstance(phases, list):
         raise ValueError("QR roadmap phases must be a list")
     selected: list[dict[str, Any]] = []
-    for phase in phases:
-        if not isinstance(phase, dict):
+    for phase_value in cast(list[Any], phases):
+        if not isinstance(phase_value, dict):
             continue
+        phase = cast(dict[str, Any], phase_value)
         if phase_number is not None and phase.get("number") != phase_number:
             continue
         selected.extend(load_phase_plans(repo_root, int(phase["number"])))
@@ -321,7 +329,7 @@ def update_phase(
     state = load_state(repo_root)
     previous_value = state.get("unplanned_findings")
     previous: list[object] = (
-        [item for item in previous_value if isinstance(item, dict)]
+        [cast(dict[str, Any], item) for item in cast(list[Any], previous_value) if isinstance(item, dict)]
         if isinstance(previous_value, list)
         else []
     )

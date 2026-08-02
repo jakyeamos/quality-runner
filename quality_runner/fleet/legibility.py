@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from quality_runner.discovery import inspect_repo
 from quality_runner.fleet.change_matrix import assess_change_surface_coverage
@@ -253,14 +253,15 @@ def _dimension_finding(
     if dimension == "quality_commands":
         commands = scan.get("quality_commands")
         if isinstance(commands, list) and commands:
+            typed_commands = cast(list[Any], commands)
             score = 2
             status = "discoverable"
             evidence = [
                 {
-                    "path": str(item.get("source", "discovered")),
-                    "detail": str(item.get("command", "")),
+                    "path": str(cast(dict[str, Any], item).get("source", "discovered")),
+                    "detail": str(cast(dict[str, Any], item).get("command", "")),
                 }
-                for item in commands
+                for item in typed_commands
                 if isinstance(item, dict)
             ][:12]
         elif contains_any(combined, ("test", "lint", "build")):
@@ -316,11 +317,12 @@ def _dimension_finding(
     if dimension == "context_routing":
         instruction_files = scan.get("agent_instruction_files")
         if isinstance(instruction_files, list) and instruction_files:
+            typed_instruction_files = cast(list[Any], instruction_files)
             score = max(score, 2)
             status = "discoverable"
             evidence.extend(
                 {"path": str(path), "detail": "agent instruction surface"}
-                for path in instruction_files
+                for path in typed_instruction_files
             )
         if (
             ".agents/context/README.md" in documents or ".context/README.md" in documents
@@ -446,11 +448,12 @@ def _scan_projection(scan: dict[str, Any]) -> dict[str, Any]:
 
 
 def _validation_commands(dimension: str, scan: dict[str, Any]) -> list[str]:
+    quality_commands = scan.get("quality_commands", [])
     commands = [
-        str(item.get("command"))
-        for item in scan.get("quality_commands", [])
-        if isinstance(item, dict) and isinstance(item.get("command"), str)
-    ]
+        str(cast(dict[str, Any], item).get("command"))
+        for item in cast(list[Any], quality_commands)
+        if isinstance(item, dict) and isinstance(cast(dict[str, Any], item).get("command"), str)
+    ] if isinstance(quality_commands, list) else []
     if dimension == "quality_commands" and commands:
         return commands[:6]
     return ["qr audit REPO --profile environment-legibility --json"]
@@ -461,7 +464,7 @@ def _has_deployment_surface(repository: dict[str, Any], scan: dict[str, Any], te
     if any((root / marker).exists() for marker in DEPLOYMENT_MARKERS):
         return True
     ci_files = scan.get("ci_files")
-    return bool(isinstance(ci_files, list) and ci_files) and contains_any(
+    return bool(isinstance(ci_files, list) and cast(list[Any], ci_files)) and contains_any(
         text, ("deploy", "release")
     )
 

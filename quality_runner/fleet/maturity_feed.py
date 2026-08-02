@@ -348,15 +348,20 @@ def _object(value: object) -> dict[str, Any]:
 def _objects(value: object) -> list[dict[str, Any]]:
     if not isinstance(value, list):
         return []
-    return [cast(dict[str, Any], item) for item in value if isinstance(item, dict)]
+    return [
+        cast(dict[str, Any], item)
+        for item in cast(list[Any], value)
+        if isinstance(item, dict)
+    ]
 
 
 def _number_mapping(value: object) -> dict[str, int | float | None]:
     if not isinstance(value, dict):
         return {}
+    typed_value = cast(dict[str, Any], value)
     return {
         str(key): cast(int | float | None, child)
-        for key, child in value.items()
+        for key, child in typed_value.items()
         if child is None or isinstance(child, (int, float))
     }
 
@@ -364,7 +369,7 @@ def _number_mapping(value: object) -> dict[str, int | float | None]:
 def _string_list(value: object) -> list[str]:
     if not isinstance(value, list):
         return []
-    return sorted(str(item) for item in value if isinstance(item, str))
+    return sorted(str(item) for item in cast(list[Any], value) if isinstance(item, str))
 
 
 def _count_values(values: list[dict[str, Any]], key: str, *, fallback: str) -> dict[str, int]:
@@ -389,8 +394,9 @@ def _assert_safe_tree(
     if key is not None and key.casefold() in _FORBIDDEN_KEYS and not privacy_flag:
         raise MaturityFeedError(f"maturity feed contains forbidden evidence field: {key}")
     if isinstance(value, dict):
-        for child_key, child_value in value.items():
+        typed_value = cast(dict[str, Any], value)
+        for child_key, child_value in typed_value.items():
             _assert_safe_tree(child_value, key=str(child_key), parent_key=key)
     elif isinstance(value, list):
-        for child in value:
+        for child in cast(list[Any], value):
             _assert_safe_tree(child, parent_key=key)
