@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 
 RULE_STATES = {
     "candidate",
@@ -21,6 +21,7 @@ def parse_prevention_section(
     if not isinstance(value, dict):
         warnings.append(_warning("quality_runner.prevention must be a table"))
         return {}
+    value = cast(dict[str, Any], value)
 
     required_modules = _string_list(
         value.get("required_modules"),
@@ -56,11 +57,12 @@ def _rules(value: object, warnings: list[dict[str, str]]) -> list[dict[str, Any]
         return []
 
     result: list[dict[str, Any]] = []
-    for index, item in enumerate(value):
+    for index, item_value in enumerate(cast(list[object], value)):
         field = f"quality_runner.prevention.rules[{index}]"
-        if not isinstance(item, dict):
+        if not isinstance(item_value, dict):
             warnings.append(_warning(f"{field} must be a table"))
             continue
+        item = cast(dict[str, object], item_value)
         required = _required_strings(
             item,
             ("detector", "rule_id", "state", "owner", "rationale"),
@@ -100,11 +102,12 @@ def _gates(value: object, warnings: list[dict[str, str]]) -> list[dict[str, Any]
         return []
 
     result: list[dict[str, Any]] = []
-    for index, item in enumerate(value):
+    for index, item_value in enumerate(cast(list[object], value)):
         field = f"quality_runner.prevention.gates[{index}]"
-        if not isinstance(item, dict):
+        if not isinstance(item_value, dict):
             warnings.append(_warning(f"{field} must be a table"))
             continue
+        item = cast(dict[str, object], item_value)
         required = _required_strings(
             item,
             ("id", "command", "state", "owner", "rationale", "bootstrap", "mutation_risk"),
@@ -170,8 +173,10 @@ def _string_list(
 ) -> list[str]:
     if value is None:
         return []
-    if isinstance(value, list) and all(isinstance(item, str) and item for item in value):
-        return list(value)
+    if isinstance(value, list):
+        items = cast(list[object], value)
+        if all(isinstance(item, str) and item for item in items):
+            return [cast(str, item) for item in items]
     warnings.append(_warning(f"{field} must be a list of non-empty strings"))
     return []
 
