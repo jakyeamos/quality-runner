@@ -96,8 +96,7 @@ def supported_receipt_errors(
         not isinstance(criteria, dict)
         or set(typed_criteria) != PROMOTION_CRITERIA_KEYS
         or any(
-            not isinstance(value, dict)
-            or cast(dict[str, Any], value).get("passed") is not True
+            not isinstance(value, dict) or cast(dict[str, Any], value).get("passed") is not True
             for value in typed_criteria.values()
         )
     ):
@@ -112,11 +111,7 @@ def supported_receipt_errors(
 def _objects(value: object) -> list[dict[str, Any]]:
     if not isinstance(value, list):
         return []
-    return [
-        cast(dict[str, Any], item)
-        for item in cast(list[Any], value)
-        if isinstance(item, dict)
-    ]
+    return [cast(dict[str, Any], item) for item in cast(list[Any], value) if isinstance(item, dict)]
 
 
 def _nonempty_string(value: object) -> bool:

@@ -1,5 +1,7 @@
 # Prevention readiness
 
+Last reviewed: 2026-08-02
+
 Quality Runner treats a repository command as preventative only after it has a
 resolved executable and version, a documented bootstrap, repeatable passing
 behavior, an intentional failure fixture, local evidence, and CI evidence.
@@ -57,7 +59,18 @@ environments, so global ignore rules, hooks, and launcher state cannot make
 local evidence differ from CI. The documented `uv` cache may be reused, but the
 locked environment is materialized independently for each task-check snapshot.
 
-The first promoted QR rule is `code_quality:large-source-file`. Its positive,
+The repository also has two evidence-only security gates. `uv run --locked
+pip-audit` audits the locked Python dependency graph, and `gitleaks detect
+--source . --no-banner --redact` scans repository history and files using the
+checked-in `.gitleaks.toml` policy. Both commands are required in
+`.quality-runner.toml`, `.pre-cr.json`, CI, and the release workflow. The
+Gitleaks allowlist is limited to named non-secret regression fixtures; changing
+it requires a security review and a fresh scan. These gates are not promoted to
+`qr task` prevention certification until their intentional-failure fixtures and
+local/CI provenance are recorded in the prevention policy.
+
+The first promoted QR rule is `code_quality:large-source-file` (550 physical
+source lines, including formatter-required spacing). Its positive,
 negative, and test-scope/ambiguous boundary fixtures are also in
 `tests/test_prevention_policy.py`. No other QR rule is enforced by this policy.
 

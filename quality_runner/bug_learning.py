@@ -130,7 +130,9 @@ def check_candidate_promotion(
         errors.extend(promotion_decision_errors(decision, candidate_id, fleet))
 
     raw_criteria = group.get("promotion_criteria") if isinstance(group, dict) else None
-    criteria: dict[str, Any] = cast(dict[str, Any], raw_criteria) if isinstance(raw_criteria, dict) else {}
+    criteria: dict[str, Any] = (
+        cast(dict[str, Any], raw_criteria) if isinstance(raw_criteria, dict) else {}
+    )
     if set(criteria) != PROMOTION_CRITERIA_KEYS:
         errors.append("promotion criteria are missing, extra, or unsupported")
     failed_criteria = sorted(

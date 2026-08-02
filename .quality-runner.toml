@@ -20,6 +20,16 @@ required = true
 severity = "blocker"
 mutating_risk = "safe"
 
+[[quality_runner.gates]]
+id = "security_secrets_scan"
+command = "gitleaks detect --source . --no-banner --redact"
+ecosystem = "repository"
+source = ".gitleaks.toml"
+owner = "platform"
+required = true
+severity = "blocker"
+mutating_risk = "safe"
+
 [quality_runner.structural_scan]
 similarity_enabled = false
 

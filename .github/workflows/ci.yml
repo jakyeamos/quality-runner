@@ -110,6 +110,17 @@ jobs:
       - name: Audit Python dependencies
         run: uv run --locked pip-audit
 
+      - name: Install gitleaks
+        uses: actions/setup-go@v6.0.0
+        with:
+          go-version: "1.24.x"
+
+      - name: Build gitleaks
+        run: go install github.com/gitleaks/gitleaks/v8@v8.30.1
+
+      - name: Scan repository secrets
+        run: gitleaks detect --source . --no-banner --redact
+
       - name: Build package
         run: uv build
 

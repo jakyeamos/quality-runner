@@ -176,9 +176,7 @@ def _nested_package_root_state(root: Path, path: Path) -> dict[str, Any]:
     except (OSError, json.JSONDecodeError):
         document = {}
     package_manager = (
-        cast(dict[str, Any], document).get("packageManager")
-        if isinstance(document, dict)
-        else None
+        cast(dict[str, Any], document).get("packageManager") if isinstance(document, dict) else None
     )
     lockfiles = sorted(
         candidate.name

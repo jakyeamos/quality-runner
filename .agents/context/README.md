@@ -3,7 +3,7 @@ id: quality-runner.repo-context
 title: Quality Runner Repository Context
 tier: project
 status: active
-last_reviewed: 2026-07-28
+last_reviewed: 2026-08-02
 applies_when:
   - repo_context
 tags:

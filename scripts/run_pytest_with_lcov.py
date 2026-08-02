@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import importlib
 import os
 import subprocess
 import sys
@@ -50,7 +51,7 @@ def main() -> int:
         trace=False,
         ignoredirs=[sys.prefix, str(ROOT / ".venv")],
     )
-    exit_code = tracer.runfunc(pytest.main, pytest_args)
+    exit_code = tracer.runfunc(_run_changed_tests, pytest_args)
     elapsed = time.monotonic() - started
     print(
         f"[pre-cr-tests] pytest finished in {elapsed:.1f}s with exit code {exit_code}",
@@ -60,6 +61,39 @@ def main() -> int:
     write_lcov(tracer.results().counts)
     print(f"[pre-cr-tests] wrote coverage: {OUTPUT}", file=sys.stderr, flush=True)
     return int(exit_code)
+
+
+def _run_changed_tests(pytest_args: list[str]) -> int:
+    if "--changed-only" in sys.argv[1:]:
+        _import_changed_modules()
+    return int(pytest.main(pytest_args))
+
+
+def _import_changed_modules() -> None:
+    """Load staged package modules so import and wiring changes are traced."""
+    for path in _changed_source_paths():
+        module_name = path[:-3].replace("/", ".")
+        try:
+            importlib.import_module(module_name)
+        except Exception as error:  # pragma: no cover - exercised by the hook
+            raise RuntimeError(f"unable to import changed module {module_name}: {error}") from error
+
+
+def _changed_source_paths() -> list[str]:
+    result = subprocess.run(
+        ["git", "diff", "--cached", "--name-only", "--diff-filter=ACMR"],
+        cwd=ROOT,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    if result.returncode != 0:
+        return []
+    return sorted(
+        path
+        for path in result.stdout.splitlines()
+        if path.startswith("quality_runner/") and path.endswith(".py")
+    )
 
 
 def build_pytest_args(arguments: list[str]) -> list[str]:

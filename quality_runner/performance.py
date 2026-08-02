@@ -110,6 +110,9 @@ class PerformanceRecorder:
 
 
 def performance_from_payload(payload: object) -> dict[str, Any] | None:
-    if not isinstance(payload, dict) or cast(dict[str, Any], payload).get("schema") != PERFORMANCE_SCHEMA:
+    if (
+        not isinstance(payload, dict)
+        or cast(dict[str, Any], payload).get("schema") != PERFORMANCE_SCHEMA
+    ):
         return None
     return cast(dict[str, Any], payload)

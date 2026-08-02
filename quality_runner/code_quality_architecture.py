@@ -73,9 +73,21 @@ def _import_boundary_findings(
     sources_value = rule.get("sources", [])
     disallowed_value = rule.get("disallowed_imports", [])
     allowed_value = rule.get("allowed_imports", [])
-    sources = [item for item in cast(list[Any], sources_value) if isinstance(item, str)] if isinstance(sources_value, list) else []
-    disallowed = [item for item in cast(list[Any], disallowed_value) if isinstance(item, str)] if isinstance(disallowed_value, list) else []
-    allowed = [item for item in cast(list[Any], allowed_value) if isinstance(item, str)] if isinstance(allowed_value, list) else []
+    sources = (
+        [item for item in cast(list[Any], sources_value) if isinstance(item, str)]
+        if isinstance(sources_value, list)
+        else []
+    )
+    disallowed = (
+        [item for item in cast(list[Any], disallowed_value) if isinstance(item, str)]
+        if isinstance(disallowed_value, list)
+        else []
+    )
+    allowed = (
+        [item for item in cast(list[Any], allowed_value) if isinstance(item, str)]
+        if isinstance(allowed_value, list)
+        else []
+    )
     if not rule_id or not sources or not disallowed:
         return []
 
@@ -136,8 +148,16 @@ def _pattern_boundary_findings(
     rule_id = str(rule.get("id", ""))
     paths_value = rule.get("paths", [])
     patterns_value = rule.get("disallowed_patterns", [])
-    paths = [item for item in cast(list[Any], paths_value) if isinstance(item, str)] if isinstance(paths_value, list) else []
-    patterns = [item for item in cast(list[Any], patterns_value) if isinstance(item, str)] if isinstance(patterns_value, list) else []
+    paths = (
+        [item for item in cast(list[Any], paths_value) if isinstance(item, str)]
+        if isinstance(paths_value, list)
+        else []
+    )
+    patterns = (
+        [item for item in cast(list[Any], patterns_value) if isinstance(item, str)]
+        if isinstance(patterns_value, list)
+        else []
+    )
     if not rule_id or not paths or not patterns:
         return []
 

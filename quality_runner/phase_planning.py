@@ -329,7 +329,11 @@ def update_phase(
     state = load_state(repo_root)
     previous_value = state.get("unplanned_findings")
     previous: list[object] = (
-        [cast(dict[str, Any], item) for item in cast(list[Any], previous_value) if isinstance(item, dict)]
+        [
+            cast(dict[str, Any], item)
+            for item in cast(list[Any], previous_value)
+            if isinstance(item, dict)
+        ]
         if isinstance(previous_value, list)
         else []
     )

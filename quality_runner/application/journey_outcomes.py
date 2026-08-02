@@ -155,7 +155,9 @@ def _gate_verification(repo_root: Path, payload: LegacyPayload) -> LegacyPayload
         loaded = json.loads(path.read_text(encoding="utf-8"))
     except (FileNotFoundError, OSError, ValueError, json.JSONDecodeError):
         return None
-    return _payload_mapping(cast(Mapping[str, object], loaded)) if isinstance(loaded, dict) else None
+    return (
+        _payload_mapping(cast(Mapping[str, object], loaded)) if isinstance(loaded, dict) else None
+    )
 
 
 def _payload_mapping(payload: Mapping[str, object]) -> LegacyPayload:

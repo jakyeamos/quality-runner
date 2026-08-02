@@ -1,0 +1,73 @@
+{
+  "schema_version": "change-surface-matrix/v1",
+  "subject": {
+    "kind": "repository",
+    "id": "quality-runner"
+  },
+  "owner": "quality-runner-maintainers",
+  "last_reviewed": "2026-08-02",
+  "surfaces": [
+    {
+      "id": "python-source-and-contracts",
+      "scope": "local",
+      "path": "quality_runner/",
+      "owner": "quality-runner-maintainers",
+      "condition": "Python implementation, CLI, MCP, or artifact behavior changes",
+      "operations": ["add", "change", "remove"],
+      "validation": [
+        "uv run --locked pytest -q",
+        "uv run --locked ruff check .",
+        "uv run --locked basedpyright"
+      ],
+      "status": "applicable"
+    },
+    {
+      "id": "public-contracts",
+      "scope": "external",
+      "path": "docs/cli.md and quality_runner/schemas/",
+      "owner": "quality-runner-maintainers",
+      "condition": "CLI, MCP, schema, or artifact contract changes",
+      "operations": ["add", "change", "remove"],
+      "validation": [
+        "uv run --locked pytest -q tests/test_cli.py tests/test_artifact_contracts.py",
+        "uv run --locked qr release-smoke --json"
+      ],
+      "status": "applicable"
+    },
+    {
+      "id": "ci-and-release",
+      "scope": "external",
+      "path": ".github/workflows/",
+      "owner": "quality-runner-maintainers",
+      "condition": "CI, packaging, release, or deployment boundary changes",
+      "operations": ["add", "change", "remove"],
+      "validation": [
+        "python3 scripts/check_environment_contract.py",
+        "uv build",
+        "uv run --locked qr release-smoke --json"
+      ],
+      "status": "applicable"
+    }
+  ],
+  "unresolved_surfaces": [],
+  "operation_evidence": {
+    "add": {
+      "status": "passed",
+      "evidence": [
+        "tests/test_change_matrix_maturity.py::test_change_matrix_scores_incomplete_stale_unknown_validated_and_proven"
+      ]
+    },
+    "change": {
+      "status": "passed",
+      "evidence": [
+        "tests/test_change_matrix_maturity.py::test_change_matrix_scores_incomplete_stale_unknown_validated_and_proven"
+      ]
+    },
+    "remove": {
+      "status": "passed",
+      "evidence": [
+        "tests/test_change_matrix_maturity.py::test_change_matrix_scores_incomplete_stale_unknown_validated_and_proven"
+      ]
+    }
+  }
+}

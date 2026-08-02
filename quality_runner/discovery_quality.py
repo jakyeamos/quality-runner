@@ -286,6 +286,18 @@ def _ci_quality_commands(
         ("dead_code", "vulture", "uv run --with vulture vulture . --min-confidence 70", "python"),
         ("build", "uv build", "uv build", "python"),
         (
+            "dependency_audit",
+            "pip-audit",
+            "uv run --locked pip-audit",
+            "python",
+        ),
+        (
+            "environment_contract",
+            "check_environment_contract.py",
+            "python3 scripts/check_environment_contract.py",
+            "python",
+        ),
+        (
             "package_consumer_smoke",
             "quality-runner release-smoke",
             "quality-runner release-smoke --json",

@@ -1,5 +1,7 @@
 # Coding and artifact conventions
 
+Last reviewed: 2026-08-02
+
 - Target Python 3.12 or newer and preserve the locked `uv` environment.
 - Add explicit public return types and typed boundaries for new production
   code. Fix real type errors; do not add broad ignores or casts that hide them.

@@ -59,4 +59,7 @@ def _is_quality_runner_checkout(path: Path) -> bool:
     except (OSError, tomllib.TOMLDecodeError):
         return False
     project = document.get("project")
-    return isinstance(project, dict) and cast(dict[str, Any], project).get("name") == QUALITY_RUNNER_PROJECT
+    return (
+        isinstance(project, dict)
+        and cast(dict[str, Any], project).get("name") == QUALITY_RUNNER_PROJECT
+    )

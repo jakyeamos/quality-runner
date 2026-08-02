@@ -37,6 +37,8 @@ REQUIRED_FILES = (
     "uv.lock",
     ".pre-cr.json",
     ".quality-runner.toml",
+    ".gitleaks.toml",
+    "change-surface-matrix.json",
     ".gitignore",
     ".github/workflows/ci.yml",
     ".github/workflows/release.yml",
@@ -52,11 +54,14 @@ QUALITY_COMMANDS = (
     "uv run --locked pip-audit",
     "uv build",
     "python3 scripts/check_environment_contract.py",
+    "gitleaks detect --source . --no-banner --redact",
 )
 CI_REQUIRED_COMMANDS = (
     "python3 scripts/check_environment_contract.py",
     "uv run --locked basedpyright",
     "uv build",
+    "uv run --locked pip-audit",
+    "gitleaks detect --source . --no-banner --redact",
 )
 REQUIRED_GITIGNORE = (
     ".env",
@@ -69,6 +74,7 @@ REQUIRED_GITIGNORE = (
 REQUIRED_QUALITY_GATES = {
     "security_dependency_audit": "uv run --locked pip-audit",
     "environment_contract": "python3 scripts/check_environment_contract.py",
+    "security_secrets_scan": "gitleaks detect --source . --no-banner --redact",
 }
 MIN_HOOK_TIMEOUT_SECONDS = 360
 MAX_CONTEXT_AGE = timedelta(days=35)

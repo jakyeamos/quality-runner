@@ -1,5 +1,7 @@
 # Packaging, deployment, and rollback
 
+Last reviewed: 2026-08-02
+
 Quality Runner is a Python package and CLI, not a hosted service. CI builds the
 wheel and sdist, runs the locked quality ladder, smoke-tests installed console
 scripts, and audits dependencies. Release workflow publication uses PyPI

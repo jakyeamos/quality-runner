@@ -289,6 +289,8 @@ def test_inspect_repo_detects_ci_only_python_commands(tmp_path: Path) -> None:
                 "      - run: uv run --with ruff ruff format --check .",
                 "      - run: uv run --with basedpyright basedpyright",
                 "      - run: uv run --locked vulture quality_runner quality_evidence_contract repo_quality_certifier tests scripts --min-confidence 70",
+                "      - run: uv run --locked pip-audit",
+                "      - run: python3 scripts/check_environment_contract.py",
                 "      - run: uv build",
                 "      - run: quality-runner release-smoke --json",
                 "      - run: quality-runner doctor --json",
@@ -310,6 +312,11 @@ def test_inspect_repo_detects_ci_only_python_commands(tmp_path: Path) -> None:
         == "uv run --locked vulture quality_runner quality_evidence_contract repo_quality_certifier tests scripts --min-confidence 70"
     )
     assert commands["build"]["command"] == "uv build"
+    assert commands["dependency_audit"]["command"] == "uv run --locked pip-audit"
+    assert (
+        commands["environment_contract"]["command"]
+        == "python3 scripts/check_environment_contract.py"
+    )
     assert commands["package_consumer_smoke"]["command"] == "quality-runner release-smoke --json"
     assert commands["runtime_smoke"]["command"] == "quality-runner doctor --json"
     assert commands["pre_pr"]["command"] == "github-actions pull_request quality"

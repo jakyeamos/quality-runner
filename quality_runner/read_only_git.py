@@ -131,9 +131,7 @@ def restore_if_changed(
         "manifest_complete": after.manifest_complete and before.manifest_complete,
         "restored": restored,
         "allowed_paths": list(ALLOWED_MUTATION_PATHS),
-        "scan_exclusions": sorted(
-            item for item in (scan_exclusions or []) if item
-        ),
+        "scan_exclusions": sorted(item for item in (scan_exclusions or []) if item),
         **({"restore_error": restore_error} if restore_error else {}),
     }
 

@@ -339,7 +339,17 @@ def _quality_commands_from_scan(repository: dict[str, Any]) -> list[dict[str, An
     commands = cast(dict[str, Any], scan).get("quality_commands")
     if not isinstance(commands, list):
         return []
-    allowed_capabilities = {"lint", "typecheck", "tests", "formatter", "dead_code", "runtime_smoke"}
+    allowed_capabilities = {
+        "lint",
+        "typecheck",
+        "tests",
+        "formatter",
+        "dead_code",
+        "runtime_smoke",
+        "build",
+        "dependency_audit",
+        "environment_contract",
+    }
     return [
         cast(dict[str, Any], item)
         for item in cast(list[object], commands)

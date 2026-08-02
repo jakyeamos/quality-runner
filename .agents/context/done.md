@@ -1,5 +1,7 @@
 # Definition of done
 
+Last reviewed: 2026-08-02
+
 A Quality Runner change is complete only when:
 
 - the affected CLI, MCP, workflow, artifact, schema, and documentation

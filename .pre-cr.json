@@ -14,7 +14,8 @@
     "uv run --locked vulture quality_runner quality_evidence_contract repo_quality_certifier tests scripts --min-confidence 70",
     "uv run --locked pip-audit",
     "uv build",
-    "python3 scripts/check_environment_contract.py"
+    "python3 scripts/check_environment_contract.py",
+    "gitleaks detect --source . --no-banner --redact"
   ],
   "qualityAdapters": [
     {
@@ -41,7 +42,10 @@
     "pyproject.toml",
     "quality_runner/schemas/**",
     "scripts/**",
-    "tests/**"
+    "tests/**",
+    ".gitleaks.toml",
+    "change-surface-matrix.json",
+    ".quality-runner.toml"
   ],
   "checks": {
     "coverage": false,

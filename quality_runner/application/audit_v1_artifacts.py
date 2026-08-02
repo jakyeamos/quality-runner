@@ -294,7 +294,11 @@ def _intent_docs(scan: dict[str, Any]) -> list[dict[str, str]] | None:
     intent_docs = scan.get("intent_docs")
     if not isinstance(intent_docs, list):
         return None
-    return [cast(dict[str, str], item) for item in cast(list[Any], intent_docs) if isinstance(item, dict)]
+    return [
+        cast(dict[str, str], item)
+        for item in cast(list[Any], intent_docs)
+        if isinstance(item, dict)
+    ]
 
 
 def _legacy_payload(payload: AuditPayload) -> dict[str, Any]:

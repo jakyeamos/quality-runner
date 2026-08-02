@@ -1,5 +1,7 @@
 # Canonical commands and quality gates
 
+Last reviewed: 2026-08-02
+
 Run from the repository root with the locked development environment:
 
 ```sh
@@ -12,6 +14,7 @@ uv run --locked vulture quality_runner quality_evidence_contract repo_quality_ce
 uv run --locked pip-audit
 uv build
 python3 scripts/check_environment_contract.py
+gitleaks detect --source . --no-banner --redact
 ```
 
 For the complete pre-release path, also run:

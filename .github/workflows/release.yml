@@ -43,6 +43,14 @@ jobs:
       - name: Install locked development environment
         run: uv sync --locked --all-groups --python 3.12
 
+      - name: Install gitleaks
+        uses: actions/setup-go@v6.0.0
+        with:
+          go-version: "1.24.x"
+
+      - name: Build gitleaks
+        run: go install github.com/gitleaks/gitleaks/v8@v8.30.1
+
       - name: Run release checks
         run: |
           python3 scripts/check_environment_contract.py
@@ -52,6 +60,7 @@ jobs:
           uv run --locked basedpyright
           uv run --locked vulture quality_runner quality_evidence_contract repo_quality_certifier tests scripts --min-confidence 70
           uv run --locked pip-audit
+          gitleaks detect --source . --no-banner --redact
 
       - name: Build package
         run: uv build

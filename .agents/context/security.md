@@ -1,5 +1,7 @@
 # Security and approval constraints
 
+Last reviewed: 2026-08-02
+
 Quality Runner is local-first. It may read bounded repository files and write
 `.quality-runner/runs/<run-id>/` artifacts in a target repository. It must not
 call remote services, contact model providers, collect credentials, edit target

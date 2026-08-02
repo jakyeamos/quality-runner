@@ -1,5 +1,7 @@
 # Architecture and boundaries
 
+Last reviewed: 2026-08-02
+
 Quality Runner inspects a target repository, compiles standards, discovers
 available quality gates, normalizes evidence-backed findings, and writes a
 remediation plan. It is an orchestrator for evidence, not an implementation

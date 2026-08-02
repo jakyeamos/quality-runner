@@ -77,7 +77,6 @@ def test_changed_only_selects_staged_tests(tmp_path: Path, monkeypatch) -> None:
     assert spec.loader is not None
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
-
     monkeypatch.setattr(module, "ROOT", tmp_path)
     monkeypatch.setattr(
         module.subprocess,
@@ -97,3 +96,24 @@ def test_changed_only_selects_staged_tests(tmp_path: Path, monkeypatch) -> None:
         "tests/test_entrypoints.py",
         "tests/test_config.py",
     ]
+
+
+def test_changed_only_imports_staged_modules_for_wiring_coverage(monkeypatch) -> None:
+    script_path = Path(__file__).resolve().parents[1] / "scripts" / "run_pytest_with_lcov.py"
+    spec = importlib.util.spec_from_file_location("run_pytest_with_lcov_imports", script_path)
+    assert spec is not None
+    assert spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+
+    imported: list[str] = []
+    monkeypatch.setattr(
+        module,
+        "_changed_source_paths",
+        lambda: ["quality_runner/config.py", "quality_runner/security/scan.py"],
+    )
+    monkeypatch.setattr(module.importlib, "import_module", imported.append)
+
+    module._import_changed_modules()
+
+    assert imported == ["quality_runner.config", "quality_runner.security.scan"]

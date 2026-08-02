@@ -1,5 +1,7 @@
 # Common failure modes and recovery
 
+Last reviewed: 2026-08-02
+
 - **Locked environment unavailable:** restore the documented `uv sync --locked
   --all-groups` environment. Do not replace locked commands with an unpinned
   install or claim a partial run is equivalent.

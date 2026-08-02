@@ -43,6 +43,7 @@ _status = status
 _usable_verification = usable_verification
 _writes = writes
 
+
 def project_audit_outcome(
     payload: LegacyPayload,
     *,
@@ -118,6 +119,7 @@ def project_audit_outcome(
         payload=payload,
         run_id=run_id,
     )
+
 
 def project_review_outcome(payload: LegacyPayload, *, repo_root: Path) -> JourneyOutcome:
     status = _status(payload)
@@ -207,6 +209,7 @@ def project_review_outcome(payload: LegacyPayload, *, repo_root: Path) -> Journe
         payload=payload,
         run_id=run_id,
     )
+
 
 def project_verify_outcome(
     payload: LegacyPayload,
@@ -367,6 +370,7 @@ def project_verify_outcome(
         run_id=run_id,
     )
 
+
 def project_runs_outcome(history: HistoryPayload, *, repo_root: Path) -> JourneyOutcome:
     runs = object_list(history.get("runs"))
     unavailable = string_list(history.get("unavailable_run_ids"))
@@ -456,12 +460,14 @@ def project_runs_outcome(history: HistoryPayload, *, repo_root: Path) -> Journey
         history=history_snapshot,
     )
 
+
 def _review_confidence(limitations: list[str]) -> OutcomeConfidence:
     return _confidence(
         level="limited" if limitations else "confirmed",
         basis=["validated packet-bound local response"],
         limitations=limitations,
     )
+
 
 def _history_snapshot(
     history: HistoryPayload,

@@ -176,9 +176,7 @@ def _outcome_contract_passed(outcome: Mapping[str, object]) -> bool:
     typed_writes = cast(dict[str, Any], writes) if isinstance(writes, dict) else {}
     artifact_paths_value = typed_writes.get("artifact_paths")
     artifact_paths = (
-        cast(dict[str, Any], artifact_paths_value)
-        if isinstance(artifact_paths_value, dict)
-        else {}
+        cast(dict[str, Any], artifact_paths_value) if isinstance(artifact_paths_value, dict) else {}
     )
     typed_safety = cast(dict[str, Any], safety) if isinstance(safety, dict) else {}
     typed_next_action = cast(dict[str, Any], next_action) if isinstance(next_action, dict) else {}
@@ -196,8 +194,7 @@ def _outcome_contract_passed(outcome: Mapping[str, object]) -> bool:
         and typed_next_action.get("kind") == "start-audit"
         and bool(artifact_paths)
         and all(
-            isinstance(path, str) and Path(path).is_file()
-            for path in list(artifact_paths.values())
+            isinstance(path, str) and Path(path).is_file() for path in list(artifact_paths.values())
         )
     )
 
