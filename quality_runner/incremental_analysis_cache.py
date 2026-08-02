@@ -329,19 +329,25 @@ class IncrementalAnalysisCache:
         except (OSError, UnicodeDecodeError, json.JSONDecodeError):
             self._index_status = "corrupt"
             return
-        if (
-            not isinstance(payload, dict)
-            or payload.get("schema") != INCREMENTAL_ANALYSIS_CACHE_SCHEMA
-        ):
+        if not isinstance(payload, dict):
             self._index_status = "corrupt"
             return
-        entries = payload.get("entries")
+        payload_data = cast(dict[str, object], payload)
+        if payload_data.get("schema") != INCREMENTAL_ANALYSIS_CACHE_SCHEMA:
+            self._index_status = "corrupt"
+            return
+        entries = payload_data.get("entries")
         if not isinstance(entries, dict) or not all(
-            isinstance(key, str) and isinstance(value, dict) for key, value in entries.items()
+            isinstance(key, str) and isinstance(value, dict)
+            for key, value in cast(dict[object, object], entries).items()
         ):
             self._index_status = "corrupt"
             return
-        self._index = {key: cast(dict[str, object], value) for key, value in entries.items()}
+        self._index = {
+            key: cast(dict[str, object], value)
+            for key, value in cast(dict[object, object], entries).items()
+            if isinstance(key, str) and isinstance(value, dict)
+        }
         self._index_status = "ready"
 
     def _invalidation_reasons(
@@ -394,12 +400,13 @@ class IncrementalAnalysisCache:
             return None
         if not isinstance(payload, dict):
             return None
-        if payload.get("schema") != INCREMENTAL_ANALYSIS_CACHE_SCHEMA:
+        payload_data = cast(dict[str, object], payload)
+        if payload_data.get("schema") != INCREMENTAL_ANALYSIS_CACHE_SCHEMA:
             return None
-        if payload.get("cache_key") != cache_key:
+        if payload_data.get("cache_key") != cache_key:
             return None
-        stored_identity = payload.get("identity")
-        result = payload.get("result")
+        stored_identity = payload_data.get("identity")
+        result = payload_data.get("result")
         if stored_identity != identity or not isinstance(result, dict):
             return None
         typed_result = cast(AnalysisResult, result)

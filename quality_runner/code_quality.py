@@ -54,6 +54,7 @@ __all__ = [
 
 DEFAULT_LARGE_FILE_LINES = _DEFAULT_LARGE_FILE_LINES
 DEFAULT_FAT_ROUTER_LINES = _DEFAULT_FAT_ROUTER_LINES
+_scan_file = scan_file
 
 
 def create_code_quality_scan(
@@ -290,7 +291,7 @@ def _analyze_code_quality_file(
     text = "\n".join(lines)
     return {
         "redacted_lines": lines,
-        "findings": scan_file(
+        "findings": _scan_file(
             relative_path=relative_path,
             text=text,
             lines=lines,
