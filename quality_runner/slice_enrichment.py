@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from quality_runner.evidence_excerpts import SourceExcerptReader, enrich_finding_evidence
 from quality_runner.finding_quality import compute_finding_quality, compute_leverage
@@ -28,12 +28,12 @@ def enrich_remediation_slices(
         if isinstance(findings, list):
             item["findings"] = [
                 _enrich_slice_finding(
-                    finding,
+                    cast(dict[str, Any], finding),
                     repo_root=repo_root,
                     raw_by_id=raw_by_id,
                     excerpt_reader=source_reader,
                 )
-                for finding in findings
+                for finding in cast(list[object], findings)
                 if isinstance(finding, dict)
             ]
         quality = _slice_quality(item, raw_by_id=raw_by_id)
@@ -83,13 +83,13 @@ def _slice_quality(
     if not isinstance(findings, list) or not findings:
         representative = {"category": "", "severity": "warning", "score": slice_item.get("score")}
         return compute_finding_quality(representative)
-    first = findings[0]
+    first = cast(dict[str, Any], findings[0])
     raw_group = [
-        raw_by_id[str(finding["id"])]
-        for finding in findings
+        raw_by_id[str(cast(dict[str, Any], finding)["id"])]
+        for finding in cast(list[object], findings)
         if isinstance(finding, dict)
-        and isinstance(finding.get("id"), str)
-        and finding["id"] in raw_by_id
+        and isinstance(cast(dict[str, Any], finding).get("id"), str)
+        and cast(dict[str, Any], finding)["id"] in raw_by_id
     ]
     aggregate = {
         "id": first.get("id"),
@@ -127,11 +127,11 @@ def _scope_paths(slice_item: dict[str, Any]) -> list[str]:
         return []
     paths = sorted(
         {
-            str(finding["file"])
-            for finding in findings
+            str(cast(dict[str, Any], finding)["file"])
+            for finding in cast(list[object], findings)
             if isinstance(finding, dict)
-            and isinstance(finding.get("file"), str)
-            and finding["file"]
+            and isinstance(cast(dict[str, Any], finding).get("file"), str)
+            and cast(dict[str, Any], finding)["file"]
         }
     )
     return paths
@@ -147,11 +147,11 @@ def _slice_scope(
         return {"in_scope": [], "out_of_scope": _default_out_of_scope()}
     fingerprints = sorted(
         {
-            str(finding["fingerprint"])
-            for finding in findings
+            str(cast(dict[str, Any], finding)["fingerprint"])
+            for finding in cast(list[object], findings)
             if isinstance(finding, dict)
-            and isinstance(finding.get("fingerprint"), str)
-            and finding["fingerprint"]
+            and isinstance(cast(dict[str, Any], finding).get("fingerprint"), str)
+            and cast(dict[str, Any], finding)["fingerprint"]
         }
     )
     files = _scope_paths(slice_item)
@@ -165,21 +165,22 @@ def _slice_scope(
         in_scope.append(f"Only listed files: {', '.join(files)}")
     else:
         finding_ids = [
-            str(finding["id"])
-            for finding in findings
-            if isinstance(finding, dict) and isinstance(finding.get("id"), str)
+            str(cast(dict[str, Any], finding)["id"])
+            for finding in cast(list[object], findings)
+            if isinstance(finding, dict)
+            and isinstance(cast(dict[str, Any], finding).get("id"), str)
         ]
         if finding_ids:
             in_scope.append(f"Only findings {', '.join(finding_ids)}")
         else:
             in_scope.append(f"Only slice {slice_item.get('id')} findings and declared actions.")
     categories = {
-        str(raw_by_id[finding["id"]]["category"])
-        for finding in findings
+        str(raw_by_id[cast(dict[str, Any], finding)["id"]]["category"])
+        for finding in cast(list[object], findings)
         if isinstance(finding, dict)
-        and isinstance(finding.get("id"), str)
-        and finding["id"] in raw_by_id
-        and isinstance(raw_by_id[finding["id"]].get("category"), str)
+        and isinstance(cast(dict[str, Any], finding).get("id"), str)
+        and cast(dict[str, Any], finding)["id"] in raw_by_id
+        and isinstance(raw_by_id[cast(dict[str, Any], finding)["id"]].get("category"), str)
     }
     if len(categories) == 1:
         in_scope.append(f"Same finding family only ({next(iter(categories))}).")
@@ -207,8 +208,9 @@ def _stop_conditions(slice_item: dict[str, Any]) -> list[str]:
         )
     findings = slice_item.get("findings")
     if isinstance(findings, list) and any(
-        isinstance(finding, dict) and str(finding.get("category", "")).startswith("structural:")
-        for finding in findings
+        isinstance(finding, dict)
+        and str(cast(dict[str, Any], finding).get("category", "")).startswith("structural:")
+        for finding in cast(list[object], findings)
     ):
         conditions.append(
             "Stop if the row is generated, vendor, or test-fixture code that QR should exclude instead."
@@ -223,9 +225,10 @@ def _raw_findings_by_id(code_quality_scan: dict[str, Any] | None) -> dict[str, d
     if not isinstance(findings, list):
         return {}
     indexed: dict[str, dict[str, Any]] = {}
-    for finding in findings:
+    for finding in cast(list[object], findings):
         if not isinstance(finding, dict):
             continue
+        finding = cast(dict[str, Any], finding)
         finding_id = finding.get("id")
         if isinstance(finding_id, str) and finding_id:
             indexed[finding_id] = finding
