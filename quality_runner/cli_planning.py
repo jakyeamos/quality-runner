@@ -25,7 +25,7 @@ from quality_runner.phase_planning import (
 
 
 def add_planning_commands(
-    subparsers: argparse._SubParsersAction[argparse.ArgumentParser],
+    subparsers: Any,
 ) -> None:
     plan_parser = subparsers.add_parser("plan", help="Manage the QR-owned planning namespace")
     plan_subparsers = plan_parser.add_subparsers(dest="plan_action", required=True)
@@ -176,7 +176,7 @@ def planning_command_payload(args: argparse.Namespace, validated_repo_path: Any)
             )
         if args.plan_action == "contract":
             cache_root = Path(args.cache_dir).expanduser().resolve() if args.cache_dir else None
-            common = {
+            common: dict[str, Any] = {
                 "repo_root": repo_root,
                 "run_id": args.run_id,
                 "phase_id": args.phase_id,
