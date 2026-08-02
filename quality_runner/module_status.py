@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections import Counter
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 MODULE_STATUS_SCHEMA = "quality-runner-module-status-v0.1"
 MODULE_STATUS_VALUES = frozenset(
@@ -159,10 +159,11 @@ def validate_module_status(payload: dict[str, Any]) -> dict[str, Any]:
         errors.append("module status must contain the expected schema and modules list")
     if isinstance(modules, list):
         seen: set[str] = set()
-        for item in modules:
-            if not isinstance(item, dict):
+        for raw_item in cast(list[object], modules):
+            if not isinstance(raw_item, dict):
                 errors.append("module entries must be objects")
                 continue
+            item = cast(dict[str, Any], raw_item)
             module_id = item.get("id")
             status = item.get("status")
             if not isinstance(module_id, str) or not module_id:
@@ -178,7 +179,7 @@ def validate_module_status(payload: dict[str, Any]) -> dict[str, Any]:
     return {
         "passed": not errors,
         "errors": errors,
-        "module_count": len(modules) if isinstance(modules, list) else 0,
+        "module_count": len(cast(list[object], modules)) if isinstance(modules, list) else 0,
     }
 
 
@@ -235,7 +236,8 @@ def _optional_skills(
     section = _section(config, "skills")
     skills = code_quality_scan.get("quality_skills") if code_quality_scan else None
     selection = code_quality_scan.get("skill_selection") if code_quality_scan else None
-    selection_status = selection.get("status") if isinstance(selection, dict) else None
+    selection_map = cast(dict[str, Any], selection) if isinstance(selection, dict) else {}
+    selection_status = selection_map.get("status")
     if section is None and selection_status == "disabled":
         return _module(
             "quality-skills",
@@ -274,11 +276,11 @@ def _optional_skills(
             "Quality Skill packs are explicitly disabled for this repository.",
         )
     if isinstance(skills, list) and skills:
-        source = selection.get("source") if isinstance(selection, dict) else "local"
+        source = selection_map.get("source") if isinstance(selection, dict) else "local"
         global_count = (
-            len(selection.get("selected_global_skill_ids", []))
+            len(cast(list[object], selection_map.get("selected_global_skill_ids", [])))
             if isinstance(selection, dict)
-            and isinstance(selection.get("selected_global_skill_ids"), list)
+            and isinstance(selection_map.get("selected_global_skill_ids"), list)
             else 0
         )
         source_summary = f" from {source}" if isinstance(source, str) else ""
@@ -286,7 +288,7 @@ def _optional_skills(
             "quality-skills",
             "optional",
             "enabled",
-            f"{len(skills)} Quality Skill pack(s) are active{source_summary}; {global_count} selected from the global corpus.",
+            f"{len(cast(list[object], skills))} Quality Skill pack(s) are active{source_summary}; {global_count} selected from the global corpus.",
         )
     return _module(
         "quality-skills",
@@ -305,7 +307,8 @@ def _optional_security(security_scan: dict[str, Any] | None) -> dict[str, Any]:
             "The security review phase was not run for this workflow.",
         )
     settings = security_scan.get("settings")
-    if isinstance(settings, dict) and settings.get("enabled") is False:
+    settings_map = cast(dict[str, Any], settings) if isinstance(settings, dict) else {}
+    if isinstance(settings, dict) and settings_map.get("enabled") is False:
         return _module(
             "security-review",
             "optional",
@@ -356,7 +359,7 @@ def _optional_ci(repo_scan: dict[str, Any]) -> dict[str, Any]:
             "ci-evidence",
             "optional",
             "enabled",
-            f"{len(checks)} CI check result(s) were supplied to the run.",
+            f"{len(cast(list[object], checks))} CI check result(s) were supplied to the run.",
         )
     return _module(
         "ci-evidence",
@@ -417,7 +420,7 @@ def _summary(code_quality_scan: dict[str, Any] | None) -> dict[str, Any]:
     if not isinstance(code_quality_scan, dict):
         return {}
     summary = code_quality_scan.get("summary")
-    return summary if isinstance(summary, dict) else {}
+    return cast(dict[str, Any], summary) if isinstance(summary, dict) else {}
 
 
 def _ui_file_count(code_quality_scan: dict[str, Any] | None) -> int:
@@ -430,10 +433,10 @@ def _ui_file_count(code_quality_scan: dict[str, Any] | None) -> int:
         return 0
     return sum(
         1
-        for item in accountability
-        if isinstance(item, dict)
-        and isinstance(item.get("check_coverage"), list)
-        and "ui-structural" in item["check_coverage"]
+        for raw_item in cast(list[object], accountability)
+        if isinstance(raw_item, dict)
+        and isinstance(cast(dict[str, Any], raw_item).get("check_coverage"), list)
+        and "ui-structural" in cast(dict[str, Any], raw_item)["check_coverage"]
     )
 
 
@@ -480,7 +483,7 @@ def _similarity_summary(summary: dict[str, Any]) -> str:
 
 def _section(config: dict[str, Any] | None, key: str) -> dict[str, Any] | None:
     value = config.get(key) if isinstance(config, dict) else None
-    return value if isinstance(value, dict) else None
+    return cast(dict[str, Any], value) if isinstance(value, dict) else None
 
 
 def _int_value(value: object) -> int:
