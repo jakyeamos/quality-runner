@@ -19,7 +19,7 @@ from quality_runner import (
     review_execution_artifacts,
 )
 from quality_runner.application import audit_v1_artifacts, journey_outcomes
-from quality_runner.fleet.legibility import _maintained_legibility_control
+from quality_runner.fleet.legibility_contract import maintained_control
 from quality_runner.schema_constants import PERFORMANCE_SCHEMA, REVIEW_EXECUTION_SCHEMA
 
 
@@ -133,7 +133,7 @@ def test_changed_surface_helpers_cover_state_and_artifact_validation(
 
 def test_changed_surface_legibility_contract_is_maintained() -> None:
     root = Path(__file__).resolve().parents[1]
-    evidence = _maintained_legibility_control(
+    evidence = maintained_control(
         root=root,
         dimension="architecture_boundaries",
         as_of="2026-08-02T05:00:00+00:00",
@@ -141,3 +141,24 @@ def test_changed_surface_legibility_contract_is_maintained() -> None:
 
     assert evidence is not None
     assert any(item["path"] == "environment-legibility.json" for item in evidence)
+
+
+def test_changed_surface_legibility_contract_rejects_unsafe_evidence(tmp_path: Path) -> None:
+    contract = json.loads(
+        (Path(__file__).resolve().parents[1] / "environment-legibility.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    contract["controls"][0]["evidence"] = ["../outside.md"]
+    (tmp_path / "environment-legibility.json").write_text(
+        json.dumps(contract), encoding="utf-8"
+    )
+
+    assert (
+        maintained_control(
+            root=tmp_path,
+            dimension="architecture_boundaries",
+            as_of="2026-08-02T05:00:00+00:00",
+        )
+        is None
+    )
