@@ -33,6 +33,7 @@ def validate_exclusion_packet(
     errors: list[str] = []
     if not isinstance(packet, dict):
         return ["packet must be an object"]
+    packet = cast(dict[str, object], packet)
     allowed_packet_keys = {
         "schema",
         "run_id",
@@ -59,6 +60,7 @@ def validate_exclusion_packet(
     if not isinstance(candidates, list):
         errors.append("packet candidates must be an array")
         return errors
+    candidates = cast(list[object], candidates)
     seen_ids: set[str] = set()
     seen_paths: set[str] = set()
     for index, candidate_value in enumerate(candidates):
@@ -122,7 +124,7 @@ def validate_exclusion_packet(
                 not isinstance(available_scopes, list)
                 or any(
                     item not in {SCAN_EXCLUSION_SCOPE_ALL, *SCAN_EXCLUSION_MODULES}
-                    for item in available_scopes
+                    for item in cast(list[object], available_scopes)
                 )
             ):
                 errors.append(f"packet candidate {path_value} has invalid available module scopes")
@@ -133,7 +135,7 @@ def validate_exclusion_packet(
             errors.append(f"packet candidate {path_value} must be marked protected")
         protected_reasons = candidate.get("protected_reasons")
         if not isinstance(protected_reasons, list) or any(
-            not isinstance(reason, str) for reason in protected_reasons
+            not isinstance(reason, str) for reason in cast(list[object], protected_reasons)
         ):
             errors.append(f"packet candidate {path_value} protected_reasons must be string array")
         if candidate.get("suggested_decision") not in {"exclude", "include", "defer"}:
@@ -192,10 +194,14 @@ def validate_exclusion_report(
         if not isinstance(packet_config, dict):
             errors.append("packet config must contain the effective-exclusion fingerprint")
         else:
-            if packet_config.get("scan_exclusion_fingerprint") != current_exclusions["fingerprint"]:
+            packet_config_map = cast(dict[str, object], packet_config)
+            if (
+                packet_config_map.get("scan_exclusion_fingerprint")
+                != current_exclusions["fingerprint"]
+            ):
                 errors.append("packet effective-exclusion fingerprint is stale")
             if (
-                packet_config.get("effective_scan_exclusions_by_module")
+                packet_config_map.get("effective_scan_exclusions_by_module")
                 != current_exclusions["effective_scan_exclusions_by_module"]
             ):
                 errors.append("packet effective module exclusions are stale")
@@ -217,16 +223,18 @@ def validate_exclusion_report(
     candidate_map: dict[str, dict[str, object]] = {}
     candidates = packet_dict.get("candidates")
     if isinstance(candidates, list):
-        for candidate_value in candidates:
-            if isinstance(candidate_value, dict) and isinstance(
-                candidate_value.get("candidate_id"), str
-            ):
-                candidate_map[str(candidate_value["candidate_id"])] = cast(
-                    dict[str, object], candidate_value
-                )
+        for candidate_value in cast(list[object], candidates):
+            if isinstance(candidate_value, dict):
+                candidate_map_value = cast(dict[str, object], candidate_value)
+                if isinstance(candidate_map_value.get("candidate_id"), str):
+                    candidate_map[str(candidate_map_value["candidate_id"])] = candidate_map_value
     decisions_value = report_dict.get("decisions")
     decisions = (
-        [cast(dict[str, object], item) for item in decisions_value if isinstance(item, dict)]
+        [
+            cast(dict[str, object], item)
+            for item in cast(list[object], decisions_value)
+            if isinstance(item, dict)
+        ]
         if isinstance(decisions_value, list)
         else []
     )
@@ -281,7 +289,10 @@ def validate_exclusion_report(
         if (
             not isinstance(evidence, list)
             or not evidence
-            or any(not isinstance(item, str) or not item.strip() for item in evidence)
+            or any(
+                not isinstance(item, str) or not item.strip()
+                for item in cast(list[object], evidence)
+            )
         ):
             errors.append(f"report decision {candidate_value_id} evidence must contain strings")
         confidence = decision.get("confidence")
