@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import Any, cast
 
 MAX_CI_STATUS_BYTES = 1_000_000
 
@@ -60,7 +61,7 @@ def load_ci_status(
                 "path": relative_path,
             }
         ]
-    if not isinstance(payload, dict) or not isinstance(payload.get("checks"), list):
+    if not isinstance(payload, dict):
         return [], [
             {
                 "code": "invalid_ci_status_shape",
@@ -69,14 +70,24 @@ def load_ci_status(
             }
         ]
 
+    payload_map = cast(dict[str, Any], payload)
+    if not isinstance(payload_map.get("checks"), list):
+        return [], [
+            {
+                "code": "invalid_ci_status_shape",
+                "message": f"{relative_path} must contain a checks array",
+                "path": relative_path,
+            }
+        ]
+    checks_value = cast(list[object], payload_map["checks"])
     checks: list[dict[str, str | None]] = []
     warnings: list[dict[str, str]] = []
     provenance = {
-        **_provenance(payload),
-        **_provenance(payload.get("provenance")),
+        **_provenance(payload_map),
+        **_provenance(payload_map.get("provenance")),
     }
-    for index, item in enumerate(payload["checks"]):
-        if not isinstance(item, dict):
+    for index, raw_item in enumerate(checks_value):
+        if not isinstance(raw_item, dict):
             warnings.append(
                 {
                     "code": "invalid_ci_status_check",
@@ -85,6 +96,7 @@ def load_ci_status(
                 }
             )
             continue
+        item = cast(dict[str, Any], raw_item)
         name = item.get("name")
         if not isinstance(name, str) or not name:
             warnings.append(
@@ -126,8 +138,9 @@ def _optional_string(value: object) -> str | None:
 def _provenance(value: object) -> dict[str, str | None]:
     if not isinstance(value, dict):
         return {}
+    value_map = cast(dict[str, Any], value)
     result = {
-        key: _optional_string(value.get(key))
+        key: _optional_string(value_map.get(key))
         for key in (
             "head_sha",
             "ref",
@@ -136,10 +149,10 @@ def _provenance(value: object) -> dict[str, str | None]:
             "source_url",
             "quality_runner_version",
         )
-        if _optional_string(value.get(key)) is not None
+        if _optional_string(value_map.get(key)) is not None
     }
     for key in ("workflow_run_id", "run_id", "workflow_id"):
-        workflow_run_id = _optional_string(value.get(key))
+        workflow_run_id = _optional_string(value_map.get(key))
         if workflow_run_id is not None:
             result["workflow_run_id"] = workflow_run_id
             break
