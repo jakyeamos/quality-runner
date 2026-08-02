@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import re
-from typing import Any
+from typing import Any, cast
 
 
 def wiring_decision_slices(code_quality_scan: dict[str, Any] | None) -> list[dict[str, Any]]:
@@ -26,9 +26,10 @@ def _integrate_findings(code_quality_scan: dict[str, Any] | None) -> list[dict[s
         return []
 
     normalized: list[dict[str, Any]] = []
-    for finding in findings:
-        if not isinstance(finding, dict):
+    for finding_value in cast(list[object], findings):
+        if not isinstance(finding_value, dict):
             continue
+        finding = cast(dict[str, Any], finding_value)
         if finding.get("category") != "integrate":
             continue
         finding_id = finding.get("id")
