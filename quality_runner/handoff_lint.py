@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import re
-from typing import Any
+from typing import Any, cast
 
 from quality_runner.evidence_redaction import REDACTED_LITERAL
 from quality_runner.remediation_context import validate_remediation_context
@@ -34,14 +34,15 @@ def validate_handoff_quality(
     if plan is None:
         artifact_paths = handoff.get("artifact_paths")
         if isinstance(artifact_paths, dict):
-            plan_path = artifact_paths.get("remediation_plan_json")
+            plan_path = cast(dict[str, Any], artifact_paths).get("remediation_plan_json")
             if isinstance(plan_path, str):
                 plan = _load_json(plan_path)
     slices = plan.get("slices") if isinstance(plan, dict) else None
     if isinstance(slices, list):
-        for slice_item in slices:
+        for slice_item in cast(list[object], slices):
             if not isinstance(slice_item, dict):
                 continue
+            slice_item = cast(dict[str, Any], slice_item)
             slice_id = str(slice_item.get("id") or "unknown")
             if not verification_contract_is_valid(slice_item):
                 errors.append(f"slice {slice_id} has an invalid verification contract")
@@ -61,7 +62,7 @@ def validate_handoff_quality(
         if context is None:
             artifact_paths = handoff.get("artifact_paths")
             context_path = (
-                artifact_paths.get("remediation_context_json")
+                cast(dict[str, Any], artifact_paths).get("remediation_context_json")
                 if isinstance(artifact_paths, dict)
                 else None
             )
@@ -75,11 +76,11 @@ def validate_handoff_quality(
                 remediation_plan=plan,
                 require_ready=True,
             )
-            errors.extend(context_result.get("errors", []))
+            errors.extend(cast(list[str], context_result.get("errors", [])))
 
     next_slice = handoff.get("next_slice")
     if isinstance(next_slice, dict):
-        errors.extend(_lint_slice_dict(next_slice, label="next_slice"))
+        errors.extend(_lint_slice_dict(cast(dict[str, Any], next_slice), label="next_slice"))
 
     result: dict[str, Any] = {"passed": not errors, "errors": errors}
     if context_result is not None:
@@ -128,7 +129,9 @@ def _lint_slice_dict(slice_item: dict[str, Any], *, label: str) -> list[str]:
     if _is_structural_slice(slice_item) and not _has_structural_anchor(slice_item):
         errors.append(f"{label} lacks structural anchor")
     scope = slice_item.get("scope")
-    if not isinstance(scope, dict) or not _non_empty_string_list(scope.get("in_scope")):
+    if not isinstance(scope, dict) or not _non_empty_string_list(
+        cast(dict[str, Any], scope).get("in_scope")
+    ):
         errors.append(f"{label} lacks in-scope boundaries")
     return errors
 
@@ -138,8 +141,9 @@ def _is_structural_slice(slice_item: dict[str, Any]) -> bool:
     if not isinstance(findings, list):
         return str(slice_item.get("id") or "").startswith("remediate-structural-")
     return any(
-        isinstance(finding, dict) and str(finding.get("category", "")).startswith("structural:")
-        for finding in findings
+        isinstance(finding, dict)
+        and str(cast(dict[str, Any], finding).get("category", "")).startswith("structural:")
+        for finding in cast(list[object], findings)
     )
 
 
@@ -147,15 +151,16 @@ def _has_structural_anchor(slice_item: dict[str, Any]) -> bool:
     findings = slice_item.get("findings")
     if not isinstance(findings, list):
         return False
-    for finding in findings:
+    for finding in cast(list[object], findings):
         if not isinstance(finding, dict):
             continue
+        finding = cast(dict[str, Any], finding)
         if isinstance(finding.get("fingerprint"), str) and finding["fingerprint"]:
             return True
         if isinstance(finding.get("file"), str) and isinstance(finding.get("line"), int):
             return True
         excerpt = finding.get("evidence_excerpt")
-        if isinstance(excerpt, dict) and isinstance(excerpt.get("file"), str):
+        if isinstance(excerpt, dict) and isinstance(cast(dict[str, Any], excerpt).get("file"), str):
             return True
     return False
 
@@ -167,8 +172,8 @@ def _contains_secret_literal(content: str) -> bool:
 def _non_empty_string_list(value: object) -> bool:
     return (
         isinstance(value, list)
-        and bool(value)
-        and all(isinstance(item, str) and item for item in value)
+        and bool(cast(list[object], value))
+        and all(isinstance(item, str) and item for item in cast(list[object], value))
     )
 
 
@@ -180,4 +185,4 @@ def _load_json(path: str) -> dict[str, Any] | None:
     if not target.exists():
         return None
     payload = json.loads(target.read_text(encoding="utf-8"))
-    return payload if isinstance(payload, dict) else None
+    return cast(dict[str, Any], payload) if isinstance(payload, dict) else None
