@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 
 from quality_runner.security.review_obligations import build_security_review_obligations
 
@@ -11,13 +11,14 @@ def security_review_handoff(
 ) -> dict[str, Any] | None:
     if not isinstance(security_scan, dict):
         return None
-    if security_scan.get("settings", {}).get("enabled") is False:
+    settings = _mapping(security_scan.get("settings")) or {}
+    if settings.get("enabled") is False:
         return None
 
     executable_gates = [
         gate
-        for gate in security_scan.get("available_capabilities", [])
-        if isinstance(gate, dict) and gate.get("capability_kind") == "local_command"
+        for gate in _mappings(security_scan.get("available_capabilities"))
+        if gate.get("capability_kind") == "local_command"
     ]
     missing_gates = security_scan.get("missing_capabilities", [])
     candidates = security_scan.get("candidates", [])
@@ -39,6 +40,7 @@ def security_review_handoff(
 def security_review_markdown(security_review: object) -> list[str]:
     if not isinstance(security_review, dict):
         return []
+    security_review = cast(dict[str, Any], security_review)
 
     lines = [
         "",
@@ -50,32 +52,28 @@ def security_review_markdown(security_review: object) -> list[str]:
 
     agent_gates = security_review.get("agent_review_gates")
     if isinstance(agent_gates, list) and agent_gates:
-        for gate in agent_gates:
-            if not isinstance(gate, dict):
-                continue
+        for gate in _mappings(agent_gates):
             gate_id = gate.get("id")
             if not isinstance(gate_id, str):
                 continue
             lines.extend([f"### {gate_id}", ""])
-            scope = gate.get("scope")
-            if isinstance(scope, dict):
+            scope = _mapping(gate.get("scope"))
+            if scope is not None:
                 paths = scope.get("paths")
                 categories = scope.get("categories")
                 if isinstance(paths, list) and paths:
                     lines.append("Scope:")
-                    lines.extend(f"- {path}" for path in paths if isinstance(path, str))
+                    lines.extend(f"- {path}" for path in _strings(paths))
                     lines.append("")
                 if isinstance(categories, list) and categories:
                     lines.append("Review categories:")
-                    lines.extend(
-                        f"- {category}" for category in categories if isinstance(category, str)
-                    )
+                    lines.extend(f"- {category}" for category in _strings(categories))
                     lines.append("")
             instructions = gate.get("review_instructions")
             if isinstance(instructions, list) and instructions:
                 lines.append("Instructions:")
                 for index, instruction in enumerate(
-                    (item for item in instructions if isinstance(item, str)),
+                    _strings(instructions),
                     start=1,
                 ):
                     lines.append(f"{index}. {instruction}")
@@ -83,31 +81,28 @@ def security_review_markdown(security_review: object) -> list[str]:
             completion = gate.get("completion_criteria")
             if isinstance(completion, list) and completion:
                 lines.append("Completion criteria:")
-                lines.extend(f"- {item}" for item in completion if isinstance(item, str))
+                lines.extend(f"- {item}" for item in _strings(completion))
                 lines.append("")
     else:
         lines.extend(["No agent-review security gates for this run.", ""])
 
     candidates = security_review.get("security_candidates")
     if isinstance(candidates, list) and candidates:
+        candidate_values = cast(list[object], candidates)
         lines.extend(["## QR-Detected Security Candidates", ""])
-        for candidate in candidates[:20]:
-            if not isinstance(candidate, dict):
-                continue
+        for candidate in _mappings(candidates)[:20]:
             lines.append(
                 f"- {candidate.get('id')} ({candidate.get('category')}): "
                 f"{candidate.get('file')}:{candidate.get('line')}"
             )
-        if len(candidates) > 20:
-            lines.append(f"- {len(candidates) - 20} additional candidates omitted.")
+        if len(candidate_values) > 20:
+            lines.append(f"- {len(candidate_values) - 20} additional candidates omitted.")
         lines.append("")
 
     missing = security_review.get("missing_repo_owned_gates")
     if isinstance(missing, list) and missing:
         lines.extend(["## Missing Repo-Owned Security Gates", ""])
-        for gate in missing:
-            if not isinstance(gate, dict):
-                continue
+        for gate in _mappings(missing):
             gate_id = gate.get("id")
             commands = gate.get("recommended_commands")
             if isinstance(gate_id, str):
@@ -118,3 +113,19 @@ def security_review_markdown(security_review: object) -> list[str]:
         lines.append("")
 
     return lines
+
+
+def _mapping(value: object) -> dict[str, Any] | None:
+    return cast(dict[str, Any], value) if isinstance(value, dict) else None
+
+
+def _mappings(value: Any) -> list[dict[str, Any]]:
+    if not isinstance(value, list):
+        return []
+    return [item for item in cast(list[object], value) if isinstance(item, dict)]
+
+
+def _strings(value: Any) -> list[str]:
+    if not isinstance(value, list):
+        return []
+    return [item for item in cast(list[object], value) if isinstance(item, str)]
