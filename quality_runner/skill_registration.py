@@ -1,12 +1,12 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from quality_runner.config import CONFIG_FILE_NAME, load_repo_config
 
 
-def _canonical_skill_toml(raw: dict[str, Any], skill_id: str) -> str:
+def canonical_skill_toml(raw: dict[str, Any], skill_id: str) -> str:
     lines = [
         f'id = "{skill_id}"',
         f'name = "{_escape_toml_string(str(raw.get("name", skill_id)))}"',
@@ -21,8 +21,9 @@ def _canonical_skill_toml(raw: dict[str, Any], skill_id: str) -> str:
 
     sources = raw.get("sources")
     if isinstance(sources, list):
-        for source in sources:
-            if not isinstance(source, dict):
+        for source_value in cast(list[object], sources):
+            source = _mapping(source_value)
+            if source is None:
                 continue
             lines.append("[[sources]]")
             for key, value in source.items():
@@ -33,8 +34,9 @@ def _canonical_skill_toml(raw: dict[str, Any], skill_id: str) -> str:
         collection = raw.get(collection_name)
         if not isinstance(collection, list):
             continue
-        for item in collection:
-            if not isinstance(item, dict):
+        for item_value in cast(list[object], collection):
+            item = _mapping(item_value)
+            if item is None:
                 continue
             lines.append(f"[[{collection_name}]]")
             for key, value in item.items():
@@ -49,8 +51,11 @@ def _toml_field_lines(key: str, value: object) -> list[str]:
         if "\n" in value:
             return [f'{key} = """', value.rstrip(), '"""']
         return [f'{key} = "{_escape_toml_string(value)}"']
-    if isinstance(value, list) and all(isinstance(item, str) for item in value):
-        quoted = ", ".join(f'"{_escape_toml_string(item)}"' for item in value)
+    if isinstance(value, list):
+        values = cast(list[object], value)
+        if not all(isinstance(item, str) for item in values):
+            return []
+        quoted = ", ".join(f'"{_escape_toml_string(cast(str, item))}"' for item in values)
         return [f"{key} = [{quoted}]"]
     return []
 
@@ -59,7 +64,7 @@ def _escape_toml_string(value: str) -> str:
     return value.replace("\\", "\\\\").replace('"', '\\"')
 
 
-def _update_repo_config(
+def update_repo_config(
     repo_root: Path,
     *,
     skill_id: str,
@@ -86,10 +91,12 @@ def update_repo_skills_config(
     skills_section = config.get("skills")
     if not isinstance(skills_section, dict):
         skills_section = {"enabled": True}
+    skills_section = cast(dict[str, Any], skills_section)
 
     local = skills_section.get("local")
     if not isinstance(local, list):
         local = []
+    local = cast(list[object], local)
 
     entry_by_id = {
         item["id"]: item
@@ -98,19 +105,18 @@ def update_repo_skills_config(
     }
     updated_local: list[dict[str, Any]] = []
     found_ids: set[str] = set()
-    for item in local:
-        item_id = item.get("id") if isinstance(item, dict) else None
+    for item_value in local:
+        item = _mapping(item_value)
+        if item is None:
+            continue
+        item_id = item.get("id")
         if isinstance(item_id, str) and item_id in entry_by_id:
             replacement = dict(entry_by_id[item_id])
-            if (
-                isinstance(item, dict)
-                and isinstance(item.get("applies_to"), list)
-                and "applies_to" not in replacement
-            ):
+            if isinstance(item.get("applies_to"), list) and "applies_to" not in replacement:
                 replacement["applies_to"] = item["applies_to"]
             updated_local.append(replacement)
             found_ids.add(item_id)
-        elif isinstance(item, dict):
+        else:
             updated_local.append(item)
     for item_id, item in entry_by_id.items():
         if item_id not in found_ids:
@@ -120,7 +126,7 @@ def update_repo_skills_config(
     if replace_active:
         active_ids: list[str] = []
     elif isinstance(active, list):
-        active_ids = [item for item in active if isinstance(item, str) and item]
+        active_ids = [item for item in cast(list[object], active) if isinstance(item, str) and item]
     else:
         active_ids = []
     for skill_id in activate_ids or []:
@@ -154,19 +160,13 @@ def _render_skills_config_block(
     lines = ["[quality_runner.skills]", f"enabled = {'true' if enabled else 'false'}"]
     if isinstance(global_enabled, bool):
         lines.append(f"global_enabled = {'true' if global_enabled else 'false'}")
-    if (
-        isinstance(global_exclude, list)
-        and global_exclude
-        and all(isinstance(item, str) for item in global_exclude)
-    ):
-        quoted = ", ".join(f'"{item}"' for item in sorted(global_exclude))
+    exclude_values = _string_list(global_exclude)
+    if exclude_values:
+        quoted = ", ".join(f'"{item}"' for item in sorted(exclude_values))
         lines.append(f"global_exclude = [{quoted}]")
-    if (
-        isinstance(global_always, list)
-        and global_always
-        and all(isinstance(item, str) for item in global_always)
-    ):
-        quoted = ", ".join(f'"{item}"' for item in sorted(global_always))
+    always_values = _string_list(global_always)
+    if always_values:
+        quoted = ", ".join(f'"{item}"' for item in sorted(always_values))
         lines.append(f"global_always = [{quoted}]")
     if active:
         quoted = ", ".join(f'"{item}"' for item in sorted(active))
@@ -182,7 +182,9 @@ def _render_skills_config_block(
         lines.append(f'path = "{path}"')
         applies_to = item.get("applies_to")
         if isinstance(applies_to, list) and applies_to:
-            quoted = ", ".join(f'"{value}"' for value in applies_to)
+            quoted = ", ".join(
+                f'"{value}"' for value in _string_list(cast(list[object], applies_to))
+            )
             lines.append(f"applies_to = [{quoted}]")
     return "\n".join(lines)
 
@@ -215,3 +217,13 @@ def _replace_skills_block(existing: str, block: str) -> str:
         result.append(line)
         index += 1
     return "\n".join(result).rstrip() + "\n"
+
+
+def _mapping(value: object) -> dict[str, Any] | None:
+    return cast(dict[str, Any], value) if isinstance(value, dict) else None
+
+
+def _string_list(value: object) -> list[str]:
+    if not isinstance(value, list):
+        return []
+    return [item for item in cast(list[object], value) if isinstance(item, str)]

@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from quality_runner.fleet.contracts import FRESHNESS_DAYS, MAX_DOCUMENT_BYTES, relative_path
 
@@ -89,6 +89,7 @@ def assess_matrix_path(path: Path, *, root: Path, as_of: str) -> dict[str, Any]:
         return _unknown(display_path, f"Matrix is unreadable or invalid JSON: {error}")
     if not isinstance(payload, dict):
         return _unknown(display_path, "Matrix root must be an object.")
+    payload = cast(dict[str, Any], payload)
 
     if payload.get("schema_version") == POINTER_SCHEMA:
         target = payload.get("artifact_path")
@@ -118,7 +119,9 @@ def assess_matrix_path(path: Path, *, root: Path, as_of: str) -> dict[str, Any]:
     if not isinstance(owner, str) or not owner.strip():
         problems.append("matrix owner is missing")
     subject = payload.get("subject")
-    if not isinstance(subject, dict) or not isinstance(subject.get("id"), str):
+    if not isinstance(subject, dict) or not isinstance(
+        cast(dict[str, Any], subject).get("id"), str
+    ):
         problems.append("subject identity is missing")
     reviewed = _parse_date(payload.get("last_reviewed"))
     as_of_date = _parse_date(as_of)
@@ -135,11 +138,12 @@ def assess_matrix_path(path: Path, *, root: Path, as_of: str) -> dict[str, Any]:
     local_declared = False
     external_declared = False
     unresolved = 0
-    for index, surface in enumerate(surfaces):
+    for index, surface in enumerate(cast(list[object], surfaces)):
         if not isinstance(surface, dict):
             problems.append(f"surface {index + 1} is invalid")
             unresolved += 1
             continue
+        surface = cast(dict[str, Any], surface)
         status = surface.get("status", "applicable")
         scope = surface.get("scope")
         local_declared = local_declared or scope == "local"
@@ -167,7 +171,7 @@ def assess_matrix_path(path: Path, *, root: Path, as_of: str) -> dict[str, Any]:
 
     declared_unresolved = payload.get("unresolved_surfaces")
     if isinstance(declared_unresolved, list) and declared_unresolved:
-        unresolved += len(declared_unresolved)
+        unresolved += len(cast(list[object], declared_unresolved))
         problems.append("unresolved surfaces remain")
 
     operation_evidence = payload.get("operation_evidence")
@@ -175,12 +179,13 @@ def assess_matrix_path(path: Path, *, root: Path, as_of: str) -> dict[str, Any]:
     if not isinstance(operation_evidence, dict):
         exercised = False
     else:
+        operation_evidence = cast(dict[str, Any], operation_evidence)
         for operation in ("add", "change", "remove"):
             item = operation_evidence.get(operation)
             if (
                 not isinstance(item, dict)
-                or item.get("status") != "passed"
-                or not _string_list(item.get("evidence"))
+                or cast(dict[str, Any], item).get("status") != "passed"
+                or not _string_list(cast(dict[str, Any], item).get("evidence"))
             ):
                 exercised = False
 
@@ -233,7 +238,7 @@ def _nonempty(value: object) -> bool:
 def _string_list(value: object) -> list[str]:
     if not isinstance(value, list):
         return []
-    return [item for item in value if isinstance(item, str) and item.strip()]
+    return [item for item in cast(list[object], value) if isinstance(item, str) and item.strip()]
 
 
 def _parse_date(value: object) -> datetime | None:

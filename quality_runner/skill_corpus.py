@@ -12,7 +12,7 @@ from quality_runner.schema_constants import (
 )
 from quality_runner.skill_config import _load_skill_pack, _resolve_skill_path, sanitize_skill_id
 from quality_runner.skill_ingest import append_skill_to_target, validate_skill_pack
-from quality_runner.skill_registration import _canonical_skill_toml, update_repo_skills_config
+from quality_runner.skill_registration import canonical_skill_toml, update_repo_skills_config
 
 CORPUS_SCHEMA = "quality-runner-skill-corpus-v0.1"
 CORPUS_MANIFEST_NAME = "quality-runner-corpus.toml"
@@ -326,7 +326,7 @@ def sync_skill_corpus(
             if target_path is None or target_warning is not None:
                 repo_errors.append(f"target path rejected for {skill_id}")
                 continue
-            canonical_content = _canonical_skill_toml(pack_entry["pack"], skill_id)
+            canonical_content = canonical_skill_toml(pack_entry["pack"], skill_id)
             pack_plans.append(
                 {
                     "id": skill_id,

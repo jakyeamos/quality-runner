@@ -12,7 +12,7 @@ from quality_runner.skill_config import (
     _resolve_skill_path,
     sanitize_skill_id,
 )
-from quality_runner.skill_registration import _canonical_skill_toml, _update_repo_config
+from quality_runner.skill_registration import canonical_skill_toml, update_repo_config
 
 SKILLS_DIR = ".quality-runner/skills"
 
@@ -132,7 +132,7 @@ def validate_skill_pack(
         skill_id=normalized_id,
         warnings=warnings,
         errors=[],
-        canonical_content=_canonical_skill_toml(raw, normalized_id),
+        canonical_content=canonical_skill_toml(raw, normalized_id),
     )
 
 
@@ -184,7 +184,7 @@ def ingest_skill_pack(
 
     resolved_target.parent.mkdir(parents=True, exist_ok=True)
     resolved_target.write_text(canonical_content, encoding="utf-8")
-    _update_repo_config(
+    update_repo_config(
         repo_root, skill_id=normalized_id, skill_path=skill_relative_path, activate=activate
     )
 
@@ -385,7 +385,7 @@ def _append_skill_to_target(
     if isinstance(candidate_version, str) and candidate_version:
         source["version"] = candidate_version
     sources.append(source)
-    canonical_content = _canonical_skill_toml(
+    canonical_content = canonical_skill_toml(
         {
             "name": target_pack["name"],
             "version": target_pack.get("version"),
@@ -410,7 +410,7 @@ def _append_skill_to_target(
 
     target_path.write_text(canonical_content, encoding="utf-8")
     if repo_root is not None and target_relative_path is not None:
-        _update_repo_config(
+        update_repo_config(
             repo_root,
             skill_id=normalized_pack_id,
             skill_path=target_relative_path,
