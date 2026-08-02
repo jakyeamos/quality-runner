@@ -5,6 +5,7 @@ import json
 import os
 from collections.abc import Mapping
 from pathlib import Path, PurePosixPath
+from typing import Any, cast
 
 from quality_runner import __version__
 from quality_runner.artifacts import (
@@ -33,7 +34,7 @@ def load_gate_execution_plan(repo_root: Path, run_id: str) -> list[object] | Non
         payload = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         return None
-    return payload if isinstance(payload, list) else None
+    return cast(list[object], payload) if isinstance(payload, list) else None
 
 
 def build_timeout_identity(
@@ -240,7 +241,7 @@ def read_json(path: Path | None) -> dict[str, object] | None:
         payload = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         return None
-    return payload if isinstance(payload, dict) else None
+    return cast(dict[str, object], payload) if isinstance(payload, dict) else None
 
 
 def write_run_baseline_artifact(
@@ -257,16 +258,20 @@ def write_run_baseline_artifact(
 
 
 def mapping(value: object) -> dict[str, object]:
-    return dict(value) if isinstance(value, Mapping) else {}
+    return (
+        {str(key): item for key, item in cast(Mapping[Any, Any], value).items()}
+        if isinstance(value, Mapping)
+        else {}
+    )
 
 
 def list_value(value: object) -> list[object]:
-    return list(value) if isinstance(value, list) else []
+    return list(cast(list[Any], value)) if isinstance(value, list) else []
 
 
 def string_list(value: object) -> list[str]:
     return (
-        [item for item in value if isinstance(item, str) and item]
+        [item for item in cast(list[Any], value) if isinstance(item, str) and item]
         if isinstance(value, list)
         else []
     )
@@ -292,7 +297,10 @@ def json_safe(value: object) -> object:
     if value is None or isinstance(value, (str, int, float, bool)):
         return value
     if isinstance(value, Mapping):
-        return {str(key): json_safe(item) for key, item in value.items()}
+        return {
+            str(key): json_safe(item)
+            for key, item in cast(Mapping[Any, Any], value).items()
+        }
     if isinstance(value, list):
-        return [json_safe(item) for item in value]
+        return [json_safe(item) for item in cast(list[Any], value)]
     return str(value)

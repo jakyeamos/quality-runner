@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import re
-from typing import Any
+from typing import Any, cast
 
 
 def parse_artifacts_section(value: object, warnings: list[dict[str, str]]) -> dict[str, Any]:
@@ -15,9 +15,10 @@ def parse_artifacts_section(value: object, warnings: list[dict[str, str]]) -> di
             )
         )
         return {}
+    typed_value = cast(dict[str, Any], value)
 
     patterns = _string_list(
-        value.get("redact_patterns"),
+        typed_value.get("redact_patterns"),
         "quality_runner.artifacts.redact_patterns",
         warnings,
     )
@@ -35,15 +36,15 @@ def parse_artifacts_section(value: object, warnings: list[dict[str, str]]) -> di
             continue
         valid_patterns.append(pattern)
     replacement = _string_value(
-        value.get("redact_replacement"),
+        typed_value.get("redact_replacement"),
         "quality_runner.artifacts.redact_replacement",
         warnings,
     )
     retention_runs = _positive_int(
-        value.get("retention_runs"), "quality_runner.artifacts.retention_runs", warnings
+        typed_value.get("retention_runs"), "quality_runner.artifacts.retention_runs", warnings
     )
     retention_days = _positive_int(
-        value.get("retention_days"), "quality_runner.artifacts.retention_days", warnings
+        typed_value.get("retention_days"), "quality_runner.artifacts.retention_days", warnings
     )
 
     parsed: dict[str, Any] = {}
@@ -86,8 +87,10 @@ def _string_value(value: object, field: str, warnings: list[dict[str, str]]) -> 
 def _string_list(value: object, field: str, warnings: list[dict[str, str]]) -> list[str]:
     if value is None:
         return []
-    if isinstance(value, list) and all(isinstance(item, str) and item for item in value):
-        return value
+    if isinstance(value, list):
+        typed_value = cast(list[Any], value)
+        if all(isinstance(item, str) and item for item in typed_value):
+            return [cast(str, item) for item in typed_value]
     warnings.append(
         _warning(
             "invalid_quality_runner_config_field",

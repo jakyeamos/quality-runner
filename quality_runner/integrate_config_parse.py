@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 
 
 def parse_integrate_section(
@@ -18,8 +18,9 @@ def parse_integrate_section(
         )
         return {}
 
+    typed_value = cast(dict[str, Any], value)
     result: dict[str, Any] = {}
-    enabled = value.get("enabled")
+    enabled = typed_value.get("enabled")
     if enabled is not None:
         if isinstance(enabled, bool):
             result["enabled"] = enabled
@@ -31,12 +32,12 @@ def parse_integrate_section(
                 )
             )
     registration_globs = _string_list(
-        value.get("registration_globs"),
+        typed_value.get("registration_globs"),
         "quality_runner.integrate.registration_globs",
         warnings,
     )
     entrypoint_globs = _string_list(
-        value.get("entrypoint_globs"),
+        typed_value.get("entrypoint_globs"),
         "quality_runner.integrate.entrypoint_globs",
         warnings,
     )
@@ -50,8 +51,10 @@ def parse_integrate_section(
 def _string_list(value: object, field: str, warnings: list[dict[str, str]]) -> list[str]:
     if value is None:
         return []
-    if isinstance(value, list) and all(isinstance(item, str) and item for item in value):
-        return value
+    if isinstance(value, list):
+        typed_value = cast(list[Any], value)
+        if all(isinstance(item, str) and item for item in typed_value):
+            return [cast(str, item) for item in typed_value]
     warnings.append(
         _warning(
             "invalid_quality_runner_config_field",

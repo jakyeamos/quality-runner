@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 from uuid import uuid4
 
 from quality_runner.artifacts import (
@@ -246,7 +246,7 @@ def load_gate_responses(*, repo_root: Path, gate_run_id: str) -> list[dict[str, 
             continue
         payload = json.loads(line)
         if isinstance(payload, dict):
-            responses.append(payload)
+            responses.append(cast(dict[str, Any], payload))
     return responses
 
 
@@ -267,7 +267,8 @@ def _derive_awaiting(*, handoff: dict[str, Any], lifecycle_status: str) -> dict[
     since = datetime.now(UTC).isoformat()
     gate_verification = handoff.get("gate_verification")
     if isinstance(gate_verification, dict):
-        primary_blocker_class = gate_verification.get("primary_blocker_class")
+        typed_gate_verification = cast(dict[str, Any], gate_verification)
+        primary_blocker_class = typed_gate_verification.get("primary_blocker_class")
         if handoff.get("status") in {"gates-blocked", "gates-failed"}:
             return {
                 "kind": "blocker-routing",
@@ -282,12 +283,13 @@ def _derive_awaiting(*, handoff: dict[str, Any], lifecycle_status: str) -> dict[
 
     next_slice = handoff.get("next_slice")
     if isinstance(next_slice, dict):
-        findings = next_slice.get("findings")
+        typed_next_slice = cast(dict[str, Any], next_slice)
+        findings = typed_next_slice.get("findings")
         if isinstance(findings, list):
-            for finding in findings:
+            for finding in cast(list[Any], findings):
                 if not isinstance(finding, dict):
                     continue
-                if finding.get("actionability") == "needs-author-decision":
+                if cast(dict[str, Any], finding).get("actionability") == "needs-author-decision":
                     return {
                         "kind": "author-decision",
                         "primary_blocker_class": None,
@@ -419,7 +421,7 @@ def _gate_run_file(
 def _gate_run_path(gate_run: dict[str, Any]) -> str | None:
     artifact_paths = gate_run.get("artifact_paths")
     if isinstance(artifact_paths, dict):
-        path = artifact_paths.get("gate_run_json")
+        path = cast(dict[str, Any], artifact_paths).get("gate_run_json")
         if isinstance(path, str) and path:
             return path
     return None
@@ -429,7 +431,7 @@ def _load_json(path: Path) -> dict[str, Any]:
     payload = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(payload, dict):
         raise ValueError(f"expected JSON object: {path}")
-    return payload
+    return cast(dict[str, Any], payload)
 
 
 def _validate_gate_run_id(gate_run_id: str) -> None:

@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from collections import Counter, defaultdict
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from quality_runner.artifacts import prepare_safe_directory, write_text
 
@@ -273,7 +273,7 @@ def _top_slices(slices: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
 def _finding_line(finding: dict[str, Any]) -> str:
     evidence = finding.get("evidence")
-    evidence_items = evidence if isinstance(evidence, list) else []
+    evidence_items = cast(list[Any], evidence) if isinstance(evidence, list) else []
     evidence_text = "; ".join(str(item) for item in evidence_items[:3]) or "no evidence listed"
     return (
         f"- `{finding.get('id')}` {finding.get('severity')} {finding.get('category')}: "
@@ -309,10 +309,12 @@ def _repo_name(result: dict[str, Any]) -> str:
 def _missing_capabilities(capability: dict[str, Any], result: dict[str, Any]) -> list[str]:
     missing = capability.get("missing")
     if isinstance(missing, list):
+        typed_missing = cast(list[Any], missing)
         return [
-            item["id"]
-            for item in missing
-            if isinstance(item, dict) and isinstance(item.get("id"), str)
+            cast(dict[str, Any], item)["id"]
+            for item in typed_missing
+            if isinstance(item, dict)
+            and isinstance(cast(dict[str, Any], item).get("id"), str)
         ]
     return _string_items(result.get("missing_capabilities"))
 
@@ -320,7 +322,7 @@ def _missing_capabilities(capability: dict[str, Any], result: dict[str, Any]) ->
 def _summary_finding_count(result: dict[str, Any]) -> int:
     value = result.get("finding_counts")
     if isinstance(value, dict):
-        return _int_value(value.get("total"))
+        return _int_value(cast(dict[str, Any], value).get("total"))
     return 0
 
 
@@ -331,15 +333,23 @@ def _load_json(path: Path) -> dict[str, Any]:
         payload = json.loads(path.read_text(encoding="utf-8"))
     except json.JSONDecodeError:
         return {}
-    return payload if isinstance(payload, dict) else {}
+    return cast(dict[str, Any], payload) if isinstance(payload, dict) else {}
 
 
 def _dict_items(value: object) -> list[dict[str, Any]]:
-    return [item for item in value if isinstance(item, dict)] if isinstance(value, list) else []
+    return (
+        [cast(dict[str, Any], item) for item in cast(list[Any], value) if isinstance(item, dict)]
+        if isinstance(value, list)
+        else []
+    )
 
 
 def _string_items(value: object) -> list[str]:
-    return [item for item in value if isinstance(item, str)] if isinstance(value, list) else []
+    return (
+        [item for item in cast(list[Any], value) if isinstance(item, str)]
+        if isinstance(value, list)
+        else []
+    )
 
 
 def _path_or_none(value: object) -> Path | None:
