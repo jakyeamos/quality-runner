@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, cast
 
 from quality_runner.schema_constants import PHASE_PLAN_SCHEMA
 
@@ -12,7 +12,11 @@ PRIORITY_ORDER = {"high": 0, "medium": 1, "low": 2}
 def ordered_slices(slices: object) -> list[dict[str, Any]]:
     if not isinstance(slices, list):
         return []
-    valid = [item for item in slices if isinstance(item, dict) and isinstance(item.get("id"), str)]
+    valid = [
+        cast(dict[str, Any], item)
+        for item in cast(list[object], slices)
+        if isinstance(item, dict) and isinstance(cast(dict[str, Any], item).get("id"), str)
+    ]
     indexed = list(enumerate(valid))
     indexed.sort(
         key=lambda item: (
@@ -61,17 +65,21 @@ def build_phase_plan(
     priority = str(slice_item.get("priority") or "medium").lower()
     finding_value = slice_item.get("findings")
     finding_items: list[object] = (
-        [item for item in finding_value] if isinstance(finding_value, list) else []
+        [item for item in cast(list[object], finding_value)]
+        if isinstance(finding_value, list)
+        else []
     )
     finding_ids = [
-        str(item["id"]) for item in finding_items if isinstance(item, dict) and item.get("id")
+        str(cast(dict[str, Any], item)["id"])
+        for item in finding_items
+        if isinstance(item, dict) and cast(dict[str, Any], item).get("id")
     ]
     if not finding_ids:
         finding_ids = _string_list(slice_item.get("finding_ids"))
     fingerprints = [
-        str(item["fingerprint"])
+        str(cast(dict[str, Any], item)["fingerprint"])
         for item in finding_items
-        if isinstance(item, dict) and item.get("fingerprint")
+        if isinstance(item, dict) and cast(dict[str, Any], item).get("fingerprint")
     ]
     if not fingerprints:
         fingerprints = _string_list(slice_item.get("finding_fingerprints"))
@@ -80,7 +88,8 @@ def build_phase_plan(
         for item in _string_list(slice_item.get("depends_on"))
         if item in plan_ids_by_slice
     ]
-    source_info = source["source"] if isinstance(source.get("source"), dict) else {}
+    source_value = source.get("source")
+    source_info = cast(dict[str, Any], source_value) if isinstance(source_value, dict) else {}
     source_slice_ids = _string_list(slice_item.get("slice_ids"))
     return {
         "schema": PHASE_PLAN_SCHEMA,
@@ -110,4 +119,4 @@ def build_phase_plan(
 def _string_list(value: object) -> list[str]:
     if not isinstance(value, list):
         return []
-    return [item for item in value if isinstance(item, str)]
+    return [item for item in cast(list[object], value) if isinstance(item, str)]
