@@ -45,6 +45,7 @@
     "tests/**",
     ".gitleaks.toml",
     "change-surface-matrix.json",
+    "environment-legibility.json",
     ".quality-runner.toml"
   ],
   "checks": {

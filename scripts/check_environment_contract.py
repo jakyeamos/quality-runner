@@ -39,6 +39,7 @@ REQUIRED_FILES = (
     ".quality-runner.toml",
     ".gitleaks.toml",
     "change-surface-matrix.json",
+    "environment-legibility.json",
     ".gitignore",
     ".github/workflows/ci.yml",
     ".github/workflows/release.yml",
@@ -78,6 +79,19 @@ REQUIRED_QUALITY_GATES = {
 }
 MIN_HOOK_TIMEOUT_SECONDS = 360
 MAX_CONTEXT_AGE = timedelta(days=35)
+LEGIBILITY_SCHEMA = "quality-runner-environment-legibility/v1"
+LEGIBILITY_DIMENSIONS = {
+    "architecture_boundaries",
+    "coding_conventions",
+    "security_constraints",
+    "failure_modes",
+    "implementation_examples",
+    "definition_of_done",
+    "approval_gated_paths",
+    "deployment_rollback",
+    "context_routing",
+    "quality_commands",
+}
 REVIEW_RE = re.compile(r"last_reviewed:\s*(\d{4}-\d{2}-\d{2})")
 SECRET_NAMES = {
     ".env",
@@ -275,6 +289,76 @@ def _check_quality_runner(root: Path, errors: list[str]) -> None:
             errors.append(f"Quality Runner gate is not a required blocker: {gate_id}")
 
 
+def _check_legibility_contract(root: Path, errors: list[str], as_of: date) -> None:
+    path = root / "environment-legibility.json"
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as error:
+        errors.append(f"invalid environment-legibility.json: {error.__class__.__name__}")
+        return
+    if not isinstance(payload, dict) or payload.get("schema") != LEGIBILITY_SCHEMA:
+        errors.append("environment-legibility.json has an invalid schema")
+        return
+    reviewed_value = payload.get("last_reviewed")
+    try:
+        reviewed = date.fromisoformat(str(reviewed_value))
+    except ValueError:
+        errors.append("environment-legibility.json last_reviewed is invalid")
+    else:
+        age = as_of - reviewed
+        if age.days < 0:
+            errors.append("environment-legibility.json last_reviewed is in the future")
+        elif age > MAX_CONTEXT_AGE:
+            errors.append("environment-legibility.json is stale")
+    controls = payload.get("controls")
+    if not isinstance(controls, list):
+        errors.append("environment-legibility.json controls must be a list")
+        return
+    seen: set[str] = set()
+    for control in controls:
+        if not isinstance(control, dict):
+            errors.append("environment-legibility.json contains a non-object control")
+            continue
+        dimension = control.get("dimension")
+        if not isinstance(dimension, str) or dimension not in LEGIBILITY_DIMENSIONS:
+            errors.append(f"environment-legibility.json has an invalid dimension: {dimension}")
+            continue
+        seen.add(dimension)
+        evidence = control.get("evidence")
+        if not isinstance(evidence, list) or not evidence:
+            errors.append(f"legibility control has no evidence: {dimension}")
+        else:
+            for relative_path in evidence:
+                if not isinstance(relative_path, str):
+                    errors.append(f"legibility evidence path is not text: {dimension}")
+                    continue
+                target = (root / relative_path).resolve()
+                if root.resolve() not in target.parents or not target.is_file():
+                    errors.append(f"legibility evidence does not resolve: {relative_path}")
+        validation = control.get("validation")
+        if (
+            not isinstance(validation, list)
+            or not validation
+            or not all(isinstance(command, str) and command.strip() for command in validation)
+        ):
+            errors.append(f"legibility control has no validation commands: {dimension}")
+        validation_evidence = control.get("validation_evidence")
+        if not isinstance(validation_evidence, list) or not validation_evidence:
+            errors.append(f"legibility control has no validation evidence: {dimension}")
+        enforcement = control.get("enforcement")
+        if not isinstance(enforcement, dict) or enforcement.get("mode") not in {
+            "required",
+            "routed",
+        }:
+            errors.append(f"legibility control has no enforcement path: {dimension}")
+        elif not isinstance(enforcement.get("gate"), str) or not enforcement.get("gate"):
+            errors.append(f"legibility control has no enforcement gate: {dimension}")
+    errors.extend(
+        f"legibility control is missing: {dimension}"
+        for dimension in sorted(LEGIBILITY_DIMENSIONS - seen)
+    )
+
+
 def _check_gitignore(root: Path, errors: list[str]) -> None:
     try:
         lines = {
@@ -307,6 +391,7 @@ def validate(root: Path, as_of: date | None = None) -> list[str]:
     _check_workflow(root / ".github/workflows/ci.yml", "CI", errors)
     _check_workflow(root / ".github/workflows/release.yml", "release", errors)
     _check_quality_runner(root, errors)
+    _check_legibility_contract(root, errors, effective_as_of)
     _check_gitignore(root, errors)
 
     tracked_paths = _tracked_paths(root)

@@ -20,6 +20,7 @@ from quality_runner import (
 )
 from quality_runner.application import audit_v1_artifacts, journey_outcomes
 from quality_runner.schema_constants import PERFORMANCE_SCHEMA, REVIEW_EXECUTION_SCHEMA
+from quality_runner.fleet.legibility import _maintained_legibility_control
 
 
 def test_changed_surface_helpers_cover_projection_and_policy_branches(
@@ -128,3 +129,15 @@ def test_changed_surface_helpers_cover_state_and_artifact_validation(
         "input_hashes": {"input": "hash"},
     }
     review_execution_artifacts._validate_prepared_execution(payload, context)
+
+
+def test_changed_surface_legibility_contract_is_maintained() -> None:
+    root = Path(__file__).resolve().parents[1]
+    evidence = _maintained_legibility_control(
+        root=root,
+        dimension="architecture_boundaries",
+        as_of="2026-08-02T05:00:00+00:00",
+    )
+
+    assert evidence is not None
+    assert any(item["path"] == "environment-legibility.json" for item in evidence)

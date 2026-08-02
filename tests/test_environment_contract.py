@@ -96,3 +96,16 @@ mutating_risk = "safe"
 
     assert "missing required Quality Runner gate: security_dependency_audit" in errors
     assert "Quality Runner gate is not a required blocker: environment_contract" in errors
+
+
+def test_environment_contract_requires_all_legibility_controls(tmp_path: Path) -> None:
+    root = Path(__file__).resolve().parents[1]
+    contract = json.loads((root / "environment-legibility.json").read_text(encoding="utf-8"))
+    contract["controls"] = contract["controls"][:-1]
+    (tmp_path / "environment-legibility.json").write_text(json.dumps(contract), encoding="utf-8")
+
+    errors = __import__("scripts.check_environment_contract", fromlist=["validate"]).validate(
+        tmp_path, as_of=date(2026, 8, 2)
+    )
+
+    assert "legibility control is missing: quality_commands" in errors

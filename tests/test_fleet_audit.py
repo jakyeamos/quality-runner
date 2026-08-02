@@ -79,6 +79,21 @@ def test_static_audit_records_not_applicable_deployment_when_absent(tmp_path: Pa
     assert result["plan"]["local_projection"]["source_edits"] is False
 
 
+def test_static_audit_scores_structured_legibility_controls_as_maintained() -> None:
+    root = Path(__file__).resolve().parents[1]
+    repository = repository_record_for_root(root)
+    result = audit_repository(
+        repository=repository,
+        as_of="2026-08-02T05:00:00+00:00",
+        run_id="structured-legibility",
+    )
+
+    findings = {item["dimension"]: item for item in result["findings"]}
+    assert findings["architecture_boundaries"]["status"] == "maintained"
+    assert findings["architecture_boundaries"]["score"] == 4
+    assert findings["definition_of_done"]["score"] == 4
+
+
 def test_dynamic_audit_uses_disposable_worktree_and_replays(tmp_path: Path) -> None:
     projects = tmp_path / "projects"
     root = projects / "fixture"
