@@ -73,7 +73,7 @@ class SemanticSimilarityCache:
         if not isinstance(prior_identity, dict):
             self._record_miss(["cache-index-corrupt"])
             return None
-        reasons = _invalidation_reasons(prior_identity, identity)
+        reasons = _invalidation_reasons(cast(dict[str, object], prior_identity), identity)
         if reasons:
             self._record_miss(reasons)
             return None
@@ -84,17 +84,20 @@ class SemanticSimilarityCache:
         except (OSError, UnicodeDecodeError, json.JSONDecodeError):
             self._record_miss(["corrupt-entry" if cache_path.exists() else "missing-entry"])
             return None
+        if not isinstance(payload, dict):
+            self._record_miss(["corrupt-entry"])
+            return None
+        payload_map = cast(dict[str, Any], payload)
         if (
-            not isinstance(payload, dict)
-            or payload.get("schema") != SEMANTIC_SIMILARITY_CACHE_SCHEMA
-            or payload.get("cache_key") != key
-            or payload.get("identity") != dict(identity)
-            or not isinstance(payload.get("result"), dict)
+            payload_map.get("schema") != SEMANTIC_SIMILARITY_CACHE_SCHEMA
+            or payload_map.get("cache_key") != key
+            or payload_map.get("identity") != dict(identity)
+            or not isinstance(payload_map.get("result"), dict)
         ):
             self._record_miss(["corrupt-entry"])
             return None
         try:
-            result = materialize(cast(Mapping[str, object], payload["result"]))
+            result = materialize(cast(Mapping[str, object], payload_map["result"]))
         except (TypeError, ValueError, KeyError):
             self._record_miss(["corrupt-entry"])
             return None
@@ -103,8 +106,10 @@ class SemanticSimilarityCache:
         scanner_status = result.get("scanner_status")
         if isinstance(scanner_status, list):
             result["scanner_status"] = [
-                {**entry, "status": "cached"} if isinstance(entry, dict) else entry
-                for entry in scanner_status
+                {**cast(dict[str, Any], entry), "status": "cached"}
+                if isinstance(entry, dict)
+                else entry
+                for entry in cast(list[object], scanner_status)
             ]
         return result
 
@@ -203,20 +208,29 @@ class SemanticSimilarityCache:
         except (OSError, UnicodeDecodeError, json.JSONDecodeError):
             self._index_status = "corrupt"
             return
-        entries = payload.get("entries") if isinstance(payload, dict) else None
+        if not isinstance(payload, dict):
+            self._index_status = "corrupt"
+            return
+        payload_map = cast(dict[str, Any], payload)
+        entries = payload_map.get("entries")
         if (
-            not isinstance(payload, dict)
-            or payload.get("schema") != SEMANTIC_SIMILARITY_CACHE_SCHEMA
+            payload_map.get("schema") != SEMANTIC_SIMILARITY_CACHE_SCHEMA
             or not isinstance(entries, dict)
             or not all(
-                isinstance(key, str) and isinstance(value, dict) for key, value in entries.items()
+                isinstance(key, str) and isinstance(value, dict)
+                for key, value in cast(dict[object, object], entries).items()
             )
         ):
             self._index_status = "corrupt"
             return
-        self._index = {key: dict(value) for key, value in entries.items()}
-        latest_identity = payload.get("latest_identity")
-        self._latest_identity = dict(latest_identity) if isinstance(latest_identity, dict) else None
+        entries_map = cast(dict[str, dict[str, object]], entries)
+        self._index = {key: dict(value) for key, value in entries_map.items()}
+        latest_identity = payload_map.get("latest_identity")
+        self._latest_identity = (
+            dict(cast(dict[str, object], latest_identity))
+            if isinstance(latest_identity, dict)
+            else None
+        )
         self._index_status = "ready"
 
     def _record_miss(self, reasons: list[str]) -> None:
@@ -232,7 +246,7 @@ def cache_identity(
     disabled_groups: set[str],
     implementation_paths: Sequence[Path],
 ) -> dict[str, object]:
-    files = []
+    files: list[list[str]] = []
     for scanned_file in scanned_files or ():
         path = scanned_file.get("path")
         text = scanned_file.get("text")
