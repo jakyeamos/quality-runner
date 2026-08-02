@@ -86,12 +86,12 @@ def validate_skill_decomposition_report(report: Mapping[str, object]) -> dict[st
         errors.append("units must be a list")
     else:
         seen_ids: set[str] = set()
-        for index, item in enumerate(raw_units):
+        for index, item in enumerate(cast(list[object], raw_units)):
             if not isinstance(item, Mapping):
                 errors.append(f"units[{index}] must be an object")
                 continue
             try:
-                normalized = _normalize_unit(item, index=index)
+                normalized = _normalize_unit(cast(Mapping[str, object], item), index=index)
             except ValueError as error:
                 errors.append(str(error))
                 continue
@@ -105,14 +105,17 @@ def validate_skill_decomposition_report(report: Mapping[str, object]) -> dict[st
     if not isinstance(actual_summary, Mapping):
         errors.append("summary must be an object")
     else:
+        actual_summary_map = cast(Mapping[str, object], actual_summary)
         for key, expected in expected_summary.items():
-            if actual_summary.get(key) != expected:
+            if actual_summary_map.get(key) != expected:
                 errors.append(f"summary.{key} must be {expected}")
 
     fixture_ids = report.get("fixture_ids")
     if fixture_ids is not None and (
         not isinstance(fixture_ids, list)
-        or not all(isinstance(item, str) and item.strip() for item in fixture_ids)
+        or not all(
+            isinstance(item, str) and item.strip() for item in cast(list[object], fixture_ids)
+        )
     ):
         errors.append("fixture_ids must be a list of non-empty strings")
 
@@ -173,8 +176,9 @@ def render_skill_decomposition_markdown(report: Mapping[str, object]) -> str:
         "",
     ]
     if isinstance(summary, Mapping):
-        for key in sorted(summary):
-            lines.append(f"- {key}: `{summary[key]}`")
+        summary_map = cast(Mapping[str, object], summary)
+        for key in sorted(summary_map):
+            lines.append(f"- {key}: `{summary_map[key]}`")
     else:
         lines.append("- unavailable")
     lines.extend(["", "## Evidence units", ""])
@@ -182,24 +186,26 @@ def render_skill_decomposition_markdown(report: Mapping[str, object]) -> str:
     if not isinstance(units, list) or not units:
         lines.append("- None")
         return "\n".join(lines).rstrip() + "\n"
-    for item in units:
+    for raw_item in cast(list[object], units):
+        item = raw_item
         if not isinstance(item, Mapping):
             continue
+        item_map = cast(Mapping[str, object], item)
         lines.extend(
             [
-                f"### {item.get('id', 'unknown')}",
+                f"### {item_map.get('id', 'unknown')}",
                 "",
-                f"- Source: `{item.get('source', '')}`",
-                f"- Revision: `{item.get('revision', '')}`",
-                f"- Path: `{item.get('path', '')}`",
-                f"- Locator: `{item.get('locator', '')}`",
-                f"- Knowledge role: `{item.get('knowledge_role', '')}`",
-                f"- Enforceability: `{item.get('enforceability', '')}`",
-                f"- Normalization: `{item.get('normalization_status', '')}`",
-                f"- Evidence preserved: `{str(item.get('evidence_preserved')).lower()}`",
-                f"- Mapping: `{item.get('mapping_status', '')}`",
-                f"- Loss reason: {item.get('loss_reason') or 'None'}",
-                f"- Evidence: {item.get('evidence', '')}",
+                f"- Source: `{item_map.get('source', '')}`",
+                f"- Revision: `{item_map.get('revision', '')}`",
+                f"- Path: `{item_map.get('path', '')}`",
+                f"- Locator: `{item_map.get('locator', '')}`",
+                f"- Knowledge role: `{item_map.get('knowledge_role', '')}`",
+                f"- Enforceability: `{item_map.get('enforceability', '')}`",
+                f"- Normalization: `{item_map.get('normalization_status', '')}`",
+                f"- Evidence preserved: `{str(item_map.get('evidence_preserved')).lower()}`",
+                f"- Mapping: `{item_map.get('mapping_status', '')}`",
+                f"- Loss reason: {item_map.get('loss_reason') or 'None'}",
+                f"- Evidence: {item_map.get('evidence', '')}",
                 "",
             ]
         )
@@ -303,4 +309,8 @@ def _relative_path(value: object, field: str) -> str:
 
 
 def _strings(value: object) -> list[str]:
-    return [item for item in value if isinstance(item, str)] if isinstance(value, list) else []
+    return (
+        [item for item in cast(list[object], value) if isinstance(item, str)]
+        if isinstance(value, list)
+        else []
+    )
