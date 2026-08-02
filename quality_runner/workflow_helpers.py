@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from quality_runner.artifacts import write_json
 from quality_runner.exclusion_preflight import (
@@ -21,10 +21,17 @@ def config_with_include_overrides(
     if not include_ignored_paths:
         return config
     merged = dict(config)
-    structural_scan = dict(merged.get("structural_scan") or {})
+    raw_structural_scan = merged.get("structural_scan")
+    structural_scan = (
+        cast(dict[str, object], raw_structural_scan)
+        if isinstance(raw_structural_scan, dict)
+        else {}
+    )
     existing = structural_scan.get("include_ignored_paths")
     paths = (
-        [item for item in existing if isinstance(item, str)] if isinstance(existing, list) else []
+        [item for item in cast(list[object], existing) if isinstance(item, str)]
+        if isinstance(existing, list)
+        else []
     )
     for path in include_ignored_paths:
         if path not in paths:
@@ -50,7 +57,9 @@ def config_with_scan_exclusion_overrides(
     merged = dict(config)
     existing = merged.get("scan_exclusions")
     exclusions = (
-        [item for item in existing if isinstance(item, str)] if isinstance(existing, list) else []
+        [item for item in cast(list[object], existing) if isinstance(item, str)]
+        if isinstance(existing, list)
+        else []
     )
     for pattern in global_patterns:
         if pattern not in exclusions:
@@ -61,9 +70,11 @@ def config_with_scan_exclusion_overrides(
     existing_by_module = merged.get("scan_exclusions_by_module")
     exclusions_by_module: dict[str, list[str]] = {}
     if isinstance(existing_by_module, dict):
-        for module, patterns in existing_by_module.items():
+        for module, patterns in cast(dict[object, object], existing_by_module).items():
             if isinstance(module, str) and isinstance(patterns, list):
-                exclusions_by_module[module] = [item for item in patterns if isinstance(item, str)]
+                exclusions_by_module[module] = [
+                    item for item in cast(list[object], patterns) if isinstance(item, str)
+                ]
     for module, patterns in module_patterns.items():
         existing_patterns = exclusions_by_module.setdefault(module, [])
         for pattern in patterns:
@@ -104,9 +115,10 @@ def combined_warnings(scan: dict[str, Any], capability_map: dict[str, Any]) -> l
     for source in (scan.get("warnings"), capability_map.get("warnings")):
         if not isinstance(source, list):
             continue
-        for item in source:
-            if not isinstance(item, dict):
+        for raw_item in cast(list[object], source):
+            if not isinstance(raw_item, dict):
                 continue
+            item = cast(dict[str, Any], raw_item)
             code = str(item.get("code") or "")
             message = str(item.get("message") or "")
             path = str(item.get("path") or "")
@@ -124,6 +136,6 @@ def gate_timeouts(config: dict[str, Any]) -> dict[str, int]:
         return {}
     return {
         gate_id: seconds
-        for gate_id, seconds in configured.items()
+        for gate_id, seconds in cast(dict[object, object], configured).items()
         if isinstance(gate_id, str) and isinstance(seconds, int) and seconds > 0
     }
