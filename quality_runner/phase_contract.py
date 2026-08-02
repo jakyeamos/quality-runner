@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 PHASE_CONTRACT_SCHEMA = "quality-runner-phase-contract-v0.1"
 SCAN_TIERS = {"targeted", "phase", "repo"}
@@ -24,8 +24,9 @@ def load_phase_contract(path: Path) -> dict[str, Any]:
     payload = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(payload, dict):
         raise ValueError("phase contract must contain a JSON object")
-    validate_phase_contract(payload)
-    return payload
+    typed_payload = cast(dict[str, Any], payload)
+    validate_phase_contract(typed_payload)
+    return typed_payload
 
 
 def validate_phase_contract(contract: dict[str, Any]) -> None:
@@ -40,20 +41,27 @@ def validate_phase_contract(contract: dict[str, Any]) -> None:
     scope = contract.get("scope", {})
     if not isinstance(scope, dict):
         raise ValueError("phase contract scope must be an object")
+    scope_map = cast(dict[str, Any], scope)
     for field in ("include_paths", "exclude_paths", "rules", "categories"):
-        value = scope.get(field, [])
-        if not isinstance(value, list) or not all(isinstance(item, str) and item for item in value):
+        value = scope_map.get(field, [])
+        if not isinstance(value, list) or not all(
+            isinstance(item, str) and item for item in cast(list[object], value)
+        ):
             raise ValueError(f"phase contract scope.{field} must be a list of strings")
-    if tier in {"targeted", "phase"} and not scope.get("include_paths"):
+    if tier in {"targeted", "phase"} and not scope_map.get("include_paths"):
         raise ValueError("targeted and phase scans require scope.include_paths")
-    for item in contract.get("finding_map", []):
-        if not isinstance(item, dict) or not item.get("fingerprints"):
+    for raw_item in cast(list[object], contract.get("finding_map", [])):
+        if not isinstance(raw_item, dict):
+            raise ValueError("finding_map entries require fingerprints")
+        item = cast(dict[str, Any], raw_item)
+        if not item.get("fingerprints"):
             raise ValueError("finding_map entries require fingerprints")
         if not isinstance(item.get("fingerprints"), list):
             raise ValueError("finding_map fingerprints must be a list")
-    for item in contract.get("dispositions", []):
-        if not isinstance(item, dict):
+    for raw_item in cast(list[object], contract.get("dispositions", [])):
+        if not isinstance(raw_item, dict):
             raise ValueError("dispositions must contain objects")
+        item = cast(dict[str, Any], raw_item)
         status = item.get("status")
         if status not in ACCEPTED_DISPOSITIONS:
             raise ValueError(f"unsupported accepted disposition: {status}")
@@ -67,18 +75,27 @@ def scan_include_paths(contract: dict[str, Any]) -> tuple[str, ...]:
     if contract.get("scan_tier") == "repo":
         return ()
     scope = contract.get("scope")
-    return tuple(scope.get("include_paths", [])) if isinstance(scope, dict) else ()
+    return (
+        tuple(
+            item
+            for item in cast(list[object], cast(dict[str, Any], scope).get("include_paths", []))
+            if isinstance(item, str)
+        )
+        if isinstance(scope, dict)
+        else ()
+    )
 
 
 def path_in_scope(path: str, contract: dict[str, Any]) -> bool:
     scope = contract.get("scope")
     if not isinstance(scope, dict):
         return False
+    scope_map = cast(dict[str, Any], scope)
     normalized = path.replace("\\", "/").strip("/")
-    excluded = _normalized_paths(scope.get("exclude_paths"))
+    excluded = _normalized_paths(scope_map.get("exclude_paths"))
     if any(normalized == item or normalized.startswith(f"{item}/") for item in excluded):
         return False
-    included = _normalized_paths(scope.get("include_paths"))
+    included = _normalized_paths(scope_map.get("include_paths"))
     if not included:
         return True
     return any(normalized == item or normalized.startswith(f"{item}/") for item in included)
@@ -91,18 +108,25 @@ def finding_matches_contract(finding: dict[str, Any], contract: dict[str, Any]) 
     scope = contract.get("scope")
     if not isinstance(scope, dict):
         return False
+    scope_map = cast(dict[str, Any], scope)
     rule = finding.get("rule_id") or finding.get("rule")
-    rules = scope.get("rules", [])
-    if rules and rule not in rules:
+    rules = scope_map.get("rules", [])
+    if isinstance(rules, list) and rules and rule not in cast(list[object], rules):
         return False
     category = finding.get("category")
-    categories = scope.get("categories", [])
-    return not categories or category in categories
+    categories = scope_map.get("categories", [])
+    return not categories or (
+        isinstance(categories, list) and category in cast(list[object], categories)
+    )
 
 
 def finding_owner(fingerprint: str, contract: dict[str, Any]) -> dict[str, Any]:
-    for item in contract.get("finding_map", []):
-        if isinstance(item, dict) and fingerprint in item.get("fingerprints", []):
+    for raw_item in cast(list[object], contract.get("finding_map", [])):
+        if not isinstance(raw_item, dict):
+            continue
+        item = cast(dict[str, Any], raw_item)
+        fingerprints = item.get("fingerprints")
+        if isinstance(fingerprints, list) and fingerprint in cast(list[object], fingerprints):
             return {
                 "mapped": True,
                 "phase_id": contract["phase_id"],
@@ -135,7 +159,9 @@ def early_refresh_recommendation(
     ]
     if paths:
         reasons.extend(
-            item for item in contract.get("early_refresh_triggers", []) if isinstance(item, str)
+            item
+            for item in cast(list[object], contract.get("early_refresh_triggers", []))
+            if isinstance(item, str)
         )
     return {
         "recommended": bool(reasons),
@@ -149,5 +175,7 @@ def _normalized_paths(value: object) -> tuple[str, ...]:
     if not isinstance(value, list):
         return ()
     return tuple(
-        item.replace("\\", "/").strip("/") for item in value if isinstance(item, str) and item
+        item.replace("\\", "/").strip("/")
+        for item in cast(list[object], value)
+        if isinstance(item, str) and item
     )
