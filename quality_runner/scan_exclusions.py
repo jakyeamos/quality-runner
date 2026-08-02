@@ -5,7 +5,7 @@ import json
 from collections.abc import Iterator, Sequence
 from fnmatch import fnmatchcase
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 ALWAYS_EXCLUDED_PATH_PARTS = {
     ".git",
@@ -99,21 +99,29 @@ def resolve_scan_exclusions(
     *,
     module: str | None = None,
 ) -> list[str]:
-    configured = config.get("scan_exclusions") if isinstance(config, dict) else None
+    config_map = cast(dict[str, object], config) if config is not None else {}
+    configured = config_map.get("scan_exclusions")
     exclusions = (
-        [*DEFAULT_SCAN_EXCLUSIONS, *configured]
+        [
+            *DEFAULT_SCAN_EXCLUSIONS,
+            *[item for item in cast(list[object], configured) if isinstance(item, str)],
+        ]
         if isinstance(configured, list)
         else list(DEFAULT_SCAN_EXCLUSIONS)
     )
     if module is None:
         return _unique(exclusions)
     normalized_module = normalize_scan_exclusion_module(module)
-    module_config = config.get("scan_exclusions_by_module") if isinstance(config, dict) else None
+    module_config = config_map.get("scan_exclusions_by_module")
     module_exclusions = (
-        module_config.get(normalized_module) if isinstance(module_config, dict) else None
+        cast(dict[str, object], module_config).get(normalized_module)
+        if isinstance(module_config, dict)
+        else None
     )
     if isinstance(module_exclusions, list):
-        exclusions.extend(module_exclusions)
+        exclusions.extend(
+            item for item in cast(list[object], module_exclusions) if isinstance(item, str)
+        )
     return _unique(exclusions)
 
 
@@ -159,21 +167,20 @@ def scan_exclusion_contract(
     root: Path,
     config: dict[str, Any] | None,
 ) -> dict[str, Any]:
-    configured = config.get("scan_exclusions") if isinstance(config, dict) else None
-    configured_by_module = (
-        config.get("scan_exclusions_by_module") if isinstance(config, dict) else None
-    )
+    config_map = cast(dict[str, object], config) if config is not None else {}
+    configured = config_map.get("scan_exclusions")
+    configured_by_module = config_map.get("scan_exclusions_by_module")
     effective_by_module = effective_scan_exclusions_by_module(root, config)
     payload = {
         "configured_scan_exclusions": (
-            [item for item in configured if isinstance(item, str)]
+            [item for item in cast(list[object], configured) if isinstance(item, str)]
             if isinstance(configured, list)
             else []
         ),
         "configured_scan_exclusions_by_module": (
             {
-                module: [item for item in values if isinstance(item, str)]
-                for module, values in configured_by_module.items()
+                module: [item for item in cast(list[object], values) if isinstance(item, str)]
+                for module, values in cast(dict[object, object], configured_by_module).items()
                 if isinstance(module, str) and isinstance(values, list)
             }
             if isinstance(configured_by_module, dict)
@@ -248,11 +255,7 @@ def iter_allowed_paths(root: Path, scan_exclusions: list[str]) -> Iterator[Path]
 
 
 def matches_scan_exclusion(relative_path: str, scan_exclusions: list[str]) -> bool:
-    return any(
-        _matches_exclusion(relative_path, pattern)
-        for pattern in scan_exclusions
-        if isinstance(pattern, str)
-    )
+    return any(_matches_exclusion(relative_path, pattern) for pattern in scan_exclusions)
 
 
 def _matches_exclusion(relative_path: str, pattern: str) -> bool:
@@ -358,7 +361,10 @@ def _record_path(root: Path, path: Path) -> None:
     if not isinstance(paths, list):
         paths = []
         _SCAN_PROGRESS["last_paths"] = paths
-    paths.append(_relative_path(root, path))
+    paths = cast(list[str], paths)
+    relative_path = _relative_path(root, path)
+    if relative_path is not None:
+        paths.append(relative_path)
     del paths[:-MAX_SCAN_PROGRESS_PATHS]
 
 
@@ -370,7 +376,10 @@ def _record_skipped(root: Path, path: Path) -> None:
     if not isinstance(paths, list):
         paths = []
         _SCAN_PROGRESS["last_skipped_paths"] = paths
-    paths.append(_relative_path(root, path))
+    paths = cast(list[str], paths)
+    relative_path = _relative_path(root, path)
+    if relative_path is not None:
+        paths.append(relative_path)
     del paths[:-MAX_SCAN_PROGRESS_PATHS]
 
 
@@ -381,6 +390,7 @@ def _increment_count(key: str, value: str | None) -> None:
     if not isinstance(counts, dict):
         counts = {}
         _SCAN_PROGRESS[key] = counts
+    counts = cast(dict[str, int], counts)
     counts[value] = int(counts.get(value, 0)) + 1
 
 
