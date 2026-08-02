@@ -64,7 +64,7 @@ def run_exclusion_preflight_command(
         packet = cast(dict[str, object], packet_value) if isinstance(packet_value, dict) else {}
         report_value = load_json(report_path)
         report = cast(dict[str, object], report_value) if isinstance(report_value, dict) else None
-        validation = validate_exclusion_report(packet_value, report_value, repo_root=root)
+        validation = validate_exclusion_report(packet, report, repo_root=root)
 
     artifact_paths: dict[str, str] = {
         "scan_exclusion_preflight_packet_json": str(
@@ -100,7 +100,9 @@ def run_exclusion_preflight_command(
             "exclude": 0,
             "include": 0,
             "defer": 0,
-            "pending_review": len(candidates) if isinstance(candidates, list) else 0,
+            "pending_review": len(cast(list[object], candidates))
+            if isinstance(candidates, list)
+            else 0,
         }
     else:
         assert validation is not None
@@ -111,7 +113,6 @@ def run_exclusion_preflight_command(
             for module, patterns in object_value(
                 validation.get("approved_patterns_by_module")
             ).items()
-            if isinstance(module, str)
         }
         rejected_decisions = object_list(validation.get("rejected_decisions"))
         decision_summary = object_value(validation.get("decision_counts"))
@@ -204,7 +205,7 @@ def render_exclusion_packet_markdown(packet: dict[str, object]) -> str:
     policy = object_value(packet.get("preflight_policy"))
     available_scopes = policy.get("available_module_scopes")
     scope_text = (
-        ", ".join(str(item) for item in available_scopes)
+        ", ".join(str(item) for item in cast(list[object], available_scopes))
         if isinstance(available_scopes, list)
         else "all-modules"
     )
@@ -264,18 +265,16 @@ def apply_config_exclusions(
             parsed = tomllib.loads(before)
         except tomllib.TOMLDecodeError as error:
             raise ValueError(f"cannot apply exclusions to invalid TOML config: {error}") from error
-        section = parsed.get("quality_runner")
-        existing = string_list(section.get("scan_exclusions")) if isinstance(section, dict) else []
-        existing_by_module = (
-            {
-                module: string_list(values)
-                for module, values in section.get("scan_exclusions_by_module", {}).items()
-                if isinstance(module, str)
-            }
-            if isinstance(section, dict)
-            and isinstance(section.get("scan_exclusions_by_module"), dict)
-            else {}
+        section_value = parsed.get("quality_runner")
+        section = cast(dict[str, object], section_value) if isinstance(section_value, dict) else {}
+        existing = string_list(section.get("scan_exclusions"))
+        module_value = section.get("scan_exclusions_by_module")
+        module_section = (
+            cast(dict[str, object], module_value) if isinstance(module_value, dict) else {}
         )
+        existing_by_module = {
+            module: string_list(values) for module, values in module_section.items()
+        }
     else:
         existing = []
         existing_by_module = {}

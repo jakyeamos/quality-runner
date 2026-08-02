@@ -3,7 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from quality_runner.artifacts import artifact_dir, write_json, write_text
 from quality_runner.phase_contract import (
@@ -54,7 +54,7 @@ def build_phase_closure(
     )
     out_of_scope = sorted(set(current) - set(scoped_current))
     early_refresh = early_refresh_recommendation(contract, changed_paths)
-    blockers = []
+    blockers: list[str] = []
     if actionable:
         blockers.append("phase scope still contains actionable findings")
     if unmapped:
@@ -158,7 +158,9 @@ def render_phase_closure(payload: dict[str, Any]) -> str:
 def _findings(payload: dict[str, Any]) -> list[dict[str, Any]]:
     findings = payload.get("findings")
     return (
-        [item for item in findings if isinstance(item, dict)] if isinstance(findings, list) else []
+        [cast(dict[str, Any], item) for item in cast(list[Any], findings) if isinstance(item, dict)]
+        if isinstance(findings, list)
+        else []
     )
 
 
@@ -179,13 +181,21 @@ def _fingerprint(finding: dict[str, Any]) -> str:
 
 def _statuses(ledger: dict[str, Any], contract: dict[str, Any]) -> dict[str, str]:
     statuses: dict[str, str] = {}
-    for item in ledger.get("entries", []) if isinstance(ledger.get("entries"), list) else []:
-        if isinstance(item, dict) and isinstance(item.get("fingerprint"), str):
-            status = item.get("status")
-            statuses[item["fingerprint"]] = status if isinstance(status, str) else "unresolved"
-    for item in contract.get("dispositions", []):
-        if isinstance(item, dict) and isinstance(item.get("fingerprint"), str):
-            statuses[item["fingerprint"]] = str(item["status"])
+    entries = ledger.get("entries", [])
+    for item in cast(list[Any], entries) if isinstance(entries, list) else []:
+        if isinstance(item, dict):
+            typed_item = cast(dict[str, Any], item)
+            if isinstance(typed_item.get("fingerprint"), str):
+                status = typed_item.get("status")
+                statuses[typed_item["fingerprint"]] = (
+                    status if isinstance(status, str) else "unresolved"
+                )
+    dispositions = contract.get("dispositions", [])
+    for item in cast(list[Any], dispositions) if isinstance(dispositions, list) else []:
+        if isinstance(item, dict):
+            typed_item = cast(dict[str, Any], item)
+            if isinstance(typed_item.get("fingerprint"), str):
+                statuses[typed_item["fingerprint"]] = str(typed_item.get("status"))
     return statuses
 
 
@@ -206,10 +216,10 @@ def _ref(finding: dict[str, Any], owner: dict[str, Any], status: str | None) -> 
 def _load(path: Path) -> dict[str, Any]:
     if not path.exists():
         raise FileNotFoundError(f"required QR artifact does not exist: {path}")
-    payload = json.loads(path.read_text(encoding="utf-8"))
-    if not isinstance(payload, dict):
+    payload_value = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(payload_value, dict):
         raise ValueError(f"QR artifact must contain an object: {path}")
-    return payload
+    return cast(dict[str, Any], payload_value)
 
 
 def _load_optional(path: Path) -> dict[str, Any]:

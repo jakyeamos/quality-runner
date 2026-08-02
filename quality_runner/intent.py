@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from quality_runner.artifacts import write_json
 from quality_runner.schema_constants import INTENT_SCHEMA
@@ -64,11 +64,12 @@ def load_intent_file(
     if not path.is_file():
         raise ValueError(f"intent file is not a file: {path}")
     try:
-        payload = json.loads(path.read_text(encoding="utf-8"))
+        payload_value = json.loads(path.read_text(encoding="utf-8"))
     except json.JSONDecodeError as error:
         raise ValueError(f"intent file is not valid JSON: {error}") from error
-    if not isinstance(payload, dict):
+    if not isinstance(payload_value, dict):
         raise ValueError("intent file must contain a JSON object")
+    payload = cast(dict[str, Any], payload_value)
     goal = payload.get("goal")
     if not isinstance(goal, str) or not goal.strip():
         raise ValueError("intent file must include a non-empty goal string")
@@ -150,8 +151,9 @@ def workflow_intent_from_cli_args(
 def intent_markdown_lines(intent: object) -> list[str]:
     if not isinstance(intent, dict):
         return []
+    typed_intent = cast(dict[str, Any], intent)
     lines = ["## Intent", ""]
-    goal = intent.get("goal")
+    goal = typed_intent.get("goal")
     if isinstance(goal, str) and goal:
         lines.append(f"- Goal: {goal}")
     for field, title in (
@@ -161,10 +163,11 @@ def intent_markdown_lines(intent: object) -> list[str]:
         ("risk_areas", "Risk areas"),
         ("verification_expectations", "Verification expectations"),
     ):
-        items = intent.get(field)
+        items = typed_intent.get(field)
         if isinstance(items, list) and items:
+            typed_items = cast(list[Any], items)
             lines.append(f"- {title}:")
-            lines.extend(f"  - {item}" for item in items if isinstance(item, str) and item)
+            lines.extend(f"  - {item}" for item in typed_items if isinstance(item, str) and item)
     lines.append("")
     return lines
 
@@ -199,7 +202,11 @@ def _normalize_text_field(field: str, value: object) -> list[str] | None:
     if isinstance(value, str) and value.strip():
         return [value.strip()]
     if isinstance(value, list):
-        items = [item.strip() for item in value if isinstance(item, str) and item.strip()]
+        items = [
+            item.strip()
+            for item in cast(list[Any], value)
+            if isinstance(item, str) and item.strip()
+        ]
         return items or None
     if value is not None:
         raise ValueError(f"intent field {field} must be a string or string list")
