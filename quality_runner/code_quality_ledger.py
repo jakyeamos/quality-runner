@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
-from quality_runner.code_quality_findings import _counts
-from quality_runner.code_quality_paths import _string_or_none
+from quality_runner.code_quality_findings import counts
+from quality_runner.code_quality_paths import string_or_none
 from quality_runner.review_state import finalize_cycle_state
 from quality_runner.schema_constants import RESOLUTION_LEDGER_SCHEMA
 
@@ -50,8 +50,8 @@ def build_resolution_ledger(
         elif previous is not None:
             status = str(previous["status"])
             reason = str(previous.get("reason") or previous.get("disposition") or "")
-            owner = _string_or_none(previous.get("owner"))
-            expires = _string_or_none(previous.get("expires"))
+            owner = string_or_none(previous.get("owner"))
+            expires = string_or_none(previous.get("expires"))
 
         entries.append(
             _ledger_entry(
@@ -83,7 +83,7 @@ def build_resolution_ledger(
         "run_id": run_id,
         "summary": {
             "total_entries": len(entries),
-            "by_status": _counts(entries, "status", sorted(RESOLUTION_STATUSES)),
+            "by_status": counts(entries, "status", sorted(RESOLUTION_STATUSES)),
         },
         "entries": entries,
     }
@@ -100,17 +100,19 @@ def render_resolution_ledger_markdown(ledger: dict[str, Any]) -> str:
         "",
     ]
     summary = ledger.get("summary")
-    by_status = summary.get("by_status") if isinstance(summary, dict) else None
+    summary_map = cast(dict[str, Any], summary) if isinstance(summary, dict) else {}
+    by_status = summary_map.get("by_status")
     if isinstance(by_status, dict):
-        for status, count in sorted(by_status.items()):
+        for status, count in sorted(cast(dict[str, int], by_status).items()):
             lines.append(f"- {status}: {count}")
     lines.extend(["", "## Entries", ""])
 
     entries = ledger.get("entries")
     if isinstance(entries, list) and entries:
-        for entry in entries:
-            if not isinstance(entry, dict):
+        for raw_entry in cast(list[object], entries):
+            if not isinstance(raw_entry, dict):
                 continue
+            entry = cast(dict[str, Any], raw_entry)
             lines.append(
                 f"- {entry.get('status')}: {entry.get('rule_id')} "
                 f"({entry.get('file')}:{entry.get('line')})"
@@ -139,9 +141,10 @@ def _current_findings(code_quality_scan: dict[str, Any]) -> dict[str, dict[str, 
     if not isinstance(findings, list):
         return {}
     return {
-        finding["fingerprint"]: finding
-        for finding in findings
-        if isinstance(finding, dict) and isinstance(finding.get("fingerprint"), str)
+        cast(dict[str, Any], finding)["fingerprint"]: cast(dict[str, Any], finding)
+        for finding in cast(list[object], findings)
+        if isinstance(finding, dict)
+        and isinstance(cast(dict[str, Any], finding).get("fingerprint"), str)
     }
 
 
@@ -188,9 +191,14 @@ def _latest_previous_resolution_entries(repo_root: Path, run_id: str) -> list[di
             payload = json.loads(candidate.read_text(encoding="utf-8"))
         except (OSError, ValueError):
             continue
-        entries = payload.get("entries")
+        payload_map = cast(dict[str, Any], payload) if isinstance(payload, dict) else {}
+        entries = payload_map.get("entries")
         if isinstance(entries, list):
-            return [entry for entry in entries if isinstance(entry, dict)]
+            return [
+                cast(dict[str, Any], entry)
+                for entry in cast(list[object], entries)
+                if isinstance(entry, dict)
+            ]
     return []
 
 
@@ -199,9 +207,10 @@ def _accepted_dispositions(config: dict[str, Any]) -> dict[str, dict[str, str]]:
     if not isinstance(dispositions, list):
         return {}
     accepted: dict[str, dict[str, str]] = {}
-    for item in dispositions:
-        if not isinstance(item, dict):
+    for raw_item in cast(list[object], dispositions):
+        if not isinstance(raw_item, dict):
             continue
+        item = cast(dict[str, Any], raw_item)
         fingerprint = item.get("fingerprint")
         status = item.get("status")
         reason = item.get("reason")

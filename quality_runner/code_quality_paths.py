@@ -382,3 +382,25 @@ def _split_lines(text: str) -> list[str]:
 
 def _string_or_none(value: object) -> str | None:
     return value if isinstance(value, str) else None
+
+
+string_or_none = _string_or_none
+
+# Public projections keep the path helpers usable by the rule and snapshot
+# layers without making the implementation names part of their contract.
+ignored_directory_reason = _ignored_directory_reason
+under_generated_path = _under_generated_path
+join_relative = _join_relative
+is_generated_file = _is_generated_file
+check_coverage = _check_coverage
+is_deep_nesting = _is_deep_nesting
+nested_ternary = _nested_ternary
+is_javascript_source_file = _is_javascript_source_file
+is_api_file = _is_api_file
+is_runtime_file = _is_runtime_file
+is_router_path = _is_router_path
+is_page_file = _is_page_file
+has_todo_comment = _has_todo_comment
+is_ui_file = _is_ui_file
+has_motion_without_reduced_motion = _has_motion_without_reduced_motion
+split_lines = _split_lines
