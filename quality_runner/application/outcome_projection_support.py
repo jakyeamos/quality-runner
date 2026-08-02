@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 from shlex import quote
+from typing import Any, cast
 
 from quality_runner.core.outcome_contracts import (
     JourneyOutcome,
@@ -166,8 +167,8 @@ def _usable_verification(verification: LegacyPayload | None) -> LegacyPayload | 
     gates_value = verification.get("gates")
     if not isinstance(gates_value, list):
         return None
-    gates = _object_list(gates_value)
-    if len(gates) != len(gates_value):
+    gates = _object_list(cast(list[object], gates_value))
+    if len(gates) != len(cast(list[object], gates_value)):
         return None
     if any(
         _string(gate.get("id")) is None or gate.get("status") not in {"passed", "failed", "skipped"}
@@ -177,7 +178,10 @@ def _usable_verification(verification: LegacyPayload | None) -> LegacyPayload | 
     only_gate_ids = verification.get("only_gate_ids")
     if only_gate_ids is not None and (
         not isinstance(only_gate_ids, list)
-        or any(not isinstance(gate_id, str) or not gate_id for gate_id in only_gate_ids)
+        or any(
+            not isinstance(gate_id, str) or not gate_id
+            for gate_id in cast(list[object], only_gate_ids)
+        )
     ):
         return None
     if status == "passed" and not any(gate.get("status") == "passed" for gate in gates):
@@ -268,7 +272,7 @@ def _selected_gate_limitation(verification: LegacyPayload) -> str | None:
     selected = verification.get("only_gate_ids")
     if not isinstance(selected, list) or not selected:
         return None
-    gate_ids = [gate_id for gate_id in selected if isinstance(gate_id, str)]
+    gate_ids = [gate_id for gate_id in cast(list[object], selected) if isinstance(gate_id, str)]
     if not gate_ids:
         return None
     return (
@@ -285,7 +289,7 @@ def _append_unique(values: list[str], value: str | None) -> None:
 def _review_finding_count(payload: LegacyPayload) -> int:
     report = _object(payload.get("report"))
     findings = report.get("findings")
-    return len(findings) if isinstance(findings, list) else 0
+    return len(cast(list[object], findings)) if isinstance(findings, list) else 0
 
 
 def _warning_messages(payload: LegacyPayload) -> list[str]:
@@ -334,16 +338,20 @@ def _authorize_verification_command(repo_root: Path, run_id: str | None) -> str:
 
 
 def _object(value: object) -> LegacyPayload:
-    return value if isinstance(value, dict) else {}
+    return cast(dict[str, Any], value) if isinstance(value, dict) else {}
 
 
 def _object_list(value: object) -> list[LegacyPayload]:
-    return [item for item in value if isinstance(item, dict)] if isinstance(value, list) else []
+    return (
+        [cast(dict[str, Any], item) for item in cast(list[object], value) if isinstance(item, dict)]
+        if isinstance(value, list)
+        else []
+    )
 
 
 def _string_list(value: object) -> list[str]:
     return (
-        [item for item in value if isinstance(item, str) and item]
+        [item for item in cast(list[object], value) if isinstance(item, str) and item]
         if isinstance(value, list)
         else []
     )
@@ -357,3 +365,30 @@ class _ExecutionDetails:
     def __init__(self, *, isolated: bool, commands_executed: bool) -> None:
         self.isolated = isolated
         self.commands_executed = commands_executed
+
+
+# Public adapter projections keep the implementation helpers private while
+# making their cross-module use explicit to strict type checking.
+outcome = _outcome
+confidence = _confidence
+writes = _writes
+history_writes = _history_writes
+safety = _safety
+history_safety = _history_safety
+next_action = _next_action
+execution_details = _execution_details
+usable_verification = _usable_verification
+verification_matches_result = _verification_matches_result
+verify_confidence = _verify_confidence
+requires_verification_authorization = _requires_verification_authorization
+review_finding_count = _review_finding_count
+warning_messages = _warning_messages
+run_id = _run_id
+command = _command
+handoff_command = _handoff_command
+run_command = _run_command
+authorize_verification_command = _authorize_verification_command
+string_list = _string_list
+object_list = _object_list
+string = _string
+status = _status

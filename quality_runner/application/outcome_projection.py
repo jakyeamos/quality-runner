@@ -4,29 +4,29 @@ from pathlib import Path
 
 from quality_runner.application.outcome_projection_support import (
     LegacyPayload,
-    _authorize_verification_command,
-    _command,
-    _confidence,
-    _execution_details,
-    _handoff_command,
-    _history_safety,
-    _history_writes,
-    _next_action,
-    _object_list,
-    _outcome,
-    _requires_verification_authorization,
-    _review_finding_count,
-    _run_command,
-    _run_id,
-    _safety,
-    _status,
-    _string,
-    _string_list,
-    _usable_verification,
-    _verification_matches_result,
-    _verify_confidence,
-    _warning_messages,
-    _writes,
+    authorize_verification_command,
+    command,
+    confidence,
+    execution_details,
+    handoff_command,
+    history_safety,
+    history_writes,
+    next_action,
+    object_list,
+    outcome,
+    requires_verification_authorization,
+    review_finding_count,
+    run_command,
+    run_id,
+    safety,
+    status,
+    string,
+    string_list,
+    usable_verification,
+    verification_matches_result,
+    verify_confidence,
+    warning_messages,
+    writes,
 )
 from quality_runner.application.run_history import HistoryPayload
 from quality_runner.core.outcome_contracts import (
@@ -35,6 +35,32 @@ from quality_runner.core.outcome_contracts import (
     OutcomeHistory,
     OutcomeHistoryRun,
 )
+
+# Keep the established local helper names while importing the public adapter
+# projections above; this removes private cross-module coupling.
+_authorize_verification_command = authorize_verification_command
+_command = command
+_confidence = confidence
+_execution_details = execution_details
+_handoff_command = handoff_command
+_history_safety = history_safety
+_history_writes = history_writes
+_next_action = next_action
+_object_list = object_list
+_outcome = outcome
+_requires_verification_authorization = requires_verification_authorization
+_review_finding_count = review_finding_count
+_run_command = run_command
+_run_id = run_id
+_safety = safety
+_status = status
+_string = string
+_string_list = string_list
+_usable_verification = usable_verification
+_verification_matches_result = verification_matches_result
+_verify_confidence = verify_confidence
+_warning_messages = warning_messages
+_writes = writes
 
 
 def project_audit_outcome(
