@@ -7,7 +7,7 @@ import shlex
 import shutil
 import subprocess
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from quality_runner.schema_constants import PREVENTION_READINESS_SCHEMA
 
@@ -29,11 +29,13 @@ def evaluate_readiness(
     repo_root: Path,
     prevention: dict[str, Any],
 ) -> dict[str, Any]:
-    global_environment_paths = prevention.get("environment_paths", [])
+    prevention_data = cast(dict[str, object], prevention)
+    global_environment_paths = prevention_data.get("environment_paths", [])
     gates: list[dict[str, Any]] = []
-    for configured in prevention.get("gates", []):
-        if not isinstance(configured, dict):
+    for raw_configured in cast(list[object], prevention_data.get("gates", [])):
+        if not isinstance(raw_configured, dict):
             continue
+        configured = cast(dict[str, Any], raw_configured)
         gates.append(
             _evaluate_gate(
                 repo_root=repo_root,
@@ -70,9 +72,11 @@ def run_certified_gates(
     results: list[dict[str, Any]] = []
     blockers: list[dict[str, str]] = []
     bootstrap_results: dict[tuple[str, tuple[str, ...]], dict[str, Any]] = {}
-    for gate in readiness.get("gates", []):
-        if not isinstance(gate, dict):
+    readiness_data = cast(dict[str, object], readiness)
+    for raw_gate in cast(list[object], readiness_data.get("gates", [])):
+        if not isinstance(raw_gate, dict):
             continue
+        gate = cast(dict[str, Any], raw_gate)
         if gate.get("state") != "certified":
             if gate.get("required") is True:
                 blockers.append(
