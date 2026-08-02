@@ -6,7 +6,7 @@ import subprocess
 from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from quality_runner import __version__
 from quality_runner.artifacts import prepare_safe_directory, write_json
@@ -192,15 +192,18 @@ def _run_rollout_entry(
             worktree_mode=worktree_mode,
             allow_dirty_worktree_verify=allow_dirty_worktree_verify,
         )
-        summary = refresh.get("summary")
+        refresh_data = cast(dict[str, object], refresh)
+        summary = refresh_data.get("summary")
         if not isinstance(summary, dict):
             raise ValueError("refresh did not return a summary object")
+        summary_data = cast(dict[str, object], summary)
+        summary_payload = cast(dict[str, Any], summary)
         post_git_status_short = _git_status_short(repo_root)
         target_head = _git_head(repo_root)
         report = build_controller_report_from_summary(
             repo_path=str(repo_root),
             branch_name=branch_name,
-            summary=summary,
+            summary=summary_payload,
             baseline_run_id=entry.get("baseline_run_id"),
             git_status_short=post_git_status_short,
             files_changed=_files_changed_since(pre_git_status_short, post_git_status_short),
@@ -223,19 +226,19 @@ def _run_rollout_entry(
         _write_json(report_path, report)
         _write_json(validation_path, validation)
         return {
-            "status": str(refresh.get("status") or summary.get("status") or "unknown"),
+            "status": str(refresh_data.get("status") or summary_data.get("status") or "unknown"),
             "repo_name": repo_name,
             "repo_slug": repo_slug,
             "repo_path": str(repo_root),
             "branch_name": branch_name,
             "run_id_prefix": repo_run_id_prefix,
-            "final_run_id": summary.get("run_id"),
-            "classification": summary.get("recommended_classification"),
+            "final_run_id": summary_data.get("run_id"),
+            "classification": summary_data.get("recommended_classification"),
             "report_path": str(report_path),
             "validation_path": str(validation_path),
             "report_status": validation["status"],
             "validation_errors": validation["errors"],
-            "artifact_path": summary.get("path"),
+            "artifact_path": summary_data.get("path"),
         }
     except Exception as error:
         post_git_status_short = _git_status_short(repo_root)
@@ -309,20 +312,23 @@ def _parse_repo_list(path: Path) -> list[dict[str, str]]:
 
 
 def _parse_json_repo_list(value: object) -> list[dict[str, str]]:
-    repos = value.get("repos") if isinstance(value, dict) else value
+    repos = cast(dict[str, object], value).get("repos") if isinstance(value, dict) else value
     if not isinstance(repos, list):
         raise ValueError("JSON repo list must be an array or an object with a repos array")
     entries: list[dict[str, str]] = []
-    for item in repos:
+    for item in cast(list[object], repos):
         if isinstance(item, str):
             entries.append({"repo_path": item})
         elif isinstance(item, dict):
-            repo_path = _string_value(item.get("repo_path")) or _string_value(item.get("path"))
+            entry_data = cast(dict[str, object], item)
+            repo_path = _string_value(entry_data.get("repo_path")) or _string_value(
+                entry_data.get("path")
+            )
             if not repo_path:
                 raise ValueError("JSON repo entry must include repo_path or path")
             entry = {"repo_path": repo_path}
             for key in ("name", "baseline_run_id", "run_id_prefix"):
-                value = _string_value(item.get(key))
+                value = _string_value(entry_data.get(key))
                 if value:
                     entry[key] = value
             entries.append(entry)
