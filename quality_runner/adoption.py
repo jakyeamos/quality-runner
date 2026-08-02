@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 
 
 def build_adoption_stage(
@@ -70,9 +70,10 @@ def handoff_adoption_stage(remediation_plan: dict[str, Any]) -> dict[str, Any]:
             "title": "Refactor roadmap",
             "rationale": "Remediation plan did not include adoption-stage metadata.",
         }
-    stage_id = adoption_stage.get("id")
-    title = adoption_stage.get("title")
-    rationale = adoption_stage.get("rationale")
+    stage = cast(dict[str, object], adoption_stage)
+    stage_id = stage.get("id")
+    title = stage.get("title")
+    rationale = stage.get("rationale")
     if not (
         isinstance(stage_id, str)
         and stage_id
@@ -86,11 +87,12 @@ def handoff_adoption_stage(remediation_plan: dict[str, Any]) -> dict[str, Any]:
             "title": "Refactor roadmap",
             "rationale": "Remediation plan adoption-stage metadata was incomplete.",
         }
-    return dict(adoption_stage)
+    return dict(stage)
 
 
 def stopping_criteria(adoption_stage: dict[str, Any]) -> list[str]:
-    stage_id = adoption_stage.get("id")
+    stage = cast(dict[str, object], adoption_stage)
+    stage_id = stage.get("id")
     if stage_id == "phase-0-clean-baseline":
         return ["Stop after recording the clean baseline; no remediation branch is needed."]
     if stage_id == "phase-1-capability-gates":
@@ -122,9 +124,10 @@ def stopping_criteria(adoption_stage: dict[str, Any]) -> list[str]:
 def adoption_stage_markdown(value: object) -> list[str]:
     if not isinstance(value, dict):
         return ["- unavailable"]
-    stage_id = value.get("id")
-    title = value.get("title")
-    rationale = value.get("rationale")
+    stage = cast(dict[str, object], value)
+    stage_id = stage.get("id")
+    title = stage.get("title")
+    rationale = stage.get("rationale")
     if not (
         isinstance(stage_id, str)
         and stage_id
@@ -139,8 +142,8 @@ def adoption_stage_markdown(value: object) -> list[str]:
         f"- Title: {title}",
         f"- Rationale: {rationale}",
     ]
-    structural_groups = value.get("structural_finding_groups")
-    structural_score = value.get("structural_score")
+    structural_groups = stage.get("structural_finding_groups")
+    structural_score = stage.get("structural_score")
     if isinstance(structural_groups, int):
         lines.append(f"- Structural finding groups: {structural_groups}")
     if isinstance(structural_score, int):
