@@ -389,6 +389,9 @@ string_or_none = _string_or_none
 # Public projections keep the path helpers usable by the rule and snapshot
 # layers without making the implementation names part of their contract.
 ignored_directory_reason = _ignored_directory_reason
+artifact_directory_reason = _artifact_directory_reason
+top_level_ignored_directory_reason = _top_level_ignored_directory_reason
+is_included_or_included_parent = _is_included_or_included_parent
 under_generated_path = _under_generated_path
 join_relative = _join_relative
 is_generated_file = _is_generated_file

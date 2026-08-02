@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from quality_runner.schema_constants import PACKAGE_MANAGER_PREFLIGHT_SCHEMA
 
@@ -49,7 +49,7 @@ def _declared_package_manager(root: Path) -> str | None:
         return None
     if not isinstance(payload, dict):
         return None
-    package_manager = payload.get("packageManager")
+    package_manager = cast(dict[str, Any], payload).get("packageManager")
     if not isinstance(package_manager, str) or not package_manager:
         return None
     return package_manager.split("@", maxsplit=1)[0]
@@ -103,8 +103,11 @@ def _nested_lockfiles(
         return [], []
     found: list[dict[str, str]] = []
     warnings: list[dict[str, str]] = []
-    for workspace in workspaces:
-        if not isinstance(workspace, dict) or workspace.get("kind") != "javascript":
+    for workspace_value in cast(list[Any], workspaces):
+        if not isinstance(workspace_value, dict):
+            continue
+        workspace = cast(dict[str, Any], workspace_value)
+        if workspace.get("kind") != "javascript":
             continue
         declared_lockfile = workspace.get("lockfile")
         if isinstance(declared_lockfile, str) and declared_lockfile:

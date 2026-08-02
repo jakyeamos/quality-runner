@@ -5,20 +5,20 @@ from pathlib import Path
 from typing import Any, cast
 
 from quality_runner.code_quality_paths import (
-    _artifact_directory_reason,
-    _ignored_directory_reason,
-    _is_generated_file,
-    _join_relative,
-    _top_level_ignored_directory_reason,
-    _under_generated_path,
+    artifact_directory_reason,
+    ignored_directory_reason,
+    is_generated_file,
+    join_relative,
+    top_level_ignored_directory_reason,
+    under_generated_path,
 )
 from quality_runner.core.audit_contracts import AuditPayload, ScannedTextFile, TextScanScope
 from quality_runner.scan_exclusions import (
     record_scan_activity,
 )
 from quality_runner.scan_scope_helpers import (
-    _scope_allows_directory,
-    _scope_includes_file,
+    scope_allows_directory,
+    scope_includes_file,
     effective_scan_exclusions,
     generated_paths,
     is_scan_excluded,
@@ -198,16 +198,16 @@ def discover_scan_inventory(
         metrics["visited_directories"] += 1
         metrics["visited_paths"] += 1
         relative_current = current_path.relative_to(root).as_posix()
-        if include_paths and not _scope_allows_directory(relative_current, include_paths):
+        if include_paths and not scope_allows_directory(relative_current, include_paths):
             dir_names[:] = []
             continue
         ignored: list[tuple[str, str]] = []
         for name in sorted(dir_names):
-            relative_name = _join_relative(relative_current, name)
-            generated = _under_generated_path(relative_name, generated_paths)
-            preferred_reason = _artifact_directory_reason(
+            relative_name = join_relative(relative_current, name)
+            generated = under_generated_path(relative_name, generated_paths)
+            preferred_reason = artifact_directory_reason(
                 relative_name, include_ignored_paths=include_ignored_paths
-            ) or _top_level_ignored_directory_reason(
+            ) or top_level_ignored_directory_reason(
                 relative_name, include_ignored_paths=include_ignored_paths
             )
             reason = (
@@ -221,7 +221,7 @@ def discover_scan_inventory(
                     scan_exclusions=scan_exclusions,
                     include_ignored_paths=include_ignored_paths,
                 )
-                else _ignored_directory_reason(
+                else ignored_directory_reason(
                     relative_name, include_ignored_paths=include_ignored_paths
                 )
             )
@@ -240,7 +240,7 @@ def discover_scan_inventory(
             metrics["visited_paths"] += 1
             path = current_path / file_name
             relative_path = path.relative_to(root).as_posix()
-            if include_paths and not _scope_includes_file(relative_path, include_paths):
+            if include_paths and not scope_includes_file(relative_path, include_paths):
                 continue
             if path.is_symlink() or not path.is_file():
                 continue
@@ -253,7 +253,7 @@ def discover_scan_inventory(
                     skipped_files.append({"path": relative_path, "reason": "scan exclusion"})
                     metrics["skipped_paths"] += 1
                 continue
-            if _is_generated_file(relative_path):
+            if is_generated_file(relative_path):
                 skipped_files.append({"path": relative_path, "reason": "generated file"})
                 metrics["skipped_paths"] += 1
                 continue
@@ -318,7 +318,7 @@ def discover_text_files(
         current_path = Path(current_root)
         record_scan_activity(root, current_path, kind="text-scan")
         relative_current = current_path.relative_to(root).as_posix()
-        if include_paths and not _scope_allows_directory(relative_current, include_paths):
+        if include_paths and not scope_allows_directory(relative_current, include_paths):
             dir_names[:] = []
             continue
         if scan_budget_exceeded:
@@ -329,11 +329,11 @@ def discover_text_files(
             continue
         ignored: list[tuple[str, str]] = []
         for name in sorted(dir_names):
-            relative_name = _join_relative(relative_current, name)
-            generated = _under_generated_path(relative_name, generated_paths)
-            preferred_reason = _artifact_directory_reason(
+            relative_name = join_relative(relative_current, name)
+            generated = under_generated_path(relative_name, generated_paths)
+            preferred_reason = artifact_directory_reason(
                 relative_name, include_ignored_paths=include_ignored_paths
-            ) or _top_level_ignored_directory_reason(
+            ) or top_level_ignored_directory_reason(
                 relative_name, include_ignored_paths=include_ignored_paths
             )
             reason = (
@@ -347,7 +347,7 @@ def discover_text_files(
                     scan_exclusions=scan_exclusions,
                     include_ignored_paths=include_ignored_paths,
                 )
-                else _ignored_directory_reason(
+                else ignored_directory_reason(
                     relative_name, include_ignored_paths=include_ignored_paths
                 )
             )
@@ -362,7 +362,7 @@ def discover_text_files(
         for file_name in sorted(file_names):
             path = current_path / file_name
             relative_path = path.relative_to(root).as_posix()
-            if include_paths and not _scope_includes_file(relative_path, include_paths):
+            if include_paths and not scope_includes_file(relative_path, include_paths):
                 continue
             if path.is_symlink() or not path.is_file():
                 continue
@@ -374,7 +374,7 @@ def discover_text_files(
                 if is_text_file(path):
                     skipped_files.append({"path": relative_path, "reason": "scan exclusion"})
                 continue
-            if _is_generated_file(relative_path):
+            if is_generated_file(relative_path):
                 skipped_files.append({"path": relative_path, "reason": "generated file"})
                 continue
             if focus_paths and not _path_in_focus(relative_path, focus_paths):
@@ -413,16 +413,16 @@ def discover_security_surface_paths(
         current_path = Path(current_root)
         record_scan_activity(root, current_path, kind="text-scan")
         relative_current = current_path.relative_to(root).as_posix()
-        if include_paths and not _scope_allows_directory(relative_current, include_paths):
+        if include_paths and not scope_allows_directory(relative_current, include_paths):
             dir_names[:] = []
             continue
         ignored_names: set[str] = set()
         for name in sorted(dir_names):
-            relative_name = _join_relative(relative_current, name)
-            generated = _under_generated_path(relative_name, generated_paths)
-            preferred_reason = _artifact_directory_reason(
+            relative_name = join_relative(relative_current, name)
+            generated = under_generated_path(relative_name, generated_paths)
+            preferred_reason = artifact_directory_reason(
                 relative_name, include_ignored_paths=include_ignored_paths
-            ) or _top_level_ignored_directory_reason(
+            ) or top_level_ignored_directory_reason(
                 relative_name, include_ignored_paths=include_ignored_paths
             )
             reason = (
@@ -436,7 +436,7 @@ def discover_security_surface_paths(
                     scan_exclusions=scan_exclusions,
                     include_ignored_paths=include_ignored_paths,
                 )
-                else _ignored_directory_reason(
+                else ignored_directory_reason(
                     relative_name, include_ignored_paths=include_ignored_paths
                 )
             )
@@ -446,7 +446,7 @@ def discover_security_surface_paths(
         for file_name in sorted(file_names):
             path = current_path / file_name
             relative_path = path.relative_to(root).as_posix()
-            if include_paths and not _scope_includes_file(relative_path, include_paths):
+            if include_paths and not scope_includes_file(relative_path, include_paths):
                 continue
             if path.is_symlink() or not path.is_file():
                 continue
@@ -454,7 +454,7 @@ def discover_security_surface_paths(
                 relative_path,
                 scan_exclusions=scan_exclusions,
                 include_ignored_paths=include_ignored_paths,
-            ) or _is_generated_file(relative_path):
+            ) or is_generated_file(relative_path):
                 continue
             if not is_security_surface_file(path, relative_path):
                 continue

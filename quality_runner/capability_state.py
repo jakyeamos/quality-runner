@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 
 
 def verification_state(
@@ -39,19 +39,20 @@ def matching_ci_status(
         "pre_pr": ("pull request", "pre-pr", "pre pr"),
         "pre_cr": ("pre-cr", "pre cr"),
     }.get(capability_id, (capability_id,))
-    for check in checks:
+    for check in cast(list[Any], checks):
         if not isinstance(check, dict):
             continue
-        name = check.get("name")
+        typed_check = cast(dict[str, Any], check)
+        name = typed_check.get("name")
         if not isinstance(name, str):
             continue
         normalized = name.lower()
         if any(term in normalized for term in terms):
             return {
                 "name": name,
-                "status": _optional_string(check.get("status")),
-                "conclusion": _optional_string(check.get("conclusion")),
-                "url": _optional_string(check.get("url")),
+                "status": _optional_string(typed_check.get("status")),
+                "conclusion": _optional_string(typed_check.get("conclusion")),
+                "url": _optional_string(typed_check.get("url")),
             }
     return None
 

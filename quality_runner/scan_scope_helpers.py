@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from quality_runner.code_quality_paths import (
     TEXT_EXTENSIONS,
-    _is_included_or_included_parent,
+    is_included_or_included_parent,
 )
 from quality_runner.scan_exclusions import (
     ALWAYS_EXCLUDED_PATH_PARTS,
@@ -25,10 +25,10 @@ def generated_paths(scan: dict[str, Any]) -> set[str]:
     if not isinstance(generated_code, list):
         return set()
     paths: set[str] = set()
-    for item in generated_code:
+    for item in cast(list[Any], generated_code):
         if not isinstance(item, dict):
             continue
-        path = item.get("path")
+        path = cast(dict[str, Any], item).get("path")
         if isinstance(path, str) and path:
             paths.add(path.strip("/"))
     return paths
@@ -75,11 +75,11 @@ def is_scan_excluded(
     normalized = relative_path.strip("/")
     if any(
         part in ALWAYS_EXCLUDED_PATH_PARTS for part in normalized.split("/")
-    ) and _is_included_or_included_parent(normalized, include_ignored_paths):
+    ) and is_included_or_included_parent(normalized, include_ignored_paths):
         return True
     return bool(
         normalized
-        and not _is_included_or_included_parent(normalized, include_ignored_paths)
+        and not is_included_or_included_parent(normalized, include_ignored_paths)
         and matches_scan_exclusion(normalized, scan_exclusions)
     )
 
@@ -88,8 +88,14 @@ def normalized_path_list(value: object) -> list[str]:
     if not isinstance(value, list):
         return []
     paths: list[str] = []
-    for item in value:
+    for item in cast(list[Any], value):
         if not isinstance(item, str) or not item:
             continue
         paths.append(item.strip("/"))
     return paths
+
+
+# Public projections keep scan-scope policy helpers usable without exposing
+# their implementation-prefixed names to importing modules.
+scope_allows_directory = _scope_allows_directory
+scope_includes_file = _scope_includes_file

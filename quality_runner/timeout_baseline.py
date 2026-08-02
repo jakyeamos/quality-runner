@@ -118,7 +118,11 @@ def resolve_timeout_context(
         context["sample_count"] = _positive_int(baseline.get("sample_count"))
         return context
     sample_count = _positive_int(baseline.get("sample_count"))
-    samples = [item for item in _list_value(baseline.get("samples")) if isinstance(item, dict)]
+    samples: list[dict[str, object]] = [
+        cast(dict[str, object], item)
+        for item in _list_value(baseline.get("samples"))
+        if isinstance(item, dict)
+    ]
     if sample_count < TIMEOUT_BASELINE_ACTIVATION_SAMPLES or len(samples) < sample_count:
         context["reason"] = "active timeout baseline has insufficient comparable samples"
         context["sample_count"] = sample_count
@@ -190,8 +194,12 @@ def record_timeout_sample(
 
     baseline = load_timeout_baseline(root)
     existing_identity = _mapping(baseline.get("identity")) if baseline else {}
-    samples = (
-        [item for item in _list_value(baseline.get("samples")) if isinstance(item, dict)]
+    samples: list[dict[str, object]] = (
+        [
+            cast(dict[str, object], item)
+            for item in _list_value(baseline.get("samples"))
+            if isinstance(item, dict)
+        ]
         if baseline is not None and existing_identity.get("sha256") == identity["sha256"]
         else []
     )
@@ -279,7 +287,7 @@ def load_timeout_baseline(repo_root: Path) -> dict[str, object] | None:
         payload = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         return None
-    return payload if isinstance(payload, dict) else None
+    return cast(dict[str, object], payload) if isinstance(payload, dict) else None
 
 
 def _sample_ineligibility_reason(

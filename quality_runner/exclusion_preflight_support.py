@@ -6,7 +6,7 @@ from collections import Counter
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from pathlib import Path, PurePosixPath
-from typing import cast
+from typing import Any, cast
 
 from quality_runner import __version__
 from quality_runner.config import CONFIG_FILE_NAME, load_repo_config
@@ -293,9 +293,10 @@ def json_safe(value: object) -> JsonValue:
     if value is None or isinstance(value, (str, int, float, bool)):
         return value
     if isinstance(value, dict):
-        return {str(key): json_safe(item) for key, item in value.items()}
+        typed_value = cast(dict[Any, Any], value)
+        return {str(key): json_safe(item) for key, item in typed_value.items()}
     if isinstance(value, list):
-        return [json_safe(item) for item in value]
+        return [json_safe(item) for item in cast(list[Any], value)]
     return str(value)
 
 
@@ -309,18 +310,22 @@ def object_value(value: object) -> dict[str, object]:
 
 def object_list(value: object) -> list[dict[str, object]]:
     return (
-        [cast(dict[str, object], item) for item in value if isinstance(item, dict)]
+        [cast(dict[str, object], item) for item in cast(list[Any], value) if isinstance(item, dict)]
         if isinstance(value, list)
         else []
     )
 
 
 def list_value(value: object) -> list[object]:
-    return value if isinstance(value, list) else []
+    return list(cast(list[Any], value)) if isinstance(value, list) else []
 
 
 def string_list(value: object) -> list[str]:
-    return [item for item in value if isinstance(item, str)] if isinstance(value, list) else []
+    return (
+        [item for item in cast(list[Any], value) if isinstance(item, str)]
+        if isinstance(value, list)
+        else []
+    )
 
 
 def positive_int(value: object) -> int | None:

@@ -338,6 +338,7 @@ def _analysis_matches_request(analysis: AuditAnalysis, request: VerificationRequ
     captured_git = _legacy_payload(analysis.scan).get("git_provenance")
     if not isinstance(captured_git, dict):
         return False
+    typed_captured_git = cast(dict[str, Any], captured_git)
     captured_config = _legacy_payload(analysis.config)
     current_config = config_with_scan_exclusion_overrides(
         load_repo_config(request.repo_root),
@@ -353,7 +354,8 @@ def _analysis_matches_request(analysis: AuditAnalysis, request: VerificationRequ
         return False
     current_git = git_state_for_repo(request.repo_root)
     return all(
-        captured_git.get(key) == current_git.get(key) for key in ("head_sha", "branch", "dirty")
+        typed_captured_git.get(key) == current_git.get(key)
+        for key in ("head_sha", "branch", "dirty")
     )
 
 

@@ -3,7 +3,7 @@ from __future__ import annotations
 import sys
 from collections.abc import Iterable
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from quality_runner.dependency_setup import (
     dependency_setup_context,
@@ -132,11 +132,13 @@ def verify_discovered_gates(
 def apply_gate_verification(
     capability_map: dict[str, Any], verification: dict[str, Any]
 ) -> dict[str, Any]:
-    results = {
-        gate["id"]: gate
-        for gate in verification.get("gates", [])
-        if isinstance(gate, dict) and isinstance(gate.get("id"), str)
-    }
+    gates_value = verification.get("gates", [])
+    results: dict[str, dict[str, Any]] = {
+        cast(dict[str, Any], gate)["id"]: cast(dict[str, Any], gate)
+        for gate in cast(list[Any], gates_value)
+        if isinstance(gate, dict)
+        and isinstance(cast(dict[str, Any], gate).get("id"), str)
+    } if isinstance(gates_value, list) else {}
     updated = dict(capability_map)
     available: list[dict[str, Any]] = []
     for capability in _available_capabilities(capability_map):
@@ -144,9 +146,10 @@ def apply_gate_verification(
         gate = results.get(str(copied.get("id")))
         if gate is not None and gate.get("status") in {"passed", "failed", "blocked"}:
             previous = copied.get("verification_state")
+            typed_previous = cast(dict[str, Any], previous) if isinstance(previous, dict) else {}
             discovery = (
-                previous.get("discovery")
-                if isinstance(previous, dict) and isinstance(previous.get("discovery"), str)
+                typed_previous.get("discovery")
+                if isinstance(typed_previous.get("discovery"), str)
                 else _discovery_for_capability(copied)
             )
             copied["verification_state"] = {
@@ -204,7 +207,11 @@ def _available_capabilities(capability_map: dict[str, Any]) -> list[dict[str, An
     available = capability_map.get("available")
     if not isinstance(available, list):
         return []
-    return [capability for capability in available if isinstance(capability, dict)]
+    return [
+        cast(dict[str, Any], capability)
+        for capability in cast(list[Any], available)
+        if isinstance(capability, dict)
+    ]
 
 
 def _status(gates: list[dict[str, Any]]) -> str:
