@@ -3,14 +3,14 @@ from __future__ import annotations
 import re
 import tomllib
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from quality_runner.schema_constants import (
     SKILL_APPEND_RESULT_SCHEMA,
     SKILL_CLASSIFICATION_SCHEMA,
     SKILL_SYNC_RESULT_SCHEMA,
 )
-from quality_runner.skill_config import _load_skill_pack, _resolve_skill_path, sanitize_skill_id
+from quality_runner.skill_config import load_skill_pack, resolve_skill_path, sanitize_skill_id
 from quality_runner.skill_ingest import append_skill_to_target, validate_skill_pack
 from quality_runner.skill_registration import canonical_skill_toml, update_repo_skills_config
 
@@ -68,7 +68,7 @@ def classify_skill_pack(
             "errors": validation.get("errors", []),
         }
 
-    candidate_pack, candidate_warning = _load_skill_pack(
+    candidate_pack, candidate_warning = load_skill_pack(
         candidate_path.expanduser().resolve(), str(validation["skill_id"])
     )
     warnings = list(validation.get("warnings", []))
@@ -203,19 +203,18 @@ def load_skill_corpus(corpus_path: Path) -> tuple[dict[str, Any] | None, list[st
         raw = tomllib.loads(manifest_path.read_text(encoding="utf-8"))
     except (OSError, tomllib.TOMLDecodeError) as error:
         return None, [f"corpus manifest could not be parsed: {error}"]
-    if not isinstance(raw, dict):
-        return None, ["corpus manifest must be a TOML table"]
-    if raw.get("schema") != CORPUS_SCHEMA:
+    manifest = cast(dict[str, object], raw)
+    if manifest.get("schema") != CORPUS_SCHEMA:
         return None, [f"corpus manifest schema must be {CORPUS_SCHEMA}"]
 
-    corpus_id = raw.get("id")
+    corpus_id = manifest.get("id")
     if not isinstance(corpus_id, str) or not corpus_id:
         return None, ["corpus manifest must include a non-empty id"]
-    version = raw.get("version", "0.1.0")
+    version = manifest.get("version", "0.1.0")
     if not isinstance(version, str) or not version:
         return None, ["corpus manifest version must be a non-empty string"]
 
-    pack_entries = raw.get("packs")
+    pack_entries = manifest.get("packs")
     if not isinstance(pack_entries, list) or not pack_entries:
         return None, ["corpus manifest must include at least one [[packs]] entry"]
 
@@ -223,10 +222,11 @@ def load_skill_corpus(corpus_path: Path) -> tuple[dict[str, Any] | None, list[st
     packs: list[dict[str, Any]] = []
     seen_ids: set[str] = set()
     errors: list[str] = []
-    for index, item in enumerate(pack_entries):
-        if not isinstance(item, dict):
+    for index, raw_item in enumerate(cast(list[object], pack_entries)):
+        if not isinstance(raw_item, dict):
             errors.append(f"packs[{index}] must be a table")
             continue
+        item = cast(dict[str, object], raw_item)
         pack_id = item.get("id")
         normalized_id = sanitize_skill_id(pack_id) if isinstance(pack_id, str) else None
         if normalized_id is None:
@@ -240,11 +240,11 @@ def load_skill_corpus(corpus_path: Path) -> tuple[dict[str, Any] | None, list[st
         if not isinstance(relative_path, str) or not relative_path:
             errors.append(f"packs[{index}] must include a path")
             continue
-        pack_path, path_warning = _resolve_skill_path(corpus_root, relative_path)
+        pack_path, path_warning = resolve_skill_path(corpus_root, relative_path)
         if pack_path is None or path_warning is not None:
             errors.append(f"packs[{index}] path rejected for traversal safety: {relative_path}")
             continue
-        pack, warning = _load_skill_pack(pack_path, normalized_id)
+        pack, warning = load_skill_pack(pack_path, normalized_id)
         if warning is not None:
             errors.append(warning["message"])
         if pack is None:
@@ -252,7 +252,7 @@ def load_skill_corpus(corpus_path: Path) -> tuple[dict[str, Any] | None, list[st
             continue
         focus = item.get("focus")
         focus_terms = (
-            [value for value in focus if isinstance(value, str) and value]
+            [value for value in cast(list[object], focus) if isinstance(value, str) and value]
             if isinstance(focus, list)
             else []
         )
@@ -265,13 +265,13 @@ def load_skill_corpus(corpus_path: Path) -> tuple[dict[str, Any] | None, list[st
             }
         )
 
-    active = raw.get("active")
+    active = manifest.get("active")
     if active is not None and not isinstance(active, list):
         errors.append("corpus active must be a list of pack ids")
         active_ids: list[str] = []
     else:
         active_ids = []
-        for value in active or []:
+        for value in cast(list[object], active or []):
             normalized_active = sanitize_skill_id(value) if isinstance(value, str) else None
             if normalized_active is None:
                 errors.append(f"corpus active contains invalid pack id: {value}")
@@ -320,7 +320,7 @@ def sync_skill_corpus(
             repo_errors.append(f"repository path is not a directory: {repo_root}")
         for pack_entry in corpus["packs"]:
             skill_id = pack_entry["id"]
-            target_path, target_warning = _resolve_skill_path(
+            target_path, target_warning = resolve_skill_path(
                 repo_root, f".quality-runner/skills/{skill_id}.toml"
             )
             if target_path is None or target_warning is not None:
@@ -401,14 +401,17 @@ def _pack_terms(pack: dict[str, Any], *, extra: list[str] | None = None) -> set[
         collection = pack.get(collection_key)
         if not isinstance(collection, list):
             continue
-        for item in collection:
-            if not isinstance(item, dict):
+        for raw_item in cast(list[object], collection):
+            if not isinstance(raw_item, dict):
                 continue
+            item = cast(dict[str, object], raw_item)
             values.extend(str(value) for value in item.values() if isinstance(value, str))
             for value in item.values():
                 if isinstance(value, list):
                     values.extend(
-                        str(item_value) for item_value in value if isinstance(item_value, str)
+                        str(item_value)
+                        for item_value in cast(list[object], value)
+                        if isinstance(item_value, str)
                     )
     return {
         token
