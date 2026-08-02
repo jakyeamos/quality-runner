@@ -6,15 +6,15 @@ import shutil
 import subprocess
 from collections.abc import Mapping, Sequence
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from quality_runner.code_quality_duplicates import duplicate_clusters as build_duplicate_clusters
-from quality_runner.code_quality_findings import _finding
+from quality_runner.code_quality_findings import finding as make_finding
 from quality_runner.code_quality_native_similarity import (
     NATIVE_SIMILARITY_SCHEMA,
     native_similarity_scan,
 )
-from quality_runner.code_quality_paths import _verification_for_path
+from quality_runner.code_quality_paths import verification_for_path
 from quality_runner.code_quality_similarity_parse import parse_similarity_output
 from quality_runner.semantic_similarity_policy import (
     DEFAULT_SIMILARITY_BACKEND,
@@ -74,7 +74,7 @@ def collect_deduplicate_scan(
     for cluster in duplicate_clusters:
         first = cluster["candidates"][0]
         findings.append(
-            _finding(
+            make_finding(
                 category="deduplicate",
                 severity="warning",
                 confidence="medium",
@@ -86,7 +86,7 @@ def collect_deduplicate_scan(
                     "Extract a shared helper only when the call sites share domain semantics."
                 ),
                 risk="Near-duplicate logic can drift across fixes.",
-                verification=_verification_for_path(first["file"]),
+                verification=verification_for_path(first["file"]),
                 remediation_bucket="duplicate consolidation and helper extraction",
             )
         )
@@ -103,8 +103,8 @@ def collect_deduplicate_scan(
     findings.extend(similarity_result["findings"])
     semantic_similarity_tools = {
         str(entry["tool"]): str(entry["status"])
-        for entry in similarity_result["scanner_status"]
-        if isinstance(entry, dict) and isinstance(entry.get("tool"), str)
+        for entry in cast(list[dict[str, object]], similarity_result["scanner_status"])
+        if isinstance(entry.get("tool"), str)
     }
     return (
         duplicate_clusters,
@@ -284,19 +284,11 @@ def _skipped_result(repo_root: Path, *, reason: str) -> dict[str, Any]:
 
 def _materialize_similarity_report(report: Mapping[str, object]) -> dict[str, Any]:
     raw_clusters = report.get("clusters")
-    clusters = (
-        [item for item in raw_clusters if isinstance(item, dict)]
-        if isinstance(raw_clusters, list)
-        else []
-    )
+    clusters = cast(list[dict[str, Any]], raw_clusters) if isinstance(raw_clusters, list) else []
     for index, cluster in enumerate(clusters, start=1):
         cluster["id"] = f"{SIMILARITY_CLUSTER_ID_PREFIX}-{index:03d}"
     raw_findings = report.get("findings")
-    findings = (
-        [item for item in raw_findings if isinstance(item, dict)]
-        if isinstance(raw_findings, list)
-        else []
-    )
+    findings = cast(list[dict[str, Any]], raw_findings) if isinstance(raw_findings, list) else []
     if not findings:
         findings = [
             _cluster_finding(cluster, source=str(cluster.get("source", ""))) for cluster in clusters
@@ -420,7 +412,7 @@ def _cluster_finding(cluster: dict[str, Any], *, source: str) -> dict[str, Any]:
     )
     severity = "warning" if similarity_pct >= 90.0 and avg_lines >= 8 else "observation"
     confidence = "high" if similarity_pct >= 95.0 else "medium"
-    finding = _finding(
+    finding = make_finding(
         category="deduplicate",
         severity=severity,
         confidence=confidence,
@@ -456,7 +448,7 @@ def _stable_similarity_fingerprint(
     candidates: list[dict[str, Any]],
     similarity_pct: float,
 ) -> str:
-    parts = []
+    parts: list[str] = []
     for candidate in sorted(
         candidates, key=lambda item: (str(item.get("file", "")), str(item.get("name", "")))
     ):
