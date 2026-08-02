@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import tomllib
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from quality_runner.scan_exclusions import is_scan_path_allowed, iter_allowed_paths
 
@@ -35,7 +35,7 @@ def _read_package_json(
                 "path": path,
             }
         ]
-    return payload, []
+    return cast(dict[str, Any], payload), []
 
 
 def _read_pyproject(
@@ -54,14 +54,6 @@ def _read_pyproject(
                 "path": path,
             }
         ]
-    if not isinstance(payload, dict):
-        return {}, [
-            {
-                "code": "invalid_pyproject_toml_shape",
-                "message": f"{path} must contain a TOML table",
-                "path": path,
-            }
-        ]
     return payload, []
 
 
@@ -69,10 +61,11 @@ def _package_scripts(package_json: dict[str, Any]) -> dict[str, str]:
     scripts = package_json.get("scripts")
     if not isinstance(scripts, dict):
         return {}
+    scripts_map = cast(dict[str, Any], scripts)
     return {
-        str(name): command
-        for name, command in scripts.items()
-        if isinstance(name, str) and isinstance(command, str) and command
+        name: command
+        for name, command in scripts_map.items()
+        if isinstance(command, str) and command
     }
 
 
@@ -138,3 +131,10 @@ def _read_text(path: Path) -> str:
         return path.read_text(encoding="utf-8")
     except OSError:
         return ""
+
+
+package_scripts = _package_scripts
+read_package_json = _read_package_json
+read_pyproject = _read_pyproject
+read_text = _read_text
+workspace_manifests = _workspace_manifests

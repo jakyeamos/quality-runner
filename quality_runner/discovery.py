@@ -9,13 +9,13 @@ from quality_runner import __version__
 from quality_runner.aggregate_coverage import analyze_aggregate_coverage
 from quality_runner.cache_modes import CacheMode
 from quality_runner.discovery_inputs import (
-    _package_scripts,
-    _read_package_json,
-    _read_pyproject,
-    _read_text,
-    _workspace_manifests,
+    package_scripts,
+    read_package_json,
+    read_pyproject,
+    read_text,
+    workspace_manifests,
 )
-from quality_runner.discovery_quality import _quality_commands
+from quality_runner.discovery_quality import quality_commands as discover_quality_commands
 from quality_runner.intent_docs import discover_intent_docs
 from quality_runner.inventory_cache import load_or_build_inventory
 from quality_runner.manifest import git_state_for_repo
@@ -75,12 +75,12 @@ def _inspect_repo_uncached(
     scan_exclusions = effective_scan_exclusions(root, config)
     structural_scan_exclusions = effective_scan_exclusions(root, config, module="structural")
     scan_exclusions_by_module = effective_scan_exclusions_by_module(root, config)
-    package_json, warnings = _read_package_json(root)
-    pyproject, pyproject_warnings = _read_pyproject(root)
+    package_json, warnings = read_package_json(root)
+    pyproject, pyproject_warnings = read_pyproject(root)
     warnings.extend(pyproject_warnings)
-    workspaces, workspace_warnings = _workspace_manifests(root, structural_scan_exclusions)
+    workspaces, workspace_warnings = workspace_manifests(root, structural_scan_exclusions)
     warnings.extend(workspace_warnings)
-    scripts = _package_scripts(package_json)
+    scripts = package_scripts(package_json)
     agent_instruction_files = _agent_instruction_files(root)
     ci_files, ci_warnings = _ci_files(root)
     warnings.extend(ci_warnings)
@@ -111,7 +111,7 @@ def _inspect_repo_uncached(
         "worktree_mode": "in-place",
         "workflow_run_id": run_id,
     }
-    quality_commands = _quality_commands(
+    quality_commands = discover_quality_commands(
         root=root,
         package_json=package_json,
         scripts=scripts,
@@ -229,9 +229,7 @@ def _detect_quality_contract(
     scripts: dict[str, str],
     agent_instruction_files: list[str],
 ) -> dict[str, Any]:
-    instruction_text = "\n".join(
-        _read_text(root / path).lower() for path in agent_instruction_files
-    )
+    instruction_text = "\n".join(read_text(root / path).lower() for path in agent_instruction_files)
     required_terms = {
         "lint": _has_instruction_term(instruction_text, ("lint", "linting")) or "lint" in scripts,
         "typecheck": _has_instruction_term(

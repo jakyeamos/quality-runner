@@ -3,13 +3,13 @@ from __future__ import annotations
 import json
 import re
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from quality_runner.discovery_inputs import (
-    _package_scripts,
-    _read_package_json,
-    _read_pyproject,
-    _read_text,
+    package_scripts,
+    read_package_json,
+    read_pyproject,
+    read_text,
 )
 from quality_runner.surfaces import quality_commands_from_surfaces
 
@@ -42,6 +42,9 @@ def _quality_commands(
     existing_ids = {command["id"] for command in commands}
     commands.extend(_ci_quality_commands(root=root, ci_files=ci_files, existing_ids=existing_ids))
     return commands
+
+
+quality_commands = _quality_commands
 
 
 def _javascript_quality_commands(
@@ -110,7 +113,8 @@ def _python_pyproject_quality_commands(
     commands: list[dict[str, str]] = []
     workspace_path = _workspace_path_from_manifest(manifest_path)
     if isinstance(tool, dict):
-        if isinstance(tool.get("ruff"), dict):
+        tool_map = cast(dict[str, Any], tool)
+        if isinstance(tool_map.get("ruff"), dict):
             commands.extend(
                 [
                     _quality_command(
@@ -129,7 +133,7 @@ def _python_pyproject_quality_commands(
                     ),
                 ]
             )
-        if isinstance(tool.get("basedpyright"), dict):
+        if isinstance(tool_map.get("basedpyright"), dict):
             commands.append(
                 _quality_command(
                     capability_id="typecheck",
@@ -139,7 +143,7 @@ def _python_pyproject_quality_commands(
                     language="python",
                 )
             )
-        elif isinstance(tool.get("mypy"), dict):
+        elif isinstance(tool_map.get("mypy"), dict):
             commands.append(
                 _quality_command(
                     capability_id="typecheck",
@@ -149,7 +153,7 @@ def _python_pyproject_quality_commands(
                     language="python",
                 )
             )
-        elif isinstance(tool.get("ty"), dict):
+        elif isinstance(tool_map.get("ty"), dict):
             commands.append(
                 _quality_command(
                     capability_id="typecheck",
@@ -159,8 +163,11 @@ def _python_pyproject_quality_commands(
                     language="python",
                 )
             )
-        pytest_section = tool.get("pytest")
-        if isinstance(pytest_section, dict) and isinstance(pytest_section.get("ini_options"), dict):
+        pytest_section = tool_map.get("pytest")
+        pytest_map = (
+            cast(dict[str, Any], pytest_section) if isinstance(pytest_section, dict) else {}
+        )
+        if isinstance(pytest_section, dict) and isinstance(pytest_map.get("ini_options"), dict):
             commands.append(
                 _quality_command(
                     capability_id="tests",
@@ -194,13 +201,13 @@ def _workspace_quality_commands(
         if not isinstance(manifest, str) or not isinstance(kind, str):
             continue
         if kind == "python":
-            pyproject, _ = _read_pyproject(root, manifest)
+            pyproject, _ = read_pyproject(root, manifest)
             commands.extend(_python_pyproject_quality_commands(pyproject, manifest_path=manifest))
         elif kind == "javascript":
-            package_json, _ = _read_package_json(root, manifest)
+            package_json, _ = read_package_json(root, manifest)
             commands.extend(
                 _javascript_quality_commands(
-                    _package_scripts(package_json),
+                    package_scripts(package_json),
                     manifest_path=manifest,
                     package_manager=_detect_package_manager(
                         root,
@@ -231,7 +238,8 @@ def _pre_cr_quality_commands(root: Path, pre_cr_config: str | None) -> list[dict
     except json.JSONDecodeError:
         command = "pre-cr run --workspace ."
     else:
-        test_command = payload.get("testCommand") if isinstance(payload, dict) else None
+        payload_map = cast(dict[str, Any], payload) if isinstance(payload, dict) else {}
+        test_command = payload_map.get("testCommand")
         command = (
             test_command
             if isinstance(test_command, str) and test_command
@@ -265,7 +273,7 @@ def _ci_quality_commands(
     if not workflow_root.exists():
         return []
     text = "\n".join(
-        _read_text(path)
+        read_text(path)
         for path in sorted(workflow_root.iterdir())
         if path.is_file() and path.suffix in {".yml", ".yaml"}
     )
