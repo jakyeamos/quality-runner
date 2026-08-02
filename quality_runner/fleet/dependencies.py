@@ -343,3 +343,6 @@ def _package_manager_declaration(worktree: Path) -> tuple[str, str, str] | None:
         "yarn": "yarn install --offline --immutable --mode=skip-builds",
     }
     return manager, lockfiles[manager], commands[manager]
+
+
+remove_runtime_path = _remove_runtime_path

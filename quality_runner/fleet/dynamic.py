@@ -5,15 +5,15 @@ import shutil
 import subprocess
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from quality_runner.artifacts import prepare_safe_directory
 from quality_runner.fleet.contracts import digest, hash_text, redact_text
 from quality_runner.fleet.dependencies import (
-    _remove_runtime_path,
+    prepare_dynamic_dependencies as _prepare_dependency_tree,
 )
 from quality_runner.fleet.dependencies import (
-    prepare_dynamic_dependencies as _prepare_dependency_tree,
+    remove_runtime_path,
 )
 from quality_runner.fleet.discovery import checkout_fingerprint
 from quality_runner.process_runner import run_shell_command
@@ -51,13 +51,16 @@ def dynamic_result(
     target = repository.get("target_branch")
     if not isinstance(target, dict):
         return {"status": "blocked", "selected": True, "reason": "target branch is unresolved"}
+    target = cast(dict[str, Any], target)
     target_state = target.get("target_state")
     target_head = target.get("head")
     signature = digest(
         {
             "repo": repository.get("repo_id"),
             "head": target_head,
-            "quality_commands": finding.get("scan", {}).get("quality_commands", []),
+            "quality_commands": cast(dict[str, Any], finding.get("scan", {})).get(
+                "quality_commands", []
+            ),
         }
     )
     previous = _find_previous_dynamic(
@@ -86,7 +89,10 @@ def dynamic_result(
             "reason": "no changed-only trigger was found",
             "signature": signature,
         }
-    if not isinstance(target_state, dict) or target_state.get("status") != "ready":
+    if (
+        not isinstance(target_state, dict)
+        or cast(dict[str, Any], target_state).get("status") != "ready"
+    ):
         return {
             "status": "blocked",
             "selected": True,
@@ -99,7 +105,7 @@ def dynamic_result(
     source_checkout = next(
         (
             item
-            for item in repository.get("checkouts", [])
+            for item in cast(list[dict[str, Any]], repository.get("checkouts", []))
             if item.get("checkout_id") == source_checkout_id
         ),
         None,
@@ -230,7 +236,7 @@ def _execute_dynamic(
         if worktree.exists():
             shutil.rmtree(worktree, ignore_errors=True)
         for path in reversed(dependency_cleanup_paths):
-            _remove_runtime_path(path)
+            remove_runtime_path(path)
     after = checkout_fingerprint(source)
     result["source_integrity_before"] = before
     result["source_integrity_after"] = after
@@ -304,10 +310,17 @@ def _missing_runtime_requirement(command: str, stdout: str, stderr: str) -> str 
 
 def apply_dynamic_quality_evidence(result: dict[str, Any]) -> None:
     dynamic = result.get("dynamic")
-    if not isinstance(dynamic, dict) or dynamic.get("status") not in {"passed", "reused"}:
+    if not isinstance(dynamic, dict) or cast(dict[str, Any], dynamic).get("status") not in {
+        "passed",
+        "reused",
+    }:
         return
-    for finding in result.get("findings", []):
-        if isinstance(finding, dict) and finding.get("dimension") == "quality_commands":
+    for finding in cast(list[object], result.get("findings", [])):
+        if (
+            isinstance(finding, dict)
+            and cast(dict[str, Any], finding).get("dimension") == "quality_commands"
+        ):
+            finding = cast(dict[str, Any], finding)
             finding["score"] = 4
             finding["status"] = "validated"
             finding["message"] = (
@@ -323,14 +336,14 @@ def _quality_commands_from_scan(repository: dict[str, Any]) -> list[dict[str, An
     scan = repository.get("scan")
     if not isinstance(scan, dict):
         return []
-    commands = scan.get("quality_commands")
+    commands = cast(dict[str, Any], scan).get("quality_commands")
     if not isinstance(commands, list):
         return []
     allowed_capabilities = {"lint", "typecheck", "tests", "formatter", "dead_code", "runtime_smoke"}
     return [
-        item
-        for item in commands
-        if isinstance(item, dict) and item.get("id") in allowed_capabilities
+        cast(dict[str, Any], item)
+        for item in cast(list[object], commands)
+        if isinstance(item, dict) and cast(dict[str, Any], item).get("id") in allowed_capabilities
     ][:8]
 
 
@@ -374,20 +387,21 @@ def _selection_reasons(
 ) -> list[str]:
     reasons: list[str] = []
     target = repository.get("target_branch")
-    if not isinstance(target, dict) or target.get("status") != "ready":
+    if not isinstance(target, dict) or cast(dict[str, Any], target).get("status") != "ready":
         reasons.append("target baseline is blocked or stale")
     if not target_head:
         reasons.append("target HEAD is missing")
+    finding_items = cast(list[object], finding.get("findings", []))
     if any(
-        item.get("status") in {"unknown", "stale", "blocked"}
-        for item in finding.get("findings", [])
+        cast(dict[str, Any], item).get("status") in {"unknown", "stale", "blocked"}
+        for item in finding_items
         if isinstance(item, dict)
     ):
         reasons.append("static evidence is incomplete or stale")
     if any(
-        item.get("score", 0) < 2
-        for item in finding.get("findings", [])
-        if isinstance(item, dict) and item.get("score") is not None
+        cast(dict[str, Any], item).get("score", 0) < 2
+        for item in finding_items
+        if isinstance(item, dict) and cast(dict[str, Any], item).get("score") is not None
     ):
         reasons.append("a quality dimension is below discoverable maturity")
     return reasons
@@ -422,15 +436,22 @@ def _find_previous_dynamic(
         if current_as_of - previous_as_of > timedelta(days=max_age_days):
             continue
         dynamic = finding.get("dynamic")
-        if not isinstance(dynamic, dict) or dynamic.get("status") not in {"passed", "reused"}:
+        if not isinstance(dynamic, dict) or cast(dict[str, Any], dynamic).get("status") not in {
+            "passed",
+            "reused",
+        }:
             continue
-        if dynamic.get("target_head") != target_head or dynamic.get("signature") != signature:
+        dynamic_map = cast(dict[str, Any], dynamic)
+        if (
+            dynamic_map.get("target_head") != target_head
+            or dynamic_map.get("signature") != signature
+        ):
             continue
         return {
             "previous_audit_id": candidate.name,
             "target_head": target_head,
             "signature": signature,
-            "commands": dynamic.get("commands", []),
+            "commands": dynamic_map.get("commands", []),
         }
     return None
 
