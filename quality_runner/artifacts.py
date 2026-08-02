@@ -5,7 +5,7 @@ import re
 import shutil
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 DEFAULT_REDACTION_REPLACEMENT = "[REDACTED]"
 DEFAULT_RETENTION_RUNS = 3
@@ -24,26 +24,29 @@ class ArtifactPolicy:
         section = config.get("artifacts")
         if not isinstance(section, dict):
             return cls()
-        patterns = section.get("redact_patterns")
-        replacement = section.get("redact_replacement")
-        has_retention_runs = "retention_runs" in section
-        has_retention_days = "retention_days" in section
+        section_map = cast(dict[str, Any], section)
+        patterns = section_map.get("redact_patterns")
+        replacement = section_map.get("redact_replacement")
+        has_retention_runs = "retention_runs" in section_map
+        has_retention_days = "retention_days" in section_map
         retention_runs = (
-            section.get("retention_runs")
+            section_map.get("retention_runs")
             if has_retention_runs
             else DEFAULT_RETENTION_RUNS
             if not has_retention_days
             else None
         )
         retention_days = (
-            section.get("retention_days")
+            section_map.get("retention_days")
             if has_retention_days
             else DEFAULT_RETENTION_DAYS
             if not has_retention_runs
             else None
         )
         return cls(
-            redact_patterns=tuple(item for item in patterns if isinstance(item, str) and item)
+            redact_patterns=tuple(
+                item for item in cast(list[object], patterns) if isinstance(item, str) and item
+            )
             if isinstance(patterns, list)
             else (),
             redact_replacement=(
@@ -227,20 +230,16 @@ def cleanup_artifacts(
     current_time = now if now is not None else _current_time()
     preserved = set(preserve_run_ids or set()) | _auto_preserved_run_ids(entries)
     result["preserved_run_ids"] = sorted(preserved)
-    retained_by_count = (
-        {entry.name for entry in entries[: policy.retention_runs]}
-        if policy.retention_runs is not None
-        else set()
+    retention_runs = policy.retention_runs
+    retained_by_count: set[str] = (
+        {entry.name for entry in entries[:retention_runs]} if retention_runs is not None else set()
     )
-    cutoff = (
-        current_time - policy.retention_days * 24 * 60 * 60
-        if policy.retention_days is not None
-        else None
-    )
+    retention_days = policy.retention_days
+    cutoff = current_time - retention_days * 24 * 60 * 60 if retention_days is not None else None
     for index, entry in enumerate(entries):
         if entry.name in preserved or entry.name in retained_by_count:
             continue
-        expired_by_count = policy.retention_runs is not None and index >= policy.retention_runs
+        expired_by_count = retention_runs is not None and index >= retention_runs
         expired_by_age = cutoff is not None and entry.stat().st_mtime < cutoff
         if not expired_by_count and not expired_by_age:
             continue
@@ -280,20 +279,21 @@ def _auto_preserved_run_ids(entries: list[Path]) -> set[str]:
                 continue
             if not isinstance(payload, dict):
                 continue
-            if payload.get("preserved") is True or payload.get("retain") is True:
+            payload_map = cast(dict[str, Any], payload)
+            if payload_map.get("preserved") is True or payload_map.get("retain") is True:
                 preserved.add(entry.name)
-            retention = payload.get("retention")
-            if isinstance(retention, dict) and retention.get("preserve") is True:
+            retention = payload_map.get("retention")
+            if (
+                isinstance(retention, dict)
+                and cast(dict[str, Any], retention).get("preserve") is True
+            ):
                 preserved.add(entry.name)
-            statuses = {
-                value
-                for value in (
-                    payload.get("status"),
-                    payload.get("lifecycle_status"),
-                    payload.get("gate_verification_status"),
-                )
-                if isinstance(value, str)
-            }
+            status_values = (
+                payload_map.get("status"),
+                payload_map.get("lifecycle_status"),
+                payload_map.get("gate_verification_status"),
+            )
+            statuses = {value for value in status_values if isinstance(value, str)}
             if statuses & {"active", "blocked", "current", "preserved"}:
                 preserved.add(entry.name)
         if entry.name in preserved:
@@ -366,9 +366,7 @@ def _artifact_path(repo_root: Path, run_id: str) -> Path:
     return current
 
 
-def _validate_run_id(run_id: str) -> None:
-    """Backward-compatible private alias for older internal imports."""
-    validate_run_id(run_id)
+_validate_run_id = validate_run_id
 
 
 def _prepare_artifact_file(path: Path) -> Path:
