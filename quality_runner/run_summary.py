@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from quality_runner.artifacts import (
     artifact_file,
@@ -101,7 +101,7 @@ def _load_optional_json(path: Path) -> dict[str, Any]:
         payload = json.loads(path.read_text(encoding="utf-8"))
     except json.JSONDecodeError:
         return {}
-    return payload if isinstance(payload, dict) else {}
+    return cast(dict[str, Any], payload) if isinstance(payload, dict) else {}
 
 
 def _load_optional_artifact_json(run_dir: Path, filename: str) -> dict[str, Any]:
@@ -114,9 +114,10 @@ def _gate_results(gate_verification: dict[str, Any]) -> list[dict[str, Any]]:
     if not isinstance(gates, list):
         return []
     results: list[dict[str, Any]] = []
-    for gate in gates:
-        if not isinstance(gate, dict):
+    for gate_value in cast(list[object], gates):
+        if not isinstance(gate_value, dict):
             continue
+        gate = cast(dict[str, Any], gate_value)
         result = {
             "id": gate.get("id"),
             "status": gate.get("status"),
@@ -133,7 +134,9 @@ def _missing_capabilities(capability_map: dict[str, Any]) -> list[str]:
     if not isinstance(missing, list):
         return []
     return [
-        item["id"] for item in missing if isinstance(item, dict) and isinstance(item.get("id"), str)
+        cast(dict[str, Any], item)["id"]
+        for item in cast(list[object], missing)
+        if isinstance(item, dict) and isinstance(cast(dict[str, Any], item).get("id"), str)
     ]
 
 
@@ -143,16 +146,21 @@ def _finding_counts(audit: dict[str, Any]) -> dict[str, Any]:
         return {"total": 0, "by_category": {}, "by_confidence": {}}
     by_category: dict[str, int] = {}
     by_confidence: dict[str, int] = {}
-    for finding in findings:
-        if not isinstance(finding, dict):
+    for finding_value in cast(list[object], findings):
+        if not isinstance(finding_value, dict):
             continue
+        finding = cast(dict[str, Any], finding_value)
         category = finding.get("category")
         confidence = finding.get("confidence")
         if isinstance(category, str):
             by_category[category] = by_category.get(category, 0) + 1
         if isinstance(confidence, str):
             by_confidence[confidence] = by_confidence.get(confidence, 0) + 1
-    return {"total": len(findings), "by_category": by_category, "by_confidence": by_confidence}
+    return {
+        "total": len(cast(list[object], findings)),
+        "by_category": by_category,
+        "by_confidence": by_confidence,
+    }
 
 
 def _summary_status(gate_verification: dict[str, Any], audit: dict[str, Any]) -> str:
@@ -264,7 +272,7 @@ def _summary_delta(*, baseline: dict[str, Any], final: dict[str, Any]) -> dict[s
 
 def _nested_value(payload: dict[str, Any], key: str, nested_key: str) -> object:
     value = payload.get(key)
-    return value.get(nested_key) if isinstance(value, dict) else None
+    return cast(dict[str, Any], value).get(nested_key) if isinstance(value, dict) else None
 
 
 def _int_value(value: object) -> int:
