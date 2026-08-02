@@ -5,6 +5,25 @@ from pathlib import Path
 from quality_runner.fleet import dynamic
 
 
+def test_dynamic_quality_selection_keeps_required_security_capability() -> None:
+    commands = [
+        {"id": command_id, "command": command_id}
+        for command_id in (
+            "formatter",
+            "lint",
+            "typecheck",
+            "tests",
+            "build",
+            "dead_code",
+            "dependency_audit",
+            "environment_contract",
+            "security_secrets_scan",
+        )
+    ]
+    selected = dynamic._quality_commands_from_scan({"scan": {"quality_commands": commands}})
+    assert "security_secrets_scan" in {str(item["id"]) for item in selected}
+
+
 def test_missing_dynamic_command_worktree_is_unavailable(monkeypatch, tmp_path: Path) -> None:
     def missing_worktree(command: str, *, cwd: Path, timeout: int) -> dict[str, object]:
         del command, cwd, timeout

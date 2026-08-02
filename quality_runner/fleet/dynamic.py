@@ -351,11 +351,13 @@ def _quality_commands_from_scan(repository: dict[str, Any]) -> list[dict[str, An
         "environment_contract",
         "security_secrets_scan",
     }
+    # Keep every executable quality capability in the bounded dynamic set so
+    # required security and dependency gates cannot be truncated by ordering.
     return [
         cast(dict[str, Any], item)
         for item in cast(list[object], commands)
         if isinstance(item, dict) and cast(dict[str, Any], item).get("id") in allowed_capabilities
-    ][:8]
+    ][:12]
 
 
 def _safe_dynamic_command(command: dict[str, Any]) -> bool:
