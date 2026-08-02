@@ -5,7 +5,7 @@ import json
 import sys
 from collections.abc import Mapping
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from quality_runner import __version__
 from quality_runner.application.audit_workflows import inspect_payload, run_payload
@@ -290,7 +290,7 @@ def call_tool(name: str, arguments: dict[str, Any] | None = None) -> dict[str, A
             normalized_finding_ids: list[str] | None = None
         elif isinstance(finding_ids, list):
             normalized_finding_ids = [
-                item for item in finding_ids if isinstance(item, str) and item
+                item for item in cast(list[object], finding_ids) if isinstance(item, str) and item
             ]
         else:
             raise JsonRpcError(JSONRPC_INVALID_PARAMS, "finding_ids must be an array of strings")
@@ -314,7 +314,7 @@ def call_tool(name: str, arguments: dict[str, Any] | None = None) -> dict[str, A
             propose_fix_finding_ids: list[str] | None = None
         elif isinstance(finding_ids, list):
             propose_fix_finding_ids = [
-                item for item in finding_ids if isinstance(item, str) and item
+                item for item in cast(list[object], finding_ids) if isinstance(item, str) and item
             ]
         else:
             raise JsonRpcError(JSONRPC_INVALID_PARAMS, "finding_ids must be an array of strings")
@@ -336,8 +336,9 @@ def handle_jsonrpc_message(message: object) -> dict[str, Any] | None:
     if not isinstance(message, dict):
         return _jsonrpc_error(None, JSONRPC_INVALID_REQUEST, "JSON-RPC message must be an object")
 
-    request_id = message.get("id")
-    method = message.get("method")
+    message_map = cast(dict[str, Any], message)
+    request_id = message_map.get("id")
+    method = message_map.get("method")
     if method == "notifications/initialized":
         return None
     if not isinstance(method, str):
@@ -353,7 +354,7 @@ def handle_jsonrpc_message(message: object) -> dict[str, Any] | None:
         elif method == "tools/list":
             result = {"tools": list_tools()}
         elif method == "tools/call":
-            result = _handle_tools_call(message.get("params"))
+            result = _handle_tools_call(message_map.get("params"))
         else:
             raise JsonRpcError(
                 JSONRPC_METHOD_NOT_FOUND,
@@ -400,15 +401,16 @@ def main(argv: list[str] | None = None) -> int:
 def _handle_tools_call(params: object) -> dict[str, Any]:
     if not isinstance(params, dict):
         raise JsonRpcError(JSONRPC_INVALID_PARAMS, "tools/call requires object params")
-    tool_name = params.get("name")
+    params_map = cast(dict[str, Any], params)
+    tool_name = params_map.get("name")
     if not isinstance(tool_name, str) or not tool_name:
         raise JsonRpcError(JSONRPC_INVALID_PARAMS, "tools/call requires params.name")
-    arguments = params.get("arguments", {})
+    arguments = params_map.get("arguments", {})
     if arguments is None:
         arguments = {}
     if not isinstance(arguments, dict):
         raise JsonRpcError(JSONRPC_INVALID_PARAMS, "tools/call params.arguments must be an object")
-    return call_tool(tool_name, arguments)
+    return call_tool(tool_name, cast(dict[str, Any], arguments))
 
 
 def _status_payload(repo_root: Path) -> dict[str, Any]:

@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import sys
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from repo_quality_certifier.cli import build_doc_quality_payload, build_plan_payload
 
@@ -99,12 +99,15 @@ def handle_jsonrpc_message(message: dict[str, Any]) -> dict[str, Any] | None:
             result = {"tools": list_tools()}
         elif method == "tools/call":
             params = message.get("params")
-            params = params if isinstance(params, dict) else {}
+            params = cast(dict[str, Any], params) if isinstance(params, dict) else {}
             tool_name = params.get("name")
             if not isinstance(tool_name, str):
                 raise ValueError("tools/call requires params.name")
             arguments = params.get("arguments")
-            result = call_tool(tool_name, arguments if isinstance(arguments, dict) else {})
+            result = call_tool(
+                tool_name,
+                cast(dict[str, Any], arguments) if isinstance(arguments, dict) else {},
+            )
         else:
             raise ValueError(f"Unsupported JSON-RPC method: {method}")
         return {"jsonrpc": "2.0", "id": request_id, "result": result}
