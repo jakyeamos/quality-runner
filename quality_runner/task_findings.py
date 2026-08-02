@@ -3,7 +3,7 @@ from __future__ import annotations
 import hashlib
 from datetime import UTC, datetime
 from fnmatch import fnmatch
-from typing import Any
+from typing import Any, cast
 
 from quality_runner.schema_constants import NORMALIZED_FINDINGS_SCHEMA
 
@@ -105,7 +105,7 @@ def compare_findings(
         else:
             result["advisory"].append(occurrence)
 
-    current_coverage = current.get("coverage", {})
+    current_coverage = _mapping(current.get("coverage")) or {}
     for key in sorted(baseline_keys - current_keys):
         occurrence = baseline_rows[key]
         module = str(occurrence.get("coverage_ref") or "")
@@ -143,8 +143,9 @@ def compare_findings(
 
 def promotion_issues(prevention: dict[str, Any]) -> list[dict[str, str]]:
     issues: list[dict[str, str]] = []
-    for rule in prevention.get("rules", []):
-        if not isinstance(rule, dict) or rule.get("state") != "behavior-verified":
+    for rule_value in cast(list[object], prevention.get("rules", [])):
+        rule = _mapping(rule_value)
+        if rule is None or rule.get("state") != "behavior-verified":
             continue
         evidence = _evidence_kinds(rule.get("evidence_refs"))
         missing = sorted(REQUIRED_PROMOTION_EVIDENCE - evidence)
@@ -174,8 +175,9 @@ def _normalize_rows(
     if not isinstance(value, list):
         return []
     result: list[dict[str, Any]] = []
-    for row in value:
-        if not isinstance(row, dict):
+    for row_value in cast(list[object], value):
+        row = _mapping(row_value)
+        if row is None:
             continue
         rule_id = row.get(rule_field)
         fingerprint = row.get("fingerprint")
@@ -292,8 +294,9 @@ def _source_occurrence_sort_key(
 
 def _rule_policies(prevention: dict[str, Any]) -> dict[tuple[str, str], dict[str, Any]]:
     result: dict[tuple[str, str], dict[str, Any]] = {}
-    for item in prevention.get("rules", []):
-        if not isinstance(item, dict):
+    for item_value in cast(list[object], prevention.get("rules", [])):
+        item = _mapping(item_value)
+        if item is None:
             continue
         detector = item.get("detector")
         rule_id = item.get("rule_id")
@@ -311,7 +314,10 @@ def _eligible(policy: dict[str, Any] | None, path: str, confidence: object) -> b
     if (
         isinstance(patterns, list)
         and patterns
-        and not any(isinstance(pattern, str) and fnmatch(path, pattern) for pattern in patterns)
+        and not any(
+            isinstance(pattern, str) and fnmatch(path, pattern)
+            for pattern in cast(list[object], patterns)
+        )
     ):
         return False
     threshold = policy.get("confidence_threshold", 0.0)
@@ -322,7 +328,11 @@ def _eligible(policy: dict[str, Any] | None, path: str, confidence: object) -> b
 def _evidence_kinds(value: object) -> set[str]:
     if not isinstance(value, list):
         return set()
-    return {item.split(":", 1)[0] for item in value if isinstance(item, str) and ":" in item}
+    return {
+        item.split(":", 1)[0]
+        for item in cast(list[object], value)
+        if isinstance(item, str) and ":" in item
+    }
 
 
 def _ambiguities(occurrences: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -356,8 +366,9 @@ def _unique_occurrences(value: object) -> dict[str, dict[str, Any]]:
         return {}
     result: dict[str, dict[str, Any]] = {}
     duplicates: set[str] = set()
-    for item in value:
-        if not isinstance(item, dict) or item.get("normalization_error"):
+    for item_value in cast(list[object], value):
+        item = _mapping(item_value)
+        if item is None or item.get("normalization_error"):
             continue
         key = _occurrence_key(item)
         if key in result:
@@ -378,6 +389,10 @@ def _coverage_value(value: object) -> str:
     if value == "full":
         return "complete"
     return "unknown"
+
+
+def _mapping(value: object) -> dict[str, Any] | None:
+    return cast(dict[str, Any], value) if isinstance(value, dict) else None
 
 
 def _active_waiver(
