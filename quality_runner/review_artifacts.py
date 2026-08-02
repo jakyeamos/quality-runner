@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from collections.abc import Mapping, Sequence
 from pathlib import Path
+from typing import cast
 
 from quality_runner.artifacts import prepare_artifact_dir, write_json, write_text
 from quality_runner.skill_decomposition import write_skill_decomposition_artifacts
@@ -79,7 +80,9 @@ def render_review_markdown(report: Mapping[str, object]) -> str:
     if isinstance(next_action, str) and next_action:
         lines.extend(["## Next action", "", next_action, ""])
     sections = report.get("sections")
-    sections_map = sections if isinstance(sections, Mapping) else {}
+    sections_map: Mapping[str, object] = (
+        cast(Mapping[str, object], sections) if isinstance(sections, Mapping) else {}
+    )
     for key, title in SECTION_TITLES:
         lines.extend([f"## {title}", ""])
         lines.extend(_section_items(sections_map.get(key)))
@@ -146,18 +149,21 @@ def render_fix_prompts(
         else:
             lines.append("No finding-specific prompts were generated.")
         return "\n".join(lines).rstrip() + "\n"
-    for finding in findings:
+    for finding in cast(Sequence[object], findings):
         if not isinstance(finding, Mapping):
             continue
-        finding_id = finding.get("id", "unknown")
-        prompt = finding.get("agent_prompt", "Investigate this finding and report what you find.")
-        location = finding.get("location", [])
+        finding_map = cast(Mapping[str, object], finding)
+        finding_id = finding_map.get("id", "unknown")
+        prompt = finding_map.get(
+            "agent_prompt", "Investigate this finding and report what you find."
+        )
+        location = finding_map.get("location", [])
         lines.extend(
             [
                 f"## {finding_id}",
                 "",
-                f"- Severity: `{finding.get('severity', 'unknown')}`",
-                f"- Confidence: `{finding.get('confidence', 'unknown')}`",
+                f"- Severity: `{finding_map.get('severity', 'unknown')}`",
+                f"- Confidence: `{finding_map.get('confidence', 'unknown')}`",
                 f"- Inspect: {', '.join(_strings(location)) or 'location not provided'}",
                 "",
                 str(prompt),
@@ -175,10 +181,13 @@ def _section_items(value: object) -> list[str]:
     if not isinstance(value, Sequence) or isinstance(value, (str, bytes)) or not value:
         return ["- None"]
     lines: list[str] = []
-    for item in value:
+    for item in cast(Sequence[object], value):
         if isinstance(item, Mapping):
-            finding_id = item.get("id", "finding")
-            summary = item.get("summary", item.get("recommended_fix", item.get("agent_prompt", "")))
+            item_map = cast(Mapping[str, object], item)
+            finding_id = item_map.get("id", "finding")
+            summary = item_map.get(
+                "summary", item_map.get("recommended_fix", item_map.get("agent_prompt", ""))
+            )
             lines.append(f"- **{finding_id}**: {summary}")
         else:
             lines.append(f"- {item}")
@@ -188,4 +197,4 @@ def _section_items(value: object) -> list[str]:
 def _strings(value: object) -> list[str]:
     if not isinstance(value, Sequence) or isinstance(value, (str, bytes)):
         return []
-    return [item for item in value if isinstance(item, str)]
+    return [item for item in cast(Sequence[object], value) if isinstance(item, str)]
