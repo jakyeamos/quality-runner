@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from quality_runner.manifest import git_state_for_repo
 from quality_runner.readiness_evidence import (
@@ -158,20 +158,16 @@ def build_readiness_policy_summary(
             "missing_required_capability_ids": [],
         }
     required = _required_readiness_gate_ids(scan=scan, capability_map={"available": available})
-    missing_ids = {
-        item.get("id")
-        for item in missing
-        if isinstance(item, dict) and isinstance(item.get("id"), str)
-    }
+    missing_ids = {item.get("id") for item in missing if isinstance(item.get("id"), str)}
     unresolved = sorted(gate_id for gate_id in required if gate_id in missing_ids)
     missing_required = _missing_required_capability_ids(missing)
     repo_root_value = standards_packet.get("repo_root")
     repo_root = Path(repo_root_value) if isinstance(repo_root_value, str) else Path.cwd()
-    config = standards_packet.get("config")
+    config = _mapping(standards_packet.get("config")) or {}
     evidence_file = str(
         resolve_evidence_path(
             repo_root=repo_root,
-            config=config if isinstance(config, dict) else {},
+            config=config,
             override=None,
         )
     )
@@ -189,8 +185,8 @@ def build_readiness_policy_summary(
 def resolve_evidence_path(
     *, repo_root: Path, config: dict[str, Any], override: Path | None
 ) -> Path:
-    readiness = config.get("readiness")
-    configured = readiness.get("evidence_file") if isinstance(readiness, dict) else None
+    readiness = _mapping(config.get("readiness"))
+    configured = readiness.get("evidence_file") if readiness is not None else None
     candidate = override if override is not None else Path(configured or DEFAULT_EVIDENCE_FILE)
     resolved = candidate.expanduser()
     if not resolved.is_absolute():
@@ -210,14 +206,14 @@ def apply_readiness_evidence_override(
     readiness = capability_map.get("readiness")
     if not isinstance(readiness, dict):
         return capability_map
-    config = standards_packet.get("config")
+    config = _mapping(standards_packet.get("config")) or {}
     updated = dict(capability_map)
     updated["readiness"] = {
         **readiness,
         "evidence_file": str(
             resolve_evidence_path(
                 repo_root=repo_root,
-                config=config if isinstance(config, dict) else {},
+                config=config,
                 override=evidence_file,
             )
         ),
@@ -244,18 +240,18 @@ def evaluate_readiness(
             "missing_required_capability_ids": [],
             "gates": [],
         }
-    config = standards_packet.get("config")
+    config = _mapping(standards_packet.get("config")) or {}
     evidence_path = resolve_evidence_path(
         repo_root=repo_root,
-        config=config if isinstance(config, dict) else {},
+        config=config,
         override=evidence_file,
     )
     evidence, evidence_error = load_release_evidence(repo_root, evidence_path)
     current_git = git_state_for_repo(repo_root)
     existing = {
-        str(gate.get("id")): gate
-        for gate in gate_verification.get("gates", [])
-        if isinstance(gate, dict) and isinstance(gate.get("id"), str)
+        str(gate["id"]): gate
+        for gate in _mappings(gate_verification.get("gates"))
+        if isinstance(gate.get("id"), str)
     }
     required = _required_readiness_gate_ids(scan=scan, capability_map=capability_map)
     readiness_gates = [
@@ -299,9 +295,9 @@ def evaluate_readiness(
         )
     )
     missing_by_id = {
-        str(item.get("id")): str(item.get("reason"))
-        for item in capability_map.get("missing", [])
-        if isinstance(item, dict) and isinstance(item.get("id"), str)
+        str(item["id"]): str(item.get("reason"))
+        for item in _mappings(capability_map.get("missing"))
+        if isinstance(item.get("id"), str)
     }
     unresolved: list[str] = []
     for gate_id in required:
@@ -318,17 +314,15 @@ def evaluate_readiness(
             readiness_gates.append(gate)
         if gate.get("status") != "passed":
             unresolved.append(gate_id)
-    missing_required = _missing_required_capability_ids(
-        [item for item in capability_map.get("missing", []) if isinstance(item, dict)]
-    )
+    missing_required = _missing_required_capability_ids(_mappings(capability_map.get("missing")))
     for capability_id in missing_required:
         missing_item = next(
             (
                 item
-                for item in capability_map.get("missing", [])
-                if isinstance(item, dict) and item.get("id") == capability_id
+                for item in _mappings(capability_map.get("missing"))
+                if item.get("id") == capability_id
             ),
-            {},
+            cast(dict[str, Any], {}),
         )
         readiness_gates.append(
             _blocked_gate(
@@ -377,11 +371,18 @@ def _missing_required_capability_ids(missing: list[dict[str, Any]]) -> list[str]
     )
 
 
+def _mapping(value: object) -> dict[str, Any] | None:
+    return cast(dict[str, Any], value) if isinstance(value, dict) else None
+
+
+def _mappings(value: object) -> list[dict[str, Any]]:
+    if not isinstance(value, list):
+        return []
+    return [item for item in (cast(list[object], value)) if isinstance(item, dict)]
+
+
 def _has_surface(scan: dict[str, Any], surface_id: str) -> bool:
-    surfaces = scan.get("repo_surfaces")
-    return isinstance(surfaces, list) and any(
-        isinstance(surface, dict) and surface.get("id") == surface_id for surface in surfaces
-    )
+    return any(surface.get("id") == surface_id for surface in _mappings(scan.get("repo_surfaces")))
 
 
 def _stateful_surface(scan: dict[str, Any]) -> bool:
@@ -390,18 +391,19 @@ def _stateful_surface(scan: dict[str, Any]) -> bool:
 
 def _publication_review_required(capability_map: dict[str, Any]) -> bool:
     return any(
-        isinstance(capability, dict)
-        and capability.get("id") == "security_publication_visibility_review"
-        for capability in capability_map.get("available", [])
+        capability.get("id") == "security_publication_visibility_review"
+        for capability in _mappings(capability_map.get("available"))
     )
 
 
 def _observed_artifact_digest(gate_verification: dict[str, Any]) -> str | None:
     provenance = gate_verification.get("provenance")
-    if isinstance(provenance, dict) and isinstance(provenance.get("artifact_digest"), str):
-        return provenance["artifact_digest"]
-    for gate in gate_verification.get("gates", []):
-        if isinstance(gate, dict) and isinstance(gate.get("artifact_digest"), str):
+    if isinstance(provenance, dict):
+        provenance = cast(dict[str, Any], provenance)
+        if isinstance(provenance.get("artifact_digest"), str):
+            return provenance["artifact_digest"]
+    for gate in _mappings(gate_verification.get("gates")):
+        if isinstance(gate.get("artifact_digest"), str):
             return gate["artifact_digest"]
     return None
 
