@@ -2,15 +2,17 @@ from __future__ import annotations
 
 import re
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from quality_runner.code_quality_findings import (
     CATEGORY_ORDER,
-    _counts,
-    _finding,
-    _finding_sort_key,
+    counts,
+    finding_sort_key,
 )
-from quality_runner.code_quality_paths import _verification_for_path
+from quality_runner.code_quality_findings import (
+    finding as make_finding,
+)
+from quality_runner.code_quality_paths import verification_for_path
 
 WIP_TERMS = ("draft", "stub", "placeholder", "wip", "scaffold")
 VULTURE_RE = re.compile(
@@ -41,7 +43,7 @@ def merge_dead_code_unwired_findings(
     findings = [*list(_scan_findings(code_quality_scan)), *candidates]
     fingerprints: set[str] = set()
     deduped: list[dict[str, Any]] = []
-    for finding in sorted(findings, key=_finding_sort_key):
+    for finding in sorted(findings, key=finding_sort_key):
         fingerprint = str(finding.get("fingerprint") or "")
         if fingerprint in fingerprints:
             continue
@@ -52,10 +54,12 @@ def merge_dead_code_unwired_findings(
         finding["id"] = f"CQ-{index:04d}"
 
     existing_summary = merged.get("summary")
-    summary: dict[str, Any] = dict(existing_summary) if isinstance(existing_summary, dict) else {}
+    summary: dict[str, Any] = (
+        cast(dict[str, Any], existing_summary) if isinstance(existing_summary, dict) else {}
+    )
     summary["total_findings"] = len(deduped)
-    summary["findings_by_category"] = _counts(deduped, "category", CATEGORY_ORDER)
-    summary["findings_by_severity"] = _counts(deduped, "severity", ["warning", "observation"])
+    summary["findings_by_category"] = counts(deduped, "category", CATEGORY_ORDER)
+    summary["findings_by_severity"] = counts(deduped, "severity", ["warning", "observation"])
     merged["summary"] = summary
     merged["findings"] = deduped
     return merged
@@ -89,7 +93,7 @@ def dead_code_unwired_findings(
     for candidate in _dead_code_candidates(output):
         if not _looks_like_unwired_work(candidate, correlated_paths):
             continue
-        finding = _finding(
+        finding = make_finding(
             category="integrate",
             severity="warning",
             confidence="high" if candidate["file"] in correlated_paths else "medium",
@@ -105,7 +109,7 @@ def dead_code_unwired_findings(
                 "entrypoint, finished, descoped, or accepted as intentional WIP."
             ),
             risk="Dead-code output on scaffold-like work can indicate incomplete wiring rather than obsolete code.",
-            verification=_verification_for_path(candidate["file"]),
+            verification=verification_for_path(candidate["file"]),
             remediation_bucket="Integration and wiring decisions",
         )
         fingerprint = str(finding["fingerprint"])
@@ -119,8 +123,11 @@ def _dead_code_gate(gate_verification: dict[str, Any]) -> dict[str, Any] | None:
     gates = gate_verification.get("gates")
     if not isinstance(gates, list):
         return None
-    for gate in gates:
-        if isinstance(gate, dict) and gate.get("id") == "dead_code":
+    for raw_gate in cast(list[object], gates):
+        if not isinstance(raw_gate, dict):
+            continue
+        gate = cast(dict[str, Any], raw_gate)
+        if gate.get("id") == "dead_code":
             return gate
     return None
 
@@ -186,9 +193,10 @@ def _accepted_fingerprint_prefixes(config: dict[str, Any]) -> list[str]:
     if not isinstance(dispositions, list):
         return []
     prefixes: list[str] = []
-    for item in dispositions:
-        if not isinstance(item, dict):
+    for raw_item in cast(list[object], dispositions):
+        if not isinstance(raw_item, dict):
             continue
+        item = cast(dict[str, object], raw_item)
         fingerprint = item.get("fingerprint")
         if isinstance(fingerprint, str) and fingerprint:
             prefixes.append(fingerprint)
@@ -199,7 +207,11 @@ def _scan_findings(code_quality_scan: dict[str, Any]) -> list[dict[str, Any]]:
     findings = code_quality_scan.get("findings")
     if not isinstance(findings, list):
         return []
-    return [finding for finding in findings if isinstance(finding, dict)]
+    return [
+        cast(dict[str, Any], finding)
+        for finding in cast(list[object], findings)
+        if isinstance(finding, dict)
+    ]
 
 
 def _normalize_path(path: str) -> str:

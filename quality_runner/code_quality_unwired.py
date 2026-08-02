@@ -5,13 +5,13 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from fnmatch import fnmatchcase
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
-from quality_runner.code_quality_findings import _finding
+from quality_runner.code_quality_findings import finding as make_finding
 from quality_runner.code_quality_paths import (
-    _has_todo_comment,
-    _is_test_file,
-    _verification_for_path,
+    has_todo_comment,
+    is_test_file,
+    verification_for_path,
 )
 
 DEFAULT_REGISTRATION_GLOBS = ["**/cli.py", "**/router*.ts", "**/mcp.py"]
@@ -60,7 +60,7 @@ def unwired_findings(
     findings: list[dict[str, Any]] = []
     for item in source_files:
         path = item["path"]
-        if _is_test_file(path) or _is_barrel_file(path):
+        if is_test_file(path) or _is_barrel_file(path):
             continue
         findings.extend(_stub_findings(item))
         findings.extend(_todo_scaffold_findings(item, policy["entrypoint_globs"]))
@@ -94,7 +94,7 @@ def _source_file(item: dict[str, Any]) -> dict[str, Any] | None:
         return {
             "path": path,
             "text": text,
-            "lines": [line for line in lines if isinstance(line, str)],
+            "lines": [line for line in cast(list[object], lines) if isinstance(line, str)],
         }
     return None
 
@@ -110,7 +110,7 @@ def _stub_findings(item: dict[str, Any]) -> list[dict[str, Any]]:
         else:
             continue
         findings.append(
-            _finding(
+            make_finding(
                 category="integrate",
                 severity="warning",
                 confidence="high" if "NotImplementedError" in line else "medium",
@@ -123,7 +123,7 @@ def _stub_findings(item: dict[str, Any]) -> list[dict[str, Any]]:
                     "its caller, descoped, or accepted as intentional WIP."
                 ),
                 risk="Stubbed implementation can look complete while the feature path is not usable.",
-                verification=_verification_for_path(path),
+                verification=verification_for_path(path),
                 remediation_bucket="Integration and wiring decisions",
             )
         )
@@ -136,7 +136,7 @@ def _todo_scaffold_findings(
     path = item["path"]
     lines = item["lines"]
     todo_lines = [
-        (index, line) for index, line in enumerate(lines, start=1) if _has_todo_comment(line)
+        (index, line) for index, line in enumerate(lines, start=1) if has_todo_comment(line)
     ]
     if len(todo_lines) < 3:
         return []
@@ -146,7 +146,7 @@ def _todo_scaffold_findings(
         return []
     first_line, first_evidence = todo_lines[0]
     return [
-        _finding(
+        make_finding(
             category="integrate",
             severity="warning",
             confidence="medium",
@@ -159,7 +159,7 @@ def _todo_scaffold_findings(
                 "tracked as explicit WIP with an owner."
             ),
             risk="TODO-heavy scaffolded files often represent started work that never reached an entrypoint.",
-            verification=_verification_for_path(path),
+            verification=verification_for_path(path),
             remediation_bucket="Integration and wiring decisions",
         )
     ]
@@ -182,7 +182,7 @@ def _export_without_reference_findings(
         if _symbol_referenced_elsewhere(symbol, path, reference_index):
             continue
         findings.append(
-            _finding(
+            make_finding(
                 category="integrate",
                 severity="warning",
                 confidence="medium",
@@ -195,7 +195,7 @@ def _export_without_reference_findings(
                     "descope the partial work, or record intentional WIP."
                 ),
                 risk="Exported or top-level surfaces with no callers are often unfinished wiring rather than cleanup-only dead code.",
-                verification=_verification_for_path(path),
+                verification=verification_for_path(path),
                 remediation_bucket="Integration and wiring decisions",
             )
         )
@@ -219,7 +219,7 @@ def _handler_without_registration_findings(
         if _symbol_referenced_in_paths(symbol, path, reference_index):
             continue
         findings.append(
-            _finding(
+            make_finding(
                 category="integrate",
                 severity="warning",
                 confidence="medium",
@@ -232,7 +232,7 @@ def _handler_without_registration_findings(
                     "or accepted as explicit WIP."
                 ),
                 risk="Handlers and commands that are not registered are invisible to users and automation.",
-                verification=_verification_for_path(path),
+                verification=verification_for_path(path),
                 remediation_bucket="Integration and wiring decisions",
             )
         )
@@ -243,12 +243,13 @@ def _integrate_policy(config: dict[str, Any]) -> dict[str, Any]:
     section = config.get("integrate")
     if not isinstance(section, dict):
         section = {}
-    enabled = section.get("enabled")
+    section_data = cast(dict[str, object], section)
+    enabled = section_data.get("enabled")
     return {
         "enabled": enabled is not False,
-        "registration_globs": _string_list(section.get("registration_globs"))
+        "registration_globs": _string_list(section_data.get("registration_globs"))
         or DEFAULT_REGISTRATION_GLOBS,
-        "entrypoint_globs": _string_list(section.get("entrypoint_globs"))
+        "entrypoint_globs": _string_list(section_data.get("entrypoint_globs"))
         or DEFAULT_ENTRYPOINT_GLOBS,
     }
 
@@ -287,7 +288,7 @@ def _build_reference_index(
     configured_registration_paths = registration_paths or set()
     for item in source_files:
         path = item["path"]
-        if _is_test_file(path):
+        if is_test_file(path):
             continue
         for match in _SYMBOL_REFERENCE_RE.finditer(item["text"]):
             symbol = match.group(1)
@@ -361,4 +362,4 @@ def _path_matches_glob(relative_path: str, pattern: str) -> bool:
 def _string_list(value: object) -> list[str]:
     if not isinstance(value, list):
         return []
-    return [item for item in value if isinstance(item, str) and item]
+    return [item for item in cast(list[object], value) if isinstance(item, str) and item]
