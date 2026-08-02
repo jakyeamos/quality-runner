@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 
 from quality_runner import __version__
 from quality_runner.cli_fix_proposals import FIX_PROPOSAL_RESULT_SCHEMAS
@@ -35,10 +35,11 @@ def human_summary(payload: dict[str, Any]) -> str:
         if isinstance(saved_path, str):
             lines.append(f"saved: {saved_path}")
         artifact_paths = payload.get("artifact_paths")
+        artifact_map = (
+            cast(dict[str, Any], artifact_paths) if isinstance(artifact_paths, dict) else None
+        )
         packet_path = (
-            artifact_paths.get("review_agent_packet_md")
-            if isinstance(artifact_paths, dict)
-            else None
+            artifact_map.get("review_agent_packet_md") if artifact_map is not None else None
         )
         if packet_ready and isinstance(packet_path, str):
             lines.append(f"review packet: {packet_path}")
@@ -50,7 +51,7 @@ def human_summary(payload: dict[str, Any]) -> str:
         return _release_smoke_summary(payload, status)
     if payload.get("schema") == STATUS_RESULT_SCHEMA:
         latest = payload.get("latest_run")
-        run_id = latest.get("run_id") if isinstance(latest, dict) else "none"
+        run_id = cast(dict[str, Any], latest).get("run_id") if isinstance(latest, dict) else "none"
         return f"status: {status}\nlatest run: {run_id}"
     if payload.get("schema") == EXPORT_HANDOFF_RESULT_SCHEMA:
         output_path = payload.get("output_path")
@@ -71,9 +72,9 @@ def human_summary(payload: dict[str, Any]) -> str:
         ]
         artifact_paths = payload.get("artifact_paths")
         if isinstance(artifact_paths, dict) and isinstance(
-            artifact_paths.get("remediation_delta_md"), str
+            cast(dict[str, Any], artifact_paths).get("remediation_delta_md"), str
         ):
-            lines.append(f"delta: {artifact_paths['remediation_delta_md']}")
+            lines.append(f"delta: {cast(dict[str, Any], artifact_paths)['remediation_delta_md']}")
         return "\n".join(lines)
     if payload.get("schema") == PHASE_VERIFICATION_SCHEMA:
         return _phase_verification_summary(payload)
@@ -81,16 +82,17 @@ def human_summary(payload: dict[str, Any]) -> str:
         return _phase_result_summary(payload, status)
     if payload.get("schema") in GATE_RESULT_SCHEMAS:
         gate_run = payload.get("gate_run")
-        gate_run_id = gate_run.get("gate_run_id") if isinstance(gate_run, dict) else None
-        lifecycle = gate_run.get("lifecycle_status") if isinstance(gate_run, dict) else None
+        gate_map = cast(dict[str, Any], gate_run) if isinstance(gate_run, dict) else None
+        gate_run_id = gate_map.get("gate_run_id") if gate_map is not None else None
+        lifecycle = gate_map.get("lifecycle_status") if gate_map is not None else None
         lines = [f"status: {status}"]
         if isinstance(gate_run_id, str):
             lines.append(f"gate run: {gate_run_id}")
         if isinstance(lifecycle, str):
             lines.append(f"lifecycle: {lifecycle}")
-        awaiting = gate_run.get("awaiting") if isinstance(gate_run, dict) else None
+        awaiting = gate_map.get("awaiting") if gate_map is not None else None
         if isinstance(awaiting, dict):
-            kind = awaiting.get("kind")
+            kind = cast(dict[str, Any], awaiting).get("kind")
             if isinstance(kind, str):
                 lines.append(f"awaiting: {kind}")
         return "\n".join(lines)
@@ -122,15 +124,17 @@ def _phase_result_summary(payload: dict[str, Any], status: object) -> str:
     lines = [f"status: {status}"]
     phase = payload.get("phase")
     if isinstance(phase, dict):
-        lines.append(f"phase: {phase.get('number')} {phase.get('title')}")
+        phase_map = cast(dict[str, Any], phase)
+        lines.append(f"phase: {phase_map.get('number')} {phase_map.get('title')}")
     elif isinstance(phase, int):
         lines.append(f"phase: {phase:02d}")
     plan = payload.get("plan")
     if isinstance(plan, dict):
-        lines.append(f"plan: {plan.get('id')} {plan.get('title', '')}".rstrip())
+        plan_map = cast(dict[str, Any], plan)
+        lines.append(f"plan: {plan_map.get('id')} {plan_map.get('title', '')}".rstrip())
     plans = payload.get("plans")
     if isinstance(plans, list):
-        lines.append(f"plans: {len(plans)}")
+        lines.append(f"plans: {len(cast(list[object], plans))}")
     for key in ("root", "phase_directory", "context_path", "summary_path", "verification_path"):
         value = payload.get(key)
         if isinstance(value, str):
@@ -143,29 +147,38 @@ def _phase_verification_summary(payload: dict[str, Any]) -> str:
         f"status: {payload.get('status', 'unknown')}",
         f"phase: {payload.get('phase')}",
         f"run id: {payload.get('run_id')}",
-        f"verified plans: {len(payload.get('verified_plan_ids', []))}",
-        f"unresolved plans: {len(payload.get('unresolved_plan_ids', []))}",
-        f"failed checks: {len(payload.get('failed_checks', []))}",
+        f"verified plans: {len(cast(list[object], payload.get('verified_plan_ids', [])))}",
+        f"unresolved plans: {len(cast(list[object], payload.get('unresolved_plan_ids', [])))}",
+        f"failed checks: {len(cast(list[object], payload.get('failed_checks', [])))}",
     ]
     return "\n".join(lines)
 
 
 def _refresh_summary(payload: dict[str, Any], status: object) -> str:
     summary = payload.get("summary")
-    run_id = summary.get("run_id") if isinstance(summary, dict) else payload.get("run_id_prefix")
+    run_id = (
+        cast(dict[str, Any], summary).get("run_id")
+        if isinstance(summary, dict)
+        else payload.get("run_id_prefix")
+    )
     lines = [f"status: {status}", f"run id: {run_id}"]
     handoff_export = payload.get("handoff_export")
     if isinstance(handoff_export, dict):
-        output_path = handoff_export.get("output_path")
+        output_path = cast(dict[str, Any], handoff_export).get("output_path")
         if isinstance(output_path, str):
             lines.append(f"handoff: {output_path}")
     delta = payload.get("review_delta")
     if isinstance(delta, dict):
-        lines.append(f"review cycle: {delta.get('cycle_id')} iteration {delta.get('iteration')}")
-        lines.append(f"review recommendation: {'stop' if delta.get('clean') else 'continue'}")
+        delta_map = cast(dict[str, Any], delta)
+        lines.append(
+            f"review cycle: {delta_map.get('cycle_id')} iteration {delta_map.get('iteration')}"
+        )
+        lines.append(f"review recommendation: {'stop' if delta_map.get('clean') else 'continue'}")
         delta_paths = payload.get("review_delta_paths")
-        if isinstance(delta_paths, dict) and isinstance(delta_paths.get("review_delta_md"), str):
-            lines.append(f"review delta: {delta_paths['review_delta_md']}")
+        if isinstance(delta_paths, dict) and isinstance(
+            cast(dict[str, Any], delta_paths).get("review_delta_md"), str
+        ):
+            lines.append(f"review delta: {cast(dict[str, Any], delta_paths)['review_delta_md']}")
     return "\n".join(lines)
 
 
@@ -183,8 +196,8 @@ def _rollout_summary(payload: dict[str, Any], status: object) -> str:
         lines.append(f"controller reports: {accepted} accepted, {rejected} rejected")
     fleet_documents = payload.get("fleet_documents")
     if isinstance(fleet_documents, dict):
-        index_md = fleet_documents.get("index_md")
-        phase_md = fleet_documents.get("phase_md")
+        index_md = cast(dict[str, Any], fleet_documents).get("index_md")
+        phase_md = cast(dict[str, Any], fleet_documents).get("phase_md")
         if isinstance(index_md, str):
             lines.append(f"repo docs: {index_md}")
         if isinstance(phase_md, str):
@@ -200,7 +213,7 @@ def _default_summary(payload: dict[str, Any], status: object) -> str:
 
     artifact_paths = payload.get("artifact_paths")
     if isinstance(artifact_paths, dict):
-        _append_artifact_lines(lines, artifact_paths)
+        _append_artifact_lines(lines, cast(dict[str, Any], artifact_paths))
     return "\n".join(lines)
 
 
