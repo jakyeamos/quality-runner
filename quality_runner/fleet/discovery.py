@@ -4,7 +4,7 @@ import os
 import re
 import subprocess
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 from urllib.parse import urlparse
 
 from quality_runner.fleet.contracts import (
@@ -145,7 +145,12 @@ def resolve_target_branch(
     *,
     override: str | None = None,
 ) -> dict[str, Any]:
-    checkouts = [item for item in repository.get("checkouts", []) if isinstance(item, dict)]
+    raw_checkouts = repository.get("checkouts", [])
+    checkouts = [
+        cast(dict[str, Any], item)
+        for item in cast(list[object], raw_checkouts)
+        if isinstance(item, dict)
+    ]
     branches = sorted(
         {
             branch
@@ -325,7 +330,7 @@ def _checkout_record(
                 for item in _registered_worktrees(root)
                 if Path(item.get("path", "")).resolve() == root
             ),
-            {},
+            cast(dict[str, str], {}),
         )
         if exists
         else {}
