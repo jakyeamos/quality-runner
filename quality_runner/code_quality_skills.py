@@ -1,15 +1,15 @@
 from __future__ import annotations
 
 import re
-from typing import Any
+from typing import Any, cast
 
 from quality_runner.code_quality_architecture import (
-    _extract_import_specifiers,
-    _import_violates_boundary,
-    _path_matches_any,
+    extract_import_specifiers,
+    import_violates_boundary,
+    path_matches_any,
 )
-from quality_runner.code_quality_findings import _finding
-from quality_runner.code_quality_paths import _verification_for_path
+from quality_runner.code_quality_findings import finding
+from quality_runner.code_quality_paths import verification_for_path
 from quality_runner.skill_config import load_active_skills
 from quality_runner.skill_review import review_report_findings, validate_skill_review_report
 from quality_runner.verification_contract import verification_contract_fields
@@ -27,6 +27,7 @@ def scan_quality_skills(
     skills = selected_skills
     if skills is None:
         skills, _warnings = load_active_skills(repo_root, config)
+    skills = _mappings(skills)
     if not skills:
         return [], [], []
 
@@ -36,11 +37,9 @@ def scan_quality_skills(
         skill_id = str(skill["id"])
         skill_name = str(skill["name"])
         applies_to = skill.get("applies_to")
-        path_filter = applies_to if isinstance(applies_to, list) else None
+        path_filter = _strings(applies_to) if isinstance(applies_to, list) else None
 
-        for rule in skill.get("deterministic_rules", []):
-            if not isinstance(rule, dict):
-                continue
+        for rule in _mappings(skill.get("deterministic_rules", [])):
             paths = _rule_paths(rule, path_filter)
             scoped_files = _scoped_files(scanned_files, paths, path_filter)
             skip_reason = _rule_skip_reason(rule)
@@ -105,12 +104,10 @@ def scan_quality_skills(
     for skill in skills:
         skill_id = str(skill["id"])
         applies_to = skill.get("applies_to")
-        path_filter = applies_to if isinstance(applies_to, list) else None
-        for review in skill.get("agent_reviews", []):
-            if not isinstance(review, dict):
-                continue
+        path_filter = _strings(applies_to) if isinstance(applies_to, list) else None
+        for review in _mappings(skill.get("agent_reviews", [])):
             review_id = str(review["id"])
-            paths = [item for item in review.get("paths", []) if isinstance(item, str)]
+            paths = _strings(review.get("paths", []))
             scoped_files = _scoped_files(scanned_files, paths, path_filter)
             review_matches = [
                 finding
@@ -176,16 +173,16 @@ def _rule_severity(rule: dict[str, Any]) -> str:
 
 
 def _rule_paths(rule: dict[str, Any], path_filter: list[str] | None) -> list[str]:
-    paths = [item for item in rule.get("paths", []) if isinstance(item, str)]
+    paths = _strings(rule.get("paths", []))
     if path_filter is None:
         return paths
     return paths or path_filter
 
 
 def _file_in_scope(relative_path: str, paths: list[str], path_filter: list[str] | None) -> bool:
-    if path_filter is not None and not _path_matches_any(relative_path, path_filter):
+    if path_filter is not None and not path_matches_any(relative_path, path_filter):
         return False
-    return _path_matches_any(relative_path, paths)
+    return path_matches_any(relative_path, paths)
 
 
 def _skill_finding(
@@ -198,7 +195,7 @@ def _skill_finding(
     evidence: str,
 ) -> dict[str, Any]:
     rule_id = str(rule["id"])
-    finding = _finding(
+    finding_record = finding(
         category=_skill_category(skill_id),
         severity=_rule_severity(rule),
         confidence=_rule_confidence(rule),
@@ -208,18 +205,18 @@ def _skill_finding(
         evidence=evidence,
         expected_improvement=str(rule["expected"]),
         risk=str(rule["risk"]),
-        verification=str(rule.get("verification") or _verification_for_path(file)),
+        verification=str(rule.get("verification") or verification_for_path(file)),
         remediation_bucket=f"Skill: {skill_name}",
         rule_message=str(rule.get("message", "")),
         rule_category=str(rule.get("category", "")),
     )
-    finding.update(
+    finding_record.update(
         verification_contract_fields(
-            finding,
+            finding_record,
             explicit_mode=rule.get("verification_mode"),
         )
     )
-    return finding
+    return finding_record
 
 
 def _rule_confidence(rule: dict[str, Any]) -> str:
@@ -257,14 +254,14 @@ def _rule_skip_reason(rule: dict[str, Any]) -> str | None:
     if not _rule_paths(rule, None):
         return "no paths configured"
     if rule_type == "disallowed_pattern":
-        patterns = [item for item in rule.get("disallowed_patterns", []) if isinstance(item, str)]
+        patterns = _strings(rule.get("disallowed_patterns", []))
         if not patterns:
             return "no disallowed_patterns configured"
         if not _compile_regexes(patterns):
             return "all configured disallowed_patterns are invalid regexes"
     elif rule_type == "trigger_without_required":
-        triggers = [item for item in rule.get("trigger_patterns", []) if isinstance(item, str)]
-        required = [item for item in rule.get("required_patterns", []) if isinstance(item, str)]
+        triggers = _strings(rule.get("trigger_patterns", []))
+        required = _strings(rule.get("required_patterns", []))
         if not triggers or not required:
             return "trigger_patterns and required_patterns are required"
         if not _compile_regexes(triggers):
@@ -272,7 +269,7 @@ def _rule_skip_reason(rule: dict[str, Any]) -> str | None:
         if not _compile_regexes(required):
             return "all configured required_patterns are invalid regexes"
     else:
-        disallowed = [item for item in rule.get("disallowed_imports", []) if isinstance(item, str)]
+        disallowed = _strings(rule.get("disallowed_imports", []))
         if not disallowed:
             return "no disallowed_imports configured"
     return None
@@ -303,7 +300,7 @@ def _rule_coverage(
         "rule_category": str(rule.get("category", "")),
         "severity": _rule_severity(rule),
         "confidence": _rule_confidence(rule),
-        "paths": [item for item in rule.get("paths", []) if isinstance(item, str)],
+        "paths": _strings(rule.get("paths", [])),
         "scoped_files": len(scoped_files),
         "matched_files": len({str(item.get("file")) for item in findings}),
         "finding_count": len(findings),
@@ -323,7 +320,7 @@ def _disallowed_pattern_findings(
     path_filter: list[str] | None,
 ) -> list[dict[str, Any]]:
     paths = _rule_paths(rule, path_filter)
-    patterns = [item for item in rule.get("disallowed_patterns", []) if isinstance(item, str)]
+    patterns = _strings(rule.get("disallowed_patterns", []))
     if not paths or not patterns:
         return []
 
@@ -344,7 +341,7 @@ def _disallowed_pattern_findings(
         lines = item.get("lines")
         if not isinstance(lines, list):
             continue
-        for index, line in enumerate(lines, start=1):
+        for index, line in enumerate(cast(list[object], lines), start=1):
             if not isinstance(line, str):
                 continue
             for pattern in compiled:
@@ -373,10 +370,8 @@ def _trigger_without_required_findings(
     path_filter: list[str] | None,
 ) -> list[dict[str, Any]]:
     paths = _rule_paths(rule, path_filter)
-    trigger_patterns = [item for item in rule.get("trigger_patterns", []) if isinstance(item, str)]
-    required_patterns = [
-        item for item in rule.get("required_patterns", []) if isinstance(item, str)
-    ]
+    trigger_patterns = _strings(rule.get("trigger_patterns", []))
+    required_patterns = [item for item in _strings(rule.get("required_patterns", []))]
     if not paths or not trigger_patterns or not required_patterns:
         return []
 
@@ -408,7 +403,7 @@ def _trigger_without_required_findings(
             continue
         trigger_line: int | None = None
         trigger_evidence = ""
-        for index, line in enumerate(lines, start=1):
+        for index, line in enumerate(cast(list[object], lines), start=1):
             if not isinstance(line, str):
                 continue
             if any(pattern.search(line) for pattern in compiled_triggers):
@@ -438,8 +433,8 @@ def _import_boundary_findings(
     path_filter: list[str] | None,
 ) -> list[dict[str, Any]]:
     paths = _rule_paths(rule, path_filter)
-    disallowed = [item for item in rule.get("disallowed_imports", []) if isinstance(item, str)]
-    allowed = [item for item in rule.get("allowed_imports", []) if isinstance(item, str)]
+    disallowed = _strings(rule.get("disallowed_imports", []))
+    allowed = _strings(rule.get("allowed_imports", []))
     if not paths or not disallowed:
         return []
 
@@ -451,11 +446,11 @@ def _import_boundary_findings(
         lines = item.get("lines")
         if not isinstance(lines, list):
             continue
-        for index, line in enumerate(lines, start=1):
+        for index, line in enumerate(cast(list[object], lines), start=1):
             if not isinstance(line, str):
                 continue
-            for specifier in _extract_import_specifiers(line):
-                if not _import_violates_boundary(
+            for specifier in extract_import_specifiers(line):
+                if not import_violates_boundary(
                     source_file=relative_path,
                     specifier=specifier,
                     disallowed_patterns=disallowed,
@@ -473,3 +468,15 @@ def _import_boundary_findings(
                     )
                 )
     return findings
+
+
+def _mappings(value: Any) -> list[dict[str, Any]]:
+    if not isinstance(value, list):
+        return []
+    return [item for item in cast(list[object], value) if isinstance(item, dict)]
+
+
+def _strings(value: Any) -> list[str]:
+    if not isinstance(value, list):
+        return []
+    return [item for item in cast(list[object], value) if isinstance(item, str)]

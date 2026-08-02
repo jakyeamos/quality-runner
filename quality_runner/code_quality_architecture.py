@@ -5,8 +5,8 @@ import re
 from fnmatch import fnmatchcase
 from typing import Any
 
-from quality_runner.code_quality_findings import _finding
-from quality_runner.code_quality_paths import _is_test_file, _verification_for_path
+from quality_runner.code_quality_findings import finding
+from quality_runner.code_quality_paths import is_test_file, verification_for_path
 
 SOURCE_EXTENSIONS = (".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs", ".py")
 
@@ -102,7 +102,7 @@ def _import_boundary_findings(
                 ):
                     continue
                 findings.append(
-                    _finding(
+                    finding(
                         category="architecture",
                         severity=severity,
                         confidence="medium",
@@ -112,7 +112,7 @@ def _import_boundary_findings(
                         evidence=line,
                         expected_improvement=expected,
                         risk=risk,
-                        verification=_verification_for_path(relative_path),
+                        verification=verification_for_path(relative_path),
                         remediation_bucket="architecture contract",
                     )
                 )
@@ -154,7 +154,7 @@ def _pattern_boundary_findings(
     findings: list[dict[str, Any]] = []
     for item in scanned_files:
         relative_path = str(item["path"])
-        if _is_test_file(relative_path) or not _path_matches_any(relative_path, paths):
+        if is_test_file(relative_path) or not _path_matches_any(relative_path, paths):
             continue
         lines = item.get("lines")
         if not isinstance(lines, list):
@@ -166,7 +166,7 @@ def _pattern_boundary_findings(
                 if not pattern.search(line):
                     continue
                 findings.append(
-                    _finding(
+                    finding(
                         category="architecture",
                         severity=severity,
                         confidence="medium",
@@ -176,7 +176,7 @@ def _pattern_boundary_findings(
                         evidence=line,
                         expected_improvement=expected,
                         risk=risk,
-                        verification=_verification_for_path(relative_path),
+                        verification=verification_for_path(relative_path),
                         remediation_bucket="architecture contract",
                     )
                 )
@@ -267,3 +267,8 @@ def _path_matches_glob(relative_path: str, pattern: str) -> bool:
             return True
         return fnmatchcase(normalized_path, base)
     return False
+
+
+extract_import_specifiers = _extract_import_specifiers
+import_violates_boundary = _import_violates_boundary
+path_matches_any = _path_matches_any

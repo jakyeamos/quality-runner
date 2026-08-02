@@ -224,6 +224,9 @@ def _verification_for_path(relative_path: str) -> str:
     return "Run the relevant formatter, typecheck, and tests for the touched package."
 
 
+verification_for_path = _verification_for_path
+
+
 def _is_deep_nesting(stripped: str, block_depth: int) -> bool:
     return block_depth >= 3 and stripped.startswith(
         ("if ", "if(", "for ", "for(", "while ", "while(", "switch", "try", "catch")
@@ -344,6 +347,9 @@ def _is_test_file(relative_path: str) -> bool:
         re.search(r"(?:^|/)test_[^/]+\.py$", relative_path)
         or re.search(r"(?:^|/)[^/]+_test\.py$", relative_path)
     )
+
+
+is_test_file = _is_test_file
 
 
 def _has_todo_comment(line: str) -> bool:

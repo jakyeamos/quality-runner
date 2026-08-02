@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from quality_runner.code_quality_paths import (
     _artifact_directory_reason,
@@ -67,6 +67,7 @@ def structural_scan_policy(config: dict[str, Any]) -> dict[str, Any]:
     policy = config.get("structural_scan")
     if not isinstance(policy, dict):
         policy = {}
+    policy = cast(dict[str, Any], policy)
     disabled = policy.get("disabled_rule_groups")
     large_file_lines = policy.get("large_file_lines")
     fat_router_lines = policy.get("fat_router_lines")
@@ -78,8 +79,10 @@ def structural_scan_policy(config: dict[str, Any]) -> dict[str, Any]:
     similarity_max_pairs = policy.get("similarity_max_pairs")
     similarity_timeout_seconds = policy.get("similarity_timeout_seconds")
     similarity_include_tests = policy.get("similarity_include_tests")
-    resolved = {
-        "disabled_rule_groups": [item for item in disabled if isinstance(item, str)]
+    resolved: dict[str, Any] = {
+        "disabled_rule_groups": [
+            item for item in cast(list[object], disabled) if isinstance(item, str)
+        ]
         if isinstance(disabled, list)
         else [],
         "include_ignored_paths": normalized_path_list(policy.get("include_ignored_paths")),
