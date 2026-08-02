@@ -3,7 +3,7 @@ from __future__ import annotations
 import hashlib
 import re
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from quality_runner.artifacts import (
     artifact_text_file,
@@ -53,20 +53,20 @@ def render_slice_spec_markdown(
     lines.append("- `quality-runner refresh` no longer reports the targeted finding family.")
     lines.extend(["", "## STOP conditions", ""])
     lines.extend(_markdown_items(slice_item.get("stop_conditions")))
-    planned_at = slice_item.get("planned_at")
-    if isinstance(planned_at, dict):
+    planned_at = _mapping(slice_item.get("planned_at"))
+    if planned_at is not None:
         lines.extend(["", "## Planned-at git state", ""])
         for key in ("head", "branch", "dirty"):
             value = planned_at.get(key)
             if value is not None:
                 lines.append(f"- {key}: {value}")
-        drift_check = slice_item.get("drift_check")
-        if isinstance(drift_check, dict):
+        drift_check = _mapping(slice_item.get("drift_check"))
+        if drift_check is not None:
             command = drift_check.get("command")
             if isinstance(command, str) and command:
                 lines.append(f"- drift check: `{command}`")
-    leverage = slice_item.get("leverage")
-    if isinstance(leverage, dict):
+    leverage = _mapping(slice_item.get("leverage"))
+    if leverage is not None:
         lines.extend(["", "## Leverage", ""])
         rank = leverage.get("rank")
         explanation = leverage.get("explanation")
@@ -93,8 +93,6 @@ def write_slice_specs(
     specs_dir = prepare_directory(run_dir, "slice-specs")
     paths: dict[str, str] = {}
     for slice_item in slices:
-        if not isinstance(slice_item, dict):
-            continue
         slice_id = slice_item.get("id")
         if not isinstance(slice_id, str) or not slice_id:
             continue
@@ -131,26 +129,29 @@ def export_slice_specs_payload(
         raise FileNotFoundError(f"remediation plan not found for run: {run_id}") from error
     import json
 
-    plan = json.loads(plan_path.read_text(encoding="utf-8"))
+    plan_value = json.loads(plan_path.read_text(encoding="utf-8"))
+    plan = _mapping(plan_value)
+    if plan is None:
+        raise ValueError("remediation plan must be an object")
     slices = plan.get("slices")
     if not isinstance(slices, list):
         raise ValueError("remediation plan slices must be a list")
-    for slice_item in slices:
-        if not isinstance(slice_item, dict):
-            continue
+    for slice_item in _mappings(slices):
         slice_id = slice_item.get("id")
         if isinstance(slice_id, str) and slice_id:
             validate_path_segment(slice_id, label="slice_id")
     scan_path = safe_child_file(run_dir, "repo-scan.json")
     intent_docs = None
     if scan_path.exists():
-        scan = json.loads(scan_path.read_text(encoding="utf-8"))
+        scan = _mapping(json.loads(scan_path.read_text(encoding="utf-8"))) or {}
         discovered = scan.get("intent_docs")
         if isinstance(discovered, list):
-            intent_docs = discovered
+            intent_docs = [
+                item for item in _mappings(discovered) if isinstance(item.get("path"), str)
+            ]
     paths = write_slice_specs(
         run_dir,
-        slices,
+        _mappings(slices),
         run_id=run_id,
         intent_docs=intent_docs,
     )
@@ -166,28 +167,24 @@ def _evidence_sections(findings: object) -> list[str]:
     if not isinstance(findings, list):
         return ["- No finding evidence captured."]
     lines: list[str] = []
-    for finding in findings:
-        if not isinstance(finding, dict):
-            continue
+    for finding in _mappings(findings):
         finding_id = finding.get("id")
         summary = finding.get("summary")
         if isinstance(finding_id, str) and isinstance(summary, str):
             lines.append(f"- {finding_id}: {summary}")
-        excerpt = finding.get("evidence_excerpt")
-        if isinstance(excerpt, dict):
+        excerpt = _mapping(finding.get("evidence_excerpt"))
+        if excerpt is not None:
             file = excerpt.get("file")
             line = excerpt.get("line")
             text = excerpt.get("excerpt")
             if isinstance(file, str) and isinstance(line, int) and isinstance(text, str):
                 lines.append(f"  - `{file}:{line}`")
                 lines.append("    ```")
-                for before in excerpt.get("context_before") or []:
-                    if isinstance(before, str):
-                        lines.append(f"    {before}")
+                for before in _strings(excerpt.get("context_before")):
+                    lines.append(f"    {before}")
                 lines.append(f"    {text}")
-                for after in excerpt.get("context_after") or []:
-                    if isinstance(after, str):
-                        lines.append(f"    {after}")
+                for after in _strings(excerpt.get("context_after")):
+                    lines.append(f"    {after}")
                 lines.append("    ```")
     return lines or ["- No finding evidence captured."]
 
@@ -195,7 +192,7 @@ def _evidence_sections(findings: object) -> list[str]:
 def _markdown_items(value: object, *, prefix: str = "item") -> list[str]:
     if not isinstance(value, list):
         return [f"- No {prefix} recorded."]
-    items = [item for item in value if isinstance(item, str) and item]
+    items = [item for item in _strings(value) if item]
     if not items:
         return [f"- No {prefix} recorded."]
     return [f"- {item}" for item in items]
@@ -204,16 +201,33 @@ def _markdown_items(value: object, *, prefix: str = "item") -> list[str]:
 def _numbered_items(value: object) -> list[str]:
     if not isinstance(value, list):
         return ["1. unavailable"]
-    items = [item for item in value if isinstance(item, str) and item]
+    items = [item for item in _strings(value) if item]
     if not items:
         return ["1. unavailable"]
     return [f"{index}. {item}" for index, item in enumerate(items, start=1)]
 
 
 def _scope_items(scope: object, *, field: str) -> list[str]:
-    if not isinstance(scope, dict):
+    scope_mapping = _mapping(scope)
+    if scope_mapping is None:
         return ["- unavailable"]
-    items = scope.get(field)
+    items = scope_mapping.get(field)
     if not isinstance(items, list) or not items:
         return ["- unavailable"]
-    return [f"- {item}" for item in items if isinstance(item, str) and item]
+    return [f"- {item}" for item in _strings(items) if item]
+
+
+def _mapping(value: object) -> dict[str, Any] | None:
+    return cast(dict[str, Any], value) if isinstance(value, dict) else None
+
+
+def _mappings(value: Any) -> list[dict[str, Any]]:
+    if not isinstance(value, list):
+        return []
+    return [item for item in cast(list[object], value) if isinstance(item, dict)]
+
+
+def _strings(value: Any) -> list[str]:
+    if not isinstance(value, list):
+        return []
+    return [item for item in cast(list[object], value) if isinstance(item, str)]
