@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 
 from quality_runner.schema_constants import SECURITY_REVIEW_OBLIGATIONS_SCHEMA
 
@@ -25,17 +25,22 @@ def build_security_review_obligations(
         return _empty_payload(status="unavailable")
 
     settings = security_scan.get("settings")
-    enabled = not isinstance(settings, dict) or settings.get("enabled") is not False
+    settings_map = cast(dict[str, Any], settings) if isinstance(settings, dict) else {}
+    enabled = not isinstance(settings, dict) or settings_map.get("enabled") is not False
     gates = security_scan.get("agent_review_gates")
     candidates = security_scan.get("candidates")
     candidate_items = (
-        [item for item in candidates if isinstance(item, dict)]
+        [
+            cast(dict[str, Any], item)
+            for item in cast(list[object], candidates)
+            if isinstance(item, dict)
+        ]
         if isinstance(candidates, list)
         else []
     )
-    gate_items = (
-        [item for item in gates if isinstance(item, dict)] if isinstance(gates, list) else []
-    )
+    gate_items = [
+        cast(dict[str, Any], item) for item in cast(list[object], gates) if isinstance(item, dict)
+    ]
     obligations = [
         _obligation_for_gate(gate, candidate_items)
         for gate in sorted(gate_items, key=lambda item: str(item.get("id") or ""))
@@ -67,13 +72,15 @@ def validate_security_review_obligations(payload: dict[str, Any]) -> dict[str, A
     if not isinstance(obligations, list):
         errors.append("security review obligations must be a list")
         return {"passed": False, "errors": errors}
-    if payload.get("obligation_count") != len(obligations):
+    obligations_list = cast(list[object], obligations)
+    if payload.get("obligation_count") != len(obligations_list):
         errors.append("security review obligation count must match the list length")
     ids: set[str] = set()
-    for index, obligation in enumerate(obligations):
-        if not isinstance(obligation, dict):
+    for index, raw_obligation in enumerate(obligations_list):
+        if not isinstance(raw_obligation, dict):
             errors.append(f"obligation at index {index} is not an object")
             continue
+        obligation = cast(dict[str, Any], raw_obligation)
         for field in ("id", "slice_id", "finding_id", "status"):
             if not isinstance(obligation.get(field), str) or not obligation[field]:
                 errors.append(f"obligation at index {index} field {field} must be non-empty")
@@ -147,7 +154,7 @@ def _candidate_ref(candidate: dict[str, Any]) -> dict[str, Any]:
 
 def _string_list(value: object) -> list[str]:
     return (
-        [item for item in value if isinstance(item, str) and item]
+        [item for item in cast(list[object], value) if isinstance(item, str) and item]
         if isinstance(value, list)
         else []
     )
