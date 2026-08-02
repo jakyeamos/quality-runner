@@ -448,6 +448,7 @@ normalize_locations = _normalize_locations
 normalize_repository = _normalize_repository
 normalize_revision = _normalize_revision
 normalize_source = _normalize_source
+normalize_path = _normalize_path
 quality_level = _quality_level
 raw_coverage = _raw_coverage
 validate_coverage = _validate_coverage

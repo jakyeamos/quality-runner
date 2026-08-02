@@ -303,3 +303,6 @@ def _finding_aliases(finding: Mapping[str, Any]) -> list[str]:
         aliases.append(f"provider:{normal_key(provider_id)}")
     aliases.append(f"semantic:{semantic}")
     return list(dict.fromkeys(aliases))
+
+
+finding_aliases = _finding_aliases

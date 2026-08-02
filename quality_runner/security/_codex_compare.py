@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Mapping, Sequence
-from typing import Any
+from typing import Any, cast
 
 from quality_runner.evidence_contract import QUALITY_EVIDENCE_SCHEMA
 from quality_runner.schema_constants import (
@@ -12,14 +12,14 @@ from quality_runner.schema_constants import (
     CODEX_SECURITY_EVIDENCE_SCHEMA,
 )
 from quality_runner.security._codex_common import (
-    _normalize_coverage,
-    _normalize_path,
-    _validation_result,
     canonical_hash,
     canonical_json,
+    normalize_coverage,
+    normalize_path,
+    validation_result,
 )
 from quality_runner.security._codex_evidence import (
-    _finding_aliases,
+    finding_aliases,
     import_codex_evidence,
     validate_codex_evidence,
 )
@@ -79,9 +79,9 @@ def validate_codex_compare(payload: Mapping[str, Any]) -> dict[str, Any]:
         errors.append("Codex comparison schema is invalid")
     if payload.get("contract_schema") != QUALITY_EVIDENCE_SCHEMA:
         errors.append("Codex comparison contract_schema is invalid")
-    baseline = payload.get("baseline")
-    current = payload.get("current")
-    if not isinstance(baseline, dict) or not isinstance(current, dict):
+    baseline = _dict(payload.get("baseline"))
+    current = _dict(payload.get("current"))
+    if baseline is None or current is None:
         errors.append("Codex comparison must include baseline and current evidence")
     else:
         for label, artifact in (("baseline", baseline), ("current", current)):
@@ -94,9 +94,10 @@ def validate_codex_compare(payload: Mapping[str, Any]) -> dict[str, Any]:
         if not isinstance(input_hashes, Mapping):
             errors.append("Codex comparison input_hashes are required")
         else:
-            if input_hashes.get("baseline") != payload.get("baseline_hash"):
+            input_hashes_map = cast(Mapping[str, Any], input_hashes)
+            if input_hashes_map.get("baseline") != payload.get("baseline_hash"):
                 errors.append("Codex comparison input_hashes.baseline is not bound")
-            if input_hashes.get("current") != payload.get("current_hash"):
+            if input_hashes_map.get("current") != payload.get("current_hash"):
                 errors.append("Codex comparison input_hashes.current is not bound")
         expected_matches, expected_summary = _comparison_projection(baseline, current)
         if canonical_json(payload.get("matches")) != canonical_json(expected_matches):
@@ -113,10 +114,7 @@ def validate_codex_compare(payload: Mapping[str, Any]) -> dict[str, Any]:
     if not isinstance(matches, list):
         errors.append("Codex comparison matches must be a list")
     else:
-        for index, match in enumerate(matches):
-            if not isinstance(match, dict):
-                errors.append(f"comparison match {index} must be an object")
-                continue
+        for index, match in enumerate(_dict_list(cast(object, matches))):
             if match.get("status") not in {"present", "new", "resolved", "unknown"}:
                 errors.append(f"comparison match {index} has an invalid status")
             if not isinstance(match.get("match_key"), str) or not match["match_key"].strip():
@@ -129,7 +127,7 @@ def validate_codex_compare(payload: Mapping[str, Any]) -> dict[str, Any]:
             errors.append("Codex comparison comparison_hash does not match the artifact contents")
     else:
         errors.append("Codex comparison comparison_hash is required")
-    return _validation_result(payload, errors=errors, warnings=warnings)
+    return validation_result(payload, errors=errors, warnings=warnings)
 
 
 def _ensure_evidence(value: Mapping[str, Any] | Sequence[Any]) -> dict[str, Any]:
@@ -144,7 +142,7 @@ def _with_follow_up_coverage(
     artifact: Mapping[str, Any], follow_up_coverage: Mapping[str, Any]
 ) -> dict[str, Any]:
     updated = json.loads(canonical_json(artifact))
-    updated["coverage"] = _normalize_coverage(follow_up_coverage)
+    updated["coverage"] = normalize_coverage(follow_up_coverage)
     updated["coverage_complete"] = updated["coverage"]["complete"]
     updated["evidence_hash"] = canonical_hash(updated, exclude=("source_hash", "evidence_hash"))
     return updated
@@ -254,9 +252,11 @@ def _pair_findings(
 
 def _aliases_for_normalized(finding: Mapping[str, Any]) -> list[str]:
     aliases = finding.get("match_keys")
-    if isinstance(aliases, list) and all(isinstance(item, str) for item in aliases):
-        return aliases
-    return _finding_aliases(finding)
+    if isinstance(aliases, list) and all(
+        isinstance(item, str) for item in cast(list[Any], aliases)
+    ):
+        return [item for item in cast(list[Any], aliases) if isinstance(item, str)]
+    return finding_aliases(finding)
 
 
 def _comparison_match(
@@ -304,9 +304,9 @@ def _follow_up_coverage_complete(
     disappeared: Sequence[Mapping[str, Any]],
 ) -> bool:
     if not disappeared:
-        return bool(current["coverage"].get("complete"))
-    coverage = current.get("coverage")
-    if not isinstance(coverage, Mapping):
+        return bool((_dict(current.get("coverage")) or {}).get("complete"))
+    coverage = _dict(current.get("coverage"))
+    if coverage is None:
         return False
     if coverage.get("status") != "complete" or coverage.get("complete") is not True:
         return False
@@ -318,7 +318,7 @@ def _follow_up_coverage_complete(
         return False
     covered_keys = coverage.get("covered_match_keys")
     if isinstance(covered_keys, list) and covered_keys:
-        covered = {str(item) for item in covered_keys}
+        covered = {str(item) for item in _any_list(cast(object, covered_keys))}
         if any(
             not covered.intersection(_aliases_for_normalized(finding)) for finding in disappeared
         ):
@@ -327,8 +327,8 @@ def _follow_up_coverage_complete(
     if scope in {"repository", "repo", "full", "all"}:
         return True
     covered_paths = {
-        _normalize_path(str(item))
-        for item in coverage.get("scanned_paths", [])
+        normalize_path(str(item))
+        for item in _any_list(cast(object, coverage.get("scanned_paths")))
         if str(item).strip()
     }
     if not covered_paths:
@@ -339,12 +339,28 @@ def _follow_up_coverage_complete(
     for finding in disappeared:
         locations = finding.get("locations")
         paths = {
-            _normalize_path(str(location.get("file")))
-            for location in locations or []
-            if isinstance(location, Mapping) and location.get("file")
+            normalize_path(str(location.get("file")))
+            for location in _dict_list(locations)
+            if location.get("file")
         }
         if not paths:
             return False
         if paths and not paths.issubset(covered_paths):
             return False
     return True
+
+
+def _dict(value: object) -> dict[str, Any] | None:
+    return cast(dict[str, Any], value) if isinstance(value, dict) else None
+
+
+def _dict_list(value: object) -> list[dict[str, Any]]:
+    if not isinstance(value, list):
+        return []
+    return [
+        cast(dict[str, Any], item) for item in cast(list[Any], value) if isinstance(item, Mapping)
+    ]
+
+
+def _any_list(value: object) -> list[Any]:
+    return cast(list[Any], value) if isinstance(value, list) else []
