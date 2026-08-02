@@ -1,21 +1,23 @@
 from __future__ import annotations
 
 from datetime import date
-from typing import Any
+from typing import Any, cast
 
 
 def active_exception(standards_packet: dict[str, Any], capability_id: str) -> dict[str, str] | None:
     config = standards_packet.get("config")
     if not isinstance(config, dict):
         return None
-    accepted_exceptions = config.get("accepted_exceptions")
+    config_data = cast(dict[str, object], config)
+    accepted_exceptions = config_data.get("accepted_exceptions")
     if not isinstance(accepted_exceptions, list):
         return None
 
     today = date.today()
-    for item in accepted_exceptions:
-        if not isinstance(item, dict):
+    for raw_item in cast(list[object], accepted_exceptions):
+        if not isinstance(raw_item, dict):
             continue
+        item = cast(dict[str, object], raw_item)
         capability = item.get("capability")
         reason = item.get("reason")
         owner = item.get("owner")
