@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any, Literal, cast
 
 from quality_runner.application.audit_workflows import run_payload
 from quality_runner.artifacts import (
@@ -248,21 +248,23 @@ def reconcile_delivery_contract(
             }
         )
 
-    reported = {
-        str(item.get("obligation_id")): item
-        for item in execution.get("obligation_results", [])
-        if isinstance(item, dict) and isinstance(item.get("obligation_id"), str)
-    }
+    reported: dict[str, dict[str, Any]] = {}
+    for raw_item in cast(list[object], execution.get("obligation_results", [])):
+        if not isinstance(raw_item, dict):
+            continue
+        item = cast(dict[str, Any], raw_item)
+        if isinstance(item.get("obligation_id"), str):
+            reported[str(item["obligation_id"])] = item
     obligation_results: list[dict[str, Any]] = []
     for obligation in _obligations(contract):
         obligation_id = str(obligation.get("id", "unknown"))
         item = reported.get(obligation_id)
-        evidence_refs = item.get("evidence_refs") if isinstance(item, dict) else None
-        status = item.get("status") if isinstance(item, dict) else "missing"
+        evidence_refs = item.get("evidence_refs") if item is not None else None
+        status = item.get("status") if item is not None else "missing"
         has_evidence = isinstance(evidence_refs, list) and bool(
-            [ref for ref in evidence_refs if isinstance(ref, str) and ref]
+            [ref for ref in cast(list[object], evidence_refs) if isinstance(ref, str) and ref]
         )
-        result_item = {
+        result_item: dict[str, Any] = {
             "obligation_id": obligation_id,
             "kind": obligation.get("kind", "advisory"),
             "status": status,
@@ -432,15 +434,19 @@ def _build_obligations(
     obligations: list[dict[str, Any]] = []
     slices = remediation_plan.get("slices")
     if isinstance(slices, list):
-        for item in slices:
-            if not isinstance(item, dict) or not isinstance(item.get("id"), str):
+        for raw_item in cast(list[object], slices):
+            if not isinstance(raw_item, dict):
+                continue
+            item = cast(dict[str, Any], raw_item)
+            if not isinstance(item.get("id"), str):
                 continue
             findings = item.get("findings")
             scope = sorted(
                 {
-                    str(finding.get("file"))
-                    for finding in findings
-                    if isinstance(finding, dict) and isinstance(finding.get("file"), str)
+                    str(cast(dict[str, Any], finding).get("file"))
+                    for finding in cast(list[object], findings)
+                    if isinstance(finding, dict)
+                    and isinstance(cast(dict[str, Any], finding).get("file"), str)
                 }
                 if isinstance(findings, list)
                 else set()
