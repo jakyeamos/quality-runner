@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from quality_runner.artifacts import (
     artifact_text_file,
@@ -36,7 +36,7 @@ def find_active_gate_run_id(*, repo_root: Path, run_id: str) -> str | None:
         except (FileNotFoundError, ValueError):
             continue
         try:
-            payload = json.loads(gate_run_path.read_text(encoding="utf-8"))
+            payload = _load_json(gate_run_path)
         except (OSError, ValueError):
             continue
         if payload.get("schema") != GATE_RUN_SCHEMA:
@@ -61,9 +61,13 @@ def enrich_record_disposition_response(
         raise ValueError(f"unsupported disposition status: {disposition}")
     if not owner.strip():
         raise ValueError("record-disposition requires a non-empty owner")
-    finding_ids = response.get("finding_ids")
-    if not isinstance(finding_ids, list) or not finding_ids:
+    raw_finding_ids = response.get("finding_ids")
+    if not isinstance(raw_finding_ids, list) or not raw_finding_ids:
         raise ValueError("record-disposition requires at least one --finding-id")
+    finding_ids = cast(list[object], raw_finding_ids)
+    if not all(isinstance(item, str) and item for item in finding_ids):
+        raise ValueError("record-disposition finding ids must be non-empty strings")
+    finding_ids = cast(list[str], finding_ids)
 
     references = resolve_finding_references(
         repo_root=repo_root, run_id=run_id, finding_ids=finding_ids
@@ -100,9 +104,10 @@ def apply_record_disposition(
     if not isinstance(disposition, str) or not isinstance(owner, str):
         return None
 
-    finding_ids = response.get("finding_ids")
-    if not isinstance(finding_ids, list):
+    raw_finding_ids = response.get("finding_ids")
+    if not isinstance(raw_finding_ids, list):
         return None
+    finding_ids = cast(list[object], raw_finding_ids)
 
     records = load_finding_dispositions(repo_root=repo_root, run_id=run_id)
     now = datetime.now(UTC).isoformat()
@@ -130,6 +135,7 @@ def apply_record_disposition(
     ledger = json.loads(ledger_path.read_text(encoding="utf-8"))
     if not isinstance(ledger, dict):
         return None
+    ledger = cast(dict[str, Any], ledger)
     ledger["finding_dispositions"] = _merge_finding_dispositions(
         ledger.get("finding_dispositions"),
         records,
@@ -191,7 +197,7 @@ def load_finding_dispositions(*, repo_root: Path, run_id: str) -> list[dict[str,
             ):
                 continue
             at = response.get("at")
-            for finding_id in finding_ids:
+            for finding_id in cast(list[object], finding_ids):
                 if not isinstance(finding_id, str) or not finding_id:
                     continue
                 records.append(
@@ -244,12 +250,13 @@ def apply_finding_dispositions_to_entries(ledger: dict[str, Any]) -> dict[str, A
         return ledger
 
     by_fingerprint: dict[str, dict[str, Any]] = {}
-    for record in records:
-        if not isinstance(record, dict):
+    for record_value in cast(list[object], records):
+        record = _mapping(record_value)
+        if record is None:
             continue
         fingerprints = record.get("fingerprints")
         if isinstance(fingerprints, list):
-            for fingerprint in fingerprints:
+            for fingerprint in cast(list[object], fingerprints):
                 if isinstance(fingerprint, str) and fingerprint:
                     by_fingerprint[fingerprint] = record
 
@@ -257,9 +264,10 @@ def apply_finding_dispositions_to_entries(ledger: dict[str, Any]) -> dict[str, A
     if not isinstance(entries, list):
         return ledger
 
-    updated_entries: list[dict[str, Any]] = []
-    for entry in entries:
-        if not isinstance(entry, dict):
+    updated_entries: list[Any] = []
+    for entry_value in cast(list[object], entries):
+        entry = _mapping(entry_value)
+        if entry is None:
             updated_entries.append(entry)
             continue
         fingerprint = entry.get("fingerprint")
@@ -287,8 +295,6 @@ def _merge_finding_dispositions(
 ) -> list[dict[str, Any]]:
     merged: dict[str, dict[str, Any]] = {}
     for record in [*(_list(existing)), *incoming]:
-        if not isinstance(record, dict):
-            continue
         finding_id = record.get("finding_id")
         if isinstance(finding_id, str) and finding_id:
             merged[finding_id] = record
@@ -302,8 +308,9 @@ def _audit_findings_by_id(audit: dict[str, Any] | None) -> dict[str, dict[str, A
     if not isinstance(findings, list):
         return {}
     indexed: dict[str, dict[str, Any]] = {}
-    for finding in findings:
-        if isinstance(finding, dict) and isinstance(finding.get("id"), str):
+    for finding_value in cast(list[object], findings):
+        finding = _mapping(finding_value)
+        if finding is not None and isinstance(finding.get("id"), str):
             indexed[finding["id"]] = finding
     return indexed
 
@@ -315,8 +322,9 @@ def _scan_fingerprints_by_id(scan: dict[str, Any] | None) -> dict[str, str]:
     if not isinstance(findings, list):
         return {}
     indexed: dict[str, str] = {}
-    for finding in findings:
-        if not isinstance(finding, dict):
+    for finding_value in cast(list[object], findings):
+        finding = _mapping(finding_value)
+        if finding is None:
             continue
         finding_id = finding.get("id")
         fingerprint = finding.get("fingerprint")
@@ -334,7 +342,7 @@ def _load_run_json(repo_root: Path, run_id: str, name: str) -> dict[str, Any] | 
         payload = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return None
-    return payload if isinstance(payload, dict) else None
+    return cast(dict[str, Any], payload) if isinstance(payload, dict) else None
 
 
 def _existing_gate_runs_dir(repo_root: Path) -> Path | None:
@@ -347,8 +355,9 @@ def _existing_gate_runs_dir(repo_root: Path) -> Path | None:
 def _fingerprints_for_finding(response: dict[str, Any], finding_id: str) -> list[str]:
     references = response.get("finding_references")
     if isinstance(references, list):
-        for reference in references:
-            if not isinstance(reference, dict):
+        for reference_value in cast(list[object], references):
+            reference = _mapping(reference_value)
+            if reference is None:
                 continue
             if reference.get("finding_id") != finding_id:
                 continue
@@ -357,7 +366,7 @@ def _fingerprints_for_finding(response: dict[str, Any], finding_id: str) -> list
                 return [fingerprint]
     fingerprints = response.get("fingerprints")
     if isinstance(fingerprints, list):
-        return [item for item in fingerprints if isinstance(item, str) and item]
+        return [item for item in cast(list[object], fingerprints) if isinstance(item, str) and item]
     return []
 
 
@@ -370,7 +379,7 @@ def _load_gate_responses(path: Path) -> list[dict[str, Any]]:
             continue
         payload = json.loads(line)
         if isinstance(payload, dict):
-            responses.append(payload)
+            responses.append(cast(dict[str, Any], payload))
     return responses
 
 
@@ -378,10 +387,14 @@ def _load_json(path: Path) -> dict[str, Any]:
     payload = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(payload, dict):
         raise ValueError(f"expected JSON object: {path}")
-    return payload
+    return cast(dict[str, Any], payload)
 
 
 def _list(value: object) -> list[dict[str, Any]]:
     if not isinstance(value, list):
         return []
-    return [item for item in value if isinstance(item, dict)]
+    return [item for item in cast(list[object], value) if isinstance(item, dict)]
+
+
+def _mapping(value: object) -> dict[str, Any] | None:
+    return cast(dict[str, Any], value) if isinstance(value, dict) else None
