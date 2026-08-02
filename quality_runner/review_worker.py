@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from quality_runner.artifacts import artifact_text_file, existing_artifact_dir, safe_child_file
 from quality_runner.controller_reports import validate_controller_report
@@ -76,7 +76,10 @@ def review_worker_payload(
     changed_files = worker_report.get("files_changed")
     expected_files = _expected_files_from_worker(worker_report)
     if isinstance(changed_files, list) and expected_files:
-        unexpected = sorted(set(changed_files) - set(expected_files))
+        changed_file_values = [
+            item for item in cast(list[object], changed_files) if isinstance(item, str)
+        ]
+        unexpected = sorted(set(changed_file_values) - set(expected_files))
         if unexpected:
             warnings.append(
                 f"worker changed files outside declared scope: {', '.join(unexpected[:5])}"
@@ -123,19 +126,21 @@ def _fingerprints(scan: dict[str, Any] | None) -> set[str]:
     findings = scan.get("findings")
     if not isinstance(findings, list):
         return set()
-    return {
-        str(finding["fingerprint"])
-        for finding in findings
-        if isinstance(finding, dict)
-        and isinstance(finding.get("fingerprint"), str)
-        and finding["fingerprint"]
-    }
+    fingerprints: set[str] = set()
+    for raw_finding in cast(list[object], findings):
+        if not isinstance(raw_finding, dict):
+            continue
+        finding = cast(dict[str, object], raw_finding)
+        fingerprint = finding.get("fingerprint")
+        if isinstance(fingerprint, str) and fingerprint:
+            fingerprints.add(fingerprint)
+    return fingerprints
 
 
 def _expected_files_from_worker(worker_report: dict[str, Any]) -> list[str]:
     files = worker_report.get("files_changed")
     if isinstance(files, list):
-        return [item for item in files if isinstance(item, str)]
+        return [item for item in cast(list[object], files) if isinstance(item, str)]
     return []
 
 
@@ -145,24 +150,24 @@ def _load_json(path: Path, label: str) -> dict[str, Any]:
     payload = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(payload, dict):
         raise ValueError(f"{label} must be a JSON object")
-    return payload
+    return cast(dict[str, Any], payload)
 
 
 def _optional_json(path: Path) -> dict[str, Any] | None:
     if not path.exists():
         return None
     payload = json.loads(path.read_text(encoding="utf-8"))
-    return payload if isinstance(payload, dict) else None
+    return cast(dict[str, Any], payload) if isinstance(payload, dict) else None
 
 
 def _optional_artifact_json(run_dir: Path, filename: str) -> dict[str, Any] | None:
     return _optional_json(safe_child_file(run_dir, filename))
 
 
-def _nested(payload: dict[str, Any] | None, *keys: str) -> Any:
-    current: Any = payload
+def _nested(payload: dict[str, Any] | None, *keys: str) -> object:
+    current: object = payload
     for key in keys:
         if not isinstance(current, dict):
             return None
-        current = current.get(key)
+        current = cast(dict[str, object], current).get(key)
     return current
