@@ -298,6 +298,12 @@ def _ci_quality_commands(
             "python",
         ),
         (
+            "security_secrets_scan",
+            "gitleaks detect",
+            "gitleaks detect --source . --no-banner --redact",
+            "repository",
+        ),
+        (
             "package_consumer_smoke",
             "quality-runner release-smoke",
             "quality-runner release-smoke --json",

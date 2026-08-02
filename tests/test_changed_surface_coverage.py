@@ -108,9 +108,8 @@ def test_changed_surface_helpers_cover_state_and_artifact_validation(
     ]
     monkeypatch.setattr(read_only_git, "tracked_snapshot", lambda *args, **kwargs: snapshots.pop(0))
     monkeypatch.setattr(read_only_git, "_restore_snapshot", lambda **kwargs: None)
-    assert read_only_git.restore_if_changed(
-        tmp_path, snapshots[0] if False else read_only_git.TrackedSnapshot(True, "before", ("a",))
-    )
+    before = read_only_git.TrackedSnapshot(True, "before", ("a",))
+    assert read_only_git.restore_if_changed(tmp_path, before)
 
     package = tmp_path / "packages/app/package.json"
     package.parent.mkdir(parents=True)

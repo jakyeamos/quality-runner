@@ -349,6 +349,7 @@ def _quality_commands_from_scan(repository: dict[str, Any]) -> list[dict[str, An
         "build",
         "dependency_audit",
         "environment_contract",
+        "security_secrets_scan",
     }
     return [
         cast(dict[str, Any], item)
