@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from datetime import UTC, datetime
 from pathlib import Path, PurePosixPath
-from typing import Any
+from typing import Any, cast
 
 from quality_runner.bug_learning_fleet import (
     OBSERVATION_CLASSIFICATIONS,
@@ -22,7 +22,7 @@ LIFECYCLE_STATUSES = (
     "required-gate",
 )
 DISPOSITION_STATUSES = ("repository-only", "duplicate", "not-detectable")
-_ALLOWED_TRANSITIONS = {
+_ALLOWED_TRANSITIONS: dict[str, set[str]] = {
     "repository-regression": {
         "reusable-candidate",
         "repository-only",
@@ -83,20 +83,21 @@ def validate_candidate_registry(
             errors=[f"candidate registry is unreadable or invalid JSON: {error}"],
         )
     errors = _registry_errors(root, payload)
-    regressions = objects(payload.get("regressions")) if isinstance(payload, dict) else []
-    candidates = objects(payload.get("candidates")) if isinstance(payload, dict) else []
+    payload_mapping = cast(dict[str, Any], payload) if isinstance(payload, dict) else {}
+    regressions = objects(payload_mapping.get("regressions"))
+    candidates = objects(payload_mapping.get("candidates"))
     return {
         "schema": "quality-runner-candidate-registry-validation-v0.1",
         "status": "passed" if not errors else "rejected",
         "repo_root": str(root),
         "registry_path": relative,
-        "registry_schema": payload.get("schema") if isinstance(payload, dict) else None,
+        "registry_schema": payload_mapping.get("schema") or None,
         "regression_count": len(regressions),
         "candidate_count": len(candidates),
         "covered_regression_count": len(_covered_regression_ids(candidates)),
         "errors": errors,
-        "registry": payload if isinstance(payload, dict) else None,
-        "provenance_hash": digest(payload) if isinstance(payload, dict) else None,
+        "registry": payload_mapping or None,
+        "provenance_hash": digest(payload_mapping) if payload_mapping else None,
     }
 
 
@@ -112,12 +113,13 @@ def safe_relative_path_value(value: object) -> str | None:
 def objects(value: object) -> list[dict[str, Any]]:
     if not isinstance(value, list):
         return []
-    return [item for item in value if isinstance(item, dict)]
+    return [item for item in cast(list[object], value) if isinstance(item, dict)]
 
 
 def _registry_errors(root: Path, payload: object) -> list[str]:
     if not isinstance(payload, dict):
         return ["candidate registry must be a JSON object"]
+    payload = cast(dict[str, Any], payload)
     errors: list[str] = []
     if payload.get("schema") != CANDIDATE_REGISTRY_SCHEMA:
         errors.append("candidate registry schema is unsupported")
@@ -199,27 +201,29 @@ def _candidate_errors(root: Path, candidate: dict[str, Any], prefix: str) -> lis
         "likely_false_positives",
     ):
         values = candidate.get(field)
-        if isinstance(values, list) and len(_strings(values)) != len(values):
+        if isinstance(values, list) and len(_strings(cast(list[object], values))) != len(
+            cast(list[object], values)
+        ):
             errors.append(f"{prefix}.{field} must contain only non-empty strings")
     provenance = candidate.get("provenance")
     if isinstance(provenance, list) and any(
-        not isinstance(item, dict) or not item for item in provenance
+        not isinstance(item, dict) or not item for item in cast(list[object], provenance)
     ):
         errors.append(f"{prefix}.provenance must contain only non-empty objects")
     for field in ("producer_surfaces", "consumer_surfaces"):
         for value in _strings(candidate.get(field)):
             if safe_relative_path_value(value) is None:
                 errors.append(f"{prefix}.{field} contains an unsafe path: {value}")
-    signal = candidate.get("detection_signal")
-    if not isinstance(signal, dict):
+    signal = _mapping(candidate.get("detection_signal"))
+    if signal is None:
         errors.append(f"{prefix}.detection_signal must be an object")
     else:
         for field in ("kind", "description"):
             if not _nonempty_string(signal.get(field)):
                 errors.append(f"{prefix}.detection_signal.{field} must be a non-empty string")
 
-    fixtures = candidate.get("fixtures")
-    if not isinstance(fixtures, dict):
+    fixtures = _mapping(candidate.get("fixtures"))
+    if fixtures is None:
         errors.append(f"{prefix}.fixtures must be an object")
     else:
         for fixture_kind in ("positive", "negative"):
@@ -243,8 +247,8 @@ def _candidate_errors(root: Path, candidate: dict[str, Any], prefix: str) -> lis
     transitions = objects(candidate.get("transitions"))
     errors.extend(_transition_errors(transitions, status, prefix))
     if status in DISPOSITION_STATUSES:
-        disposition = candidate.get("disposition")
-        if not isinstance(disposition, dict):
+        disposition = _mapping(candidate.get("disposition"))
+        if disposition is None:
             errors.append(f"{prefix}.disposition is required for terminal disposition")
         else:
             for field in ("kind", "rationale", "decided_by", "decided_at"):
@@ -301,8 +305,8 @@ def _candidate_errors(root: Path, candidate: dict[str, Any], prefix: str) -> lis
         duration = observation.get("duration_ms")
         if not isinstance(duration, int) or isinstance(duration, bool) or duration < 0:
             errors.append(f"{observation_prefix}.duration_ms must be a non-negative integer")
-        evidence = observation.get("evidence")
-        if not isinstance(evidence, dict) or not _nonempty_string(evidence.get("reference")):
+        evidence = _mapping(observation.get("evidence"))
+        if evidence is None or not _nonempty_string(evidence.get("reference")):
             errors.append(f"{observation_prefix}.evidence.reference must be recorded")
     return errors
 
@@ -377,11 +381,15 @@ def _covered_regression_ids(candidates: list[dict[str, Any]]) -> set[str]:
 def _strings(value: object) -> list[str]:
     if not isinstance(value, list):
         return []
-    return [item for item in value if isinstance(item, str) and item]
+    return [item for item in cast(list[object], value) if isinstance(item, str) and item]
+
+
+def _mapping(value: object) -> dict[str, Any] | None:
+    return cast(dict[str, Any], value) if isinstance(value, dict) else None
 
 
 def _nonempty_list(value: object) -> bool:
-    return isinstance(value, list) and bool(value)
+    return isinstance(value, list) and bool(cast(list[object], value))
 
 
 def _nonempty_string(value: object) -> bool:
