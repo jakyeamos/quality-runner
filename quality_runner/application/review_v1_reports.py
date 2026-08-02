@@ -227,14 +227,14 @@ def _object(payload: Mapping[str, object], key: str) -> Mapping[str, object]:
 def _object_value(value: object, label: str) -> Mapping[str, object]:
     if not isinstance(value, Mapping):
         raise ValueError(f"{label} must be an object")
-    return value
+    return cast(Mapping[str, object], value)
 
 
 def _sequence(payload: Mapping[str, object], key: str) -> Sequence[object]:
     value = payload.get(key)
     if not isinstance(value, Sequence) or isinstance(value, (str, bytes)):
         raise ValueError(f"{key} must be an array")
-    return value
+    return cast(Sequence[object], value)
 
 
 def _string(payload: Mapping[str, object], key: str) -> str:
@@ -264,46 +264,46 @@ def _mode(payload: Mapping[str, object], key: str) -> ReviewMode:
     value = _string(payload, key)
     if value not in _MODES:
         raise ValueError(f"invalid mode: {value}")
-    return cast(ReviewMode, value)
+    return value
 
 
 def _scope(payload: Mapping[str, object], key: str) -> ReviewScope:
     value = _string(payload, key)
     if value not in _SCOPES:
         raise ValueError(f"invalid scope: {value}")
-    return cast(ReviewScope, value)
+    return value
 
 
 def _breadth(payload: Mapping[str, object], key: str) -> ReviewBreadth:
     value = _string(payload, key)
     if value not in _BREADTHS:
         raise ValueError(f"invalid breadth: {value}")
-    return cast(ReviewBreadth, value)
+    return value
 
 
 def _adapter_status(payload: Mapping[str, object], key: str) -> AdapterStatus:
     value = _string(payload, key)
     if value not in _ADAPTER_STATUSES:
         raise ValueError(f"invalid adapter status: {value}")
-    return cast(AdapterStatus, value)
+    return value
 
 
 def _severity(payload: Mapping[str, object], key: str) -> ReviewSeverity:
     value = _string(payload, key)
     if value not in _SEVERITIES:
         raise ValueError(f"invalid finding severity: {value}")
-    return cast(ReviewSeverity, value)
+    return value
 
 
 def _classification(payload: Mapping[str, object], key: str) -> ReviewClassification:
     value = _string(payload, key)
     if value not in _CLASSIFICATIONS:
         raise ValueError(f"invalid finding classification: {value}")
-    return cast(ReviewClassification, value)
+    return value
 
 
 def _confidence(payload: Mapping[str, object], key: str) -> ReviewConfidence:
     value = _string(payload, key)
     if value not in _CONFIDENCES:
         raise ValueError(f"invalid finding confidence: {value}")
-    return cast(ReviewConfidence, value)
+    return value

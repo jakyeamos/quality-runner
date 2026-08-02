@@ -3,7 +3,7 @@ from __future__ import annotations
 import posixpath
 import re
 from fnmatch import fnmatchcase
-from typing import Any
+from typing import Any, cast
 
 from quality_runner.code_quality_findings import finding
 from quality_runner.code_quality_paths import is_test_file, verification_for_path
@@ -37,9 +37,15 @@ def architecture_findings(
         return []
 
     findings: list[dict[str, Any]] = []
-    for rule in policy["import_boundaries"]:
+    for rule_value in cast(list[Any], policy["import_boundaries"]):
+        if not isinstance(rule_value, dict):
+            continue
+        rule = cast(dict[str, Any], rule_value)
         findings.extend(_import_boundary_findings(scanned_files, rule))
-    for rule in policy["pattern_boundaries"]:
+    for rule_value in cast(list[Any], policy["pattern_boundaries"]):
+        if not isinstance(rule_value, dict):
+            continue
+        rule = cast(dict[str, Any], rule_value)
         findings.extend(_pattern_boundary_findings(scanned_files, rule))
     return findings
 
@@ -48,9 +54,10 @@ def _architecture_policy(config: dict[str, Any]) -> dict[str, Any]:
     section = config.get("architecture")
     if not isinstance(section, dict):
         return {"enabled": False, "import_boundaries": [], "pattern_boundaries": []}
-    enabled = section.get("enabled") is True
-    import_boundaries = section.get("import_boundaries")
-    pattern_boundaries = section.get("pattern_boundaries")
+    typed_section = cast(dict[str, Any], section)
+    enabled = typed_section.get("enabled") is True
+    import_boundaries = typed_section.get("import_boundaries")
+    pattern_boundaries = typed_section.get("pattern_boundaries")
     return {
         "enabled": enabled,
         "import_boundaries": import_boundaries if isinstance(import_boundaries, list) else [],
@@ -63,9 +70,12 @@ def _import_boundary_findings(
     rule: dict[str, Any],
 ) -> list[dict[str, Any]]:
     rule_id = str(rule.get("id", ""))
-    sources = [item for item in rule.get("sources", []) if isinstance(item, str)]
-    disallowed = [item for item in rule.get("disallowed_imports", []) if isinstance(item, str)]
-    allowed = [item for item in rule.get("allowed_imports", []) if isinstance(item, str)]
+    sources_value = rule.get("sources", [])
+    disallowed_value = rule.get("disallowed_imports", [])
+    allowed_value = rule.get("allowed_imports", [])
+    sources = [item for item in cast(list[Any], sources_value) if isinstance(item, str)] if isinstance(sources_value, list) else []
+    disallowed = [item for item in cast(list[Any], disallowed_value) if isinstance(item, str)] if isinstance(disallowed_value, list) else []
+    allowed = [item for item in cast(list[Any], allowed_value) if isinstance(item, str)] if isinstance(allowed_value, list) else []
     if not rule_id or not sources or not disallowed:
         return []
 
@@ -90,7 +100,7 @@ def _import_boundary_findings(
         lines = item.get("lines")
         if not isinstance(lines, list):
             continue
-        for index, line in enumerate(lines, start=1):
+        for index, line in enumerate(cast(list[Any], lines), start=1):
             if not isinstance(line, str):
                 continue
             for specifier in _extract_import_specifiers(line):
@@ -124,8 +134,10 @@ def _pattern_boundary_findings(
     rule: dict[str, Any],
 ) -> list[dict[str, Any]]:
     rule_id = str(rule.get("id", ""))
-    paths = [item for item in rule.get("paths", []) if isinstance(item, str)]
-    patterns = [item for item in rule.get("disallowed_patterns", []) if isinstance(item, str)]
+    paths_value = rule.get("paths", [])
+    patterns_value = rule.get("disallowed_patterns", [])
+    paths = [item for item in cast(list[Any], paths_value) if isinstance(item, str)] if isinstance(paths_value, list) else []
+    patterns = [item for item in cast(list[Any], patterns_value) if isinstance(item, str)] if isinstance(patterns_value, list) else []
     if not rule_id or not paths or not patterns:
         return []
 
@@ -159,7 +171,7 @@ def _pattern_boundary_findings(
         lines = item.get("lines")
         if not isinstance(lines, list):
             continue
-        for index, line in enumerate(lines, start=1):
+        for index, line in enumerate(cast(list[Any], lines), start=1):
             if not isinstance(line, str):
                 continue
             for pattern_index, pattern in enumerate(compiled):

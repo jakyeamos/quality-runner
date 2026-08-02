@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 
 
 def required_capabilities(
@@ -16,20 +16,22 @@ def required_capabilities(
     config = standards_packet.get("config")
     if not isinstance(config, dict):
         return required
-    configured = config.get("required_capabilities")
+    typed_config = cast(dict[str, Any], config)
+    configured = typed_config.get("required_capabilities")
     if isinstance(configured, list):
         required.update(
             capability
-            for capability in configured
+            for capability in cast(list[Any], configured)
             if isinstance(capability, str)
             and (capability in script_capabilities or capability in file_capabilities)
         )
-    gates = config.get("gates")
+    gates = typed_config.get("gates")
     if isinstance(gates, list):
         required.update(
             capability_id
-            for gate in gates
-            if isinstance(gate, dict)
+            for gate_value in cast(list[Any], gates)
+            for gate in [cast(dict[str, Any], gate_value)]
+            if isinstance(gate_value, dict)
             and gate.get("required") is True
             and isinstance((capability_id := gate.get("id")), str)
             and (capability_id in script_capabilities or capability_id in file_capabilities)
