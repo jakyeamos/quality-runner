@@ -2,14 +2,14 @@ from __future__ import annotations
 
 import tomllib
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from quality_runner.config import CONFIG_FILE_NAME
 from quality_runner.schema_constants import SKILL_APPEND_RESULT_SCHEMA, SKILL_INGEST_RESULT_SCHEMA
 from quality_runner.skill_config import (
     FORBIDDEN_SKILL_FIELDS,
-    _load_skill_pack,
-    _resolve_skill_path,
+    load_skill_pack,
+    resolve_skill_path,
     sanitize_skill_id,
 )
 from quality_runner.skill_registration import canonical_skill_toml, update_repo_config
@@ -56,16 +56,6 @@ def validate_skill_pack(
             errors=[f"candidate skill file could not be parsed: {error}"],
         )
 
-    if not isinstance(raw, dict):
-        return _result(
-            status="rejected",
-            write=False,
-            skill_id=normalized_id,
-            active=False,
-            warnings=[],
-            errors=["candidate skill file must be a TOML table"],
-        )
-
     for field in FORBIDDEN_SKILL_FIELDS:
         if field in raw:
             return _result(
@@ -99,7 +89,7 @@ def validate_skill_pack(
             errors=["candidate skill file must include a non-empty name"],
         )
 
-    skill_pack, warning = _load_skill_pack(candidate_path, normalized_id)
+    skill_pack, warning = load_skill_pack(candidate_path, normalized_id)
 
     warnings: list[str] = []
     if warning is not None:
@@ -150,7 +140,7 @@ def ingest_skill_pack(
 
     normalized_id = str(validation["skill_id"])
     skill_relative_path = f"{SKILLS_DIR}/{normalized_id}.toml"
-    resolved_target, path_warning = _resolve_skill_path(repo_root, skill_relative_path)
+    resolved_target, path_warning = resolve_skill_path(repo_root, skill_relative_path)
     if path_warning is not None or resolved_target is None:
         return _result(
             status="rejected",
@@ -273,7 +263,7 @@ def _append_skill_to_target(
             errors=[f"target pack not found: {normalized_pack_id}"],
         )
 
-    target_pack, target_warning = _load_skill_pack(target_path, normalized_pack_id)
+    target_pack, target_warning = load_skill_pack(target_path, normalized_pack_id)
     warnings = list(validation.get("warnings", []))
     if target_warning is not None:
         warnings.append(target_warning["message"])
@@ -288,11 +278,13 @@ def _append_skill_to_target(
             errors=["target pack failed validation"],
         )
 
-    existing_sources = target_pack.get("sources")
-    if isinstance(existing_sources, list) and any(
-        isinstance(source, dict) and source.get("id") == normalized_source_id
-        for source in existing_sources
-    ):
+    existing_sources_raw = target_pack.get("sources")
+    existing_sources = (
+        cast(list[dict[str, Any]], existing_sources_raw)
+        if isinstance(existing_sources_raw, list)
+        else []
+    )
+    if any(source.get("id") == normalized_source_id for source in existing_sources):
         return _append_result(
             status="rejected",
             write=False,
@@ -304,7 +296,7 @@ def _append_skill_to_target(
         )
 
     candidate_path = candidate_path.expanduser().resolve()
-    candidate_pack, candidate_warning = _load_skill_pack(candidate_path, normalized_source_id)
+    candidate_pack, candidate_warning = load_skill_pack(candidate_path, normalized_source_id)
     if candidate_warning is not None:
         warnings.append(candidate_warning["message"])
     if candidate_pack is None:
@@ -318,22 +310,18 @@ def _append_skill_to_target(
             errors=["candidate pack failed validation"],
         )
 
-    merged_rules = list(target_pack.get("deterministic_rules", []))
+    merged_rules = cast(list[dict[str, Any]], list(target_pack.get("deterministic_rules", [])))
     appended_rules = _namespace_pack_items(
         candidate_pack.get("deterministic_rules", []),
         source_id=normalized_source_id,
     )
     existing_rule_ids = {
-        str(rule["id"])
-        for rule in merged_rules
-        if isinstance(rule, dict) and isinstance(rule.get("id"), str)
+        str(rule["id"]) for rule in merged_rules if isinstance(rule.get("id"), str)
     }
     rule_collisions = sorted(
         str(rule["id"])
         for rule in appended_rules
-        if isinstance(rule, dict)
-        and isinstance(rule.get("id"), str)
-        and rule["id"] in existing_rule_ids
+        if isinstance(rule.get("id"), str) and rule["id"] in existing_rule_ids
     )
     if rule_collisions:
         return _append_result(
@@ -346,21 +334,17 @@ def _append_skill_to_target(
             errors=[f"namespaced rule ids already exist: {', '.join(rule_collisions)}"],
         )
     merged_rules.extend(appended_rules)
-    merged_reviews = list(target_pack.get("agent_reviews", []))
+    merged_reviews = cast(list[dict[str, Any]], list(target_pack.get("agent_reviews", [])))
     appended_reviews = _namespace_pack_items(
         candidate_pack.get("agent_reviews", []), source_id=normalized_source_id
     )
     existing_review_ids = {
-        str(review["id"])
-        for review in merged_reviews
-        if isinstance(review, dict) and isinstance(review.get("id"), str)
+        str(review["id"]) for review in merged_reviews if isinstance(review.get("id"), str)
     }
     review_collisions = sorted(
         str(review["id"])
         for review in appended_reviews
-        if isinstance(review, dict)
-        and isinstance(review.get("id"), str)
-        and review["id"] in existing_review_ids
+        if isinstance(review.get("id"), str) and review["id"] in existing_review_ids
     )
     if review_collisions:
         return _append_result(
@@ -373,11 +357,7 @@ def _append_skill_to_target(
             errors=[f"namespaced review ids already exist: {', '.join(review_collisions)}"],
         )
     merged_reviews.extend(appended_reviews)
-    sources = [
-        source
-        for source in target_pack.get("sources", [])
-        if isinstance(source, dict) and isinstance(source.get("id"), str)
-    ]
+    sources = [source for source in existing_sources if isinstance(source.get("id"), str)]
     source: dict[str, Any] = {"id": normalized_source_id}
     if source_ref:
         source["ref"] = source_ref
@@ -431,10 +411,10 @@ def _namespace_pack_items(value: object, *, source_id: str) -> list[dict[str, An
     if not isinstance(value, list):
         return []
     namespaced: list[dict[str, Any]] = []
-    for item in value:
+    for item in cast(list[object], value):
         if not isinstance(item, dict):
             continue
-        copied = dict(item)
+        copied = dict(cast(dict[str, Any], item))
         item_id = copied.get("id")
         if isinstance(item_id, str) and item_id:
             copied["id"] = f"{source_id}/{item_id}"

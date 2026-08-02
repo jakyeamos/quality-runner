@@ -179,6 +179,11 @@ def _load_skill_pack(
     }, None
 
 
+# Public projections for consumers that need the validated skill boundaries.
+resolve_skill_path = _resolve_skill_path
+load_skill_pack = _load_skill_pack
+
+
 def _parse_deterministic_rules(
     value: object, skill_id: str
 ) -> tuple[list[dict[str, Any]], list[dict[str, str]]]:
