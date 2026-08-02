@@ -41,12 +41,15 @@ def _load_normalized_known_issues(repo_root: Path) -> list[NormalizedKnownIssue]
         payload = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, ValueError) as error:
         raise ValueError(f"known issues file is invalid: {error}") from error
-    if not isinstance(payload, Mapping) or payload.get("schema") != KNOWN_ISSUES_SCHEMA:
+    if not isinstance(payload, Mapping):
         raise ValueError("known issues file does not match its schema")
-    issues = payload.get("issues")
+    payload_data = cast(Mapping[str, object], payload)
+    if payload_data.get("schema") != KNOWN_ISSUES_SCHEMA:
+        raise ValueError("known issues file does not match its schema")
+    issues = payload_data.get("issues")
     if not isinstance(issues, list):
         raise ValueError("known issues file does not match its schema")
-    return [_validate_issue(item) for item in issues]
+    return [_validate_issue(item) for item in cast(list[object], issues)]
 
 
 def accept_known_issue(
@@ -189,31 +192,32 @@ def _save(repo_root: Path, issues: Sequence[NormalizedKnownIssue]) -> None:
 def _validate_issue(value: object) -> NormalizedKnownIssue:
     if not isinstance(value, Mapping):
         raise ValueError("known issue requires id, fingerprint, summary, and status")
+    issue_data = cast(Mapping[str, object], value)
     issue: NormalizedKnownIssue = {
-        "id": _required_issue_text(value, "id"),
-        "fingerprint": _required_issue_text(value, "fingerprint"),
-        "summary": _required_issue_text(value, "summary"),
-        "status": _required_issue_text(value, "status"),
+        "id": _required_issue_text(issue_data, "id"),
+        "fingerprint": _required_issue_text(issue_data, "fingerprint"),
+        "summary": _required_issue_text(issue_data, "summary"),
+        "status": _required_issue_text(issue_data, "status"),
         "extensions": {
             key: item
-            for key, item in value.items()
+            for key, item in issue_data.items()
             if key not in {*_REQUIRED_ISSUE_FIELDS, *_OPTIONAL_ISSUE_FIELDS}
         },
     }
-    reason = value.get("reason")
+    reason = issue_data.get("reason")
     if isinstance(reason, str):
         issue["reason"] = reason
-    elif "reason" in value:
+    elif "reason" in issue_data:
         issue["extensions"]["reason"] = reason
-    owner = value.get("owner")
+    owner = issue_data.get("owner")
     if isinstance(owner, str):
         issue["owner"] = owner
-    elif "owner" in value:
+    elif "owner" in issue_data:
         issue["extensions"]["owner"] = owner
-    updated_at = value.get("updated_at")
+    updated_at = issue_data.get("updated_at")
     if isinstance(updated_at, str):
         issue["updated_at"] = updated_at
-    elif "updated_at" in value:
+    elif "updated_at" in issue_data:
         issue["extensions"]["updated_at"] = updated_at
     return issue
 
