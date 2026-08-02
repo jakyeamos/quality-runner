@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from quality_runner.phase_planning import add_phase, initialize_plan, plan_phase
 from quality_runner.phase_sources import load_planning_source
@@ -29,10 +29,12 @@ def auto_plan(
         raise ValueError("planning source contains no remediation candidates")
 
     roadmap = load_roadmap(repo_root)
+    phases_value = roadmap.get("phases", [])
     existing_by_candidate = {
-        str(phase.get("source_candidate_id")): phase
-        for phase in roadmap.get("phases", [])
-        if isinstance(phase, dict) and isinstance(phase.get("source_candidate_id"), str)
+        str(cast(dict[str, Any], phase).get("source_candidate_id")): cast(dict[str, Any], phase)
+        for phase in cast(list[object], phases_value)
+        if isinstance(phase, dict)
+        and isinstance(cast(dict[str, Any], phase).get("source_candidate_id"), str)
     }
     phases: list[dict[str, Any]] = []
     for candidate in candidates:
@@ -84,10 +86,10 @@ def auto_plan(
 def _ordered_candidates(value: object) -> list[dict[str, Any]]:
     if not isinstance(value, list):
         return []
-    indexed = [
-        (index, item)
-        for index, item in enumerate(value)
-        if isinstance(item, dict) and isinstance(item.get("id"), str)
+    indexed: list[tuple[int, dict[str, Any]]] = [
+        (index, cast(dict[str, Any], item))
+        for index, item in enumerate(cast(list[object], value))
+        if isinstance(item, dict) and isinstance(cast(dict[str, Any], item).get("id"), str)
     ]
     domain_rank = {domain: index for index, domain in enumerate(DOMAIN_ORDER)}
     indexed.sort(
