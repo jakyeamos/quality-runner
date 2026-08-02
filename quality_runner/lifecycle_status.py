@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
-from typing import Any
+from typing import Any, cast
 
 LIFECYCLE_STATUSES = {
     "audit-clean",
@@ -40,8 +40,9 @@ def compute_lifecycle_status(
     if handoff_status == "review-required":
         return "blocked"
 
-    readiness = gate_verification.get("readiness")
-    if isinstance(readiness, dict) and readiness.get("status") == "blocked":
+    readiness_raw = gate_verification.get("readiness")
+    readiness = cast(dict[str, Any], readiness_raw) if isinstance(readiness_raw, dict) else None
+    if readiness is not None and readiness.get("status") == "blocked":
         return "blocked"
 
     if handoff_status == "gates-blocked" or gate_status == "blocked" or summary_status == "blocked":
@@ -57,7 +58,7 @@ def compute_lifecycle_status(
 
     if (
         gate_status in {"passed", "passed-with-findings"}
-        and isinstance(readiness, dict)
+        and readiness is not None
         and readiness.get("profile") == "release"
         and _ci_provenance_blocked(repo_scan)
     ):
@@ -89,13 +90,15 @@ def _merge_ready(
         return False
     if gate_status not in {"passed", "passed-with-findings"}:
         return False
-    readiness = gate_verification.get("readiness")
-    if isinstance(readiness, dict) and readiness.get("profile") == "release":
+    readiness_raw = gate_verification.get("readiness")
+    readiness = cast(dict[str, Any], readiness_raw) if isinstance(readiness_raw, dict) else None
+    if readiness is not None and readiness.get("profile") == "release":
         return not _ci_provenance_blocked(repo_scan)
-    checks = repo_scan.get("ci_checks") if isinstance(repo_scan, dict) else None
+    checks_raw = repo_scan.get("ci_checks") if repo_scan is not None else None
+    checks = cast(list[dict[str, Any]], checks_raw) if isinstance(checks_raw, list) else None
     if not isinstance(checks, list) or not checks:
         return False
-    return all(isinstance(check, dict) and check.get("conclusion") == "success" for check in checks)
+    return all(check.get("conclusion") == "success" for check in checks)
 
 
 def _string_or_none(value: object) -> str | None:
@@ -105,11 +108,14 @@ def _string_or_none(value: object) -> str | None:
 def _ci_provenance_blocked(repo_scan: dict[str, Any] | None) -> bool:
     if not isinstance(repo_scan, dict):
         return True
-    checks = repo_scan.get("ci_checks")
-    if not isinstance(checks, list) or not checks:
+    checks_raw = repo_scan.get("ci_checks")
+    if not isinstance(checks_raw, list) or not checks_raw:
         return True
+    checks = cast(list[dict[str, Any]], checks_raw)
     provenance_value = repo_scan.get("git_provenance") or repo_scan.get("provenance")
-    git_provenance = provenance_value if isinstance(provenance_value, dict) else {}
+    git_provenance = (
+        cast(dict[str, Any], provenance_value) if isinstance(provenance_value, dict) else {}
+    )
     current_head = git_provenance.get("head_sha")
     current_branch = git_provenance.get("branch")
     if not isinstance(current_head, str) or not current_head:
@@ -117,7 +123,7 @@ def _ci_provenance_blocked(repo_scan: dict[str, Any] | None) -> bool:
     if not isinstance(current_branch, str) or not current_branch:
         return True
     for check in checks:
-        if not isinstance(check, dict) or check.get("conclusion") != "success":
+        if check.get("conclusion") != "success":
             return True
         if check.get("head_sha") != current_head:
             return True
