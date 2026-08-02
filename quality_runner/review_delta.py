@@ -5,7 +5,7 @@ import json
 import re
 import subprocess
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from quality_runner.artifacts import (
     artifact_file,
@@ -131,35 +131,40 @@ def render_review_delta_markdown(payload: dict[str, Any]) -> str:
         "## Task-scoped findings",
         "",
     ]
+    findings_map = cast(dict[str, Any], findings)
     for key, title in (("new", "New"), ("persisted", "Persisted"), ("resolved", "Resolved")):
-        items = findings.get(key, [])
-        lines.append(f"### {title} ({len(items) if isinstance(items, list) else 0})")
+        items = findings_map.get(key, [])
+        item_list = cast(list[object], items) if isinstance(items, list) else []
+        lines.append(f"### {title} ({len(item_list)})")
         lines.append("")
-        if isinstance(items, list) and items:
+        if item_list:
             lines.extend(
-                f"- `{item.get('fingerprint')}`: {item.get('summary', 'No summary')}"
-                for item in items
+                f"- `{cast(dict[str, Any], item).get('fingerprint')}`: {cast(dict[str, Any], item).get('summary', 'No summary')}"
+                for item in item_list
                 if isinstance(item, dict)
             )
         else:
             lines.append("- None")
         lines.append("")
-    out_of_scope = findings.get("out_of_scope", [])
+    out_of_scope = findings_map.get("out_of_scope", [])
     lines.extend(
         [
             "## Out of scope",
             "",
-            f"{len(out_of_scope) if isinstance(out_of_scope, list) else 0} finding(s) retained for visibility; they do not block this task.",
+            f"{len(cast(list[object], out_of_scope)) if isinstance(out_of_scope, list) else 0} finding(s) retained for visibility; they do not block this task.",
             "",
         ]
     )
     verification = payload.get("verification", {})
+    verification_map = (
+        cast(dict[str, Any], verification) if isinstance(verification, dict) else None
+    )
     lines.extend(
         [
             "## Verification",
             "",
-            f"- Status: `{verification.get('status', 'unknown') if isinstance(verification, dict) else 'unknown'}`",
-            f"- Blocked: `{verification.get('blocked', True) if isinstance(verification, dict) else True}`",
+            f"- Status: `{verification_map.get('status', 'unknown') if verification_map is not None else 'unknown'}`",
+            f"- Blocked: `{verification_map.get('blocked', True) if verification_map is not None else True}`",
             "",
         ]
     )
@@ -189,8 +194,13 @@ def _findings(path: Path) -> list[dict[str, Any]]:
     if not path.exists():
         return []
     payload = json.loads(path.read_text(encoding="utf-8"))
-    findings = payload.get("findings", []) if isinstance(payload, dict) else []
-    return [_normalize_finding(item) for item in findings if isinstance(item, dict)]
+    payload_map = cast(dict[str, Any], payload) if isinstance(payload, dict) else {}
+    findings = payload_map.get("findings", [])
+    return [
+        _normalize_finding(cast(dict[str, Any], item))
+        for item in cast(list[object], findings)
+        if isinstance(item, dict)
+    ]
 
 
 def _normalize_finding(finding: dict[str, Any]) -> dict[str, Any]:
@@ -248,11 +258,17 @@ def _finding_ref(finding: dict[str, Any]) -> dict[str, Any]:
 
 def _verification_state(run_dir: Path) -> dict[str, Any]:
     path = safe_child_file(run_dir, "gate-verification.json")
-    payload = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
-    status = payload.get("status", "unavailable") if isinstance(payload, dict) else "unavailable"
-    blockers = payload.get("blockers", []) if isinstance(payload, dict) else []
-    failure_type = payload.get("failure_type") if isinstance(payload, dict) else None
-    blocked = status not in {"passed", "clean"} or bool(blockers) or bool(failure_type)
+    payload_map: dict[str, Any] = (
+        cast(dict[str, Any], json.loads(path.read_text(encoding="utf-8"))) if path.exists() else {}
+    )
+    status = payload_map.get("status", "unavailable")
+    blockers = payload_map.get("blockers", [])
+    failure_type = payload_map.get("failure_type")
+    blocked = (
+        status not in {"passed", "clean"}
+        or bool(cast(list[object], blockers))
+        or bool(failure_type)
+    )
     return {
         "status": status,
         "blocked": blocked,
@@ -295,8 +311,9 @@ def _baseline_head_sha(repo_root: Path, baseline_run_id: str | None) -> str | No
         payload = json.loads(path.read_text(encoding="utf-8"))
     except (FileNotFoundError, OSError, json.JSONDecodeError):
         return None
-    git = payload.get("git", {}) if isinstance(payload, dict) else {}
-    head_sha = git.get("head_sha") if isinstance(git, dict) else None
+    payload_map = cast(dict[str, Any], payload) if isinstance(payload, dict) else {}
+    git = payload_map.get("git", {})
+    head_sha = cast(dict[str, Any], git).get("head_sha") if isinstance(git, dict) else None
     if not isinstance(head_sha, str) or not _GIT_OBJECT_ID_PATTERN.fullmatch(head_sha):
         return None
     return head_sha
