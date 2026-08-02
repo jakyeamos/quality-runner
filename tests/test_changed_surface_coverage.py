@@ -150,9 +150,7 @@ def test_changed_surface_legibility_contract_rejects_unsafe_evidence(tmp_path: P
         )
     )
     contract["controls"][0]["evidence"] = ["../outside.md"]
-    (tmp_path / "environment-legibility.json").write_text(
-        json.dumps(contract), encoding="utf-8"
-    )
+    (tmp_path / "environment-legibility.json").write_text(json.dumps(contract), encoding="utf-8")
 
     assert (
         maintained_control(
