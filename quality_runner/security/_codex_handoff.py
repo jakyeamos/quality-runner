@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
-from typing import Any
+from typing import Any, cast
 
 from quality_runner.evidence_contract import QUALITY_EVIDENCE_SCHEMA
 from quality_runner.schema_constants import (
@@ -13,9 +13,9 @@ from quality_runner.schema_constants import (
     CODEX_SECURITY_RESULT_SCHEMA,
 )
 from quality_runner.security._codex_common import (
-    _validation_result,
     canonical_hash,
     canonical_json,
+    validation_result,
 )
 from quality_runner.security._codex_compare import validate_codex_compare
 from quality_runner.security._codex_evidence import validate_codex_evidence
@@ -28,7 +28,7 @@ def export_codex_handoff(comparison: Mapping[str, Any]) -> dict[str, Any]:
     if not validation["passed"]:
         raise ValueError("invalid Codex comparison: " + "; ".join(validation["errors"]))
 
-    matches = list(comparison["matches"])
+    matches = cast(list[dict[str, Any]], comparison["matches"])
     unknown_count = sum(1 for match in matches if match["status"] == "unknown")
     actionable = [match for match in matches if match["status"] in {"new", "present", "unknown"}]
     if not _comparison_coverage_complete(comparison) or unknown_count:
@@ -77,43 +77,44 @@ def validate_codex_handoff(payload: Mapping[str, Any]) -> dict[str, Any]:
     if not isinstance(comparison, dict):
         errors.append("Codex handoff must include the compared evidence snapshots")
     else:
-        comparison_result = validate_codex_compare(comparison)
+        comparison_map = cast(dict[str, Any], comparison)
+        comparison_result = validate_codex_compare(comparison_map)
         errors.extend(f"comparison: {error}" for error in comparison_result["errors"])
         warnings.extend(f"comparison: {warning}" for warning in comparison_result["warnings"])
-        if payload.get("comparison_hash") != comparison.get("comparison_hash"):
+        if payload.get("comparison_hash") != comparison_map.get("comparison_hash"):
             errors.append("Codex handoff comparison_hash is not bound to comparison")
-        if payload.get("baseline_evidence_hash") != comparison.get("baseline_hash"):
+        if payload.get("baseline_evidence_hash") != comparison_map.get("baseline_hash"):
             errors.append("Codex handoff baseline_evidence_hash is not bound to comparison")
-        if payload.get("current_evidence_hash") != comparison.get("current_hash"):
+        if payload.get("current_evidence_hash") != comparison_map.get("current_hash"):
             errors.append("Codex handoff current_evidence_hash is not bound to comparison")
         input_hashes = payload.get("input_hashes")
         if not isinstance(input_hashes, Mapping):
             errors.append("Codex handoff input_hashes are required")
         else:
             expected_input_hashes = {
-                "baseline": comparison.get("baseline_hash"),
-                "current": comparison.get("current_hash"),
-                "comparison": comparison.get("comparison_hash"),
+                "baseline": comparison_map.get("baseline_hash"),
+                "current": comparison_map.get("current_hash"),
+                "comparison": comparison_map.get("comparison_hash"),
             }
             if canonical_json(input_hashes) != canonical_json(expected_input_hashes):
                 errors.append("Codex handoff input_hashes are not bound to comparison")
-        comparison_matches = comparison.get("matches")
+        comparison_matches = comparison_map.get("matches")
         if isinstance(comparison_matches, list):
-            expected_status = _handoff_status(comparison_matches, comparison)
-            expected_findings = [
-                match
-                for match in comparison_matches
-                if isinstance(match, Mapping)
-                and match.get("status") in {"new", "present", "unknown"}
+            matches = cast(list[Mapping[str, Any]], comparison_matches)
+            expected_status = _handoff_status(matches, comparison_map)
+            expected_findings: list[Mapping[str, Any]] = [
+                match for match in matches if match.get("status") in {"new", "present", "unknown"}
             ]
             if payload.get("status") != expected_status:
                 errors.append("Codex handoff status is inconsistent with comparison matches")
             if canonical_json(payload.get("findings")) != canonical_json(expected_findings):
                 errors.append("Codex handoff findings are not bound to comparison matches")
-            if canonical_json(payload.get("summary")) != canonical_json(comparison.get("summary")):
+            if canonical_json(payload.get("summary")) != canonical_json(
+                comparison_map.get("summary")
+            ):
                 errors.append("Codex handoff summary is not bound to comparison")
             if canonical_json(payload.get("coverage")) != canonical_json(
-                comparison.get("coverage")
+                comparison_map.get("coverage")
             ):
                 errors.append("Codex handoff coverage is not bound to comparison")
     if isinstance(payload.get("handoff_hash"), str):
@@ -122,20 +123,20 @@ def validate_codex_handoff(payload: Mapping[str, Any]) -> dict[str, Any]:
             errors.append("Codex handoff handoff_hash does not match the artifact contents")
     else:
         errors.append("Codex handoff handoff_hash is required")
-    return _validation_result(payload, errors=errors, warnings=warnings)
+    return validation_result(payload, errors=errors, warnings=warnings)
 
 
 def validate_codex_document(payload: Mapping[str, Any]) -> dict[str, Any]:
     """Dispatch validation for evidence, comparison, or handoff artifacts."""
 
-    schema = payload.get("schema") if isinstance(payload, Mapping) else None
+    schema = payload.get("schema")
     if schema == CODEX_SECURITY_EVIDENCE_SCHEMA:
         return validate_codex_evidence(payload)
     if schema == CODEX_SECURITY_COMPARE_SCHEMA:
         return validate_codex_compare(payload)
     if schema == CODEX_SECURITY_HANDOFF_SCHEMA:
         return validate_codex_handoff(payload)
-    return _validation_result(payload, errors=[f"unsupported Codex document schema: {schema}"])
+    return validation_result(payload, errors=[f"unsupported Codex document schema: {schema}"])
 
 
 def security_result(
@@ -208,9 +209,11 @@ def _handoff_status(
 def _comparison_coverage_complete(comparison: Mapping[str, Any]) -> bool:
     coverage = comparison.get("coverage")
     summary = comparison.get("summary")
+    coverage_map = cast(Mapping[str, Any], coverage) if isinstance(coverage, Mapping) else None
+    summary_map = cast(Mapping[str, Any], summary) if isinstance(summary, Mapping) else None
     return bool(
-        isinstance(coverage, Mapping)
-        and coverage.get("complete") is True
-        and isinstance(summary, Mapping)
-        and summary.get("follow_up_coverage_complete") is True
+        coverage_map is not None
+        and coverage_map.get("complete") is True
+        and summary_map is not None
+        and summary_map.get("follow_up_coverage_complete") is True
     )
