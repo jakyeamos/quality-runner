@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 
 
 def parse_security_section(value: object, warnings: list[dict[str, str]]) -> dict[str, Any]:
@@ -15,10 +15,11 @@ def parse_security_section(value: object, warnings: list[dict[str, str]]) -> dic
             }
         )
         return {}
+    config = cast(dict[str, object], value)
 
     result: dict[str, Any] = {}
-    if "enabled" in value:
-        enabled = value.get("enabled")
+    if "enabled" in config:
+        enabled = config.get("enabled")
         if isinstance(enabled, bool):
             result["enabled"] = enabled
         else:
@@ -29,15 +30,15 @@ def parse_security_section(value: object, warnings: list[dict[str, str]]) -> dic
                     "path": ".quality-runner.toml",
                 }
             )
-    if "require_security_baseline" in value:
-        require_baseline = value.get("require_security_baseline")
+    if "require_security_baseline" in config:
+        require_baseline = config.get("require_security_baseline")
         if isinstance(require_baseline, bool):
             result["require_security_baseline"] = require_baseline
-    if "agent_review_gates" in value:
-        agent_review = value.get("agent_review_gates")
+    if "agent_review_gates" in config:
+        agent_review = config.get("agent_review_gates")
         if isinstance(agent_review, bool):
             result["agent_review_gates"] = agent_review
-    owner_role = value.get("owner_role")
+    owner_role = config.get("owner_role")
     if owner_role is not None:
         if isinstance(owner_role, str) and owner_role.strip():
             result["owner_role"] = owner_role.strip()
@@ -49,15 +50,15 @@ def parse_security_section(value: object, warnings: list[dict[str, str]]) -> dic
                     "path": ".quality-runner.toml",
                 }
             )
-    required = _string_list(value.get("required_capabilities"))
+    required = _string_list(config.get("required_capabilities"))
     if required:
         result["required_capabilities"] = required
-    disabled = _string_list(value.get("disabled_rule_groups"))
+    disabled = _string_list(config.get("disabled_rule_groups"))
     if disabled:
         result["disabled_rule_groups"] = disabled
-    severity = value.get("severity")
+    severity = config.get("severity")
     if isinstance(severity, dict):
-        minimum = severity.get("minimum_agent_review")
+        minimum = cast(dict[str, object], severity).get("minimum_agent_review")
         if isinstance(minimum, str) and minimum:
             result["severity"] = {"minimum_agent_review": minimum}
     return result
@@ -66,4 +67,4 @@ def parse_security_section(value: object, warnings: list[dict[str, str]]) -> dic
 def _string_list(value: object) -> list[str]:
     if not isinstance(value, list):
         return []
-    return [item for item in value if isinstance(item, str) and item]
+    return [item for item in cast(list[object], value) if isinstance(item, str) and item]
