@@ -3,11 +3,15 @@ from __future__ import annotations
 import re
 from typing import Any
 
-from quality_runner.code_quality_findings import _finding
+from quality_runner.code_quality_findings import finding
 from quality_runner.code_quality_paths import (
-    _is_javascript_source_file,
-    _verification_for_path,
+    is_javascript_source_file,
+    verification_for_path,
 )
+
+_finding = finding
+_is_javascript_source_file = is_javascript_source_file
+_verification_for_path = verification_for_path
 
 API_BOUNDARY_PATTERNS = (
     r"(?:^|/)api(?:/|$)",
@@ -189,3 +193,7 @@ def _first_matching_line(lines: list[str], pattern: str) -> tuple[int, str]:
         if re.search(pattern, line, re.IGNORECASE):
             return index, line
     return 1, lines[0] if lines else ""
+
+
+api_contract_findings = _api_contract_findings
+api_line_findings = _api_line_findings

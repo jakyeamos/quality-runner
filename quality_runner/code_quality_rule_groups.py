@@ -3,15 +3,23 @@ from __future__ import annotations
 import re
 from typing import Any
 
-from quality_runner.code_quality_findings import _finding
+from quality_runner.code_quality_findings import finding
 from quality_runner.code_quality_paths import (
-    _has_todo_comment,
-    _is_javascript_source_file,
-    _is_page_file,
-    _is_runtime_file,
-    _is_test_file,
-    _verification_for_path,
+    has_todo_comment,
+    is_javascript_source_file,
+    is_page_file,
+    is_runtime_file,
+    is_test_file,
+    verification_for_path,
 )
+
+_finding = finding
+_has_todo_comment = has_todo_comment
+_is_javascript_source_file = is_javascript_source_file
+_is_page_file = is_page_file
+_is_runtime_file = is_runtime_file
+_is_test_file = is_test_file
+_verification_for_path = verification_for_path
 
 
 def _harden_findings(relative_path: str, line: str, line_number: int) -> list[dict[str, Any]]:
@@ -303,3 +311,8 @@ def _test_quality_findings(relative_path: str, line: str, line_number: int) -> l
             )
         )
     return findings
+
+
+clarify_findings = _clarify_findings
+harden_findings = _harden_findings
+test_quality_findings = _test_quality_findings

@@ -7,9 +7,10 @@ from collections import defaultdict
 from collections.abc import Mapping, Sequence
 from difflib import SequenceMatcher
 from pathlib import Path
+from typing import cast
 
-from quality_runner.code_quality_duplicates import _block_end
-from quality_runner.code_quality_paths import _is_test_file
+from quality_runner.code_quality_duplicates import block_end
+from quality_runner.code_quality_paths import is_test_file
 
 NATIVE_SIMILARITY_SCHEMA = "quality-runner-similarity-v0.1"
 NATIVE_SIMILARITY_SOURCE = "qr-native"
@@ -204,7 +205,7 @@ def _native_candidates(
         if not isinstance(path, str) or not isinstance(text, str):
             continue
         suffix = _suffix(path)
-        if suffix not in _SUPPORTED_EXTENSIONS or (not include_tests and _is_test_file(path)):
+        if suffix not in _SUPPORTED_EXTENSIONS or (not include_tests and is_test_file(path)):
             continue
         language = _language_for_suffix(suffix)
         if language == "python":
@@ -261,7 +262,7 @@ def _extract_braced_functions(path: str, text: str, language: str) -> list[dict[
         match = pattern.search(line)
         if match is None:
             continue
-        end = _block_end(lines, index)
+        end = block_end(lines, index)
         functions.append(
             {
                 "file": path,
@@ -283,7 +284,8 @@ def _similarity_clusters(
     for candidate in candidates:
         tokens = candidate["tokens"]
         if isinstance(tokens, list):
-            buckets[(str(candidate["language"]), max(1, len(tokens) // 12))].append(candidate)
+            token_values = cast(list[object], tokens)
+            buckets[(str(candidate["language"]), max(1, len(token_values) // 12))].append(candidate)
 
     matches: list[dict[str, object]] = []
     for (language, band), left_bucket in sorted(buckets.items()):
@@ -314,7 +316,9 @@ def _similarity_clusters(
 def _token_similarity(left: object, right: object) -> float:
     if not isinstance(left, list) or not isinstance(right, list) or not left or not right:
         return 0.0
-    return SequenceMatcher(None, left, right, autojunk=False).ratio()
+    return SequenceMatcher(
+        None, cast(list[object], left), cast(list[object], right), autojunk=False
+    ).ratio()
 
 
 def _candidate_ref(candidate: Mapping[str, object]) -> dict[str, object]:
@@ -337,10 +341,11 @@ def _candidate_sort_key(candidate: Mapping[str, object]) -> tuple[str, int, str]
 
 def _cluster_sort_key(cluster: Mapping[str, object]) -> tuple[float, str, int, str, int]:
     candidates = cluster.get("candidates")
-    first = candidates[0] if isinstance(candidates, list) and candidates else {}
-    second = candidates[1] if isinstance(candidates, list) and len(candidates) > 1 else {}
-    first_map = first if isinstance(first, Mapping) else {}
-    second_map = second if isinstance(second, Mapping) else {}
+    candidate_values = cast(list[object], candidates) if isinstance(candidates, list) else []
+    first: object = candidate_values[0] if candidate_values else {}
+    second: object = candidate_values[1] if len(candidate_values) > 1 else {}
+    first_map = cast(dict[str, object], first) if isinstance(first, dict) else {}
+    second_map = cast(dict[str, object], second) if isinstance(second, dict) else {}
     return (
         -_float_value(cluster.get("similarity"), default=0.0),
         str(first_map.get("file", "")),

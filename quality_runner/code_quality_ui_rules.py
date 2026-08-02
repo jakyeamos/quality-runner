@@ -3,8 +3,12 @@ from __future__ import annotations
 import re
 from typing import Any
 
-from quality_runner.code_quality_findings import _finding
-from quality_runner.code_quality_paths import _is_ui_file, _verification_for_path
+from quality_runner.code_quality_findings import finding
+from quality_runner.code_quality_paths import is_ui_file, verification_for_path
+
+_finding = finding
+_is_ui_file = is_ui_file
+_verification_for_path = verification_for_path
 
 
 def _ui_structural_findings(
@@ -465,3 +469,8 @@ def _icon_only_button_without_label(line: str) -> bool:
         )
         is not None
     )
+
+
+ui_file_level_findings = _ui_file_level_findings
+ui_structural_findings = _ui_structural_findings
+fetches_ui_text = _fetches_ui_text

@@ -8,7 +8,7 @@ from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
-from quality_runner.code_quality_duplicates import _duplicate_clusters
+from quality_runner.code_quality_duplicates import duplicate_clusters as build_duplicate_clusters
 from quality_runner.code_quality_findings import _finding
 from quality_runner.code_quality_native_similarity import (
     NATIVE_SIMILARITY_SCHEMA,
@@ -69,7 +69,7 @@ def collect_deduplicate_scan(
         )
         return [], [], 0, {}, similarity_result["cache_evidence"]
 
-    duplicate_clusters = _duplicate_clusters(extracted_functions)
+    duplicate_clusters = build_duplicate_clusters(extracted_functions)
     findings: list[dict[str, Any]] = []
     for cluster in duplicate_clusters:
         first = cluster["candidates"][0]

@@ -7,7 +7,7 @@ from typing import Any, cast
 from quality_runner.cache_modes import CacheMode
 from quality_runner.code_quality_architecture import architecture_findings
 from quality_runner.code_quality_bundles import bundle_budget_findings
-from quality_runner.code_quality_duplicates import _extract_functions
+from quality_runner.code_quality_duplicates import extract_functions
 from quality_runner.code_quality_findings import (
     CATEGORY_ORDER,
     _counts,
@@ -299,7 +299,7 @@ def _analyze_code_quality_file(
             large_file_lines=large_file_lines,
             fat_router_lines=fat_router_lines,
         ),
-        "extracted_functions": _extract_functions(relative_path, lines),
+        "extracted_functions": extract_functions(relative_path, lines),
     }
 
 

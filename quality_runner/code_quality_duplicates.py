@@ -3,11 +3,11 @@ from __future__ import annotations
 import re
 from typing import Any
 
-from quality_runner.code_quality_paths import _is_javascript_source_file
+from quality_runner.code_quality_paths import is_javascript_source_file
 
 
 def _extract_functions(relative_path: str, lines: list[str]) -> list[dict[str, Any]]:
-    if not _is_javascript_source_file(relative_path):
+    if not is_javascript_source_file(relative_path):
         return []
     functions: list[dict[str, Any]] = []
     for index, line in enumerate(lines):
@@ -36,7 +36,7 @@ def _duplicate_clusters(functions: list[dict[str, Any]]) -> list[dict[str, Any]]
     for function in functions:
         normalized = str(function["normalized_body"])
         groups.setdefault(normalized, []).append(function)
-    clusters = []
+    clusters: list[dict[str, Any]] = []
     for group in groups.values():
         if len(group) < 2:
             continue
@@ -71,6 +71,11 @@ def _block_end(lines: list[str], start: int) -> int:
         if opened and depth <= 0:
             return index
     return start
+
+
+block_end = _block_end
+extract_functions = _extract_functions
+duplicate_clusters = _duplicate_clusters
 
 
 def _normalize_function(body: str, params: str) -> str:

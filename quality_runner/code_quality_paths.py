@@ -396,6 +396,7 @@ check_coverage = _check_coverage
 is_deep_nesting = _is_deep_nesting
 nested_ternary = _nested_ternary
 is_javascript_source_file = _is_javascript_source_file
+is_source_file = _is_source_file
 is_api_file = _is_api_file
 is_runtime_file = _is_runtime_file
 is_router_path = _is_router_path
