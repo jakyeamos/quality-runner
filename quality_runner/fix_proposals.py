@@ -4,7 +4,7 @@ import hashlib
 import json
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 from uuid import uuid4
 
 from quality_runner.artifacts import existing_artifact_dir, safe_child_file, write_json
@@ -98,13 +98,16 @@ def resolve_finding_group(
         collection = remediation_plan.get(collection_name)
         if not isinstance(collection, list):
             continue
-        for slice_item in collection:
-            if isinstance(slice_item, dict) and slice_item.get("id") == finding_group:
-                return slice_item
+        for slice_item in cast(list[object], collection):
+            if (
+                isinstance(slice_item, dict)
+                and cast(dict[str, Any], slice_item).get("id") == finding_group
+            ):
+                return cast(dict[str, Any], slice_item)
 
     next_slice = handoff.get("next_slice")
-    if isinstance(next_slice, dict) and next_slice.get("id") == finding_group:
-        return next_slice
+    if isinstance(next_slice, dict) and cast(dict[str, Any], next_slice).get("id") == finding_group:
+        return cast(dict[str, Any], next_slice)
 
     raise ValueError(f"finding group does not exist for run: {finding_group}")
 
@@ -217,8 +220,9 @@ def _gate_proposal(
     command = None
     steps: list[str] = []
     kind = "instruction"
-    if isinstance(setup, dict) and isinstance(setup.get("setup_command"), str):
-        command = setup["setup_command"]
+    setup_map = cast(dict[str, Any], setup) if isinstance(setup, dict) else None
+    if setup_map is not None and isinstance(setup_map.get("setup_command"), str):
+        command = setup_map["setup_command"]
         kind = "command"
         steps = [f"Run dependency setup: {command}"]
     else:
@@ -284,7 +288,11 @@ def _selected_findings(
     findings = slice_item.get("findings")
     if not isinstance(findings, list):
         return []
-    normalized = [finding for finding in findings if isinstance(finding, dict)]
+    normalized = [
+        cast(dict[str, Any], finding)
+        for finding in cast(list[object], findings)
+        if isinstance(finding, dict)
+    ]
     if not finding_ids:
         return normalized
     allowed = set(finding_ids)
@@ -297,8 +305,10 @@ def _index_audit_findings(audit: dict[str, Any]) -> dict[str, dict[str, Any]]:
         return {}
     return {
         finding["id"]: finding
-        for finding in findings
-        if isinstance(finding, dict) and isinstance(finding.get("id"), str) and finding["id"]
+        for finding in cast(list[object], findings)
+        if isinstance(finding, dict)
+        and isinstance(cast(dict[str, Any], finding).get("id"), str)
+        and cast(dict[str, Any], finding)["id"]
     }
 
 
@@ -307,18 +317,19 @@ def _index_gate_blockers(gate_verification: dict[str, Any]) -> dict[str, dict[st
     if not isinstance(gates, list):
         return {}
     indexed: dict[str, dict[str, Any]] = {}
-    for gate in gates:
+    for gate in cast(list[object], gates):
         if not isinstance(gate, dict):
             continue
+        gate = cast(dict[str, Any], gate)
         gate_id = gate.get("id")
         if not isinstance(gate_id, str) or not gate_id:
             continue
         diagnostics = gate.get("diagnostics")
         dependency_setup = None
         if isinstance(diagnostics, dict):
-            setup = diagnostics.get("dependency_setup")
+            setup = cast(dict[str, Any], diagnostics).get("dependency_setup")
             if isinstance(setup, dict):
-                dependency_setup = setup
+                dependency_setup = cast(dict[str, Any], setup)
         indexed[gate_id] = {
             **gate,
             "dependency_setup": dependency_setup,
@@ -348,9 +359,10 @@ def _index_ledger_fingerprints(ledger: dict[str, Any]) -> dict[str, str]:
     if not isinstance(entries, list):
         return {}
     indexed: dict[str, str] = {}
-    for entry in entries:
+    for entry in cast(list[object], entries):
         if not isinstance(entry, dict):
             continue
+        entry = cast(dict[str, Any], entry)
         fingerprint = entry.get("fingerprint")
         if isinstance(fingerprint, str) and fingerprint:
             indexed[str(entry.get("rule_id") or "")] = fingerprint
@@ -418,13 +430,13 @@ def _load_json(path: Path) -> dict[str, Any]:
     payload = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(payload, dict):
         raise ValueError(f"expected JSON object: {path}")
-    return payload
+    return cast(dict[str, Any], payload)
 
 
 def _string_list(value: object) -> list[str]:
     if not isinstance(value, list):
         return []
-    return [item for item in value if isinstance(item, str) and item]
+    return [item for item in cast(list[object], value) if isinstance(item, str) and item]
 
 
 def _string_or_none(value: object) -> str | None:
