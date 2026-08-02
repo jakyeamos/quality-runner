@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import re
-from typing import Any
+from typing import Any, cast
 
 from quality_runner.code_quality_findings import CATEGORY_ORDER
 
@@ -40,9 +40,10 @@ def _code_quality_findings(
         return []
 
     normalized: list[dict[str, Any]] = []
-    for finding in findings:
-        if not isinstance(finding, dict):
+    for finding_value in cast(list[object], findings):
+        if not isinstance(finding_value, dict):
             continue
+        finding = cast(dict[str, Any], finding_value)
         finding_id = finding.get("id")
         category = finding.get("category")
         severity = finding.get("severity")

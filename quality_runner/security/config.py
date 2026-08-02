@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 
 DEFAULT_REQUIRED_SECURITY_CAPABILITIES: tuple[str, ...] = ()
 
@@ -22,16 +22,17 @@ def security_settings(config: dict[str, Any]) -> dict[str, Any]:
     if not isinstance(section, dict):
         return _default_security_settings(configured=False)
 
-    enabled = section.get("enabled")
-    require_baseline = section.get("require_security_baseline")
-    agent_review = section.get("agent_review_gates")
-    required = section.get("required_capabilities")
-    disabled_groups = section.get("disabled_rule_groups")
-    severity = section.get("severity")
-    owner_role = section.get("owner_role")
+    section_map = cast(dict[str, Any], section)
+    enabled = section_map.get("enabled")
+    require_baseline = section_map.get("require_security_baseline")
+    agent_review = section_map.get("agent_review_gates")
+    required = section_map.get("required_capabilities")
+    disabled_groups = section_map.get("disabled_rule_groups")
+    severity = section_map.get("severity")
+    owner_role = section_map.get("owner_role")
     minimum_agent_review = "medium"
     if isinstance(severity, dict):
-        value = severity.get("minimum_agent_review")
+        value = cast(dict[str, Any], severity).get("minimum_agent_review")
         if isinstance(value, str) and value:
             minimum_agent_review = value
 
@@ -66,4 +67,4 @@ def _default_security_settings(*, configured: bool) -> dict[str, Any]:
 def _string_list(value: object) -> list[str]:
     if not isinstance(value, list):
         return []
-    return [item for item in value if isinstance(item, str) and item]
+    return [item for item in cast(list[object], value) if isinstance(item, str) and item]
