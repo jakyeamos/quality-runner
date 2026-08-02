@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from quality_runner.phase_sources import load_json_artifact
 from quality_runner.phase_store import (
@@ -27,12 +27,12 @@ def load_or_build_delta(repo_root: Path, *, baseline_run_id: str, run_id: str) -
 
 
 def nested_object(payload: dict[str, Any], *keys: str) -> dict[str, Any]:
-    current: object = payload
+    current: Any = payload
     for key in keys:
         if not isinstance(current, dict):
             return {}
-        current = current.get(key)
-    return current if isinstance(current, dict) else {}
+        current = cast(dict[str, Any], current).get(key)
+    return cast(dict[str, Any], current) if isinstance(current, dict) else {}
 
 
 def plan_ready(plan: dict[str, Any], all_plans: list[dict[str, Any]]) -> bool:
@@ -41,7 +41,7 @@ def plan_ready(plan: dict[str, Any], all_plans: list[dict[str, Any]]) -> bool:
     by_id = {str(item["id"]): item for item in all_plans}
     return all(
         by_id.get(str(dep), {}).get("status") in {"verified", "complete", "skipped"}
-        for dep in plan.get("depends_on", [])
+        for dep in cast(list[object], plan.get("depends_on", []))
     )
 
 
@@ -58,11 +58,12 @@ def result_plan_status(status: str) -> str:
 def verification_blocked(payload: object) -> bool:
     if not isinstance(payload, dict):
         return True
-    status = payload.get("status")
+    payload_map = cast(dict[str, Any], payload)
+    status = payload_map.get("status")
     return (
         status in {"failed", "blocked", "error"}
-        or bool(payload.get("blockers"))
-        or bool(payload.get("failure_type"))
+        or bool(payload_map.get("blockers"))
+        or bool(payload_map.get("failure_type"))
     )
 
 
@@ -78,9 +79,9 @@ def finding_refs(value: object) -> set[str]:
     if not isinstance(value, list):
         return set()
     return {
-        str(item.get("fingerprint"))
-        for item in value
-        if isinstance(item, dict) and item.get("fingerprint")
+        str(cast(dict[str, Any], item).get("fingerprint"))
+        for item in cast(list[object], value)
+        if isinstance(item, dict) and cast(dict[str, Any], item).get("fingerprint")
     }
 
 
@@ -88,9 +89,9 @@ def finding_records(value: object) -> list[dict[str, Any]]:
     if not isinstance(value, list):
         return []
     return [
-        item
-        for item in value
-        if isinstance(item, dict) and isinstance(item.get("fingerprint"), str)
+        cast(dict[str, Any], item)
+        for item in cast(list[object], value)
+        if isinstance(item, dict) and isinstance(cast(dict[str, Any], item).get("fingerprint"), str)
     ]
 
 
@@ -98,12 +99,13 @@ def unique_finding_refs(values: list[object]) -> list[dict[str, Any]]:
     seen: set[str] = set()
     result: list[dict[str, Any]] = []
     for value in values:
-        if not isinstance(value, dict) or not value.get("fingerprint"):
+        if not isinstance(value, dict) or not cast(dict[str, Any], value).get("fingerprint"):
             continue
-        fingerprint = str(value["fingerprint"])
+        value_map = cast(dict[str, Any], value)
+        fingerprint = str(value_map["fingerprint"])
         if fingerprint not in seen:
             seen.add(fingerprint)
-            result.append(value)
+            result.append(value_map)
     return result
 
 
