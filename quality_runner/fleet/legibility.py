@@ -451,14 +451,18 @@ def _maintained_legibility_control(
     validation_evidence = control.get("validation_evidence")
     enforcement = control.get("enforcement")
     if not all(
-        isinstance(value, list) and value and all(isinstance(item, str) and item for item in value)
+        isinstance(value, list) and value for value in (evidence, validation, validation_evidence)
+    ):
+        return None
+    if not all(
+        all(isinstance(item, str) and item for item in cast(list[object], value))
         for value in (evidence, validation, validation_evidence)
     ):
         return None
     if not isinstance(enforcement, dict) or enforcement.get("mode") not in {"required", "routed"}:
         return None
     resolved_evidence: list[dict[str, str]] = []
-    for relative_path in evidence:
+    for relative_path in cast(list[str], evidence):
         target = (root / relative_path).resolve()
         if root not in target.parents or not target.is_file():
             return None
@@ -468,7 +472,7 @@ def _maintained_legibility_control(
     )
     resolved_evidence.extend(
         {"path": "environment-legibility.json", "detail": f"validation evidence: {item}"}
-        for item in validation_evidence
+        for item in cast(list[str], validation_evidence)
     )
     return resolved_evidence
 

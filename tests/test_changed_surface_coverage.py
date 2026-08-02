@@ -19,8 +19,8 @@ from quality_runner import (
     review_execution_artifacts,
 )
 from quality_runner.application import audit_v1_artifacts, journey_outcomes
-from quality_runner.schema_constants import PERFORMANCE_SCHEMA, REVIEW_EXECUTION_SCHEMA
 from quality_runner.fleet.legibility import _maintained_legibility_control
+from quality_runner.schema_constants import PERFORMANCE_SCHEMA, REVIEW_EXECUTION_SCHEMA
 
 
 def test_changed_surface_helpers_cover_projection_and_policy_branches(
