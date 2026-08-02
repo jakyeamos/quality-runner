@@ -2,10 +2,10 @@ from __future__ import annotations
 
 import hashlib
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from quality_runner.cache_modes import CacheMode
-from quality_runner.code_quality_paths import _split_lines
+from quality_runner.code_quality_paths import split_lines
 from quality_runner.core.audit_contracts import AuditPayload, TextScanScope
 from quality_runner.incremental_analysis_cache import IncrementalAnalysisCache
 from quality_runner.scan_exclusions import effective_scan_exclusions, matches_scan_exclusion
@@ -122,7 +122,7 @@ def create_security_scan(
                             {
                                 "path": relative_path,
                                 "text": source_text,
-                                "lines": _split_lines(source_text),
+                                "lines": split_lines(source_text),
                             }
                         ],
                         disabled_groups=disabled_groups,
@@ -196,19 +196,24 @@ def merge_security_into_capability_map(
         missing=security_scan.get("missing_capabilities", []),
         agent_review_gates=security_scan.get("agent_review_gates", []),
     )
-    readiness = merged.get("readiness")
+    readiness_raw = merged.get("readiness")
+    readiness = cast(dict[str, Any], readiness_raw) if isinstance(readiness_raw, dict) else None
     surfaces = security_scan.get("surfaces")
     if (
-        isinstance(readiness, dict)
+        readiness is not None
         and readiness.get("profile") == "release"
         and isinstance(surfaces, dict)
-        and surfaces.get("publication_visibility") is True
+        and cast(dict[str, Any], surfaces).get("publication_visibility") is True
     ):
         required = [
-            item for item in readiness.get("required_gate_ids", []) if isinstance(item, str)
+            item
+            for item in cast(list[object], readiness.get("required_gate_ids", []))
+            if isinstance(item, str)
         ]
         unresolved = [
-            item for item in readiness.get("unresolved_gate_ids", []) if isinstance(item, str)
+            item
+            for item in cast(list[object], readiness.get("unresolved_gate_ids", []))
+            if isinstance(item, str)
         ]
         if "publication_visibility_review" not in required:
             required.append("publication_visibility_review")
@@ -295,18 +300,21 @@ def _scan_files(
         module="security",
     )
     include_ignored_paths: set[str] = set()
-    structural = config.get("structural_scan")
-    if isinstance(structural, dict):
+    structural_raw = config.get("structural_scan")
+    structural = cast(dict[str, Any], structural_raw) if isinstance(structural_raw, dict) else None
+    if structural is not None:
         paths = structural.get("include_ignored_paths")
         if isinstance(paths, list):
-            include_ignored_paths = {item for item in paths if isinstance(item, str)}
+            include_ignored_paths = {
+                item for item in cast(list[object], paths) if isinstance(item, str)
+            }
     generated_paths: set[str] = set()
     generated = scan.get("generated_code")
     if isinstance(generated, list):
-        generated_paths = {item for item in generated if isinstance(item, str)}
+        generated_paths = {item for item in cast(list[object], generated) if isinstance(item, str)}
     skipped_files: list[AuditPayload] = []
     max_text_files = 5000
-    if isinstance(structural, dict) and isinstance(structural.get("max_text_files"), int):
+    if structural is not None and isinstance(structural.get("max_text_files"), int):
         max_text_files = structural["max_text_files"]
 
     scanned: list[dict[str, Any]] = []
@@ -327,7 +335,7 @@ def _scan_files(
             {
                 "path": relative_path,
                 "text": text,
-                "lines": _split_lines(text),
+                "lines": split_lines(text),
             }
         )
     return scanned
@@ -449,14 +457,17 @@ def _disabled_cache_evidence(
 
 
 def _valid_security_file_result(result: dict[str, object]) -> bool:
-    return _candidate_list_result(result) is not None
+    _candidate_list_result(result)
+    return True
 
 
 def _candidate_list_result(result: dict[str, object]) -> list[dict[str, Any]]:
     value = result.get("candidates")
-    if not isinstance(value, list) or not all(isinstance(item, dict) for item in value):
+    if not isinstance(value, list) or not all(
+        isinstance(item, dict) for item in cast(list[object], value)
+    ):
         raise ValueError("invalid cached security result field: candidates")
-    return [dict(item) for item in value]
+    return [dict(cast(dict[str, Any], item)) for item in cast(list[object], value)]
 
 
 def _renumber_security_candidate_ids(candidates: list[dict[str, Any]]) -> None:
