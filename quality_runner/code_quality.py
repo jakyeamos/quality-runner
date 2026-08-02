@@ -10,16 +10,16 @@ from quality_runner.code_quality_bundles import bundle_budget_findings
 from quality_runner.code_quality_duplicates import extract_functions
 from quality_runner.code_quality_findings import (
     CATEGORY_ORDER,
-    _counts,
-    _finding_sort_key,
+    counts,
+    finding_sort_key,
 )
 from quality_runner.code_quality_ledger import (
     build_resolution_ledger,
     render_resolution_ledger_markdown,
 )
-from quality_runner.code_quality_paths import _check_coverage, _split_lines, _string_or_none
+from quality_runner.code_quality_paths import check_coverage, split_lines, string_or_none
 from quality_runner.code_quality_ponytail import ponytail_findings
-from quality_runner.code_quality_rules import _scan_file
+from quality_runner.code_quality_rules import scan_file
 from quality_runner.code_quality_similarity import collect_deduplicate_scan
 from quality_runner.code_quality_skill_selection import scan_quality_skills_with_selection
 from quality_runner.code_quality_summary import quality_summary_fields
@@ -108,6 +108,7 @@ def create_code_quality_scan(
     accountability: list[dict[str, Any]] = []
     scanned_files: list[dict[str, Any]] = []
 
+    source_items: list[tuple[str, str, list[str]]]
     if scope.files:
         source_items = [
             (file_info.path, file_info.text, file_info.lines) for file_info in scope.files
@@ -139,7 +140,7 @@ def create_code_quality_scan(
                 compute=lambda source_text, relative_path=relative_path: _analyze_code_quality_file(
                     relative_path=relative_path,
                     source_text=source_text,
-                    source_lines=_split_lines(source_text),
+                    source_lines=split_lines(source_text),
                     source_analysis_cache=source_analysis_cache,
                     disabled_groups=disabled_groups,
                     large_file_lines=policy["large_file_lines"],
@@ -157,7 +158,7 @@ def create_code_quality_scan(
                 "sha256": analysis_cache.content_sha256_for(relative_path)
                 or hashlib.sha256(source_text.encode("utf-8")).hexdigest(),
                 "scan_status": "scanned",
-                "check_coverage": _check_coverage(relative_path),
+                "check_coverage": check_coverage(relative_path),
             }
         )
         findings.extend(_dict_list_result(file_result, "findings"))
@@ -217,13 +218,13 @@ def create_code_quality_scan(
     )
     findings.extend(skill_findings)
 
-    sorted_findings = sorted(findings, key=_finding_sort_key)
+    sorted_findings = sorted(findings, key=finding_sort_key)
     for index, finding in enumerate(sorted_findings, start=1):
         finding["id"] = f"CQ-{index:04d}"
 
     return {
         "schema": CODE_QUALITY_SCAN_SCHEMA,
-        "run_id": _string_or_none(scan.get("run_id")),
+        "run_id": string_or_none(scan.get("run_id")),
         "repo_root": str(root),
         "coverage": "partial" if deferred_checks else _coverage_status(skipped_files),
         "scan_exclusion_scope": "code_quality",
@@ -233,10 +234,8 @@ def create_code_quality_scan(
             "total_files": len(accountability),
             "total_lines": sum(item["line_count"] for item in accountability),
             "total_findings": len(sorted_findings),
-            "findings_by_category": _counts(sorted_findings, "category", CATEGORY_ORDER),
-            "findings_by_severity": _counts(
-                sorted_findings, "severity", ["warning", "observation"]
-            ),
+            "findings_by_category": counts(sorted_findings, "category", CATEGORY_ORDER),
+            "findings_by_severity": counts(sorted_findings, "severity", ["warning", "observation"]),
             "duplicate_clusters": len(duplicate_clusters),
             "semantic_similarity_clusters": semantic_similarity_clusters,
             "semantic_similarity_backend": policy["similarity_backend"],
@@ -291,7 +290,7 @@ def _analyze_code_quality_file(
     text = "\n".join(lines)
     return {
         "redacted_lines": lines,
-        "findings": _scan_file(
+        "findings": scan_file(
             relative_path=relative_path,
             text=text,
             lines=lines,
@@ -304,25 +303,31 @@ def _analyze_code_quality_file(
 
 
 def _valid_code_quality_file_result(result: dict[str, object]) -> bool:
-    return (
-        _string_list_result(result, "redacted_lines") is not None
-        and _dict_list_result(result, "findings") is not None
-        and _dict_list_result(result, "extracted_functions") is not None
-    )
+    try:
+        _string_list_result(result, "redacted_lines")
+        _dict_list_result(result, "findings")
+        _dict_list_result(result, "extracted_functions")
+    except ValueError:
+        return False
+    return True
 
 
 def _string_list_result(result: dict[str, object], key: str) -> list[str]:
     value = result.get(key)
-    if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
+    if not isinstance(value, list) or not all(
+        isinstance(item, str) for item in cast(list[object], value)
+    ):
         raise ValueError(f"invalid cached code-quality result field: {key}")
-    return list(value)
+    return [item for item in cast(list[object], value) if isinstance(item, str)]
 
 
 def _dict_list_result(result: dict[str, object], key: str) -> list[dict[str, Any]]:
     value = result.get(key)
-    if not isinstance(value, list) or not all(isinstance(item, dict) for item in value):
+    if not isinstance(value, list) or not all(
+        isinstance(item, dict) for item in cast(list[object], value)
+    ):
         raise ValueError(f"invalid cached code-quality result field: {key}")
-    return [cast(dict[str, Any], item) for item in value]
+    return [cast(dict[str, Any], item) for item in cast(list[object], value)]
 
 
 def preview_ignored_paths(

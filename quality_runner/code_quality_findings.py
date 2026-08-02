@@ -102,3 +102,4 @@ def _counts(items: list[dict[str, Any]], field: str, keys: list[str]) -> dict[st
 
 counts = _counts
 finding = _finding
+finding_sort_key = _finding_sort_key
