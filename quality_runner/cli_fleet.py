@@ -280,6 +280,14 @@ def add_fleet_commands(subparsers: Any) -> None:
             "comparisons ineligible"
         ),
     )
+    feed_parser.add_argument(
+        "--production-projects-root",
+        default=None,
+        help=(
+            "Explicitly authorize a bounded projects root for canonical feed publication; "
+            "the selected audit must cover every repository identity under that root"
+        ),
+    )
     feed_parser.add_argument("--json", action="store_true")
 
     mac_control_parser = fleet_actions.add_parser(
@@ -468,6 +476,9 @@ def fleet_command_payload(args: argparse.Namespace) -> dict[str, Any]:
             audit_id=args.audit_id,
             output_dir=Path(args.output_dir) if args.output_dir else None,
             allow_incomplete_coverage=args.allow_incomplete_coverage,
+            production_projects_root=(
+                Path(args.production_projects_root) if args.production_projects_root else None
+            ),
         )
     raise ValueError(f"unsupported fleet audit action: {args.audit_action}")
 

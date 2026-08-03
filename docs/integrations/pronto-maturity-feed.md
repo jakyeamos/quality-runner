@@ -117,6 +117,18 @@ one-standard result cannot stand in for the full maturity inventory, so
 `qr fleet audit feed` rejects it. Replay and inspect the report directly.
 The supported diagnostic standard scopes are `matrix-maintenance`,
 `developer-legibility`, `long-running-tasks`, and `cache-design`.
+The default production scope is `~/projects`. Repositories intentionally
+managed under another bounded root may publish a complete fleet snapshot by
+explicitly authorizing that root:
+
+```bash
+qr fleet audit feed --audit-id AUDIT_ID \
+  --production-projects-root /path/to/projects --json
+```
+
+The audit must still cover every repository identity under the authorized
+root. Explicit single-repository or partial-scope snapshots cannot replace
+the stable feed.
 
 The feed contains the QR audit ID, timestamp, replay status, provenance hash,
 fleet counts, aggregate maturity distributions, unresolved measurement gaps,

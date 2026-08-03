@@ -28,8 +28,15 @@ def fleet_feed_payload(
     audit_id: str | None = None,
     output_dir: Path | None = None,
     allow_incomplete_coverage: bool = False,
+    production_projects_root: Path | None = None,
 ) -> dict[str, Any]:
-    """Validate and publish one immutable fleet audit as the stable maturity feed."""
+    """Validate and publish one immutable fleet audit as the stable maturity feed.
+
+    The default publication scope is ``~/projects``. A caller may explicitly
+    authorize another bounded projects root for a canonical feed publication;
+    the immutable snapshot must still cover every repository identity under
+    that root and pass deterministic replay.
+    """
 
     if output_dir is not None and _same_path(output_dir, MATURITY_FEED_FLEET_ROOT):
         raise MaturityFeedError(
@@ -42,7 +49,13 @@ def fleet_feed_payload(
     feed = build_maturity_feed(
         artifact_root,
         replay=replay,
-        expected_projects_root=(Path.home() / "projects") if output_dir is None else None,
+        expected_projects_root=(
+            production_projects_root.expanduser().resolve()
+            if production_projects_root is not None
+            else (Path.home() / "projects")
+            if output_dir is None
+            else None
+        ),
         allow_incomplete_coverage=allow_incomplete_coverage,
     )
     publication_root = (

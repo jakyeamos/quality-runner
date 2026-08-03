@@ -6,7 +6,9 @@ from pathlib import Path
 
 import pytest
 
+from quality_runner.fleet import feed as feed_module
 from quality_runner.fleet.audit import fleet_audit_payload, fleet_replay_payload
+from quality_runner.fleet.contracts import digest
 from quality_runner.fleet.feed import fleet_feed_payload
 from quality_runner.fleet.maturity_coverage import (
     AuditCoverageFeedError,
@@ -584,6 +586,50 @@ def test_feed_does_not_downgrade_a_blocked_coordinated_lane_to_legacy(tmp_path: 
 
     with pytest.raises(MaturityFeedError, match="coordinated Mac Control lane is blocked"):
         fleet_feed_payload(output_dir=artifact_root)
+
+
+def test_feed_command_accepts_an_explicit_external_production_scope(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    result, artifact_root = _audit(tmp_path)
+    projects_root = tmp_path / "projects"
+    production_root = tmp_path / "production-feed"
+    monkeypatch.setattr(feed_module, "MATURITY_FEED_FLEET_ROOT", production_root)
+    monkeypatch.setattr(
+        feed_module,
+        "resolve_artifact_root",
+        lambda output_dir, audit_id: artifact_root,
+    )
+
+    published = fleet_feed_payload(
+        audit_id=str(result["audit_id"]),
+        production_projects_root=projects_root,
+    )
+
+    assert published["status"] == "published"
+    assert published["feed_path"] == str(production_root / "current" / "maturity.json")
+    assert published["feed"]["source"]["projects_root"] == str(projects_root.resolve())
+
+
+def test_feed_command_still_rejects_a_partial_external_scope(tmp_path: Path) -> None:
+    result, artifact_root = _audit(tmp_path)
+    inventory_path = artifact_root / "inventory.json"
+    inventory = json.loads(inventory_path.read_text(encoding="utf-8"))
+    inventory["scope"] = "explicit repository paths under the bounded projects root"
+    inventory_path.write_text(json.dumps(inventory), encoding="utf-8")
+    manifest_path = artifact_root / "replay-manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    summary = json.loads((artifact_root / "summary.json").read_text(encoding="utf-8"))
+    manifest["inventory_hash"] = digest(inventory)
+    manifest["provenance_hash"] = digest({"inventory": inventory, "summary": summary})
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+    with pytest.raises(MaturityFeedError, match="fleet-wide audit scope"):
+        fleet_feed_payload(
+            audit_id=str(result["audit_id"]),
+            output_dir=artifact_root,
+            production_projects_root=tmp_path / "projects",
+        )
 
 
 def test_feed_rejects_failed_replay_and_partial_scope(tmp_path: Path) -> None:

@@ -214,6 +214,23 @@ and only confirmed critical risk can cap the score. The new capability
 producers cover reliability and data integrity, security/privacy/supply chain,
 code and compatibility health, runtime observability, user-facing web quality,
 consolidated agent usability, and governance continuity.
+The canonical feed defaults to `~/projects`. For a complete fleet rooted
+elsewhere, explicitly authorize that bounded root when publishing:
+
+```bash
+qr fleet audit feed --audit-id AUDIT_ID \
+  --production-projects-root /path/to/projects --json
+```
+
+Partial or single-repository snapshots remain ineligible for canonical
+publication even when an external root is authorized.
+
+The fleet feed is a versioned, private handoff at
+`~/.quality-runner/fleet-audit/current/maturity.json`. It is generated only
+from a complete, replay-valid fleet snapshot and contains redacted maturity
+projections for local consumers. Immutable source artifacts remain in the
+audit-specific directory. `--output-dir` is safe for isolated tests and cannot
+replace the production current feed.
 
 The profile uses QR's read-only audit and disposable-worktree contracts. Do not
 pass `environment-legibility` to `--only-gate`; that selector remains reserved

@@ -233,6 +233,18 @@ keys include every target, version, ruleset, and configuration identity; native
 QR overlaps are related and counted once. The command intentionally writes only
 published evidence below each repository's `.quality-runner/runs`; its fleet
 ledger and disposable worktrees stay below the runtime-owned output directory.
+The canonical feed defaults to `~/projects`. If a repository fleet is
+intentionally rooted elsewhere, explicitly authorize that bounded root when
+publishing its complete audit:
+
+```bash
+qr fleet audit feed --audit-id AUDIT_ID \
+  --production-projects-root /path/to/projects --json
+```
+
+The selected snapshot must still cover every repository identity under the
+authorized root; an explicit single-repository or partial-scope audit remains
+ineligible for canonical publication.
 
 The fleet audit resolves the documented development branch, preferring `dev`,
 and never selects a branch by commit-count maturity. A checkout from the same
