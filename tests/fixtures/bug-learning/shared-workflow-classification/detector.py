@@ -1,3 +1,9 @@
+"""Executable fixture for subprocess contract tests.
+
+This file intentionally has no inline assertions: the parent tests assert the
+process exit code and stdout for both semantic branches.
+"""
+
 from __future__ import annotations
 
 import json
