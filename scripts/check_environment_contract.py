@@ -58,6 +58,8 @@ QUALITY_COMMANDS = (
     "gitleaks detect --source . --no-banner --redact",
 )
 CI_REQUIRED_COMMANDS = (
+    "uses: actions/setup-go@v7.0.0",
+    "cache: false",
     "python3 scripts/check_environment_contract.py",
     "uv run --locked basedpyright",
     "uv build",
