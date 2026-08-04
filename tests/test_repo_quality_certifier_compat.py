@@ -130,6 +130,17 @@ def test_module_cli_plan_writes_external_fixture_artifacts(tmp_path: Path) -> No
     assert payload["phase_scope_policy"] == "repo_local_gate_scoped"
     assert payload["repo_local_phases"]
     assert Path(payload["artifact_paths"]["gate_matrix_json"]).exists()
+    artifact_files: list[Path] = []
+    for raw_path in payload["artifact_paths"].values():
+        path = Path(raw_path)
+        artifact_files.extend(
+            [path]
+            if path.is_file()
+            else [candidate for candidate in path.rglob("*") if candidate.is_file()]
+        )
+    artifact_text = "\n".join(path.read_text(encoding="utf-8") for path in artifact_files)
+    assert "/Users/jakyeamos/AIOS/scripts/linked-repo-quality-runner.py" not in artifact_text
+    assert "qr audit <project> --json" in artifact_text
     enrichment = json.loads(
         Path(payload["artifact_paths"]["tmcp_expert_enrichment_json"]).read_text(encoding="utf-8")
     )

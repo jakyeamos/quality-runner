@@ -58,11 +58,14 @@ QUALITY_COMMANDS = (
     "gitleaks detect --source . --no-banner --redact",
 )
 CI_REQUIRED_COMMANDS = (
+    "uses: actions/setup-go@v7.0.0",
+    "cache: false",
     "python3 scripts/check_environment_contract.py",
     "uv run --locked basedpyright",
     "uv build",
     "uv run --locked pip-audit",
     "gitleaks detect --source . --no-banner --redact",
+    "go install github.com/zricethezav/gitleaks/v8@v8.30.1",
 )
 REQUIRED_GITIGNORE = (
     ".env",

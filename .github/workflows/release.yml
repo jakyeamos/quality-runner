@@ -44,12 +44,13 @@ jobs:
         run: uv sync --locked --all-groups --python 3.12
 
       - name: Install gitleaks
-        uses: actions/setup-go@v6.0.0
+        uses: actions/setup-go@v7.0.0
         with:
           go-version: "1.24.x"
+          cache: false
 
       - name: Build gitleaks
-        run: go install github.com/gitleaks/gitleaks/v8@v8.30.1
+        run: go install github.com/zricethezav/gitleaks/v8@v8.30.1
 
       - name: Run release checks
         run: |
