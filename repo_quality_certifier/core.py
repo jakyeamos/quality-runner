@@ -92,7 +92,7 @@ GATE_LABELS = {
     "anti_slop": "Anti-Slop Heuristics",
     "data_state_integrity": "Data / State Integrity",
     "observability_debuggability": "Observability / Debuggability",
-    "local_quality_contract": "AIOS Local Quality Contract",
+    "local_quality_contract": "Repository-local Quality Contract",
     "ci": "Remote CI",
     "local_hook": "Local Hook Enforcement",
 }
@@ -271,14 +271,14 @@ GATE_SETUP_GUIDANCE = {
     },
     "local_quality_contract": {
         "actions": [
-            "Add a repo-local `.aios-quality-gate.json` contract that names the AIOS project id and required adoption gates.",
-            "Keep the contract aligned with the central AIOS quality profile instead of using it to weaken requirements.",
+            "Add repo-owned quality commands, CI, `.pre-cr.json`, or a documented equivalent that names the required gates.",
+            "Keep the contract aligned with QR-discovered evidence instead of using it to weaken requirements.",
         ],
         "commands": [
-            "test -f .aios-quality-gate.json",
-            "python3 /Users/jakyeamos/AIOS/scripts/linked-repo-quality-runner.py --project <project>",
+            "qr audit <project> --json",
+            "qr verify <project> --json",
         ],
-        "files": [".aios-quality-gate.json", "config/quality-gates.json"],
+        "files": [".pre-cr.json", "pyproject.toml", "package.json", ".github/workflows/"],
     },
 }
 
