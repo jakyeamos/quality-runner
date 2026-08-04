@@ -29,6 +29,24 @@ def _repo(tmp_path: Path) -> Path:
     return tmp_path
 
 
+def _git_object_payloads(objects: Path) -> list[Path]:
+    """Return actual loose and packed objects, excluding Git housekeeping files."""
+
+    return sorted(
+        path.relative_to(objects)
+        for path in objects.rglob("*")
+        if path.is_file()
+        and (
+            (
+                len(path.relative_to(objects).parts) == 2
+                and len(path.relative_to(objects).parts[0]) == 2
+                and len(path.relative_to(objects).parts[1]) == 38
+            )
+            or path.relative_to(objects).parts[0] == "pack"
+        )
+    )
+
+
 def test_workspace_snapshot_captures_edits_deletions_and_untracked_files(
     tmp_path: Path,
 ) -> None:
@@ -282,14 +300,14 @@ def test_merge_workspace_does_not_write_objects_to_source_repository(
     _git(repo, "add", "task.txt")
     _git(repo, "commit", "-m", "task change")
     objects = repo / ".git" / "objects"
-    before = sorted(path.relative_to(objects) for path in objects.rglob("*") if path.is_file())
+    before = _git_object_payloads(objects)
 
     with workspace_snapshot(repo, merge_target_ref=target_sha) as (snapshot, manifest):
         assert (snapshot / "target.txt").read_text() == "target\n"
         assert (snapshot / "task.txt").read_text() == "task\n"
         attach_git_metadata(repo, snapshot, source=manifest["source"])
 
-    after = sorted(path.relative_to(objects) for path in objects.rglob("*") if path.is_file())
+    after = _git_object_payloads(objects)
     assert after == before
 
 

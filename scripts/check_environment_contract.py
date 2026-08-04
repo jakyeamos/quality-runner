@@ -63,6 +63,7 @@ CI_REQUIRED_COMMANDS = (
     "uv build",
     "uv run --locked pip-audit",
     "gitleaks detect --source . --no-banner --redact",
+    "go install github.com/zricethezav/gitleaks/v8@v8.30.1",
 )
 REQUIRED_GITIGNORE = (
     ".env",
