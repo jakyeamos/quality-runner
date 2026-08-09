@@ -32,6 +32,7 @@ from quality_runner.fleet.dynamic import (
 )
 from quality_runner.fleet.legibility import audit_repository
 from quality_runner.fleet.reporting import plan_markdown, report_markdown, summary_markdown
+from quality_runner.fleet.static_scan import static_scan_repository as _static_scan_repository
 
 DEFAULT_FLEET_ROOT = Path("~/.quality-runner/fleet-audit")
 DEFAULT_DYNAMIC_MAX_AGE_DAYS = 30
@@ -71,11 +72,17 @@ def fleet_audit_payload(
         target_override = overrides.get(str(repository["repo_id"]))
         target = resolve_target_branch(repository, override=target_override)
         repository_with_target = {**repository, "target_branch": target}
+        static_repository = _static_scan_repository(repository_with_target)
         result = audit_repository(
-            repository=repository_with_target,
+            repository=static_repository,
             as_of=resolved_as_of,
             run_id=f"{audit_id}-{repository['repo_id']}",
         )
+        # Keep the canonical repository identity (including its primary path)
+        # in persisted artifacts. The ready target checkout is only the static
+        # evidence source; it must not replace the identity or dirty-worktree
+        # provenance used by Pronto and dynamic verification.
+        result["repository"] = repository_with_target
         dynamic_evidence = build_dynamic_result(
             repository=result["repository"],
             finding=result,
