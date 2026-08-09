@@ -7,6 +7,7 @@ from quality_runner.policy_surfaces import (
     classify_policy_surface,
     validate_policy_surfaces,
 )
+from quality_runner.cli import main
 
 
 def test_policy_files_are_classified_outside_source_line_coverage() -> None:
@@ -88,3 +89,43 @@ def test_pre_cr_wires_policy_validation_and_excludes_only_source_coverage() -> N
     assert "check_policy_surfaces.py" in adapter["command"]
     assert ".quality-runner.toml" in config["excludePatterns"]
     assert "change-surface-matrix.json" in config["excludePatterns"]
+
+
+def test_policy_surface_cli_exposes_pass_and_failure_exit_states(tmp_path: Path) -> None:
+    config = {
+        "version": 1,
+        "testCommand": "pytest",
+        "coveragePaths": ["coverage.lcov"],
+        "threshold": 80,
+    }
+    config_path = tmp_path / ".pre-cr.json"
+    config_path.write_text(json.dumps(config), encoding="utf-8")
+
+    assert (
+        main(
+            [
+                "policy-surfaces",
+                "check",
+                str(tmp_path),
+                "--changed-file",
+                ".pre-cr.json",
+                "--json",
+            ]
+        )
+        == 0
+    )
+
+    config_path.write_text('{"version": 1}', encoding="utf-8")
+    assert (
+        main(
+            [
+                "policy-surfaces",
+                "check",
+                str(tmp_path),
+                "--changed-file",
+                ".pre-cr.json",
+                "--json",
+            ]
+        )
+        == 1
+    )

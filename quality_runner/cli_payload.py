@@ -31,6 +31,7 @@ from quality_runner.cli_gate import (
 from quality_runner.cli_handoff import handoff_command_payload
 from quality_runner.cli_phase import phase_command_payload
 from quality_runner.cli_planning import planning_command_payload
+from quality_runner.cli_policy_surfaces import policy_surfaces_payload
 from quality_runner.cli_refresh import refresh_command_payload
 from quality_runner.cli_remediation import remediation_delta_command_payload
 from quality_runner.cli_repo_hygiene import repo_hygiene_payload
@@ -333,6 +334,8 @@ def payload_for_args(
         )
     if args.command == "repo-hygiene":
         return repo_hygiene_payload(args, validated_repo_path=_validated_repo_path)
+    if args.command == "policy-surfaces":
+        return policy_surfaces_payload(args, repo_path=_validated_repo_path)
     raise ValueError(f"unsupported command: {args.command}")
 
 

@@ -23,6 +23,7 @@ from quality_runner.cli_outcome import OUTCOME_SCHEMA, render_outcome
 from quality_runner.cli_payload import payload_for_args
 from quality_runner.cli_phase import add_phase_commands
 from quality_runner.cli_planning import add_planning_commands
+from quality_runner.cli_policy_surfaces import add_policy_surface_commands
 from quality_runner.cli_remediation import add_remediation_commands
 from quality_runner.cli_repo_hygiene import add_repo_hygiene_commands
 from quality_runner.cli_review import add_review_command
@@ -64,7 +65,8 @@ Compatibility commands remain available:
 
 Advanced operations:
   refresh, rollout, gate, controller-report, skill, proposal, remediation,
-  plan, phase, repo-hygiene, security, release-smoke, and worker handoff tools
+  plan, phase, repo-hygiene, policy-surfaces, security, release-smoke, and
+  worker handoff tools
 
 Fleet environment audit:
   fleet audit run --all       static-all audit with optional changed-only dynamic checks
@@ -73,6 +75,10 @@ Fleet environment audit:
   fleet audit replay          verify deterministic artifact regeneration
   fleet audit report          write an aggregate-only reviewable projection
   fleet audit feed            publish the validated stable maturity feed
+  fleet mac-control audit run --all
+                               validate the explicit Mac Control ideal-state lane
+  fleet mac-control audit feed
+                               publish the Mac Control companion report for Pronto
 
 Run '{program_name} <command> --help' for options. Audit, review, verify, and
 runs emit a compact outcome card by default and v2 JSON with --json. Use
@@ -313,6 +319,7 @@ def build_parser(prog: str = CANONICAL_PROGRAM) -> argparse.ArgumentParser:
 
     add_artifact_commands(subparsers)
     add_repo_hygiene_commands(subparsers)
+    add_policy_surface_commands(subparsers)
 
     add_handoff_commands(subparsers)
 
@@ -418,6 +425,8 @@ def main(argv: list[str] | None = None) -> int:
     if parsed.command == "plan" and payload.get("status") == "blocked":
         return 1
     if parsed.command == "repo-hygiene" and payload.get("status") in {"fail", "blocked"}:
+        return 1
+    if parsed.command == "policy-surfaces" and payload.get("status") != "passed":
         return 1
     return 0
 
