@@ -13,8 +13,8 @@ from quality_runner.fleet.mac_control import (
     MAC_CONTROL_MANIFEST_SCHEMA,
     mac_control_audit_payload,
     mac_control_feed_payload,
-    mac_control_report_payload,
     mac_control_replay_payload,
+    mac_control_report_payload,
     validate_manifest,
 )
 from quality_runner.fleet.mac_control_contracts import MacControlAuditError
