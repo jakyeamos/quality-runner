@@ -31,7 +31,9 @@ def mac_control_replay_payload(
         repositories=objects(report.get("repositories")),
         live=bool(object_value(inventory.get("live_policy")).get("requested", False)),
     )
-    deterministic = bool(inventory and report and summary) and canonical_json(rebuilt) == canonical_json(summary)
+    deterministic = bool(inventory and report and summary) and canonical_json(
+        rebuilt
+    ) == canonical_json(summary)
     return {
         "schema": MAC_CONTROL_REPLAY_SCHEMA,
         "status": "passed" if deterministic else "failed",
@@ -76,7 +78,11 @@ def mac_control_feed_payload(
     if replay.get("status") != "passed":
         raise MacControlAuditError("Mac Control audit replay failed; report was not published")
     report = read_object(artifact_root / "mac-control-ideal-state.json")
-    root = MAC_CONTROL_DEFAULT_ROOT if output_dir is None else publication_root(output_dir, artifact_root)
+    root = (
+        MAC_CONTROL_DEFAULT_ROOT
+        if output_dir is None
+        else publication_root(output_dir, artifact_root)
+    )
     current = root.expanduser() / "current"
     prepare_safe_directory(current)
     report_path = write_json(current / MAC_CONTROL_REPORT_RELATIVE_PATH.name, report)
@@ -96,7 +102,12 @@ def mac_control_feed_payload(
 
 
 def build_summary(
-    *, audit_id: str, observed_at: str, projects_root: Path, repositories: list[dict[str, Any]], live: bool
+    *,
+    audit_id: str,
+    observed_at: str,
+    projects_root: Path,
+    repositories: list[dict[str, Any]],
+    live: bool,
 ) -> dict[str, Any]:
     applicability_counts: dict[str, int] = {}
     task_count = 0
@@ -131,20 +142,19 @@ def build_summary(
         live_statuses.append(live_lane["status"])
         implementation_criteria_passed_count += int(implementation["criteria_passed_count"])
         implementation_criteria_total += int(implementation["criteria_total"])
-        if applicability == "unknown" or implementation_status in {"failed", "blocked"} or (
-            applicability == "applicable"
-            and (
-                implementation["status"] != "passed"
-                or live_lane["status"] != "passed"
+        if (
+            applicability == "unknown"
+            or implementation_status in {"failed", "blocked"}
+            or (
+                applicability == "applicable"
+                and (implementation["status"] != "passed" or live_lane["status"] != "passed")
             )
         ):
             failing_repositories.append(str(entry.get("repository_id", "unknown")))
     implementation_status = _aggregate_lane_status(
         implementation_statuses, applicability_counts.get("applicable", 0)
     )
-    live_status = _aggregate_lane_status(
-        live_statuses, applicability_counts.get("applicable", 0)
-    )
+    live_status = _aggregate_lane_status(live_statuses, applicability_counts.get("applicable", 0))
     return {
         "schema": "quality-runner-mac-control-summary/v1",
         "audit_id": audit_id,
@@ -165,9 +175,7 @@ def build_summary(
         "live_requested": live,
         "status": (
             "passed"
-            if repositories
-            and not failing_repositories
-            and not applicability_counts.get("unknown")
+            if repositories and not failing_repositories and not applicability_counts.get("unknown")
             else "review_required"
         ),
         "implementation_allowed": False,
@@ -193,9 +201,7 @@ def _implementation_lane(entry: dict[str, Any]) -> dict[str, Any]:
         if not isinstance(criteria_total, int):
             criteria_total = len(CRITERIA)
         return {
-            "status": _normalize_lane_status(
-                lane.get("status"), applicability, fallback="failed"
-            ),
+            "status": _normalize_lane_status(lane.get("status"), applicability, fallback="failed"),
             "criteria_passed_count": criteria_passed_count,
             "criteria_total": criteria_total,
         }
@@ -302,7 +308,12 @@ def _aggregate_lane_status(statuses: list[str], applicable_count: int) -> str:
 
 
 def write_artifacts(
-    *, artifact_root: Path, inventory: dict[str, Any], report: dict[str, Any], summary: dict[str, Any], provider_results: dict[str, dict[str, Any]]
+    *,
+    artifact_root: Path,
+    inventory: dict[str, Any],
+    report: dict[str, Any],
+    summary: dict[str, Any],
+    provider_results: dict[str, dict[str, Any]],
 ) -> dict[str, str]:
     prepare_safe_directory(artifact_root)
     providers = prepare_safe_directory(artifact_root / "providers")
@@ -318,7 +329,9 @@ def write_artifacts(
         "inventory_hash": digest(inventory),
         "report_hash": digest(report),
         "summary_hash": digest(summary),
-        "provider_hashes": {repo_id: digest(value) for repo_id, value in sorted(provider_results.items())},
+        "provider_hashes": {
+            repo_id: digest(value) for repo_id, value in sorted(provider_results.items())
+        },
         "provenance_hash": digest({"inventory": inventory, "report": report, "summary": summary}),
     }
     replay_path = write_json(artifact_root / "replay-manifest.json", replay)
@@ -378,7 +391,9 @@ def resolve_artifact_root(output_dir: Path | None, audit_id: str | None) -> Path
 
 
 def latest(root: Path) -> Path:
-    candidates = [path for path in root.glob("**/inventory.json") if path.is_file() and not path.is_symlink()]
+    candidates = [
+        path for path in root.glob("**/inventory.json") if path.is_file() and not path.is_symlink()
+    ]
     if not candidates:
         raise FileNotFoundError(f"no Mac Control audit artifacts found under {root}")
     return max(candidates, key=lambda path: path.stat().st_mtime).parent

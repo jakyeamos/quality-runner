@@ -177,12 +177,8 @@ def _audit_repository(
                 [],
                 {},
                 [],
-                implementation_errors=[
-                    "No repository-owned Mac Control manifest was found."
-                ],
-                live_errors=[
-                    "No repository-owned Mac Control manifest was found."
-                ],
+                implementation_errors=["No repository-owned Mac Control manifest was found."],
+                live_errors=["No repository-owned Mac Control manifest was found."],
             ),
             None,
         )
@@ -211,8 +207,14 @@ def _audit_repository(
             if isinstance(sidecar.get("observed_at"), str) and sidecar["observed_at"].strip():
                 observed_at = sidecar["observed_at"].strip()
             sidecar_commit = sidecar.get("observed_commit")
-            if isinstance(sidecar_commit, str) and sidecar_commit.strip() and sidecar_commit.strip() != commit:
-                live_errors.append("evidence sidecar observed_commit does not match the repository commit")
+            if (
+                isinstance(sidecar_commit, str)
+                and sidecar_commit.strip()
+                and sidecar_commit.strip() != commit
+            ):
+                live_errors.append(
+                    "evidence sidecar observed_commit does not match the repository commit"
+                )
             merge_task_evidence(tasks, sidecar.get("tasks"), live_errors)
     if manifest_errors:
         evidence.extend(f"manifest_error:{error}" for error in manifest_errors)
@@ -234,7 +236,9 @@ def _audit_repository(
             provider_evidence = f"macctl:ideal-state.audit:{provider.get('status', 'unknown')}"
             evidence.append(provider_evidence)
             live_evidence.append(provider_evidence)
-            live_errors.append("live Mac Control ideal-state audit did not produce a redacted structural pass")
+            live_errors.append(
+                "live Mac Control ideal-state audit did not produce a redacted structural pass"
+            )
         if provider.get("finding_count", 0):
             findings_evidence = f"macctl:ideal-state.audit:findings={provider['finding_count']}"
             evidence.append(findings_evidence)
@@ -279,9 +283,7 @@ def _base_entry(
     implementation_errors = sorted(set(implementation_errors or []))
     live_errors = sorted(set(live_errors or []))
     live_evidence = sorted(set(live_evidence or []))
-    implementation_evidence = sorted(
-        item for item in set(evidence) if item.startswith("manifest:")
-    )
+    implementation_evidence = sorted(item for item in set(evidence) if item.startswith("manifest:"))
     return {
         "repository_id": str(repository["repo_id"]),
         "repository_name": Path(str(repository["primary_path"])).name,
@@ -452,7 +454,9 @@ def _run_mac_control_provider(
     }
 
 
-def _repositories_for_scope(root: Path, repository_paths: list[Path] | None) -> list[dict[str, Any]]:
+def _repositories_for_scope(
+    root: Path, repository_paths: list[Path] | None
+) -> list[dict[str, Any]]:
     if repository_paths is None:
         return discover_repositories(root)
     records: dict[str, dict[str, Any]] = {}
@@ -471,7 +475,11 @@ def _repositories_for_scope(root: Path, repository_paths: list[Path] | None) -> 
 
 def _repository_commit(repository: dict[str, Any]) -> str:
     for checkout in repository.get("checkouts", []):
-        if isinstance(checkout, dict) and checkout.get("is_primary") and isinstance(checkout.get("head"), str):
+        if (
+            isinstance(checkout, dict)
+            and checkout.get("is_primary")
+            and isinstance(checkout.get("head"), str)
+        ):
             return checkout["head"]
     for checkout in repository.get("checkouts", []):
         if isinstance(checkout, dict) and isinstance(checkout.get("head"), str):

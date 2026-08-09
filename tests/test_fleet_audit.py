@@ -97,15 +97,18 @@ def test_static_scan_preserves_identity_for_unusable_target_metadata() -> None:
     assert _static_scan_repository({"target_branch": {"status": "ready"}}) == {
         "target_branch": {"status": "ready"}
     }
-    assert _static_scan_repository(
-        {"target_branch": {"status": "ready", "checkout_id": 7}}
-    ) == {"target_branch": {"status": "ready", "checkout_id": 7}}
-    assert _static_scan_repository(
-        {
-            "target_branch": {"status": "ready", "checkout_id": "checkout-dev"},
-            "checkouts": [{"checkout_id": "other", "path": "/private/tmp/other"}],
-        }
-    )["target_branch"]["checkout_id"] == "checkout-dev"
+    assert _static_scan_repository({"target_branch": {"status": "ready", "checkout_id": 7}}) == {
+        "target_branch": {"status": "ready", "checkout_id": 7}
+    }
+    assert (
+        _static_scan_repository(
+            {
+                "target_branch": {"status": "ready", "checkout_id": "checkout-dev"},
+                "checkouts": [{"checkout_id": "other", "path": "/private/tmp/other"}],
+            }
+        )["target_branch"]["checkout_id"]
+        == "checkout-dev"
+    )
     assert _static_scan_repository(
         {
             "target_branch": {"status": "ready", "checkout_id": "checkout-dev"},

@@ -39,9 +39,21 @@ def _phase(phase_id: str, state: str, evidence: str) -> dict[str, str]:
 def _report_only_backfill(*, has_verification: bool = True) -> dict[str, Any]:
     phases = [
         _phase("detect", "native", "Quality Runner evaluates the configured skill rules."),
-        _phase("report", "native", "Findings are emitted with evidence, risk, and expected improvement."),
-        _phase("plan", "available", "Findings can enter the existing remediation and handoff projections."),
-        _phase("apply", "unsupported", "Quality Runner does not apply code changes from a skill finding."),
+        _phase(
+            "report",
+            "native",
+            "Findings are emitted with evidence, risk, and expected improvement.",
+        ),
+        _phase(
+            "plan",
+            "available",
+            "Findings can enter the existing remediation and handoff projections.",
+        ),
+        _phase(
+            "apply",
+            "unsupported",
+            "Quality Runner does not apply code changes from a skill finding.",
+        ),
         _phase(
             "verify",
             "required" if has_verification else "not_evidenced",
@@ -59,9 +71,15 @@ def _unknown_backfill() -> dict[str, Any]:
     return {
         "mode": "not_evidenced",
         "phases": [
-            _phase("detect", "not_evidenced", "No reviewed Quality Runner representation was found."),
+            _phase(
+                "detect", "not_evidenced", "No reviewed Quality Runner representation was found."
+            ),
             _phase("report", "not_evidenced", "No finding-producing adapter was found."),
-            _phase("plan", "not_evidenced", "Backfill planning cannot be inferred from skill inventory alone."),
+            _phase(
+                "plan",
+                "not_evidenced",
+                "Backfill planning cannot be inferred from skill inventory alone.",
+            ),
             _phase("apply", "unsupported", "No automatic application path is implied."),
             _phase("verify", "not_evidenced", "Verification evidence is unavailable."),
         ],
@@ -99,9 +117,7 @@ def _quality_runner_representation(
         }
     )
     finding_count = sum(
-        _int_value(item.get("finding_count"))
-        for item in coverage
-        if isinstance(item, dict)
+        _int_value(item.get("finding_count")) for item in coverage if isinstance(item, dict)
     )
     coverage_proven = bool(coverage) and all(
         status in {"evaluated", "matched", "reviewed"} for status in statuses
@@ -110,8 +126,13 @@ def _quality_runner_representation(
     gaps = []
     if not coverage:
         gaps.append("The active pack has no deterministic or agent-review coverage entries.")
-    if any(value in {"skipped", "no_matching_files", "review_required", "review_rejected"} for value in statuses):
-        gaps.append("At least one configured rule or review is not covered by a successful evaluation.")
+    if any(
+        value in {"skipped", "no_matching_files", "review_required", "review_rejected"}
+        for value in statuses
+    ):
+        gaps.append(
+            "At least one configured rule or review is not covered by a successful evaluation."
+        )
     return {
         "status": status,
         "adapter": adapter,
@@ -180,7 +201,9 @@ def _skill_pack_capability(
                 "evidence": ["The skill is present in the active Quality Runner selection."],
                 "gaps": ["No finding-producing rule or review is declared."],
             },
-            "gaps": ["Add a reviewed deterministic rule or agent review before expecting findings."],
+            "gaps": [
+                "Add a reviewed deterministic rule or agent review before expecting findings."
+            ],
         }
 
     return {
@@ -327,7 +350,9 @@ def build_skill_capability_feed(quality_scan: dict[str, Any]) -> dict[str, Any]:
         "schema": CAPABILITY_SCHEMA,
         "generated_at": _now(),
         "source": "Quality Runner code-quality scan",
-        "run_id": quality_scan.get("run_id") if isinstance(quality_scan.get("run_id"), str) else None,
+        "run_id": quality_scan.get("run_id")
+        if isinstance(quality_scan.get("run_id"), str)
+        else None,
         "status": "report_only",
         "skills": capabilities,
         "gaps": [

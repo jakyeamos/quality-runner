@@ -661,9 +661,7 @@ def test_fat_router_owns_overlapping_large_file_signal(tmp_path: Path) -> None:
     )
 
     debloat_rules = [
-        finding["rule_id"]
-        for finding in result["findings"]
-        if finding["category"] == "debloat"
+        finding["rule_id"] for finding in result["findings"] if finding["category"] == "debloat"
     ]
     assert debloat_rules == ["fat-router"]
     fat_router = next(

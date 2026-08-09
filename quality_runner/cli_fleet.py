@@ -150,13 +150,19 @@ def fleet_command_payload(args: argparse.Namespace) -> dict[str, Any]:
         action = args.mac_control_audit_action
         if action == "run":
             if not args.all and not args.repo_path:
-                raise ValueError("fleet mac-control audit run requires --all or at least one --repo-path")
+                raise ValueError(
+                    "fleet mac-control audit run requires --all or at least one --repo-path"
+                )
             if args.all and args.repo_path:
-                raise ValueError("fleet mac-control audit run accepts --all or --repo-path, not both")
+                raise ValueError(
+                    "fleet mac-control audit run accepts --all or --repo-path, not both"
+                )
             return mac_control_audit_payload(
                 projects_root=Path(args.projects_root),
                 output_dir=Path(args.output_dir) if args.output_dir else None,
-                repository_paths=[Path(path) for path in args.repo_path] if args.repo_path else None,
+                repository_paths=[Path(path) for path in args.repo_path]
+                if args.repo_path
+                else None,
                 as_of=args.as_of,
                 live=args.live,
                 macctl_path=args.macctl,

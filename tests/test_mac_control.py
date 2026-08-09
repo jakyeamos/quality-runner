@@ -13,8 +13,8 @@ from quality_runner.fleet.mac_control import (
     MAC_CONTROL_MANIFEST_SCHEMA,
     mac_control_audit_payload,
     mac_control_feed_payload,
-    mac_control_report_payload,
     mac_control_replay_payload,
+    mac_control_report_payload,
     validate_manifest,
 )
 from quality_runner.fleet.mac_control_contracts import MacControlAuditError
@@ -111,7 +111,9 @@ def test_manifest_separates_static_contract_from_live_task_evidence(tmp_path: Pa
     assert result["summary"]["implementation_criteria_passed_count"] == 8
     assert result["summary"]["live_status"] == "review_required"
     assert result["summary"]["status"] == "review_required"
-    assert mac_control_replay_payload(output_dir=Path(result["artifact_root"]))["status"] == "passed"
+    assert (
+        mac_control_replay_payload(output_dir=Path(result["artifact_root"]))["status"] == "passed"
+    )
     report = mac_control_report_payload(output_dir=Path(result["artifact_root"]))
     assert report["status"] == "review_required"
     assert Path(report["artifact_paths"]["report_json"]).is_file()
@@ -132,7 +134,9 @@ def test_manifest_separates_static_contract_from_live_task_evidence(tmp_path: Pa
     assert missing_entry["repository_id"] in missing_result["summary"]["failing_repository_ids"]
 
 
-def test_evidence_sidecar_publishes_companion_report_without_changing_qr_score(tmp_path: Path) -> None:
+def test_evidence_sidecar_publishes_companion_report_without_changing_qr_score(
+    tmp_path: Path,
+) -> None:
     projects = tmp_path / "projects"
     repo = projects / "fixture"
     _repo(repo)
@@ -194,7 +198,9 @@ def test_manifest_rejects_guessing_routes_and_incomplete_state() -> None:
     task["navigation_strategy"] = "sequential_tabbing"
     task["observable_states"] = ["enabled"]
     assert any("sequential tabbing" in error for error in validate_manifest(manifest))
-    assert any("observable_states is missing completed" in error for error in validate_manifest(manifest))
+    assert any(
+        "observable_states is missing completed" in error for error in validate_manifest(manifest)
+    )
 
 
 def test_invalid_not_applicable_manifest_is_review_required(tmp_path: Path) -> None:
@@ -205,9 +211,7 @@ def test_invalid_not_applicable_manifest_is_review_required(tmp_path: Path) -> N
     manifest_dir.mkdir()
     manifest = _manifest("repo")
     manifest["applicability"] = "not_applicable"
-    manifest_dir.joinpath("ideal-state.json").write_text(
-        json.dumps(manifest), encoding="utf-8"
-    )
+    manifest_dir.joinpath("ideal-state.json").write_text(json.dumps(manifest), encoding="utf-8")
 
     result = mac_control_audit_payload(
         projects_root=projects,
@@ -233,7 +237,7 @@ def test_live_lane_records_redacted_provider_result(tmp_path: Path) -> None:
     )
     provider = tmp_path / "macctl-fixture"
     provider.write_text(
-        "#!/bin/sh\nprintf '%s\\n' '{\"status\":\"succeeded\",\"result\":{\"structural_valid\":true,\"findings\":[],\"redacted\":true}}'\n",
+        '#!/bin/sh\nprintf \'%s\\n\' \'{"status":"succeeded","result":{"structural_valid":true,"findings":[],"redacted":true}}\'\n',
         encoding="utf-8",
     )
     provider.chmod(provider.stat().st_mode | 0o111)

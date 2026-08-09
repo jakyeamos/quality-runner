@@ -3,11 +3,11 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from quality_runner.cli import main
 from quality_runner.policy_surfaces import (
     classify_policy_surface,
     validate_policy_surfaces,
 )
-from quality_runner.cli import main
 
 
 def test_policy_files_are_classified_outside_source_line_coverage() -> None:

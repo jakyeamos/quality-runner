@@ -147,7 +147,9 @@ def test_active_skill_without_a_scan_reports_a_configuration_gap() -> None:
 
 def test_empty_active_skill_and_missing_inventory_stay_not_evidenced() -> None:
     records = build_skill_capabilities(
-        quality_skills=[{"id": "empty", "name": "Empty", "deterministic_rules": [], "agent_reviews": []}]
+        quality_skills=[
+            {"id": "empty", "name": "Empty", "deterministic_rules": [], "agent_reviews": []}
+        ]
     )
     empty = next(item for item in records if item["id"] == "empty")
     assert empty["finding_expectation"] == "review_required"
@@ -157,7 +159,9 @@ def test_empty_active_skill_and_missing_inventory_stay_not_evidenced() -> None:
     native_only = build_skill_capabilities()
     debloat = next(item for item in native_only if item["id"] == "debloat-repository")
     assert debloat["quality_runner"]["status"] == "adapter_defined"
-    assert any("No active Quality Runner skill packs" in gap for gap in debloat["quality_runner"]["gaps"])
+    assert any(
+        "No active Quality Runner skill packs" in gap for gap in debloat["quality_runner"]["gaps"]
+    )
 
 
 def test_feed_preserves_supplied_capabilities_and_rejects_invalid_inputs(tmp_path: Path) -> None:

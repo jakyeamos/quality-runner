@@ -107,13 +107,22 @@ def validate_manifest(manifest: object) -> list[str]:
             "sequential tabbing",
         }:
             errors.append(f"task {label} must not rely on sequential tabbing")
-        _require_values(task.get("observable_states"), OBSERVABLE_STATES, f"task {label} observable_states", errors)
-        _require_values(task.get("change_states"), CHANGE_STATES, f"task {label} change_states", errors)
+        _require_values(
+            task.get("observable_states"),
+            OBSERVABLE_STATES,
+            f"task {label} observable_states",
+            errors,
+        )
+        _require_values(
+            task.get("change_states"), CHANGE_STATES, f"task {label} change_states", errors
+        )
         eligible = task.get("eligible_routes")
         if not isinstance(eligible, list) or not eligible:
             errors.append(f"task {label} requires eligible_routes")
         else:
-            normalized_routes = {_normalize_token(item) for item in eligible if isinstance(item, str)}
+            normalized_routes = {
+                _normalize_token(item) for item in eligible if isinstance(item, str)
+            }
             for route in normalized_routes - set(ROUTES):
                 errors.append(f"task {label} has unsupported route {route}")
             if _normalize_token(task.get("selected_route")) not in normalized_routes:
@@ -194,11 +203,19 @@ def normalize_token(value: object) -> str:
 
 
 def bool_mapping(value: object) -> dict[str, bool]:
-    return {str(key): child for key, child in value.items() if isinstance(child, bool)} if isinstance(value, dict) else {}
+    return (
+        {str(key): child for key, child in value.items() if isinstance(child, bool)}
+        if isinstance(value, dict)
+        else {}
+    )
 
 
 def string_list(value: object) -> list[str]:
-    return sorted({item for item in value if isinstance(item, str) and item.strip()}) if isinstance(value, list) else []
+    return (
+        sorted({item for item in value if isinstance(item, str) and item.strip()})
+        if isinstance(value, list)
+        else []
+    )
 
 
 def _nonempty(value: object) -> bool:
@@ -213,7 +230,9 @@ def _normalize_token(value: object) -> str:
     return normalize_token(value)
 
 
-def _require_values(value: object, required: tuple[str, ...], label: str, errors: list[str]) -> None:
+def _require_values(
+    value: object, required: tuple[str, ...], label: str, errors: list[str]
+) -> None:
     values = {normalize_token(item) for item in value} if isinstance(value, list) else set()
     for expected in required:
         if expected not in values:
