@@ -22,6 +22,11 @@
       "name": "environment-contract",
       "command": "python3 scripts/check_environment_contract.py",
       "required": true
+    },
+    {
+      "name": "policy-surface-validation",
+      "command": "python3 scripts/check_policy_surfaces.py --json --changed-files \"{changedFiles}\"",
+      "required": true
     }
   ],
   "threshold": 80,
@@ -29,6 +34,12 @@
     ".github/**",
     ".gitignore",
     ".pre-cr.json",
+    ".gitleaks.toml",
+    ".quality-runner.toml",
+    "change-surface-matrix.json",
+    ".agents/change-surface-matrix.json",
+    ".context/change-surface-matrix.json",
+    "docs/change-surface-matrix.json",
     ".quality-runner/**",
     ".venv/**",
     "CHANGELOG.md",
