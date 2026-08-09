@@ -7,6 +7,7 @@ from typing import cast
 
 import pytest
 
+from quality_runner.cli import main
 from quality_runner.fleet.discovery import repository_record_for_root
 from quality_runner.fleet.mac_control import (
     MAC_CONTROL_MANIFEST_SCHEMA,
@@ -354,3 +355,100 @@ def test_live_provider_failures_and_scope_boundaries_are_explicit(tmp_path: Path
             repository_paths=[tmp_path / "outside"],
             output_dir=tmp_path / "outside-audit",
         )
+
+
+def test_mac_control_fleet_cli_routes_run_replay_report_and_feed(tmp_path: Path) -> None:
+    projects = tmp_path / "projects"
+    repo = projects / "fixture"
+    _repo(repo)
+    record = repository_record_for_root(repo)
+    manifest_dir = repo / ".mac-control"
+    manifest_dir.mkdir()
+    manifest_dir.joinpath("ideal-state.json").write_text(
+        json.dumps(_manifest(str(record["repo_id"]))), encoding="utf-8"
+    )
+    output = tmp_path / "audit"
+    audit = mac_control_audit_payload(
+        projects_root=projects,
+        output_dir=output,
+        as_of="2026-08-08T12:00:00+00:00",
+    )
+    artifact_root = Path(audit["artifact_root"])
+
+    assert (
+        main(
+            [
+                "fleet",
+                "mac-control",
+                "audit",
+                "run",
+                "--repo-path",
+                str(repo),
+                "--projects-root",
+                str(projects),
+                "--output-dir",
+                str(tmp_path / "cli-run"),
+                "--json",
+            ]
+        )
+        == 0
+    )
+    assert (
+        main(
+            [
+                "fleet",
+                "mac-control",
+                "audit",
+                "replay",
+                "--output-dir",
+                str(artifact_root),
+                "--json",
+            ]
+        )
+        == 0
+    )
+    assert (
+        main(
+            [
+                "fleet",
+                "mac-control",
+                "audit",
+                "report",
+                "--output-dir",
+                str(artifact_root),
+                "--json",
+            ]
+        )
+        == 0
+    )
+    assert (
+        main(
+            [
+                "fleet",
+                "mac-control",
+                "audit",
+                "feed",
+                "--output-dir",
+                str(artifact_root),
+                "--json",
+            ]
+        )
+        == 0
+    )
+    assert (
+        main(
+            [
+                "fleet",
+                "mac-control",
+                "audit",
+                "run",
+                "--all",
+                "--repo-path",
+                str(repo),
+                "--projects-root",
+                str(projects),
+                "--json",
+            ]
+        )
+        == 1
+    )
