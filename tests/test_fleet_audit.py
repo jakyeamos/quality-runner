@@ -5,6 +5,7 @@ import subprocess
 from pathlib import Path
 
 from quality_runner.fleet.audit import (
+    _static_scan_repository,
     fleet_audit_payload,
     fleet_replay_payload,
     fleet_report_payload,
@@ -60,6 +61,60 @@ def test_target_branch_prefers_dev_over_more_advanced_feature(tmp_path: Path) ->
     assert target["branch"] == "dev"
     assert target["source"] == "default_dev"
     assert target["status"] == "ready"
+
+
+def test_static_scan_uses_ready_target_checkout_without_replacing_identity() -> None:
+    repository = {
+        "repo_id": "repo-example",
+        "primary_path": "/projects/repository",
+        "checkouts": [
+            {
+                "checkout_id": "checkout-dev",
+                "path": "/private/tmp/repository-dev",
+                "branch": "dev",
+                "dirty": False,
+                "exists": True,
+            }
+        ],
+        "target_branch": {
+            "branch": "dev",
+            "checkout_id": "checkout-dev",
+            "status": "ready",
+        },
+    }
+
+    scanned = _static_scan_repository(repository)
+
+    assert scanned["primary_path"] == "/private/tmp/repository-dev"
+    assert scanned["repo_id"] == repository["repo_id"]
+    assert repository["primary_path"] == "/projects/repository"
+
+
+def test_static_scan_preserves_identity_for_unusable_target_metadata() -> None:
+    assert _static_scan_repository({"primary_path": "/projects/repository"}) == {
+        "primary_path": "/projects/repository"
+    }
+    assert _static_scan_repository({"target_branch": {"status": "ready"}}) == {
+        "target_branch": {"status": "ready"}
+    }
+    assert _static_scan_repository(
+        {"target_branch": {"status": "ready", "checkout_id": 7}}
+    ) == {"target_branch": {"status": "ready", "checkout_id": 7}}
+    assert _static_scan_repository(
+        {
+            "target_branch": {"status": "ready", "checkout_id": "checkout-dev"},
+            "checkouts": [{"checkout_id": "other", "path": "/private/tmp/other"}],
+        }
+    )["target_branch"]["checkout_id"] == "checkout-dev"
+    assert _static_scan_repository(
+        {
+            "target_branch": {"status": "ready", "checkout_id": "checkout-dev"},
+            "checkouts": [{"checkout_id": "checkout-dev", "path": None}],
+        }
+    ) == {
+        "target_branch": {"status": "ready", "checkout_id": "checkout-dev"},
+        "checkouts": [{"checkout_id": "checkout-dev", "path": None}],
+    }
 
 
 def test_static_audit_records_not_applicable_deployment_when_absent(tmp_path: Path) -> None:
