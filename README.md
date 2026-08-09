@@ -156,10 +156,26 @@ Leverage and Pronto consume the same stable feed; the legacy leverage maturity
 audit is historical and is not imported.
 
 Repository maturity includes `change_surface_coverage`. Repositories that host
-skills also receive `skill_contract_quality`; repositories without skills
-record that dimension as explicitly not applicable. Audits assess only an
-existing repository-owned matrix or validated pointer. They never create or
-infer a matrix, and a missing matrix is an ordinary maturity gap rather than a
+skills also receive conditional `skill_contract_quality`; repositories without
+hosted skills record that dimension as explicitly not applicable. The
+skill-quality audit includes conventional `skills/*/SKILL.md` contracts and
+every repository-relative hosted contract declared in the agent-usability
+manifest, including provider-edge locations such as `.agents/skills` or
+`.codex/skills`. Separately,
+the repository projection exposes four agent-usability lanes—documentation
+contract, tool-to-skill coverage, behavior evidence, and freshness/portability—
+plus growth-health counts for documentation, tools, skills, and skill families.
+The relationship is declared in `.agents/agent-usability.json` using
+`agent-usability/v1`. Growth health measures routed and classified coverage; it
+does not award maturity for adding more prose or more skills.
+Repositories without an agent-facing tool or skill surface declare
+`applicability: not_applicable` with a concrete reason and empty `tools` and
+`skills` arrays. This keeps them in the fleet inventory without manufacturing
+coverage or penalizing ordinary application repositories for missing a skill.
+
+Audits assess only an existing repository-owned matrix or validated pointer.
+They never create or infer a matrix, and a missing matrix is an ordinary maturity
+gap rather than a
 blocker to unrelated checks.
 
 `audit` creates evidence and a remediation plan without editing source files.
