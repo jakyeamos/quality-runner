@@ -108,39 +108,56 @@ def _scan_file(
             if stripped.startswith("}") and loop_depth > 0:
                 loop_depth -= 1
 
-    if "simplify" not in disabled_groups and is_source_file(relative_path):
-        if len(lines) > large_file_lines and not is_test_file(relative_path):
+    if "debloat" not in disabled_groups and is_source_file(relative_path):
+        is_fat_router = is_router_path(relative_path) and len(lines) > fat_router_lines
+        if len(lines) > large_file_lines and not is_test_file(relative_path) and not is_fat_router:
             findings.append(
                 finding(
-                    category="simplify",
+                    category="debloat",
                     severity="warning",
-                    confidence="high",
+                    confidence="low",
                     file=relative_path,
                     line=1,
                     rule_id="large-source-file",
                     evidence=f"{len(lines)} lines",
-                    expected_improvement="Split mixed responsibilities into focused modules.",
-                    risk="Large files increase review cost and refactor risk.",
+                    expected_improvement=(
+                        "Use this size signal to trigger a read-only ownership-pressure audit for "
+                        "duplicated engines, reusable helpers, parallel or legacy surfaces, and "
+                        "obsolete ownership paths. Confidence-mark each opportunity separately "
+                        "from implementation readiness."
+                    ),
+                    risk=(
+                        "File size alone does not prove architectural bloat and this signal does "
+                        "not authorize deletion. Repository breadth, churn, or dirty work may "
+                        "block edits but must not narrow the read-only audit."
+                    ),
                     verification=verification_for_path(relative_path),
-                    remediation_bucket="simplification and shrink pass",
+                    remediation_bucket="debloat candidate review",
                 )
             )
-        if is_router_path(relative_path) and len(lines) > fat_router_lines:
+        if is_fat_router:
             findings.append(
                 finding(
-                    category="simplify",
+                    category="debloat",
                     severity="warning",
-                    confidence="high",
+                    confidence="low",
                     file=relative_path,
                     line=1,
                     rule_id="fat-router",
                     evidence=f"{len(lines)} router lines",
                     expected_improvement=(
-                        "Keep routers focused on validation, authorization, delegation, and response shaping."
+                        "Use this router-size signal to trace boundary ownership and then audit "
+                        "parallel engines, duplicated orchestration, reusable helpers, legacy "
+                        "routes, and superseded compatibility paths. Confidence-mark each "
+                        "opportunity separately from implementation readiness."
                     ),
-                    risk="Fat routers mix API boundary and domain logic.",
+                    risk=(
+                        "Router size alone does not prove architectural bloat and this signal does "
+                        "not authorize deletion. Repository breadth, churn, or dirty work may "
+                        "block edits but must not narrow the read-only audit."
+                    ),
                     verification=verification_for_path(relative_path),
-                    remediation_bucket="simplification and shrink pass",
+                    remediation_bucket="debloat candidate review",
                 )
             )
 

@@ -228,7 +228,7 @@ def create_code_quality_scan(
         skill_coverage=skill_coverage,
         findings=sorted_findings,
         quality_scan={
-            "run_id": _string_or_none(scan.get("run_id")),
+            "run_id": string_or_none(scan.get("run_id")),
             "skill_coverage": skill_coverage,
             "findings": sorted_findings,
         },

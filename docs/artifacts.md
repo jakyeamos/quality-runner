@@ -77,6 +77,16 @@ blockers, gates, coverage, and finding buckets:
   recorded as non-blocking skipped scanner status. Opt-in architecture-contract findings use
   category `architecture` when configured in `.quality-runner.toml`. Opt-in
   Quality Skill findings use category `skill:<skill-id>` when configured.
+  Oversized source files and fat routers use category `debloat`. These findings
+  are review candidates, never deletion authorization: callers, runtime behavior,
+  and an approved verification plan must be established before any removal.
+  Category ownership is intentionally non-overlapping: `debloat` owns repository-
+  shape pressure, `simplify` owns local control-flow complexity, `deduplicate`
+  owns repeated implementations, `ponytail` owns concrete speculative
+  abstractions and replaceable wrappers/dependencies, `architecture` owns
+  configured boundary violations, and `integrate` owns incomplete or unwired
+  work. A file can have findings in several categories only when separate rules
+  identify separate causes; one rule is emitted in exactly one owner category.
   Partially built or unwired work uses category `integrate`; see
   [Unwired Work Detection](unwired-work.md). The `analysis_cache` object records
   per-file cache hits, misses, invalidation reasons, index state, and whether
