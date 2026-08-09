@@ -43,6 +43,7 @@ from quality_runner.scan_scope import (
     structural_scan_policy,
 )
 from quality_runner.schema_constants import CODE_QUALITY_SCAN_SCHEMA
+from quality_runner.skill_capabilities import build_skill_capabilities
 from quality_runner.source_analysis_cache import SourceAnalysisCache
 
 __all__ = [
@@ -222,6 +223,16 @@ def create_code_quality_scan(
     sorted_findings = sorted(findings, key=finding_sort_key)
     for index, finding in enumerate(sorted_findings, start=1):
         finding["id"] = f"CQ-{index:04d}"
+    skill_capabilities = build_skill_capabilities(
+        quality_skills=quality_skills,
+        skill_coverage=skill_coverage,
+        findings=sorted_findings,
+        quality_scan={
+            "run_id": _string_or_none(scan.get("run_id")),
+            "skill_coverage": skill_coverage,
+            "findings": sorted_findings,
+        },
+    )
 
     return {
         "schema": CODE_QUALITY_SCAN_SCHEMA,
@@ -261,6 +272,7 @@ def create_code_quality_scan(
         "skipped_files": sorted(skipped_files, key=_skipped_file_path),
         "quality_skills": quality_skills,
         "skill_coverage": skill_coverage,
+        "skill_capabilities": skill_capabilities,
         "skill_selection": skill_selection,
         "semantic_similarity_cache": semantic_similarity_cache,
         "analysis_mode": analysis_mode,
