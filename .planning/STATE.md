@@ -10,6 +10,15 @@ progress:
   total_plans: 8
   completed_plans: 8
   percent: 100
+maturity_targets:
+  - id: basedpyright-strict
+    dimension: typechecking
+    target_level: 4
+    target_max_level: 4
+    status: blocked
+    interim_gate: basedpyright-standard-full-package
+    observed_strict_errors: 4192
+    promotion_requirement: occurrence-aware ratchet or zero strict diagnostics with repeatable local and CI evidence
 ---
 
 # Planning State
@@ -90,6 +99,21 @@ they authorize repository changes.
   `qr` command is already present, while merging its stale six-file tree would
   delete the current implementation. Preserve the ref rather than merging or
   pruning it during this fold.
+
+## Outstanding Maturity Target
+
+- `basedpyright-strict` remains required for **4/4 type-checking maturity**.
+- The passing full-package standard BasedPyright command is the certified
+  interim gate, not the terminal maturity state.
+- The last strict-mode trial reported 4,192 existing diagnostics, so strict
+  enforcement is blocked; the target must not be removed or marked complete
+  because standard mode passes.
+- Promotion requires a pinned, repeatable full-package strict command with
+  equivalent local and CI evidence, an intentional-failure fixture, and either
+  zero strict diagnostics or deterministic occurrence-level baselining that
+  blocks new diagnostics without treating persisted legacy debt as new.
+- Reassess this target after the `0.7.0` fold and before any claim that
+  type-checking has reached 4/4 maturity.
 
 ## Next Step
 

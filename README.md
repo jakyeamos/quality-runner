@@ -123,6 +123,29 @@ qr fleet audit report --audit-id AUDIT_ID --json
 qr fleet audit feed --audit-id AUDIT_ID --json
 ```
 
+The Mac Control ideal-state gate is a separate, explicit fleet lane. It does
+not change the numeric maturity score. Each repository that supports Mac
+Control owns `.mac-control/ideal-state.json`; missing manifests remain
+`unknown`, while a non-app repository must declare a current
+`not_applicable` manifest. QR validates every manifest and can consume
+redacted task evidence sidecars without modifying a checkout:
+
+```bash
+qr fleet mac-control audit run --all --projects-root /path/to/projects --json
+qr fleet mac-control audit run --all --projects-root /path/to/projects \
+  --evidence-dir /path/to/mac-control-evidence --json
+qr fleet mac-control audit replay --audit-id AUDIT_ID --json
+qr fleet mac-control audit feed --audit-id AUDIT_ID --json
+```
+
+Pass `--live` only for an explicitly authorized foreground Mac Control lane.
+It invokes `macctl ideal-state audit` for applicable manifests and records only
+redacted structural provider metadata. Measured task attempts and successful
+postconditions come from the versioned evidence sidecar contract, so a live
+GUI check is never inferred from static validation. The companion report is
+published at `~/.quality-runner/fleet-audit/current/mac-control-ideal-state.json`;
+the ordinary `maturity.json` feed remains unchanged.
+
 The fleet audit resolves the documented development branch, preferring `dev`,
 and never selects a branch by commit-count maturity. Dirty, detached, stale,
 prunable, or unverifiable target checkouts receive static findings only. Fleet
