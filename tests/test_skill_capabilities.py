@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pytest
 
+from quality_runner.cli import main
 from quality_runner.skill_capabilities import (
     CAPABILITY_SCHEMA,
     _string_list,
@@ -182,3 +183,37 @@ def test_feed_preserves_supplied_capabilities_and_rejects_invalid_inputs(tmp_pat
 def test_string_list_discards_non_strings_and_blank_values() -> None:
     assert _string_list(["one", "", " two ", 3]) == ["one", " two "]
     assert _string_list("one") == []
+
+
+def test_skill_capabilities_cli_separates_preview_from_write(tmp_path: Path) -> None:
+    scan = tmp_path / "quality-scan.json"
+    scan.write_text(
+        json.dumps(
+            {
+                "run_id": "run-cli",
+                "quality_skills": [],
+                "skill_coverage": [],
+                "findings": [],
+            }
+        ),
+        encoding="utf-8",
+    )
+    output = tmp_path / "capabilities.json"
+
+    assert main(["skill", "capabilities", str(scan), "--json"]) == 0
+    assert not output.exists()
+    assert (
+        main(
+            [
+                "skill",
+                "capabilities",
+                str(scan),
+                "--output",
+                str(output),
+                "--write",
+                "--json",
+            ]
+        )
+        == 0
+    )
+    assert json.loads(output.read_text(encoding="utf-8"))["schema"] == CAPABILITY_SCHEMA

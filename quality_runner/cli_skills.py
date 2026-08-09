@@ -5,6 +5,12 @@ from pathlib import Path
 from typing import Any
 
 from quality_runner.config import load_repo_config
+from quality_runner.skill_capabilities import (
+    DEFAULT_CAPABILITY_FEED,
+    build_skill_capability_feed,
+    load_quality_scan,
+    write_skill_capability_feed,
+)
 from quality_runner.skill_corpus import (
     append_skill_to_corpus,
     classify_skill_pack,
@@ -80,6 +86,23 @@ def add_skill_commands(subparsers: argparse._SubParsersAction[argparse.ArgumentP
     skill_sync_parser.add_argument("--write", action="store_true", help="Apply the synchronization")
     skill_sync_parser.add_argument("--json", action="store_true", help="Emit JSON output")
 
+    skill_capabilities_parser = skill_subparsers.add_parser(
+        "capabilities",
+        help="Derive finding and backfill capability evidence from a Quality Runner scan",
+    )
+    skill_capabilities_parser.add_argument(
+        "quality_scan_json", help="Quality Runner code-quality scan JSON path"
+    )
+    skill_capabilities_parser.add_argument(
+        "--output",
+        default=str(DEFAULT_CAPABILITY_FEED),
+        help="Capability feed path (defaults to Pronto's shared local feed)",
+    )
+    skill_capabilities_parser.add_argument(
+        "--write", action="store_true", help="Write the capability feed to --output"
+    )
+    skill_capabilities_parser.add_argument("--json", action="store_true", help="Emit JSON output")
+
     validate_skill_review_parser = subparsers.add_parser(
         "validate-skill-review",
         help="Validate an agent-produced skill review report",
@@ -142,4 +165,16 @@ def skill_command_payload(
             write=args.write,
             replace_active=args.replace_active,
         )
+    if args.command == "skill" and args.skill_command == "capabilities":
+        quality_scan = load_quality_scan(Path(args.quality_scan_json).expanduser().resolve())
+        if args.write:
+            return write_skill_capability_feed(
+                quality_scan,
+                Path(args.output).expanduser().resolve(),
+            )
+        return {
+            "status": "preview",
+            "path": str(Path(args.output).expanduser().resolve()),
+            "feed": build_skill_capability_feed(quality_scan),
+        }
     raise ValueError("unsupported skill command")
