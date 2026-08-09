@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from quality_runner.fleet.agent_usability import assess_agent_usability
 from quality_runner.fleet.change_matrix import assess_change_surface_coverage
 from quality_runner.fleet.skill_contracts import assess_skill_contract_quality
 
@@ -150,6 +151,47 @@ Complete when `pytest` passes and the report names each observed result.
     assert "behavioral parity remains unproven" in hosted["message"]
 
 
+def test_skill_contract_quality_checks_manifest_declared_hosted_path(tmp_path: Path) -> None:
+    skill = tmp_path / ".codex/skills/example/SKILL.md"
+    manifest = tmp_path / ".agents/agent-usability.json"
+    skill.parent.mkdir(parents=True)
+    manifest.parent.mkdir(parents=True)
+    skill.write_text(
+        """---
+name: example
+description: Use for a narrowly defined fixture task.
+---
+# Example
+Produce a JSON report.
+## Definition of done
+Complete when `pytest` passes and the report names each observed result.
+""",
+        encoding="utf-8",
+    )
+    manifest.write_text(
+        json.dumps(
+            {
+                "schema": "agent-usability/v1",
+                "reviewed_at": "2026-08-09",
+                "tools": [],
+                "skills": [
+                    {
+                        "id": "example",
+                        "family": "repository-operations",
+                        "source": "hosted",
+                        "contract_path": ".codex/skills/example/SKILL.md",
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    result = assess_skill_contract_quality(tmp_path)
+    assert result["status"] == "static_validated"
+    assert result["score"] == 3
+
+
 def test_skill_contract_quality_reports_tmcp_static_gap_classes(tmp_path: Path) -> None:
     skill = tmp_path / "skills/example/SKILL.md"
     skill.parent.mkdir(parents=True)
@@ -177,3 +219,192 @@ Load /Users/example/.agents/private.md before work.
     assert "contradictory approval" in details
     assert "host-specific assumption" in details
     assert "precedence hazard" in details
+
+
+def test_agent_usability_tracks_four_lanes_and_growth_health(tmp_path: Path) -> None:
+    router = tmp_path / ".agents/context/README.md"
+    commands = tmp_path / ".agents/context/commands.md"
+    manifest = tmp_path / ".agents/agent-usability.json"
+    skill = tmp_path / ".agents/skills/example/SKILL.md"
+    receipt = tmp_path / "tests/test_agent_tool.py"
+    for path in (router, commands, manifest, skill, receipt):
+        path.parent.mkdir(parents=True, exist_ok=True)
+    router.write_text("[Commands](commands.md)\n", encoding="utf-8")
+    commands.write_text("# Commands\n", encoding="utf-8")
+    skill.write_text("---\nname: example\ndescription: A focused example.\n---\n", encoding="utf-8")
+    receipt.write_text("def test_agent_tool():\n    assert True\n", encoding="utf-8")
+    manifest.write_text(
+        json.dumps(
+            {
+                "schema": "agent-usability/v1",
+                "reviewed_at": "2026-07-26",
+                "tools": [
+                    {
+                        "id": "example-cli",
+                        "documentation": [".agents/context/commands.md"],
+                        "skills": ["example"],
+                        "behavior_evidence": [
+                            {
+                                "path": "tests/test_agent_tool.py",
+                                "status": "passed",
+                                "observed_at": "2026-07-26",
+                            }
+                        ],
+                    }
+                ],
+                "skills": [
+                    {
+                        "id": "example",
+                        "family": "repository-operations",
+                        "source": "hosted",
+                        "contract_path": ".agents/skills/example/SKILL.md",
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    documents = {
+        ".agents/context/README.md": router.read_text(encoding="utf-8"),
+        ".agents/context/commands.md": commands.read_text(encoding="utf-8"),
+    }
+    links = {
+        "links": [
+            {
+                "source": ".agents/context/README.md",
+                "target": ".agents/context/commands.md",
+                "status": "valid",
+            }
+        ]
+    }
+
+    result = assess_agent_usability(tmp_path, documents, links, "2026-08-01T00:00:00Z")
+
+    assert result["status"] == "healthy"
+    assert result["covered_lane_count"] == 4
+    assert [lane["id"] for lane in result["lanes"]] == [
+        "documentation_contract",
+        "tool_skill_coverage",
+        "behavior_evidence",
+        "freshness_portability",
+    ]
+    assert result["growth_health"]["status"] == "healthy"
+    assert result["growth_health"]["skill_count"] == 1
+    assert result["growth_health"]["family_count"] == 1
+    assert result["growth_health"]["behavior_verified_tool_count"] == 1
+
+
+def test_agent_usability_does_not_reward_unmapped_growth(tmp_path: Path) -> None:
+    agent_doc = tmp_path / ".agents/context/commands.md"
+    agent_doc.parent.mkdir(parents=True)
+    agent_doc.write_text("# Commands\n", encoding="utf-8")
+
+    result = assess_agent_usability(
+        tmp_path,
+        {".agents/context/commands.md": "# Commands\n"},
+        {"links": []},
+        "2026-08-01T00:00:00Z",
+    )
+    assert result["lanes"][0]["status"] == "untracked"
+    assert result["growth_health"]["unrouted_agent_document_count"] == 1
+
+    assert result["status"] == "attention"
+
+
+def test_agent_usability_rejects_missing_hosted_skill_contract(tmp_path: Path) -> None:
+    commands = tmp_path / ".agents/context/commands.md"
+    manifest = tmp_path / ".agents/agent-usability.json"
+    commands.parent.mkdir(parents=True)
+    commands.write_text("# Commands\n", encoding="utf-8")
+    manifest.write_text(
+        json.dumps(
+            {
+                "schema": "agent-usability/v1",
+                "reviewed_at": "2026-07-26",
+                "tools": [
+                    {
+                        "id": "example-cli",
+                        "documentation": [".agents/context/commands.md"],
+                        "skills": ["missing-hosted-skill"],
+                        "behavior_evidence": [],
+                    }
+                ],
+                "skills": [
+                    {
+                        "id": "missing-hosted-skill",
+                        "family": "repository-operations",
+                        "source": "hosted",
+                        "contract_path": ".agents/skills/missing/SKILL.md",
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    result = assess_agent_usability(
+        tmp_path,
+        {".agents/context/commands.md": "# Commands\n"},
+        {"links": []},
+        "2026-08-01T00:00:00Z",
+    )
+
+    assert result["lanes"][1]["status"] == "missing"
+    assert result["lanes"][3]["status"] == "static_gaps"
+    assert result["growth_health"]["status"] == "attention"
+
+
+def test_agent_usability_supports_explicit_not_applicable_repository(tmp_path: Path) -> None:
+    router = tmp_path / ".agents/context/README.md"
+    manifest = tmp_path / ".agents/agent-usability.json"
+    router.parent.mkdir(parents=True)
+    router.write_text("# Repository context\n", encoding="utf-8")
+    manifest.write_text(
+        json.dumps(
+            {
+                "schema": "agent-usability/v1",
+                "reviewed_at": "2026-07-26",
+                "applicability": "not_applicable",
+                "reason": "This repository has no agent-facing tool or skill surface.",
+                "tools": [],
+                "skills": [],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    result = assess_agent_usability(
+        tmp_path,
+        {".agents/context/README.md": router.read_text(encoding="utf-8")},
+        {"links": []},
+        "2026-08-01T00:00:00Z",
+    )
+
+    assert result["status"] == "not_applicable"
+    assert result["applicability"] == "not_applicable"
+    assert result["applicable_lane_count"] == 0
+    assert all(lane["status"] == "not_applicable" for lane in result["lanes"])
+    assert result["growth_health"]["agent_document_count"] == 1
+
+
+def test_agent_usability_rejects_unsupported_not_applicable_claim(tmp_path: Path) -> None:
+    manifest = tmp_path / ".agents/agent-usability.json"
+    manifest.parent.mkdir(parents=True)
+    manifest.write_text(
+        json.dumps(
+            {
+                "schema": "agent-usability/v1",
+                "reviewed_at": "2026-07-26",
+                "applicability": "not_applicable",
+                "tools": [{"id": "hidden-tool"}],
+                "skills": [],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    result = assess_agent_usability(tmp_path, {}, {"links": []}, "2026-08-01T00:00:00Z")
+
+    assert result["status"] == "blocked"
+    assert result["manifest_status"] == "invalid"
+    assert result["lanes"][3]["status"] == "blocked"

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import re
 from pathlib import Path
 from typing import Any
@@ -10,8 +11,10 @@ MAX_SKILLS = 120
 
 
 def assess_skill_contract_quality(root: Path) -> dict[str, Any]:
+    root = root.resolve()
     skill_root = root / "skills"
-    paths = sorted(skill_root.glob("*/SKILL.md"))[:MAX_SKILLS] if skill_root.is_dir() else []
+    conventional = list(skill_root.glob("*/SKILL.md")) if skill_root.is_dir() else []
+    paths = sorted(set(conventional) | set(_declared_hosted_skill_paths(root)))[:MAX_SKILLS]
     if not paths:
         return {
             "score": None,
@@ -85,6 +88,38 @@ def assess_skill_contract_quality(root: Path) -> dict[str, Any]:
             }
         ],
     }
+
+
+def _declared_hosted_skill_paths(root: Path) -> list[Path]:
+    manifest_path = root / ".agents/agent-usability.json"
+    try:
+        if (
+            not manifest_path.is_file()
+            or manifest_path.is_symlink()
+            or manifest_path.stat().st_size > MAX_DOCUMENT_BYTES
+        ):
+            return []
+        payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError):
+        return []
+    if not isinstance(payload, dict) or not isinstance(payload.get("skills"), list):
+        return []
+
+    paths: list[Path] = []
+    for item in payload["skills"]:
+        if not isinstance(item, dict) or item.get("source") != "hosted":
+            continue
+        contract_path = item.get("contract_path")
+        if not isinstance(contract_path, str) or not contract_path:
+            continue
+        candidate = root / contract_path
+        try:
+            candidate.resolve().relative_to(root)
+        except (OSError, ValueError):
+            continue
+        if candidate.name == "SKILL.md" and candidate.is_file():
+            paths.append(candidate)
+    return paths
 
 
 def _static_findings(root: Path, path: Path, text: str) -> list[dict[str, str]]:

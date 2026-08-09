@@ -303,6 +303,7 @@ def _repository_projection(repository: dict[str, Any], finding: dict[str, Any]) 
         "finding_count": len(findings),
         "blocker_count": blockers,
         "dynamic_status": dynamic_status,
+        "agent_usability": _object(finding.get("agent_usability")),
     }
 
 

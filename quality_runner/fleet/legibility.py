@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Any
 
 from quality_runner.discovery import inspect_repo
+from quality_runner.fleet.agent_usability import assess_agent_usability
 from quality_runner.fleet.change_matrix import assess_change_surface_coverage
 from quality_runner.fleet.contracts import (
     DIMENSION_LABELS,
@@ -93,6 +94,12 @@ def audit_repository(
         )
         for dimension in DIMENSIONS
     ]
+    agent_usability = assess_agent_usability(
+        root,
+        documents,
+        link_evidence,
+        as_of,
+    )
     if scan_error:
         findings.append(
             {
@@ -131,6 +138,7 @@ def audit_repository(
             "link_evidence": link_evidence,
             "freshness": collect_freshness_evidence(documents, as_of),
         },
+        "agent_usability": agent_usability,
         "findings": findings,
         "plan": plan,
         "static_provenance_hash": digest(

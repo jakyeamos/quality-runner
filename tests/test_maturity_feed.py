@@ -77,6 +77,9 @@ def test_feed_is_deterministic_and_redacted(tmp_path: Path) -> None:
         gap["dimension"] == "change_surface_coverage"
         for gap in first["repositories"][0]["dimension_gaps"]
     )
+    agent_usability = first["repositories"][0]["agent_usability"]
+    assert agent_usability["schema"] == "quality-runner-agent-usability/v1"
+    assert len(agent_usability["lanes"]) == 4
     serialized = json.dumps(first).lower()
     for forbidden in ('"prompt"', '"code"', '"diff"', '"transcript"', '"credential"'):
         assert forbidden not in serialized
