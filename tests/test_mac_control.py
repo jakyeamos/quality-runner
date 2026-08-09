@@ -10,6 +10,7 @@ from quality_runner.fleet.mac_control import (
     MAC_CONTROL_MANIFEST_SCHEMA,
     mac_control_audit_payload,
     mac_control_feed_payload,
+    mac_control_report_payload,
     mac_control_replay_payload,
     validate_manifest,
 )
@@ -107,6 +108,9 @@ def test_manifest_separates_static_contract_from_live_task_evidence(tmp_path: Pa
     assert result["summary"]["live_status"] == "review_required"
     assert result["summary"]["status"] == "review_required"
     assert mac_control_replay_payload(output_dir=Path(result["artifact_root"]))["status"] == "passed"
+    report = mac_control_report_payload(output_dir=Path(result["artifact_root"]))
+    assert report["status"] == "review_required"
+    assert Path(report["artifact_paths"]["report_json"]).is_file()
 
     missing = tmp_path / "missing-projects"
     missing_repo = missing / "missing"
