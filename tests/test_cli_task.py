@@ -41,7 +41,9 @@ def _init_repo(tmp_path: Path, *, large: bool = False, extra_policy: str = "") -
                 'rationale = "Large source files increase review cost."',
                 'evidence_refs = ["positive:tests/fixtures/large.py", "negative:tests/fixtures/small.py", "ambiguous:tests/fixtures/generated.py"]',
                 'paths = ["**/*.py", "*.py"]',
-                "confidence_threshold = 1.0",
+                # Debloat is intentionally low-confidence; this fixture opts in to
+                # enforcing it so the end-to-end violation path remains covered.
+                "confidence_threshold = 0.3",
                 "",
                 extra_policy,
             ]
