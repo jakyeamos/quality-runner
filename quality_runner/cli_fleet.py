@@ -11,6 +11,12 @@ from quality_runner.fleet.audit import (
     fleet_show_payload,
 )
 from quality_runner.fleet.feed import fleet_feed_payload
+from quality_runner.fleet.mac_control import (
+    mac_control_audit_payload,
+    mac_control_feed_payload,
+    mac_control_replay_payload,
+    mac_control_report_payload,
+)
 
 
 def add_fleet_commands(subparsers: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
@@ -93,8 +99,85 @@ def add_fleet_commands(subparsers: argparse._SubParsersAction[argparse.ArgumentP
     feed_parser.add_argument("--output-dir", default=None)
     feed_parser.add_argument("--json", action="store_true")
 
+    mac_control_parser = fleet_actions.add_parser(
+        "mac-control",
+        help="Audit the explicit Mac Control ideal-state lane without changing repository checkouts",
+    )
+    mac_control_actions = mac_control_parser.add_subparsers(
+        dest="mac_control_action", required=True
+    )
+    mac_control_audit_parser = mac_control_actions.add_parser(
+        "audit", help="Run, replay, report, or publish the Mac Control ideal-state audit"
+    )
+    mac_control_audit_actions = mac_control_audit_parser.add_subparsers(
+        dest="mac_control_audit_action", required=True
+    )
+    mc_run_parser = mac_control_audit_actions.add_parser(
+        "run", help="Validate repository-owned manifests and optional live Mac Control evidence"
+    )
+    mc_run_parser.add_argument("--all", action="store_true")
+    mc_run_parser.add_argument("--repo-path", action="append", default=[])
+    mc_run_parser.add_argument("--projects-root", default=str(Path.home() / "projects"))
+    mc_run_parser.add_argument("--output-dir", default=None)
+    mc_run_parser.add_argument(
+        "--live",
+        action="store_true",
+        help="Explicitly call Mac Control for live foreground Accessibility audits; never implicit",
+    )
+    mc_run_parser.add_argument("--macctl", default="macctl")
+    mc_run_parser.add_argument(
+        "--evidence-dir",
+        default=None,
+        help="Directory of redacted Mac Control task evidence files named REPO_ID.json",
+    )
+    mc_run_parser.add_argument("--as-of", default=None)
+    mc_run_parser.add_argument("--json", action="store_true")
+    for action, help_text in (
+        ("replay", "Replay a persisted Mac Control audit without rerunning GUI work"),
+        ("report", "Render the persisted Mac Control report for review"),
+        ("feed", "Publish the validated Mac Control companion report for Pronto"),
+    ):
+        parser = mac_control_audit_actions.add_parser(action, help=help_text)
+        parser.add_argument("--audit-id", default=None)
+        parser.add_argument("--output-dir", default=None)
+        parser.add_argument("--json", action="store_true")
+
 
 def fleet_command_payload(args: argparse.Namespace) -> dict[str, Any]:
+    if args.fleet_action == "mac-control":
+        if args.mac_control_action != "audit":
+            raise ValueError(f"unsupported Mac Control action: {args.mac_control_action}")
+        action = args.mac_control_audit_action
+        if action == "run":
+            if not args.all and not args.repo_path:
+                raise ValueError("fleet mac-control audit run requires --all or at least one --repo-path")
+            if args.all and args.repo_path:
+                raise ValueError("fleet mac-control audit run accepts --all or --repo-path, not both")
+            return mac_control_audit_payload(
+                projects_root=Path(args.projects_root),
+                output_dir=Path(args.output_dir) if args.output_dir else None,
+                repository_paths=[Path(path) for path in args.repo_path] if args.repo_path else None,
+                as_of=args.as_of,
+                live=args.live,
+                macctl_path=args.macctl,
+                evidence_dir=Path(args.evidence_dir) if args.evidence_dir else None,
+            )
+        if action == "replay":
+            return mac_control_replay_payload(
+                audit_id=args.audit_id,
+                output_dir=Path(args.output_dir) if args.output_dir else None,
+            )
+        if action == "report":
+            return mac_control_report_payload(
+                audit_id=args.audit_id,
+                output_dir=Path(args.output_dir) if args.output_dir else None,
+            )
+        if action == "feed":
+            return mac_control_feed_payload(
+                audit_id=args.audit_id,
+                output_dir=Path(args.output_dir) if args.output_dir else None,
+            )
+        raise ValueError(f"unsupported Mac Control audit action: {action}")
     if args.fleet_action != "audit":
         raise ValueError(f"unsupported fleet action: {args.fleet_action}")
     if args.audit_action == "run":
