@@ -1,0 +1,10 @@
+{
+  "schema_version": 1,
+  "revision": 1,
+  "commitments": [
+    {"id": "bootstrap-boundary", "kind": "constraint", "statement": "Only .project-compass/ may be changed by this bootstrap; preserve unrelated dirty work and ownership.", "status": "active", "source": {"ref": "conversation:2026-08-02-project-compass-fleet-bootstrap", "note": "User-authorized scope.", "observed_at": "2026-08-02T13:25:04Z"}},
+    {"id": "read-only-quality-authority", "kind": "constraint", "statement": "Quality Runner remains read-only and fail-closed; its local evidence does not become CI, provider, browser, or release proof without that layer's verification.", "status": "active", "source": {"ref": "README.md", "note": "Explicit quality-runner boundary.", "observed_at": "2026-08-02T13:25:04Z"}}
+  ],
+  "reconciliations": [],
+  "updated_at": "2026-08-02T13:25:04Z"
+}
