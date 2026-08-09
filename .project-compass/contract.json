@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "revision": 1,
+  "project": {
+    "name": "quality-runner",
+    "identity": "A local-first audit-and-plan quality orchestrator that produces evidence and plans without mutating source code, installing dependencies, or committing changes.",
+    "audience": "Developers and reviewers who need an evidence-backed quality view and safe next plan for a repository or change.",
+    "core_loop": "Inspect repository and task state, compile applicable quality checks, run or collect bounded evidence, distinguish findings from opinion, and produce an explicit review or remediation plan without source mutation.",
+    "north_star": "Quality decisions are more trustworthy because the runner shows what was checked, what was not, why a finding matters, and what safe action follows.",
+    "not_this": ["An auto-fixer or code mutator", "An installer or package manager", "A commit, merge, or release authority"]
+  },
+  "targets": {
+    "mvp": {"definition": "A repository task can receive a scoped audit, machine-readable findings, and an actionable plan while preserving the source worktree."},
+    "complete_product": {"definition": "Quality Runner provides reliable task-scoped audit, review-delta, cache, security, release, and planning evidence with clear maturity boundaries across supported repositories."}
+  },
+  "pillars": [
+    {"id": "evidence-over-opinion", "name": "Evidence over opinion", "outcomes": [{"id": "scoped-audit-plan", "name": "A quality result distinguishes observed evidence, inferred risk, unknowns, and safe next actions for the exact task scope.", "targets": ["mvp", "complete_product"], "maturity": 75, "confidence": "high", "layers": {"intended": "A reviewer can make a calibrated quality decision without confusing configured checks with executed proof.", "planned": "The repository defines audit, plan, review-delta, cache, release, and security contracts.", "implemented": "The orchestrator is read-only and produces machine-readable findings and plans.", "verified": "Repository documentation and local contract behavior establish the read-only boundary; broader provider and release parity was not run here."}, "evidence": [{"ref": "README.md", "note": "Defines the audit-and-plan quality orchestrator and no-mutation boundary.", "observed_at": "2026-08-02T13:25:04Z"}], "blockers": [{"kind": "verification", "summary": "Configured or local-only evidence does not by itself establish provider-native, CI, browser, or release proof."}]}]},
+    {"id": "safe-quality-projection", "name": "Safe quality projection", "outcomes": [{"id": "review-ready-output", "name": "Quality findings can be consumed by review and release workflows without the runner taking ownership of source mutation, commits, or merges.", "targets": ["complete_product"], "maturity": 50, "confidence": "high", "layers": {"intended": "The runner informs governed workflows while preserving project ownership and integration gates.", "planned": "The project explicitly separates audit and plan from mutation and release authority.", "implemented": "Machine-readable quality outputs and review-oriented contracts exist.", "verified": "No hosted CI or release projection was run in this bootstrap."}, "evidence": [{"ref": "README.md", "note": "Documents the no-source-mutation and no-commit scope.", "observed_at": "2026-08-02T13:25:04Z"}], "blockers": [{"kind": "technical", "summary": "Consumer-specific promotion and release behavior remain separate verification surfaces."}]}]}
+  ],
+  "source_layers": {"intended": [{"ref": "README.md", "note": "Product purpose and safety boundary.", "observed_at": "2026-08-02T13:25:04Z"}], "planned": [{"ref": "README.md", "note": "Quality contract and supported surfaces.", "observed_at": "2026-08-02T13:25:04Z"}], "implemented": [{"ref": "README.md", "note": "Current audit-and-plan implementation.", "observed_at": "2026-08-02T13:25:04Z"}], "verified": [{"ref": "README.md", "note": "Documented read-only claims; no hosted release verification here.", "observed_at": "2026-08-02T13:25:04Z"}]},
+  "drift": [{"kind": "verification-gap", "summary": "Quality Runner has a strong local read-only contract, but its outputs are not automatically authoritative proof for CI, provider, browser, or release layers.", "status": "open", "observed_at": "2026-08-02T13:25:04Z", "evidence": [{"ref": "README.md", "note": "Defines local audit scope and preserved ownership boundaries.", "observed_at": "2026-08-02T13:25:04Z"}]}],
+  "updated_at": "2026-08-02T13:25:04Z"
+}
