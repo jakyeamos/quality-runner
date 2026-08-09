@@ -7,6 +7,7 @@ from quality_runner.evidence_redaction import redact_secret_like_literals
 
 CATEGORY_ORDER = [
     "harden",
+    "debloat",
     "simplify",
     "ponytail",
     "clarify",

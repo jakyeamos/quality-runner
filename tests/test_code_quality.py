@@ -608,8 +608,69 @@ def test_code_quality_scan_ignores_generated_build_large_tests_and_non_frontend(
     assert "build" in skipped_paths
     assert "explicit-any" not in rules
     assert "large-source-file" in rules
+    large_file = next(
+        finding for finding in result["findings"] if finding["rule_id"] == "large-source-file"
+    )
+    assert large_file["category"] == "debloat"
+    assert large_file["confidence"] == "low"
+    assert large_file["remediation_bucket"] == "debloat candidate review"
+    assert "does not authorize deletion" in large_file["risk"]
+    assert "must not narrow the read-only audit" in large_file["risk"]
+    assert "duplicated engines" in large_file["expected_improvement"]
+    assert result["summary"]["findings_by_category"]["debloat"] == 1
+    assert not any(
+        finding["rule_id"] == "large-source-file" and finding["category"] == "simplify"
+        for finding in result["findings"]
+    )
     assert all(finding["file"] != "tests/test_large.py" for finding in result["findings"])
     assert result["summary"]["findings_by_category"]["ui_structural"] == 0
+
+
+def test_code_quality_scan_can_disable_debloat_candidates(tmp_path: Path) -> None:
+    from quality_runner.code_quality import create_code_quality_scan
+
+    _write(tmp_path / "src" / "service.py", "\n".join(["value = 1"] * 12))
+
+    result = create_code_quality_scan(
+        tmp_path,
+        scan={"run_id": "scan-001"},
+        config={
+            "structural_scan": {
+                "disabled_rule_groups": ["debloat"],
+                "large_file_lines": 10,
+            }
+        },
+    )
+
+    assert result["summary"]["findings_by_category"]["debloat"] == 0
+    assert not any(finding["category"] == "debloat" for finding in result["findings"])
+
+
+def test_fat_router_owns_overlapping_large_file_signal(tmp_path: Path) -> None:
+    from quality_runner.code_quality import create_code_quality_scan
+
+    _write(
+        tmp_path / "src" / "routers" / "api.ts",
+        "\n".join(f"const value{index} = {index};" for index in range(12)),
+    )
+
+    result = create_code_quality_scan(
+        tmp_path,
+        scan={"run_id": "scan-001"},
+        config={"structural_scan": {"large_file_lines": 10, "fat_router_lines": 10}},
+    )
+
+    debloat_rules = [
+        finding["rule_id"]
+        for finding in result["findings"]
+        if finding["category"] == "debloat"
+    ]
+    assert debloat_rules == ["fat-router"]
+    fat_router = next(
+        finding for finding in result["findings"] if finding["rule_id"] == "fat-router"
+    )
+    assert fat_router["confidence"] == "low"
+    assert "legacy routes" in fat_router["expected_improvement"]
 
 
 def test_code_quality_scan_ignores_shadow_vendor_cache_and_build_variants(
