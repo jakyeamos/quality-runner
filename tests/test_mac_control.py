@@ -5,6 +5,8 @@ import subprocess
 from pathlib import Path
 from typing import cast
 
+import pytest
+
 from quality_runner.fleet.discovery import repository_record_for_root
 from quality_runner.fleet.mac_control import (
     MAC_CONTROL_MANIFEST_SCHEMA,
@@ -14,6 +16,7 @@ from quality_runner.fleet.mac_control import (
     mac_control_replay_payload,
     validate_manifest,
 )
+from quality_runner.fleet.mac_control_contracts import MacControlAuditError
 
 
 def _git(root: Path, *args: str) -> str:
@@ -291,3 +294,63 @@ def test_live_task_failure_is_distinct_from_missing_measurement(tmp_path: Path) 
     assert entry["live_task_evidence"]["status"] == "failed"
     assert result["summary"]["live_status"] == "failed"
     assert result["summary"]["status"] == "review_required"
+
+
+def test_live_provider_failures_and_scope_boundaries_are_explicit(tmp_path: Path) -> None:
+    projects = tmp_path / "projects"
+    repo = projects / "fixture"
+    _repo(repo)
+    record = repository_record_for_root(repo)
+    manifest_dir = repo / ".mac-control"
+    manifest_dir.mkdir()
+    manifest_dir.joinpath("ideal-state.json").write_text(
+        json.dumps(_manifest(str(record["repo_id"]))), encoding="utf-8"
+    )
+
+    invalid_json_provider = tmp_path / "invalid-json"
+    invalid_json_provider.write_text("#!/bin/sh\nprintf 'not-json\\n'\n", encoding="utf-8")
+    invalid_json_provider.chmod(invalid_json_provider.stat().st_mode | 0o111)
+    invalid = mac_control_audit_payload(
+        projects_root=projects,
+        output_dir=tmp_path / "invalid-audit",
+        live=True,
+        macctl_path=str(invalid_json_provider),
+        as_of="2026-08-08T12:00:00+00:00",
+    )
+    provider_path = Path(invalid["artifact_root"]) / "providers" / f"{record['repo_id']}.json"
+    assert json.loads(provider_path.read_text(encoding="utf-8"))["status"] == "failed"
+    assert invalid["report"]["repositories"][0]["live_task_evidence"]["status"] == "blocked"
+
+    unavailable = mac_control_audit_payload(
+        projects_root=projects,
+        output_dir=tmp_path / "unavailable-audit",
+        live=True,
+        macctl_path=str(tmp_path / "does-not-exist"),
+        as_of="2026-08-08T12:00:00+00:00",
+    )
+    unavailable_provider = (
+        Path(unavailable["artifact_root"]) / "providers" / f"{record['repo_id']}.json"
+    )
+    assert json.loads(unavailable_provider.read_text(encoding="utf-8"))["status"] == "unavailable"
+
+    manifest_without_app = _manifest(str(record["repo_id"]))
+    manifest_without_app.pop("app")
+    manifest_dir.joinpath("ideal-state.json").write_text(
+        json.dumps(manifest_without_app), encoding="utf-8"
+    )
+    blocked = mac_control_audit_payload(
+        projects_root=projects,
+        output_dir=tmp_path / "blocked-audit",
+        live=True,
+        macctl_path="unused",
+        as_of="2026-08-08T12:00:00+00:00",
+    )
+    blocked_provider = Path(blocked["artifact_root"]) / "providers" / f"{record['repo_id']}.json"
+    assert json.loads(blocked_provider.read_text(encoding="utf-8"))["status"] == "blocked"
+
+    with pytest.raises(MacControlAuditError, match="outside the bounded projects root"):
+        mac_control_audit_payload(
+            projects_root=projects,
+            repository_paths=[tmp_path / "outside"],
+            output_dir=tmp_path / "outside-audit",
+        )
