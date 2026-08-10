@@ -10,3 +10,6 @@ __pycache__/
 # Generated / cache / audit output
 .turbo/
 .firecrawl/
+
+# Historical migration imports are generated input, not repository source.
+artifacts/migrations/imports/
