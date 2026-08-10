@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import tomllib
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from quality_runner.architecture_config_parse import parse_architecture_section
 from quality_runner.artifact_config_parse import parse_artifacts_section
@@ -12,6 +12,7 @@ from quality_runner.disposition_config import (
     parse_inline_dispositions,
 )
 from quality_runner.integrate_config_parse import parse_integrate_section
+from quality_runner.maintenance_surface_config_parse import parse_maintenance_surface_section
 from quality_runner.scan_exclusions_config import parse_scan_exclusions_by_module
 from quality_runner.security.config_parse import parse_security_section
 from quality_runner.skills_config_parse import parse_skills_section
@@ -48,9 +49,10 @@ def load_repo_config(repo_root: Path) -> dict[str, Any]:
             ],
         )
 
-    section = payload.get("quality_runner")
-    if not isinstance(section, dict):
+    section_value = payload.get("quality_runner")
+    if not isinstance(section_value, dict):
         return _empty_config(path=CONFIG_FILE_NAME, warnings=[])
+    section = cast(dict[str, object], section_value)
 
     warnings: list[dict[str, str]] = []
     default_profile = _string_value(
@@ -90,6 +92,9 @@ def load_repo_config(repo_root: Path) -> dict[str, Any]:
     structural_scan = parse_structural_scan_section(section.get("structural_scan"), warnings)
     integrate = parse_integrate_section(section.get("integrate"), warnings)
     architecture = parse_architecture_section(section.get("architecture"), warnings)
+    maintenance_surface = parse_maintenance_surface_section(
+        cast(object, section.get("maintenance_surface")), warnings
+    )
     security = parse_security_section(section.get("security"), warnings)
     skills = parse_skills_section(section.get("skills"), warnings)
     readiness = _readiness(section.get("readiness"), warnings)
@@ -115,6 +120,8 @@ def load_repo_config(repo_root: Path) -> dict[str, Any]:
         payload["integrate"] = integrate
     if architecture:
         payload["architecture"] = architecture
+    if maintenance_surface or "maintenance_surface" in section:
+        payload["maintenance_surface"] = maintenance_surface
     if security:
         payload["security"] = security
     if skills:

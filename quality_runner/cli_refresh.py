@@ -4,6 +4,7 @@ import argparse
 from pathlib import Path
 from typing import Any
 
+from quality_runner.branch_diff import BranchDiffScope, resolve_branch_diff
 from quality_runner.cli_status import export_handoff_payload
 from quality_runner.compatibility.legacy_workflow import refresh_payload
 from quality_runner.core.audit_contracts import ScanExclusionOverlay
@@ -20,19 +21,39 @@ def refresh_command_payload(
     *,
     progress: ProgressCallback | None = None,
 ) -> dict[str, Any]:
+    diff_base = getattr(args, "diff_base", None)
+    diff_head = getattr(args, "diff_head", None)
+    branch_diff: BranchDiffScope | None = None
+    if diff_base is not None or diff_head is not None:
+        if not isinstance(diff_base, str) or not diff_base.strip():
+            raise ValueError("--diff-head requires --diff-base")
+        if getattr(args, "checkout_most_advanced_branch", False):
+            raise ValueError(
+                "--diff-base/--diff-head cannot be combined with --checkout-most-advanced-branch"
+            )
+        branch_diff = resolve_branch_diff(
+            repo_root,
+            base_ref=diff_base,
+            head_ref=diff_head or "HEAD",
+        )
+        changed_paths = list(branch_diff.changed_paths)
+    else:
+        changed_paths = (
+            git_changed_paths(repo_root, args.baseline_run_id)
+            if getattr(args, "changed_only", False)
+            else []
+        )
+    scope_requested = getattr(args, "changed_only", False) or branch_diff is not None
+    if scope_requested and not changed_paths:
+        scope_label = "branch diff" if branch_diff is not None else "--changed-only"
+        raise ValueError(f"{scope_label} requires at least one changed path")
+
     workflow_intent = resolve_workflow_intent(
         repo_root=repo_root,
         run_id=f"{args.run_id_prefix}-verify",
         goal=args.intent,
         intent_file=Path(args.intent_file).expanduser().resolve() if args.intent_file else None,
     )
-    changed_paths = (
-        git_changed_paths(repo_root, args.baseline_run_id)
-        if getattr(args, "changed_only", False)
-        else []
-    )
-    if getattr(args, "changed_only", False) and not changed_paths:
-        raise ValueError("--changed-only requires at least one changed path")
 
     include_paths = tuple(getattr(args, "include_path", []) or [])
     if not include_paths and getattr(args, "phase_contract", None):
@@ -67,7 +88,8 @@ def refresh_command_payload(
         review_iteration=args.review_iteration,
         agent_review_mode=getattr(args, "agent_review_mode", None),
         scan_exclusion_overlay=_scan_exclusion_overlay(args, repo_root),
-        focus_paths=(changed_paths if getattr(args, "changed_only", False) else None),
+        focus_paths=(changed_paths if scope_requested else None),
+        scope_metadata=(branch_diff.to_payload() if branch_diff is not None else None),
         include_paths=include_paths,
         progress=progress,
         analysis_mode=args.analysis_mode,

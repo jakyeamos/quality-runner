@@ -19,6 +19,7 @@ from quality_runner.cli_gate import add_gate_commands
 from quality_runner.cli_handoff import add_handoff_commands
 from quality_runner.cli_human_summary import human_summary
 from quality_runner.cli_journeys import add_journey_commands
+from quality_runner.cli_maintenance_surface import add_maintenance_surface_command
 from quality_runner.cli_outcome import OUTCOME_SCHEMA, render_outcome
 from quality_runner.cli_payload import payload_for_args
 from quality_runner.cli_phase import add_phase_commands
@@ -65,8 +66,8 @@ Compatibility commands remain available:
 
 Advanced operations:
   refresh, rollout, gate, controller-report, skill, proposal, remediation,
-  plan, phase, repo-hygiene, policy-surfaces, security, release-smoke, and
-  worker handoff tools
+  plan, phase, repo-hygiene, maintenance-surface, policy-surfaces, security,
+  release-smoke, and worker handoff tools
 
 Fleet environment audit:
   fleet audit run --all       static-all audit with optional changed-only dynamic checks
@@ -224,6 +225,22 @@ def build_parser(prog: str = CANONICAL_PROGRAM) -> argparse.ArgumentParser:
         action="store_true",
         help="Limit inspect/run analysis to paths changed from the baseline and working tree",
     )
+    refresh_parser.add_argument(
+        "--diff-base",
+        default=None,
+        help=(
+            "Scope findings to the merge-base-to-head branch diff; implies --changed-only "
+            "and records resolved Git provenance"
+        ),
+    )
+    refresh_parser.add_argument(
+        "--diff-head",
+        default=None,
+        help=(
+            "Head ref for --diff-base; it must resolve to the checked-out HEAD "
+            "(defaults to HEAD)"
+        ),
+    )
     add_worktree_verify_arguments(refresh_parser)
     refresh_parser.add_argument(
         "--handoff-output",
@@ -319,6 +336,7 @@ def build_parser(prog: str = CANONICAL_PROGRAM) -> argparse.ArgumentParser:
 
     add_artifact_commands(subparsers)
     add_repo_hygiene_commands(subparsers)
+    add_maintenance_surface_command(subparsers)
     add_policy_surface_commands(subparsers)
 
     add_handoff_commands(subparsers)

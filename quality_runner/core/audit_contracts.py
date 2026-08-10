@@ -37,6 +37,7 @@ class AuditRequest:
     cache_root: Path | None = None
     performance_budget_seconds: float | None = None
     include_paths: tuple[str, ...] = ()
+    scope_metadata: AuditPayload | None = None
 
 
 @dataclass(frozen=True)

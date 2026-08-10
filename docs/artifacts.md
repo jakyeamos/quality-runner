@@ -309,6 +309,26 @@ For a small change review, `refresh --changed-only` limits source analysis to th
 baseline and working-tree changed paths. It fails closed when no changed path is
 available rather than silently claiming a focused review.
 
+To scope a refresh to one branch relative to another, use an explicit head that
+is checked out in the repository:
+
+```bash
+qr refresh /path/to/repo \
+  --run-id-prefix tenure-dev-diff \
+  --diff-base main \
+  --diff-head dev \
+  --json
+```
+
+`--diff-base` implies changed-only analysis. The committed scope is the
+merge-base-to-head diff, and tracked, staged, unstaged, and untracked worktree
+paths are included when the checked-out commit matches the requested head. The
+refresh result and each `repo-scan.json` record the requested refs, resolved
+commits, merge base, path list, and worktree status under `scan_scope`. A
+different checked-out head fails closed before scanning. This is a changed-path
+scope, not an added-line-only filter; use the full scan when findings in an
+unchanged file or line-level diff semantics are required.
+
 To bound generated run output, configure one or both limits:
 
 ```toml

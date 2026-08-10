@@ -223,7 +223,9 @@ def discover_scan_inventory(
             if reason is not None:
                 ignored.append((name, reason))
         for directory_name, reason in ignored:
-            skipped_files.append(_fast_skipped_directory_entry(root, current_path / directory_name, reason))
+            skipped_files.append(
+                _fast_skipped_directory_entry(root, current_path / directory_name, reason)
+            )
         metrics["skipped_paths"] += len(ignored)
         ignored_names = {name for name, _reason in ignored}
         dir_names[:] = sorted(name for name in dir_names if name not in ignored_names)

@@ -45,6 +45,7 @@ def inspect_payload(
     cache_root: Path | None = None,
     performance_budget_seconds: float | None = None,
     include_paths: tuple[str, ...] = (),
+    scope_metadata: AuditPayload | None = None,
     progress: ProgressCallback | None = None,
     refresh_context: dict[str, object] | None = None,
 ) -> dict[str, Any]:
@@ -73,6 +74,7 @@ def inspect_payload(
             cache_mode=cache_mode,
             cache_root=cache_root,
             performance_budget_seconds=performance_budget_seconds,
+            scope_metadata=scope_metadata,
         ),
         progress=progress,
     )
@@ -113,6 +115,7 @@ def run_payload(
     cache_root: Path | None = None,
     performance_budget_seconds: float | None = None,
     include_paths: tuple[str, ...] = (),
+    scope_metadata: AuditPayload | None = None,
     progress: ProgressCallback | None = None,
     refresh_context: dict[str, object] | None = None,
 ) -> dict[str, Any]:
@@ -141,6 +144,7 @@ def run_payload(
             cache_mode=cache_mode,
             cache_root=cache_root,
             performance_budget_seconds=performance_budget_seconds,
+            scope_metadata=scope_metadata,
         ),
         progress=progress,
     )
@@ -182,6 +186,7 @@ def _audit_request(
     cache_root: Path | None,
     performance_budget_seconds: float | None,
     include_paths: tuple[str, ...],
+    scope_metadata: AuditPayload | None,
 ) -> AuditRequest:
     return AuditRequest(
         repo_root=repo_root,
@@ -208,6 +213,7 @@ def _audit_request(
         cache_root=cache_root,
         performance_budget_seconds=performance_budget_seconds,
         include_paths=include_paths,
+        scope_metadata=scope_metadata,
     )
 
 

@@ -109,3 +109,21 @@ consumers. Prefer high recall and use low confidence when versioning or external
 consumers are not visible. Accept a compatibility layer when it models a real
 external constraint, but require an explicit reason and removal boundary.
 """
+
+[[agent_reviews]]
+id = "vertical-slice-removal"
+category = "architecture-removal"
+severity = "observation"
+paths = ["*.py", "**/*.py", "*.js", "**/*.js", "*.jsx", "**/*.jsx", "*.ts", "**/*.ts", "*.tsx", "**/*.tsx", "*.go", "**/*.go", "*.rs", "**/*.rs", "*.java", "**/*.java", "*.sql", "**/*.sql", "*.yml", "**/*.yml", "*.yaml", "**/*.yaml", "*.toml", "**/*.toml", "*.json", "**/*.json", "*.md", "**/*.md"]
+focus = ["implementation", "entry points", "configuration and flags", "persistence and schemas", "tests", "documentation", "telemetry", "compatibility paths"]
+rubric = """
+Review feature removal as a vertical slice rather than a file deletion.
+
+Trace the removed behavior through implementation, entry points, configuration,
+flags, persistence or schemas, tests, documentation, telemetry, and compatibility
+paths. Report plausible residual consumers, unreachable remnants, stale promises,
+or migrations that still preserve the deleted concept. Cite exact evidence and
+use low confidence when external consumers or runtime state are unavailable.
+Do not demand deletion of historical records or intentional compatibility data;
+require a named owner and removal condition when remnants must remain.
+"""
