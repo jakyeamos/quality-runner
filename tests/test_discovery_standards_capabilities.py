@@ -489,6 +489,49 @@ def test_nested_javascript_workspace_uses_its_own_lockfile_package_manager(
     )
 
 
+def test_nested_javascript_workspace_inherits_root_package_manager(tmp_path: Path) -> None:
+    from quality_runner.discovery import inspect_repo
+
+    (tmp_path / "package.json").write_text(
+        json.dumps({"packageManager": "pnpm@11.9.0", "scripts": {}}),
+        encoding="utf-8",
+    )
+    workspace = tmp_path / "apps" / "web"
+    workspace.mkdir(parents=True)
+    (workspace / "package.json").write_text(
+        json.dumps({"scripts": {"lint": "eslint .", "test": "vitest run"}}),
+        encoding="utf-8",
+    )
+
+    scan = inspect_repo(tmp_path, run_id="nested-root-package-manager")
+    commands = {(item["id"], item["source"]): item["command"] for item in scan["quality_commands"]}
+
+    assert commands[("lint", "apps/web/package.json:scripts.lint")] == (
+        "cd apps/web && pnpm run lint"
+    )
+    assert commands[("tests", "apps/web/package.json:scripts.test")] == (
+        "cd apps/web && pnpm run test"
+    )
+
+
+def test_ci_setup_step_is_not_misclassified_as_typecheck(tmp_path: Path) -> None:
+    from quality_runner.discovery import inspect_repo
+
+    workflows = tmp_path / ".github" / "workflows"
+    workflows.mkdir(parents=True)
+    (workflows / "ci.yml").write_text(
+        "jobs:\n  quality:\n    steps:\n"
+        "      - run: python -m pip install ruff==1.0 basedpyright==1.0\n"
+        "      - run: basedpyright\n",
+        encoding="utf-8",
+    )
+
+    scan = inspect_repo(tmp_path, run_id="ci-setup-filter")
+    commands = {item["id"]: item["command"] for item in scan["quality_commands"]}
+
+    assert commands["typecheck"] == "basedpyright"
+
+
 def test_inspect_repo_discovery_prunes_excluded_trees_before_recursive_walk(
     tmp_path: Path,
     monkeypatch,

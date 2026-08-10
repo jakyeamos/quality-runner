@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 import shutil
 import subprocess
 from datetime import datetime, timedelta
@@ -14,6 +15,9 @@ from quality_runner.fleet.dependencies import (
 )
 from quality_runner.fleet.dependencies import (
     prepare_dynamic_dependencies as _prepare_dependency_tree,
+)
+from quality_runner.fleet.dependency_sources import (
+    compatible_dependency_source as _dependency_source,
 )
 from quality_runner.fleet.discovery import checkout_fingerprint
 from quality_runner.process_runner import run_shell_command
@@ -190,7 +194,7 @@ def _execute_dynamic(
         statuses: list[str] = []
         dependency_setup = _prepare_dynamic_dependencies(
             worktree=worktree,
-            source=source,
+            source=_dependency_source(repository, worktree=worktree, default=source),
             timeout_seconds=timeout_seconds,
         )
         dependency_cleanup_paths = [
@@ -341,7 +345,15 @@ def _quality_commands_from_scan(repository: dict[str, Any]) -> list[dict[str, An
     commands = scan.get("quality_commands")
     if not isinstance(commands, list):
         return []
-    allowed_capabilities = {"lint", "typecheck", "tests", "formatter", "dead_code", "runtime_smoke"}
+    allowed_capabilities = {
+        "lint",
+        "typecheck",
+        "tests",
+        "formatter",
+        "dead_code",
+        "runtime_smoke",
+        "pre_cr",
+    }
     return [
         item
         for item in commands
@@ -366,6 +378,8 @@ def _safe_dynamic_command(command: dict[str, Any]) -> bool:
     text = str(command.get("command", "")).lower()
     if not text:
         return False
+    if re.fullmatch(r"docker compose(?:\s+-f\s+[^\s]+)?\s+config", text):
+        return True
     denied = (
         "install",
         "sync",

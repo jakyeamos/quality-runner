@@ -138,6 +138,32 @@ def test_dynamic_dependency_setup_copies_protected_checkout_dependencies(tmp_pat
     assert (worktree / "node_modules" / "tool" / "index.js").is_file()
 
 
+def test_dynamic_dependency_setup_copies_nested_workspace_dependencies(tmp_path: Path) -> None:
+    source = tmp_path / "source"
+    worktree = tmp_path / "worktree"
+    (source / "node_modules" / "root-tool").mkdir(parents=True)
+    (source / "packages" / "core" / "node_modules" / "eslint").mkdir(parents=True)
+    (source / "packages" / "core" / "node_modules" / "eslint" / "index.js").write_text(
+        "export {};\n", encoding="utf-8"
+    )
+    (worktree / "packages" / "core").mkdir(parents=True)
+    (worktree / "package.json").write_text(
+        '{"devDependencies":{"root-tool":"1.0.0"}}', encoding="utf-8"
+    )
+    (worktree / "packages" / "core" / "package.json").write_text(
+        '{"scripts":{"lint":"eslint ."}}', encoding="utf-8"
+    )
+
+    result = dynamic._prepare_dynamic_dependencies(
+        worktree=worktree,
+        source=source,
+        timeout_seconds=30,
+    )
+
+    assert result["status"] == "passed"
+    assert (worktree / "packages" / "core" / "node_modules" / "eslint" / "index.js").is_file()
+
+
 def test_dynamic_dependency_copy_rebases_workspace_links_into_disposable_worktree(
     tmp_path: Path,
 ) -> None:
@@ -287,3 +313,60 @@ def test_documented_archival_repository_is_not_an_unknown_dynamic_result(
     )
 
     assert dynamic._documented_archival_repository(tmp_path) is True
+
+
+def test_dynamic_selection_includes_safe_pre_cr_aggregate() -> None:
+    repository = {
+        "scan": {
+            "quality_commands": [{"id": "pre_cr", "command": "python3 scripts/pre_cr_coverage.py"}]
+        }
+    }
+
+    assert dynamic._quality_commands_from_scan(repository) == [
+        {"id": "pre_cr", "command": "python3 scripts/pre_cr_coverage.py"}
+    ]
+
+
+def test_read_only_docker_compose_config_is_safe_but_build_is_not() -> None:
+    assert dynamic._safe_dynamic_command(
+        {"id": "runtime_smoke", "command": "docker compose -f compose.yml config"}
+    )
+    assert not dynamic._safe_dynamic_command(
+        {"id": "runtime_smoke", "command": "docker compose build"}
+    )
+
+
+def test_compatible_checkout_can_donate_locked_dependency_tree(tmp_path: Path) -> None:
+    worktree = tmp_path / "worktree"
+    default = tmp_path / "attached-target"
+    donor = tmp_path / "prepared-checkout"
+    for root in (worktree, default, donor):
+        root.mkdir()
+        (root / "package.json").write_text(
+            '{"packageManager":"pnpm@11.9.0","devDependencies":{"vitest":"1.0.0"}}',
+            encoding="utf-8",
+        )
+        (root / "pnpm-lock.yaml").write_text("lockfileVersion: '9.0'\n", encoding="utf-8")
+    (donor / "node_modules").mkdir()
+    repository = {"checkouts": [{"exists": True, "path": str(donor)}]}
+
+    assert dynamic._dependency_source(repository, worktree=worktree, default=default) == donor
+
+
+def test_mismatched_lockfile_cannot_donate_dependency_tree(tmp_path: Path) -> None:
+    worktree = tmp_path / "worktree"
+    default = tmp_path / "attached-target"
+    donor = tmp_path / "prepared-checkout"
+    for root in (worktree, default, donor):
+        root.mkdir()
+        (root / "package.json").write_text(
+            '{"packageManager":"pnpm@11.9.0","devDependencies":{"vitest":"1.0.0"}}',
+            encoding="utf-8",
+        )
+    (worktree / "pnpm-lock.yaml").write_text("target\n", encoding="utf-8")
+    (default / "pnpm-lock.yaml").write_text("default\n", encoding="utf-8")
+    (donor / "pnpm-lock.yaml").write_text("different\n", encoding="utf-8")
+    (donor / "node_modules").mkdir()
+    repository = {"checkouts": [{"exists": True, "path": str(donor)}]}
+
+    assert dynamic._dependency_source(repository, worktree=worktree, default=default) == default

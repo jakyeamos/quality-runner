@@ -6,6 +6,7 @@ from pathlib import Path
 
 from quality_runner.fleet.discovery import (
     discover_repositories,
+    load_fleet_policy,
     repository_record_for_root,
     resolve_target_branch,
 )
@@ -87,6 +88,32 @@ def test_generated_nested_worktrees_are_excluded_from_identity_discovery(tmp_pat
     assert [item["primary_path"] for item in records] == [str(parent.resolve())]
 
 
+def test_projects_root_fleet_policy_excludes_paths_and_descendants(tmp_path: Path) -> None:
+    projects = tmp_path / "projects"
+    included = projects / "included"
+    excluded = projects / "test-fixtures" / "fixture"
+    harvested = projects / "tmcp" / ".tmcp" / "harvest-sources" / "taste-skill"
+    _repo(included)
+    _repo(excluded)
+    _repo(harvested)
+    policy_path = projects / ".quality-runner" / "fleet.json"
+    policy_path.parent.mkdir()
+    policy_path.write_text(
+        '{"schema":"quality-runner-fleet-policy-v0.1","exclude_paths":'
+        '["test-fixtures","tmcp/.tmcp/harvest-sources/taste-skill"]}',
+        encoding="utf-8",
+    )
+
+    policy = load_fleet_policy(projects)
+    records = discover_repositories(projects)
+
+    assert policy["exclude_paths"] == [
+        "test-fixtures",
+        "tmcp/.tmcp/harvest-sources/taste-skill",
+    ]
+    assert [item["primary_path"] for item in records] == [str(included.resolve())]
+
+
 def test_no_remote_identity_uses_common_git_dir_or_path(tmp_path: Path) -> None:
     root = tmp_path / "repo"
     _repo(root)
@@ -164,30 +191,20 @@ def test_ambiguous_local_branches_without_fallback_are_blocked(tmp_path: Path) -
     assert target["reason"].startswith("no dev branch")
 
 
-def test_target_without_clean_disposable_worktree_host_is_blocked() -> None:
-    target = resolve_target_branch(
-        {
-            "checkouts": [
-                {
-                    "local_branches": ["dev"],
-                    "branch": "feature",
-                    "exists": True,
-                    "working_tree": True,
-                    "dirty": True,
-                    "prunable": False,
-                    "path": "/tmp/dirty-target-host",
-                }
-            ]
-        }
-    )
+def test_dirty_checkout_can_host_committed_target_in_disposable_worktree(tmp_path: Path) -> None:
+    root = tmp_path / "dirty-target-host"
+    _repo(root)
+    dev_head = _git(root, "rev-parse", "HEAD")
+    _git(root, "branch", "feature")
+    _git(root, "switch", "feature")
+    (root / "uncommitted.txt").write_text("preserve me\n", encoding="utf-8")
 
-    assert target == {
-        "branch": "dev",
-        "source": "default_dev",
-        "status": "blocked",
-        "reason": "target branch exists but no clean checkout can host disposable verification",
-        "checkout_id": None,
-    }
+    target = resolve_target_branch(repository_record_for_root(root))
+
+    assert target["status"] == "ready"
+    assert target["branch"] == "dev"
+    assert target["head"] == dev_head
+    assert "fingerprinted checkout" in target["reason"]
 
 
 def test_documented_main_branch_is_used_when_dev_is_absent(tmp_path: Path) -> None:

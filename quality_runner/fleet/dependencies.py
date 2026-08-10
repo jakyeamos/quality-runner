@@ -94,7 +94,7 @@ def prepare_dynamic_dependencies(
     if (
         source_dependencies is not None
         and source_dependencies.is_dir()
-        and _copy_source_dependencies(source_dependencies, worktree / "node_modules")
+        and _copy_javascript_dependency_trees(source=source, worktree=worktree)
     ):
         result = {
             "status": "passed",
@@ -195,7 +195,11 @@ def _prepare_nested_javascript_workspaces(
     run_command: CommandRunner,
 ) -> list[dict[str, Any]]:
     results: list[dict[str, Any]] = []
-    for manifest in sorted(worktree.glob("*/package.json")):
+    manifests = [
+        *worktree.glob("*/package.json"),
+        *worktree.glob("*/*/package.json"),
+    ]
+    for manifest in sorted(set(manifests)):
         workspace = manifest.parent
         if not _has_declared_dependencies(manifest):
             continue
@@ -277,6 +281,28 @@ def _copy_source_dependencies(source: Path, destination: Path) -> bool:
             return False
     if not _contained_symlinks(destination_root):
         shutil.rmtree(destination, ignore_errors=True)
+        return False
+    return True
+
+
+def _copy_javascript_dependency_trees(*, source: Path, worktree: Path) -> bool:
+    destinations: list[Path] = []
+    roots = [(source / "node_modules", worktree / "node_modules")]
+    manifests = [
+        *worktree.glob("*/package.json"),
+        *worktree.glob("*/*/package.json"),
+    ]
+    for manifest in sorted(set(manifests)):
+        relative = manifest.parent.relative_to(worktree)
+        nested_source = source / relative / "node_modules"
+        if nested_source.is_dir():
+            roots.append((nested_source, worktree / relative / "node_modules"))
+    for source_tree, destination in roots:
+        if _copy_source_dependencies(source_tree, destination):
+            destinations.append(destination)
+            continue
+        for copied in destinations:
+            shutil.rmtree(copied, ignore_errors=True)
         return False
     return True
 

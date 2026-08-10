@@ -72,6 +72,18 @@ analysis at phase, release, or audit boundaries. Hard obligations, stale source
 fingerprints, missing mandatory evidence, uncovered plan obligations, and
 deferred hard checks block reconciliation; advisory obligations remain visible.
 
+For fleet audits, automatic discovery honors the projects-root
+`.quality-runner/fleet.json` exclusion policy and records it in inventory.
+Dynamic checks always target a committed ref in a detached disposable worktree;
+a dirty source checkout is an eligible host because QR fingerprints it before
+and after and blocks the result if anything changes. Safe configured `pre_cr`
+aggregates and the exact read-only `docker compose ... config` form are eligible
+for dynamic execution; dependency install, synchronization, and unpinned
+`uv --with` commands remain blocked.
+An alternate checkout may donate a JavaScript dependency tree only when its
+package-manager declaration, dependency fields, and lockfile signature match
+the detached target.
+
 Agent workflow:
 
 1. Run QR before editing source.

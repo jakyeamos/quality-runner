@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import json
 import os
 import subprocess
+from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
@@ -47,12 +49,59 @@ EXCLUDED_DIRECTORIES = {
     "DerivedData",
 }
 
+FLEET_POLICY_RELATIVE_PATH = Path(".quality-runner/fleet.json")
+FLEET_POLICY_SCHEMA = "quality-runner-fleet-policy-v0.1"
 
-def discover_repositories(projects_root: Path) -> list[dict[str, Any]]:
+
+def load_fleet_policy(projects_root: Path) -> dict[str, Any]:
+    root = projects_root.expanduser().resolve()
+    path = root / FLEET_POLICY_RELATIVE_PATH
+    if not path.is_file():
+        return {
+            "schema": FLEET_POLICY_SCHEMA,
+            "source": "default",
+            "path": str(path),
+            "exclude_paths": [],
+        }
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as error:
+        raise ValueError(f"fleet policy is not valid JSON: {path}") from error
+    if not isinstance(payload, dict) or payload.get("schema") != FLEET_POLICY_SCHEMA:
+        raise ValueError(f"fleet policy must declare schema {FLEET_POLICY_SCHEMA}: {path}")
+    raw_exclusions = payload.get("exclude_paths", [])
+    if not isinstance(raw_exclusions, list):
+        raise ValueError(f"fleet policy exclude_paths must be an array: {path}")
+    exclusions: list[str] = []
+    for raw in raw_exclusions:
+        if not isinstance(raw, str) or not raw.strip():
+            raise ValueError(f"fleet policy exclusions must be non-empty strings: {path}")
+        candidate = Path(raw)
+        if candidate.is_absolute() or ".." in candidate.parts:
+            raise ValueError(f"fleet policy exclusions must stay under projects_root: {raw}")
+        normalized = candidate.as_posix().strip("/")
+        if normalized in {"", "."}:
+            raise ValueError("fleet policy cannot exclude the projects root")
+        exclusions.append(normalized)
+    return {
+        "schema": FLEET_POLICY_SCHEMA,
+        "source": "projects_root",
+        "path": str(path),
+        "exclude_paths": sorted(set(exclusions)),
+    }
+
+
+def discover_repositories(
+    projects_root: Path, *, policy: dict[str, Any] | None = None
+) -> list[dict[str, Any]]:
     root = projects_root.expanduser().resolve()
     if not root.exists() or not root.is_dir():
         raise ValueError(f"projects root is not a directory: {root}")
-    candidates = _discover_roots(root)
+    resolved_policy = policy or load_fleet_policy(root)
+    excluded_paths = {
+        str(path) for path in resolved_policy.get("exclude_paths", []) if isinstance(path, str)
+    }
+    candidates = _discover_roots(root, excluded_paths=excluded_paths)
     grouped: dict[str, list[Path]] = {}
     for candidate in candidates:
         identity_key = _identity_key(candidate)
@@ -139,6 +188,29 @@ def repository_record_for_root(root: Path) -> dict[str, Any]:
     }
 
 
+def repositories_for_scope(
+    projects_root: Path,
+    repository_paths: Sequence[Path] | None,
+    *,
+    fleet_policy: dict[str, Any] | None = None,
+) -> list[dict[str, Any]]:
+    if repository_paths is None:
+        return discover_repositories(projects_root, policy=fleet_policy)
+    root = projects_root.expanduser().resolve()
+    records: dict[str, dict[str, Any]] = {}
+    for path in repository_paths:
+        resolved = path.expanduser().resolve()
+        try:
+            resolved.relative_to(root)
+        except ValueError as error:
+            raise ValueError(
+                f"repository path is outside the bounded projects root: {resolved}"
+            ) from error
+        record = repository_record_for_root(resolved)
+        records[str(record["repo_id"])] = record
+    return [records[repo_id] for repo_id in sorted(records)]
+
+
 def resolve_target_branch(
     repository: dict[str, Any],
     *,
@@ -168,15 +240,34 @@ def checkout_fingerprint(path: Path) -> dict[str, Any]:
     }
 
 
-def _discover_roots(root: Path) -> list[Path]:
+def _discover_roots(root: Path, *, excluded_paths: set[str] | None = None) -> list[Path]:
+    exclusions = excluded_paths or set()
     found: list[Path] = []
     for current, directories, files in os.walk(root, topdown=True, followlinks=False):
-        has_git = ".git" in directories or ".git" in files
-        directories[:] = [name for name in directories if name not in EXCLUDED_DIRECTORIES]
         current_path = Path(current)
+        relative_current = current_path.relative_to(root).as_posix()
+        if relative_current != "." and _fleet_path_is_excluded(relative_current, exclusions):
+            directories[:] = []
+            continue
+        has_git = ".git" in directories or ".git" in files
+        directories[:] = [
+            name
+            for name in directories
+            if name not in EXCLUDED_DIRECTORIES
+            and not _fleet_path_is_excluded(
+                (current_path / name).relative_to(root).as_posix(), exclusions
+            )
+        ]
         if has_git:
             found.append(current_path.resolve())
     return sorted(set(found), key=lambda path: path.as_posix())
+
+
+def _fleet_path_is_excluded(relative_path: str, exclusions: set[str]) -> bool:
+    return any(
+        relative_path == excluded or relative_path.startswith(f"{excluded}/")
+        for excluded in exclusions
+    )
 
 
 def _identity_key(root: Path) -> str:

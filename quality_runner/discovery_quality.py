@@ -35,7 +35,7 @@ def _quality_commands(
             )
         ),
         *(_python_pyproject_quality_commands(root, pyproject, manifest_path="pyproject.toml")),
-        *(_workspace_quality_commands(root, workspaces)),
+        *(_workspace_quality_commands(root, workspaces, root_package_manager=package_manager)),
         *(_pre_cr_quality_commands(root, pre_cr_config)),
     ]
     existing_ids = {command["id"] for command in commands}
@@ -198,6 +198,8 @@ def _python_pyproject_quality_commands(
 def _workspace_quality_commands(
     root: Path,
     workspaces: list[dict[str, str]],
+    *,
+    root_package_manager: str | None = None,
 ) -> list[dict[str, str]]:
     commands: list[dict[str, str]] = []
     for workspace in workspaces:
@@ -216,10 +218,13 @@ def _workspace_quality_commands(
                 _javascript_quality_commands(
                     _package_scripts(package_json),
                     manifest_path=manifest,
-                    package_manager=_detect_package_manager(
-                        root,
-                        package_json,
-                        workspace_path=_workspace_path_from_manifest(manifest),
+                    package_manager=(
+                        _detect_package_manager(
+                            root,
+                            package_json,
+                            workspace_path=_workspace_path_from_manifest(manifest),
+                        )
+                        or root_package_manager
                     ),
                 )
             )
@@ -342,9 +347,22 @@ def _workflow_run_command(text: str, *, needle: str, fallback: str) -> str:
             candidate = stripped.removeprefix("run:").strip()
         else:
             continue
-        if candidate and candidate != "|" and needle in candidate:
+        if (
+            candidate
+            and candidate != "|"
+            and needle in candidate
+            and not _workflow_setup_command(candidate)
+        ):
             return candidate
     return fallback
+
+
+def _workflow_setup_command(command: str) -> bool:
+    lowered = command.lower()
+    installers = (" pip", "python -m pip", "python3 -m pip", "uv pip", "pnpm", "npm", "yarn")
+    return "uv sync" in lowered or any(
+        f"{installer} install" in lowered for installer in installers
+    )
 
 
 def _python_project_command(

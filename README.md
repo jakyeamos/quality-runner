@@ -141,20 +141,36 @@ published at `~/.quality-runner/fleet-audit/current/mac-control-ideal-state.json
 the ordinary `maturity.json` feed remains unchanged.
 
 The fleet audit resolves the documented development branch, preferring `dev`,
-and never selects a branch by commit-count maturity. When that committed branch
-is not attached, a clean checkout from the same Git repository may host QR's
-detached disposable worktree; an attached dirty target remains blocked. Branch
+and never selects a branch by commit-count maturity. A checkout from the same
+Git repository may host QR's detached disposable worktree even when it has
+uncommitted work: QR targets the committed branch HEAD and requires the host's
+full source fingerprint to remain identical before and after execution. Branch
 fallbacks are evidence ordered: documented policy, a locally verified remote
 default, then an unambiguous sole local branch. Fleet artifacts are private by
 default; the report command emits an aggregate-only projection that remains
 explicitly review-required before publication.
 
+Automatic discovery honors `/path/to/projects/.quality-runner/fleet.json` with
+schema `quality-runner-fleet-policy-v0.1`. Its `exclude_paths` are relative to
+the bounded projects root, exclude the named tree and descendants, and are
+recorded in the immutable inventory. Explicit `--repo-path` requests remain an
+intentional override for one-off inspection.
+
 Dynamic Python commands use `uv run --offline --locked` when the repository or
 workspace owns `uv.lock`, including its declared `dev` extra when present.
 JavaScript dependency trees are either copied into the disposable worktree or
 reproduced from a pinned package manager and lockfile without scripts or
-network access. For lockfile-only repositories, script execution may use an
+network access. Nested JavaScript workspaces inherit a pinned root package
+manager when they do not declare a closer one, so their scripts run through the
+prepared dependency tree instead of relying on ambient executables. For
+lockfile-only repositories, script execution may use an
 already cached matching manager binary, but never a Corepack download path.
+When the target branch is attached to an unprepared checkout, QR may copy a
+tree from another discovered checkout only after the package-manager,
+dependency-field, and lockfile signatures match the detached target exactly.
+The dynamic read-only command policy admits configured aggregate `pre_cr`
+commands after the same mutation screening and admits only the exact
+non-mutating `docker compose ... config` form from Docker surfaces.
 Swift packages expose `swift test` as their canonical local
 behavioral gate. A documented generated archival snapshot with no maintained
 executable surface is recorded as `not_applicable`, not as an unexplained

@@ -21,7 +21,8 @@ from quality_runner.fleet.contracts import (
     stable_id,
 )
 from quality_runner.fleet.discovery import (
-    discover_repositories,
+    load_fleet_policy,
+    repositories_for_scope,
     repository_record_for_root,
     resolve_target_branch,
 )
@@ -54,6 +55,7 @@ def fleet_audit_payload(
 ) -> dict[str, Any]:
     resolved_as_of = parse_as_of(as_of)
     root = projects_root.expanduser().resolve()
+    fleet_policy = load_fleet_policy(root)
     overrides = target_overrides or {}
     audit_id = stable_id(
         "audit",
@@ -65,9 +67,10 @@ def fleet_audit_payload(
         timeout_seconds,
         sorted(overrides.items()),
         sorted(str(path.expanduser().resolve()) for path in repository_paths or []),
+        fleet_policy,
     )
     artifact_root = _artifact_root(output_dir, audit_id)
-    repositories = _repositories_for_scope(root, repository_paths)
+    repositories = repositories_for_scope(root, repository_paths, fleet_policy=fleet_policy)
     results: list[dict[str, Any]] = []
     for repository in repositories:
         target_override = overrides.get(str(repository["repo_id"]))
@@ -122,6 +125,7 @@ def fleet_audit_payload(
             "max_age_days": dynamic_max_age_days,
             "timeout_seconds": timeout_seconds,
         },
+        "fleet_policy": {**fleet_policy, "applies_to": "automatic discovery"},
         "repositories": [item["repository"] for item in results],
         "provenance_hash": digest(
             {
@@ -154,27 +158,6 @@ def fleet_audit_payload(
         "public_projection": public_projection(summary),
         "implementation_allowed": False,
     }
-
-
-def _repositories_for_scope(
-    projects_root: Path,
-    repository_paths: Sequence[Path] | None,
-) -> list[dict[str, Any]]:
-    if repository_paths is None:
-        return discover_repositories(projects_root)
-    root = projects_root.expanduser().resolve()
-    records: dict[str, dict[str, Any]] = {}
-    for path in repository_paths:
-        resolved = path.expanduser().resolve()
-        try:
-            resolved.relative_to(root)
-        except ValueError as error:
-            raise ValueError(
-                f"repository path is outside the bounded projects root: {resolved}"
-            ) from error
-        record = repository_record_for_root(resolved)
-        records[str(record["repo_id"])] = record
-    return [records[repo_id] for repo_id in sorted(records)]
 
 
 def local_environment_audit_payload(

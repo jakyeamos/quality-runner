@@ -42,7 +42,6 @@ def resolve_target_branch(
         checkout
         for checkout in checkouts
         if checkout.get("exists") is True
-        and checkout.get("dirty") is not True
         and checkout.get("prunable") is False
         and _branch_head(checkout, target_branch) is not None
     ]
@@ -52,7 +51,7 @@ def resolve_target_branch(
             "branch": target_branch,
             "source": source,
             "status": "blocked",
-            "reason": "target branch exists but no clean checkout can host disposable verification",
+            "reason": "target branch exists but no checkout can host disposable verification",
             "checkout_id": None,
         }
     checkout = hosts[0]
@@ -139,7 +138,7 @@ def _branch_state(checkout: dict[str, Any], branch: str, head: str | None) -> di
             return {"status": "stale", "reason": "target branch is behind its configured upstream"}
     return {
         "status": "ready",
-        "reason": "target branch is committed and a clean checkout can host disposable verification",
+        "reason": "target branch is committed and a fingerprinted checkout can host disposable verification",
     }
 
 
@@ -148,7 +147,6 @@ def _target_state(checkout: dict[str, Any]) -> dict[str, str]:
         (checkout.get("exists") is not True, "target checkout does not exist"),
         (checkout.get("detached") is True, "target checkout is detached"),
         (checkout.get("prunable") is True, "target checkout is prunable"),
-        (checkout.get("dirty") is True, "target checkout is dirty"),
         (
             not isinstance(checkout.get("head"), str) or not checkout.get("head"),
             "target checkout has no verifiable HEAD",
@@ -158,7 +156,10 @@ def _target_state(checkout: dict[str, Any]) -> dict[str, str]:
     for blocked, reason in checks:
         if blocked:
             return {"status": "stale" if "behind" in reason else "blocked", "reason": reason}
-    return {"status": "ready", "reason": "target checkout is clean, attached, and verifiable"}
+    return {
+        "status": "ready",
+        "reason": "target checkout has a committed HEAD and is fingerprinted for disposable verification",
+    }
 
 
 def _documented_branch(repository: dict[str, Any]) -> tuple[str, str] | None:
