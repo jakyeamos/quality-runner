@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any
 
 from quality_runner.artifacts import prepare_safe_directory, write_json, write_text
+from quality_runner.fleet.agent_usability_scoring import applicable_agent_usability_scores
 from quality_runner.fleet.contracts import (
     DIMENSIONS,
     FLEET_AUDIT_SCHEMA,
@@ -328,6 +329,12 @@ def _build_summary(
             dimension = finding.get("dimension")
             if isinstance(score, int | float) and isinstance(dimension, str) and score >= 0:
                 dimension_scores.setdefault(dimension, []).append(float(score))
+            if status in {"unknown", "stale", "blocked"}:
+                unresolved.append(f"{result.get('repo_id')}:{dimension}:{status}")
+        for score_record in applicable_agent_usability_scores(result.get("agent_usability")):
+            dimension = str(score_record["dimension"])
+            status = str(score_record["status"])
+            dimension_scores.setdefault(dimension, []).append(float(score_record["score"]))
             if status in {"unknown", "stale", "blocked"}:
                 unresolved.append(f"{result.get('repo_id')}:{dimension}:{status}")
         dynamic_result = result.get("dynamic")

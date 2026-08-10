@@ -120,6 +120,9 @@ def test_run_payload_adds_structural_findings_and_groups_remediation_slices(
     from quality_runner.workflow import run_payload
 
     write_complete_js_fixture(tmp_path)
+    (tmp_path / ".quality-runner.toml").write_text(
+        "[quality_runner.security]\nenabled = false\n", encoding="utf-8"
+    )
     source = tmp_path / "src" / "app" / "page.tsx"
     source.parent.mkdir(parents=True)
     source.write_text(
@@ -412,7 +415,7 @@ def test_run_payload_does_not_false_positive_python_quality_gates(tmp_path: Path
         Path(payload["artifact_paths"]["capability_matrix_json"]).read_text()
     )
 
-    assert payload["status"] == "clean"
+    assert payload["status"] == "planned"
     finding_ids = {finding["id"] for finding in audit_report["findings"]}
     assert "missing-formatter" not in finding_ids
     assert "missing-lint" not in finding_ids
@@ -618,6 +621,9 @@ def test_run_payload_handoff_contains_next_slice_and_verification_gates(tmp_path
     from quality_runner.workflow import run_payload
 
     write_js_fixture(tmp_path)
+    (tmp_path / ".quality-runner.toml").write_text(
+        "[quality_runner.security]\nenabled = false\n", encoding="utf-8"
+    )
 
     payload = run_payload(repo_root=tmp_path, run_id="handoff-context-run", profile="default")
     handoff = json.loads(Path(payload["artifact_paths"]["agent_handoff_json"]).read_text())
@@ -727,6 +733,9 @@ def test_run_payload_reports_clean_when_no_remediation_slices(tmp_path: Path) ->
     from quality_runner.workflow import run_payload
 
     write_complete_js_fixture(tmp_path)
+    (tmp_path / ".quality-runner.toml").write_text(
+        "[quality_runner.security]\nenabled = false\n", encoding="utf-8"
+    )
 
     payload = run_payload(repo_root=tmp_path, run_id="clean-run", profile="default")
     remediation_plan = json.loads(

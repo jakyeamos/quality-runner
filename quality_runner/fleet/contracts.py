@@ -28,6 +28,8 @@ DIMENSIONS = (
     "deployment_rollback",
     "context_routing",
     "skill_contract_quality",
+    "strict_policy_visibility",
+    "strict_type_debt",
 )
 
 DIMENSION_LABELS = {
@@ -43,7 +45,52 @@ DIMENSION_LABELS = {
     "deployment_rollback": "deployment and rollback",
     "context_routing": "context routing and minimum context",
     "skill_contract_quality": "skill contract quality",
+    "strict_policy_visibility": "strict policy visibility",
+    "strict_type_debt": "strict BasedPyright debt",
 }
+
+DIMENSION_TERMS: dict[str, tuple[str, ...]] = {
+    "architecture_boundaries": ("architecture", "boundary", "ownership", "module", "system design"),
+    "change_surface_coverage": ("change surface", "change matrix", "dependency map"),
+    "coding_conventions": ("convention", "style", "strict", "format", "coding standard"),
+    "security_constraints": ("security", "credential", "secret", "authentication", "do not commit"),
+    "failure_modes": ("failure", "troubleshoot", "recovery", "incident", "common issue"),
+    "implementation_examples": (
+        "example",
+        "good implementation",
+        "reference implementation",
+        "pattern",
+    ),
+    "definition_of_done": (
+        "definition of done",
+        "acceptance criteria",
+        "quality gate",
+        "done when",
+        "verify",
+    ),
+    "approval_gated_paths": (
+        "approval",
+        "forbidden",
+        "do not change",
+        "destructive",
+        "human review",
+    ),
+    "deployment_rollback": ("deploy", "deployment", "rollback", "release", "revert"),
+    "context_routing": ("read when", "load when", "routing", "minimum context", "context index"),
+    "skill_contract_quality": ("skill", "trigger", "observable output"),
+}
+
+DEPLOYMENT_MARKERS = (
+    ".github/workflows",
+    "vercel.json",
+    "fly.toml",
+    "dockerfile",
+    "docker-compose",
+    "render.yaml",
+    "railway.json",
+    "terraform",
+    "pulumi",
+)
 
 FRESHNESS_DAYS = 90
 MAX_DOCUMENT_BYTES = 250_000

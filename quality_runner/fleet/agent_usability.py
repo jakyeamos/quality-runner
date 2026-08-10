@@ -5,6 +5,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any, cast
 
+from quality_runner.fleet.agent_usability_scoring import growth_health_score
 from quality_runner.fleet.contracts import FRESHNESS_DAYS, MAX_DOCUMENT_BYTES, relative_path
 
 AGENT_USABILITY_SCHEMA = "quality-runner-agent-usability/v1"
@@ -190,7 +191,7 @@ def assess_agent_usability(
         or invalid_skill_contract_ids
     ):
         growth_reasons.append("the manifest contains unresolved references")
-    if not surface_present:
+    if not surface_present or explicit_not_applicable:
         growth_status = "not_applicable"
     elif document_inventory_truncated or skill_inventory_truncated or manifest_error:
         growth_status = "blocked"
@@ -231,6 +232,7 @@ def assess_agent_usability(
         "lanes": lanes,
         "growth_health": {
             "status": growth_status,
+            "score": growth_health_score(growth_status),
             "message": "; ".join(growth_reasons)
             if growth_reasons
             else "Documentation and skill structure remains proportionate and routed.",
@@ -487,11 +489,9 @@ def _file_size(path: Path) -> int:
 
 
 def _strings(value: object) -> list[str]:
-    return (
-        [item for item in value if isinstance(item, str) and item]
-        if isinstance(value, list)
-        else []
-    )
+    if not isinstance(value, list):
+        return []
+    return [item for item in value if isinstance(item, str) and item]
 
 
 def _objects(value: object) -> list[dict[str, Any]]:

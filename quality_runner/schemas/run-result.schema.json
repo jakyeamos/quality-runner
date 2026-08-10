@@ -13,9 +13,21 @@
       "type": "object",
       "additionalProperties": { "type": "string" }
     },
+    "analysis_coverage": { "$ref": "#/$defs/analysisCoverage" },
     "warnings": { "$ref": "#/$defs/warnings" }
   },
   "$defs": {
+    "analysisCoverage": {
+      "type": "object",
+      "required": ["status", "deferred_checks", "scan_budget_exceeded", "performance_budget_exceeded"],
+      "properties": {
+        "status": { "enum": ["complete", "partial"] },
+        "deferred_checks": { "type": "array", "items": { "type": "object" } },
+        "scan_budget_exceeded": { "type": "boolean" },
+        "performance_budget_exceeded": { "type": "boolean" }
+      },
+      "additionalProperties": false
+    },
     "warnings": {
       "type": "array",
       "items": { "$ref": "#/$defs/warning" }

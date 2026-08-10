@@ -237,8 +237,7 @@ def build_parser(prog: str = CANONICAL_PROGRAM) -> argparse.ArgumentParser:
         "--diff-head",
         default=None,
         help=(
-            "Head ref for --diff-base; it must resolve to the checked-out HEAD "
-            "(defaults to HEAD)"
+            "Head ref for --diff-base; it must resolve to the checked-out HEAD (defaults to HEAD)"
         ),
     )
     add_worktree_verify_arguments(refresh_parser)

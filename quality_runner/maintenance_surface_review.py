@@ -31,18 +31,27 @@ def contract_evidence(
         for item in config.get("warnings", [])
         if "quality_runner.maintenance_surface" in str(item.get("message", ""))
     ]
+    invalid_config_observations = [
+        observation(
+            "contract-config-invalid",
+            "Maintenance-surface contracts are invalid and cannot prove ownership.",
+            evidence=[str(item.get("message", "invalid maintenance-surface configuration"))],
+            confidence="high",
+        )
+        for item in relevant_warnings
+    ]
     if section is None or not section.get("enabled"):
         return {
             "status": "invalid" if relevant_warnings else "not_configured",
             "behavior_owners": [],
             "compatibility": [],
-            "observations": [],
+            "observations": invalid_config_observations,
             "invalid_config": bool(relevant_warnings),
         }
     owners = _contract_list(section.get("behavior_owners"))
     compatibility = _contract_list(section.get("compatibility"))
     changed_paths = [item["path"] for item in changes]
-    observations: list[dict[str, Any]] = []
+    observations: list[dict[str, Any]] = list(invalid_config_observations)
     for candidate in candidates["public_surfaces"]:
         matches = [item for item in owners if _matches_any(candidate["path"], item["paths"])]
         if len(matches) != 1:

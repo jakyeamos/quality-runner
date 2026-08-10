@@ -4,6 +4,7 @@ from pathlib import Path
 
 from quality_runner.application.outcome_projection_support import (
     LegacyPayload,
+    _analysis_coverage_limitations,
     _authorize_verification_command,
     _command,
     _confidence,
@@ -45,10 +46,11 @@ def project_audit_outcome(
     branch_switched: bool,
 ) -> JourneyOutcome:
     warnings = _warning_messages(payload)
+    limitations = [*warnings, *_analysis_coverage_limitations(payload)]
     confidence = _confidence(
-        level="limited" if warnings else "observed",
+        level="limited" if limitations else "observed",
         basis=["local repository analysis"],
-        limitations=warnings,
+        limitations=limitations,
     )
     writes = _writes(payload, branch_switched=branch_switched)
     safety = _safety(

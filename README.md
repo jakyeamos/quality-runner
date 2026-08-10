@@ -161,13 +161,16 @@ hosted skills record that dimension as explicitly not applicable. The
 skill-quality audit includes conventional `skills/*/SKILL.md` contracts and
 every repository-relative hosted contract declared in the agent-usability
 manifest, including provider-edge locations such as `.agents/skills` or
-`.codex/skills`. Separately,
-the repository projection exposes four agent-usability lanes—documentation
-contract, tool-to-skill coverage, behavior evidence, and freshness/portability—
-plus growth-health counts for documentation, tools, skills, and skill families.
+`.codex/skills`. The repository projection also exposes four agent-usability
+lanes—documentation contract, tool-to-skill coverage, behavior evidence, and
+freshness/portability—plus growth health for documentation, tools, skills, and
+skill families. Every applicable lane and growth-health score contributes to
+repository and fleet maturity under a stable `agent_usability.*` dimension ID;
+explicit `not_applicable` evidence remains outside the denominator.
 The relationship is declared in `.agents/agent-usability.json` using
-`agent-usability/v1`. Growth health measures routed and classified coverage; it
-does not award maturity for adding more prose or more skills.
+`agent-usability/v1`. Growth health scores blocked, attention, and healthy
+structure as 0, 2, and 4; adding more prose or more skills cannot improve it by
+itself.
 Repositories without an agent-facing tool or skill surface declare
 `applicability: not_applicable` with a concrete reason and empty `tools` and
 `skills` arrays. This keeps them in the fleet inventory without manufacturing

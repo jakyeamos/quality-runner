@@ -7,7 +7,9 @@ from quality_runner.discovery import inspect_repo
 from quality_runner.fleet.agent_usability import assess_agent_usability
 from quality_runner.fleet.change_matrix import assess_change_surface_coverage
 from quality_runner.fleet.contracts import (
+    DEPLOYMENT_MARKERS,
     DIMENSION_LABELS,
+    DIMENSION_TERMS,
     DIMENSIONS,
     FLEET_FINDING_SCHEMA,
     FLEET_PLAN_SCHEMA,
@@ -22,48 +24,9 @@ from quality_runner.fleet.legibility_evidence import (
 )
 from quality_runner.fleet.projection import build_local_projection
 from quality_runner.fleet.skill_contracts import assess_skill_contract_quality
-
-DIMENSION_TERMS: dict[str, tuple[str, ...]] = {
-    "architecture_boundaries": ("architecture", "boundary", "ownership", "module", "system design"),
-    "change_surface_coverage": ("change surface", "change matrix", "dependency map"),
-    "coding_conventions": ("convention", "style", "strict", "format", "coding standard"),
-    "security_constraints": ("security", "credential", "secret", "authentication", "do not commit"),
-    "failure_modes": ("failure", "troubleshoot", "recovery", "incident", "common issue"),
-    "implementation_examples": (
-        "example",
-        "good implementation",
-        "reference implementation",
-        "pattern",
-    ),
-    "definition_of_done": (
-        "definition of done",
-        "acceptance criteria",
-        "quality gate",
-        "done when",
-        "verify",
-    ),
-    "approval_gated_paths": (
-        "approval",
-        "forbidden",
-        "do not change",
-        "destructive",
-        "human review",
-    ),
-    "deployment_rollback": ("deploy", "deployment", "rollback", "release", "revert"),
-    "context_routing": ("read when", "load when", "routing", "minimum context", "context index"),
-    "skill_contract_quality": ("skill", "trigger", "observable output"),
-}
-
-DEPLOYMENT_MARKERS = (
-    ".github/workflows",
-    "vercel.json",
-    "fly.toml",
-    "dockerfile",
-    "docker-compose",
-    "render.yaml",
-    "railway.json",
-    "terraform",
-    "pulumi",
+from quality_runner.fleet.strict_debt import (
+    assess_strict_policy_visibility,
+    assess_strict_type_debt,
 )
 
 
@@ -142,7 +105,13 @@ def audit_repository(
         "findings": findings,
         "plan": plan,
         "static_provenance_hash": digest(
-            {"repo": repository, "scan": scan, "documents": documents, "findings": findings}
+            {
+                "repo": repository,
+                "scan": scan,
+                "documents": documents,
+                "agent_usability": agent_usability,
+                "findings": findings,
+            }
         ),
     }
 
@@ -257,6 +226,40 @@ def _dimension_finding(
             message=assessment["message"],
             evidence=assessment["evidence"],
             validation_commands=["qr fleet audit run --repo-path REPO --json"],
+        )
+    if dimension == "strict_policy_visibility":
+        assessment = assess_strict_policy_visibility(
+            Path(str(repository["primary_path"])).expanduser().resolve(), scan
+        )
+        return _finding(
+            repository=repository,
+            dimension=dimension,
+            score=assessment["score"],
+            as_of=as_of,
+            status=assessment["status"],
+            severity="observation",
+            priority="P1",
+            confidence="high",
+            message=assessment["message"],
+            evidence=assessment["evidence"],
+            validation_commands=["uv run --locked qr fleet audit run --repo-path REPO --json"],
+        )
+    if dimension == "strict_type_debt":
+        assessment = assess_strict_type_debt(
+            Path(str(repository["primary_path"])).expanduser().resolve()
+        )
+        return _finding(
+            repository=repository,
+            dimension=dimension,
+            score=assessment["score"],
+            as_of=as_of,
+            status=assessment["status"],
+            severity="high" if assessment["status"] == "blocked" else "observation",
+            priority="P0" if assessment["status"] == "blocked" else "P1",
+            confidence="high",
+            message=assessment["message"],
+            evidence=assessment["evidence"],
+            validation_commands=["uv run --locked python scripts/check_strict_baseline.py"],
         )
     if dimension == "quality_commands":
         commands = scan.get("quality_commands")

@@ -356,7 +356,7 @@ def test_cli_verify_gates_json_executes_discovered_gates(tmp_path: Path) -> None
     verification = json.loads(Path(payload["artifact_paths"]["gate_verification_json"]).read_text())
 
     assert payload["schema"] == "quality-runner-verify-gates-result-v0.1"
-    assert payload["status"] == "passed"
+    assert payload["status"] == "passed-with-findings"
     assert verification["gates"][0]["status"] == "passed"
 
 
@@ -404,7 +404,7 @@ def test_cli_verify_gates_can_run_only_one_gate(tmp_path: Path) -> None:
     payload = json.loads(result.stdout)
     verification = json.loads(Path(payload["artifact_paths"]["gate_verification_json"]).read_text())
 
-    assert payload["status"] == "passed"
+    assert payload["status"] == "passed-with-findings"
     assert verification["only_gate_ids"] == ["lint"]
     assert [gate["id"] for gate in verification["gates"]] == ["lint"]
 

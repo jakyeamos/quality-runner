@@ -86,7 +86,7 @@ def test_verify_gates_runs_package_scripts_through_detected_package_manager(
     )
     verification = json.loads(Path(payload["artifact_paths"]["gate_verification_json"]).read_text())
 
-    assert payload["status"] == "passed"
+    assert payload["status"] == "passed-with-findings"
     assert verification["gates"][0]["command"] == "pnpm run lint"
     assert "package-bin-ok\n" in verification["gates"][0]["stdout_tail"]
 
@@ -275,7 +275,7 @@ def test_verify_gates_uses_per_gate_timeout_config_and_skips_covered_aggregate(
     )
     verification = json.loads(Path(payload["artifact_paths"]["gate_verification_json"]).read_text())
 
-    assert payload["status"] == "passed"
+    assert payload["status"] == "passed-with-findings"
     assert verification["gate_timeouts"] == {"lint": 9}
     assert [(gate["id"], gate["status"]) for gate in verification["gates"]] == [
         ("lint", "passed"),

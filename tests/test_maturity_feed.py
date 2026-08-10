@@ -50,6 +50,48 @@ Deployment has a rollback procedure.
     _git(root, "commit", "-m", "fixture")
 
 
+def _add_agent_surface(root: Path) -> None:
+    router = root / ".agents/context/README.md"
+    commands = root / ".agents/context/commands.md"
+    skill = root / ".agents/skills/example/SKILL.md"
+    manifest = root / ".agents/agent-usability.json"
+    for path in (router, commands, skill, manifest):
+        path.parent.mkdir(parents=True, exist_ok=True)
+    router.write_text("[Commands](commands.md)\n", encoding="utf-8")
+    commands.write_text("# Agent command\n", encoding="utf-8")
+    skill.write_text(
+        "---\nname: example\ndescription: Use the example agent command.\n---\n",
+        encoding="utf-8",
+    )
+    manifest.write_text(
+        json.dumps(
+            {
+                "schema": "agent-usability/v1",
+                "reviewed_at": "2026-07-26",
+                "tools": [
+                    {
+                        "id": "example-cli",
+                        "documentation": [".agents/context/commands.md"],
+                        "skills": ["example"],
+                        "behavior_evidence": [],
+                    }
+                ],
+                "skills": [
+                    {
+                        "id": "example",
+                        "family": "repository-operations",
+                        "source": "hosted",
+                        "contract_path": ".agents/skills/example/SKILL.md",
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    _git(root, "add", ".agents")
+    _git(root, "commit", "-m", "add agent surface")
+
+
 def _audit(tmp_path: Path) -> tuple[dict[str, object], Path]:
     projects = tmp_path / "projects"
     _init_repo(projects / "fixture")
@@ -80,9 +122,53 @@ def test_feed_is_deterministic_and_redacted(tmp_path: Path) -> None:
     agent_usability = first["repositories"][0]["agent_usability"]
     assert agent_usability["schema"] == "quality-runner-agent-usability/v1"
     assert len(agent_usability["lanes"]) == 4
+    assert not any(
+        key.startswith("agent_usability.") for key in first["repositories"][0]["dimension_scores"]
+    )
     serialized = json.dumps(first).lower()
     for forbidden in ('"prompt"', '"code"', '"diff"', '"transcript"', '"credential"'):
         assert forbidden not in serialized
+
+
+def test_agent_usability_scores_contribute_to_repository_and_fleet_maturity(
+    tmp_path: Path,
+) -> None:
+    projects = tmp_path / "projects"
+    root = projects / "fixture"
+    _init_repo(root)
+    _add_agent_surface(root)
+    result = fleet_audit_payload(
+        projects_root=projects,
+        output_dir=tmp_path / "fleet",
+        as_of="2026-07-26T17:00:00+00:00",
+    )
+    artifact_root = Path(str(result["artifact_root"]))
+    feed = build_maturity_feed(
+        artifact_root,
+        replay=fleet_replay_payload(output_dir=artifact_root),
+    )
+
+    repository = feed["repositories"][0]
+    agent_dimensions = {
+        key: value
+        for key, value in repository["dimension_scores"].items()
+        if key.startswith("agent_usability.")
+    }
+    assert agent_dimensions == {
+        "agent_usability.behavior_evidence": 1.0,
+        "agent_usability.documentation_contract": 4.0,
+        "agent_usability.freshness_portability": 3.0,
+        "agent_usability.growth_health": 4.0,
+        "agent_usability.tool_skill_coverage": 3.0,
+    }
+    scored = [value for value in repository["dimension_scores"].values() if value is not None]
+    assert repository["maturity_score"] == round(sum(scored) / len(scored), 3)
+    assert any(
+        gap["dimension"] == "agent_usability.behavior_evidence"
+        for gap in repository["dimension_gaps"]
+    )
+    assert result["summary"]["dimension_means"]["agent_usability.behavior_evidence"] == 1.0
+    assert feed["mean_maturity"] == result["summary"]["mean_maturity"]
 
 
 def test_feed_publish_replaces_stable_file_atomically(tmp_path: Path) -> None:

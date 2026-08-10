@@ -32,6 +32,7 @@ def create_code_quality_scan_with_skills(
     analysis_mode: str = "full",
     cache_mode: CacheMode | str = "repo",
     cache_root: Path | None = None,
+    scope_metadata: dict[str, object] | None = None,
 ) -> tuple[dict[str, Any], list[dict[str, str]]]:
     code_quality_scan = create_code_quality_scan(
         repo_root,
@@ -44,6 +45,7 @@ def create_code_quality_scan_with_skills(
         analysis_mode=analysis_mode,
         cache_mode=cache_mode,
         cache_root=cache_root,
+        scope_metadata=scope_metadata,
     )
     selection = code_quality_scan.get("skill_selection")
     skill_warnings = (

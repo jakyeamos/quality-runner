@@ -51,6 +51,36 @@ def test_audit_branch_switch_is_reported_only_when_observed() -> None:
     assert outcome["safety"]["source_worktree_mutated"] is True
 
 
+def test_audit_outcome_limits_confidence_for_partial_analysis_coverage() -> None:
+    outcome = project_audit_outcome(
+        _payload(
+            schema="quality-runner-inspect-result-v0.1",
+            status="inspected",
+            run_id="audit-partial",
+            artifact_paths={},
+            analysis_coverage={
+                "status": "partial",
+                "deferred_checks": [{"check": "architecture"}, {"check": "similarity"}],
+                "scan_budget_exceeded": True,
+                "performance_budget_exceeded": False,
+            },
+        ),
+        repo_root=Path("/repo"),
+        inspect_only=True,
+        branch_switched=False,
+    )
+
+    assert outcome["state"] == "complete"
+    assert outcome["confidence"] == {
+        "level": "limited",
+        "basis": ["local repository analysis"],
+        "limitations": [
+            "Analysis coverage is partial; deferred checks: architecture, similarity.",
+            "The code-quality scan exceeded its text-file budget.",
+        ],
+    }
+
+
 def test_outcome_commands_quote_repo_paths_and_run_ids() -> None:
     outcome = project_audit_outcome(
         _payload(

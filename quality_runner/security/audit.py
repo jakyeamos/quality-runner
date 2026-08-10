@@ -16,17 +16,9 @@ def security_audit_findings(
 
     findings: list[dict[str, Any]] = []
     findings.extend(_candidate_findings(security_scan))
-    if _explicit_security_requirements(security_config):
-        findings.extend(_missing_capability_findings(security_scan))
+    findings.extend(_missing_capability_findings(security_scan))
     findings.extend(_agent_review_findings(security_scan))
     return findings
-
-
-def _explicit_security_requirements(security_config: dict[str, Any] | None) -> bool:
-    if not isinstance(security_config, dict):
-        return False
-    required = security_config.get("required_capabilities")
-    return isinstance(required, list) and bool(required)
 
 
 def _candidate_findings(security_scan: dict[str, Any]) -> list[dict[str, Any]]:

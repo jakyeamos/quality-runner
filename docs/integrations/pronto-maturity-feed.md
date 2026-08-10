@@ -28,14 +28,20 @@ reading or generating repository artifacts.
 
 Each repository projection also includes `agent_usability`. Its four independent
 lanes preserve documentation-contract, tool-to-skill, behavior-evidence, and
-freshness/portability states. `growth_health` reports bounded counts and coverage
-for documentation, tools, hosted or projected skills, and declared skill
-families. The producer never infers a passing relation from file volume: the
+freshness/portability states. Every applicable lane is also emitted as a stable
+`agent_usability.*` dimension and contributes to the repository score, fleet
+mean, dimension means, gaps, and certification decision. `growth_health` reports
+bounded counts and coverage for documentation, tools, hosted or projected
+skills, and declared skill families; its blocked, attention, and healthy states
+score 0, 2, and 4 respectively and contribute through
+`agent_usability.growth_health`. The producer never infers a passing relation
+from file volume: the
 repository must declare tool relationships in `.agents/agent-usability.json`.
 A repository with no agent-facing tool or skill surface may declare
 `applicability: not_applicable`, a non-empty `reason`, and empty `tools` and
-`skills` arrays. Its lanes remain explicitly not applicable while growth-health
-inventory still reports its agent documentation structure.
+`skills` arrays. Its lanes and growth score remain explicitly not applicable and
+outside every score denominator while growth-health inventory still reports its
+agent documentation structure.
 
 Hosted `contract_path` entries also drive conditional skill-contract quality.
 This keeps provider-edge and nested hosted skills inside the same bounded static

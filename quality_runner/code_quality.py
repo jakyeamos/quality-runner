@@ -17,6 +17,10 @@ from quality_runner.code_quality_ledger import (
     build_resolution_ledger,
     render_resolution_ledger_markdown,
 )
+from quality_runner.code_quality_maintenance_surface import (
+    MAINTENANCE_SURFACE_SCHEMA,
+    maintenance_surface_scan_findings,
+)
 from quality_runner.code_quality_paths import _check_coverage, _split_lines, _string_or_none
 from quality_runner.code_quality_ponytail import ponytail_findings
 from quality_runner.code_quality_rules import _scan_file
@@ -69,6 +73,7 @@ def create_code_quality_scan(
     analysis_mode: str = "full",
     cache_mode: CacheMode | str = "repo",
     cache_root: Path | None = None,
+    scope_metadata: dict[str, object] | None = None,
 ) -> dict[str, Any]:
     root = repo_root.expanduser().resolve()
     policy = structural_scan_policy(config)
@@ -102,7 +107,9 @@ def create_code_quality_scan(
     scanned_files: list[dict[str, Any]] = []
 
     if scope.files:
-        source_items = [(file_info.path, file_info.text, file_info.lines) for file_info in scope.files]
+        source_items = [
+            (file_info.path, file_info.text, file_info.lines) for file_info in scope.files
+        ]
     else:
         source_items = [(relative_path, "", []) for relative_path in scope.file_paths]
     for relative_path, source_text, source_lines in source_items:
@@ -207,6 +214,20 @@ def create_code_quality_scan(
         )
     )
     findings.extend(skill_findings)
+    if "maintenance-surface" in disabled_groups:
+        maintenance_findings = []
+        maintenance_surface = {
+            "schema": MAINTENANCE_SURFACE_SCHEMA,
+            "status": "disabled",
+            "finding_count": 0,
+        }
+    else:
+        maintenance_findings, maintenance_surface = maintenance_surface_scan_findings(
+            root,
+            scope_metadata=scope_metadata,
+            eligible_paths={item["path"] for item in accountability},
+        )
+    findings.extend(maintenance_findings)
 
     sorted_findings = sorted(findings, key=_finding_sort_key)
     for index, finding in enumerate(sorted_findings, start=1):
@@ -263,12 +284,15 @@ def create_code_quality_scan(
         "skill_coverage": skill_coverage,
         "skill_capabilities": skill_capabilities,
         "skill_selection": skill_selection,
+        "maintenance_surface": maintenance_surface,
         "semantic_similarity_cache": semantic_similarity_cache,
         "analysis_mode": analysis_mode,
         "coverage": "partial" if deferred_checks else "full",
         "deferred_checks": deferred_checks,
         "analysis_cache": analysis_cache.evidence(
-            considered_files=len(scope.file_paths or tuple(file_info.path for file_info in scope.files))
+            considered_files=len(
+                scope.file_paths or tuple(file_info.path for file_info in scope.files)
+            )
         ),
     }
 
@@ -282,7 +306,7 @@ def _analyze_code_quality_file(
     disabled_groups: set[str],
     large_file_lines: int,
     fat_router_lines: int,
-    ) -> dict[str, object]:
+) -> dict[str, object]:
     lines = source_analysis_cache.redacted_lines_for_source(
         source_text=source_text,
         source_lines=source_lines,

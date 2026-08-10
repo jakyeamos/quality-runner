@@ -96,9 +96,7 @@ def resolve_branch_diff(
         "--",
     )
     worktree_paths = (
-        _git_names(root, "diff", "--name-only", HEAD_REF, "--")
-        if include_working_tree
-        else []
+        _git_names(root, "diff", "--name-only", HEAD_REF, "--") if include_working_tree else []
     )
     untracked_paths = (
         _git_names(root, "ls-files", "--others", "--exclude-standard", "--")
@@ -133,7 +131,9 @@ def _resolve_commit(repo_root: Path, ref: str) -> str:
 
 
 def _clean_paths(paths: tuple[str, ...] | list[str]) -> tuple[str, ...]:
-    return tuple(sorted({path for path in paths if path and not path.startswith(".quality-runner/")}))
+    return tuple(
+        sorted({path for path in paths if path and not path.startswith(".quality-runner/")})
+    )
 
 
 def _git_names(repo_root: Path, *args: str) -> list[str]:

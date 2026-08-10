@@ -49,6 +49,7 @@ jobs:
           uv run --locked ruff check .
           uv run --locked ruff format --check .
           uv run --locked basedpyright
+          uv run --locked python scripts/check_strict_baseline.py
           uv run --locked vulture quality_runner quality_evidence_contract repo_quality_certifier tests scripts --min-confidence 70
           uv run --locked pip-audit
 

@@ -289,6 +289,7 @@ def test_agent_usability_tracks_four_lanes_and_growth_health(tmp_path: Path) -> 
         "freshness_portability",
     ]
     assert result["growth_health"]["status"] == "healthy"
+    assert result["growth_health"]["score"] == 4
     assert result["growth_health"]["skill_count"] == 1
     assert result["growth_health"]["family_count"] == 1
     assert result["growth_health"]["behavior_verified_tool_count"] == 1
@@ -307,6 +308,7 @@ def test_agent_usability_does_not_reward_unmapped_growth(tmp_path: Path) -> None
     )
     assert result["lanes"][0]["status"] == "untracked"
     assert result["growth_health"]["unrouted_agent_document_count"] == 1
+    assert result["growth_health"]["score"] == 2
 
     assert result["status"] == "attention"
 
@@ -352,6 +354,7 @@ def test_agent_usability_rejects_missing_hosted_skill_contract(tmp_path: Path) -
     assert result["lanes"][1]["status"] == "missing"
     assert result["lanes"][3]["status"] == "static_gaps"
     assert result["growth_health"]["status"] == "attention"
+    assert result["growth_health"]["score"] == 2
 
 
 def test_agent_usability_supports_explicit_not_applicable_repository(tmp_path: Path) -> None:
@@ -384,6 +387,7 @@ def test_agent_usability_supports_explicit_not_applicable_repository(tmp_path: P
     assert result["applicability"] == "not_applicable"
     assert result["applicable_lane_count"] == 0
     assert all(lane["status"] == "not_applicable" for lane in result["lanes"])
+    assert result["growth_health"]["score"] is None
     assert result["growth_health"]["agent_document_count"] == 1
 
 
@@ -408,3 +412,4 @@ def test_agent_usability_rejects_unsupported_not_applicable_claim(tmp_path: Path
     assert result["status"] == "blocked"
     assert result["manifest_status"] == "invalid"
     assert result["lanes"][3]["status"] == "blocked"
+    assert result["growth_health"]["score"] == 0

@@ -193,10 +193,15 @@ def payload_for_args(
                 agent_review_mode=args.agent_review_mode,
                 include_paths=_include_paths_from_args(args),
                 scan_exclusion_overlay=_scan_exclusion_overlay(args, repo_root),
+                analysis_mode=args.analysis_mode,
+                cache_mode=args.cache_mode,
+                cache_root=_cache_root(args),
+                performance_budget_seconds=args.performance_budget_seconds,
                 intent=_legacy_payload(
                     workflow_intent_from_cli_args(args, repo_root=repo_root, run_id=args.run_id)
                 ),
                 inspect_only=args.inspect_only,
+                progress=progress,
             )
         )
     if args.command == "inspect":
@@ -489,10 +494,4 @@ def _float_value(value: object) -> float:
 
 
 def _unique_strings(values: list[str]) -> list[str]:
-    unique: list[str] = []
-    seen: set[str] = set()
-    for value in values:
-        if value and value not in seen:
-            unique.append(value)
-            seen.add(value)
-    return unique
+    return list(dict.fromkeys(value for value in values if value))

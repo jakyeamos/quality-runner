@@ -18,6 +18,7 @@ from quality_runner.artifacts import artifact_text_file
 from quality_runner.core.audit_contracts import ScanExclusionOverlay
 from quality_runner.core.outcome_contracts import JourneyOutcome
 from quality_runner.git_branches import checked_out_branch
+from quality_runner.progress import ProgressCallback
 
 
 def audit_journey_outcome(
@@ -35,6 +36,11 @@ def audit_journey_outcome(
     scan_exclusion_overlay: ScanExclusionOverlay | None = None,
     readiness_evidence_file: Path | None = None,
     include_paths: tuple[str, ...] = (),
+    analysis_mode: str = "full",
+    cache_mode: str | None = None,
+    cache_root: Path | None = None,
+    performance_budget_seconds: float | None = None,
+    progress: ProgressCallback | None = None,
 ) -> JourneyOutcome:
     branch_before = checked_out_branch(repo_root)
     payload = (
@@ -50,7 +56,12 @@ def audit_journey_outcome(
             agent_review_mode=agent_review_mode,
             scan_exclusion_overlay=scan_exclusion_overlay,
             include_paths=include_paths,
+            analysis_mode=analysis_mode,
+            cache_mode=cache_mode,
+            cache_root=cache_root,
+            performance_budget_seconds=performance_budget_seconds,
             intent=intent,
+            progress=progress,
         )
         if inspect_only
         else run_payload(
@@ -65,7 +76,12 @@ def audit_journey_outcome(
             agent_review_mode=agent_review_mode,
             scan_exclusion_overlay=scan_exclusion_overlay,
             include_paths=include_paths,
+            analysis_mode=analysis_mode,
+            cache_mode=cache_mode,
+            cache_root=cache_root,
+            performance_budget_seconds=performance_budget_seconds,
             intent=intent,
+            progress=progress,
         )
     )
     return project_audit_outcome(

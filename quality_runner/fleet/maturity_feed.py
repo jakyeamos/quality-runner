@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any, cast
 
 from quality_runner.artifacts import prepare_safe_directory
+from quality_runner.fleet.agent_usability_scoring import applicable_agent_usability_scores
 from quality_runner.fleet.contracts import digest
 
 FLEET_MATURITY_FEED_SCHEMA = "quality-runner-maturity-feed/v1"
@@ -239,6 +240,7 @@ def _repository_projection(repository: dict[str, Any], finding: dict[str, Any]) 
     applicable_scores: list[float] = []
     statuses: list[str] = []
     blockers = 0
+    agent_attention = False
     for item in findings:
         dimension = _required_string(item, "dimension")
         status = str(item.get("status", "unknown"))
@@ -260,6 +262,26 @@ def _repository_projection(repository: dict[str, Any], finding: dict[str, Any]) 
         if status == "blocked" or item.get("severity") == "blocker" or item.get("priority") == "P0":
             blockers += 1
 
+    agent_usability = _object(finding.get("agent_usability"))
+    for item in applicable_agent_usability_scores(agent_usability):
+        dimension = str(item["dimension"])
+        status = str(item["status"])
+        score = float(item["score"])
+        dimension_scores[dimension] = score
+        applicable_scores.append(score)
+        if score < 4:
+            agent_attention = True
+            dimension_gaps.append(
+                {
+                    "dimension": dimension,
+                    "status": status,
+                    "score": score,
+                    "message": str(item["message"])[:240],
+                }
+            )
+        if status == "blocked":
+            blockers += 1
+
     dynamic = _object(finding.get("dynamic"))
     dynamic_status = str(dynamic.get("status", "not_selected"))
     if blockers or dynamic_status in {"failed", "timeout", "blocked"}:
@@ -268,6 +290,7 @@ def _repository_projection(repository: dict[str, Any], finding: dict[str, Any]) 
         quality_status = "unknown"
     elif (
         dynamic_status in {"passed", "reused"}
+        and not agent_attention
         and statuses
         and all(status in {"validated", "maintained", "not_applicable"} for status in statuses)
     ):
@@ -303,7 +326,7 @@ def _repository_projection(repository: dict[str, Any], finding: dict[str, Any]) 
         "finding_count": len(findings),
         "blocker_count": blockers,
         "dynamic_status": dynamic_status,
-        "agent_usability": _object(finding.get("agent_usability")),
+        "agent_usability": agent_usability,
     }
 
 
