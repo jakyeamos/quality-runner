@@ -92,7 +92,8 @@ def prepare_dynamic_dependencies(
 
     source_dependencies = (source / "node_modules") if source is not None else None
     if (
-        source_dependencies is not None
+        source is not None
+        and source_dependencies is not None
         and source_dependencies.is_dir()
         and _copy_javascript_dependency_trees(source=source, worktree=worktree)
     ):
@@ -228,14 +229,19 @@ def _has_declared_dependencies(package_json: Path) -> bool:
     )
 
 
-def _copy_source_dependencies(source: Path, destination: Path) -> bool:
+def _copy_source_dependencies(
+    source: Path,
+    destination: Path,
+    source_scope: Path | None = None,
+    destination_scope: Path | None = None,
+) -> bool:
     try:
         shutil.copytree(source, destination, symlinks=True)
     except OSError:
         shutil.rmtree(destination, ignore_errors=True)
         return False
-    source_root = source.parent.resolve()
-    destination_root = destination.parent.resolve()
+    source_root = (source_scope or source.parent).resolve()
+    destination_root = (destination_scope or destination.parent).resolve()
     external_copies: list[tuple[Path, Path]] = []
     for path in sorted(destination.rglob("*"), key=lambda item: len(item.parts)):
         if not path.is_symlink():
@@ -274,7 +280,8 @@ def _copy_source_dependencies(source: Path, destination: Path) -> bool:
         try:
             path.unlink()
             path.symlink_to(
-                os.path.relpath(mapped, path.parent), target_is_directory=mapped.is_dir()
+                os.path.relpath(mapped, path.parent.resolve()),
+                target_is_directory=mapped.is_dir(),
             )
         except OSError:
             shutil.rmtree(destination, ignore_errors=True)
@@ -298,7 +305,7 @@ def _copy_javascript_dependency_trees(*, source: Path, worktree: Path) -> bool:
         if nested_source.is_dir():
             roots.append((nested_source, worktree / relative / "node_modules"))
     for source_tree, destination in roots:
-        if _copy_source_dependencies(source_tree, destination):
+        if _copy_source_dependencies(source_tree, destination, source, worktree):
             destinations.append(destination)
             continue
         for copied in destinations:

@@ -164,6 +164,35 @@ def test_dynamic_dependency_setup_copies_nested_workspace_dependencies(tmp_path:
     assert (worktree / "packages" / "core" / "node_modules" / "eslint" / "index.js").is_file()
 
 
+def test_nested_workspace_dependency_links_rebase_to_root_tree(tmp_path: Path) -> None:
+    source = tmp_path / "source"
+    worktree = tmp_path / "worktree"
+    root_tool = source / "node_modules" / "root-tool"
+    root_tool.mkdir(parents=True)
+    (root_tool / "index.js").write_text("export {};\n", encoding="utf-8")
+    nested_link = source / "client" / "node_modules" / "root-tool"
+    nested_link.parent.mkdir(parents=True)
+    nested_link.symlink_to(root_tool, target_is_directory=True)
+    (worktree / "client").mkdir(parents=True)
+    (worktree / "package.json").write_text(
+        '{"devDependencies":{"root-tool":"1.0.0"}}', encoding="utf-8"
+    )
+    (worktree / "client" / "package.json").write_text(
+        '{"devDependencies":{"root-tool":"1.0.0"}}', encoding="utf-8"
+    )
+
+    result = dynamic._prepare_dynamic_dependencies(
+        worktree=worktree,
+        source=source,
+        timeout_seconds=30,
+    )
+
+    assert result["status"] == "passed"
+    assert (worktree / "client" / "node_modules" / "root-tool").resolve() == (
+        worktree / "node_modules" / "root-tool"
+    )
+
+
 def test_dynamic_dependency_copy_rebases_workspace_links_into_disposable_worktree(
     tmp_path: Path,
 ) -> None:
@@ -189,6 +218,25 @@ def test_dynamic_dependency_copy_rebases_workspace_links_into_disposable_worktre
 
     assert result["status"] == "passed"
     assert (worktree / "node_modules" / "tool").resolve() == worktree / "packages" / "tool"
+
+
+def test_dependency_copy_normalizes_aliased_runtime_parent(tmp_path: Path) -> None:
+    source = tmp_path / "source"
+    package = source / "packages" / "tool"
+    package.mkdir(parents=True)
+    (package / "index.js").write_text("export {};\n", encoding="utf-8")
+    linked = source / "node_modules" / "tool"
+    linked.parent.mkdir(parents=True)
+    linked.symlink_to(package, target_is_directory=True)
+
+    runtime = tmp_path / "runtime"
+    runtime.mkdir()
+    alias = tmp_path / "runtime-alias"
+    alias.symlink_to(runtime, target_is_directory=True)
+    destination = alias / "worktree" / "node_modules"
+
+    assert dependencies._copy_source_dependencies(source / "node_modules", destination)
+    assert (destination / "tool").resolve() == runtime / "worktree" / "packages" / "tool"
 
 
 def test_dependency_copy_failure_falls_back_to_locked_offline_setup(
