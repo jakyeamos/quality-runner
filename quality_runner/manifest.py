@@ -55,12 +55,12 @@ def _git_state(repo_root: Path) -> dict[str, Any]:
 
     head_sha = _git_output(root, "rev-parse", "HEAD")
     branch = _git_output(root, "rev-parse", "--abbrev-ref", "HEAD")
-    status = _git_output(root, "status", "--porcelain")
+    dirty = _git_status(root)
     return {
         "is_repo": head_sha is not None,
         "head_sha": head_sha,
         "branch": branch,
-        "dirty": None if status is None else bool(status),
+        "dirty": dirty,
     }
 
 
@@ -83,3 +83,20 @@ def _git_output(repo_root: Path, *args: str) -> str | None:
         return None
     output = result.stdout.strip()
     return output or None
+
+
+def _git_status(repo_root: Path) -> bool | None:
+    try:
+        result = subprocess.run(
+            ["git", "status", "--porcelain"],
+            cwd=repo_root,
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    if result.returncode != 0:
+        return None
+    return bool(result.stdout.strip())

@@ -386,6 +386,7 @@ def test_run_payload_writes_manifest_with_git_head(tmp_path: Path) -> None:
     from quality_runner.workflow import run_payload
 
     head_sha = _git_commit(tmp_path)
+    (tmp_path / "tracked.txt").write_text("changed\n", encoding="utf-8")
 
     payload = run_payload(repo_root=tmp_path, run_id="manifest-run", profile="default")
     manifest = json.loads(Path(payload["artifact_paths"]["run_manifest_json"]).read_text())
