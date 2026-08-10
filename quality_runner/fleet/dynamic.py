@@ -150,6 +150,13 @@ def _execute_dynamic(
         "implementation_allowed": False,
     }
     if not commands:
+        if _documented_archival_repository(source):
+            result["status"] = "not_applicable"
+            result["reason"] = (
+                "repository documentation declares an archival generated snapshot with no "
+                "maintained executable quality surface"
+            )
+            return result
         result["reason"] = "no safe local quality commands were discovered"
         return result
     worktree = artifact_root / "worktrees" / str(repository["repo_id"])
@@ -299,6 +306,14 @@ def _missing_runtime_requirement(command: str, stdout: str, stderr: str) -> str 
         return "a required executable is unavailable in the bounded runtime"
     if "public agent-config engine not found" in combined:
         return "the documented public agent-config sibling runtime is unavailable"
+    if "network connectivity is disabled" in combined and "wasn't found in the cache" in combined:
+        return "a locked Python dependency is absent from the bounded offline cache"
+    if (
+        "econnrefused" in combined
+        or "connection refused" in combined
+        or "err_connection_refused" in combined
+    ) and any(host in combined for host in ("127.0.0.1", "localhost", "::1")):
+        return "the declared smoke check requires a local service that is not running"
     return None
 
 
@@ -332,6 +347,19 @@ def _quality_commands_from_scan(repository: dict[str, Any]) -> list[dict[str, An
         for item in commands
         if isinstance(item, dict) and item.get("id") in allowed_capabilities
     ][:8]
+
+
+def _documented_archival_repository(root: Path) -> bool:
+    readme = root / "README.md"
+    try:
+        text = readme.read_text(encoding="utf-8")[:20_000].lower()
+    except OSError:
+        return False
+    return (
+        "archival notice" in text
+        and "generated library" in text
+        and ("do not regenerate" in text or "retained" in text)
+    )
 
 
 def _safe_dynamic_command(command: dict[str, Any]) -> bool:

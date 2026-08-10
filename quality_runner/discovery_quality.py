@@ -34,11 +34,16 @@ def _quality_commands(
                 package_manager=package_manager,
             )
         ),
-        *(_python_pyproject_quality_commands(pyproject, manifest_path="pyproject.toml")),
+        *(_python_pyproject_quality_commands(root, pyproject, manifest_path="pyproject.toml")),
         *(_workspace_quality_commands(root, workspaces)),
         *(_pre_cr_quality_commands(root, pre_cr_config)),
-        *(quality_commands_from_surfaces(root, scan_exclusions=scan_exclusions)),
     ]
+    existing_ids = {command["id"] for command in commands}
+    commands.extend(
+        command
+        for command in quality_commands_from_surfaces(root, scan_exclusions=scan_exclusions)
+        if command["id"] not in existing_ids
+    )
     existing_ids = {command["id"] for command in commands}
     commands.extend(_ci_quality_commands(root=root, ci_files=ci_files, existing_ids=existing_ids))
     return commands
@@ -102,6 +107,7 @@ def _script_matches_capability(capability_id: str, script_name: str, command: st
 
 
 def _python_pyproject_quality_commands(
+    root: Path,
     pyproject: dict[str, Any],
     *,
     manifest_path: str,
@@ -111,29 +117,35 @@ def _python_pyproject_quality_commands(
     workspace_path = _workspace_path_from_manifest(manifest_path)
     if isinstance(tool, dict):
         if isinstance(tool.get("ruff"), dict):
-            commands.extend(
-                [
+            if isinstance(tool["ruff"].get("format"), dict):
+                commands.append(
                     _quality_command(
                         capability_id="formatter",
-                        command=_workspace_command(workspace_path, "ruff format --check ."),
+                        command=_python_project_command(
+                            root,
+                            pyproject,
+                            manifest_path,
+                            "ruff format --check .",
+                        ),
                         source_type="pyproject",
                         source=f"{manifest_path}:tool.ruff",
                         language="python",
-                    ),
-                    _quality_command(
-                        capability_id="lint",
-                        command=_workspace_command(workspace_path, "ruff check ."),
-                        source_type="pyproject",
-                        source=f"{manifest_path}:tool.ruff",
-                        language="python",
-                    ),
-                ]
+                    )
+                )
+            commands.append(
+                _quality_command(
+                    capability_id="lint",
+                    command=_python_project_command(root, pyproject, manifest_path, "ruff check ."),
+                    source_type="pyproject",
+                    source=f"{manifest_path}:tool.ruff",
+                    language="python",
+                )
             )
         if isinstance(tool.get("basedpyright"), dict):
             commands.append(
                 _quality_command(
                     capability_id="typecheck",
-                    command=_workspace_command(workspace_path, "basedpyright"),
+                    command=_python_project_command(root, pyproject, manifest_path, "basedpyright"),
                     source_type="pyproject",
                     source=f"{manifest_path}:tool.basedpyright",
                     language="python",
@@ -143,7 +155,7 @@ def _python_pyproject_quality_commands(
             commands.append(
                 _quality_command(
                     capability_id="typecheck",
-                    command=_workspace_command(workspace_path, "mypy ."),
+                    command=_python_project_command(root, pyproject, manifest_path, "mypy ."),
                     source_type="pyproject",
                     source=f"{manifest_path}:tool.mypy",
                     language="python",
@@ -153,7 +165,7 @@ def _python_pyproject_quality_commands(
             commands.append(
                 _quality_command(
                     capability_id="typecheck",
-                    command=_workspace_command(workspace_path, "ty check"),
+                    command=_python_project_command(root, pyproject, manifest_path, "ty check"),
                     source_type="pyproject",
                     source=f"{manifest_path}:tool.ty",
                     language="python",
@@ -164,7 +176,7 @@ def _python_pyproject_quality_commands(
             commands.append(
                 _quality_command(
                     capability_id="tests",
-                    command=_workspace_command(workspace_path, "pytest -q"),
+                    command=_python_project_command(root, pyproject, manifest_path, "pytest -q"),
                     source_type="pyproject",
                     source=f"{manifest_path}:tool.pytest.ini_options",
                     language="python",
@@ -195,7 +207,9 @@ def _workspace_quality_commands(
             continue
         if kind == "python":
             pyproject, _ = _read_pyproject(root, manifest)
-            commands.extend(_python_pyproject_quality_commands(pyproject, manifest_path=manifest))
+            commands.extend(
+                _python_pyproject_quality_commands(root, pyproject, manifest_path=manifest)
+            )
         elif kind == "javascript":
             package_json, _ = _read_package_json(root, manifest)
             commands.extend(
@@ -295,10 +309,11 @@ def _ci_quality_commands(
     for capability_id, needle, command, language in ci_patterns:
         if capability_id in existing_ids or needle not in text:
             continue
+        discovered_command = _workflow_run_command(text, needle=needle, fallback=command)
         commands.append(
             _quality_command(
                 capability_id=capability_id,
-                command=_workflow_run_command(text, needle=needle, fallback=command),
+                command=_locked_ci_command(root, discovered_command, language),
                 source_type="github_workflow",
                 source=".github/workflows",
                 language=language,
@@ -330,6 +345,35 @@ def _workflow_run_command(text: str, *, needle: str, fallback: str) -> str:
         if candidate and candidate != "|" and needle in candidate:
             return candidate
     return fallback
+
+
+def _python_project_command(
+    root: Path,
+    pyproject: dict[str, Any],
+    manifest_path: str,
+    command: str,
+) -> str:
+    workspace_path = _workspace_path_from_manifest(manifest_path)
+    workspace_root = root / workspace_path if workspace_path else root
+    if not (workspace_root / "uv.lock").is_file():
+        return _workspace_command(workspace_path, command)
+    optional = pyproject.get("project", {}).get("optional-dependencies", {})
+    extra = " --extra dev" if isinstance(optional, dict) and "dev" in optional else ""
+    return _workspace_command(workspace_path, f"uv run --offline --locked{extra} {command}")
+
+
+def _locked_ci_command(root: Path, command: str, language: str) -> str:
+    if language != "python" or not (root / "uv.lock").is_file():
+        return command
+    if command.startswith("uv run --with "):
+        match = re.match(r"uv run --with\s+\S+\s+(.+)", command)
+        if match:
+            return f"uv run --offline --locked {match.group(1)}"
+    if command.startswith("uv run ") and "--offline" not in command:
+        command = command.replace("uv run ", "uv run --offline ", 1)
+    if command.startswith("uv run ") and "--locked" not in command:
+        return command.replace("uv run ", "uv run --locked ", 1)
+    return command
 
 
 def _quality_command(

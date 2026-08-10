@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shlex
 import shutil
 import signal
@@ -30,7 +31,7 @@ def run_shell_command(command: str, *, cwd: Path, timeout: int) -> dict[str, obj
         stderr=subprocess.PIPE,
         text=True,
         start_new_session=True,
-        env=local_command_env(cwd),
+        env=local_command_env(cwd, command=command),
     )
     try:
         stdout, stderr = process.communicate(timeout=timeout)
@@ -86,16 +87,21 @@ def _text_value(value: object) -> str:
     return value if isinstance(value, str) else ""
 
 
-def local_command_env(cwd: Path) -> dict[str, str]:
+def local_command_env(cwd: Path, *, command: str | None = None) -> dict[str, str]:
     env = {
         key: value
         for key in LOCAL_COMMAND_ENV_ALLOWLIST
         if (value := os.environ.get(key)) is not None
     }
     cache_root = cwd / ".quality-runner" / "cache"
-    env["UV_CACHE_DIR"] = str(cache_root / "uv")
+    env["UV_CACHE_DIR"] = (
+        os.environ.get("UV_CACHE_DIR", str(Path.home() / ".cache" / "uv"))
+        if command and "uv run" in command and "--offline" in command
+        else str(cache_root / "uv")
+    )
     env["XDG_CACHE_HOME"] = str(cache_root / "xdg")
-    package_manager_bin = _cached_package_manager_bin(cwd)
+    package_manager_root = _package_manager_command_root(cwd, command)
+    package_manager_bin = _cached_package_manager_bin(package_manager_root)
     if package_manager_bin and env.get("PATH"):
         env["PATH"] = f"{package_manager_bin}{os.pathsep}{env['PATH']}"
     return env
@@ -104,13 +110,20 @@ def local_command_env(cwd: Path) -> dict[str, str]:
 def _cached_package_manager_bin(cwd: Path) -> str | None:
     package_manager = _declared_package_manager(cwd)
     if package_manager is None:
+        manager = _lockfile_package_manager(cwd)
+        version = None
+    else:
+        manager, version = package_manager
+    if manager is None:
         return None
-    manager, version = package_manager
     cache_roots = (
         Path.home() / ".cache" / "node" / "corepack" / "v1",
         Path.home() / "Library" / "pnpm" / ".tools",
     )
-    candidates = [root / manager / version / "bin" for root in cache_roots]
+    versions = [version] if version is not None else _cached_versions(cache_roots, manager)
+    candidates = [
+        root / manager / candidate / "bin" for candidate in versions for root in cache_roots
+    ]
     for candidate in candidates:
         if (candidate / manager).is_file():
             return str(candidate)
@@ -122,6 +135,49 @@ def _cached_package_manager_bin(cwd: Path) -> str | None:
         if shim is not None:
             return shim
     return None
+
+
+def _package_manager_command_root(cwd: Path, command: str | None) -> Path:
+    if not command:
+        return cwd
+    match = re.match(r"\s*cd\s+([A-Za-z0-9_./-]+)\s*&&\s*(?:pnpm|yarn|npm|bun)\b", command)
+    if not match:
+        return cwd
+    candidate = (cwd / match.group(1)).resolve()
+    try:
+        candidate.relative_to(cwd.resolve())
+    except ValueError:
+        return cwd
+    return candidate
+
+
+def _lockfile_package_manager(cwd: Path) -> str | None:
+    for lockfile, manager in (
+        ("pnpm-lock.yaml", "pnpm"),
+        ("yarn.lock", "yarn"),
+        ("package-lock.json", "npm"),
+        ("bun.lock", "bun"),
+        ("bun.lockb", "bun"),
+    ):
+        if (cwd / lockfile).is_file():
+            return manager
+    return None
+
+
+def _cached_versions(cache_roots: tuple[Path, ...], manager: str) -> list[str]:
+    versions = {
+        path.name
+        for root in cache_roots
+        if (manager_root := root / manager).is_dir()
+        for path in manager_root.iterdir()
+        if path.is_dir()
+    }
+    return sorted(versions, key=_version_key, reverse=True)
+
+
+def _version_key(value: str) -> tuple[int, ...]:
+    parts = re.findall(r"\d+", value)
+    return tuple(int(part) for part in parts) if parts else (0,)
 
 
 def _declared_package_manager(cwd: Path) -> tuple[str, str] | None:

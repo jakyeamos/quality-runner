@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from quality_runner.fleet import dynamic
+from quality_runner.fleet import dependencies, dynamic
 
 
 def test_missing_dynamic_command_worktree_is_unavailable(monkeypatch, tmp_path: Path) -> None:
@@ -42,6 +42,52 @@ def test_missing_required_executable_is_unavailable(monkeypatch, tmp_path: Path)
     assert result["status"] == "unavailable"
     assert result["reason"] == (
         "required executable golangci-lint is unavailable in the bounded runtime"
+    )
+
+
+def test_offline_dependency_cache_miss_is_unavailable(monkeypatch, tmp_path: Path) -> None:
+    def missing_wheel(command: str, *, cwd: Path, timeout: int) -> dict[str, object]:
+        del command, cwd, timeout
+        return {
+            "returncode": 1,
+            "stdout": "",
+            "stderr": (
+                "Network connectivity is disabled, but the requested data wasn't found in the cache"
+            ),
+        }
+
+    monkeypatch.setattr(dynamic, "run_shell_command", missing_wheel)
+
+    result = dynamic._run_dynamic_command(
+        {"id": "tests", "command": "uv run --offline --locked pytest -q"},
+        tmp_path,
+        30,
+    )
+
+    assert result["status"] == "unavailable"
+    assert result["reason"] == (
+        "a locked Python dependency is absent from the bounded offline cache"
+    )
+
+
+def test_local_service_smoke_precondition_is_unavailable(monkeypatch, tmp_path: Path) -> None:
+    def refused_service(command: str, *, cwd: Path, timeout: int) -> dict[str, object]:
+        del command, cwd, timeout
+        return {
+            "returncode": 1,
+            "stdout": "",
+            "stderr": "page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:5173/",
+        }
+
+    monkeypatch.setattr(dynamic, "run_shell_command", refused_service)
+
+    result = dynamic._run_dynamic_command(
+        {"id": "runtime_smoke", "command": "pnpm run smoke"}, tmp_path, 30
+    )
+
+    assert result["status"] == "unavailable"
+    assert result["reason"] == (
+        "the declared smoke check requires a local service that is not running"
     )
 
 
@@ -92,6 +138,110 @@ def test_dynamic_dependency_setup_copies_protected_checkout_dependencies(tmp_pat
     assert (worktree / "node_modules" / "tool" / "index.js").is_file()
 
 
+def test_dynamic_dependency_copy_rebases_workspace_links_into_disposable_worktree(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "source"
+    worktree = tmp_path / "worktree"
+    package = source / "packages" / "tool"
+    package.mkdir(parents=True)
+    (package / "index.js").write_text("export {};\n", encoding="utf-8")
+    linked = source / "node_modules" / "tool"
+    linked.parent.mkdir(parents=True)
+    linked.symlink_to(package, target_is_directory=True)
+    (worktree / "packages" / "tool").mkdir(parents=True)
+    (worktree / "packages" / "tool" / "index.js").write_text("export {};\n", encoding="utf-8")
+    (worktree / "package.json").write_text(
+        '{"devDependencies":{"tool":"workspace:*"}}', encoding="utf-8"
+    )
+
+    result = dynamic._prepare_dynamic_dependencies(
+        worktree=worktree,
+        source=source,
+        timeout_seconds=30,
+    )
+
+    assert result["status"] == "passed"
+    assert (worktree / "node_modules" / "tool").resolve() == worktree / "packages" / "tool"
+
+
+def test_dependency_copy_failure_falls_back_to_locked_offline_setup(
+    monkeypatch, tmp_path: Path
+) -> None:
+    source = tmp_path / "source"
+    worktree = tmp_path / "worktree"
+    (source / "node_modules").mkdir(parents=True)
+    worktree.mkdir()
+    (worktree / "package.json").write_text(
+        '{"packageManager":"pnpm@11.7.0","devDependencies":{"tool":"1.0.0"}}',
+        encoding="utf-8",
+    )
+    (worktree / "pnpm-lock.yaml").write_text("lockfileVersion: '9.0'\n", encoding="utf-8")
+    calls: list[str] = []
+
+    monkeypatch.setattr(dependencies, "_copy_source_dependencies", lambda *_: False)
+
+    result = dependencies.prepare_dynamic_dependencies(
+        worktree=worktree,
+        source=source,
+        timeout_seconds=30,
+        run_command=lambda command, **_: (
+            calls.append(command) or {"returncode": 0, "stdout": "", "stderr": ""}
+        ),
+    )
+
+    assert result["status"] == "passed"
+    assert calls == [
+        "pnpm install --offline --frozen-lockfile --ignore-scripts --reporter=append-only"
+    ]
+
+
+def test_existing_dependency_tree_precedes_absolute_local_dependency_copy(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "source"
+    worktree = tmp_path / "worktree"
+    (source / "node_modules" / "tool").mkdir(parents=True)
+    (source / "node_modules" / "tool" / "index.js").write_text("export {};\n", encoding="utf-8")
+    worktree.mkdir()
+    (worktree / "package.json").write_text(
+        '{"dependencies":{"tool":"file:/outside/runtime/tool"}}', encoding="utf-8"
+    )
+
+    result = dynamic._prepare_dynamic_dependencies(
+        worktree=worktree,
+        source=source,
+        timeout_seconds=30,
+    )
+
+    assert result["status"] == "passed"
+    assert result["method"] == "copied_from_protected_checkout"
+
+
+def test_nested_javascript_workspace_dependencies_are_prepared(tmp_path: Path) -> None:
+    source = tmp_path / "source"
+    worktree = tmp_path / "worktree"
+    (source / "frontend" / "node_modules" / "tool").mkdir(parents=True)
+    (source / "frontend" / "node_modules" / "tool" / "index.js").write_text(
+        "export {};\n", encoding="utf-8"
+    )
+    (worktree / "frontend").mkdir(parents=True)
+    (worktree / "frontend" / "package.json").write_text(
+        '{"devDependencies":{"tool":"1.0.0"}}', encoding="utf-8"
+    )
+
+    result = dynamic._prepare_dynamic_dependencies(
+        worktree=worktree,
+        source=source,
+        timeout_seconds=30,
+    )
+
+    assert result["status"] == "passed"
+    assert result["method"] == "nested_workspace_dependency_trees"
+    assert result["workspaces"][0]["workspace"] == "frontend"
+    assert (worktree / "frontend" / "node_modules" / "tool" / "index.js").is_file()
+
+
 def test_dynamic_dependency_setup_refuses_unpinned_javascript_environment(tmp_path: Path) -> None:
     (tmp_path / "package.json").write_text(
         '{"scripts":{"test":"node --test"},"dependencies":{"tool":"1.0.0"}}',
@@ -126,3 +276,14 @@ def test_dynamic_dependency_setup_copies_documented_sibling_runtime(tmp_path: Pa
     assert result["status"] == "not_required"
     assert result["documented_sibling_runtime"] == "copied"
     assert (worktree.parent / "jakyeamos-agent-skills" / "bin.mjs").is_file()
+
+
+def test_documented_archival_repository_is_not_an_unknown_dynamic_result(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "README.md").write_text(
+        "# Generated library\n\nARCHIVAL NOTICE: retained; do not regenerate.\n",
+        encoding="utf-8",
+    )
+
+    assert dynamic._documented_archival_repository(tmp_path) is True

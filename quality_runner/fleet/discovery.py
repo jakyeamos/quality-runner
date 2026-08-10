@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import os
-import re
 import subprocess
 from pathlib import Path
 from typing import Any
@@ -145,66 +144,9 @@ def resolve_target_branch(
     *,
     override: str | None = None,
 ) -> dict[str, Any]:
-    checkouts = [item for item in repository.get("checkouts", []) if isinstance(item, dict)]
-    branches = sorted(
-        {
-            branch
-            for checkout in checkouts
-            for branch in checkout.get("local_branches", [])
-            if isinstance(branch, str) and branch
-        }
-    )
-    if override:
-        if override not in branches:
-            return {
-                "branch": override,
-                "source": "explicit_override",
-                "status": "blocked",
-                "reason": "explicit target branch is not present in a discovered checkout",
-                "checkout_id": None,
-            }
-        source = "explicit_override"
-        target_branch = override
-    elif "dev" in branches:
-        source = "default_dev"
-        target_branch = "dev"
-    else:
-        documented = _documented_branch(repository)
-        if documented is None or documented[0] not in branches:
-            return {
-                "branch": None,
-                "source": "unresolved",
-                "status": "blocked",
-                "reason": "no dev branch or documented canonical fallback was found",
-                "checkout_id": None,
-            }
-        target_branch, source = documented
+    from quality_runner.fleet.targeting import resolve_target_branch as resolve
 
-    candidates = [
-        checkout
-        for checkout in checkouts
-        if checkout.get("branch") == target_branch and checkout.get("exists") is True
-    ]
-    candidates.sort(key=lambda item: (item.get("dirty") is True, str(item.get("path", ""))))
-    target_checkout = candidates[0] if candidates else None
-    if target_checkout is None:
-        return {
-            "branch": target_branch,
-            "source": source,
-            "status": "blocked",
-            "reason": "target branch exists but no attached checkout is currently available",
-            "checkout_id": None,
-        }
-    state = _target_state(target_checkout)
-    return {
-        "branch": target_branch,
-        "source": source,
-        "status": "ready" if state["status"] == "ready" else state["status"],
-        "reason": state["reason"],
-        "checkout_id": target_checkout.get("checkout_id"),
-        "head": target_checkout.get("head"),
-        "target_state": state,
-    }
+    return resolve(repository, override=override)
 
 
 def checkout_fingerprint(path: Path) -> dict[str, Any]:
@@ -301,16 +243,15 @@ def _checkout_record(
 ) -> dict[str, Any]:
     root = path.expanduser().resolve()
     exists = root.exists() and root.is_dir()
+    working_tree = (
+        _git_output(root, "rev-parse", "--is-inside-work-tree") == "true" if exists else False
+    )
     head = _git_output(root, "rev-parse", "HEAD") if exists else None
-    branch = _git_output(root, "symbolic-ref", "--short", "-q", "HEAD") if exists else None
-    if (
-        exists
-        and branch is None
-        and _git_output(root, "rev-parse", "--is-inside-work-tree") == "true"
-    ):
-        branch = None
+    branch = _git_output(root, "symbolic-ref", "--short", "-q", "HEAD") if working_tree else None
     status = (
-        _git_output(root, "status", "--porcelain=v1", "--untracked-files=all") if exists else None
+        _git_output(root, "status", "--porcelain=v1", "--untracked-files=all")
+        if working_tree
+        else None
     )
     upstream = (
         _git_output(root, "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{upstream}")
@@ -340,10 +281,11 @@ def _checkout_record(
         "relative_to_projects_root": relative_path(projects_root, root),
         "is_primary": primary,
         "is_registered_worktree": bool(worktree_record),
+        "working_tree": working_tree,
         "exists": exists,
         "head": head,
         "branch": branch,
-        "detached": exists and branch is None,
+        "detached": working_tree and branch is None,
         "dirty": None if status is None else bool(status),
         "prunable": prunable,
         "upstream": upstream,
@@ -374,56 +316,6 @@ def _checkout_record(
     }
 
 
-def _target_state(checkout: dict[str, Any]) -> dict[str, str]:
-    if checkout.get("exists") is not True:
-        return {"status": "blocked", "reason": "target checkout does not exist"}
-    if checkout.get("detached") is True:
-        return {"status": "blocked", "reason": "target checkout is detached"}
-    if checkout.get("prunable") is True:
-        return {"status": "blocked", "reason": "target checkout is prunable"}
-    if checkout.get("dirty") is True:
-        return {"status": "blocked", "reason": "target checkout is dirty"}
-    if not isinstance(checkout.get("head"), str) or not checkout.get("head"):
-        return {"status": "blocked", "reason": "target checkout has no verifiable HEAD"}
-    if checkout.get("stale") is True:
-        return {"status": "stale", "reason": "target checkout is behind its configured upstream"}
-    return {"status": "ready", "reason": "target checkout is clean, attached, and verifiable"}
-
-
-def _documented_branch(repository: dict[str, Any]) -> tuple[str, str] | None:
-    root = Path(str(repository.get("primary_path", ".")))
-    texts: list[tuple[str, str]] = []
-    for relative in (
-        "AGENTS.md",
-        "CLAUDE.md",
-        "README.md",
-        "CONTRIBUTING.md",
-        ".agents/context/README.md",
-    ):
-        path = root / relative
-        if path.is_file():
-            try:
-                texts.append((relative, path.read_text(encoding="utf-8")[:100_000]))
-            except OSError:
-                continue
-    patterns = (
-        (
-            r"(?:canonical|default|primary|routine|development)\s+(?:branch|lane)[^\n]{0,80}\b(develop|trunk|main)\b",
-            "documented_fallback",
-        ),
-        (
-            r"\b(develop|trunk|main)\b\s+(?:branch|is)\s+(?:the\s+)?(?:canonical|default|primary)",
-            "documented_fallback",
-        ),
-    )
-    for path, text in texts:
-        for pattern, source in patterns:
-            match = re.search(pattern, text, re.IGNORECASE)
-            if match:
-                return match.group(1), f"{source}:{path}"
-    return None
-
-
 def _repository_class(root: Path, origin: str | None) -> str:
     if (root / "Package.swift").exists() or any(root.glob("*.xcodeproj")):
         return "apple"
@@ -443,10 +335,12 @@ def _local_branches(root: Path) -> list[str]:
     return sorted(output.splitlines()) if output else []
 
 
-def _ahead_behind(root: Path, upstream: str | None) -> tuple[int | None, int | None]:
+def _ahead_behind(
+    root: Path, upstream: str | None, *, head: str = "HEAD"
+) -> tuple[int | None, int | None]:
     if not upstream:
         return None, None
-    output = _git_output(root, "rev-list", "--left-right", "--count", f"HEAD...{upstream}")
+    output = _git_output(root, "rev-list", "--left-right", "--count", f"{head}...{upstream}")
     if not output:
         return None, None
     parts = output.split()

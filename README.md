@@ -141,10 +141,24 @@ published at `~/.quality-runner/fleet-audit/current/mac-control-ideal-state.json
 the ordinary `maturity.json` feed remains unchanged.
 
 The fleet audit resolves the documented development branch, preferring `dev`,
-and never selects a branch by commit-count maturity. Dirty, detached, stale,
-prunable, or unverifiable target checkouts receive static findings only. Fleet
-artifacts are private by default; the report command emits an aggregate-only
-projection that remains explicitly review-required before publication.
+and never selects a branch by commit-count maturity. When that committed branch
+is not attached, a clean checkout from the same Git repository may host QR's
+detached disposable worktree; an attached dirty target remains blocked. Branch
+fallbacks are evidence ordered: documented policy, a locally verified remote
+default, then an unambiguous sole local branch. Fleet artifacts are private by
+default; the report command emits an aggregate-only projection that remains
+explicitly review-required before publication.
+
+Dynamic Python commands use `uv run --offline --locked` when the repository or
+workspace owns `uv.lock`, including its declared `dev` extra when present.
+JavaScript dependency trees are either copied into the disposable worktree or
+reproduced from a pinned package manager and lockfile without scripts or
+network access. For lockfile-only repositories, script execution may use an
+already cached matching manager binary, but never a Corepack download path.
+Swift packages expose `swift test` as their canonical local
+behavioral gate. A documented generated archival snapshot with no maintained
+executable surface is recorded as `not_applicable`, not as an unexplained
+unknown.
 
 Quality Runner publishes the validated current fleet maturity feed to the fixed
 private path `~/.quality-runner/fleet-audit/current/maturity.json`. Immutable

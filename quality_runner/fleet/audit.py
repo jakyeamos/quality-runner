@@ -316,6 +316,7 @@ def _build_summary(
             "unavailable",
             "timeout",
             "unknown",
+            "not_applicable",
         )
     }
     unresolved: list[str] = []
@@ -356,6 +357,8 @@ def _build_summary(
                 dynamic_counts["timeout"] += 1
             elif state == "unknown":
                 dynamic_counts["unknown"] += 1
+            elif state == "not_applicable":
+                dynamic_counts["not_applicable"] += 1
     all_scores = [score for scores in dimension_scores.values() for score in scores]
     means = {
         dimension: round(sum(scores) / len(scores), 3) if scores else None
@@ -380,6 +383,8 @@ def _build_summary(
         "dynamic_blocked": dynamic_counts["blocked"],
         "dynamic_unavailable": dynamic_counts["unavailable"],
         "dynamic_timeout": dynamic_counts["timeout"],
+        "dynamic_unknown": dynamic_counts["unknown"],
+        "dynamic_not_applicable": dynamic_counts["not_applicable"],
         "mean_maturity": round(sum(all_scores) / len(all_scores), 3) if all_scores else None,
         "dimension_means": means,
         "finding_counts": dict(sorted(finding_counts.items())),
@@ -395,7 +400,7 @@ def _build_summary(
             "unknown_evidence_is_not_green": True,
             "not_applicable_requires_bounded_evidence": True,
             "dynamic_scope": "changed, new, dirty, priority, stale, failed, or incomplete evidence only",
-            "target_branch_policy": "documented development branch, default dev; no maturity-based branch selection",
+            "target_branch_policy": "explicit override, dev, documented fallback, locally verified remote default, or sole local branch; no maturity-based branch selection",
             "source_checkouts_modified": False,
         },
         "provenance_hash": digest(

@@ -27,6 +27,14 @@ def test_local_command_env_uses_allowlist_and_repo_local_caches(tmp_path, monkey
     assert "AWS_SECRET_ACCESS_KEY" not in env
 
 
+def test_offline_uv_command_uses_prepared_host_cache(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("UV_CACHE_DIR", "/inherited/uv-cache")
+
+    env = local_command_env(tmp_path, command="uv run --offline --locked pytest -q")
+
+    assert env["UV_CACHE_DIR"] == "/inherited/uv-cache"
+
+
 def test_local_command_env_prefers_exact_cached_package_manager(tmp_path, monkeypatch) -> None:
     monkeypatch.setenv("PATH", "/usr/local/bin:/usr/bin")
     home = tmp_path / "home"
@@ -68,3 +76,49 @@ def test_local_command_env_shims_corepack_script_cache(tmp_path, monkeypatch) ->
     shim = repo / ".quality-runner" / "cache" / "package-managers" / "bin" / "pnpm"
     assert env["PATH"].split(":", 1)[0] == str(shim.parent)
     assert shim.read_text(encoding="utf-8").startswith("#!/bin/sh\nexec ")
+
+
+def test_local_command_env_uses_cached_manager_for_unpinned_lockfile(tmp_path, monkeypatch) -> None:
+    node_bin = tmp_path / "node-bin"
+    node_bin.mkdir()
+    node = node_bin / "node"
+    node.write_text("#!/bin/sh\n", encoding="utf-8")
+    node.chmod(0o755)
+    monkeypatch.setenv("PATH", str(node_bin))
+    home = tmp_path / "home"
+    monkeypatch.setenv("HOME", str(home))
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    (repo / "pnpm-lock.yaml").write_text("lockfileVersion: '9.0'\n", encoding="utf-8")
+    package_manager_bin = home / ".cache" / "node" / "corepack" / "v1" / "pnpm" / "11.20.0" / "bin"
+    package_manager_bin.mkdir(parents=True)
+    (package_manager_bin / "pnpm.cjs").write_text("console.log('11.20.0')\n", encoding="utf-8")
+
+    env = local_command_env(repo)
+
+    shim = repo / ".quality-runner" / "cache" / "package-managers" / "bin" / "pnpm"
+    assert env["PATH"].split(":", 1)[0] == str(shim.parent)
+    assert "11.20.0" in shim.read_text(encoding="utf-8")
+
+
+def test_command_workspace_selects_nested_lockfile_package_manager(tmp_path, monkeypatch) -> None:
+    node_bin = tmp_path / "node-bin"
+    node_bin.mkdir()
+    node = node_bin / "node"
+    node.write_text("#!/bin/sh\n", encoding="utf-8")
+    node.chmod(0o755)
+    monkeypatch.setenv("PATH", str(node_bin))
+    home = tmp_path / "home"
+    monkeypatch.setenv("HOME", str(home))
+    repo = tmp_path / "repo"
+    frontend = repo / "frontend"
+    frontend.mkdir(parents=True)
+    (frontend / "pnpm-lock.yaml").write_text("lockfileVersion: '9.0'\n", encoding="utf-8")
+    package_manager_bin = home / ".cache" / "node" / "corepack" / "v1" / "pnpm" / "11.20.0" / "bin"
+    package_manager_bin.mkdir(parents=True)
+    (package_manager_bin / "pnpm.cjs").write_text("console.log('11.20.0')\n", encoding="utf-8")
+
+    env = local_command_env(repo, command="cd frontend && pnpm run test")
+
+    shim = frontend / ".quality-runner" / "cache" / "package-managers" / "bin" / "pnpm"
+    assert env["PATH"].split(":", 1)[0] == str(shim.parent)

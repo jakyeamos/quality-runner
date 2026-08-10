@@ -4,7 +4,11 @@ import shutil
 import subprocess
 from pathlib import Path
 
-from quality_runner.fleet.discovery import discover_repositories, repository_record_for_root
+from quality_runner.fleet.discovery import (
+    discover_repositories,
+    repository_record_for_root,
+    resolve_target_branch,
+)
 
 
 def _git(root: Path, *args: str) -> str:
@@ -91,3 +95,140 @@ def test_no_remote_identity_uses_common_git_dir_or_path(tmp_path: Path) -> None:
 
     assert record["identity_provenance"]["normalized_origin"] is None
     assert record["identity_key"].startswith("common:")
+
+
+def test_unattached_dev_branch_uses_clean_checkout_for_disposable_verification(
+    tmp_path: Path,
+) -> None:
+    root = tmp_path / "repo"
+    _repo(root)
+    dev_head = _git(root, "rev-parse", "HEAD")
+    _git(root, "branch", "main")
+    _git(root, "switch", "main")
+
+    target = resolve_target_branch(repository_record_for_root(root))
+
+    assert target["status"] == "ready"
+    assert target["branch"] == "dev"
+    assert target["head"] == dev_head
+    assert target["target_state"]["reason"].startswith("target branch is committed")
+
+
+def test_only_local_branch_is_an_unambiguous_fallback(tmp_path: Path) -> None:
+    root = tmp_path / "repo"
+    root.mkdir()
+    _git(root, "init", "-b", "main")
+    _git(root, "config", "user.email", "qr-tests@example.com")
+    _git(root, "config", "user.name", "Quality Runner Tests")
+    (root / "README.md").write_text("# Fixture\n", encoding="utf-8")
+    _git(root, "add", "README.md")
+    _git(root, "commit", "-m", "fixture")
+
+    target = resolve_target_branch(repository_record_for_root(root))
+
+    assert target["status"] == "ready"
+    assert target["branch"] == "main"
+    assert target["source"] == "only_local_branch"
+
+
+def test_missing_explicit_target_branch_is_blocked() -> None:
+    target = resolve_target_branch(
+        {"checkouts": [{"local_branches": ["dev"]}]},
+        override="main",
+    )
+
+    assert target == {
+        "branch": "main",
+        "source": "explicit_override",
+        "status": "blocked",
+        "reason": "explicit target branch is not present in a discovered checkout",
+        "checkout_id": None,
+    }
+
+
+def test_ambiguous_local_branches_without_fallback_are_blocked(tmp_path: Path) -> None:
+    target = resolve_target_branch(
+        {
+            "primary_path": str(tmp_path),
+            "checkouts": [
+                {
+                    "local_branches": ["feature", "main"],
+                    "exists": False,
+                }
+            ],
+        }
+    )
+
+    assert target["status"] == "blocked"
+    assert target["source"] == "unresolved"
+    assert target["reason"].startswith("no dev branch")
+
+
+def test_target_without_clean_disposable_worktree_host_is_blocked() -> None:
+    target = resolve_target_branch(
+        {
+            "checkouts": [
+                {
+                    "local_branches": ["dev"],
+                    "branch": "feature",
+                    "exists": True,
+                    "working_tree": True,
+                    "dirty": True,
+                    "prunable": False,
+                    "path": "/tmp/dirty-target-host",
+                }
+            ]
+        }
+    )
+
+    assert target == {
+        "branch": "dev",
+        "source": "default_dev",
+        "status": "blocked",
+        "reason": "target branch exists but no clean checkout can host disposable verification",
+        "checkout_id": None,
+    }
+
+
+def test_documented_main_branch_is_used_when_dev_is_absent(tmp_path: Path) -> None:
+    (tmp_path / "README.md").write_text("main is the canonical branch\n", encoding="utf-8")
+    target = resolve_target_branch(
+        {
+            "primary_path": str(tmp_path),
+            "checkouts": [
+                {
+                    "checkout_id": "main-checkout",
+                    "local_branches": ["feature", "main"],
+                    "branch": "main",
+                    "exists": True,
+                    "working_tree": True,
+                    "dirty": False,
+                    "detached": False,
+                    "prunable": False,
+                    "stale": False,
+                    "head": "abc123",
+                    "path": str(tmp_path),
+                }
+            ],
+        }
+    )
+
+    assert target["status"] == "ready"
+    assert target["branch"] == "main"
+    assert target["source"] == "documented_fallback:README.md"
+
+
+def test_bare_repository_is_a_host_not_an_attached_checkout(tmp_path: Path) -> None:
+    bare = tmp_path / "fixture"
+    _repo(bare)
+    _git(bare, "config", "core.bare", "true")
+
+    record = repository_record_for_root(bare)
+    checkout = record["checkouts"][0]
+    target = resolve_target_branch(record)
+
+    assert checkout["working_tree"] is False
+    assert checkout["branch"] is None
+    assert checkout["detached"] is False
+    assert target["status"] == "ready"
+    assert target["target_state"]["reason"].startswith("target branch is committed")
