@@ -48,6 +48,8 @@ def inspect_payload(
     scope_metadata: AuditPayload | None = None,
     progress: ProgressCallback | None = None,
     refresh_context: dict[str, object] | None = None,
+    baseline_run_id: str | None = None,
+    reset_resolution_ledger: bool = False,
 ) -> dict[str, Any]:
     resolved_run_id = generated_run_id() if run_id is None else run_id
     branch_warnings = prepare_scan_branch(
@@ -75,6 +77,8 @@ def inspect_payload(
             cache_root=cache_root,
             performance_budget_seconds=performance_budget_seconds,
             scope_metadata=scope_metadata,
+            baseline_run_id=baseline_run_id,
+            reset_resolution_ledger=reset_resolution_ledger,
         ),
         progress=progress,
     )
@@ -90,6 +94,7 @@ def inspect_payload(
         "artifact_paths": artifact_paths,
         "module_status": _module_status_from_artifacts(artifact_paths),
         "analysis_coverage": _analysis_coverage(analysis),
+        "module_timings": _module_timings_from_artifacts(artifact_paths),
         **_optional_field("skill_review", skill_review),
         "warnings": combined_warnings(
             _legacy_payload(analysis.scan), _legacy_payload(analysis.capability_map)
@@ -119,6 +124,8 @@ def run_payload(
     scope_metadata: AuditPayload | None = None,
     progress: ProgressCallback | None = None,
     refresh_context: dict[str, object] | None = None,
+    baseline_run_id: str | None = None,
+    reset_resolution_ledger: bool = False,
 ) -> dict[str, Any]:
     resolved_run_id = generated_run_id() if run_id is None else run_id
     branch_warnings = prepare_scan_branch(
@@ -146,6 +153,8 @@ def run_payload(
             cache_root=cache_root,
             performance_budget_seconds=performance_budget_seconds,
             scope_metadata=scope_metadata,
+            baseline_run_id=baseline_run_id,
+            reset_resolution_ledger=reset_resolution_ledger,
         ),
         progress=progress,
     )
@@ -161,6 +170,7 @@ def run_payload(
         "artifact_paths": artifact_paths,
         "module_status": _module_status_from_artifacts(artifact_paths),
         "analysis_coverage": _analysis_coverage(analysis),
+        "module_timings": _module_timings_from_artifacts(artifact_paths),
         **_optional_field("skill_review", skill_review),
         "warnings": combined_warnings(
             _legacy_payload(analysis.scan), _legacy_payload(analysis.capability_map)
@@ -189,6 +199,8 @@ def _audit_request(
     performance_budget_seconds: float | None,
     include_paths: tuple[str, ...],
     scope_metadata: AuditPayload | None,
+    baseline_run_id: str | None,
+    reset_resolution_ledger: bool,
 ) -> AuditRequest:
     return AuditRequest(
         repo_root=repo_root,
@@ -216,6 +228,8 @@ def _audit_request(
         performance_budget_seconds=performance_budget_seconds,
         include_paths=include_paths,
         scope_metadata=scope_metadata,
+        baseline_run_id=baseline_run_id,
+        reset_resolution_ledger=reset_resolution_ledger,
     )
 
 
@@ -243,6 +257,18 @@ def _module_status_from_artifacts(artifact_paths: dict[str, str]) -> dict[str, A
         cast(dict[str, Any], payload).get("module_status") if isinstance(payload, dict) else None
     )
     return cast(dict[str, Any], module_status) if isinstance(module_status, dict) else {}
+
+
+def _module_timings_from_artifacts(artifact_paths: dict[str, str]) -> dict[str, Any]:
+    path = artifact_paths.get("repo_scan_json")
+    if not isinstance(path, str) or not path:
+        return {}
+    try:
+        payload = json.loads(Path(path).read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+    timings = payload.get("module_timings") if isinstance(payload, dict) else None
+    return timings if isinstance(timings, dict) else {}
 
 
 def _skill_review_from_analysis(

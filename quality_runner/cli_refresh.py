@@ -105,6 +105,7 @@ def refresh_command_payload(
             for item in (getattr(args, "include_ignored_path", []) or [])
             if isinstance(item, str) and item
         ],
+        reset_resolution_ledger=getattr(args, "reset_resolution_ledger", False),
     )
     if args.handoff_output:
         payload["handoff_export"] = export_handoff_payload(

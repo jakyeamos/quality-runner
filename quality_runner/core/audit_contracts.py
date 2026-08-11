@@ -40,6 +40,8 @@ class AuditRequest:
     performance_budget_seconds: float | None = None
     include_paths: tuple[str, ...] = ()
     scope_metadata: AuditPayload | None = None
+    baseline_run_id: str | None = None
+    reset_resolution_ledger: bool = False
 
 
 @dataclass(frozen=True)

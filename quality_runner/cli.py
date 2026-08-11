@@ -168,6 +168,11 @@ def build_parser(prog: str = CANONICAL_PROGRAM) -> argparse.ArgumentParser:
         "--baseline-run-id", default=None, help="Baseline run id for deltas"
     )
     refresh_parser.add_argument(
+        "--reset-resolution-ledger",
+        action="store_true",
+        help="Ignore all prior run dispositions and start the resolution ledger fresh",
+    )
+    refresh_parser.add_argument(
         "--review-cycle-id",
         default=None,
         help="Stable task implement-review cycle id; enables review-delta artifacts",

@@ -59,6 +59,7 @@ def refresh_payload(
     performance_budget_seconds: float | None = None,
     include_ignored_paths: list[str] | None = None,
     scope_metadata: dict[str, object] | None = None,
+    reset_resolution_ledger: bool = False,
 ) -> dict[str, Any]:
     review_enabled = review_cycle_id is not None or review_iteration is not None
     if review_enabled:
@@ -112,6 +113,7 @@ def refresh_payload(
         verify_callback=verify_callback,
         summary_callback=summary_callback,
         progress=progress,
+        reset_resolution_ledger=reset_resolution_ledger,
     )
     if not review_enabled:
         _prune_completed_refresh_artifacts(

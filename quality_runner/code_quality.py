@@ -176,6 +176,7 @@ def create_code_quality_scan(
     deferred_checks: list[dict[str, str]] = []
     semantic_similarity_clusters = 0
     semantic_similarity_tools: dict[str, str] = {}
+    semantic_similarity_timing: dict[str, Any] = {}
     semantic_similarity_cache: dict[str, Any] = {}
     duplicate_clusters: list[dict[str, Any]] = []
     if analysis_mode == "balanced":
@@ -188,12 +189,18 @@ def create_code_quality_scan(
             for check in ("similarity", "ponytail", "bundle", "unwired", "architecture")
         )
         semantic_similarity_tools = {"quality-runner": "deferred"}
+        semantic_similarity_timing = {
+            "cache_status": "deferred",
+            "recomputed": False,
+            "recompute_reason": "global analysis deferred in balanced mode",
+        }
     else:
         (
             duplicate_clusters,
             deduplicate_findings,
             semantic_similarity_clusters,
             semantic_similarity_tools,
+            semantic_similarity_timing,
             semantic_similarity_cache,
         ) = collect_deduplicate_scan(
             root,
@@ -293,6 +300,7 @@ def create_code_quality_scan(
             "semantic_similarity_clusters": semantic_similarity_clusters,
             "semantic_similarity_backend": policy["similarity_backend"],
             "semantic_similarity_tools": semantic_similarity_tools,
+            "semantic_similarity_timing": semantic_similarity_timing,
             **quality_summary_fields(
                 backend=policy["similarity_backend"],
                 enabled=policy["similarity_enabled"],

@@ -79,6 +79,7 @@ def run_refresh_payload(
     include_paths: tuple[str, ...] = (),
     include_ignored_paths: tuple[str, ...] = (),
     progress: ProgressCallback | None = None,
+    reset_resolution_ledger: bool = False,
 ) -> dict[str, Any]:
     inspect_run_id = f"{run_id_prefix}-inspect"
     run_run_id = f"{run_id_prefix}-run"
@@ -198,6 +199,8 @@ def run_refresh_payload(
                 cache_mode=cache_mode,
                 cache_root=cache_root,
                 performance_budget_seconds=performance_budget_seconds,
+                baseline_run_id=baseline_run_id,
+                reset_resolution_ledger=reset_resolution_ledger,
                 progress=progress,
             ),
             phase_timeout_seconds=resolved_inspect_timeout,
@@ -225,6 +228,8 @@ def run_refresh_payload(
                 cache_mode=cache_mode,
                 cache_root=cache_root,
                 performance_budget_seconds=performance_budget_seconds,
+                baseline_run_id=baseline_run_id,
+                reset_resolution_ledger=reset_resolution_ledger,
                 progress=progress,
             ),
             phase_timeout_seconds=resolved_run_timeout,

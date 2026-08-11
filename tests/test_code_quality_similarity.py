@@ -382,6 +382,9 @@ def test_similarity_fingerprint_stable_when_line_numbers_change(
     second = semantic_similarity_scan(tmp_path, policy=_policy(), disabled_groups=set())
 
     assert first["findings"][0]["fingerprint"] == second["findings"][0]["fingerprint"]
+    assert first["timing"]["cache_status"] == "disabled"
+    assert first["timing"]["recomputed"] is True
+    assert first["timing"]["elapsed_seconds"] >= 0
 
 
 def test_similarity_cache_reuses_unchanged_report(

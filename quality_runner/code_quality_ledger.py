@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, cast
+from typing import Any
 
 from quality_runner.code_quality_findings import counts
 from quality_runner.code_quality_paths import string_or_none
@@ -23,10 +23,16 @@ def build_resolution_ledger(
     run_id: str,
     code_quality_scan: dict[str, Any],
     config: dict[str, Any],
+    previous_run_id: str | None = None,
+    reset_previous_dispositions: bool = False,
 ) -> dict[str, Any]:
     current_findings = _current_findings(code_quality_scan)
     current_fingerprints = set(current_findings)
-    previous_entries = _latest_previous_resolution_entries(repo_root, run_id)
+    previous_entries = (
+        []
+        if reset_previous_dispositions
+        else _previous_resolution_entries(repo_root, previous_run_id)
+    )
     accepted_by_config = _accepted_dispositions(config)
     accepted_by_previous = {
         entry["fingerprint"]: entry
@@ -60,6 +66,14 @@ def build_resolution_ledger(
                 reason=reason,
                 owner=owner,
                 expires=expires,
+                disposition_source=(
+                    "config"
+                    if configured is not None
+                    else "explicit-baseline"
+                    if previous is not None
+                    else "none"
+                ),
+                disposition_run_id=previous_run_id if previous is not None else None,
             )
         )
 
@@ -77,10 +91,39 @@ def build_resolution_ledger(
             }
         )
 
+    for configured in accepted_by_config.values():
+        fingerprint = configured["fingerprint"]
+        if fingerprint in current_fingerprints or any(
+            entry.get("fingerprint") == fingerprint for entry in entries
+        ):
+            continue
+        entries.append(
+            {
+                **_config_only_entry(configured),
+                "status": "superseded-by-current-scan",
+                "reason": "Finding absent from current scan; QR did not execute remediation.",
+            }
+        )
+
     entries.sort(key=lambda item: (str(item["status"]), str(item["rule_id"]), str(item["file"])))
     return {
         "schema": RESOLUTION_LEDGER_SCHEMA,
         "run_id": run_id,
+        "disposition_provenance": {
+            "mode": (
+                "reset"
+                if reset_previous_dispositions
+                else "explicit-baseline"
+                if previous_run_id is not None
+                else "none"
+            ),
+            "previous_run_id": previous_run_id,
+            "source": (
+                f".quality-runner/runs/{previous_run_id}/resolution-ledger.json"
+                if previous_run_id is not None and not reset_previous_dispositions
+                else None
+            ),
+        },
         "summary": {
             "total_entries": len(entries),
             "by_status": counts(entries, "status", sorted(RESOLUTION_STATUSES)),
@@ -100,19 +143,17 @@ def render_resolution_ledger_markdown(ledger: dict[str, Any]) -> str:
         "",
     ]
     summary = ledger.get("summary")
-    summary_map = cast(dict[str, Any], summary) if isinstance(summary, dict) else {}
-    by_status = summary_map.get("by_status")
+    by_status = summary.get("by_status") if isinstance(summary, dict) else None
     if isinstance(by_status, dict):
-        for status, count in sorted(cast(dict[str, int], by_status).items()):
+        for status, count in sorted(by_status.items()):
             lines.append(f"- {status}: {count}")
     lines.extend(["", "## Entries", ""])
 
     entries = ledger.get("entries")
     if isinstance(entries, list) and entries:
-        for raw_entry in cast(list[object], entries):
-            if not isinstance(raw_entry, dict):
+        for entry in entries:
+            if not isinstance(entry, dict):
                 continue
-            entry = cast(dict[str, Any], raw_entry)
             lines.append(
                 f"- {entry.get('status')}: {entry.get('rule_id')} "
                 f"({entry.get('file')}:{entry.get('line')})"
@@ -141,10 +182,9 @@ def _current_findings(code_quality_scan: dict[str, Any]) -> dict[str, dict[str, 
     if not isinstance(findings, list):
         return {}
     return {
-        cast(dict[str, Any], finding)["fingerprint"]: cast(dict[str, Any], finding)
-        for finding in cast(list[object], findings)
-        if isinstance(finding, dict)
-        and isinstance(cast(dict[str, Any], finding).get("fingerprint"), str)
+        finding["fingerprint"]: finding
+        for finding in findings
+        if isinstance(finding, dict) and isinstance(finding.get("fingerprint"), str)
     }
 
 
@@ -155,6 +195,8 @@ def _ledger_entry(
     reason: str,
     owner: str | None,
     expires: str | None,
+    disposition_source: str,
+    disposition_run_id: str | None,
 ) -> dict[str, Any]:
     return {
         "fingerprint": finding["fingerprint"],
@@ -170,36 +212,47 @@ def _ledger_entry(
         "reason": reason,
         "owner": owner,
         "expires": expires,
+        "disposition_source": disposition_source,
+        "disposition_run_id": disposition_run_id,
     }
 
 
-def _latest_previous_resolution_entries(repo_root: Path, run_id: str) -> list[dict[str, Any]]:
-    runs_dir = repo_root.expanduser().resolve() / ".quality-runner" / "runs"
-    if not runs_dir.is_dir():
-        return []
-    candidates = [
-        path / "resolution-ledger.json"
-        for path in sorted(runs_dir.iterdir(), key=lambda item: item.stat().st_mtime, reverse=True)
-        if path.is_dir() and path.name != run_id and not path.is_symlink()
-    ]
-    for candidate in candidates:
-        if not candidate.is_file() or candidate.is_symlink():
-            continue
-        try:
-            import json
+def _config_only_entry(configured: dict[str, str]) -> dict[str, Any]:
+    return {
+        "fingerprint": configured["fingerprint"],
+        "category": "code-quality",
+        "severity": "warning",
+        "rule_id": "configured-disposition",
+        "file": "<not-present-in-current-scan>",
+        "line": 1,
+        "score": 0,
+        "confidence": "unknown",
+        "verification": "Rerun Quality Runner after the finding returns.",
+        "reason": configured["reason"],
+        "owner": configured["owner"],
+        "expires": configured.get("expires"),
+        "disposition_source": "config",
+        "disposition_run_id": None,
+    }
 
-            payload = json.loads(candidate.read_text(encoding="utf-8"))
-        except (OSError, ValueError):
-            continue
-        payload_map = cast(dict[str, Any], payload) if isinstance(payload, dict) else {}
-        entries = payload_map.get("entries")
-        if isinstance(entries, list):
-            return [
-                cast(dict[str, Any], entry)
-                for entry in cast(list[object], entries)
-                if isinstance(entry, dict)
-            ]
-    return []
+
+def _previous_resolution_entries(repo_root: Path, run_id: str | None) -> list[dict[str, Any]]:
+    if run_id is None:
+        return []
+    runs_dir = repo_root.expanduser().resolve() / ".quality-runner" / "runs"
+    candidate = runs_dir / run_id / "resolution-ledger.json"
+    if not candidate.is_file() or candidate.is_symlink():
+        return []
+    try:
+        import json
+
+        payload = json.loads(candidate.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return []
+    entries = payload.get("entries")
+    return (
+        [entry for entry in entries if isinstance(entry, dict)] if isinstance(entries, list) else []
+    )
 
 
 def _accepted_dispositions(config: dict[str, Any]) -> dict[str, dict[str, str]]:
@@ -207,10 +260,9 @@ def _accepted_dispositions(config: dict[str, Any]) -> dict[str, dict[str, str]]:
     if not isinstance(dispositions, list):
         return {}
     accepted: dict[str, dict[str, str]] = {}
-    for raw_item in cast(list[object], dispositions):
-        if not isinstance(raw_item, dict):
+    for item in dispositions:
+        if not isinstance(item, dict):
             continue
-        item = cast(dict[str, Any], raw_item)
         fingerprint = item.get("fingerprint")
         status = item.get("status")
         reason = item.get("reason")

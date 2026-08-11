@@ -3,6 +3,7 @@ from __future__ import annotations
 import ast
 import keyword
 import re
+import time
 from collections import defaultdict
 from collections.abc import Mapping, Sequence
 from difflib import SequenceMatcher
@@ -126,6 +127,7 @@ def native_similarity_scan(
     policy: Mapping[str, object],
     disabled_groups: set[str],
 ) -> dict[str, object]:
+    started = time.monotonic()
     if "deduplicate" in disabled_groups or policy.get("similarity_enabled") is False:
         return _report(
             status="skipped",
@@ -153,6 +155,10 @@ def native_similarity_scan(
                 "status": status,
                 "candidate_count": len(candidates),
                 "languages": languages,
+                "elapsed_seconds": round(time.monotonic() - started, 6),
+                "cache_status": "disabled",
+                "recomputed": True,
+                "recompute_reason": "semantic-similarity cache is not configured",
             }
         ],
     )

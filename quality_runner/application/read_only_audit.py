@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import time
 from dataclasses import replace
 from typing import Any, Literal, cast
 
@@ -87,6 +88,8 @@ def analyze_read_only_audit(
         cache_mode=cache_mode,
         budget_seconds=request.performance_budget_seconds,
     )
+    module_timings: dict[str, dict[str, Any]] = {}
+    started = time.monotonic()
     with recorder.stage("discovery"):
         ci_checks, ci_warnings = load_ci_status(repo_root, request.ci_status_json)
         base_config = load_repo_config(repo_root)
@@ -106,7 +109,12 @@ def analyze_read_only_audit(
             cache_namespace_root=request.cache_namespace_root,
             cache_context_identity=request.cache_context_identity,
         )
+    module_timings["discovery"] = {
+        "status": "completed",
+        "elapsed_seconds": round(time.monotonic() - started, 6),
+    }
     profile = request.profile or _default_profile(config)
+    started = time.monotonic()
     with recorder.stage("standards"):
         emit_progress(progress, "standards", f"profile={profile}")
         standards_packet = compile_standards(
@@ -135,6 +143,11 @@ def analyze_read_only_audit(
             profile=profile,
             config=config,
         )
+    module_timings["standards"] = {
+        "status": "completed",
+        "elapsed_seconds": round(time.monotonic() - started, 6),
+    }
+    started = time.monotonic()
     with recorder.stage("scope"):
         code_quality_scan_scope = create_text_scan_scope(
             repo_root,
@@ -176,6 +189,11 @@ def analyze_read_only_audit(
                     if isinstance(value, int)
                 }
             )
+    module_timings["scope"] = {
+        "status": "completed",
+        "elapsed_seconds": round(time.monotonic() - started, 6),
+    }
+    started = time.monotonic()
     with recorder.stage("security"):
         emit_progress(progress, "security", "security surface and dependency analysis")
         security_scan = create_security_scan(
@@ -189,6 +207,11 @@ def analyze_read_only_audit(
             cache_namespace_root=request.cache_namespace_root,
         )
         capability_map = merge_security_into_capability_map(capability_map, security_scan)
+    module_timings["security"] = {
+        "status": "completed",
+        "elapsed_seconds": round(time.monotonic() - started, 6),
+    }
+    started = time.monotonic()
     with recorder.stage("code-quality"):
         emit_progress(progress, "code-quality", "structural scan and selected skill packs")
         code_quality_scan, skill_warnings = create_code_quality_scan_with_skills(
@@ -203,6 +226,10 @@ def analyze_read_only_audit(
             cache_root=cache_root,
             cache_namespace_root=request.cache_namespace_root,
         )
+    module_timings["code-quality"] = {
+        "status": "completed",
+        "elapsed_seconds": round(time.monotonic() - started, 6),
+    }
     deferred_checks = code_quality_scan.get("deferred_checks", [])
     if isinstance(deferred_checks, list):
         for deferred in cast(list[dict[str, Any]], deferred_checks):
@@ -215,6 +242,7 @@ def analyze_read_only_audit(
         **scan,
         "include_paths": list(request.include_paths),
         "scan_inclusions": list(text_scan_scope.scan_inclusions),
+        "module_timings": module_timings,
     }
     scan = append_warnings(scan, skill_warnings)
     scan["cache_summary"] = _cache_summary(
@@ -329,6 +357,8 @@ def plan_read_only_audit(
         run_id=analysis.request.run_id,
         code_quality_scan=code_quality_scan,
         config=config,
+        previous_run_id=analysis.request.baseline_run_id,
+        reset_previous_dispositions=analysis.request.reset_resolution_ledger,
     )
     resolution_ledger = merge_security_ledger_entries(
         resolution_ledger,

@@ -4,6 +4,7 @@ import hashlib
 import os
 import shutil
 import subprocess
+import time
 from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any, cast
@@ -16,6 +17,11 @@ from quality_runner.code_quality_native_similarity import (
 )
 from quality_runner.code_quality_paths import verification_for_path
 from quality_runner.code_quality_similarity_parse import parse_similarity_output
+from quality_runner.code_quality_similarity_support import (
+    disabled_timing,
+    recomputed_timing,
+    status_entry,
+)
 from quality_runner.semantic_similarity_policy import (
     DEFAULT_SIMILARITY_BACKEND,
 )
@@ -57,6 +63,7 @@ def collect_deduplicate_scan(
     int,
     dict[str, str],
     dict[str, Any],
+    dict[str, object],
 ]:
     if "deduplicate" in disabled_groups:
         similarity_result = semantic_similarity_scan(
@@ -67,7 +74,14 @@ def collect_deduplicate_scan(
             persist_cache=persist_cache,
             cache_root=cache_root,
         )
-        return [], [], 0, {}, similarity_result["cache_evidence"]
+        return (
+            [],
+            [],
+            0,
+            {},
+            similarity_result.get("timing", disabled_timing("deduplicate module disabled")),
+            similarity_result["cache_evidence"],
+        )
 
     duplicate_clusters = build_duplicate_clusters(extracted_functions)
     findings: list[dict[str, Any]] = []
@@ -111,6 +125,7 @@ def collect_deduplicate_scan(
         findings,
         len(similarity_result["clusters"]),
         semantic_similarity_tools,
+        similarity_result.get("timing", {}),
         similarity_result["cache_evidence"],
     )
 
@@ -124,7 +139,8 @@ def semantic_similarity_scan(
     persist_cache: bool = True,
     cache_root: Path | None = None,
 ) -> dict[str, Any]:
-    return cached_semantic_similarity_scan(
+    started = time.monotonic()
+    result = cached_semantic_similarity_scan(
         repo_root,
         scanned_files=scanned_files,
         policy=policy,
@@ -142,6 +158,20 @@ def semantic_similarity_scan(
         ),
         materialize=_materialize_similarity_report,
     )
+    cache_status = str(result.get("cache_status", "disabled"))
+    if cache_status == "hit":
+        result["timing"] = {
+            "elapsed_seconds": round(time.monotonic() - started, 6),
+            "cache_status": "hit",
+            "recomputed": False,
+            "recompute_reason": None,
+        }
+    else:
+        result["timing"] = recomputed_timing(
+            started,
+            reason=f"semantic-similarity cache status: {cache_status}",
+        )
+    return result
 
 
 def _uncached_semantic_similarity_scan(
@@ -198,7 +228,7 @@ def _external_similarity_scan(
     for tool, _language in tools:
         binary = shutil.which(tool)
         if binary is None:
-            scanner_status.append(_status_entry(tool=tool, status="missing"))
+            scanner_status.append(status_entry(tool=tool, status="missing"))
             continue
 
         command = _build_command(
@@ -209,6 +239,7 @@ def _external_similarity_scan(
             min_lines=min_lines,
             include_tests=include_tests,
         )
+        started = time.monotonic()
         try:
             completed = subprocess.run(
                 command,
@@ -220,26 +251,34 @@ def _external_similarity_scan(
             )
         except subprocess.TimeoutExpired as error:
             scanner_status.append(
-                _status_entry(
+                status_entry(
                     tool=tool,
                     status="failed",
                     command=command,
                     exit_code=None,
                     stderr_tail=_tail(error.stderr),
                     stdout_tail=_tail(error.stdout),
+                    timing=recomputed_timing(
+                        started,
+                        reason="semantic-similarity cache status: miss",
+                    ),
                 )
             )
             continue
 
         status = "executed" if completed.returncode == 0 else "failed"
         scanner_status.append(
-            _status_entry(
+            status_entry(
                 tool=tool,
                 status=status,
                 command=command,
                 exit_code=completed.returncode,
                 stderr_tail=_tail(completed.stderr),
                 stdout_tail=_tail(completed.stdout),
+                timing=recomputed_timing(
+                    started,
+                    reason="semantic-similarity cache status: miss",
+                ),
             )
         )
         if status != "executed":
@@ -278,7 +317,7 @@ def _skipped_result(repo_root: Path, *, reason: str) -> dict[str, Any]:
         status=status,
         clusters=[],
         findings=[],
-        scanner_status=[_status_entry(tool=tool, status=status) for tool in tools],
+        scanner_status=[status_entry(tool=tool, status=status) for tool in tools],
     )
 
 

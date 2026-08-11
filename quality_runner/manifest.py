@@ -88,7 +88,7 @@ def _git_output(repo_root: Path, *args: str) -> str | None:
 def _git_status(repo_root: Path) -> bool | None:
     try:
         result = subprocess.run(
-            ["git", "status", "--porcelain"],
+            ["git", "-c", "core.excludesfile=/dev/null", "status", "--porcelain"],
             cwd=repo_root,
             check=False,
             capture_output=True,
