@@ -1,9 +1,10 @@
 {
-  "schema": "mac-control-task-manifest/v1",
+  "schema": "mac-control-task-manifest/v3",
   "repository_id": "repo-f6faa537a71da3e7",
   "repository_name": "quality-runner",
   "applicability": "not_applicable",
-  "applicability_reason": "No repository-owned macOS application or Mac Control-specific task surface is present; this repository exposes browser, service, library, data, CLI, or test-fixture behavior covered by its direct interface.",
+  "applicability_reason": "Quality Runner owns a local audit CLI and evidence publisher rather than a repository-owned native or browser user interface for Mac Control task measurement.",
+  "app": null,
   "criteria": {},
   "tasks": []
 }

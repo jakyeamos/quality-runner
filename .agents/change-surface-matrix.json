@@ -1,0 +1,29 @@
+{
+  "schema_version": "change-surface-matrix/v1",
+  "subject": {"kind": "repository", "id": "quality-runner"},
+  "owner": "repository-owner",
+  "last_reviewed": "2026-08-11",
+  "surfaces": [
+    {
+      "id": "quality-engine",
+      "scope": "local",
+      "path": "quality_runner/, repo_quality_certifier/, and tests/",
+      "owner": "repository-owner",
+      "condition": "scan, policy, finding, CLI, or certification behavior changes",
+      "operations": ["add", "change", "remove"],
+      "validation": ["uv run --locked pytest -q", "uv run --locked ruff check .", "uv run --locked basedpyright"],
+      "status": "applicable"
+    },
+    {
+      "id": "fleet-consumers",
+      "scope": "external",
+      "path": "installed qr, plugins, Pronto, Leverage, and fleet maturity feed",
+      "owner": "integration-owner",
+      "condition": "command, plugin, feed schema, taxonomy, or publication behavior changes",
+      "operations": ["add", "change", "remove"],
+      "validation": ["qr fleet audit replay", "qr fleet audit feed", "Pronto quality refresh and route readback"],
+      "status": "applicable"
+    }
+  ],
+  "unresolved_surfaces": []
+}
