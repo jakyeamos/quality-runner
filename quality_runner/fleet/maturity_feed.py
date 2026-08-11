@@ -10,10 +10,16 @@ from typing import Any, cast
 from quality_runner.artifacts import prepare_safe_directory
 from quality_runner.fleet.agent_usability_scoring import applicable_agent_usability_scores
 from quality_runner.fleet.contracts import digest
+from quality_runner.fleet.quality_outcomes import (
+    QUALITY_OUTCOME_TAXONOMY,
+    classify_quality_outcome,
+    quality_outcome_counts,
+)
 
 FLEET_MATURITY_FEED_SCHEMA = "quality-runner-maturity-feed/v1"
 DEFAULT_FLEET_ROOT = Path("~/.quality-runner/fleet-audit")
 MATURITY_FEED_RELATIVE_PATH = Path("current") / "maturity.json"
+MAX_DIMENSION_GAPS = 64
 _VALID_AUDIT_STATUSES = {"completed", "complete_with_blockers"}
 _FORBIDDEN_KEYS = {
     "prompt",
@@ -119,6 +125,8 @@ def build_maturity_feed(
             1 for item in projections if item.get("maturity_status") == "certified"
         ),
         "maturity_status_counts": _count_values(projections, "maturity_status", fallback="unknown"),
+        "quality_outcome_counts": quality_outcome_counts(projections),
+        "quality_outcome_taxonomy": QUALITY_OUTCOME_TAXONOMY,
         "finding_counts": _number_mapping(summary.get("finding_counts")),
         "unresolved_measurement_gaps": _string_list(summary.get("unresolved_measurement_gaps")),
         "repositories": projections,
@@ -236,10 +244,11 @@ def _repository_projection(repository: dict[str, Any], finding: dict[str, Any]) 
     target = _object(repository.get("target_branch"))
     findings = _objects(finding.get("findings"))
     dimension_scores: dict[str, float | None] = {}
-    dimension_gaps: list[dict[str, Any]] = []
+    dimension_gaps: list[Mapping[str, Any]] = []
     applicable_scores: list[float] = []
     statuses: list[str] = []
     blockers = 0
+    non_dynamic_blockers = 0
     agent_attention = False
     for item in findings:
         dimension = _required_string(item, "dimension")
@@ -261,6 +270,8 @@ def _repository_projection(repository: dict[str, Any], finding: dict[str, Any]) 
             )
         if status == "blocked" or item.get("severity") == "blocker" or item.get("priority") == "P0":
             blockers += 1
+            if dimension != "dynamic_verification":
+                non_dynamic_blockers += 1
 
     agent_usability = _object(finding.get("agent_usability"))
     for item in applicable_agent_usability_scores(agent_usability):
@@ -286,7 +297,9 @@ def _repository_projection(repository: dict[str, Any], finding: dict[str, Any]) 
     dynamic_status = str(dynamic.get("status", "not_selected"))
     if blockers or dynamic_status in {"failed", "timeout", "blocked"}:
         quality_status = "blocked"
-    elif any(status in {"unknown", "stale"} for status in statuses):
+    elif dynamic_status in {"unavailable", "unknown"} or any(
+        status in {"unknown", "stale"} for status in statuses
+    ):
         quality_status = "unknown"
     elif (
         dynamic_status in {"passed", "reused"}
@@ -297,6 +310,14 @@ def _repository_projection(repository: dict[str, Any], finding: dict[str, Any]) 
         quality_status = "healthy"
     else:
         quality_status = "attention"
+    quality_outcome = classify_quality_outcome(
+        dynamic_status=dynamic_status,
+        non_dynamic_blockers=non_dynamic_blockers,
+        statuses=statuses,
+        healthy=quality_status == "healthy",
+        dimension_gaps=dimension_gaps,
+        blocker_count=blockers,
+    )
 
     maturity_score = (
         round(sum(applicable_scores) / len(applicable_scores), 3) if applicable_scores else None
@@ -318,16 +339,35 @@ def _repository_projection(repository: dict[str, Any], finding: dict[str, Any]) 
         "target_branch": str(target.get("branch")) if target.get("branch") else None,
         "target_branch_status": target_status,
         "target_head": target.get("head"),
+        "target_state": _target_state_projection(target.get("target_state")),
         "maturity_score": maturity_score,
         "maturity_status": maturity_status,
         "dimension_scores": dict(sorted(dimension_scores.items())),
-        "dimension_gaps": sorted(dimension_gaps, key=lambda item: item["dimension"])[:16],
+        "dimension_gaps": sorted(dimension_gaps, key=lambda item: item["dimension"])[
+            :MAX_DIMENSION_GAPS
+        ],
         "quality_status": quality_status,
+        "quality_outcome": quality_outcome,
         "finding_count": len(findings),
         "blocker_count": blockers,
         "dynamic_status": dynamic_status,
         "agent_usability": agent_usability,
     }
+
+
+def _target_state_projection(value: object) -> dict[str, Any]:
+    state = value if isinstance(value, dict) else {}
+    allowed = (
+        "status",
+        "reason",
+        "local_head",
+        "upstream",
+        "upstream_head",
+        "ahead",
+        "behind",
+        "safe_action",
+    )
+    return {key: state.get(key) for key in allowed if key in state}
 
 
 def _feed_hash(feed: Mapping[str, Any]) -> str:

@@ -10,10 +10,204 @@ from quality_runner.fleet.audit import fleet_audit_payload, fleet_replay_payload
 from quality_runner.fleet.feed import fleet_feed_payload
 from quality_runner.fleet.maturity_feed import (
     MaturityFeedError,
+    _repository_projection,
     build_maturity_feed,
     publish_maturity_feed,
     read_maturity_feed,
 )
+
+
+def test_blocked_dynamic_finding_and_target_evidence_reach_feed_projection() -> None:
+    target_state = {
+        "status": "stale",
+        "reason": "target branch is behind its configured upstream",
+        "local_head": "abc",
+        "upstream": "origin/dev",
+        "upstream_head": "def",
+        "ahead": 0,
+        "behind": 1,
+        "safe_action": "fast_forward_local_target",
+    }
+    repository = {
+        "repo_id": "repo-1",
+        "primary_path": "/projects/repo-1",
+        "target_branch": {
+            "branch": "dev",
+            "status": "stale",
+            "head": "abc",
+            "target_state": target_state,
+        },
+    }
+    finding = {
+        "repo_id": "repo-1",
+        "findings": [
+            {
+                "dimension": "dynamic_verification",
+                "status": "blocked",
+                "score": 0,
+                "severity": "high",
+                "priority": "P0",
+                "message": "Dynamic verification is blocked.",
+            }
+        ],
+        "dynamic": {"status": "blocked"},
+        "agent_usability": {},
+    }
+
+    projection = _repository_projection(repository, finding)
+
+    assert projection["quality_status"] == "blocked"
+    assert projection["quality_outcome"] == {
+        "state": "verification_blocked",
+        "label": "Quality verification blocked",
+        "disposition": "No trustworthy verdict was produced because verification is blocked. Repair setup or target provenance, then rerun it.",
+        "next_step": "Repair the setup or target provenance, then rerun the blocked verification and fleet audit.",
+    }
+    assert projection["blocker_count"] == 1
+    assert projection["dynamic_status"] == "blocked"
+    assert projection["target_state"] == target_state
+
+
+def test_feed_projection_preserves_current_and_future_finding_dimensions() -> None:
+    dimensions = [f"dimension_{index:02d}" for index in range(20)] + ["future_dimension"]
+    projection = _repository_projection(
+        {
+            "repo_id": "repo-1",
+            "primary_path": "/projects/repo-1",
+            "target_branch": {"branch": "dev", "status": "ready", "head": "abc"},
+        },
+        {
+            "repo_id": "repo-1",
+            "findings": [
+                {
+                    "dimension": dimension,
+                    "status": "discoverable",
+                    "score": 2,
+                    "severity": "observation",
+                    "priority": "P1",
+                    "message": f"{dimension} needs maintained evidence.",
+                }
+                for dimension in dimensions
+            ],
+            "dynamic": {"status": "not_selected"},
+            "agent_usability": {},
+        },
+    )
+
+    assert set(projection["dimension_scores"]) == set(dimensions)
+    assert {gap["dimension"] for gap in projection["dimension_gaps"]} == set(dimensions)
+
+
+@pytest.mark.parametrize(
+    ("dynamic_status", "finding_status", "priority", "dimension", "expected_code"),
+    [
+        ("failed", "blocked", "P0", "dynamic_verification", "checks_failing"),
+        ("timeout", "blocked", "P0", "dynamic_verification", "verification_blocked"),
+        ("blocked", "blocked", "P0", "dynamic_verification", "verification_blocked"),
+        ("unknown", "unknown", "P1", "dynamic_verification", "evidence_unknown"),
+        ("reused", "blocked", "P0", "dependency_health", "checks_failing"),
+        ("not_selected", "maintained", "P2", "dependency_health", "review_needed"),
+        ("reused", "maintained", "P2", "dependency_health", "healthy"),
+    ],
+)
+def test_quality_outcome_distinguishes_failure_from_verification_blockage(
+    dynamic_status: str,
+    finding_status: str,
+    priority: str,
+    dimension: str,
+    expected_code: str,
+) -> None:
+    projection = _repository_projection(
+        {
+            "repo_id": "repo-1",
+            "primary_path": "/projects/repo-1",
+            "target_branch": {"branch": "dev", "status": "ready", "head": "abc"},
+        },
+        {
+            "repo_id": "repo-1",
+            "findings": [
+                {
+                    "dimension": dimension,
+                    "status": finding_status,
+                    "score": 4 if finding_status == "maintained" else 0,
+                    "severity": "high" if priority == "P0" else "observation",
+                    "priority": priority,
+                    "message": "Fixture evidence.",
+                }
+            ],
+            "dynamic": {"status": dynamic_status},
+            "agent_usability": {},
+        },
+    )
+
+    assert projection["quality_outcome"]["state"] == expected_code
+
+
+def test_quality_outcome_disposition_names_review_dimensions() -> None:
+    projection = _repository_projection(
+        {
+            "repo_id": "repo-1",
+            "primary_path": "/projects/repo-1",
+            "target_branch": {"branch": "dev", "status": "ready", "head": "abc"},
+        },
+        {
+            "repo_id": "repo-1",
+            "findings": [
+                {
+                    "dimension": "change_surface_coverage",
+                    "status": "maintained",
+                    "score": 3,
+                    "severity": "observation",
+                    "priority": "P2",
+                    "message": "The change matrix is discoverable but not current.",
+                }
+            ],
+            "dynamic": {"status": "not_selected"},
+            "agent_usability": {},
+        },
+    )
+
+    disposition = projection["quality_outcome"]["disposition"]
+    assert projection["quality_outcome"]["state"] == "review_needed"
+    assert "change-surface coverage" in disposition
+    assert "[maintained, score 3]" in disposition
+    assert "The change matrix is discoverable but not current." in disposition
+    assert "not a failing-test result" in disposition
+
+
+def test_quality_outcome_disposition_keeps_unknown_separate_from_failure() -> None:
+    projection = _repository_projection(
+        {
+            "repo_id": "repo-1",
+            "primary_path": "/projects/repo-1",
+            "target_branch": {"branch": "dev", "status": "ready", "head": "abc"},
+        },
+        {
+            "repo_id": "repo-1",
+            "findings": [
+                {
+                    "dimension": "quality_commands",
+                    "status": "unknown",
+                    "score": None,
+                    "severity": "observation",
+                    "priority": "P1",
+                    "message": "Current quality command evidence is unavailable.",
+                }
+            ],
+            "dynamic": {"status": "not_selected"},
+            "agent_usability": {},
+        },
+    )
+
+    outcome = projection["quality_outcome"]
+    disposition = outcome["disposition"]
+    assert outcome["state"] == "evidence_unknown"
+    assert outcome["label"] == "Evidence review required"
+    assert "quality commands [not confirmed, score n/a]" in disposition
+    assert "Current quality command evidence is unavailable." in disposition
+    assert "not a failing-test result" in disposition
+    assert "unknown" not in disposition.lower()
+    assert "Identify the listed evidence gaps" in outcome["next_step"]
 
 
 def _git(root: Path, *args: str) -> str:
@@ -114,6 +308,10 @@ def test_feed_is_deterministic_and_redacted(tmp_path: Path) -> None:
     assert first == second
     assert first["schema"] == "quality-runner-maturity-feed/v1"
     assert first["repository_count"] == result["repository_count"]
+    assert sum(first["quality_outcome_counts"].values()) == first["repository_count"]
+    assert first["quality_outcome_taxonomy"]["verification_blocked"]["label"] == (
+        "Quality verification blocked"
+    )
     assert first["repositories"][0]["local_identity"]["primary_path"].endswith("/fixture")
     assert any(
         gap["dimension"] == "change_surface_coverage"

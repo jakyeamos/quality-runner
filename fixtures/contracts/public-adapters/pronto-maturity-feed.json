@@ -1,0 +1,46 @@
+{
+  "schema": "quality-runner-maturity-feed/v1",
+  "status": "completed",
+  "feed_timestamp": "2026-08-11T00:00:00+00:00",
+  "generated_at": "2026-08-11T00:00:00+00:00",
+  "source": {
+    "audit_id": "public-contract-fixture",
+    "as_of": "2026-08-11T00:00:00+00:00",
+    "projects_root": "/path/to/projects",
+    "artifact_schema": "quality-runner-fleet-audit/v1",
+    "summary_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  },
+  "replay": {
+    "status": "passed",
+    "deterministic": true,
+    "source_summary_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "replayed_summary_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  },
+  "repository_count": 1,
+  "checkout_count": 1,
+  "mean_maturity": 4.0,
+  "repositories": [
+    {
+      "repo_id": "fixture-repository",
+      "name": "fixture-repository",
+      "maturity_score": 4.0,
+      "maturity_status": "certified",
+      "quality_outcome": {
+        "state": "healthy",
+        "label": "Quality healthy",
+        "disposition": "Verification passed and all applicable dimensions are maintained with current evidence.",
+        "next_step": "Keep the evidence checkpoint current and rerun verification when the target commit or quality contract changes."
+      }
+    }
+  ],
+  "privacy": {
+    "private_local_feed": true,
+    "raw_paths": false,
+    "raw_prompts": false,
+    "raw_code": false,
+    "raw_diffs": false,
+    "raw_transcripts": false,
+    "credentials": false
+  },
+  "provenance_hash": "40f43d5e3d21fb82b12ecd039aec2f652b2378abda05ceeb3df4a237e7797a15"
+}

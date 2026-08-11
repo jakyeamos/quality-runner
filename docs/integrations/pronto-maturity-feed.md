@@ -26,6 +26,45 @@ bounded `dimension_gaps` list so Pronto can explain scores such as
 `change_surface_coverage` and conditional `skill_contract_quality` without
 reading or generating repository artifacts.
 
+The maturity feed does not synthesize code-quality finding categories. Those
+are an open set carried by each repository's fingerprinted
+`code-quality-scan.json`; Pronto derives and renders native categories,
+`skill:*` categories, and future categories directly from that report. A fleet
+audit refreshes maturity dimensions and quality outcomes, while fresh category
+totals require a current code-quality scan for the repository followed by
+Pronto's quality refresh. Fleet maturity findings remain `dimension_gaps` and
+must not be duplicated as code-quality findings.
+The feed preserves every scored finding dimension in `dimension_scores` and up
+to 64 non-passing `dimension_gaps`, which covers the current native, dynamic,
+and agent-usability dimension set while keeping the private projection bounded.
+
+The projection also carries `target_state` with the bounded target status,
+reason, local and upstream SHAs, ahead/behind counts, and `safe_action`.
+Non-passing dynamic execution is represented both by `dynamic_status` and by a
+first-class `dynamic_verification` finding, so Pronto's blocker count and
+explanation cannot disagree with QR's execution state.
+
+The legacy per-repository `quality_status` field remains stable for v1
+consumers. New presentation surfaces should use `quality_outcome`,
+`quality_outcome_counts`, and `quality_outcome_taxonomy` so an operational
+blockage is not mislabeled as a quality failure:
+
+Presentation surfaces must render the bounded category label together with the
+repository `disposition` and optional `next_step`; they must not render a raw
+machine state as user-facing copy.
+
+- `checks_failing` means an observed check failed or a non-dynamic blocker/P0
+  finding exists.
+- `verification_blocked` means timeout, setup, execution, or target-provenance
+  conditions prevented a trustworthy verdict.
+- `review_needed` means no blocker is known, but applicable evidence is below
+  ideal or dynamic verification was not selected.
+- `evidence_unknown` is the machine state for an evidence gap. Present it as
+  `Evidence review required`, with concrete gap details; it is not a display
+  string and does not mean a test failed.
+- `healthy` means verification passed or was safely reused and every applicable
+  dimension is maintained or validated.
+
 Each repository projection also includes `agent_usability`. Its four independent
 lanes preserve documentation-contract, tool-to-skill, behavior-evidence, and
 freshness/portability states. Every applicable lane is also emitted as a stable
@@ -55,3 +94,9 @@ checkout; public exports must use only aggregate projections.
 
 The older leverage audit directory is historical evidence only. It is not a
 source for the current feed.
+
+The sanitized public consumer fixture is
+`fixtures/contracts/public-adapters/pronto-maturity-feed.json`. Consumer tests
+should read that fixture for schema compatibility; they must not copy a live
+private fleet feed into the repository. The release boundary validates the
+fixture and blocks publication when it is missing or contains local markers.

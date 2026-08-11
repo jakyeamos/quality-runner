@@ -47,6 +47,7 @@ DIMENSION_LABELS = {
     "skill_contract_quality": "skill contract quality",
     "strict_policy_visibility": "strict policy visibility",
     "strict_type_debt": "strict BasedPyright debt",
+    "dynamic_verification": "dynamic quality verification",
 }
 
 DIMENSION_TERMS: dict[str, tuple[str, ...]] = {
