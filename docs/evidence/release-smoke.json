@@ -1,0 +1,17 @@
+{
+  "schema": "repository-behavior-evidence/v1",
+  "tool": "quality-runner",
+  "status": "passed",
+  "observed_at": "2026-08-11",
+  "commands": [
+    {
+      "command": "uv run --locked quality-runner release-smoke --json",
+      "result": "passed",
+      "detail": "7 release-smoke checks passed, including CLI help, doctor contract, audit outcome contract, refresh handoff, export handoff, controller report schema compatibility, and compatibility surfaces"
+    }
+  ],
+  "summary": "Quality Runner's release smoke contract passed in the isolated review branch.",
+  "notes": [
+    "The smoke payload contains refresh_status=blocked as a fixture condition; the release-smoke command's top-level status was passed."
+  ]
+}
