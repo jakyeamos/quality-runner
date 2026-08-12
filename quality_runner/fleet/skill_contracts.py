@@ -139,18 +139,56 @@ def _static_findings(root: Path, path: Path, text: str) -> list[dict[str, str]]:
     if re.search(r"\b(any task|all tasks|always use|whenever you)\b", description):
         details.append("overbroad trigger: frontmatter does not establish a narrow task boundary")
     if not any(
-        term in lower for term in ("output", "report", "return", "produce", "show", "end with")
+        term in lower
+        for term in (
+            "output",
+            "report",
+            "return",
+            "produce",
+            "show",
+            "end with",
+            "artifact",
+            "ledger",
+            "recommendation",
+            "candidate portfolio",
+        )
     ):
         details.append(
             "missing observable output: the contract does not name a user-visible result"
         )
     if not any(
         term in lower
-        for term in ("definition of done", "done when", "complete when", "acceptance criteria")
+        for term in (
+            "definition of done",
+            "done when",
+            "complete when",
+            "acceptance criteria",
+            "## completion",
+            "stopping condition",
+            "completion criterion",
+            "verification_and_done",
+            "before finalizing",
+            "verification rule",
+            "require a succeeded response",
+        )
     ):
         details.append("unclear definition of done: completion criteria are not explicit")
+    observable_verification = any(
+        term in lower
+        for term in (
+            "observed result",
+            "verification signal",
+            "evidence reference",
+            "postcondition",
+            "readback",
+            "verifier",
+            "verification.state",
+        )
+    )
     if any(term in lower for term in ("verify", "validate", "test")) and not (
-        "```" in text or re.search(r"\b(?:pnpm|npm|pytest|cargo|python3|make)\b", lower)
+        "```" in text
+        or re.search(r"\b(?:pnpm|npm|pytest|cargo|python3|make)\b", lower)
+        or observable_verification
     ):
         details.append("vague verification: verification is named without an observable command")
     read_lines = [
@@ -172,7 +210,8 @@ def _static_findings(root: Path, path: Path, text: str) -> list[dict[str, str]]:
     ):
         details.append("precedence hazard: contract appears to override higher-level instructions")
     mandatory = len(re.findall(r"\b(?:must|always|never|required)\b", lower))
-    if mandatory > 30:
+    word_count = max(1, len(re.findall(r"\b\w+\b", lower)))
+    if mandatory > 30 and mandatory / word_count > 0.03:
         details.append(
             f"excessive mandatory structure: {mandatory} mandatory terms reduce routing clarity"
         )

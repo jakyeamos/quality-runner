@@ -1,16 +1,29 @@
 from __future__ import annotations
 
-import json
-from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any, cast
 
+from quality_runner.fleet.agent_usability_manifest import (
+    AGENT_USABILITY_MANIFEST_PATH,
+)
+from quality_runner.fleet.agent_usability_manifest import (
+    evidence_items as _evidence_items,
+)
+from quality_runner.fleet.agent_usability_manifest import (
+    fresh_passed_evidence as _fresh_passed_evidence,
+)
+from quality_runner.fleet.agent_usability_manifest import is_fresh_date as _is_fresh_date
+from quality_runner.fleet.agent_usability_manifest import local_file as _local_file
+from quality_runner.fleet.agent_usability_manifest import objects as _objects
+from quality_runner.fleet.agent_usability_manifest import read_manifest as _read_manifest
+from quality_runner.fleet.agent_usability_manifest import strings as _strings
+from quality_runner.fleet.agent_usability_manifest import (
+    supported_skill_exemption as _supported_skill_exemption,
+)
 from quality_runner.fleet.agent_usability_scoring import growth_health_score
-from quality_runner.fleet.contracts import FRESHNESS_DAYS, MAX_DOCUMENT_BYTES, relative_path
+from quality_runner.fleet.contracts import MAX_DOCUMENT_BYTES, relative_path
 
 AGENT_USABILITY_SCHEMA = "quality-runner-agent-usability/v1"
-AGENT_USABILITY_MANIFEST_SCHEMA = "agent-usability/v1"
-AGENT_USABILITY_MANIFEST_PATH = Path(".agents/agent-usability.json")
 MAX_INVENTORY_ITEMS = 500
 MAX_SKILL_FAMILY_SIZE = 12
 
@@ -73,12 +86,14 @@ def assess_agent_usability(
     missing_evidence_paths: set[str] = set()
     documented_tool_count = 0
     skill_covered_tool_count = 0
+    skill_exempt_tool_count = 0
     behavior_declared_tool_count = 0
     behavior_verified_tool_count = 0
 
     for tool in tools:
         docs = _strings(tool.get("documentation"))
         skills = _strings(tool.get("skills"))
+        skill_mapping = tool.get("skill_mapping")
         evidence = _evidence_items(tool.get("behavior_evidence"))
         mapped_document_paths.update(docs)
         existing_docs = [path for path in docs if _local_file(root, path)]
@@ -89,6 +104,8 @@ def assess_agent_usability(
             documented_tool_count += 1
         if skills and len(existing_skills) == len(skills):
             skill_covered_tool_count += 1
+        elif not skills and _supported_skill_exemption(skill_mapping):
+            skill_exempt_tool_count += 1
         existing_evidence = [
             item for item in evidence if _local_file(root, str(item.get("path", "")))
         ]
@@ -124,6 +141,7 @@ def assess_agent_usability(
         _skill_coverage_lane(
             tool_count=len(tools),
             covered_tool_count=skill_covered_tool_count,
+            exempt_tool_count=skill_exempt_tool_count,
             missing_skill_ids=missing_skill_ids,
             manifest_present=manifest_present,
         ),
@@ -249,6 +267,7 @@ def assess_agent_usability(
             "tool_count": len(tools),
             "documented_tool_count": documented_tool_count,
             "skill_covered_tool_count": skill_covered_tool_count,
+            "skill_exempt_tool_count": skill_exempt_tool_count,
             "behavior_declared_tool_count": behavior_declared_tool_count,
             "behavior_verified_tool_count": behavior_verified_tool_count,
             "inventory_truncated": document_inventory_truncated or skill_inventory_truncated,
@@ -293,11 +312,25 @@ def _documentation_lane(**values: Any) -> dict[str, Any]:
 def _skill_coverage_lane(**values: Any) -> dict[str, Any]:
     tool_count = cast(int, values["tool_count"])
     covered = cast(int, values["covered_tool_count"])
+    exempt = cast(int, values["exempt_tool_count"])
+    applicable = tool_count - exempt
     if not values["manifest_present"]:
         score, status, message = 0, "untracked", "Tool-to-skill coverage is not declared."
-    elif not tool_count or not covered:
+    elif tool_count and not applicable:
+        return {
+            **_lane(
+                "tool_skill_coverage",
+                "Tool-to-skill coverage",
+                0,
+                "not_applicable",
+                "Every declared tool has an evidenced reason that a separate skill would duplicate its maintained command documentation.",
+            ),
+            "applicable": False,
+            "score": None,
+        }
+    elif not applicable or not covered:
         score, status, message = 1, "missing", "No declared agent-facing tool is mapped to a skill."
-    elif covered < tool_count or values["missing_skill_ids"]:
+    elif covered < applicable or values["missing_skill_ids"]:
         score, status, message = 2, "partial", "Some tool-to-skill mappings are incomplete."
     else:
         score, status, message = (
@@ -384,19 +417,6 @@ def _lane(identifier: str, label: str, score: int, status: str, message: str) ->
     }
 
 
-def _read_manifest(root: Path) -> tuple[dict[str, Any], str | None]:
-    path = root / AGENT_USABILITY_MANIFEST_PATH
-    if not path.is_file() or path.is_symlink():
-        return {}, None
-    try:
-        value = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, ValueError) as error:
-        return {}, f"Agent-usability manifest could not be parsed: {error}"
-    if not isinstance(value, dict) or value.get("schema") != AGENT_USABILITY_MANIFEST_SCHEMA:
-        return {}, f"Agent-usability manifest must use {AGENT_USABILITY_MANIFEST_SCHEMA}."
-    return cast(dict[str, Any], value), None
-
-
 def _document_inventory(root: Path) -> tuple[list[str], bool]:
     candidates = [
         root / name for name in ("AGENTS.md", "CLAUDE.md", "README.md", "CONTRIBUTING.md")
@@ -425,7 +445,7 @@ def _skill_inventory(root: Path) -> tuple[list[Path], bool]:
 
 def _routed_agent_documents(paths: set[str], link_evidence: dict[str, Any]) -> set[str]:
     routers = {".agents/context/README.md", ".context/README.md"} & paths
-    routed = set(routers)
+    routed = set(routers) | ({"AGENTS.md", "CLAUDE.md"} & paths)
     for item in _objects(link_evidence.get("links")):
         if (
             item.get("source") in routers
@@ -436,65 +456,8 @@ def _routed_agent_documents(paths: set[str], link_evidence: dict[str, Any]) -> s
     return routed
 
 
-def _evidence_items(value: object) -> list[dict[str, Any]]:
-    if not isinstance(value, list):
-        return []
-    items: list[dict[str, Any]] = []
-    for item in value:
-        if isinstance(item, str):
-            items.append({"path": item})
-        elif isinstance(item, dict) and isinstance(item.get("path"), str):
-            items.append(cast(dict[str, Any], item))
-    return items
-
-
-def _fresh_passed_evidence(item: dict[str, Any], as_of: str) -> bool:
-    return item.get("status") == "passed" and _is_fresh_date(item.get("observed_at"), as_of)
-
-
-def _is_fresh_date(value: object, as_of: str) -> bool:
-    if not isinstance(value, str):
-        return False
-    try:
-        observed = datetime.fromisoformat(value.replace("Z", "+00:00"))
-        current = datetime.fromisoformat(as_of.replace("Z", "+00:00"))
-    except ValueError:
-        return False
-    if observed.tzinfo is None:
-        observed = observed.replace(tzinfo=UTC)
-    if current.tzinfo is None:
-        current = current.replace(tzinfo=UTC)
-    return current - observed <= timedelta(days=FRESHNESS_DAYS)
-
-
-def _local_file(root: Path, value: str) -> bool:
-    if not value or value.startswith(("/", "~")) or ".." in Path(value).parts:
-        return False
-    current = root
-    for part in Path(value).parts:
-        current /= part
-        if current.is_symlink():
-            return False
-    try:
-        return current.is_file() and current.resolve().is_relative_to(root.resolve())
-    except OSError:
-        return False
-
-
 def _file_size(path: Path) -> int:
     try:
         return path.stat().st_size
     except OSError:
         return 0
-
-
-def _strings(value: object) -> list[str]:
-    if not isinstance(value, list):
-        return []
-    return [item for item in value if isinstance(item, str) and item]
-
-
-def _objects(value: object) -> list[dict[str, Any]]:
-    if not isinstance(value, list):
-        return []
-    return [cast(dict[str, Any], item) for item in value if isinstance(item, dict)]

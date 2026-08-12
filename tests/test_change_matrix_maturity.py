@@ -20,6 +20,7 @@ def _matrix(*, reviewed: str = "2026-07-28", exercised: bool = False) -> dict:
             {
                 "id": "local-source",
                 "scope": "local",
+                "distribution": "public_core",
                 "path": "src/",
                 "owner": "repository-owner",
                 "condition": "code changes",
@@ -30,6 +31,8 @@ def _matrix(*, reviewed: str = "2026-07-28", exercised: bool = False) -> dict:
             {
                 "id": "external-consumer",
                 "scope": "external",
+                "distribution": "public_adapter",
+                "contract_fixtures": ["fixtures/contracts/public-adapters/consumer.json"],
                 "path": "consumer/repo",
                 "owner": "consumer-owner",
                 "condition": "public contract changes",
@@ -124,6 +127,24 @@ def test_change_matrix_requires_evidence_for_explicit_not_applicable(tmp_path: P
     unsupported = assess_change_surface_coverage(tmp_path, {}, AS_OF)
     assert unsupported["score"] == 2
     assert "unsupported not_applicable" in unsupported["message"]
+
+
+def test_change_matrix_requires_distribution_and_public_adapter_fixture(tmp_path: Path) -> None:
+    payload = _matrix(exercised=True)
+    del payload["surfaces"][0]["distribution"]
+    path = _write_matrix(tmp_path, payload)
+
+    unclassified = assess_change_surface_coverage(tmp_path, {}, AS_OF)
+    assert unclassified["score"] == 2
+    assert "distribution is missing or unsupported" in unclassified["message"]
+
+    payload = _matrix(exercised=True)
+    del payload["surfaces"][1]["contract_fixtures"]
+    path.write_text(json.dumps(payload), encoding="utf-8")
+
+    fixture_missing = assess_change_surface_coverage(tmp_path, {}, AS_OF)
+    assert fixture_missing["score"] == 2
+    assert "public adapter fixture is missing" in fixture_missing["message"]
 
 
 def test_skill_contract_quality_is_conditional_and_static_only(tmp_path: Path) -> None:
@@ -221,6 +242,53 @@ Load /Users/example/.agents/private.md before work.
     assert "precedence hazard" in details
 
 
+def test_skill_contract_quality_recognizes_process_artifacts_and_observable_done(
+    tmp_path: Path,
+) -> None:
+    skill = tmp_path / "skills/example/SKILL.md"
+    skill.parent.mkdir(parents=True)
+    skill.write_text(
+        """---
+name: example
+description: Use for bounded workflow decisions.
+---
+# Example
+Produce a recommendation artifact with a verifier and stopping condition.
+Record the observed result and evidence reference before completion.
+""",
+        encoding="utf-8",
+    )
+
+    result = assess_skill_contract_quality(tmp_path)
+
+    assert result["status"] == "static_validated"
+    assert result["score"] == 3
+
+
+def test_skill_contract_quality_does_not_penalize_long_safety_contract_density(
+    tmp_path: Path,
+) -> None:
+    skill = tmp_path / "skills/example/SKILL.md"
+    skill.parent.mkdir(parents=True)
+    safety_rules = "\n".join(f"Rule {index}: must preserve state." for index in range(31))
+    skill.write_text(
+        f"""---
+name: example
+description: Use for bounded safety control.
+---
+# Example
+Return a report. Definition of done: verify the postcondition with `pytest`.
+{"context " * 1000}
+{safety_rules}
+""",
+        encoding="utf-8",
+    )
+
+    result = assess_skill_contract_quality(tmp_path)
+
+    assert result["status"] == "static_validated"
+
+
 def test_agent_usability_tracks_four_lanes_and_growth_health(tmp_path: Path) -> None:
     router = tmp_path / ".agents/context/README.md"
     commands = tmp_path / ".agents/context/commands.md"
@@ -293,6 +361,57 @@ def test_agent_usability_tracks_four_lanes_and_growth_health(tmp_path: Path) -> 
     assert result["growth_health"]["skill_count"] == 1
     assert result["growth_health"]["family_count"] == 1
     assert result["growth_health"]["behavior_verified_tool_count"] == 1
+
+
+def test_agent_usability_accepts_evidenced_skill_mapping_exemption(tmp_path: Path) -> None:
+    router = tmp_path / ".agents/context/README.md"
+    receipt = tmp_path / "docs/evidence/cli-smoke.json"
+    manifest = tmp_path / ".agents/agent-usability.json"
+    for path in (router, receipt, manifest):
+        path.parent.mkdir(parents=True, exist_ok=True)
+    router.write_text("# Commands\n", encoding="utf-8")
+    receipt.write_text("{}\n", encoding="utf-8")
+    manifest.write_text(
+        json.dumps(
+            {
+                "schema": "agent-usability/v1",
+                "reviewed_at": "2026-08-01",
+                "tools": [
+                    {
+                        "id": "example-cli",
+                        "documentation": [".agents/context/README.md"],
+                        "skills": [],
+                        "skill_mapping": {
+                            "status": "not_applicable",
+                            "reason": "The bounded CLI and its agent instructions are the same surface.",
+                            "evidence": [".agents/context/README.md"],
+                        },
+                        "behavior_evidence": [
+                            {
+                                "path": "docs/evidence/cli-smoke.json",
+                                "status": "passed",
+                                "observed_at": "2026-08-01",
+                            }
+                        ],
+                    }
+                ],
+                "skills": [],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    result = assess_agent_usability(
+        tmp_path,
+        {".agents/context/README.md": "# Commands\n"},
+        {"links": []},
+        "2026-08-01T00:00:00Z",
+    )
+
+    skill_lane = next(lane for lane in result["lanes"] if lane["id"] == "tool_skill_coverage")
+    assert skill_lane["status"] == "not_applicable"
+    assert skill_lane["score"] is None
+    assert result["growth_health"]["skill_exempt_tool_count"] == 1
 
 
 def test_agent_usability_does_not_reward_unmapped_growth(tmp_path: Path) -> None:
