@@ -23,6 +23,11 @@ proof. Read `evidence_state`: `configured` and `covered` are not passing;
 `fresh_passing` requires a current local pass or fresh commit-bound CI. Missing,
 failed, blocked, and bounded not-applicable outcomes remain distinct.
 
+Use `ci-gate-audit` when repository semantics may justify gates beyond the
+standard CI families. Treat every result as a recommendation: inspect its
+invariant, evidence, negative-control state, and provenance, then require an
+explicit repository-owned profile before calling the gate required.
+
 Preferred MCP tools:
 
 - `quality_runner_audit_outcome` to inspect or plan with a clear remediation outcome.
@@ -94,6 +99,7 @@ qr audit /path/to/repo --run-id qr-<date-or-task> --json
 qr review /path/to/repo --mode blind --run-id review-<date-or-task> --json
 qr verify /path/to/repo --run-id qr-<date-or-task>-verify --json
 qr runs /path/to/repo --json
+qr ci-gate-audit /path/to/repo --json
 ```
 
 For the four journey commands, read the

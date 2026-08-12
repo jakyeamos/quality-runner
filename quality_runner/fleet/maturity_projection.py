@@ -137,6 +137,7 @@ def repository_projection(repository: dict[str, Any], finding: dict[str, Any]) -
         "agent_usability": agent_usability,
         "behavior_assurance": _object(finding.get("behavior_assurance")),
         "cache_design": cache_design,
+        "ci_gate_audit": _object(finding.get("ci_gate_audit")),
     }
 
 

@@ -34,6 +34,18 @@ invalid evidence remain blocked. The distributed schemas are
 
 The web-readiness artifact is local evidence that may contain repository paths
 and deployment identifiers, so the handling and retention rules below apply.
+## Custom CI gate candidate report
+
+`qr ci-gate-audit REPO --output PATH` writes
+`quality-runner-ci-gate-candidates/v1`. The report is recommendation-only and
+commit-bound. Each candidate records independent semantic evidence, the protected
+invariant, failure mode, suggested trigger, existing-check discovery, negative
+controls, and admission blockers. The same report is embedded in fleet findings
+and projected into the Pronto maturity feed as `ci_gate_audit`.
+
+Quality Runner owns detection and provenance. Repository-owned
+`.pronto/ci-gate-profile.json` remains the only authority that can classify a
+candidate as required, optional, or not applicable.
 
 Artifacts are written under:
 

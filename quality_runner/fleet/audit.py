@@ -7,7 +7,9 @@ from pathlib import Path
 from typing import Any, cast
 
 from quality_runner.artifacts import prepare_safe_directory, write_json, write_text
+from quality_runner.ci_gate_audit import audit_ci_gate_candidates
 from quality_runner.fleet import audit_coverage
+from quality_runner.fleet.agent_usability_scoring import applicable_agent_usability_scores
 from quality_runner.fleet.contracts import (
     FLEET_AUDIT_SCHEMA,
     FLEET_FINDING_SCHEMA,
@@ -142,6 +144,14 @@ def fleet_audit_payload(
             as_of=resolved_as_of,
             run_id=f"{audit_id}-{repository['repo_id']}",
             standard=standard,
+        )
+        target_branch = target.get("branch") if isinstance(target.get("branch"), str) else None
+        target_head = target.get("head") if isinstance(target.get("head"), str) else None
+        result["ci_gate_audit"] = audit_ci_gate_candidates(
+            Path(str(static_repository["primary_path"])),
+            generated_at=resolved_as_of,
+            branch=target_branch,
+            head_sha=target_head,
         )
         # Keep the canonical repository identity (including its primary path)
         # in persisted artifacts. The ready target checkout is only the static

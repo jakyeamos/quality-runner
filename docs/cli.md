@@ -56,6 +56,23 @@ Unsupported transitions, uncovered regressions, invalid registries, incomplete
 fleet evidence, failed precision/cost/freshness/fixture criteria, or missing
 human approval return a non-zero CLI status. See
 [Bug-learning lifecycle](bug-learning.md) for the schemas and thresholds.
+### `quality-runner ci-gate-audit`
+
+`ci-gate-audit` is Quality Runner's read-only semantic audit for repository-specific
+CI needs. It requires multiple independent repository signals before emitting a
+candidate and explains the invariant, failure mode, evidence paths, suggested
+trigger and check context, existing-check evidence, negative controls, and
+remaining admission blockers.
+
+```bash
+qr ci-gate-audit /path/to/repo --json
+qr ci-gate-audit /path/to/repo --output /tmp/ci-gate-candidates.json --json
+```
+
+The command does not edit the target repository unless the caller explicitly
+chooses an output path inside it. A candidate is never a requirement. Promotion
+requires an explicit repository-owned CI profile plus a candidate-commit check
+and a negative control.
 
 `inspect`, `run`, and `verify-gates` remain supported v1 compatibility commands.
 `review --legacy-output` provides the established v1 review JSON field shape

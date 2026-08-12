@@ -1,0 +1,87 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "quality-runner-ci-gate-candidates-v1",
+  "type": "object",
+  "required": [
+    "schema",
+    "status",
+    "generated_at",
+    "repository",
+    "policy",
+    "inventory",
+    "candidate_count",
+    "candidates",
+    "provenance_hash"
+  ],
+  "properties": {
+    "schema": {"const": "quality-runner-ci-gate-candidates/v1"},
+    "status": {"enum": ["complete", "partial"]},
+    "generated_at": {"type": "string", "minLength": 1},
+    "repository": {
+      "type": "object",
+      "required": ["name", "branch", "head_sha"],
+      "properties": {
+        "name": {"type": "string", "minLength": 1},
+        "branch": {"type": ["string", "null"]},
+        "head_sha": {"type": ["string", "null"]}
+      },
+      "additionalProperties": false
+    },
+    "policy": {
+      "type": "object",
+      "required": ["authority", "implementation_allowed", "promotion_requirement"],
+      "properties": {
+        "authority": {"const": "recommendation_only"},
+        "implementation_allowed": {"const": false},
+        "promotion_requirement": {"type": "string", "minLength": 1}
+      },
+      "additionalProperties": false
+    },
+    "candidate_count": {"type": "integer", "minimum": 0, "maximum": 16},
+    "candidates": {
+      "type": "array",
+      "maxItems": 16,
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "label",
+          "recommendation",
+          "confidence",
+          "invariant",
+          "failure_mode",
+          "evidence",
+          "suggested_trigger",
+          "suggested_check_context",
+          "existing_check",
+          "negative_controls",
+          "admission",
+          "next_step"
+        ],
+        "properties": {
+          "id": {"type": "string", "pattern": "^custom:[a-z][a-z0-9_]*$"},
+          "label": {"type": "string", "minLength": 1, "maxLength": 100},
+          "recommendation": {
+            "enum": ["required_candidate", "optional_candidate", "review_required"]
+          },
+          "confidence": {"enum": ["high", "medium"]},
+          "invariant": {"type": "string", "minLength": 1, "maxLength": 400},
+          "failure_mode": {"type": "string", "minLength": 1, "maxLength": 400},
+          "evidence": {"type": "array", "minItems": 1, "maxItems": 8},
+          "negative_controls": {"type": "array", "maxItems": 8},
+          "admission": {
+            "type": "object",
+            "required": ["state", "blockers"],
+            "properties": {
+              "state": {"enum": ["proposal_only", "implementation_detected"]},
+              "blockers": {"type": "array", "minItems": 1, "items": {"type": "string"}}
+            }
+          }
+        },
+        "additionalProperties": true
+      }
+    },
+    "provenance_hash": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+  },
+  "additionalProperties": true
+}

@@ -16,6 +16,7 @@ from quality_runner.application.verification_workflows import verify_gates_paylo
 from quality_runner.cli_artifacts import prune_artifacts_payload
 from quality_runner.cli_assurance import assurance_command_payload
 from quality_runner.cli_candidates import candidate_command_payload
+from quality_runner.cli_ci_gate_audit import ci_gate_audit_command_payload
 from quality_runner.cli_controller_reports import (
     controller_report_command_payload,
     controller_report_from_summary_payload,
@@ -77,6 +78,8 @@ def payload_for_args(
         return doctor_payload(include_environment=True)
     if args.command == "behavior":
         return assurance_command_payload(args)
+    if args.command == "ci-gate-audit":
+        return ci_gate_audit_command_payload(args, validated_repo_path=_validated_repo_path)
     if args.command == "fleet":
         return fleet_command_payload(args)
     if args.command == "candidates":

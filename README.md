@@ -143,6 +143,7 @@ qr fleet certify --scope-manifest /path/to/fleet-scope.json \
   --projects-root /bounded/root --parallelism 8 --json
 qr fleet certify --scope-manifest /path/to/fleet-scope.json \
   --projects-root /bounded/root --audit-id AUDIT_ID --json
+qr ci-gate-audit /path/to/repo --json
 ```
 
 The non-release-blocking `cache-design` standard inventories derived storage

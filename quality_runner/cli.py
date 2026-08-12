@@ -10,6 +10,7 @@ from quality_runner import __version__
 from quality_runner.cli_artifacts import add_artifact_commands
 from quality_runner.cli_behavior import add_behavior_commands
 from quality_runner.cli_candidates import add_candidate_commands
+from quality_runner.cli_ci_gate_audit import add_ci_gate_audit_command
 from quality_runner.cli_controller_reports import (
     add_controller_report_command,
     add_controller_report_summary_arguments,
@@ -62,6 +63,7 @@ Stable journeys:
   verify REPO           record gate evidence; execution requires explicit consent
   runs REPO             read recent evidence without creating new artifacts
   doctor                confirm local installation readiness
+  ci-gate-audit REPO    recommend repository-specific CI gates from semantic evidence
 
 Configuration:
   init REPO             create a starter Quality Runner configuration
@@ -123,6 +125,7 @@ def build_parser(prog: str = CANONICAL_PROGRAM) -> argparse.ArgumentParser:
 
     add_journey_commands(subparsers)
     add_behavior_commands(subparsers)
+    add_ci_gate_audit_command(subparsers)
     add_fleet_commands(subparsers)
     add_candidate_commands(subparsers)
     add_security_commands(subparsers)

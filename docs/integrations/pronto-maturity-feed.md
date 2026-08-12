@@ -304,3 +304,10 @@ The sanitized public consumer fixture is
 should read that fixture for schema compatibility; they must not copy a live
 private fleet feed into the repository. The release boundary validates the
 fixture and blocks publication when it is missing or contains local markers.
+Each repository projection also includes a `ci_gate_audit` report using
+`quality-runner-ci-gate-candidates/v1`. Pronto may validate and explain these
+recommendations, but must not add them to a repository's denominator or
+remediation queue. Only a repository-owned CI profile can promote a candidate.
+The report preserves the exact target branch and commit, bounded relative evidence
+paths, existing-check discovery, negative controls, and remaining admission
+blockers so “custom gate needed” is never inferred from a repository name alone.
