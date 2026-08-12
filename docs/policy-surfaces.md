@@ -30,3 +30,7 @@ qr release-boundary REPOSITORY --dist-dir REPOSITORY/dist --json
 
 The release gate additionally checks tracked public content, wheel/sdist
 members, adapter fixtures, and the installed wheel in an isolated home.
+It persists a privacy-safe v2 receipt at
+`.quality-runner/release-boundary.json` for exact-target consumers such as
+Pronto. The receipt contains hashes and relative names, never workstation
+paths or private inventories.

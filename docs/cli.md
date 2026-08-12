@@ -595,8 +595,14 @@ sanitized JSON contract fixtures. It then scans tracked public source/docs for
 personal home paths and private inventory markers, blocks tracked paths declared
 local-only, enforces per-archive path allowlists, and installs the wheel in a
 temporary home whose executable path does not expose `pronto`, `leverage`, or
-`macctl`. The result schema is
-`quality-runner-release-boundary/v1`; any blocked check produces exit code 1.
+`macctl`. The command atomically writes
+`.quality-runner/release-boundary.json` by default; `--output` selects another
+receipt path. The privacy-safe receipt uses
+`quality-runner-release-boundary/v2` and records the exact branch and commit,
+producer version, change-matrix SHA-256, wheel and sdist SHA-256 values,
+sanitized fixture hashes, and every check result without embedding the local
+repository path. A dirty release input, missing provenance, stale policy, or
+blocked check produces exit code 1.
 
 ## `quality-runner validate-report`
 

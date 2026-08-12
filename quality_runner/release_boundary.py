@@ -1,34 +1,27 @@
 from __future__ import annotations
 
 import fnmatch
+import hashlib
 import json
-import os
 import re
-import shutil
 import subprocess
-import sys
-import tarfile
-import tempfile
-import zipfile
-from pathlib import Path, PurePosixPath
+from datetime import UTC, datetime
+from pathlib import Path
 from typing import Any
 
+from quality_runner import __version__
 from quality_runner.fleet.change_matrix import MATRIX_SCHEMA, SURFACE_DISTRIBUTIONS
+from quality_runner.release_boundary_artifacts import (
+    clean_room_install_check as _clean_room_install_check,
+)
+from quality_runner.release_boundary_artifacts import (
+    distribution_archive_check as _distribution_archive_check,
+)
 
-RELEASE_BOUNDARY_SCHEMA = "quality-runner-release-boundary/v1"
+RELEASE_BOUNDARY_SCHEMA = "quality-runner-release-boundary/v2"
 DEFAULT_MATRIX_PATH = Path(".agents/change-surface-matrix.json")
+DEFAULT_REPORT_PATH = Path(".quality-runner/release-boundary.json")
 MAX_SCANNED_FILE_BYTES = 2 * 1024 * 1024
-TEXT_ARCHIVE_SUFFIXES = {
-    ".cfg",
-    ".json",
-    ".md",
-    ".py",
-    ".rst",
-    ".toml",
-    ".txt",
-    ".yaml",
-    ".yml",
-}
 
 
 def release_boundary_payload(
@@ -36,6 +29,7 @@ def release_boundary_payload(
     repo_root: Path,
     dist_dir: Path,
     run_clean_room: bool = True,
+    generated_at: str | None = None,
 ) -> dict[str, Any]:
     """Fail closed when a public release surface is unclassified or leaks local state."""
 
@@ -43,6 +37,8 @@ def release_boundary_payload(
     matrix_path = root / DEFAULT_MATRIX_PATH
     matrix = _read_object(matrix_path)
     checks: list[dict[str, Any]] = []
+    branch, head_sha, dirty_path_count = _git_provenance(root, dist_dir)
+    checks.append(_source_provenance_check(branch, head_sha, dirty_path_count))
     checks.append(_surface_classification_check(matrix, matrix_path=DEFAULT_MATRIX_PATH.as_posix()))
 
     release_policy = matrix.get("release_boundary") if isinstance(matrix, dict) else None
@@ -57,6 +53,7 @@ def release_boundary_payload(
         checks.append(_tracked_content_check(root, content_policy))
         checks.append(_adapter_fixture_check(root, matrix, content_policy))
         archive_check, wheel = _distribution_archive_check(
+            root,
             dist_dir.expanduser().resolve(),
             release_policy.get("artifacts"),
             content_policy,
@@ -70,15 +67,105 @@ def release_boundary_payload(
             checks.append(_blocked("clean_room_install", "clean-room verification was not run"))
 
     blocked = [check for check in checks if check.get("status") != "passed"]
+    repository_id = (
+        matrix.get("subject", {}).get("id") if isinstance(matrix.get("subject"), dict) else None
+    )
     return {
         "schema": RELEASE_BOUNDARY_SCHEMA,
         "status": "passed" if not blocked else "blocked",
-        "repository": str(root),
-        "matrix_path": str(matrix_path),
+        "generated_at": generated_at or datetime.now(UTC).isoformat(),
+        "producer": {"name": "quality-runner", "version": __version__},
+        "repository": {
+            "id": repository_id or root.name,
+            "branch": branch,
+            "head_sha": head_sha,
+            "dirty_path_count": dirty_path_count,
+        },
+        "matrix": {
+            "path": DEFAULT_MATRIX_PATH.as_posix(),
+            "sha256": _sha256_path(matrix_path),
+        },
         "distribution_classes": sorted(SURFACE_DISTRIBUTIONS),
+        "artifacts": next(
+            (
+                list(check.get("artifacts", []))
+                for check in checks
+                if check.get("id") == "distribution_archives"
+            ),
+            [],
+        ),
         "checks": checks,
         "blocking_check_ids": [str(check["id"]) for check in blocked],
     }
+
+
+def write_release_boundary_report(report: dict[str, Any], output_path: Path) -> Path:
+    """Atomically persist the sanitized release receipt for downstream consumers."""
+
+    path = output_path.expanduser().resolve()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_suffix(f"{path.suffix}.tmp")
+    temporary.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    temporary.replace(path)
+    return path
+
+
+def _git_provenance(root: Path, dist_dir: Path) -> tuple[str | None, str | None, int]:
+    def git(*args: str) -> subprocess.CompletedProcess[str]:
+        return subprocess.run(
+            ["git", *args],
+            cwd=root,
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+
+    try:
+        branch = git("symbolic-ref", "--quiet", "--short", "HEAD").stdout.strip() or None
+        head_sha = git("rev-parse", "--verify", "HEAD").stdout.strip() or None
+        status = git("status", "--porcelain=v1", "-z", "--untracked-files=all").stdout
+    except (OSError, subprocess.CalledProcessError, subprocess.TimeoutExpired):
+        return None, None, 0
+    excluded_prefixes = {DEFAULT_REPORT_PATH.as_posix()}
+    try:
+        relative_dist = dist_dir.expanduser().resolve().relative_to(root).as_posix().rstrip("/")
+    except ValueError:
+        relative_dist = ""
+    if relative_dist:
+        excluded_prefixes.add(f"{relative_dist}/")
+    dirty_paths = []
+    for entry in status.split("\0"):
+        if len(entry) < 4:
+            continue
+        path = entry[3:].split(" -> ")[-1]
+        if any(path == prefix or path.startswith(prefix) for prefix in excluded_prefixes):
+            continue
+        dirty_paths.append(path)
+    return branch, head_sha, len(dirty_paths)
+
+
+def _source_provenance_check(
+    branch: str | None, head_sha: str | None, dirty_path_count: int
+) -> dict[str, Any]:
+    violations: list[dict[str, Any]] = []
+    if branch is None:
+        violations.append({"rule": "branch-unavailable", "path": "repository.branch"})
+    if head_sha is None:
+        violations.append({"rule": "head-unavailable", "path": "repository.head_sha"})
+    if dirty_path_count:
+        violations.append(
+            {
+                "rule": "uncommitted-release-input",
+                "path": "repository",
+                "count": dirty_path_count,
+            }
+        )
+    check = _check("source_provenance", violations)
+    check["branch"] = branch
+    check["head_sha"] = head_sha
+    check["dirty_path_count"] = dirty_path_count
+    return check
 
 
 def _surface_classification_check(matrix: dict[str, Any], *, matrix_path: str) -> dict[str, Any]:
@@ -168,150 +255,15 @@ def _adapter_fixture_check(
             continue
         violations.extend(_scan_text_path(fixture, relative, patterns))
     check = _check("public_adapter_fixtures", violations)
-    check["fixtures"] = sorted(fixture_paths)
+    check["fixtures"] = [
+        {
+            "path": relative,
+            "sha256": _sha256_path(root / relative),
+        }
+        for relative in sorted(fixture_paths)
+        if (root / relative).is_file()
+    ]
     return check
-
-
-def _distribution_archive_check(
-    dist_dir: Path, artifact_policy: object, content_policy: object
-) -> tuple[dict[str, Any], Path | None]:
-    if not isinstance(artifact_policy, dict):
-        return _blocked("distribution_archives", "artifact allowlist is missing"), None
-    wheels = sorted(dist_dir.glob("*.whl")) if dist_dir.is_dir() else []
-    sdists = sorted(dist_dir.glob("*.tar.gz")) if dist_dir.is_dir() else []
-    violations: list[dict[str, Any]] = []
-    if len(wheels) != 1:
-        violations.append({"rule": "wheel-count", "path": str(dist_dir), "count": len(wheels)})
-    if len(sdists) != 1:
-        violations.append({"rule": "sdist-count", "path": str(dist_dir), "count": len(sdists)})
-    patterns, pattern_errors = _content_patterns(content_policy)
-    violations.extend(pattern_errors)
-    if len(wheels) == 1:
-        violations.extend(_inspect_wheel(wheels[0], artifact_policy.get("wheel"), patterns))
-    if len(sdists) == 1:
-        violations.extend(_inspect_sdist(sdists[0], artifact_policy.get("sdist"), patterns))
-    check = _check("distribution_archives", violations)
-    check["wheel"] = wheels[0].name if len(wheels) == 1 else None
-    check["sdist"] = sdists[0].name if len(sdists) == 1 else None
-    return check, wheels[0] if len(wheels) == 1 else None
-
-
-def _inspect_wheel(
-    wheel: Path, policy: object, patterns: list[tuple[str, re.Pattern[str]]]
-) -> list[dict[str, Any]]:
-    violations: list[dict[str, Any]] = []
-    if not isinstance(policy, dict):
-        return [{"rule": "wheel-allowlist-missing", "path": wheel.name}]
-    try:
-        with zipfile.ZipFile(wheel) as archive:
-            for info in archive.infolist():
-                name = info.filename.rstrip("/")
-                if not name:
-                    continue
-                if not _safe_archive_name(name):
-                    violations.append({"rule": "unsafe-archive-path", "path": name})
-                    continue
-                if not _artifact_path_allowed(name, policy):
-                    violations.append({"rule": "wheel-path-not-allowlisted", "path": name})
-                if not info.is_dir() and _is_text_archive_path(name):
-                    violations.extend(_scan_archive_text(name, archive.read(info), patterns))
-    except (OSError, zipfile.BadZipFile):
-        violations.append({"rule": "wheel-unreadable", "path": wheel.name})
-    return violations
-
-
-def _inspect_sdist(
-    sdist: Path, policy: object, patterns: list[tuple[str, re.Pattern[str]]]
-) -> list[dict[str, Any]]:
-    violations: list[dict[str, Any]] = []
-    if not isinstance(policy, dict):
-        return [{"rule": "sdist-allowlist-missing", "path": sdist.name}]
-    try:
-        with tarfile.open(sdist, mode="r:gz") as archive:
-            for member in archive.getmembers():
-                raw_name = member.name.rstrip("/")
-                if not _safe_archive_name(raw_name):
-                    violations.append({"rule": "unsafe-archive-path", "path": raw_name})
-                    continue
-                if member.issym() or member.islnk():
-                    violations.append({"rule": "archive-link-not-allowed", "path": raw_name})
-                    continue
-                parts = PurePosixPath(raw_name).parts
-                name = PurePosixPath(*parts[1:]).as_posix() if len(parts) > 1 else ""
-                if not name:
-                    continue
-                if member.isdir():
-                    continue
-                if not _artifact_path_allowed(name, policy):
-                    violations.append({"rule": "sdist-path-not-allowlisted", "path": name})
-                if member.isfile() and _is_text_archive_path(name):
-                    extracted = archive.extractfile(member)
-                    if extracted is not None:
-                        violations.extend(_scan_archive_text(name, extracted.read(), patterns))
-    except (OSError, tarfile.TarError):
-        violations.append({"rule": "sdist-unreadable", "path": sdist.name})
-    return violations
-
-
-def _clean_room_install_check(wheel: Path) -> dict[str, Any]:
-    try:
-        with tempfile.TemporaryDirectory(prefix="quality-runner-release-") as temporary:
-            root = Path(temporary)
-            venv = root / "venv"
-            subprocess.run(
-                [sys.executable, "-m", "venv", str(venv)],
-                check=True,
-                capture_output=True,
-                text=True,
-                timeout=120,
-            )
-            executable_dir = venv / ("Scripts" if os.name == "nt" else "bin")
-            python = executable_dir / ("python.exe" if os.name == "nt" else "python")
-            quality_runner = executable_dir / (
-                "quality-runner.exe" if os.name == "nt" else "quality-runner"
-            )
-            subprocess.run(
-                [str(python), "-m", "pip", "install", "--no-deps", str(wheel)],
-                check=True,
-                capture_output=True,
-                text=True,
-                timeout=120,
-            )
-            home = root / "home"
-            home.mkdir()
-            environment = {
-                "HOME": str(home),
-                "PATH": os.pathsep.join((str(executable_dir), os.defpath)),
-                "XDG_CACHE_HOME": str(home / ".cache"),
-                "XDG_CONFIG_HOME": str(home / ".config"),
-                "XDG_DATA_HOME": str(home / ".local" / "share"),
-            }
-            if os.name == "nt" and "SYSTEMROOT" in os.environ:
-                environment["SYSTEMROOT"] = os.environ["SYSTEMROOT"]
-            unavailable = [
-                command
-                for command in ("pronto", "leverage", "macctl")
-                if shutil.which(command, path=environment["PATH"]) is not None
-            ]
-            if unavailable:
-                return _blocked(
-                    "clean_room_install",
-                    "private integration executables are visible in the clean-room path",
-                    integrations=unavailable,
-                )
-            for arguments in (("doctor", "--json"), ("release-smoke", "--json")):
-                subprocess.run(
-                    [str(quality_runner), *arguments],
-                    cwd=home,
-                    env=environment,
-                    check=True,
-                    capture_output=True,
-                    text=True,
-                    timeout=180,
-                )
-    except (OSError, subprocess.CalledProcessError, subprocess.TimeoutExpired):
-        return _blocked("clean_room_install", "installed-wheel smoke failed")
-    return {"id": "clean_room_install", "status": "passed", "integrations_present": []}
 
 
 def _content_patterns(
@@ -355,18 +307,6 @@ def _scan_text_path(
     return _pattern_violations(content, display_path, patterns)
 
 
-def _scan_archive_text(
-    name: str, content: bytes, patterns: list[tuple[str, re.Pattern[str]]]
-) -> list[dict[str, Any]]:
-    if len(content) > MAX_SCANNED_FILE_BYTES:
-        return [{"rule": "archive-text-too-large", "path": name}]
-    try:
-        text = content.decode("utf-8")
-    except UnicodeDecodeError:
-        return [{"rule": "archive-text-unreadable", "path": name}]
-    return _pattern_violations(text, name, patterns)
-
-
 def _pattern_violations(
     content: str, display_path: str, patterns: list[tuple[str, re.Pattern[str]]]
 ) -> list[dict[str, Any]]:
@@ -383,24 +323,6 @@ def _pattern_violations(
     return violations
 
 
-def _artifact_path_allowed(path: str, policy: dict[str, Any]) -> bool:
-    exact = set(_string_list(policy.get("allow_paths")))
-    prefixes = tuple(_string_list(policy.get("allow_prefixes")))
-    globs = _string_list(policy.get("allow_globs"))
-    return path in exact or path.startswith(prefixes) or _matches_any(path, globs)
-
-
-def _safe_archive_name(name: str) -> bool:
-    path = PurePosixPath(name)
-    return bool(name) and not path.is_absolute() and ".." not in path.parts
-
-
-def _is_text_archive_path(name: str) -> bool:
-    return PurePosixPath(name).suffix.lower() in TEXT_ARCHIVE_SUFFIXES or name.endswith(
-        ("METADATA", "PKG-INFO")
-    )
-
-
 def _matches_any(path: str, patterns: list[str]) -> bool:
     return any(fnmatch.fnmatchcase(path, pattern) for pattern in patterns)
 
@@ -411,6 +333,17 @@ def _read_object(path: Path) -> dict[str, Any]:
     except (OSError, json.JSONDecodeError):
         return {}
     return payload if isinstance(payload, dict) else {}
+
+
+def _sha256_path(path: Path) -> str | None:
+    try:
+        digest = hashlib.sha256()
+        with path.open("rb") as stream:
+            for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+                digest.update(chunk)
+        return digest.hexdigest()
+    except OSError:
+        return None
 
 
 def _string_list(value: object) -> list[str]:

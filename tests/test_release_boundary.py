@@ -8,7 +8,11 @@ import zipfile
 from pathlib import Path
 
 from quality_runner.fleet.maturity_feed import validate_maturity_feed
-from quality_runner.release_boundary import release_boundary_payload
+from quality_runner.release_boundary import (
+    RELEASE_BOUNDARY_SCHEMA,
+    release_boundary_payload,
+    write_release_boundary_report,
+)
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -129,6 +133,64 @@ def test_release_boundary_passes_classified_sanitized_artifacts(
 
     assert payload["status"] == "passed"
     assert payload["blocking_check_ids"] == []
+    assert payload["schema"] == RELEASE_BOUNDARY_SCHEMA
+    assert payload["repository"]["branch"] == "main"
+    assert len(payload["repository"]["head_sha"]) == 40
+    assert payload["repository"]["dirty_path_count"] == 0
+    assert payload["matrix"]["path"] == ".agents/change-surface-matrix.json"
+    assert len(payload["matrix"]["sha256"]) == 64
+    assert {artifact["kind"] for artifact in payload["artifacts"]} == {"wheel", "sdist"}
+    assert {artifact["path"] for artifact in payload["artifacts"]} == {
+        "dist/quality_runner-1-py3-none-any.whl",
+        "dist/quality_runner-1.tar.gz",
+    }
+    assert all(len(artifact["sha256"]) == 64 for artifact in payload["artifacts"])
+    assert str(tmp_path) not in json.dumps(payload)
+
+
+def test_release_boundary_receipt_is_persisted_without_absolute_paths(
+    tmp_path: Path, monkeypatch
+) -> None:
+    _write_repository(tmp_path, _policy())
+    dist = tmp_path / "dist"
+    _write_archives(dist)
+    monkeypatch.setattr(
+        "quality_runner.release_boundary._clean_room_install_check",
+        lambda _wheel: {"id": "clean_room_install", "status": "passed"},
+    )
+    payload = release_boundary_payload(
+        repo_root=tmp_path,
+        dist_dir=dist,
+        generated_at="2026-08-11T12:00:00+00:00",
+    )
+
+    output = tmp_path / ".quality-runner/release-boundary.json"
+    write_release_boundary_report(payload, output)
+    persisted = output.read_text(encoding="utf-8")
+
+    assert json.loads(persisted) == payload
+    assert str(tmp_path) not in persisted
+
+
+def test_release_boundary_blocks_dirty_release_input(tmp_path: Path, monkeypatch) -> None:
+    _write_repository(tmp_path, _policy())
+    (tmp_path / "README.md").write_text("# Changed public fixture\n", encoding="utf-8")
+    dist = tmp_path / "dist"
+    _write_archives(dist)
+    monkeypatch.setattr(
+        "quality_runner.release_boundary._clean_room_install_check",
+        lambda _wheel: {"id": "clean_room_install", "status": "passed"},
+    )
+
+    payload = release_boundary_payload(repo_root=tmp_path, dist_dir=dist)
+
+    provenance = next(check for check in payload["checks"] if check["id"] == "source_provenance")
+    assert provenance["status"] == "blocked"
+    assert provenance["dirty_path_count"] == 1
+    assert provenance["violations"] == [
+        {"rule": "uncommitted-release-input", "path": "repository", "count": 1}
+    ]
+    assert "README.md" not in json.dumps(provenance)
 
 
 def test_release_boundary_blocks_unclassified_surface(tmp_path: Path, monkeypatch) -> None:

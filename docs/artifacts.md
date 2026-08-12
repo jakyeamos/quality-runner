@@ -1,5 +1,21 @@
 # Artifact Contract
 
+## Public release-boundary receipt
+
+`quality-runner release-boundary` writes
+`<repo>/.quality-runner/release-boundary.json` using schema
+`quality-runner-release-boundary/v2`. The receipt is a privacy-safe consumer
+handoff: it contains the repository identifier, exact branch and commit,
+producer version, change-matrix digest, wheel and sdist names and digests,
+sanitized public-adapter fixture digests, check results, and blocking check IDs.
+It never contains the absolute repository or matrix path.
+
+Consumers must fail closed unless the v2 receipt is current for their exact
+target, its policy digest still matches, its two artifact hashes are present,
+and every check passed. Version 1 is readable only as legacy evidence and must
+be regenerated before release. The distributed schema is
+`quality_runner/schemas/release-boundary.schema.json`.
+
 ## Web-readiness artifact
 
 `quality-runner web-readiness` writes

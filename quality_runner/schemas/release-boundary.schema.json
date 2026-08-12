@@ -1,0 +1,74 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://quality-runner.local/schemas/release-boundary.schema.json",
+  "title": "Quality Runner public release boundary receipt",
+  "type": "object",
+  "required": [
+    "schema",
+    "status",
+    "generated_at",
+    "producer",
+    "repository",
+    "matrix",
+    "distribution_classes",
+    "artifacts",
+    "checks",
+    "blocking_check_ids"
+  ],
+  "properties": {
+    "schema": {"const": "quality-runner-release-boundary/v2"},
+    "status": {"enum": ["passed", "blocked"]},
+    "generated_at": {"type": "string", "format": "date-time"},
+    "producer": {
+      "type": "object",
+      "required": ["name", "version"],
+      "properties": {
+        "name": {"const": "quality-runner"},
+        "version": {"type": "string", "minLength": 1}
+      },
+      "additionalProperties": false
+    },
+    "repository": {
+      "type": "object",
+      "required": ["id", "branch", "head_sha", "dirty_path_count"],
+      "properties": {
+        "id": {"type": "string", "minLength": 1},
+        "branch": {"type": "string", "minLength": 1},
+        "head_sha": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+        "dirty_path_count": {"type": "integer", "minimum": 0}
+      },
+      "additionalProperties": false
+    },
+    "matrix": {
+      "type": "object",
+      "required": ["path", "sha256"],
+      "properties": {
+        "path": {"const": ".agents/change-surface-matrix.json"},
+        "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+      },
+      "additionalProperties": false
+    },
+    "distribution_classes": {
+      "type": "array",
+      "items": {"enum": ["local_only", "public_adapter", "public_core"]},
+      "uniqueItems": true
+    },
+    "artifacts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["kind", "path", "sha256", "size_bytes"],
+        "properties": {
+          "kind": {"enum": ["wheel", "sdist"]},
+          "path": {"type": "string", "minLength": 1},
+          "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+          "size_bytes": {"type": "integer", "minimum": 1}
+        },
+        "additionalProperties": false
+      }
+    },
+    "checks": {"type": "array", "items": {"type": "object"}},
+    "blocking_check_ids": {"type": "array", "items": {"type": "string"}}
+  },
+  "additionalProperties": false
+}

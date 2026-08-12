@@ -54,6 +54,8 @@ def test_release_docs_describe_current_release_plan_and_release_history() -> Non
     assert "uv run --locked pip-audit" in release_docs
     assert "quality-runner release-smoke --json" in release_docs
     assert "quality-runner release-boundary . --dist-dir dist --json" in release_docs
+    assert "quality-runner-release-boundary/v2" in cli_docs
+    assert ".quality-runner/release-boundary.json" in release_docs
     assert "public_core" in release_docs
     assert "public_adapter" in release_docs
     assert "local_only" in release_docs

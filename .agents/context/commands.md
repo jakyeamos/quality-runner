@@ -15,7 +15,10 @@ For release preparation, build both archives and run
 `uv run --locked quality-runner release-boundary . --dist-dir dist --json`.
 Every applicable change-matrix surface must be classified as `public_core`,
 `public_adapter`, or `local_only`; public adapters require sanitized contract
-fixtures, and local operator wiring must not ship.
+fixtures, and local operator wiring must not ship. The command persists
+`.quality-runner/release-boundary.json` using schema v2. Release consumers must
+require its exact branch and commit, matching matrix and artifact digests, and
+all checks passed; v1, stale, dirty, or missing evidence is not releasable.
 
 The Mac Control fleet lane accepts `mac-control-task-manifest/v4` as the only
 scoring implementation format. Quality Runner derives the eight semantic

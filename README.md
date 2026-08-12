@@ -473,7 +473,9 @@ when an applicable change surface lacks a `public_core`, `public_adapter`, or
 workstation/private-inventory markers; blocks tracked paths declared local-only;
 validates the wheel and sdist allowlists; verifies sanitized public-adapter
 fixtures; and installs the wheel under a temporary home with Pronto, Leverage,
-and Mac Control absent.
+and Mac Control absent. It also writes the privacy-safe
+`.quality-runner/release-boundary.json` v2 receipt with exact Git provenance,
+the matrix digest, and wheel/sdist digests for downstream release consumers.
 
 ## MCP
 

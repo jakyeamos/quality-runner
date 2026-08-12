@@ -61,6 +61,11 @@ choosing a new version; never reuse a tag, including `v0.5.0` or `v0.5.1`.
    and installs the wheel with a temporary home and a path that does not expose
    Pronto, Leverage, or Mac Control. A missing classification or skipped
    clean-room check is release-blocking.
+   The command also writes `.quality-runner/release-boundary.json`. Treat that
+   v2 receipt as the handoff to release consumers: it is bound to the exact Git
+   branch and commit, the change-matrix digest, and the built artifact digests,
+   and it contains no absolute repository path. Regenerate it after any source,
+   policy, or artifact change.
 
 2. Run a self-audit and review its capability findings, default structural
    findings, and high-severity security candidates:

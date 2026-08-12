@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import subprocess
+import sys
 from pathlib import Path
 from typing import cast
 
@@ -239,7 +241,8 @@ def test_manifest_rejects_guessing_routes_and_incomplete_state() -> None:
 
 def test_v4_rejects_self_attested_criteria_and_surface_provider_mismatch() -> None:
     manifest = _manifest_v4("repo")
-    manifest["criteria"] = {criterion: True for criterion in _manifest("repo")["criteria"]}
+    legacy_criteria = cast(dict[str, bool], _manifest("repo")["criteria"])
+    manifest["criteria"] = {criterion: True for criterion in legacy_criteria}
     task = cast(list[dict[str, object]], manifest["tasks"])[0]
     task["surface_kind"] = "web_content"
 
@@ -248,6 +251,39 @@ def test_v4_rejects_self_attested_criteria_and_surface_provider_mismatch() -> No
     assert any("criteria must be empty" in error for error in errors)
     assert any("web_content requires a browser_connector" in error for error in errors)
     assert any("must not claim a native Mac Control route" in error for error in errors)
+
+
+def test_v4_accepts_aria_label_as_dom_native_web_identity() -> None:
+    manifest = _manifest_v4("repo")
+    task = cast(list[dict[str, object]], manifest["tasks"])[0]
+    task["surface_kind"] = "web_content"
+    task["stable_target_id"] = "Settings"
+    task["route_candidates"] = [
+        {
+            "id": "browser-dom",
+            "provider": "browser_connector",
+            "method": "adapter",
+            "interaction_mode": "semantic",
+        },
+        {
+            "id": "computer-use-pointer",
+            "provider": "computer_use",
+            "method": "pointer",
+            "interaction_mode": "pointer",
+        },
+    ]
+    semantic_evidence = cast(dict[str, dict[str, object]], task["semantic_evidence"])
+    stable_claims = cast(dict[str, str], semantic_evidence["stable_identity"]["claims"])
+    stable_claims["selector_kind"] = "aria_label"
+    stable_claims["selector_value"] = "Settings"
+    navigation_claims = cast(dict[str, str], semantic_evidence["efficient_navigation"]["claims"])
+    navigation_claims["entry_point"] = "Settings"
+    outcome_claims = cast(dict[str, str], semantic_evidence["verifiable_outcomes"]["claims"])
+    outcome_claims["readback_provider"] = "browser_connector"
+    route_claims = cast(dict[str, str], semantic_evidence["route_flexibility"]["claims"])
+    route_claims["primary_provider"] = "browser_connector"
+
+    assert validate_manifest(manifest) == []
 
 
 def test_v4_missing_source_token_is_descriptive_and_non_scoring(tmp_path: Path) -> None:
@@ -608,6 +644,40 @@ def test_live_provider_failures_and_scope_boundaries_are_explicit(tmp_path: Path
             repository_paths=[tmp_path / "outside"],
             output_dir=tmp_path / "outside-audit",
         )
+
+
+def test_mac_control_fleet_cli_audits_v4_manifest_in_fresh_process(tmp_path: Path) -> None:
+    projects = tmp_path / "projects"
+    repo = projects / "fixture"
+    _repo(repo)
+    record = repository_record_for_root(repo)
+    _write_manifest(repo, _manifest_v4(str(record["repo_id"])))
+
+    completed = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "quality_runner",
+            "fleet",
+            "mac-control",
+            "audit",
+            "run",
+            "--repo-path",
+            str(repo),
+            "--projects-root",
+            str(projects),
+            "--output-dir",
+            str(tmp_path / "fresh-process-audit"),
+            "--json",
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert completed.returncode == 0, completed.stderr
+    payload = json.loads(completed.stdout)
+    assert payload["summary"]["implementation_criteria_passed_count"] == 8
 
 
 def test_mac_control_fleet_cli_routes_run_replay_report_and_feed(tmp_path: Path) -> None:

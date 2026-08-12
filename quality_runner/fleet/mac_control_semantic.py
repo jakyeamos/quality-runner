@@ -128,6 +128,7 @@ def _validate_semantic_claims(
             errors.append(f"{label}.claims.selector_kind is unsupported")
         surface_kind = _normalize_token(task.get("surface_kind"))
         if surface_kind == "web_content" and selector_kind not in {
+            "aria_label",
             "data_attribute",
             "dom_test_id",
         }:

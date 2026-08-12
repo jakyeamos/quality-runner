@@ -88,7 +88,13 @@ SEMANTIC_CLAIM_KEYS = {
     "route_flexibility": ("primary_provider", "secondary_provider", "fallback_policy"),
     "stable_change_behavior": ("scenarios", "failure_behavior"),
 }
-SELECTOR_KINDS = ("ax_identifier", "data_attribute", "dom_test_id", "command_id")
+SELECTOR_KINDS = (
+    "ax_identifier",
+    "aria_label",
+    "data_attribute",
+    "dom_test_id",
+    "command_id",
+)
 NAVIGATION_STRATEGIES = (
     "direct_semantic",
     "menu_command",
@@ -269,9 +275,6 @@ def validate_manifest(manifest: object) -> list[str]:
     return errors
 
 
-
-
-
 def nonempty(value: object) -> bool:
     return isinstance(value, str) and bool(value.strip())
 
@@ -390,9 +393,7 @@ def _validate_v2_task(task: dict[str, Any], label: str, errors: list[str]) -> No
     validate_v2_task(task, label, errors)
 
 
-def _validate_shortcut_acceleration(
-    task: dict[str, Any], label: str, errors: list[str]
-) -> None:
+def _validate_shortcut_acceleration(task: dict[str, Any], label: str, errors: list[str]) -> None:
     from quality_runner.fleet.mac_control_task_validation import (
         validate_shortcut_acceleration,
     )
