@@ -73,7 +73,7 @@
         "quality_evidence_contract/*.py",
         "repo_quality_certifier/*.py"
       ],
-      "local_only_globs": ["docs/qr-rollout-20260702.md"],
+      "local_only_globs": [".agents/context/archives/qr-rollout-20260702.md"],
       "forbidden_patterns": [
         {
           "id": "personal-home-path",

@@ -1,5 +1,24 @@
 # Artifact Contract
 
+## Web-readiness artifact
+
+`quality-runner web-readiness` writes
+`<repo>/.quality-runner/web-readiness.json` using schema
+`quality-runner-web-readiness/v1`. It is a stable projection rather than a run
+directory artifact and records categorical status, applicability, exact Git
+identity, target identity, evidence levels, bundle budgets, route checks, and
+producer warnings. Its `implementation_allowed` field is always false.
+
+Project-owned browser producers may supply
+`quality-runner-web-deployment-evidence/v1`. QR accepts that evidence only when
+its commit matches the scanned repository's exact `HEAD`; mismatches and
+invalid evidence remain blocked. The distributed schemas are
+`quality_runner/schemas/web-readiness.schema.json` and
+`quality_runner/schemas/web-deployment-evidence.schema.json`.
+
+The web-readiness artifact is local evidence that may contain repository paths
+and deployment identifiers, so the handling and retention rules below apply.
+
 Artifacts are written under:
 
 ```text
@@ -376,6 +395,16 @@ phase/total budgets. When a complete full run is eligible for calibration, QR
 copies the baseline payload to `timeout-baseline.json` in the verify run and
 updates the local, uncommitted cache at
 `.quality-runner/cache/refresh-timeout-baseline-v1.json`.
+
+Fleet dynamic command receipts use the same evidence separation while remaining
+private to the immutable fleet finding. Each receipt records capability,
+repository source, effective timeout, command/output hashes, and output lengths.
+Failed and timed-out commands additionally retain only redacted 4,000-character
+stdout/stderr tails. The fleet selector records its CLI timeout ceiling and the
+repository's configured per-capability limits; configured limits can shorten but
+cannot exceed that ceiling.
+If any trustworthy command fails, the aggregate status is `failed`; incomplete
+siblings retain their own timeout, blocked, or unavailable status in the receipt.
 
 Execution requires both `--execute-gates` and `--worktree-mode disposable`.
 The disposable checkout is created at `HEAD`, QR writes artifacts to the

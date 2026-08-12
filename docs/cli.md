@@ -31,6 +31,25 @@ qr doctor --json
 Existing callers can use `quality-runner` in place of `qr` with the same help,
 version, and JSON behavior.
 
+### `quality-runner web-readiness`
+
+`web-readiness` writes the versioned categorical report
+`.quality-runner/web-readiness.json`. Repository policy declares the surface as
+`public_web`, `internal_web`, `not_applicable`, or `unknown`; a
+`not_applicable` declaration requires a reason. Source and built-artifact checks
+remain distinct from project-owned browser or deployment evidence.
+
+```bash
+qr web-readiness /path/to/repo --json
+qr web-readiness /path/to/repo \
+  --deployment-evidence /path/to/web-deployment-evidence.json --json
+```
+
+The command exits non-zero for `blocked` and `unknown`. Supplying deployment
+evidence does not grant QR browser or deployment authority: the producer must
+bind its observations to the repository's exact `HEAD`, target URL, and route
+records. See [Web-readiness evidence contract](integrations/web-readiness.md).
+
 `inspect`, `run`, and `verify-gates` remain supported v1 compatibility commands.
 `review --legacy-output` provides the established v1 review JSON field shape
 when an existing CLI consumer requires it; the notice is sent to stderr so
@@ -395,6 +414,13 @@ tests = 300
 pre_cr = 600
 ```
 
+Fleet dynamic audits honor the same capability timeout table, bounded by the
+fleet command's `--timeout-seconds` ceiling. For example, a repository timeout
+of `tests = 300` takes effect when the fleet run uses
+`--timeout-seconds 300` or higher; a lower CLI value remains the hard cap.
+Fleet formatter discovery prefers `format:check` and will not execute a
+formatter reported as `mutating` or `unknown`.
+
 Configured `[[quality_runner.gates]]` may set `mutating_risk` to `safe`,
 `unknown`, or `mutating`. Under `--read-only-gates`, `unknown` and `mutating`
 gates stay skipped unless `--allow-mutating-gates` is also explicit.
@@ -552,6 +578,25 @@ per-check statuses plus the generated handoff path. The handoff examples in
 outputs for manual release review. See
 [`slice-spec-structural-harden.md`](examples/slice-spec-structural-harden.md)
 for a cold-executor slice spec example.
+
+## `quality-runner release-boundary`
+
+Runs the fail-closed public/private distribution gate against a repository and
+exactly one built wheel plus one built source archive:
+
+```bash
+uv build
+quality-runner release-boundary . --dist-dir dist --json
+```
+
+The command requires every applicable change-matrix surface to be classified
+as `public_core`, `public_adapter`, or `local_only`. Public adapters must name
+sanitized JSON contract fixtures. It then scans tracked public source/docs for
+personal home paths and private inventory markers, blocks tracked paths declared
+local-only, enforces per-archive path allowlists, and installs the wheel in a
+temporary home whose executable path does not expose `pronto`, `leverage`, or
+`macctl`. The result schema is
+`quality-runner-release-boundary/v1`; any blocked check produces exit code 1.
 
 ## `quality-runner validate-report`
 

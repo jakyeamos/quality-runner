@@ -139,3 +139,7 @@ The report declares `scope: "quality_runner_fleet"`, so it may contain a
 larger discovered fleet. Pronto evaluates only its current maturity-applicable
 repository subset and still blocks when any current repository is absent,
 unknown, stale, invalid, or not commit-matched.
+
+The sanitized public consumer fixture is
+`fixtures/contracts/public-adapters/mac-control-ideal-state.json`. Use it for
+contract parsing tests in consumers; never substitute a live fleet report.
