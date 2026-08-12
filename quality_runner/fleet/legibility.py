@@ -351,7 +351,7 @@ def _dimension_finding(
                 "detail": "One or more relative context/document links are invalid.",
             }
         )
-    if freshness.get("stale_paths") and dimension in {
+    if freshness.get("status") == "stale" and dimension in {
         "context_routing",
         "definition_of_done",
         "quality_commands",

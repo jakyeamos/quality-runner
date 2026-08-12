@@ -14,6 +14,7 @@ from quality_runner.fleet.contracts import (
     relative_path,
     stable_id,
 )
+from quality_runner.process_runner import run_command
 
 EXCLUDED_DIRECTORIES = {
     ".git",
@@ -165,12 +166,22 @@ def repository_record_for_root(root: Path) -> dict[str, Any]:
     identity_key = _identity_key(resolved)
     origin = _normalized_origin(resolved)
     repo_id = stable_id("repo", identity_key)
-    checkout = _checkout_record(
-        repo_id=repo_id,
-        path=resolved,
-        primary=True,
-        projects_root=resolved.parent,
-    )
+    checkout_paths: dict[str, Path] = {str(resolved): resolved}
+    for worktree in _registered_worktrees(resolved):
+        path = worktree.get("path")
+        if isinstance(path, str) and path:
+            checkout_paths[str(Path(path).expanduser().resolve())] = (
+                Path(path).expanduser().resolve()
+            )
+    checkouts = [
+        _checkout_record(
+            repo_id=repo_id,
+            path=path,
+            primary=path == resolved,
+            projects_root=resolved.parent,
+        )
+        for path in sorted(checkout_paths.values(), key=lambda item: item.as_posix())
+    ]
     return {
         "schema": "quality-runner-fleet-repository-v0.1",
         "repo_id": repo_id,
@@ -182,9 +193,14 @@ def repository_record_for_root(root: Path) -> dict[str, Any]:
         },
         "primary_path": str(resolved),
         "repository_class": _repository_class(resolved, origin),
-        "checkouts": [checkout],
-        "checkout_count": 1,
-        "repository_provenance": digest({"identity_key": identity_key, "checkout": checkout}),
+        "checkouts": checkouts,
+        "checkout_count": len(checkouts),
+        "repository_provenance": digest(
+            {
+                "identity_key": identity_key,
+                "checkouts": [checkout["checkout_id"] for checkout in checkouts],
+            }
+        ),
     }
 
 
@@ -445,17 +461,10 @@ def _ahead_behind(
 
 def _git_run(root: Path, *args: str) -> str | None:
     try:
-        result = subprocess.run(
-            ["git", *args],
-            cwd=root,
-            check=False,
-            capture_output=True,
-            text=True,
-            timeout=10,
-        )
+        result = run_command(["git", *args], cwd=root, timeout=10)
     except (OSError, subprocess.SubprocessError):
         return None
-    return result.stdout if result.returncode == 0 else None
+    return str(result["stdout"]) if result["returncode"] == 0 else None
 
 
 def _git_output(root: Path, *args: str) -> str | None:

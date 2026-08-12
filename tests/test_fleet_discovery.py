@@ -27,6 +27,28 @@ def _repo(root: Path) -> None:
     _git(root, "commit", "-m", "fixture")
 
 
+def _add_remote_commit(root: Path, tmp_path: Path) -> tuple[str, str]:
+    remote = tmp_path / "remote.git"
+    subprocess.run(["git", "init", "--bare", str(remote)], check=True, capture_output=True)
+    _git(root, "remote", "add", "origin", str(remote))
+    _git(root, "push", "-u", "origin", "dev")
+    producer = tmp_path / "producer"
+    subprocess.run(
+        ["git", "clone", "--branch", "dev", str(remote), str(producer)],
+        check=True,
+        capture_output=True,
+    )
+    _git(producer, "config", "user.email", "qr-tests@example.com")
+    _git(producer, "config", "user.name", "Quality Runner Tests")
+    (producer / "remote.txt").write_text("remote\n", encoding="utf-8")
+    _git(producer, "add", "remote.txt")
+    _git(producer, "commit", "-m", "remote commit")
+    _git(producer, "push", "origin", "dev")
+    local_head = _git(root, "rev-parse", "dev")
+    _git(root, "fetch", "origin")
+    return local_head, _git(root, "rev-parse", "origin/dev")
+
+
 def test_linked_worktrees_group_under_one_identity(tmp_path: Path) -> None:
     projects = tmp_path / "projects"
     root = projects / "fixture"
@@ -139,6 +161,71 @@ def test_unattached_dev_branch_uses_clean_checkout_for_disposable_verification(
     assert target["branch"] == "dev"
     assert target["head"] == dev_head
     assert target["target_state"]["reason"].startswith("target branch is committed")
+
+
+def test_target_prefers_checkout_at_target_head_over_preserved_feature_checkout(
+    tmp_path: Path,
+) -> None:
+    root = tmp_path / "repo"
+    _repo(root)
+    dev_head = _git(root, "rev-parse", "dev")
+    _git(root, "branch", "feature")
+    _git(root, "switch", "feature")
+    (root / "feature.txt").write_text("feature\n", encoding="utf-8")
+    _git(root, "add", "feature.txt")
+    _git(root, "commit", "-m", "feature")
+
+    target_checkout = tmp_path / "target-checkout"
+    _git(root, "worktree", "add", "--detach", str(target_checkout), "dev")
+    try:
+        repository = repository_record_for_root(root)
+        target = resolve_target_branch(repository)
+        checkout_by_path = {
+            Path(item["path"]).resolve(): item
+            for item in repository["checkouts"]
+            if isinstance(item.get("path"), str)
+        }
+
+        assert target["head"] == dev_head
+        assert target["checkout_id"] == checkout_by_path[target_checkout.resolve()]["checkout_id"]
+    finally:
+        _git(root, "worktree", "remove", str(target_checkout))
+
+
+def test_target_behind_upstream_reports_exact_fast_forward_evidence(tmp_path: Path) -> None:
+    root = tmp_path / "repo"
+    _repo(root)
+    local_head, upstream_head = _add_remote_commit(root, tmp_path)
+
+    target = resolve_target_branch(repository_record_for_root(root))
+
+    assert target["status"] == "stale"
+    assert target["target_state"] == {
+        "local_head": local_head,
+        "upstream": "origin/dev",
+        "upstream_head": upstream_head,
+        "ahead": 0,
+        "behind": 1,
+        "safe_action": "fast_forward_local_target",
+        "status": "stale",
+        "reason": "target branch is behind its configured upstream",
+    }
+
+
+def test_diverged_target_is_blocked_and_not_offered_fast_forward(tmp_path: Path) -> None:
+    root = tmp_path / "repo"
+    _repo(root)
+    _add_remote_commit(root, tmp_path)
+    (root / "local.txt").write_text("local\n", encoding="utf-8")
+    _git(root, "add", "local.txt")
+    _git(root, "commit", "-m", "local commit")
+
+    target = resolve_target_branch(repository_record_for_root(root))
+
+    assert target["status"] == "blocked"
+    assert target["target_state"]["ahead"] == 1
+    assert target["target_state"]["behind"] == 1
+    assert target["target_state"]["safe_action"] == "reconcile_diverged_target"
 
 
 def test_only_local_branch_is_an_unambiguous_fallback(tmp_path: Path) -> None:

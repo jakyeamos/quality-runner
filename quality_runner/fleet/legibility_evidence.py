@@ -87,8 +87,13 @@ def collect_freshness_evidence(documents: dict[str, str], as_of: str) -> dict[st
         parsed_as_of = parsed_as_of.replace(tzinfo=UTC)
     stale_paths: list[str] = []
     reviewed_paths: list[str] = []
-    date_pattern = re.compile(r"(?i)(?:last\s+reviewed|reviewed|updated)\s*:\s*(\d{4}-\d{2}-\d{2})")
+    date_pattern = re.compile(
+        r"(?i)(?:last[\s_-]*reviewed|reviewed(?:[\s_-]*at)?|updated)\s*:\s*"
+        r"(\d{4}-\d{2}-\d{2})"
+    )
     for relative, content in documents.items():
+        if _historical_snapshot_path(relative):
+            continue
         match = date_pattern.search(content)
         if not match:
             continue
@@ -104,8 +109,20 @@ def collect_freshness_evidence(documents: dict[str, str], as_of: str) -> dict[st
         "freshness_window_days": FRESHNESS_DAYS,
         "reviewed_paths": sorted(reviewed_paths),
         "stale_paths": sorted(stale_paths),
-        "status": "stale" if stale_paths else "known" if reviewed_paths else "unknown",
+        "status": (
+            "stale"
+            if reviewed_paths and len(stale_paths) == len(reviewed_paths)
+            else "known"
+            if reviewed_paths
+            else "unknown"
+        ),
     }
+
+
+def _historical_snapshot_path(relative: str) -> bool:
+    """Identify immutable evidence archives that are not live control documents."""
+    parts = {part.lower().replace("_", "-") for part in Path(relative).parts}
+    return bool(parts & {"archive", "archives", "history", "report-history"})
 
 
 def term_evidence(documents: dict[str, str], matches: list[str]) -> list[dict[str, str]]:

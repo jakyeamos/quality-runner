@@ -7,6 +7,9 @@ import shlex
 import shutil
 import signal
 import subprocess
+import time
+from collections.abc import Sequence
+from contextlib import suppress
 from pathlib import Path
 from typing import Any
 
@@ -23,20 +26,33 @@ SUPPORTED_PACKAGE_MANAGERS = frozenset({"bun", "npm", "pnpm", "yarn"})
 
 
 def run_shell_command(command: str, *, cwd: Path, timeout: int) -> dict[str, object]:
+    return _run_command(command, cwd=cwd, timeout=timeout, shell=True)
+
+
+def run_command(command: Sequence[str], *, cwd: Path, timeout: int) -> dict[str, object]:
+    return _run_command(command, cwd=cwd, timeout=timeout, shell=False)
+
+
+def _run_command(
+    command: str | Sequence[str], *, cwd: Path, timeout: int, shell: bool
+) -> dict[str, object]:
     process = subprocess.Popen(
         command,
         cwd=cwd,
-        shell=True,
+        shell=shell,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         text=True,
         start_new_session=True,
-        env=local_command_env(cwd, command=command),
+        env=local_command_env(cwd, command=command if isinstance(command, str) else None),
     )
+    process_group_id = _process_group_id(process)
     try:
         stdout, stderr = process.communicate(timeout=timeout)
     except subprocess.TimeoutExpired as error:
-        captured_stdout, captured_stderr = terminate_process_group(process)
+        captured_stdout, captured_stderr = terminate_process_group(
+            process, process_group_id=process_group_id
+        )
         raise subprocess.TimeoutExpired(
             cmd=error.cmd,
             timeout=error.timeout,
@@ -44,7 +60,7 @@ def run_shell_command(command: str, *, cwd: Path, timeout: int) -> dict[str, obj
             stderr=captured_stderr or error.stderr,
         ) from error
     except BaseException:
-        terminate_process_group(process)
+        terminate_process_group(process, process_group_id=process_group_id)
         raise
     return {
         "stdout": stdout,
@@ -53,26 +69,46 @@ def run_shell_command(command: str, *, cwd: Path, timeout: int) -> dict[str, obj
     }
 
 
-def terminate_process_group(process: subprocess.Popen[Any]) -> tuple[str, str]:
+def _process_group_id(process: subprocess.Popen[Any]) -> int:
     try:
-        process_group_id = os.getpgid(process.pid)
+        return os.getpgid(process.pid)
     except ProcessLookupError:
-        return "", ""
+        # start_new_session=True makes the child pid the process-group id. Keep
+        # that stable identifier even if the leader exits before pipe cleanup.
+        return process.pid
+
+
+def terminate_process_group(
+    process: subprocess.Popen[Any], *, process_group_id: int | None = None
+) -> tuple[str, str]:
+    resolved_group_id = process_group_id or _process_group_id(process)
     try:
-        os.killpg(process_group_id, signal.SIGTERM)
-    except ProcessLookupError:
-        return "", ""
-    wait = getattr(process, "wait", None)
-    if not callable(wait):
-        return "", ""
-    try:
-        wait(timeout=0.2)
-    except subprocess.TimeoutExpired:
         try:
-            os.killpg(process_group_id, signal.SIGKILL)
+            os.killpg(resolved_group_id, signal.SIGTERM)
         except ProcessLookupError:
             return _communicate_after_termination(process)
-    return _communicate_after_termination(process)
+        wait = getattr(process, "wait", None)
+        if not callable(wait):
+            return "", ""
+        grace_started = time.monotonic()
+        with suppress(subprocess.TimeoutExpired):
+            wait(timeout=0.2)
+        grace_remaining = 0.2 - (time.monotonic() - grace_started)
+        if grace_remaining > 0:
+            time.sleep(grace_remaining)
+        # The group leader can exit after SIGTERM while descendants keep inherited
+        # pipes open. Escalate the stored group id regardless of the leader's state.
+        with suppress(ProcessLookupError):
+            os.killpg(resolved_group_id, signal.SIGKILL)
+        return _communicate_after_termination(process)
+    except BaseException:
+        # A coordinator signal or external interruption must not leave the group
+        # alive just because it arrived during the bounded cleanup window.
+        with suppress(ProcessLookupError):
+            os.killpg(resolved_group_id, signal.SIGKILL)
+        raise
+    finally:
+        _close_process_pipes(process)
 
 
 def _communicate_after_termination(process: subprocess.Popen[Any]) -> tuple[str, str]:
@@ -80,7 +116,18 @@ def _communicate_after_termination(process: subprocess.Popen[Any]) -> tuple[str,
         stdout, stderr = process.communicate(timeout=0.2)
     except (OSError, subprocess.SubprocessError):
         return "", ""
+    finally:
+        _close_process_pipes(process)
     return _text_value(stdout), _text_value(stderr)
+
+
+def _close_process_pipes(process: subprocess.Popen[Any]) -> None:
+    for name in ("stdout", "stderr"):
+        stream = getattr(process, name, None)
+        close = getattr(stream, "close", None)
+        if callable(close):
+            with suppress(OSError, ValueError):
+                close()
 
 
 def _text_value(value: object) -> str:
@@ -101,6 +148,13 @@ def local_command_env(cwd: Path, *, command: str | None = None) -> dict[str, str
     )
     env["XDG_CACHE_HOME"] = str(cache_root / "xdg")
     package_manager_root = _package_manager_command_root(cwd, command)
+    if (
+        package_manager_root is not None
+        and (package_manager_root / ".quality-runner" / "copied-dependencies").is_file()
+    ):
+        # pnpm 11 treats the copied workspace-state path as stale and otherwise
+        # starts an implicit install. QR already prepared this locked tree.
+        env["pnpm_config_verify_deps_before_run"] = "false"
     package_manager_bin = _cached_package_manager_bin(package_manager_root)
     if package_manager_bin and env.get("PATH"):
         env["PATH"] = f"{package_manager_bin}{os.pathsep}{env['PATH']}"

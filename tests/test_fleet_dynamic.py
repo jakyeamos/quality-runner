@@ -1,8 +1,60 @@
 from __future__ import annotations
 
+import subprocess
 from pathlib import Path
 
 from quality_runner.fleet import dependencies, dynamic
+from quality_runner.fleet.dynamic_scan import (
+    quality_commands_from_scan,
+    quality_commands_from_worktree,
+)
+
+
+def test_blocked_dynamic_result_becomes_first_class_finding() -> None:
+    result = {
+        "repo_id": "repo-1",
+        "audit_id": "audit-1",
+        "as_of": "2026-08-10T00:00:00+00:00",
+        "findings": [],
+        "dynamic": {
+            "status": "blocked",
+            "reason": "target branch is behind its configured upstream",
+            "target_state": {
+                "status": "stale",
+                "local_head": "abc",
+                "upstream": "origin/dev",
+                "upstream_head": "def",
+                "ahead": 0,
+                "behind": 1,
+                "safe_action": "fast_forward_local_target",
+            },
+        },
+    }
+
+    dynamic.apply_dynamic_quality_evidence(result)
+
+    finding = result["findings"][0]
+    assert finding["dimension"] == "dynamic_verification"
+    assert finding["status"] == "blocked"
+    assert finding["priority"] == "P0"
+    assert finding["evidence"][1]["safe_action"] == "fast_forward_local_target"
+    assert len(finding["provenance_hash"]) == 64
+
+
+def test_unavailable_dynamic_result_becomes_unknown_finding() -> None:
+    result = {
+        "repo_id": "repo-1",
+        "audit_id": "audit-1",
+        "as_of": "2026-08-10T00:00:00+00:00",
+        "findings": [],
+        "dynamic": {"status": "unavailable", "reason": "runtime missing"},
+    }
+
+    dynamic.apply_dynamic_quality_evidence(result)
+
+    finding = result["findings"][0]
+    assert finding["status"] == "unknown"
+    assert finding["priority"] == "P1"
 
 
 def test_missing_dynamic_command_worktree_is_unavailable(monkeypatch, tmp_path: Path) -> None:
@@ -20,6 +72,93 @@ def test_missing_dynamic_command_worktree_is_unavailable(monkeypatch, tmp_path: 
 
     assert result["status"] == "unavailable"
     assert result["command_id"] == "tests"
+
+
+def test_dynamic_command_timeout_has_actionable_reason(monkeypatch, tmp_path: Path) -> None:
+    def timed_out(command: str, *, cwd: Path, timeout: int) -> dict[str, object]:
+        del cwd
+        raise subprocess.TimeoutExpired(command, timeout)
+
+    monkeypatch.setattr(dynamic, "run_shell_command", timed_out)
+
+    result = dynamic._run_dynamic_command(
+        {"id": "tests", "command": "python -m pytest"},
+        tmp_path,
+        30,
+    )
+
+    assert result["status"] == "timeout"
+    assert result["reason"] == "dynamic quality command exceeded its 30-second timeout"
+
+
+def test_known_failure_takes_precedence_over_incomplete_command_results() -> None:
+    status, reason = dynamic._aggregate_dynamic_status(
+        ["blocked", "timeout", "unavailable", "failed"]
+    )
+
+    assert status == "failed"
+    assert reason == "one or more dynamic quality commands returned a failing result"
+
+
+def test_dynamic_failure_retains_only_bounded_redacted_output_tail(
+    monkeypatch, tmp_path: Path
+) -> None:
+    def failed(command: str, *, cwd: Path, timeout: int) -> dict[str, object]:
+        del command, cwd, timeout
+        return {
+            "returncode": 1,
+            "stdout": "x" * 5_000,
+            "stderr": f"token=super-secret\n{tmp_path}/tests/example.test.ts failed\n",
+        }
+
+    monkeypatch.setattr(dynamic, "run_shell_command", failed)
+
+    result = dynamic._run_dynamic_command(
+        {
+            "id": "tests",
+            "command": "pnpm run test",
+            "source": "package.json:scripts.test",
+        },
+        tmp_path,
+        30,
+    )
+
+    assert result["status"] == "failed"
+    assert result["command_source"] == "package.json:scripts.test"
+    assert len(result["stdout_tail"]) == 4_000
+    assert "super-secret" not in result["stderr_tail"]
+    assert "<repo>/tests/example.test.ts failed" in result["stderr_tail"]
+
+
+def test_dynamic_policy_rejects_discovered_mutating_wrapper() -> None:
+    assert not dynamic._safe_dynamic_command(
+        {
+            "id": "formatter",
+            "command": "pnpm run format",
+            "mutating_risk": "mutating",
+        }
+    )
+
+
+def test_dynamic_gate_timeout_is_bounded_by_cli_ceiling() -> None:
+    configured = {"lint": 90, "tests": 600}
+
+    assert dynamic._command_timeout("lint", configured, 300) == 90
+    assert dynamic._command_timeout("tests", configured, 300) == 300
+    assert dynamic._command_timeout("typecheck", configured, 300) == 300
+
+
+def test_dynamic_gate_timeouts_load_from_repository_contract(tmp_path: Path) -> None:
+    (tmp_path / ".quality-runner.toml").write_text(
+        "[quality_runner.gate_timeouts]\nformatter = 60\nlint = 180\ntests = 300\n",
+        encoding="utf-8",
+    )
+
+    assert dynamic._configured_gate_timeouts(tmp_path) == {
+        "formatter": 60,
+        "lint": 180,
+        "tests": 300,
+    }
 
 
 def test_missing_required_executable_is_unavailable(monkeypatch, tmp_path: Path) -> None:
@@ -363,6 +502,16 @@ def test_documented_archival_repository_is_not_an_unknown_dynamic_result(
     assert dynamic._documented_archival_repository(tmp_path) is True
 
 
+def test_documented_deprecated_repository_is_not_dynamically_executed(tmp_path: Path) -> None:
+    (tmp_path / "README.md").write_text(
+        "# Deprecated\n\nRetained for historical provenance.\n\n"
+        "## Active repository\n\nUse the active replacement instead.\n",
+        encoding="utf-8",
+    )
+
+    assert dynamic._documented_deprecated_repository(tmp_path) is True
+
+
 def test_dynamic_selection_includes_safe_pre_cr_aggregate() -> None:
     repository = {
         "scan": {
@@ -370,9 +519,93 @@ def test_dynamic_selection_includes_safe_pre_cr_aggregate() -> None:
         }
     }
 
-    assert dynamic._quality_commands_from_scan(repository) == [
+    assert quality_commands_from_scan(repository) == [
         {"id": "pre_cr", "command": "python3 scripts/pre_cr_coverage.py"}
     ]
+
+
+def test_dynamic_selection_prefers_root_aggregate_per_capability() -> None:
+    repository = {
+        "scan": {
+            "quality_commands": [
+                {
+                    "id": "lint",
+                    "command": "pnpm run lint",
+                    "source": "package.json:scripts.lint",
+                },
+                {
+                    "id": "lint",
+                    "command": "cd apps/mobile && pnpm run lint",
+                    "source": "apps/mobile/package.json:scripts.lint",
+                },
+                {
+                    "id": "tests",
+                    "command": "cd apps/mobile && pnpm run test",
+                    "source": "apps/mobile/package.json:scripts.test",
+                },
+                {
+                    "id": "tests",
+                    "command": "cd packages/api && pnpm run test",
+                    "source": "packages/api/package.json:scripts.test",
+                },
+            ]
+        }
+    }
+
+    assert quality_commands_from_scan(repository) == [
+        {
+            "id": "lint",
+            "command": "pnpm run lint",
+            "source": "package.json:scripts.lint",
+        },
+        {
+            "id": "tests",
+            "command": "cd apps/mobile && pnpm run test",
+            "source": "apps/mobile/package.json:scripts.test",
+        },
+        {
+            "id": "tests",
+            "command": "cd packages/api && pnpm run test",
+            "source": "packages/api/package.json:scripts.test",
+        },
+    ]
+
+
+def test_dynamic_selection_blocks_unbounded_non_aggregated_workspace_surface() -> None:
+    repository = {
+        "scan": {
+            "quality_commands": [
+                {
+                    "id": "tests",
+                    "command": f"cd packages/p{index} && pnpm run test",
+                    "source": f"packages/p{index}/package.json:scripts.test",
+                }
+                for index in range(9)
+            ]
+        }
+    }
+
+    try:
+        quality_commands_from_scan(repository)
+    except ValueError as error:
+        assert "9 non-aggregated dynamic commands" in str(error)
+        assert "root aggregate" in str(error)
+    else:
+        raise AssertionError("unbounded workspace command selection should fail closed")
+
+
+def test_dynamic_command_discovery_uses_target_worktree_lock_state(tmp_path: Path) -> None:
+    (tmp_path / "pyproject.toml").write_text(
+        '[project]\nname = "target"\nversion = "0.1.0"\n\n'
+        '[tool.pytest.ini_options]\ntestpaths = ["tests"]\n',
+        encoding="utf-8",
+    )
+
+    commands, error = quality_commands_from_worktree(tmp_path, run_id="dynamic-target")
+
+    assert error is None
+    tests = next(item for item in commands if item["id"] == "tests")
+    assert tests["command"] == "python3 -m pytest -q"
 
 
 def test_read_only_docker_compose_config_is_safe_but_build_is_not() -> None:

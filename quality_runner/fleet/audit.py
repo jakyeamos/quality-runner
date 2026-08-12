@@ -20,6 +20,10 @@ from quality_runner.fleet.contracts import (
     public_projection,
     stable_id,
 )
+from quality_runner.fleet.coordinator import (
+    coordinate_dynamic_result,
+    dynamic_repository_watchdog_seconds,
+)
 from quality_runner.fleet.discovery import (
     load_fleet_policy,
     repositories_for_scope,
@@ -32,7 +36,7 @@ from quality_runner.fleet.dynamic import (
 from quality_runner.fleet.dynamic import (
     dynamic_result as build_dynamic_result,
 )
-from quality_runner.fleet.legibility import audit_repository
+from quality_runner.fleet.legibility import audit_repository, build_remediation_plan
 from quality_runner.fleet.reporting import plan_markdown, report_markdown, summary_markdown
 from quality_runner.fleet.static_scan import static_scan_repository as _static_scan_repository
 
@@ -87,7 +91,8 @@ def fleet_audit_payload(
         # evidence source; it must not replace the identity or dirty-worktree
         # provenance used by Pronto and dynamic verification.
         result["repository"] = repository_with_target
-        dynamic_evidence = build_dynamic_result(
+        dynamic_evidence = coordinate_dynamic_result(
+            build=build_dynamic_result,
             repository=result["repository"],
             finding=result,
             audit_id=audit_id,
@@ -100,6 +105,12 @@ def fleet_audit_payload(
         )
         result["dynamic"] = dynamic_evidence
         apply_dynamic_quality_evidence(result)
+        result["plan"] = build_remediation_plan(
+            repository=result["repository"],
+            findings=result["findings"],
+            scan=result["scan"],
+            as_of=resolved_as_of,
+        )
         results.append(result)
 
     summary = _build_summary(
@@ -124,6 +135,9 @@ def fleet_audit_payload(
             "changed_only": changed_only,
             "max_age_days": dynamic_max_age_days,
             "timeout_seconds": timeout_seconds,
+            "repository_watchdog_timeout_seconds": dynamic_repository_watchdog_seconds(
+                timeout_seconds
+            ),
         },
         "fleet_policy": {**fleet_policy, "applies_to": "automatic discovery"},
         "repositories": [item["repository"] for item in results],

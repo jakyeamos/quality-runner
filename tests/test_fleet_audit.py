@@ -97,15 +97,18 @@ def test_static_scan_preserves_identity_for_unusable_target_metadata() -> None:
     assert _static_scan_repository({"target_branch": {"status": "ready"}}) == {
         "target_branch": {"status": "ready"}
     }
-    assert _static_scan_repository(
-        {"target_branch": {"status": "ready", "checkout_id": 7}}
-    ) == {"target_branch": {"status": "ready", "checkout_id": 7}}
-    assert _static_scan_repository(
-        {
-            "target_branch": {"status": "ready", "checkout_id": "checkout-dev"},
-            "checkouts": [{"checkout_id": "other", "path": "/private/tmp/other"}],
-        }
-    )["target_branch"]["checkout_id"] == "checkout-dev"
+    assert _static_scan_repository({"target_branch": {"status": "ready", "checkout_id": 7}}) == {
+        "target_branch": {"status": "ready", "checkout_id": 7}
+    }
+    assert (
+        _static_scan_repository(
+            {
+                "target_branch": {"status": "ready", "checkout_id": "checkout-dev"},
+                "checkouts": [{"checkout_id": "other", "path": "/private/tmp/other"}],
+            }
+        )["target_branch"]["checkout_id"]
+        == "checkout-dev"
+    )
     assert _static_scan_repository(
         {
             "target_branch": {"status": "ready", "checkout_id": "checkout-dev"},
@@ -209,6 +212,7 @@ def test_fleet_audit_accepts_a_bounded_repository_slice(tmp_path: Path) -> None:
     assert audit["summary"]["dynamic_policy"]["changed_only"] is True
     inventory = json.loads((Path(audit["artifact_root"]) / "inventory.json").read_text())
     assert inventory["scope"] == "explicit repository paths under the bounded projects root"
+    assert inventory["dynamic_policy"]["repository_watchdog_timeout_seconds"] == 1170
 
 
 def test_public_report_contains_aggregates_only(tmp_path: Path) -> None:

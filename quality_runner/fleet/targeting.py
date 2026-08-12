@@ -33,7 +33,7 @@ def resolve_target_branch(
         and checkout.get("working_tree") is not False
     ]
     attached.sort(key=lambda item: (item.get("dirty") is True, str(item.get("path", ""))))
-    if attached:
+    if attached and attached[0].get("dirty") is not True:
         checkout = attached[0]
         state = _target_state(checkout)
         return _target_result(target_branch, source, checkout, state)
@@ -45,7 +45,17 @@ def resolve_target_branch(
         and checkout.get("prunable") is False
         and _branch_head(checkout, target_branch) is not None
     ]
-    hosts.sort(key=lambda item: str(item.get("path", "")))
+    # A checkout can expose the target branch ref while its working tree is
+    # still on another branch. Static evidence must prefer a filesystem
+    # snapshot whose checked-out HEAD is the target branch HEAD; otherwise a
+    # preserved feature/baseline worktree can be reported as target evidence.
+    hosts.sort(
+        key=lambda item: (
+            item.get("head") != _branch_head(item, target_branch),
+            item.get("dirty") is True,
+            str(item.get("path", "")),
+        )
+    )
     if not hosts:
         return {
             "branch": target_branch,
@@ -100,7 +110,7 @@ def _target_result(
     branch: str,
     source: str,
     checkout: dict[str, Any],
-    state: dict[str, str],
+    state: dict[str, Any],
     *,
     head: str | None = None,
 ) -> dict[str, Any]:
@@ -122,27 +132,67 @@ def _branch_head(checkout: dict[str, Any], branch: str) -> str | None:
     return _git_output(Path(path), "rev-parse", "--verify", f"refs/heads/{branch}")
 
 
-def _branch_state(checkout: dict[str, Any], branch: str, head: str | None) -> dict[str, str]:
+def _branch_state(checkout: dict[str, Any], branch: str, head: str | None) -> dict[str, Any]:
     if not head:
-        return {"status": "blocked", "reason": "target branch has no verifiable HEAD"}
+        return {
+            "status": "blocked",
+            "reason": "target branch has no verifiable HEAD",
+            "local_head": None,
+            "safe_action": "verify_local_target",
+        }
     path = checkout.get("path")
     if not isinstance(path, str) or not path:
-        return {"status": "blocked", "reason": "source checkout path is unavailable"}
+        return {
+            "status": "blocked",
+            "reason": "source checkout path is unavailable",
+            "local_head": head,
+            "safe_action": "verify_local_target",
+        }
     root = Path(path)
     upstream = _git_output(
         root, "for-each-ref", "--format=%(upstream:short)", f"refs/heads/{branch}"
     )
+    evidence: dict[str, Any] = {
+        "local_head": head,
+        "upstream": upstream,
+        "upstream_head": None,
+        "ahead": None,
+        "behind": None,
+        "safe_action": "none",
+    }
     if upstream:
-        _, behind = _ahead_behind(root, upstream, head=head)
-        if behind and behind > 0:
-            return {"status": "stale", "reason": "target branch is behind its configured upstream"}
+        upstream_head = _git_output(root, "rev-parse", "--verify", upstream)
+        ahead, behind = _ahead_behind(root, upstream, head=head)
+        evidence.update({"upstream_head": upstream_head, "ahead": ahead, "behind": behind})
+        if upstream_head is None or ahead is None or behind is None:
+            return {
+                **evidence,
+                "status": "blocked",
+                "reason": "configured target upstream cannot be compared to the local target",
+                "safe_action": "fetch_and_verify_upstream",
+            }
+        if ahead > 0 and behind > 0:
+            return {
+                **evidence,
+                "status": "blocked",
+                "reason": "target branch has diverged from its configured upstream",
+                "safe_action": "reconcile_diverged_target",
+            }
+        if behind > 0:
+            return {
+                **evidence,
+                "status": "stale",
+                "reason": "target branch is behind its configured upstream",
+                "safe_action": "fast_forward_local_target",
+            }
     return {
+        **evidence,
         "status": "ready",
         "reason": "target branch is committed and a fingerprinted checkout can host disposable verification",
     }
 
 
-def _target_state(checkout: dict[str, Any]) -> dict[str, str]:
+def _target_state(checkout: dict[str, Any]) -> dict[str, Any]:
     checks = (
         (checkout.get("exists") is not True, "target checkout does not exist"),
         (checkout.get("detached") is True, "target checkout is detached"),
@@ -151,15 +201,21 @@ def _target_state(checkout: dict[str, Any]) -> dict[str, str]:
             not isinstance(checkout.get("head"), str) or not checkout.get("head"),
             "target checkout has no verifiable HEAD",
         ),
-        (checkout.get("stale") is True, "target checkout is behind its configured upstream"),
     )
     for blocked, reason in checks:
         if blocked:
-            return {"status": "stale" if "behind" in reason else "blocked", "reason": reason}
-    return {
-        "status": "ready",
-        "reason": "target checkout has a committed HEAD and is fingerprinted for disposable verification",
-    }
+            return {
+                "status": "blocked",
+                "reason": reason,
+                "local_head": checkout.get("head"),
+                "safe_action": "verify_local_target",
+            }
+    state = _branch_state(checkout, str(checkout.get("branch")), str(checkout.get("head")))
+    if state["status"] == "ready":
+        state["reason"] = (
+            "target checkout has a committed HEAD and is fingerprinted for disposable verification"
+        )
+    return state
 
 
 def _documented_branch(repository: dict[str, Any]) -> tuple[str, str] | None:

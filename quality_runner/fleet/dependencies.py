@@ -311,6 +311,14 @@ def _copy_javascript_dependency_trees(*, source: Path, worktree: Path) -> bool:
         for copied in destinations:
             shutil.rmtree(copied, ignore_errors=True)
         return False
+    try:
+        marker = worktree / ".quality-runner" / "copied-dependencies"
+        marker.parent.mkdir(parents=True, exist_ok=True)
+        marker.write_text("locked dependency tree copied by Quality Runner\n", encoding="utf-8")
+    except OSError:
+        for copied in destinations:
+            shutil.rmtree(copied, ignore_errors=True)
+        return False
     return True
 
 
