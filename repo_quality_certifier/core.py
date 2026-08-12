@@ -276,7 +276,7 @@ GATE_SETUP_GUIDANCE = {
         ],
         "commands": [
             "test -f .aios-quality-gate.json",
-            "python3 /Users/jakyeamos/AIOS/scripts/linked-repo-quality-runner.py --project <project>",
+            "python3 /path/to/AIOS/scripts/linked-repo-quality-runner.py --project <project>",
         ],
         "files": [".aios-quality-gate.json", "config/quality-gates.json"],
     },
