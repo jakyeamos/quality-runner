@@ -1,0 +1,3 @@
+[quality_runner.web_readiness]
+applicability = "not_applicable"
+reason = "Quality Runner is a CLI and Python library with no deployed web surface"

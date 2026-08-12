@@ -10,7 +10,23 @@ publication, the workflow verifies that the tagged commit is an ancestor of
 The package version has one source of truth in `quality_runner/_version.py` and
 is read dynamically by package metadata. The release workflow installs the
 built wheel before publishing and checks its CLI doctor contract, release smoke,
-and MCP outcome-tool discovery alongside tag, plugin, and citation parity.
+and MCP outcome-tool discovery alongside tag, plugin, and citation parity. It
+also runs the fail-closed release boundary against the built wheel and source
+archive before any publish step.
+
+Every applicable entry in `.agents/change-surface-matrix.json` must declare one
+distribution class:
+
+- `public_core`: provider-neutral behavior that belongs in the main package;
+- `public_adapter`: a public integration seam backed by a sanitized contract
+  fixture; or
+- `local_only`: workstation, account, private-repository, credential, or fleet
+  wiring that must stay outside both distribution artifacts and the tracked
+  public source tree.
+
+Keep one public development line with optional public adapters and a separate
+private configuration/operations layer. Do not maintain parallel public and
+private product branches; they obscure drift instead of enforcing the boundary.
 
 The selected version remains an unreleased candidate until the tag workflow has
 completed and PyPI verification succeeds. Its committed `CITATION.cff`
@@ -36,7 +52,15 @@ choosing a new version; never reuse a tag, including `v0.5.0` or `v0.5.1`.
    uv run --locked pip-audit
    uv run --locked quality-runner release-smoke --json
    uv build
+   uv run --locked quality-runner release-boundary . --dist-dir dist --json
    ```
+
+   `release-boundary` scans tracked public code/docs without echoing matched
+   private values, blocks any tracked path declared local-only, rejects
+   unallowlisted wheel or sdist members, validates the public adapter fixtures,
+   and installs the wheel with a temporary home and a path that does not expose
+   Pronto, Leverage, or Mac Control. A missing classification or skipped
+   clean-room check is release-blocking.
 
 2. Run a self-audit and review its capability findings, default structural
    findings, and high-severity security candidates:

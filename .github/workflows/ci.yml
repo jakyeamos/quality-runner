@@ -82,6 +82,9 @@ jobs:
       - name: Build package
         run: uv build
 
+      - name: Enforce public release boundary
+        run: uv run --locked quality-runner release-boundary . --dist-dir dist --json
+
       - name: Smoke installed console scripts
         run: |
           python -m venv /tmp/quality-runner-smoke

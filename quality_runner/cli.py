@@ -25,6 +25,7 @@ from quality_runner.cli_payload import payload_for_args
 from quality_runner.cli_phase import add_phase_commands
 from quality_runner.cli_planning import add_planning_commands
 from quality_runner.cli_policy_surfaces import add_policy_surface_commands
+from quality_runner.cli_release_boundary import add_release_boundary_command
 from quality_runner.cli_remediation import add_remediation_commands
 from quality_runner.cli_repo_hygiene import add_repo_hygiene_commands
 from quality_runner.cli_review import add_review_command
@@ -32,6 +33,7 @@ from quality_runner.cli_rollout import add_rollout_command
 from quality_runner.cli_security import add_security_commands
 from quality_runner.cli_skills import add_skill_commands
 from quality_runner.cli_update import add_update_command
+from quality_runner.cli_web_readiness import add_web_readiness_command
 from quality_runner.cli_workflow_args import (
     add_verify_arguments,
     add_workflow_arguments,
@@ -67,7 +69,8 @@ Compatibility commands remain available:
 Advanced operations:
   refresh, rollout, gate, controller-report, skill, proposal, remediation,
   plan, phase, repo-hygiene, maintenance-surface, policy-surfaces, security,
-  release-smoke, and worker handoff tools
+  release-smoke, release-boundary, and worker handoff tools
+  web-readiness REPO    produce commit-bound web production evidence
 
 Fleet environment audit:
   fleet audit run --all       static-all audit with optional changed-only dynamic checks
@@ -337,6 +340,7 @@ def build_parser(prog: str = CANONICAL_PROGRAM) -> argparse.ArgumentParser:
     add_repo_hygiene_commands(subparsers)
     add_maintenance_surface_command(subparsers)
     add_policy_surface_commands(subparsers)
+    add_release_boundary_command(subparsers)
 
     add_handoff_commands(subparsers)
 
@@ -349,6 +353,7 @@ def build_parser(prog: str = CANONICAL_PROGRAM) -> argparse.ArgumentParser:
     doctor_parser.add_argument("--json", action="store_true", help="Emit JSON output")
 
     add_update_command(subparsers)
+    add_web_readiness_command(subparsers)
 
     release_smoke_parser = subparsers.add_parser(
         "release-smoke",
@@ -433,6 +438,8 @@ def main(argv: list[str] | None = None) -> int:
         return 1
     if parsed.command == "release-smoke" and payload.get("status") != "passed":
         return 1
+    if parsed.command == "release-boundary" and payload.get("status") != "passed":
+        return 1
     if parsed.command == "summarize-run" and has_rejected_self_check(payload):
         return 1
     if parsed.command == "phase-check" and payload.get("status") != "passed":
@@ -444,6 +451,8 @@ def main(argv: list[str] | None = None) -> int:
     if parsed.command == "repo-hygiene" and payload.get("status") in {"fail", "blocked"}:
         return 1
     if parsed.command == "policy-surfaces" and payload.get("status") != "passed":
+        return 1
+    if parsed.command == "web-readiness" and payload.get("status") in {"blocked", "unknown"}:
         return 1
     return 0
 

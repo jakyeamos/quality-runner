@@ -223,7 +223,10 @@ next controller or planning surface:
 - For repository skill evidence, use the skill review/validation surfaces and
   attach the validated report with `--skill-review-report`; see
   [Quality Skills](quality-skills.md).
-- Before packaging or publishing, run `release-smoke`. MCP integrations should
+- Before packaging, run `release-smoke`; after building the wheel and sdist,
+  run `release-boundary REPOSITORY --dist-dir DIST --json`. Do not release an
+  unclassified surface or replace a sanitized public-adapter fixture with
+  workstation data. MCP integrations should
   prefer the four additive outcome tools and treat `tools/list` as the current
   registry; v1 tools remain compatibility surfaces.
 

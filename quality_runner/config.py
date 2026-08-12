@@ -17,6 +17,7 @@ from quality_runner.scan_exclusions_config import parse_scan_exclusions_by_modul
 from quality_runner.security.config_parse import parse_security_section
 from quality_runner.skills_config_parse import parse_skills_section
 from quality_runner.structural_scan_config_parse import parse_structural_scan_section
+from quality_runner.web_readiness_config import parse_web_readiness_section
 
 CONFIG_FILE_NAME = ".quality-runner.toml"
 CONFIG_SCHEMA = "quality-runner-config-v0.1"
@@ -98,6 +99,7 @@ def load_repo_config(repo_root: Path) -> dict[str, Any]:
     security = parse_security_section(section.get("security"), warnings)
     skills = parse_skills_section(section.get("skills"), warnings)
     readiness = _readiness(section.get("readiness"), warnings)
+    web_readiness = parse_web_readiness_section(section.get("web_readiness"), warnings)
     payload = _config(
         path=CONFIG_FILE_NAME,
         default_profile=default_profile,
@@ -130,6 +132,8 @@ def load_repo_config(repo_root: Path) -> dict[str, Any]:
         payload["artifacts"] = artifacts
     if readiness:
         payload["readiness"] = readiness
+    if web_readiness or "web_readiness" in section:
+        payload["web_readiness"] = web_readiness
     return payload
 
 

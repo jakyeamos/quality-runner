@@ -1,0 +1,19 @@
+{
+  "schema_version": "pronto-mac-control-ideal-state/v1",
+  "producer": "mac-control",
+  "run_id": "public-contract-fixture",
+  "observed_at": "2026-08-11T00:00:00+00:00",
+  "scope": "quality_runner_fleet",
+  "repositories": [
+    {
+      "repository_id": "fixture-repository",
+      "repository_name": "fixture-repository",
+      "applicability": "not_applicable",
+      "applicability_reason": "The fixture repository has no supported desktop task.",
+      "manifest_schema": "mac-control-task-manifest/v4",
+      "supported_tasks": [],
+      "implementation_contract": {"status": "not_applicable"},
+      "live_task_evidence": {"status": "not_applicable"}
+    }
+  ]
+}

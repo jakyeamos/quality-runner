@@ -1,0 +1,86 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://quality-runner.local/schemas/web-readiness.schema.json",
+  "title": "Quality Runner web readiness report",
+  "type": "object",
+  "required": ["schema", "status", "generated_at", "repository", "applicability", "summary", "target", "checks"],
+  "properties": {
+    "schema": { "const": "quality-runner-web-readiness/v1" },
+    "status": { "enum": ["ready", "warnings", "blocked", "unknown", "not_applicable"] },
+    "generated_at": { "type": "string", "format": "date-time" },
+    "repository": {
+      "type": "object",
+      "required": ["path", "branch", "head_sha"],
+      "properties": {
+        "path": { "type": "string" },
+        "branch": { "type": ["string", "null"] },
+        "head_sha": { "type": ["string", "null"] }
+      },
+      "additionalProperties": false
+    },
+    "applicability": {
+      "type": "object",
+      "required": ["status", "reason"],
+      "properties": {
+        "status": { "enum": ["public_web", "internal_web", "not_applicable", "unknown"] },
+        "reason": { "type": ["string", "null"] }
+      },
+      "additionalProperties": false
+    },
+    "summary": {
+      "type": "object",
+      "required": ["passed", "failed", "blocked", "unknown", "not_applicable", "check_count", "blocking_check_count", "warning_check_count", "minimum_verification_level"],
+      "properties": {
+        "passed": { "type": "integer", "minimum": 0 },
+        "failed": { "type": "integer", "minimum": 0 },
+        "blocked": { "type": "integer", "minimum": 0 },
+        "unknown": { "type": "integer", "minimum": 0 },
+        "not_applicable": { "type": "integer", "minimum": 0 },
+        "check_count": { "type": "integer", "minimum": 0 },
+        "blocking_check_count": { "type": "integer", "minimum": 0 },
+        "warning_check_count": { "type": "integer", "minimum": 0 },
+        "minimum_verification_level": {
+          "type": ["string", "null"],
+          "enum": ["source_inferred", "artifact_inspected", "browser_rendered", "deployment_verified", null]
+        }
+      },
+      "additionalProperties": false
+    },
+    "target": {
+      "type": "object",
+      "required": ["kind", "commit"],
+      "properties": {
+        "kind": { "enum": ["source", "artifact", "deployment"] },
+        "commit": { "type": ["string", "null"] },
+        "url": { "type": "string" },
+        "provider": { "type": "string" },
+        "deployment_id": { "type": "string" },
+        "artifact_digest": { "type": "string" }
+      },
+      "additionalProperties": true
+    },
+    "checks": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/check" }
+    },
+    "implementation_allowed": { "const": false }
+  },
+  "$defs": {
+    "check": {
+      "type": "object",
+      "required": ["id", "label", "category", "policy", "status", "verification_level", "detail", "evidence"],
+      "properties": {
+        "id": { "type": "string" },
+        "label": { "type": "string" },
+        "category": { "enum": ["baseline", "polish"] },
+        "policy": { "enum": ["block", "warn"] },
+        "status": { "enum": ["passed", "failed", "blocked", "unknown", "not_applicable"] },
+        "verification_level": { "enum": ["source_inferred", "artifact_inspected", "browser_rendered", "deployment_verified"] },
+        "detail": { "type": "string" },
+        "evidence": { "type": "array", "items": { "type": "object" } }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": true
+}

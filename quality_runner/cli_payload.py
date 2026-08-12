@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import argparse
 import json
 import sys
@@ -34,6 +32,7 @@ from quality_runner.cli_phase import phase_command_payload
 from quality_runner.cli_planning import planning_command_payload
 from quality_runner.cli_policy_surfaces import policy_surfaces_payload
 from quality_runner.cli_refresh import refresh_command_payload
+from quality_runner.cli_release_boundary import release_boundary_command_payload
 from quality_runner.cli_remediation import remediation_delta_command_payload
 from quality_runner.cli_repo_hygiene import repo_hygiene_payload
 from quality_runner.cli_review import review_command_payload
@@ -42,6 +41,7 @@ from quality_runner.cli_security import security_command_payload
 from quality_runner.cli_skills import skill_command_payload
 from quality_runner.cli_status import export_handoff_payload, status_payload
 from quality_runner.cli_update import update_command_payload
+from quality_runner.cli_web_readiness import web_readiness_command_payload
 from quality_runner.code_quality import preview_ignored_paths
 from quality_runner.config import CONFIG_FILE_NAME, load_repo_config
 from quality_runner.controller_reports import validate_controller_report
@@ -80,7 +80,9 @@ def payload_for_args(
         return phase_command_payload(args)
     if args.command == "self-update":
         return update_command_payload(args.source)
-    if args.command == "release-smoke":
+    if args.command in {"release-smoke", "release-boundary"}:
+        if args.command == "release-boundary":
+            return release_boundary_command_payload(args)
         from quality_runner.cli import build_parser
 
         return release_smoke_payload(
@@ -344,6 +346,8 @@ def payload_for_args(
         return maintenance_surface_command_payload(args, validated_repo_path=_validated_repo_path)
     if args.command == "policy-surfaces":
         return policy_surfaces_payload(args, repo_path=_validated_repo_path)
+    if args.command == "web-readiness":
+        return web_readiness_command_payload(args, repo_root=_validated_repo_path(args.repo_path))
     raise ValueError(f"unsupported command: {args.command}")
 
 
@@ -424,7 +428,6 @@ def _include_paths_from_args(args: argparse.Namespace) -> tuple[str, ...]:
 def _interactive_include_ignored_paths(args: argparse.Namespace, repo_root: Path) -> list[str]:
     if not _should_prompt_for_ignored_paths(args):
         return []
-
     preview = preview_ignored_paths(repo_root, config=load_repo_config(repo_root))
     expensive = [
         item
@@ -437,7 +440,6 @@ def _interactive_include_ignored_paths(args: argparse.Namespace, repo_root: Path
     ]
     if not expensive:
         return []
-
     _print_ignored_path_prompt(expensive)
     answer = sys.stdin.readline().strip().lower()
     if answer in {"n", "no"}:

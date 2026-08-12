@@ -53,6 +53,10 @@ def test_release_docs_describe_current_release_plan_and_release_history() -> Non
     assert "uv sync --locked --all-groups" in release_docs
     assert "uv run --locked pip-audit" in release_docs
     assert "quality-runner release-smoke --json" in release_docs
+    assert "quality-runner release-boundary . --dist-dir dist --json" in release_docs
+    assert "public_core" in release_docs
+    assert "public_adapter" in release_docs
+    assert "local_only" in release_docs
     assert "quality-runner-mcp" in release_docs
     assert "uv tool install 'quality-runner==0.6.0' --force" in release_docs
     assert "--execute-gates --worktree-mode disposable" in release_docs
@@ -153,6 +157,7 @@ def test_ci_and_release_workflows_smoke_built_wheel_outcome_and_mcp_surfaces() -
         assert "uv sync --locked --all-groups" in workflow
         assert "uv run --locked pip-audit" in workflow
         assert "quality-runner release-smoke --json" in workflow
+        assert "quality-runner release-boundary . --dist-dir dist --json" in workflow
         assert "quality-runner review" in workflow
         assert "review-default" in workflow
         assert "quality-runner-outcome-v0.2" in workflow

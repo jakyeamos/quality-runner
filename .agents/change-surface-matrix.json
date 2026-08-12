@@ -1,0 +1,117 @@
+{
+  "schema_version": "change-surface-matrix/v1",
+  "subject": {"kind": "repository", "id": "quality-runner"},
+  "owner": "repository-owner",
+  "last_reviewed": "2026-08-11",
+  "surfaces": [
+    {
+      "id": "quality-engine",
+      "scope": "local",
+      "distribution": "public_core",
+      "path": "quality_runner/, quality_evidence_contract/, repo_quality_certifier/, and public documentation",
+      "owner": "repository-owner",
+      "condition": "scan, policy, finding, CLI, certification, or public documentation behavior changes",
+      "operations": ["add", "change", "remove"],
+      "validation": [
+        "uv run pytest -q",
+        "uv run ruff check .",
+        "uv run basedpyright"
+      ],
+      "status": "applicable"
+    },
+    {
+      "id": "fleet-consumers",
+      "scope": "external",
+      "distribution": "public_adapter",
+      "contract_fixtures": [
+        "fixtures/contracts/public-adapters/pronto-maturity-feed.json"
+      ],
+      "path": "installed qr, plugins, Pronto, and the fleet maturity feed",
+      "owner": "integration-owner",
+      "condition": "command, plugin, feed schema, taxonomy, or publication behavior changes",
+      "operations": ["add", "change", "remove"],
+      "validation": ["qr fleet replay", "qr fleet feed", "consumer contract readback"],
+      "status": "applicable"
+    },
+    {
+      "id": "mac-control-semantic-contract",
+      "scope": "external",
+      "distribution": "public_adapter",
+      "contract_fixtures": [
+        "fixtures/contracts/public-adapters/mac-control-ideal-state.json"
+      ],
+      "path": ".mac-control/ideal-state.json, the installed validator, and the public maturity contract",
+      "owner": "Quality Runner and integration owners",
+      "condition": "manifest schema, semantic dimension, source grounding, provider boundary, score, or disposition behavior changes",
+      "operations": ["add", "change", "remove"],
+      "validation": [
+        "uv run pytest -q tests/test_mac_control.py",
+        "consumer contract readback"
+      ],
+      "status": "applicable"
+    },
+    {
+      "id": "operator-local-overlay",
+      "scope": "local",
+      "distribution": "local_only",
+      "path": "private fleet inventories, Pronto wiring, machine paths, credentials, and operator planning",
+      "owner": "local-operator",
+      "condition": "a change depends on a particular workstation, private repository, account, or fleet inventory",
+      "operations": ["add", "change", "remove"],
+      "validation": [
+        "uv run --locked quality-runner release-boundary . --dist-dir dist --json"
+      ],
+      "status": "applicable"
+    }
+  ],
+  "release_boundary": {
+    "tracked_content": {
+      "include_globs": [
+        "README.md",
+        "docs/*.md",
+        "quality_runner/*.py",
+        "quality_evidence_contract/*.py",
+        "repo_quality_certifier/*.py"
+      ],
+      "local_only_globs": ["docs/qr-rollout-20260702.md"],
+      "forbidden_patterns": [
+        {
+          "id": "personal-home-path",
+          "pattern": "/(?:Users|home)/[A-Za-z0-9._-]+/"
+        },
+        {
+          "id": "private-operator-inventory",
+          "pattern": "(?:Documents/pronto|projects/(?:Leverage|mac-control)(?:/|\\b)|\\.local/state/quality-runner/fleet)"
+        }
+      ]
+    },
+    "artifacts": {
+      "wheel": {
+        "allow_prefixes": [
+          "quality_runner/",
+          "quality_evidence_contract/",
+          "repo_quality_certifier/"
+        ],
+        "allow_globs": ["quality_runner-*.dist-info/*"]
+      },
+      "sdist": {
+        "allow_paths": [
+          "LICENSE",
+          "MANIFEST.in",
+          "PKG-INFO",
+          "README.md",
+          "pyproject.toml",
+          "setup.cfg"
+        ],
+        "allow_prefixes": [
+          "quality_runner/",
+          "quality_evidence_contract/",
+          "repo_quality_certifier/",
+          "quality_runner.egg-info/",
+          "fixtures/contracts/public-adapters/"
+        ]
+      }
+    }
+  },
+  "unresolved_surfaces": []
+}
