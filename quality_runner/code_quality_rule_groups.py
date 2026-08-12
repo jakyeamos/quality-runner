@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ast
 import re
 from typing import Any
 
@@ -213,6 +214,46 @@ def _harden_findings(relative_path: str, line: str, line_number: int) -> list[di
                 risk="Raw free-text schemas bypass input hygiene.",
                 verification=_verification_for_path(relative_path),
                 remediation_bucket="API hardening and input hygiene",
+            )
+        )
+    return findings
+
+
+def _python_silent_except_findings(
+    relative_path: str,
+    text: str,
+) -> list[dict[str, Any]]:
+    if not relative_path.endswith(".py"):
+        return []
+    try:
+        tree = ast.parse(text)
+    except SyntaxError:
+        return []
+    lines = text.splitlines()
+    findings: list[dict[str, Any]] = []
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.ExceptHandler):
+            continue
+        if len(node.body) != 1 or not isinstance(node.body[0], ast.Pass):
+            continue
+        line_number = int(node.lineno)
+        evidence = lines[line_number - 1] if 0 < line_number <= len(lines) else "except: pass"
+        findings.append(
+            _finding(
+                category="harden",
+                severity="warning",
+                confidence="high",
+                file=relative_path,
+                line=line_number,
+                rule_id="silent-except-pass",
+                evidence=evidence,
+                expected_improvement=(
+                    "Return an explicit degraded result, raise with context, or record the "
+                    "intentional suppression through an observable bounded path."
+                ),
+                risk="A swallowed exception can make failed work look successful or absent.",
+                verification=_verification_for_path(relative_path),
+                remediation_bucket="failure visibility and error handling",
             )
         )
     return findings

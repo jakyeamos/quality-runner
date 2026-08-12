@@ -545,6 +545,12 @@ artifact records `only_gate_ids`, and the canonical `verify` outcome remains
 limited because other discovered gates were not run. Omit the flag to retain
 the default all-discovered-gates behavior.
 
+Repositories may opt into the `failure_visibility` capability to make their
+negative-path and degradation checks executable through this same interface.
+Its evidence state remains `configured` until the gate runs; only a fresh pass
+is reported as `fresh_passing`. See [Failure visibility](failure-visibility.md)
+for the state contract and rollout model.
+
 Repos can override individual gate timeouts in `.quality-runner.toml`:
 
 ```toml

@@ -66,6 +66,12 @@ def _javascript_quality_commands(
         "build": ("build",),
         "dead_code": ("dead-code", "dead_code", "audit:dead-code", "knip", "vulture", "unused"),
         "runtime_smoke": ("smoke", "runtime-smoke", "smoke-test"),
+        "failure_visibility": (
+            "failure-visibility",
+            "failure_visibility",
+            "failure-paths",
+            "test:failure-visibility",
+        ),
         "pre_pr": ("pre-pr", "prepr"),
         "pre_cr": ("pre-cr", "precr", "pre-cr:run"),
     }
@@ -330,6 +336,12 @@ def _ci_quality_commands(
             "python",
         ),
         ("runtime_smoke", "quality-runner doctor --json", "quality-runner doctor --json", "python"),
+        (
+            "failure_visibility",
+            "failure-visibility",
+            "python -m pytest -q -k failure_visibility",
+            "python",
+        ),
         ("lint", "pnpm lint", "pnpm lint", "javascript"),
         ("lint", "ultracite check", "pnpm check", "javascript"),
         ("typecheck", "pnpm typecheck", "pnpm typecheck", "javascript"),

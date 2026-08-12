@@ -694,6 +694,12 @@ that every declared regression receives a candidate or documented disposition;
 `qr candidates promotion-check` requires both passing evidence criteria and an
 explicit human decision before a candidate-linked invariant can become
 required. See [Bug-learning lifecycle](docs/bug-learning.md).
+Repositories with important fallback or degraded-state behavior can opt into
+the executable `failure_visibility` capability. It requires negative-path
+tests and machine-readable readback so missing, stale, blocked, and fallback
+states cannot be presented as verified success. See the
+[Failure Visibility Capability](docs/failure-visibility.md) for the contract,
+explicit evidence-state taxonomy, and bounded exception rules.
 
 ## Scan Exclusions
 

@@ -315,6 +315,7 @@ def test_detect_capabilities_accepts_python_quality_commands(tmp_path: Path) -> 
         "source": "pyproject.toml:tool.ruff",
         "command": "ruff check .",
         "language": "python",
+        "evidence_state": "configured",
         "verification_state": {
             "discovery": "command-discovered",
             "execution": "not-run",
@@ -425,5 +426,6 @@ def test_detect_capabilities_ignores_malformed_quality_commands_and_requires_tru
         "reason": "no quality command found for lint",
         "language": "unknown",
         "required_by": "profile",
+        "evidence_state": "unavailable",
     }
     assert "state_file" not in missing

@@ -38,5 +38,11 @@ def active_exception(standards_packet: dict[str, Any], capability_id: str) -> di
         except ValueError:
             continue
         if expires_on >= today:
-            return {"capability": capability, "reason": reason, "owner": owner, "expires": expires}
+            return {
+                "capability": capability,
+                "reason": reason,
+                "owner": owner,
+                "expires": expires,
+                "evidence_state": "not_applicable",
+            }
     return None

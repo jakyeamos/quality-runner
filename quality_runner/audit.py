@@ -7,6 +7,7 @@ from quality_runner.audit_evidence import (
     analysis_evidence_findings,
     package_manager_preflight_findings,
 )
+from quality_runner.capability_state import BLOCKING_CAPABILITIES
 from quality_runner.code_quality_findings import CATEGORY_ORDER
 from quality_runner.finding_quality import compute_finding_quality, compute_leverage
 from quality_runner.findings import AUDIT_REPORT_SCHEMA
@@ -421,7 +422,7 @@ def _warnings(payload: dict[str, Any]) -> list[dict[str, str]]:
 
 
 def _severity_for_capability(capability_id: str) -> str:
-    if capability_id in {"formatter", "lint", "typecheck", "tests", "dead_code"}:
+    if capability_id in BLOCKING_CAPABILITIES:
         return "blocker"
     return "warning"
 
@@ -452,6 +453,10 @@ def _recommended_fix(capability_id: str, language: str) -> str:
         "build": "Add a Python build gate such as uv build.",
         "dead_code": "Add a Python dead-code gate such as vulture . --min-confidence 70.",
         "runtime_smoke": "Add a Python smoke gate that exercises installed console scripts.",
+        "failure_visibility": (
+            "Add negative-path tests and machine-readable readback that prove failures, "
+            "fallbacks, and unavailable evidence stay explicit."
+        ),
         "pre_pr": "Add a pull_request CI quality gate or document the equivalent pre-PR check.",
         "pre_cr": "Add a Pre-CR changed-line readiness configuration.",
     }
@@ -463,6 +468,10 @@ def _recommended_fix(capability_id: str, language: str) -> str:
         "build": "Add a build command such as pnpm build.",
         "dead_code": "Add a dead-code scan command such as pnpm audit:dead-code.",
         "runtime_smoke": "Add a smoke-test command for runtime verification.",
+        "failure_visibility": (
+            "Add a failure-visibility gate that exercises negative paths and validates "
+            "machine-readable degraded or unavailable states."
+        ),
         "pre_pr": "Add a pre-PR check command or document the equivalent release gate.",
         "pre_cr": "Add a Pre-CR script or configuration.",
         "security_secrets_scan": "Add a secrets scan gate such as gitleaks detect --source .",

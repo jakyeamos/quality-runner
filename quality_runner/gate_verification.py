@@ -5,6 +5,7 @@ from collections.abc import Iterable
 from pathlib import Path
 from typing import Any, cast
 
+from quality_runner.capability_state import local_capability_evidence_state
 from quality_runner.dependency_setup import (
     dependency_setup_context,
     dependency_setup_skipped_gate,
@@ -22,7 +23,16 @@ from quality_runner.schema_constants import GATE_VERIFICATION_SCHEMA
 
 DEFAULT_TIMEOUT_SECONDS = 120
 AGGREGATE_GATE_IDS = {"pre_cr", "pre_pr"}
-LEAF_GATE_IDS = ("formatter", "lint", "typecheck", "tests", "build", "dead_code", "runtime_smoke")
+LEAF_GATE_IDS = (
+    "formatter",
+    "lint",
+    "typecheck",
+    "tests",
+    "build",
+    "dead_code",
+    "runtime_smoke",
+    "failure_visibility",
+)
 
 
 def verify_discovered_gates(
@@ -160,6 +170,7 @@ def apply_gate_verification(
                 "execution": "local-executed",
                 "result": gate["status"],
             }
+            copied["evidence_state"] = local_capability_evidence_state(gate["status"])
         available.append(copied)
     updated["available"] = available
     return updated
@@ -270,6 +281,11 @@ def _command_mentions_gate(command: str, gate_id: str) -> bool:
         "build": ("build",),
         "dead_code": ("dead-code", "dead_code", "audit:dead-code", "knip", "vulture"),
         "runtime_smoke": ("smoke", "runtime-smoke", "smoke-test"),
+        "failure_visibility": (
+            "failure-visibility",
+            "failure_visibility",
+            "failure-paths",
+        ),
     }.get(gate_id, ())
     normalized = command.lower()
     return any(alias in normalized for alias in aliases)

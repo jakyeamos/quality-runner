@@ -346,6 +346,8 @@ def _quality_commands_from_scan(repository: dict[str, Any]) -> list[dict[str, An
         "dependency_audit",
         "environment_contract",
         "security_secrets_scan",
+        "failure_visibility",
+        "pre_cr",
     }
     # Keep every executable quality capability in the bounded dynamic set so
     # required security and dependency gates cannot be truncated by ordering.

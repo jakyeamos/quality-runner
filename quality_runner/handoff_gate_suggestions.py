@@ -2,7 +2,14 @@ from __future__ import annotations
 
 
 def gate_severity(capability_id: str) -> str:
-    if capability_id in {"formatter", "lint", "typecheck", "tests", "dead_code"}:
+    if capability_id in {
+        "formatter",
+        "lint",
+        "typecheck",
+        "tests",
+        "dead_code",
+        "failure_visibility",
+    }:
         return "blocker"
     return "warning"
 
@@ -16,6 +23,7 @@ def suggested_gate_command(capability_id: str, language: object) -> str:
         "build": "uv build",
         "dead_code": "vulture . --min-confidence 70",
         "runtime_smoke": "python -m <package_or_console_script>",
+        "failure_visibility": "pytest -q -k failure_visibility",
         "pre_pr": "quality-runner run . --json",
         "pre_cr": "pre-cr run --workspace . --json",
     }
@@ -27,6 +35,7 @@ def suggested_gate_command(capability_id: str, language: object) -> str:
         "build": "pnpm build",
         "dead_code": "pnpm audit:dead-code",
         "runtime_smoke": "pnpm smoke",
+        "failure_visibility": "pnpm failure-visibility",
         "pre_pr": "pnpm pre-pr",
         "pre_cr": "pnpm pre-cr",
         "security_secrets_scan": "gitleaks detect --source .",

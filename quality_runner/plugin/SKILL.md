@@ -17,6 +17,12 @@ source files. Discovered gates remain evidence-only unless a user explicitly
 authorizes `--execute-gates --worktree-mode disposable`; that runs local
 commands in a disposable checkout, not a sandbox.
 
+When a repository requires `failure_visibility`, inspect its negative-path
+contract and machine-readable readback instead of treating script discovery as
+proof. Read `evidence_state`: `configured` and `covered` are not passing;
+`fresh_passing` requires a current local pass or fresh commit-bound CI. Missing,
+failed, blocked, and bounded not-applicable outcomes remain distinct.
+
 Preferred MCP tools:
 
 - `quality_runner_audit_outcome` to inspect or plan with a clear remediation outcome.

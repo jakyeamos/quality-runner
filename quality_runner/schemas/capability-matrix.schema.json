@@ -44,6 +44,7 @@
         "local_execution": { "enum": ["ci-only"] },
         "ci_status": { "$ref": "#/$defs/ciStatus" },
         "verification_state": { "$ref": "#/$defs/verificationState" },
+        "evidence_state": { "$ref": "#/$defs/evidenceState" },
         "recommended_commands": { "type": "array", "items": { "type": "string" } },
         "scope": { "type": "object" },
         "review_instructions": { "type": "array", "items": { "type": "string" } },
@@ -60,6 +61,7 @@
         "reason": { "type": "string", "minLength": 1 },
         "language": { "type": "string", "minLength": 1 },
         "required_by": { "type": "string", "minLength": 1 },
+        "evidence_state": { "$ref": "#/$defs/evidenceState" },
         "owner": { "type": "string", "minLength": 1 },
         "severity": { "type": "string", "minLength": 1 }
       },
@@ -67,12 +69,13 @@
     },
     "acceptedException": {
       "type": "object",
-      "required": ["capability", "reason", "expires"],
+      "required": ["capability", "reason", "owner", "expires"],
       "properties": {
         "capability": { "type": "string", "minLength": 1 },
         "reason": { "type": "string", "minLength": 1 },
         "owner": { "type": "string", "minLength": 1 },
-        "expires": { "type": "string", "format": "date" }
+        "expires": { "type": "string", "format": "date" },
+        "evidence_state": { "$ref": "#/$defs/evidenceState" }
       },
       "additionalProperties": false
     },
@@ -112,6 +115,18 @@
         }
       },
       "additionalProperties": false
+    },
+    "evidenceState": {
+      "type": "string",
+      "enum": [
+        "configured",
+        "covered",
+        "fresh_passing",
+        "failed",
+        "blocked",
+        "unavailable",
+        "not_applicable"
+      ]
     },
     "readiness": {
       "type": "object",

@@ -3,7 +3,11 @@ from __future__ import annotations
 from typing import Any, cast
 
 from quality_runner.capability_exceptions import active_exception as _active_exception
-from quality_runner.capability_state import matching_ci_status, verification_state
+from quality_runner.capability_state import (
+    capability_evidence_state,
+    matching_ci_status,
+    verification_state,
+)
 from quality_runner.invariants import add_invariant_capabilities
 from quality_runner.readiness import (
     add_readiness_capabilities,
@@ -25,8 +29,15 @@ SCRIPT_CAPABILITIES = {
     "build": ("build",),
     "dead_code": ("dead-code", "dead_code", "audit:dead-code", "knip", "vulture", "unused"),
     "runtime_smoke": ("smoke", "runtime-smoke", "smoke-test"),
+    "failure_visibility": (
+        "failure-visibility",
+        "failure_visibility",
+        "failure-paths",
+        "test:failure-visibility",
+    ),
     "pre_pr": ("pre-pr", "prepr"),
 }
+DEFAULT_REQUIRED_SCRIPT_CAPABILITIES = frozenset(SCRIPT_CAPABILITIES) - {"failure_visibility"}
 PRE_CR_SCRIPT_NAMES = ("pre-cr", "precr", "pre-cr:run")
 FILE_CAPABILITIES = {"pre_cr"}
 
@@ -56,6 +67,7 @@ def detect_capabilities(
                     command=command,
                     required_by=required_by.get(capability_id),
                     ci_status=ci_status,
+                    evidence_state=capability_evidence_state(scan=scan, ci_status=ci_status),
                 )
             )
         elif script_name is None:
@@ -66,6 +78,7 @@ def detect_capabilities(
                 capability=dict(
                     id=capability_id,
                     type="command",
+                    evidence_state="unavailable",
                     reason=f"no quality command found for {capability_id}",
                     language=_primary_language(scan),
                     required_by=required_by.get(capability_id, "profile"),
@@ -81,6 +94,7 @@ def detect_capabilities(
                     "source": f"package.json:scripts.{script_name}",
                     **_optional_field("required_by", required_by.get(capability_id)),
                     **_optional_field("ci_status", ci_status),
+                    "evidence_state": capability_evidence_state(scan=scan, ci_status=ci_status),
                     "verification_state": verification_state(
                         discovery="script-discovered",
                         ci_status=ci_status,
@@ -250,6 +264,7 @@ def _record_file_capability(*, available: list[dict[str, Any]], missing: list[di
                 command=command,
                 required_by=required_by,
                 ci_status=ci_status,
+                evidence_state=capability_evidence_state(scan=scan, ci_status=ci_status),
             )
         )
         return
@@ -267,6 +282,7 @@ def _record_file_capability(*, available: list[dict[str, Any]], missing: list[di
                 "language": _primary_language(scan),
                 **_optional_field("required_by", required_by),
                 **_optional_field("ci_status", ci_status),
+                "evidence_state": capability_evidence_state(scan=scan, ci_status=ci_status),
                 "verification_state": verification_state(
                     discovery="script-discovered",
                     ci_status=ci_status,
@@ -282,6 +298,7 @@ def _record_file_capability(*, available: list[dict[str, Any]], missing: list[di
                     "capability_kind": "evidence_file",
                     "source": path,
                     **_optional_field("required_by", required_by),
+                    "evidence_state": "configured",
                     "verification_state": verification_state(
                         discovery="file-discovered",
                         ci_status=None,
@@ -296,6 +313,7 @@ def _record_file_capability(*, available: list[dict[str, Any]], missing: list[di
             capability=dict(
                 id=capability_id,
                 type="file",
+                evidence_state="unavailable",
                 reason=reason,
                 language=language,
                 **_optional_field("required_by", required_by),
@@ -321,7 +339,9 @@ def _required_capabilities(scan: dict[str, Any], standards_packet: dict[str, Any
     release_required = release_required_capabilities(
         scan=scan,
         standards_packet=standards_packet,
-        script_capabilities=SCRIPT_CAPABILITIES,
+        script_capabilities={
+            key: SCRIPT_CAPABILITIES[key] for key in DEFAULT_REQUIRED_SCRIPT_CAPABILITIES
+        },
         file_capabilities=FILE_CAPABILITIES,
     )
     if release_required is not None:
@@ -343,7 +363,7 @@ def _required_capabilities(scan: dict[str, Any], standards_packet: dict[str, Any
         ):
             return _known_capabilities(cast(object, required_capabilities))
 
-    required = {*SCRIPT_CAPABILITIES, "pre_cr"}
+    required = {*DEFAULT_REQUIRED_SCRIPT_CAPABILITIES, "pre_cr"}
     if config is not None:
         gates = config.get("gates")
         if isinstance(gates, list):
@@ -360,7 +380,9 @@ def _required_capabilities(scan: dict[str, Any], standards_packet: dict[str, Any
 
 def _required_by(standards_packet: dict[str, Any]) -> dict[str, str]:
     release_by = release_required_by(
-        script_capabilities=SCRIPT_CAPABILITIES,
+        script_capabilities={
+            key: SCRIPT_CAPABILITIES[key] for key in DEFAULT_REQUIRED_SCRIPT_CAPABILITIES
+        },
         profile=standards_packet.get("profile"),
     )
     if release_by is not None:
@@ -407,6 +429,7 @@ def _available_command(
     command: dict[str, str],
     required_by: str | None,
     ci_status: dict[str, str | None] | None,
+    evidence_state: str,
 ) -> dict[str, Any]:
     return {
         "id": capability_id,
@@ -422,6 +445,7 @@ def _available_command(
         **_optional_field("cwd", command.get("cwd")),
         **_optional_field("mutating_risk", command.get("mutating_risk")),
         **_optional_field("ci_status", ci_status),
+        "evidence_state": evidence_state,
         "verification_state": verification_state(
             discovery="command-discovered",
             ci_status=ci_status,

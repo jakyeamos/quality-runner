@@ -11,6 +11,7 @@ LEAF_GATE_IDS = (
     "build",
     "dead_code",
     "runtime_smoke",
+    "failure_visibility",
 )
 AGGREGATE_SCRIPT_NAMES = {
     "ci",
@@ -36,6 +37,7 @@ LEAF_ALIASES = {
     "build": ("build", "compile", "uv build"),
     "dead_code": ("dead-code", "dead_code", "knip", "vulture", "unused"),
     "runtime_smoke": ("smoke", "runtime-smoke", "smoke-test", "doctor"),
+    "failure_visibility": ("failure-visibility", "failure_visibility", "failure-paths"),
 }
 
 

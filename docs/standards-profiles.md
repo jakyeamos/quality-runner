@@ -116,6 +116,12 @@ rollout guidance.
 Unknown profiles fail closed unless they are defined under
 `quality_runner.profiles`.
 
+`failure_visibility` is an opt-in capability rather than a built-in default.
+Require it for repositories where fallback, degradation, or evidence ingestion
+can make failed work look successful or absent. Its gate must exercise negative
+paths and validate machine-readable consumer readback; see
+[Failure Visibility Capability](failure-visibility.md).
+
 CLI examples omit `--profile` because `default` is selected automatically unless
 a repo config sets a different default. `--profile <name>` can select either the
 built-in `default` profile or a custom profile saved in `.quality-runner.toml`.

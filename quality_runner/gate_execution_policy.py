@@ -293,6 +293,7 @@ def _gate_cost_key(capability: dict[str, Any]) -> tuple[int, str]:
             "lint": 20,
             "typecheck": 30,
             "runtime_smoke": 40,
+            "failure_visibility": 45,
             "dead_code": 50,
             "tests": 60,
             "build": 70,
