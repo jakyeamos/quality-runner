@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import re
+import tomllib
 from pathlib import Path
 from typing import Any, cast
 
@@ -54,17 +55,27 @@ def assess_strict_policy_visibility(root: Path, scan: dict[str, Any]) -> dict[st
 def _strict_policy_surfaces(root: Path, scan: dict[str, Any]) -> list[dict[str, Any]]:
     surfaces: list[dict[str, Any]] = []
     based_config = root / STRICT_CONFIG_PATH
+    pyproject = root / "pyproject.toml"
+    based_project = _toml_strict_surface("BasedPyright", pyproject, ("tool", "basedpyright"))
+    pyright_project = _toml_strict_surface("Pyright", pyproject, ("tool", "pyright"))
     based_surface = _command_surface(scan, "basedpyright") or _text_contains(
-        root / "pyproject.toml", "[tool.basedpyright]"
+        pyproject, "[tool.basedpyright]"
     )
     if based_config.is_file() and not based_config.is_symlink():
         surfaces.append(_basedpyright_surface(based_config, root / STRICT_BASELINE_PATH))
+    elif based_project is not None:
+        surfaces.append(based_project)
+    elif based_surface and pyright_project is not None:
+        # BasedPyright intentionally honors Pyright's pyproject configuration.
+        surfaces.append(pyright_project | {"provider": "BasedPyright"})
     elif based_surface:
         surfaces.append(_missing_strict_surface("BasedPyright", str(STRICT_CONFIG_PATH)))
 
     pyright_config = root / "pyrightconfig.json"
     if pyright_config.is_file() and not pyright_config.is_symlink() and not based_config.exists():
         surfaces.append(_json_strict_surface("Pyright", pyright_config))
+    elif pyright_project is not None and not based_surface:
+        surfaces.append(pyright_project)
     elif (
         _command_surface(scan, "pyright")
         and not based_config.exists()
@@ -77,7 +88,6 @@ def _strict_policy_surfaces(root: Path, scan: dict[str, Any]) -> list[dict[str, 
             surfaces.append(_text_strict_surface("TypeScript", path))
 
     mypy_paths = [root / "mypy.ini", root / ".mypy.ini", root / "setup.cfg"]
-    pyproject = root / "pyproject.toml"
     if pyproject.is_file() and _text_contains(pyproject, "[tool.mypy]"):
         mypy_paths.append(pyproject)
     for path in mypy_paths:
@@ -91,6 +101,24 @@ def _strict_policy_surfaces(root: Path, scan: dict[str, Any]) -> list[dict[str, 
     ):
         surfaces.append(_missing_strict_surface("TypeScript", "tsconfig*.json"))
     return surfaces
+
+
+def _toml_strict_surface(
+    provider: str, path: Path, section: tuple[str, str]
+) -> dict[str, Any] | None:
+    if not path.is_file() or path.is_symlink():
+        return None
+    try:
+        payload = tomllib.loads(path.read_text(encoding="utf-8"))
+    except (OSError, tomllib.TOMLDecodeError) as error:
+        return _blocked_surface(provider, path, str(error))
+    current: object = payload
+    for key in section:
+        if not isinstance(current, dict) or key not in current:
+            return None
+        current = current[key]
+    config = cast(dict[str, object], current) if isinstance(current, dict) else {}
+    return _configured_surface(provider, path, config.get("typeCheckingMode") == "strict")
 
 
 def _basedpyright_surface(config_path: Path, baseline_path: Path) -> dict[str, Any]:

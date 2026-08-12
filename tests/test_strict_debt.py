@@ -74,6 +74,32 @@ def test_strict_policy_exposes_a_missing_config_for_basedpyright(tmp_path: Path)
     assert result["score"] == 1
 
 
+def test_strict_policy_accepts_basedpyright_pyproject_config(tmp_path: Path) -> None:
+    (tmp_path / "pyproject.toml").write_text(
+        '[tool.basedpyright]\ntypeCheckingMode = "strict"\n', encoding="utf-8"
+    )
+
+    result = assess_strict_policy_visibility(tmp_path, {})
+
+    assert result["status"] == "validated"
+    assert result["score"] == 3
+
+
+def test_basedpyright_command_accepts_pyright_pyproject_config(tmp_path: Path) -> None:
+    (tmp_path / "pyproject.toml").write_text(
+        '[tool.pyright]\ntypeCheckingMode = "strict"\n', encoding="utf-8"
+    )
+
+    result = assess_strict_policy_visibility(
+        tmp_path,
+        {"quality_commands": [{"command": "uv run basedpyright src"}]},
+    )
+
+    assert result["status"] == "validated"
+    assert result["score"] == 3
+    assert "BasedPyright" in result["message"]
+
+
 def test_strict_policy_accepts_typescript_strict_config(tmp_path: Path) -> None:
     (tmp_path / "tsconfig.json").write_text(
         '{"compilerOptions": {"strict": true}}\n', encoding="utf-8"
