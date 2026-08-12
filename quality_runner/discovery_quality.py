@@ -56,7 +56,7 @@ def _javascript_quality_commands(
     package_manager: str | None,
 ) -> list[dict[str, str]]:
     script_capabilities = {
-        "formatter": ("format", "fmt", "prettier"),
+        "formatter": ("format:check", "format", "fmt", "prettier"),
         "lint": ("lint", "check"),
         "typecheck": ("typecheck", "type-check", "check-types", "build:ts"),
         "tests": ("test", "tests"),

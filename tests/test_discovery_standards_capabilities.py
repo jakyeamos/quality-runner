@@ -190,6 +190,30 @@ def test_inspect_repo_detects_lockfile_languages_and_truth_policy(tmp_path: Path
     assert commands["tests"]["language"] == "javascript"
 
 
+def test_inspect_repo_prefers_read_only_format_check_script(tmp_path: Path) -> None:
+    from quality_runner.discovery import inspect_repo
+
+    (tmp_path / "package.json").write_text(
+        json.dumps(
+            {
+                "packageManager": "pnpm@11.20.0",
+                "scripts": {
+                    "format": "prettier --write .",
+                    "format:check": "prettier --check .",
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    scan = inspect_repo(tmp_path, run_id="format-check-preference")
+    formatter = next(item for item in scan["quality_commands"] if item["id"] == "formatter")
+
+    assert formatter["command"] == "pnpm run format:check"
+    assert formatter["source"] == "package.json:scripts.format:check"
+    assert "mutating_risk" not in formatter
+
+
 def test_inspect_repo_detects_swift_package_test_gate(tmp_path: Path) -> None:
     from quality_runner.discovery import inspect_repo
 
