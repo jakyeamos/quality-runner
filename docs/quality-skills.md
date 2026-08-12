@@ -314,6 +314,23 @@ test frameworks use different assertion and marker conventions. The agent
 review must use repository evidence to distinguish a real coverage gap from an
 intentional integration test, snapshot, fixture, or exception.
 
+### Starter pack: Performance Readiness
+
+The [Performance Readiness starter pack](examples/performance-readiness.toml)
+reviews measurement quality, hot paths, I/O and concurrency, runtime scaling,
+and load verification. Python scans also emit native, source-bounded
+observations for database calls inside repeated loop bodies, synchronous
+database or known blocking calls inside `async def`, and un-awaited refresh,
+rebuild, ingest, migration, or backfill calls on async paths.
+
+Those Python observations feed relevant-pack selection, so backend startup,
+refresh, database-loop, and async-lifecycle risks can activate the performance
+review without a manual pin. They are review leads, not proof of a defect:
+bounded loops and deliberately worker-isolated functions may be accepted with
+runtime or call-site evidence. Awaited calls and work passed directly to
+`asyncio.to_thread` are excluded from the native blocking-call observation;
+test files are excluded so fixture setup does not masquerade as runtime debt.
+
 ### Starter pack: Security and Privacy
 
 The [Security and Privacy starter pack](examples/security-privacy.toml) adds
