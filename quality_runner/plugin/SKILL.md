@@ -95,8 +95,9 @@ intent/review-cycle delta loop; read the resulting `review-delta.json` and
 `review-delta.md`. Use `gate`/`gate-status`/`gate-respond` for controller
 decisions, `review-worker` plus strict report validation for worker handoffs,
 `plan`/`phase` or delivery contracts for bounded planning, `rollout` for
-isolated multi-repository runs, and `release-smoke` before release. The full
-agent protocol is in `docs/agent-usage.md`. Before publishing, build both
+isolated multi-repository runs, `fleet detector refresh` for full exact-target
+skill-pack evidence publication consumed by Pronto, and `release-smoke` before
+release. The full agent protocol is in `docs/agent-usage.md`. Before publishing, build both
 distributions and run `release-boundary REPOSITORY --dist-dir DIST --json`.
 Treat `public_core`, `public_adapter`, and `local_only` as the exhaustive
 distribution classes; public adapters require sanitized contract fixtures, and
@@ -104,6 +105,13 @@ local-only Pronto, fleet, account, or machine wiring must not enter artifacts or
 the tracked public source tree. Require the persisted
 `quality-runner-release-boundary/v2` receipt to match the exact release branch
 and commit; legacy, stale, dirty, or blocked receipts are not release evidence.
+
+Use `qr fleet detector refresh --all --projects-root ROOT --json` only when the
+operator explicitly wants repository-local detector evidence refreshed. It
+scans disposable exact-target worktrees with full deterministic skill packs,
+does not execute discovered gates, and publishes normal QR runs into each
+repository for Pronto. Inspect the per-repository `published`, `blocked`, and
+`unsupported` results before running `pronto quality refresh --json`.
 
 For planning and execution loops, use the additive delivery contract surface:
 

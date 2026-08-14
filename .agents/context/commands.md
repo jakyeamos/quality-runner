@@ -47,3 +47,11 @@ Repository-wide strict mode is not certified: the 0.7.0 fold exposed a large
 existing backlog when the environment branch enabled it without end-to-end
 proof. Keep that migration visible as candidate work, fix findings at their
 source, and do not add broad ignores or replace errors with casts.
+
+For missing Pronto findings evidence, use `qr fleet detector refresh --all
+--projects-root ROOT --json`. This explicit lane runs full deterministic
+skill-pack analysis at each exact committed target, publishes only normal QR
+run evidence below repository `.quality-runner/runs`, and records every
+published, blocked, or unsupported repository. It does not execute discovered
+gates. Follow with `pronto quality refresh --json` unless Pronto owns the
+combined invocation.

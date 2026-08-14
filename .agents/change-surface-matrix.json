@@ -66,6 +66,24 @@
       "status": "applicable"
     },
     {
+      "id": "fleet-detector-publication",
+      "scope": "external",
+      "distribution": "public_adapter",
+      "contract_fixtures": [
+        "fixtures/contracts/public-adapters/pronto-detector-refresh.json"
+      ],
+      "path": "qr fleet detector refresh, repository-local .quality-runner/runs, Pronto quality ingestion, and operator documentation",
+      "owner": "Quality Runner and Pronto integration owners",
+      "condition": "exact-target detector scanning, skill-pack selection, publication, status taxonomy, or consumer orchestration changes",
+      "operations": ["add", "change", "remove"],
+      "validation": [
+        "uv run --locked pytest -q tests/test_fleet_detector_refresh.py",
+        "qr fleet detector refresh --repo-path FIXTURE --projects-root ROOT --json",
+        "Pronto consumer refresh readback"
+      ],
+      "status": "applicable"
+    },
+    {
       "id": "ci-and-release",
       "scope": "external",
       "distribution": "public_core",
