@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "root_id": "project",
+  "compasses": [
+    {
+      "id": "project",
+      "kind": "root",
+      "path": "contract.json",
+      "parent_id": null,
+      "status": "active"
+    }
+  ],
+  "links": [],
+  "updated_at": "2026-08-14T23:11:30.026Z"
+}
