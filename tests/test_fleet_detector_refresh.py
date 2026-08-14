@@ -133,6 +133,31 @@ def test_detector_refresh_scans_exact_target_and_publishes_normal_runs(tmp_path:
     assert manifest["repo_root"] == str(repo)
 
 
+def test_detector_refresh_applies_repository_deadline_to_each_phase(tmp_path: Path) -> None:
+    repo = tmp_path / "app"
+    _init_repo(repo)
+    captured: dict[str, Any] = {}
+
+    def capture_refresh(**kwargs: Any) -> dict[str, Any]:
+        captured.update(kwargs)
+        return _fake_refresh(**kwargs)
+
+    fleet_detector_refresh_payload(
+        projects_root=tmp_path,
+        repository_paths=[repo],
+        output_dir=tmp_path / "artifacts",
+        timeout_seconds=900,
+        as_of="2026-08-14T04:45:30Z",
+        refresh_callback=capture_refresh,
+    )
+
+    assert captured["timeout_seconds"] == 120
+    assert captured["inspect_timeout_seconds"] == 900
+    assert captured["run_timeout_seconds"] == 900
+    assert captured["verify_timeout_seconds"] == 900
+    assert captured["total_timeout_seconds"] == 900
+
+
 def test_detector_refresh_records_blocked_target_and_continues(tmp_path: Path) -> None:
     ambiguous = tmp_path / "ambiguous"
     ready = tmp_path / "ready"

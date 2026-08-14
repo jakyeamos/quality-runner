@@ -80,6 +80,7 @@
       "validation": [
         "uv run --locked pytest -q tests/test_fleet_detector_refresh.py",
         "production refresh callback signature bind in the detector refresh happy-path test",
+        "explicit repository deadline propagation to inspect, run, verify, and total refresh budgets",
         "missing phase artifact diagnostic retention and no-partial-publication regression",
         "qr fleet detector refresh --repo-path FIXTURE --projects-root ROOT --json",
         "Pronto consumer refresh readback"

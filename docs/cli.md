@@ -622,7 +622,9 @@ published.
 The analysis mode is always `full`; deterministic skill packs are always
 enabled. Discovered repository gates are not executed. Agent review is a
 separate opt-in surface controlled by `--agent-review-mode` and defaults to
-`off`. After publication, run `pronto quality refresh --json`, or use Pronto's
+`off`. The explicit repository timeout is also the ceiling for each refresh
+phase, so large inspections are governed by the requested repository deadline
+rather than a smaller internal phase cap. After publication, run `pronto quality refresh --json`, or use Pronto's
 combined detector-refresh command when available, to import the new evidence.
 
 ## `quality-runner rollout`
