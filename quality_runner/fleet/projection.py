@@ -13,7 +13,7 @@ def build_local_projection(
     missing = [
         DIMENSION_LABELS[str(item["dimension"])]
         for item in findings
-        if item.get("status") != "not_applicable" and item.get("score", 0) < 3
+        if item.get("status") != "not_applicable" and _needs_remediation(item.get("score"))
     ]
     content = "\n".join(
         [
@@ -48,3 +48,9 @@ def build_local_projection(
         "line_count": len(content.splitlines()),
         "source_edits": False,
     }
+
+
+def _needs_remediation(score: object) -> bool:
+    if isinstance(score, bool) or not isinstance(score, (int, float)):
+        return True
+    return score < 3

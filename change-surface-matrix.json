@@ -5,7 +5,7 @@
     "id": "quality-runner"
   },
   "owner": "quality-runner-maintainers",
-  "last_reviewed": "2026-08-02",
+  "last_reviewed": "2026-08-14",
   "surfaces": [
     {
       "id": "python-source-and-contracts",
@@ -15,6 +15,7 @@
       "condition": "Python implementation, CLI, MCP, or artifact behavior changes",
       "operations": ["add", "change", "remove"],
       "validation": [
+        "uv run --locked pytest -q tests/test_fleet_audit.py",
         "uv run --locked pytest -q",
         "uv run --locked ruff check .",
         "uv run --locked basedpyright"

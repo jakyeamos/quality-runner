@@ -15,6 +15,7 @@ from quality_runner.fleet.discovery import (
     resolve_target_branch,
 )
 from quality_runner.fleet.legibility import audit_repository
+from quality_runner.fleet.projection import build_local_projection
 
 
 def _git(root: Path, *args: str) -> str:
@@ -135,6 +136,27 @@ def test_static_audit_records_not_applicable_deployment_when_absent(tmp_path: Pa
     assert findings["architecture_boundaries"]["score"] >= 2
     assert findings["deployment_rollback"]["status"] == "not_applicable"
     assert result["plan"]["local_projection"]["source_edits"] is False
+
+
+def test_projection_handles_unscored_applicable_findings() -> None:
+    projection = build_local_projection(
+        {"repo_id": "repo-example"},
+        [
+            {
+                "dimension": "architecture_boundaries",
+                "status": "unknown",
+                "score": None,
+            },
+            {
+                "dimension": "deployment_rollback",
+                "status": "not_applicable",
+                "score": None,
+            },
+        ],
+    )
+
+    assert "architecture and boundaries" in projection["content"]
+    assert "deployment and rollback" not in projection["content"]
 
 
 def test_static_audit_scores_structured_legibility_controls_as_maintained() -> None:
