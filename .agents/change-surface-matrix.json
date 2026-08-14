@@ -28,6 +28,7 @@
       "operations": ["add", "change", "remove"],
       "validation": [
         "uv run --locked pytest -q",
+        "collision-safe remediation wiring ID regression for normalized path collisions",
         "uv run --locked ruff check .",
         "uv run --locked basedpyright",
         "For maturity changes, verify dimension-to-capability-to-pillar aggregation, reverse producer coverage, explicit capability applicability, evidence coverage, missing capabilities, and confirmed-risk-only critical caps."
@@ -79,6 +80,7 @@
       "validation": [
         "uv run --locked pytest -q tests/test_fleet_detector_refresh.py",
         "production refresh callback signature bind in the detector refresh happy-path test",
+        "missing phase artifact diagnostic retention and no-partial-publication regression",
         "qr fleet detector refresh --repo-path FIXTURE --projects-root ROOT --json",
         "Pronto consumer refresh readback"
       ],

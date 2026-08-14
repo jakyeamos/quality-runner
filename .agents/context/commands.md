@@ -53,5 +53,6 @@ For missing Pronto findings evidence, use `qr fleet detector refresh --all
 skill-pack analysis at each exact committed target, publishes only normal QR
 run evidence below repository `.quality-runner/runs`, and records every
 published, blocked, or unsupported repository. It does not execute discovered
-gates. Follow with `pronto quality refresh --json` unless Pronto owns the
-combined invocation.
+gates. Missing phase artifacts remain unpublished while the fleet ledger keeps
+compact phase status, timeout, and reason diagnostics. Follow with `pronto
+quality refresh --json` unless Pronto owns the combined invocation.

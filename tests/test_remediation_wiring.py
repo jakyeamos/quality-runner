@@ -38,6 +38,23 @@ def test_wiring_decision_slices_offer_explicit_dispositions() -> None:
     assert slice_item["findings"][0]["actionability"] == "needs-author-decision"
 
 
+def test_wiring_decision_slices_disambiguate_colliding_path_slugs() -> None:
+    from quality_runner.remediation_wiring import wiring_decision_slices
+
+    first = _integrate_finding()
+    first["file"] = "bin/import-ai-history.py"
+    second = {**_integrate_finding(), "id": "CQ-0002", "file": "bin/import_ai_history.py"}
+
+    slices = wiring_decision_slices({"findings": [first, second]})
+
+    ids = [slice_item["id"] for slice_item in slices]
+    assert len(ids) == 2
+    assert len(set(ids)) == 2
+    assert all(
+        identifier.startswith("decide-wiring-bin-import-ai-history-py-") for identifier in ids
+    )
+
+
 def test_remediation_plan_uses_wiring_slice_instead_of_structural_cluster() -> None:
     from quality_runner.planning import build_agent_handoff, build_remediation_plan
 
