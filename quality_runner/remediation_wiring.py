@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import hashlib
 import re
+from collections import Counter
 from typing import Any, cast
 
 
@@ -13,8 +15,14 @@ def wiring_decision_slices(code_quality_scan: dict[str, Any] | None) -> list[dic
     for finding in findings:
         groups.setdefault(str(finding["file"]), []).append(finding)
 
+    slug_counts = Counter(_path_slug(path) for path in groups)
     return [
-        _slice_for_wiring_group(file=path, findings=group) for path, group in sorted(groups.items())
+        _slice_for_wiring_group(
+            file=path,
+            findings=group,
+            slice_id=_wiring_slice_id(path, slug_counts),
+        )
+        for path, group in sorted(groups.items())
     ]
 
 
@@ -76,7 +84,9 @@ def _integrate_findings(code_quality_scan: dict[str, Any] | None) -> list[dict[s
     return normalized
 
 
-def _slice_for_wiring_group(*, file: str, findings: list[dict[str, Any]]) -> dict[str, Any]:
+def _slice_for_wiring_group(
+    *, file: str, findings: list[dict[str, Any]], slice_id: str
+) -> dict[str, Any]:
     sorted_findings = sorted(
         findings,
         key=lambda finding: (str(finding["rule_id"]), int(finding["line"]), str(finding["id"])),
@@ -87,7 +97,7 @@ def _slice_for_wiring_group(*, file: str, findings: list[dict[str, Any]]) -> dic
     )
     score = sum(int(finding.get("score") or 0) for finding in sorted_findings)
     return {
-        "id": f"decide-wiring-{_path_slug(file)}",
+        "id": slice_id,
         "title": f"Decide wiring for partial work in {file}",
         "priority": "medium",
         "implementation_allowed": False,
@@ -161,3 +171,11 @@ def _slice_for_wiring_group(*, file: str, findings: list[dict[str, Any]]) -> dic
 def _path_slug(path: str) -> str:
     slug = re.sub(r"[^A-Za-z0-9]+", "-", path).strip("-").lower()
     return slug or "root"
+
+
+def _wiring_slice_id(path: str, slug_counts: Counter[str]) -> str:
+    slug = _path_slug(path)
+    if slug_counts[slug] == 1:
+        return f"decide-wiring-{slug}"
+    suffix = hashlib.sha256(path.encode("utf-8")).hexdigest()[:8]
+    return f"decide-wiring-{slug}-{suffix}"

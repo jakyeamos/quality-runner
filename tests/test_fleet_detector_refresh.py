@@ -72,6 +72,32 @@ def _fake_refresh_with_invalid_run(**kwargs: Any) -> dict[str, Any]:
     return result
 
 
+def _fake_refresh_with_missing_run(**kwargs: Any) -> dict[str, Any]:
+    root = Path(kwargs["repo_root"])
+    prefix = str(kwargs["run_id_prefix"])
+    for suffix in ("inspect", "verify"):
+        (root / ".quality-runner" / "runs" / f"{prefix}-{suffix}").mkdir(parents=True)
+    return {
+        "status": "blocked",
+        "phase_timings": {
+            "inspect": {"status": "completed"},
+            "run": {"status": "timed-out"},
+            "verify": {"status": "completed"},
+        },
+        "runs": {
+            "inspect": {"run_id": f"{prefix}-inspect", "status": "completed"},
+            "run": {
+                "run_id": f"{prefix}-run",
+                "status": "blocked",
+                "reason": "refresh run phase exceeded the repository deadline",
+                "timeout_scope": "repository",
+                "timeout_seconds": 600,
+            },
+            "verify": {"run_id": f"{prefix}-verify", "status": "completed"},
+        },
+    }
+
+
 def test_detector_refresh_scans_exact_target_and_publishes_normal_runs(tmp_path: Path) -> None:
     repo = tmp_path / "app"
     _init_repo(repo)
@@ -143,6 +169,39 @@ def test_detector_refresh_rolls_back_partial_publication(tmp_path: Path) -> None
     assert payload["status"] == "partial"
     assert payload["counts"] == {"published": 0, "blocked": 1, "unsupported": 0}
     assert "publication failed" in payload["results"][0]["reason"]
+    published_root = repo / ".quality-runner" / "runs"
+    assert not published_root.exists() or not any(published_root.iterdir())
+
+
+def test_detector_refresh_retains_phase_diagnostics_when_expected_run_is_missing(
+    tmp_path: Path,
+) -> None:
+    repo = tmp_path / "app"
+    _init_repo(repo)
+
+    payload = fleet_detector_refresh_payload(
+        projects_root=tmp_path,
+        repository_paths=[repo],
+        output_dir=tmp_path / "artifacts",
+        as_of="2026-08-14T04:47:30Z",
+        refresh_callback=_fake_refresh_with_missing_run,
+    )
+
+    result = payload["results"][0]
+    assert result["status"] == "blocked"
+    assert result["refresh_status"] == "blocked"
+    assert result["refresh_diagnostics"]["missing_run_ids"] == [
+        result["refresh_diagnostics"]["phases"]["run"]["run_id"]
+    ]
+    assert result["refresh_diagnostics"]["phases"]["run"] == {
+        "run_id": result["refresh_diagnostics"]["missing_run_ids"][0],
+        "status": "blocked",
+        "reason": "refresh run phase exceeded the repository deadline",
+        "timeout_scope": "repository",
+        "timeout_seconds": 600,
+        "timing_status": "timed-out",
+    }
+    assert "run phase blocked" in result["reason"]
     published_root = repo / ".quality-runner" / "runs"
     assert not published_root.exists() or not any(published_root.iterdir())
 

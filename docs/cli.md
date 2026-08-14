@@ -607,7 +607,10 @@ resolver as fleet audit. Every repository is recorded as `published`,
 `detector-refresh.json` ledger is written below
 `~/.quality-runner/fleet-detector-refresh` unless `--output-dir` is supplied.
 One repository failure does not prevent later repositories from being
-attempted.
+attempted. When a refresh finishes without all three expected run artifacts,
+the ledger retains bounded phase status, timeout, and reason diagnostics before
+the detached worktree is removed. Incomplete run sets are never partially
+published.
 
 The analysis mode is always `full`; deterministic skill packs are always
 enabled. Discovered repository gates are not executed. Agent review is a

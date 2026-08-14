@@ -40,7 +40,22 @@
       "repo_id": "blocked-repository",
       "primary_path": "/path/to/projects/blocked-repository",
       "status": "blocked",
-      "reason": "target branch is not ready"
+      "reason": "full detector refresh incomplete; run phase blocked: repository deadline exceeded",
+      "refresh_status": "blocked",
+      "refresh_diagnostics": {
+        "status": "blocked",
+        "missing_run_ids": ["fleet-detector-fixture-blocked-repository-run"],
+        "phases": {
+          "run": {
+            "run_id": "fleet-detector-fixture-blocked-repository-run",
+            "status": "blocked",
+            "reason": "repository deadline exceeded",
+            "timeout_scope": "repository",
+            "timeout_seconds": 600,
+            "timing_status": "timed-out"
+          }
+        }
+      }
     },
     {
       "repo_id": "unsupported-repository",

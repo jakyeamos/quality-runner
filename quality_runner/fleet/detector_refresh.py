@@ -189,6 +189,16 @@ def _refresh_repository(
             result["reason"] = f"full detector refresh failed: {type(error).__name__}: {error}"
             return result
         run_ids = [f"{run_prefix}-{suffix}" for suffix in ("inspect", "run", "verify")]
+        result["refresh_status"] = refresh.get("status")
+        diagnostics = _incomplete_refresh_diagnostics(
+            refresh=refresh,
+            worktree=worktree,
+            run_ids=run_ids,
+        )
+        if diagnostics is not None:
+            result["refresh_diagnostics"] = diagnostics
+            result["reason"] = _incomplete_refresh_reason(diagnostics)
+            return result
         try:
             published = _publish_runs(
                 worktree=worktree,
@@ -207,7 +217,6 @@ def _refresh_repository(
             run_ids=run_ids,
             published_paths=published,
             finding_count=finding_count,
-            refresh_status=refresh.get("status"),
         )
         return result
     finally:
@@ -223,6 +232,58 @@ def _refresh_repository(
         if result["cleanup"]["status"] != "passed" or not result["source_head_unchanged"]:
             result["status"] = "blocked"
             result["reason"] = "disposable worktree cleanup or source HEAD integrity failed"
+
+
+def _incomplete_refresh_diagnostics(
+    *, refresh: dict[str, Any], worktree: Path, run_ids: list[str]
+) -> dict[str, Any] | None:
+    run_root = worktree / ".quality-runner" / "runs"
+    missing_run_ids = [run_id for run_id in run_ids if not (run_root / run_id).is_dir()]
+    if not missing_run_ids:
+        return None
+
+    phase_payloads = refresh.get("runs")
+    timings = refresh.get("phase_timings")
+    phases: dict[str, dict[str, Any]] = {}
+    for phase in ("inspect", "run", "verify"):
+        compact: dict[str, Any] = {}
+        if isinstance(phase_payloads, dict) and isinstance(phase_payloads.get(phase), dict):
+            phase_payload = phase_payloads[phase]
+            for key in ("run_id", "status", "reason", "timeout_scope", "timeout_seconds"):
+                value = phase_payload.get(key)
+                if value is not None and isinstance(value, (str, int, float, bool)):
+                    compact[key] = value
+        if isinstance(timings, dict) and isinstance(timings.get(phase), dict):
+            timing_status = timings[phase].get("status")
+            if isinstance(timing_status, str):
+                compact["timing_status"] = timing_status
+        if compact:
+            phases[phase] = compact
+    diagnostics: dict[str, Any] = {
+        "status": refresh.get("status"),
+        "missing_run_ids": missing_run_ids,
+    }
+    if phases:
+        diagnostics["phases"] = phases
+    return diagnostics
+
+
+def _incomplete_refresh_reason(diagnostics: dict[str, Any]) -> str:
+    phases = diagnostics.get("phases")
+    if isinstance(phases, dict):
+        for phase in ("inspect", "run", "verify"):
+            details = phases.get(phase)
+            if not isinstance(details, dict):
+                continue
+            status = details.get("status") or details.get("timing_status")
+            reason = details.get("reason")
+            if status not in {None, "completed", "passed"} or reason:
+                summary = f"{phase} phase {status or 'incomplete'}"
+                if isinstance(reason, str) and reason:
+                    summary = f"{summary}: {reason}"
+                return f"full detector refresh incomplete; {summary}"
+    missing = diagnostics.get("missing_run_ids")
+    return f"full detector refresh incomplete; missing expected runs: {missing}"
 
 
 def _publish_runs(
