@@ -15,7 +15,10 @@ from quality_runner.fleet.maturity_feed import (
 
 
 def fleet_feed_payload(
-    *, audit_id: str | None = None, output_dir: Path | None = None
+    *,
+    audit_id: str | None = None,
+    output_dir: Path | None = None,
+    allow_incomplete_coverage: bool = False,
 ) -> dict[str, Any]:
     """Validate and publish one immutable fleet audit as the stable maturity feed."""
 
@@ -31,6 +34,7 @@ def fleet_feed_payload(
         artifact_root,
         replay=replay,
         expected_projects_root=(Path.home() / "projects") if output_dir is None else None,
+        allow_incomplete_coverage=allow_incomplete_coverage,
     )
     publication_root = (
         MATURITY_FEED_FLEET_ROOT

@@ -156,6 +156,13 @@ def test_strict_debt_reaches_the_maturity_feed(tmp_path: Path) -> None:
     root = projects / "fixture"
     _init_repo(root)
     _write_policy(root, 4154)
+    subprocess.run(["git", "add", "."], cwd=root, check=True)
+    subprocess.run(
+        ["git", "commit", "-m", "add strict debt policy"],
+        cwd=root,
+        check=True,
+        capture_output=True,
+    )
 
     result = fleet_audit_payload(
         projects_root=projects,

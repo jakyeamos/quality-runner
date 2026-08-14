@@ -132,6 +132,22 @@ qr fleet audit report --audit-id AUDIT_ID --json
 qr fleet audit feed --audit-id AUDIT_ID --json
 ```
 
+Before scanning, QR compares the canonical target with local and
+remote-tracking refs, detached worktree commits, and dirty registered
+worktrees. The resulting `audit_coverage` status is `complete`,
+`incomplete_unfolded`, `blocked_ambiguous`, or `stale_target`. Checks still run
+against the exact canonical target: unfolded work qualifies the completeness
+of those findings instead of being blended into a repository state that never
+existed.
+
+Canonical feed publication requires complete coverage. For bounded diagnosis,
+an operator may explicitly publish a comparison-ineligible feed without
+changing the target-attached score:
+
+```bash
+qr fleet audit feed --audit-id AUDIT_ID --allow-incomplete-coverage --json
+```
+
 The Mac Control ideal-state gate is a separate, explicit fleet lane. It does
 not change the numeric maturity score. Each repository that supports Mac
 Control owns `.mac-control/ideal-state.json`. The current v4 contract derives

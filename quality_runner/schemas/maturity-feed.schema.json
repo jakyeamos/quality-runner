@@ -34,6 +34,26 @@
     },
     "repository_count": {"type": "integer", "minimum": 1},
     "checkout_count": {"type": "integer", "minimum": 0},
+    "audit_coverage": {
+      "type": "object",
+      "required": [
+        "status",
+        "policy",
+        "complete_repository_count",
+        "incomplete_repository_count",
+        "comparison_eligible",
+        "canonical_findings_scope"
+      ],
+      "properties": {
+        "status": {"enum": ["complete", "incomplete"]},
+        "policy": {"enum": ["require_complete", "allow_incomplete"]},
+        "complete_repository_count": {"type": "integer", "minimum": 0},
+        "incomplete_repository_count": {"type": "integer", "minimum": 0},
+        "comparison_eligible": {"type": "boolean"},
+        "canonical_findings_scope": {"const": "exact_target_heads"}
+      },
+      "additionalProperties": false
+    },
     "mean_maturity": {"type": ["number", "null"], "minimum": 0, "maximum": 4},
     "source_dimension_mean": {"type": ["number", "null"], "minimum": 0, "maximum": 4},
     "pillar_means": {"type": "object"},
@@ -48,6 +68,27 @@
           "repo_id": {"type": "string", "minLength": 1},
           "maturity_score": {"type": ["number", "null"], "minimum": 0, "maximum": 4},
           "source_dimension_mean": {"type": ["number", "null"], "minimum": 0, "maximum": 4},
+          "comparison_eligible": {"type": "boolean"},
+          "audit_coverage": {
+            "type": "object",
+            "properties": {
+              "schema": {"const": "quality-runner-audit-coverage/v1"},
+              "status": {
+                "enum": [
+                  "complete",
+                  "incomplete_unfolded",
+                  "blocked_ambiguous",
+                  "stale_target"
+                ]
+              },
+              "comparison_eligible": {"type": "boolean"},
+              "publication_ready": {"type": "boolean"},
+              "unfolded_branch_count": {"type": "integer", "minimum": 0},
+              "dirty_worktree_count": {"type": "integer", "minimum": 0},
+              "ambiguous_item_count": {"type": "integer", "minimum": 0}
+            },
+            "additionalProperties": true
+          },
           "repository_maturity": {
             "type": "object",
             "required": ["schema", "score", "uncapped_score", "status", "pillars", "evidence", "critical_cap"],

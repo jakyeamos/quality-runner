@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any, cast
 
 from quality_runner.fleet.agent_usability_scoring import applicable_agent_usability_scores
+from quality_runner.fleet.maturity_coverage import project_audit_coverage
 from quality_runner.fleet.quality_outcomes import classify_quality_outcome
 from quality_runner.fleet.repository_maturity import build_repository_maturity
 
@@ -21,6 +22,7 @@ def repository_projection(repository: dict[str, Any], finding: dict[str, Any]) -
         raise MaturityProjectionError(f"repository and finding IDs do not match: {repo_id}")
     primary_path = _required_string(repository, "primary_path")
     target = _object(repository.get("target_branch"))
+    audit_coverage = project_audit_coverage(repository.get("audit_coverage"))
     findings = _objects(finding.get("findings"))
     scores: dict[str, float | None] = {}
     gaps: list[Mapping[str, Any]] = []
@@ -90,6 +92,7 @@ def repository_projection(repository: dict[str, Any], finding: dict[str, Any]) -
     target_status = str(target.get("status", "unknown"))
     certified = (
         target_status == "ready"
+        and audit_coverage.get("status") == "complete"
         and model["status"] == "certified"
         and dynamic_status in {"passed", "reused"}
     )
@@ -101,6 +104,8 @@ def repository_projection(repository: dict[str, Any], finding: dict[str, Any]) -
         "target_branch_status": target_status,
         "target_head": target.get("head"),
         "target_state": _target_state_projection(target.get("target_state")),
+        "audit_coverage": audit_coverage,
+        "comparison_eligible": audit_coverage.get("comparison_eligible") is True,
         "maturity_score": maturity_score,
         "source_dimension_mean": source_mean,
         "maturity_status": "certified"

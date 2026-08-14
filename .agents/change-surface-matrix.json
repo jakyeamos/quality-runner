@@ -2,7 +2,7 @@
   "schema_version": "change-surface-matrix/v1",
   "subject": {"kind": "repository", "id": "quality-runner"},
   "owner": "repository-owner",
-  "last_reviewed": "2026-08-13",
+  "last_reviewed": "2026-08-14",
   "surfaces": [
     {
       "id": "matrix-maintenance",
@@ -24,7 +24,7 @@
       "distribution": "public_core",
       "path": "quality_runner/, quality_evidence_contract/, repo_quality_certifier/, and public documentation",
       "owner": "repository-owner",
-      "condition": "scan, policy, finding, CLI, certification, or public documentation behavior changes",
+      "condition": "scan, audit-coverage, policy, finding, CLI, certification, or public documentation behavior changes",
       "operations": ["add", "change", "remove"],
       "validation": [
         "uv run pytest -q",
@@ -43,7 +43,7 @@
       ],
       "path": "installed qr, plugins, Pronto, quality-runner-maturity-feed/v2, and quality-runner-repository-maturity/v2",
       "owner": "integration-owner",
-      "condition": "command, plugin, feed schema, taxonomy, publication behavior, maturity pillar, applicability, coverage, cap, or source-dimension changes",
+      "condition": "command, plugin, audit-coverage, feed schema, taxonomy, publication behavior, maturity pillar, applicability, coverage, cap, or source-dimension changes",
       "operations": ["add", "change", "remove"],
       "validation": ["qr fleet replay", "qr fleet feed", "consumer contract readback in Pronto, including v1 migration labeling and v2 capability/pillar projection", "uv run pytest -q tests/test_repository_maturity.py tests/test_release_boundary.py::test_public_pronto_fixture_satisfies_the_feed_contract", "uv run pytest -q tests/test_error_codes.py"],
       "status": "applicable"

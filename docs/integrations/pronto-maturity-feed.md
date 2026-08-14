@@ -19,6 +19,18 @@ To republish an existing valid QR snapshot:
 qr fleet audit feed --audit-id AUDIT_ID --json
 ```
 
+`audit_coverage` is evidence-validity metadata, not a maturity dimension. Each
+repository projection states whether its exact-target findings are eligible
+for comparison and lists bounded, path-free evidence for unique local or
+remote-tracking branches, dirty worktrees, and ambiguous detached commits.
+Merged and patch-equivalent refs do not make coverage incomplete.
+
+The default feed command refuses `incomplete_unfolded`, `blocked_ambiguous`,
+and `stale_target` repositories. `--allow-incomplete-coverage` is an explicit
+diagnostic override: the feed remains valid for local inspection, but its
+aggregate and affected repositories carry `comparison_eligible: false` and
+must not be used for fleet ranking or certification.
+
 For a whole-inventory audit of one repository standard, run the static scoped
 lane instead:
 

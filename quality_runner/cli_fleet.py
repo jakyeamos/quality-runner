@@ -112,6 +112,14 @@ def add_fleet_commands(subparsers: argparse._SubParsersAction[argparse.ArgumentP
     )
     feed_parser.add_argument("--audit-id", default=None)
     feed_parser.add_argument("--output-dir", default=None)
+    feed_parser.add_argument(
+        "--allow-incomplete-coverage",
+        action="store_true",
+        help=(
+            "Publish a diagnostic feed when unfolded or ambiguous work makes repository "
+            "comparisons ineligible"
+        ),
+    )
     feed_parser.add_argument("--json", action="store_true")
 
     mac_control_parser = fleet_actions.add_parser(
@@ -238,6 +246,7 @@ def fleet_command_payload(args: argparse.Namespace) -> dict[str, Any]:
         return fleet_feed_payload(
             audit_id=args.audit_id,
             output_dir=Path(args.output_dir) if args.output_dir else None,
+            allow_incomplete_coverage=args.allow_incomplete_coverage,
         )
     raise ValueError(f"unsupported fleet audit action: {args.audit_action}")
 

@@ -1,6 +1,6 @@
 # Commands and quality gates
 
-last_reviewed: 2026-08-13
+last_reviewed: 2026-08-14
 
 Use `uv run pytest -q`, `uv run ruff check .`, `uv run ruff format --check .`,
 and `uv run basedpyright` for source verification. For fleet changes, run the
@@ -43,6 +43,12 @@ is retained only for migration diagnostics. Only a finding with
 applies the score cap; blocker/P0 state alone remains a quality-outcome signal.
 Agent growth health is diagnostic and does not add a fifth score beside the
 four consolidated human/agent capabilities.
+
+Fleet audit publication requires `audit_coverage.status: complete` for every
+repository. Unique local or remote-tracking work, dirty worktrees, ambiguous
+detached commits, and stale targets remain exact-target coverage qualifiers.
+Use `--allow-incomplete-coverage` only for a diagnostic feed; its
+`comparison_eligible` field remains false and consumers must not rank it.
 
 For release preparation, build both archives and run
 `uv run --locked quality-runner release-boundary . --dist-dir dist --json`.

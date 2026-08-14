@@ -18,6 +18,14 @@
   },
   "repository_count": 1,
   "checkout_count": 1,
+  "audit_coverage": {
+    "status": "complete",
+    "policy": "require_complete",
+    "complete_repository_count": 1,
+    "incomplete_repository_count": 0,
+    "comparison_eligible": true,
+    "canonical_findings_scope": "exact_target_heads"
+  },
   "mean_maturity": 4.0,
   "source_dimension_mean": 4.0,
   "pillar_means": {
@@ -33,6 +41,27 @@
     {
       "repo_id": "fixture-repository",
       "name": "fixture-repository",
+      "comparison_eligible": true,
+      "audit_coverage": {
+        "schema": "quality-runner-audit-coverage/v1",
+        "status": "complete",
+        "canonical_branch": "dev",
+        "canonical_head": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "evidence_scope": "canonical_target_head",
+        "canonical_findings_valid": true,
+        "comparison_eligible": true,
+        "publication_ready": true,
+        "unfolded_branch_count": 0,
+        "dirty_worktree_count": 0,
+        "ambiguous_item_count": 0,
+        "excluded_ref_count": 0,
+        "unfolded_branches": [],
+        "dirty_worktrees": [],
+        "ambiguous_items": [],
+        "excluded_ref_counts": {},
+        "safe_action": "none",
+        "provenance_hash": "3a01895a51c09a74e27de0946c98fe0162e5ff0dc493804ddfa9a6bb69d2df23"
+      },
       "maturity_score": 4.0,
       "source_dimension_mean": 4.0,
       "maturity_status": "certified",
@@ -182,5 +211,5 @@
     "raw_transcripts": false,
     "credentials": false
   },
-  "provenance_hash": "d9932343390ff4a9c39e87d6f5f925c360effc8e46a934e7062a657ec0ed62a5"
+  "provenance_hash": "872ae43f84304066c1c014af2b35ecf168f62465178c25b550ac4aa54b74c65d"
 }
