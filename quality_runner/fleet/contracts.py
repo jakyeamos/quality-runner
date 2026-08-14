@@ -17,7 +17,11 @@ FLEET_REPORT_SCHEMA = "quality-runner-fleet-report-v0.1"
 FLEET_STANDARD_REPORT_SCHEMA = "quality-runner-fleet-standard-report-v1"
 
 MATRIX_MAINTENANCE_STANDARD = "matrix-maintenance"
-STANDARD_DIMENSIONS = {MATRIX_MAINTENANCE_STANDARD: "matrix_maintenance"}
+DEVELOPER_LEGIBILITY_STANDARD = "developer-legibility"
+STANDARD_DIMENSIONS = {
+    MATRIX_MAINTENANCE_STANDARD: "matrix_maintenance",
+    DEVELOPER_LEGIBILITY_STANDARD: "developer_legibility",
+}
 SUPPORTED_FLEET_STANDARDS = tuple(STANDARD_DIMENSIONS)
 
 DIMENSIONS = (
@@ -31,6 +35,8 @@ DIMENSIONS = (
     "critical_user_journeys",
     "data_integrity_migration",
     "dependency_vulnerability",
+    "developer_legibility",
+    "change_surface_hotspots",
     "matrix_maintenance",
     "quality_commands",
     "coding_conventions",
@@ -65,6 +71,8 @@ DIMENSION_LABELS = {
     "critical_user_journeys": "critical user-journey verification",
     "data_integrity_migration": "data-integrity and migration safety",
     "dependency_vulnerability": "dependency and vulnerability risk",
+    "developer_legibility": "developer legibility",
+    "change_surface_hotspots": "change-surface hotspots",
     "quality_commands": "build, test, lint, and quality commands",
     "coding_conventions": "coding conventions",
     "security_constraints": "security and credential constraints",
@@ -92,6 +100,13 @@ DIMENSION_LABELS = {
 
 DIMENSION_TERMS: dict[str, tuple[str, ...]] = {
     "architecture_boundaries": ("architecture", "boundary", "ownership", "module", "system design"),
+    "developer_legibility": (
+        "developer legibility",
+        "naming convention",
+        "docstring",
+        "rationale comment",
+        "newcomer",
+    ),
     "change_surface_coverage": ("change surface", "change matrix", "dependency map"),
     "coding_conventions": ("convention", "style", "strict", "format", "coding standard"),
     "security_constraints": ("security", "credential", "secret", "authentication", "do not commit"),

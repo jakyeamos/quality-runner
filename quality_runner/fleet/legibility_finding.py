@@ -20,11 +20,12 @@ def finding(
     validation_commands: list[str],
     applicability: str | None = None,
     confirmed_critical_risk: bool = False,
+    audit: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     resolved_applicability = applicability or (
         "not_applicable" if status == "not_applicable" else "applicable"
     )
-    return {
+    result = {
         "schema": FLEET_FINDING_SCHEMA,
         "finding_id": digest([repository["repo_id"], dimension, status, evidence])[:16],
         "repo_id": repository["repo_id"],
@@ -49,9 +50,17 @@ def finding(
         "evidence": evidence,
         "validation_commands": validation_commands,
         "provenance_hash": digest(
-            {"repo_id": repository["repo_id"], "dimension": dimension, "evidence": evidence}
+            {
+                "repo_id": repository["repo_id"],
+                "dimension": dimension,
+                "evidence": evidence,
+                "audit": audit,
+            }
         ),
     }
+    if audit is not None:
+        result["audit"] = audit
+    return result
 
 
 def validation_commands(dimension: str, scan: dict[str, Any]) -> list[str]:

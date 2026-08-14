@@ -39,6 +39,25 @@
       "status": "applicable"
     },
     {
+      "id": "developer-legibility-standard",
+      "scope": "external",
+      "distribution": "public_adapter",
+      "contract_fixtures": [
+        "fixtures/contracts/public-adapters/pronto-maturity-feed.json"
+      ],
+      "path": "quality_runner/fleet/documentation_visibility.py, quality_runner/fleet/documentation_visibility_support.py, docs/maturity-gates.md, and Pronto route projection",
+      "owner": "Quality Runner and Pronto integration owners",
+      "condition": "Developer-legibility lanes, naming/comment/docstring policy, maturity caps, newcomer evidence, score, or consumer projection changes.",
+      "operations": ["add", "change", "remove"],
+      "validation": [
+        "uv run --locked pytest -q tests/test_documentation_visibility.py tests/test_fleet_audit.py tests/test_repository_maturity.py",
+        "uv run --locked ruff check quality_runner/fleet/documentation_visibility.py quality_runner/fleet/documentation_visibility_support.py tests/test_documentation_visibility.py",
+        "qr fleet audit run --repo-path FIXTURE --standard developer-legibility --json",
+        "Pronto route consumer readback exposes developer_legibility without interpreting comments as semantic proof."
+      ],
+      "status": "applicable"
+    },
+    {
       "id": "fleet-consumers",
       "scope": "external",
       "distribution": "public_adapter",

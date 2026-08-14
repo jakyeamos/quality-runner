@@ -9,6 +9,7 @@ from quality_runner.fleet.agent_usability import assess_agent_usability
 from quality_runner.fleet.behavior_assurance import assess_behavior_assurance
 from quality_runner.fleet.behavior_finding import behavior_finding_arguments
 from quality_runner.fleet.change_matrix import assess_change_surface_coverage
+from quality_runner.fleet.change_surface_hotspots import assess_change_surface_hotspots
 from quality_runner.fleet.contracts import (
     DEPLOYMENT_MARKERS,
     DIMENSION_LABELS,
@@ -19,6 +20,7 @@ from quality_runner.fleet.contracts import (
     digest,
     standard_dimension,
 )
+from quality_runner.fleet.documentation_visibility import assess_developer_legibility
 from quality_runner.fleet.error_codes import stable_error_code_finding_arguments
 from quality_runner.fleet.legibility_contract import maintained_control
 from quality_runner.fleet.legibility_evidence import (
@@ -238,6 +240,43 @@ def _dimension_finding(
     score = 0
     status = "absent"
     confidence = "medium"
+    root = Path(str(repository["primary_path"])).expanduser().resolve()
+    if dimension == "developer_legibility":
+        assessment = assess_developer_legibility(root, documents, link_evidence, as_of)
+        score = assessment["score"]
+        return _finding(
+            repository=repository,
+            dimension=dimension,
+            score=score,
+            as_of=as_of,
+            status=str(assessment["status"]),
+            severity="observation" if score is None or score >= 2 else "high",
+            priority="P1",
+            confidence="high",
+            message=str(assessment["message"]),
+            evidence=list(assessment["evidence"]),
+            validation_commands=[
+                "qr fleet audit run --repo-path REPO --standard developer-legibility --json"
+            ],
+            audit=assessment,
+        )
+    if dimension == "change_surface_hotspots":
+        assessment = assess_change_surface_hotspots(root, as_of)
+        score = assessment["score"]
+        return _finding(
+            repository=repository,
+            dimension=dimension,
+            score=score,
+            as_of=as_of,
+            status=str(assessment["status"]),
+            severity="observation",
+            priority="P2",
+            confidence="medium",
+            message=str(assessment["message"]),
+            evidence=list(assessment["evidence"]),
+            validation_commands=["qr fleet audit run --repo-path REPO --json"],
+            audit=assessment,
+        )
     if dimension in maturity_assessments:
         assessment = maturity_assessments[dimension]
         return _finding(
