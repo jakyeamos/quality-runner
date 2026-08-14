@@ -7,6 +7,7 @@
     {
       "id": "matrix-maintenance",
       "scope": "local",
+      "distribution": "local_only",
       "path": ".agents/change-surface-matrix.json",
       "owner": "repository-owner",
       "condition": "A material feature, functionality, behavior, CLI/API, workflow, data, integration, security/privacy, or quality/release change is added or changed.",
