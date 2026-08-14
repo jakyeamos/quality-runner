@@ -18,6 +18,24 @@ Consumers should invoke QR through the source-first contract in
 [Consumer Tooling](consumer-tooling.md), not through a copied package or an
 unverified global binary.
 
+## GitHub Actions failure prompt bridge
+
+This repository also has an optional `.github/workflows/codex-ci-prompt.yml`
+consumer workflow. It listens for completed `CI` runs whose conclusion is
+`failure`, `cancelled`, `timed_out`, or `action_required`, then uses the
+published `jakyeamos/ci-incident-router` action to create one bounded artifact
+containing `codex-ci-prompt.json` and `codex-ci-prompt.md`.
+
+The action is pinned to a verified bridge commit. The prompt workflow does not
+check out the failed run's commit, execute pull-request code, modify source,
+commit, push, comment, or start Codex. Logs, patches, workflow names, and pull
+request text remain untrusted evidence; fork pull requests stay diagnosis-only.
+
+The workflow must be present on this repository's default branch before
+`workflow_run` can trigger it. A live pilot is complete only after a failed CI
+run produces the artifact, the artifact contains exactly the two prompt files,
+and the local bridge `download`/`consume` commands read it back successfully.
+
 The stable handoff for any consumer is the artifact set in
 `.quality-runner/runs/<run-id>/`:
 
