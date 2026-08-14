@@ -8,8 +8,46 @@
       "path": "contract.json",
       "parent_id": null,
       "status": "active"
+    },
+    {
+      "id": "audit-evidence-engine",
+      "kind": "subsystem",
+      "path": "audit-evidence-engine.json",
+      "parent_id": "project",
+      "status": "draft"
+    },
+    {
+      "id": "review-handoff-output",
+      "kind": "subsystem",
+      "path": "review-handoff-output.json",
+      "parent_id": "project",
+      "status": "draft"
+    },
+    {
+      "id": "consumer-contracts",
+      "kind": "subsystem",
+      "path": "consumer-contracts.json",
+      "parent_id": "project",
+      "status": "draft"
     }
   ],
-  "links": [],
-  "updated_at": "2026-08-14T23:11:30.026Z"
+  "links": [
+    {
+      "id": "audit-evidence-engine-to-review-handoff-output",
+      "from": "audit-evidence-engine",
+      "to": "review-handoff-output",
+      "kind": "handoff",
+      "summary": "Audit evidence feeds review-ready output; serialization and preservation boundaries remain to be ratified.",
+      "status": "unknown"
+    },
+    {
+      "id": "audit-evidence-engine-to-consumer-contracts",
+      "from": "audit-evidence-engine",
+      "to": "consumer-contracts",
+      "kind": "handoff",
+      "summary": "Producer evidence feeds external contracts; consumer applicability and readback remain open.",
+      "status": "unknown"
+    }
+  ],
+  "updated_at": "2026-08-14T23:31:00Z"
 }
