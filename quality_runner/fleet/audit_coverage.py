@@ -71,7 +71,7 @@ def assess_audit_coverage(repository: dict[str, Any]) -> dict[str, Any]:
 def summarize_audit_coverage(results: list[dict[str, Any]]) -> dict[str, Any]:
     counts: dict[str, int] = {}
     gaps: list[str] = []
-    provenance: list[object] = []
+    provenance: list[tuple[str, object]] = []
     for result in results:
         repository = _object(result.get("repository"))
         coverage = _object(repository.get("audit_coverage"))
@@ -79,7 +79,7 @@ def summarize_audit_coverage(results: list[dict[str, Any]]) -> dict[str, Any]:
         counts[status] = counts.get(status, 0) + 1
         if status != "complete":
             gaps.append(f"{result.get('repo_id')}:audit_coverage:{status}")
-        provenance.append(coverage)
+        provenance.append((str(result.get("repo_id", "")), coverage))
     complete = counts.get("complete", 0)
     return {
         "summary": {
@@ -89,7 +89,7 @@ def summarize_audit_coverage(results: list[dict[str, Any]]) -> dict[str, Any]:
             "canonical_publication_ready": bool(results) and complete == len(results),
         },
         "gaps": gaps,
-        "provenance": provenance,
+        "provenance": [coverage for _, coverage in sorted(provenance)],
     }
 
 
