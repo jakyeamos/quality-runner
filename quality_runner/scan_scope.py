@@ -17,14 +17,14 @@ from quality_runner.scan_exclusions import (
     record_scan_activity,
 )
 from quality_runner.scan_scope_helpers import (
-    scope_allows_directory,
-    scope_includes_file,
     effective_scan_exclusions,
     generated_paths,
     is_scan_excluded,
     is_security_surface_file,
     is_text_file,
     normalized_path_list,
+    scope_allows_directory,
+    scope_includes_file,
 )
 from quality_runner.scan_scope_reading import read_text_file
 from quality_runner.scan_scope_reporting import (

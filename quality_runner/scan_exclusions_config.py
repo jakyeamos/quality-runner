@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-from quality_runner.scan_exclusions import SCAN_EXCLUSION_MODULES, normalize_scan_exclusion_module
 from typing import Any, cast
+
+from quality_runner.scan_exclusions import SCAN_EXCLUSION_MODULES, normalize_scan_exclusion_module
 
 
 def parse_scan_exclusions_by_module(

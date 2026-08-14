@@ -449,11 +449,15 @@ def _scan_projection(scan: dict[str, Any]) -> dict[str, Any]:
 
 def _validation_commands(dimension: str, scan: dict[str, Any]) -> list[str]:
     quality_commands = scan.get("quality_commands", [])
-    commands = [
-        str(cast(dict[str, Any], item).get("command"))
-        for item in cast(list[Any], quality_commands)
-        if isinstance(item, dict) and isinstance(cast(dict[str, Any], item).get("command"), str)
-    ] if isinstance(quality_commands, list) else []
+    commands = (
+        [
+            str(cast(dict[str, Any], item).get("command"))
+            for item in cast(list[Any], quality_commands)
+            if isinstance(item, dict) and isinstance(cast(dict[str, Any], item).get("command"), str)
+        ]
+        if isinstance(quality_commands, list)
+        else []
+    )
     if dimension == "quality_commands" and commands:
         return commands[:6]
     return ["qr audit REPO --profile environment-legibility --json"]

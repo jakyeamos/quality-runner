@@ -231,7 +231,9 @@ def _module_status_from_artifacts(artifact_paths: dict[str, str]) -> dict[str, A
         payload = json.loads(Path(path).read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         return {}
-    module_status = cast(dict[str, Any], payload).get("module_status") if isinstance(payload, dict) else None
+    module_status = (
+        cast(dict[str, Any], payload).get("module_status") if isinstance(payload, dict) else None
+    )
     return cast(dict[str, Any], module_status) if isinstance(module_status, dict) else {}
 
 

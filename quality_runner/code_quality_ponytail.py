@@ -355,8 +355,7 @@ def _lines(item: dict[str, Any]) -> list[str]:
     lines = item.get("lines")
     return (
         [line for line in cast(list[Any], lines) if isinstance(line, str)]
-        if isinstance(lines, list)
-        and all(isinstance(line, str) for line in cast(list[Any], lines))
+        if isinstance(lines, list) and all(isinstance(line, str) for line in cast(list[Any], lines))
         else []
     )
 
@@ -410,7 +409,11 @@ def _package_dependencies(scanned_files: list[dict[str, Any]]) -> set[str]:
             except json.JSONDecodeError:
                 continue
             for section in ("dependencies", "devDependencies", "optionalDependencies"):
-                values = cast(dict[str, Any], payload).get(section) if isinstance(payload, dict) else None
+                values = (
+                    cast(dict[str, Any], payload).get(section)
+                    if isinstance(payload, dict)
+                    else None
+                )
                 if isinstance(values, dict):
                     dependencies.update(str(key) for key in cast(dict[str, Any], values))
     return dependencies

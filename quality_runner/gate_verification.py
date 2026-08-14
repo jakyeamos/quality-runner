@@ -133,12 +133,15 @@ def apply_gate_verification(
     capability_map: dict[str, Any], verification: dict[str, Any]
 ) -> dict[str, Any]:
     gates_value = verification.get("gates", [])
-    results: dict[str, dict[str, Any]] = {
-        cast(dict[str, Any], gate)["id"]: cast(dict[str, Any], gate)
-        for gate in cast(list[Any], gates_value)
-        if isinstance(gate, dict)
-        and isinstance(cast(dict[str, Any], gate).get("id"), str)
-    } if isinstance(gates_value, list) else {}
+    results: dict[str, dict[str, Any]] = (
+        {
+            cast(dict[str, Any], gate)["id"]: cast(dict[str, Any], gate)
+            for gate in cast(list[Any], gates_value)
+            if isinstance(gate, dict) and isinstance(cast(dict[str, Any], gate).get("id"), str)
+        }
+        if isinstance(gates_value, list)
+        else {}
+    )
     updated = dict(capability_map)
     available: list[dict[str, Any]] = []
     for capability in _available_capabilities(capability_map):

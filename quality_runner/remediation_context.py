@@ -4,6 +4,9 @@ from collections import Counter
 from pathlib import Path
 from typing import Any, cast
 
+from quality_runner.remediation_context_summary import (
+    remediation_context_summary as remediation_context_summary,
+)
 from quality_runner.schema_constants import REMEDIATION_CONTEXT_SCHEMA
 
 _CONTEXT_STATUSES = {"needs-understanding", "ready"}
@@ -38,6 +41,7 @@ _HIGH_RISK_PATH_MARKERS = (
     "storage",
     "webhook",
 )
+
 
 def build_remediation_context(
     *,
@@ -87,6 +91,7 @@ def build_remediation_context(
         "summary": summary,
     }
 
+
 def attach_context_refs(
     slices: list[dict[str, Any]],
     context: dict[str, Any],
@@ -110,36 +115,6 @@ def attach_context_refs(
         enriched.append(item)
     return enriched
 
-def remediation_context_summary(
-    context: dict[str, Any] | None,
-    *,
-    artifact_path: str | None = None,
-) -> dict[str, Any] | None:
-    if not isinstance(context, dict):
-        return None
-    context_map = context
-    summary = _dict(context_map.get("summary"))
-    if summary is None and "status" in context_map:
-        summary = context
-    if summary is None:
-        return None
-
-    def _count(name: str) -> int:
-        value = summary.get(name)
-        return value if isinstance(value, int) and value >= 0 else 0
-
-    result: dict[str, Any] = {
-        "schema": context_map.get("schema", REMEDIATION_CONTEXT_SCHEMA),
-        "status": summary.get("status", "needs-understanding"),
-        "blocking": bool(summary.get("blocking", True)),
-        "record_count": _count("record_count"),
-        "finding_count": _count("finding_count"),
-        "ready_count": _count("ready_count"),
-        "pending_count": _count("pending_count"),
-    }
-    if isinstance(artifact_path, str) and artifact_path:
-        result["artifact_path"] = artifact_path
-    return result
 
 def build_remediation_context_for_plan(
     *,
@@ -161,6 +136,7 @@ def build_remediation_context_for_plan(
         repo_scan=repo_scan,
         git_state=git_state,
     )
+
 
 def validate_remediation_context(
     context: dict[str, Any],
@@ -246,6 +222,7 @@ def validate_remediation_context(
                 errors.append(f"remediation context summary field {field} is stale")
     return {"passed": not errors, "errors": errors, "readiness": readiness}
 
+
 def _build_record(
     slice_item: dict[str, Any],
     *,
@@ -327,6 +304,7 @@ def _build_record(
         "verification": verification,
     }
 
+
 def _validate_record(record: dict[str, Any], *, index: int) -> list[str]:
     errors: list[str] = []
     label = str(record.get("slice_id") or f"at index {index}")
@@ -367,6 +345,7 @@ def _validate_record(record: dict[str, Any], *, index: int) -> list[str]:
         errors.append(f"remediation context record {label} verification is incomplete")
     return errors
 
+
 def _risk_tier(slice_item: dict[str, Any], *, categories: list[str], files: list[str]) -> str:
     domain = str(slice_item.get("domain") or "")
     lowered_files = [file.lower() for file in files]
@@ -379,6 +358,7 @@ def _risk_tier(slice_item: dict[str, Any], *, categories: list[str], files: list
     if domain in _CROSS_LAYER_DOMAINS or len(files) > 1:
         return "cross-layer"
     return "local"
+
 
 def _boundaries(slice_item: dict[str, Any], *, files: list[str]) -> list[str]:
     values = {
@@ -399,6 +379,7 @@ def _boundaries(slice_item: dict[str, Any], *, files: list[str]) -> list[str]:
             values.add(boundary)
     return sorted(values)
 
+
 def _finding_anchor(finding: dict[str, Any]) -> dict[str, Any] | None:
     finding_id = finding.get("id")
     if not isinstance(finding_id, str) or not finding_id:
@@ -409,6 +390,7 @@ def _finding_anchor(finding: dict[str, Any]) -> dict[str, Any] | None:
         if (isinstance(value, str) and value) or (isinstance(value, int) and value > 0):
             anchor[field] = value
     return anchor
+
 
 def _repo_context(repo_scan: dict[str, Any] | None) -> dict[str, Any]:
     repo_scan_map = _dict(repo_scan)
@@ -434,6 +416,7 @@ def _repo_context(repo_scan: dict[str, Any] | None) -> dict[str, Any]:
             result["intent_docs"] = sorted(set(paths))
     return result
 
+
 def _planned_git(git_state: dict[str, Any] | None) -> dict[str, Any] | None:
     if not isinstance(git_state, dict):
         return None
@@ -443,6 +426,7 @@ def _planned_git(git_state: dict[str, Any] | None) -> dict[str, Any] | None:
         if git_state.get(key) is not None
     }
     return result or None
+
 
 def _plan_slice_ids(remediation_plan: dict[str, Any] | None) -> set[str]:
     if not isinstance(remediation_plan, dict):
@@ -459,13 +443,16 @@ def _plan_slice_ids(remediation_plan: dict[str, Any] | None) -> set[str]:
         )
     return ids
 
+
 def _all_agent_fields() -> tuple[str, ...]:
     return (*_BASE_AGENT_FIELDS, "impact_map", "affected_boundaries", "verification_baseline")
+
 
 def _string_list(value: object) -> list[str]:
     if not _is_string_list(value, allow_empty=True):
         return []
     return list(cast(list[str], value))
+
 
 def _is_string_list(value: object, *, allow_empty: bool) -> bool:
     if not isinstance(value, list):
@@ -474,6 +461,7 @@ def _is_string_list(value: object, *, allow_empty: bool) -> bool:
     return (allow_empty or bool(typed_value)) and all(
         isinstance(item, str) and item for item in typed_value
     )
+
 
 def _empty_readiness() -> dict[str, Any]:
     return {
@@ -486,8 +474,10 @@ def _empty_readiness() -> dict[str, Any]:
         "by_risk_tier": {},
     }
 
+
 def _dict(value: object) -> dict[str, Any] | None:
     return cast(dict[str, Any], value) if isinstance(value, dict) else None
+
 
 def _dict_list(value: object) -> list[dict[str, Any]]:
     if not isinstance(value, list):

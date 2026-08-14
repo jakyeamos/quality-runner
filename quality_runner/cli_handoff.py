@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import argparse
-from typing import Any, cast
 import json
 from pathlib import Path
+from typing import Any, cast
 
 from quality_runner.findings import validate_agent_handoff
 from quality_runner.handoff_lint import validate_handoff_quality, validate_slice_spec_content

@@ -9,6 +9,7 @@ from typing import Any, cast
 
 from quality_runner.schema_constants import GLOBAL_SKILL_CONFIG_SCHEMA, SKILL_SELECTION_SCHEMA
 from quality_runner.skill_config import load_active_skills, sanitize_skill_id
+from quality_runner.skill_selection_support import _diagnostic_signals, _global_warning
 
 GLOBAL_SKILL_CONFIG_ENV = "QUALITY_RUNNER_GLOBAL_CONFIG"
 GLOBAL_SKILL_CORPUS_ENV = "QUALITY_RUNNER_SKILL_CORPUS"
@@ -81,6 +82,7 @@ _MARKER_SIGNALS: dict[str, set[str]] = {
     "vite.config.js": {"javascript", "vite", "web"},
     "vite.config.ts": {"typescript", "vite", "web"},
 }
+
 
 def load_selected_skills(
     repo_root: Path,
@@ -246,6 +248,7 @@ def load_selected_skills(
         selection,
     )
 
+
 def load_global_skill_config(
     global_config_path: Path | None = None,
 ) -> tuple[dict[str, Any] | None, list[dict[str, str]]]:
@@ -340,6 +343,7 @@ def load_global_skill_config(
         warnings,
     )
 
+
 def repository_skill_signals(
     repo_root: Path,
     scanned_files: Iterable[dict[str, Any]],
@@ -366,6 +370,7 @@ def repository_skill_signals(
             values.append(name.lstrip("."))
     return sorted({token for value in values for token in _tokens(value)})
 
+
 def _selection_base(*, local_ids: list[str]) -> dict[str, Any]:
     return {
         "schema": SKILL_SELECTION_SCHEMA,
@@ -387,6 +392,7 @@ def _selection_base(*, local_ids: list[str]) -> dict[str, Any]:
         "warnings": [],
     }
 
+
 def _discover_global_config_path(requested_path: Path | None) -> Path | None:
     if requested_path is not None:
         path = requested_path.expanduser().resolve()
@@ -405,6 +411,7 @@ def _discover_global_config_path(requested_path: Path | None) -> Path | None:
             return candidate.resolve()
     return None
 
+
 def _configured_ids(section: object, key: str) -> list[str]:
     if not isinstance(section, dict):
         return []
@@ -417,6 +424,7 @@ def _configured_ids(section: object, key: str) -> list[str]:
         if skill_id is not None and skill_id not in normalized:
             normalized.append(skill_id)
     return normalized
+
 
 def _config_ids(
     value: object,
@@ -441,6 +449,7 @@ def _config_ids(
             normalized.append(skill_id)
     return normalized
 
+
 def _pack_score(pack_entry: dict[str, Any], signals: set[str]) -> tuple[float, list[str]]:
     pack = pack_entry.get("pack")
     if not isinstance(pack, dict):
@@ -453,6 +462,7 @@ def _pack_score(pack_entry: dict[str, Any], signals: set[str]) -> tuple[float, l
     denominator = max(1, min(len(selection_terms), 8))
     score = round(min(1.0, len(match_terms) / denominator), 3)
     return score, match_terms
+
 
 def _pack_terms(pack: dict[str, Any]) -> set[str]:
     values: list[str] = []
@@ -478,22 +488,10 @@ def _pack_terms(pack: dict[str, Any]) -> set[str]:
                     )
     return {token for value in values for token in _tokens(value)}
 
+
 def _tokens(value: str) -> set[str]:
     return {
         token
         for token in _TOKEN_RE.findall(value.lower().replace("_", " ").replace("-", " "))
         if token not in _SELECTION_STOP_WORDS
-    }
-
-def _diagnostic_signals(signals: set[str], *, priority: set[str] | None = None) -> list[str]:
-    meaningful = {token for token in signals if not token.isdigit()}
-    prioritized = sorted(meaningful & (priority or set()))
-    remainder = sorted(meaningful - set(prioritized))
-    return [*prioritized, *remainder][:160]
-
-def _global_warning(path: object, message: str) -> dict[str, str]:
-    return {
-        "code": "invalid_quality_runner_global_skill_config",
-        "message": f"global Quality Skill config: {message}",
-        "path": str(path) if path else "<global-quality-runner-config>",
     }
