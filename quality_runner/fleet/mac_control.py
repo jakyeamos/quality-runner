@@ -146,8 +146,6 @@ def mac_control_audit_payload(
     }
 
 
-
-
 def _repositories_for_scope(
     root: Path, repository_paths: list[Path] | None
 ) -> list[dict[str, Any]]:

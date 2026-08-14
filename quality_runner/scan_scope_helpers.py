@@ -39,9 +39,7 @@ def _scope_allows_directory(path: str, include_paths: tuple[str, ...]) -> bool:
     if normalized == ".":
         normalized = ""
     return not normalized or any(
-        item == normalized
-        or item.startswith(f"{normalized}/")
-        or normalized.startswith(f"{item}/")
+        item == normalized or item.startswith(f"{normalized}/") or normalized.startswith(f"{item}/")
         for item in include_paths
     )
 

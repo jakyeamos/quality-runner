@@ -72,11 +72,15 @@ def test_balanced_tenure_sized_fixture_is_incremental(tmp_path: Path) -> None:
 
 
 def test_performance_receipt_is_bounded_and_resumable() -> None:
-    recorder = PerformanceRecorder(analysis_mode="balanced", cache_mode="external", budget_seconds=0)
+    recorder = PerformanceRecorder(
+        analysis_mode="balanced", cache_mode="external", budget_seconds=0
+    )
     with recorder.stage("discovery"):
         pass
 
-    receipt = recorder.receipt(resume_command="quality-runner refresh /repo --analysis-mode balanced")
+    receipt = recorder.receipt(
+        resume_command="quality-runner refresh /repo --analysis-mode balanced"
+    )
 
     assert receipt["status"] == "partial"
     assert receipt["budget_exceeded"] is True

@@ -53,7 +53,9 @@ def validate_v2_task(task: dict[str, Any], label: str, errors: list[str]) -> Non
                 errors.append(f"task {label} verification_oracle requires {key}")
         kind = _normalize_token(oracle.get("kind"))
         if kind not in ORACLE_KINDS:
-            errors.append(f"task {label} verification_oracle kind is unsupported: {kind or 'missing'}")
+            errors.append(
+                f"task {label} verification_oracle kind is unsupported: {kind or 'missing'}"
+            )
         if oracle.get("independent_readback") is not True:
             errors.append(f"task {label} verification_oracle requires independent_readback true")
 
@@ -80,9 +82,7 @@ def validate_v2_task(task: dict[str, Any], label: str, errors: list[str]) -> Non
         )
 
 
-def validate_shortcut_acceleration(
-    task: dict[str, Any], label: str, errors: list[str]
-) -> None:
+def validate_shortcut_acceleration(task: dict[str, Any], label: str, errors: list[str]) -> None:
     shortcut = task.get("shortcut_acceleration")
     if not isinstance(shortcut, dict):
         errors.append(f"task {label} shortcut_acceleration must be an object")
