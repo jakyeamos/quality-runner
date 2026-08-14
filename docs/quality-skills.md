@@ -108,6 +108,7 @@ Quality Runner now owns the command-backed profile and fleet orchestration:
 qr audit /path/to/repo --profile environment-legibility --json
 qr fleet audit run --all --projects-root /path/to/projects --json
 qr fleet audit run --all --projects-root /path/to/projects --standard matrix-maintenance --json
+qr fleet audit run --all --projects-root /path/to/projects --standard cache-design --json
 qr fleet audit feed --audit-id AUDIT_ID --json
 ```
 
@@ -129,6 +130,13 @@ dimension. Its repository score, fleet mean, non-passing gap, and Pronto
 remediation action come from the same canonical feed. The scoped
 `--standard matrix-maintenance` command remains a diagnostic inventory and does
 not update that feed by itself.
+
+Use `--standard cache-design` for the read-only derived-storage lane. It
+classifies tool caches, build outputs, dependency materializations, durable
+state, and ambiguous storage; it never runs cleanup or repository commands.
+Raw size is diagnostic only. Incomplete traversal stays `unknown`, and a
+standard-only snapshot remains non-publishable until a complete audit passes
+replay.
 
 Maturity v2 aggregates evidence as dimensions, then capabilities, then seven
 weighted pillars. Conditional capabilities preserve explicit applicability,

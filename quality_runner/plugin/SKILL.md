@@ -91,6 +91,12 @@ An alternate checkout may donate a JavaScript dependency tree only when its
 package-manager declaration, dependency fields, and lockfile signature match
 the detached target.
 
+Use `qr fleet audit run --all --standard cache-design --json` for a read-only
+derived-storage maturity slice. Inspect its private `standard-report.json`; do
+not publish a standard-scoped snapshot as the canonical feed. The detector does
+not execute cleanup or repository commands, raw size alone is not a failure,
+and unknown traversal evidence must remain unknown.
+
 Agent workflow:
 
 1. Run QR before editing source.

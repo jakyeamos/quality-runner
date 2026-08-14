@@ -3,12 +3,35 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+from quality_runner.fleet.cache_design import assess_cache_design
 from quality_runner.fleet.contracts import (
     FLEET_STANDARD_REPORT_SCHEMA,
     digest,
     standard_dimension,
 )
 from quality_runner.fleet.matrix_maintenance import assess_matrix_maintenance
+
+
+def cache_design_finding_arguments(
+    *, repository: dict[str, Any], config: dict[str, Any], as_of: str
+) -> dict[str, Any]:
+    assessment = assess_cache_design(
+        Path(str(repository["primary_path"])).expanduser().resolve(), config, as_of
+    )
+    return {
+        "repository": repository,
+        "dimension": "cache_design",
+        "score": assessment["score"],
+        "as_of": as_of,
+        "status": assessment["status"],
+        "severity": "observation",
+        "priority": "P1",
+        "confidence": "high" if assessment["status"] != "unknown" else "medium",
+        "message": assessment["message"],
+        "evidence": [assessment],
+        "validation_commands": ["qr fleet audit run --all --standard cache-design --json"],
+        "applicability": assessment["applicability"],
+    }
 
 
 def matrix_maintenance_finding_arguments(

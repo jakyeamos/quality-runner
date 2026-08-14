@@ -24,13 +24,14 @@ lane instead:
 
 ```bash
 qr fleet audit run --all --projects-root /path/to/projects \
-  --standard matrix-maintenance --json
+  --standard cache-design --json
 ```
 
 The snapshot contains `standard-report.json` with one redacted row per audited
 repository. It is deliberately not a canonical maturity-feed input: a
 one-standard result cannot stand in for the full maturity inventory, so
 `qr fleet audit feed` rejects it. Replay and inspect the report directly.
+`matrix-maintenance` is the other supported standard scope.
 
 The feed contains the QR audit ID, timestamp, replay status, provenance hash,
 fleet counts, aggregate maturity distributions, unresolved measurement gaps,
@@ -61,6 +62,12 @@ accessibility, performance, critical user journeys, holistic web readiness,
 ownership continuity, maintenance continuity, and conditional
 license/contribution readiness. Web evidence reuses the bounded web-readiness
 checks, while security evidence reuses the security-capability detector.
+The governance pillar also contains conditional `cache_lifecycle`, produced by
+the canonical `cache_design` dimension. Its aggregate projection preserves
+applicable, not-applicable, unknown, stale, blocked, failed, and missing states.
+Only redacted class totals, risk flags, and growth metrics are published; the
+private standard report retains repository-relative surface paths. The pilot
+can affect the weighted score but cannot apply a critical cap or release block.
 
 The model draws on the ISO/IEC 25010 product-quality characteristic structure,
 OpenSSF Scorecard's risk-sensitive aggregation and explicit unknown results,

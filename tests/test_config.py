@@ -50,6 +50,7 @@ def test_load_repo_config_reads_default_profile_required_capabilities_and_except
         "gate_timeouts": {},
         "severity_overrides": {},
         "structural_scan": {},
+        "cache_design": {},
         "warnings": [],
     }
 
@@ -387,6 +388,7 @@ def test_load_repo_config_reports_missing_invalid_and_malformed_values(tmp_path)
         "gate_timeouts": {},
         "severity_overrides": {},
         "structural_scan": {},
+        "cache_design": {},
         "warnings": [],
     }
 

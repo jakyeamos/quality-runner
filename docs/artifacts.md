@@ -321,6 +321,16 @@ misses, recomputation counts, and invalidation reasons. Cache entries are
 validated before reuse and written atomically; missing, corrupt, or interrupted
 cache state recomputes the affected file instead of being treated as fresh.
 
+QR enforces both count and allocated-byte LRU limits inside validated QR-owned
+roots: incremental, source-analysis, and semantic-similarity namespaces are each
+limited to 64 MiB; repository inventory is limited to 16 MiB and the newest
+eight repository identities. Pruning atomically detaches only validated regular
+files inside the owned namespace and cannot traverse a symlink. UV downloads
+default to one external QR-owned `shared-tools/uv-v1` cache unless
+`UV_CACHE_DIR` is explicitly set. XDG state remains repository-local except for
+the version-keyed Quality Runner allowlist; other tools are never assumed safe
+to share.
+
 The cache is not a scan input: `.quality-runner/` remains excluded from source
 discovery, and cache entries contain only validated scanner results. Run output
 continues to live under `.quality-runner/runs/<run-id>/`. Cache persistence is an

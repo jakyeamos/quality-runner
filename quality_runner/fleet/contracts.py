@@ -17,7 +17,11 @@ FLEET_REPORT_SCHEMA = "quality-runner-fleet-report-v0.1"
 FLEET_STANDARD_REPORT_SCHEMA = "quality-runner-fleet-standard-report-v1"
 
 MATRIX_MAINTENANCE_STANDARD = "matrix-maintenance"
-STANDARD_DIMENSIONS = {MATRIX_MAINTENANCE_STANDARD: "matrix_maintenance"}
+CACHE_DESIGN_STANDARD = "cache-design"
+STANDARD_DIMENSIONS = {
+    MATRIX_MAINTENANCE_STANDARD: "matrix_maintenance",
+    CACHE_DESIGN_STANDARD: "cache_design",
+}
 SUPPORTED_FLEET_STANDARDS = tuple(STANDARD_DIMENSIONS)
 
 DIMENSIONS = (
@@ -31,6 +35,7 @@ DIMENSIONS = (
     "critical_user_journeys",
     "data_integrity_migration",
     "dependency_vulnerability",
+    "cache_design",
     "matrix_maintenance",
     "quality_commands",
     "coding_conventions",
@@ -65,6 +70,7 @@ DIMENSION_LABELS = {
     "critical_user_journeys": "critical user-journey verification",
     "data_integrity_migration": "data-integrity and migration safety",
     "dependency_vulnerability": "dependency and vulnerability risk",
+    "cache_design": "cache design and lifecycle",
     "quality_commands": "build, test, lint, and quality commands",
     "coding_conventions": "coding conventions",
     "security_constraints": "security and credential constraints",

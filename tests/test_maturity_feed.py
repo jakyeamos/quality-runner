@@ -130,6 +130,52 @@ def test_feed_projection_preserves_current_and_future_finding_dimensions() -> No
     assert {gap["dimension"] for gap in projection["dimension_gaps"]} == set(dimensions)
 
 
+def test_cache_design_projection_preserves_state_without_publishing_paths() -> None:
+    projection = _repository_projection(
+        {
+            "repo_id": "repo-1",
+            "primary_path": "/projects/repo-1",
+            "target_branch": {"branch": "dev", "status": "ready", "head": "abc"},
+        },
+        {
+            "repo_id": "repo-1",
+            "findings": [
+                {
+                    "dimension": "cache_design",
+                    "status": "unknown",
+                    "applicability": "unknown",
+                    "score": None,
+                    "severity": "observation",
+                    "priority": "P1",
+                    "message": "Traversal was incomplete.",
+                    "evidence": [
+                        {
+                            "schema": "quality-runner-cache-design-assessment-v1",
+                            "status": "unknown",
+                            "score": None,
+                            "measurement_complete": False,
+                            "totals": {"allocated_bytes": 4096, "file_count": 1},
+                            "categories": {
+                                "tool_cache": {"allocated_bytes": 4096, "file_count": 1}
+                            },
+                            "risk_flags": ["measurement_incomplete"],
+                            "growth": {"available": False, "snapshot_count": 0},
+                            "surfaces": [{"path": ".private/cache"}],
+                        }
+                    ],
+                }
+            ],
+            "dynamic": {"status": "not_selected"},
+            "agent_usability": {},
+        },
+    )
+
+    assert projection["cache_design"]["status"] == "unknown"
+    assert projection["cache_design"]["categories"]["tool_cache"]["allocated_bytes"] == 4096
+    assert "surfaces" not in projection["cache_design"]
+    assert ".private/cache" not in json.dumps(projection["cache_design"])
+
+
 @pytest.mark.parametrize(
     ("dynamic_status", "finding_status", "priority", "dimension", "expected_code"),
     [

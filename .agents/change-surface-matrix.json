@@ -2,7 +2,7 @@
   "schema_version": "change-surface-matrix/v1",
   "subject": {"kind": "repository", "id": "quality-runner"},
   "owner": "repository-owner",
-  "last_reviewed": "2026-08-13",
+  "last_reviewed": "2026-08-14",
   "surfaces": [
     {
       "id": "matrix-maintenance",
@@ -35,13 +35,31 @@
       "status": "applicable"
     },
     {
+      "id": "cache-design-maturity",
+      "scope": "external",
+      "distribution": "public_adapter",
+      "contract_fixtures": [
+        "fixtures/contracts/public-adapters/pronto-maturity-feed.json"
+      ],
+      "path": "quality_runner/cache_*.py, quality_runner/fleet/cache_design.py, .quality-runner.toml, cache-design standard-report evidence, maturity feed, and Pronto",
+      "owner": "Quality Runner and Pronto integration owners",
+      "condition": "derived-storage classification, cache lifecycle policy, cache bounds, standard scoring, redacted feed projection, or consumer presentation changes",
+      "operations": ["add", "change", "remove"],
+      "validation": [
+        "uv run pytest -q tests/test_cache_design.py tests/test_cache_limits.py tests/test_fleet_standard_audit.py tests/test_maturity_feed.py",
+        "uv run --locked qr fleet audit run --all --standard cache-design --json",
+        "Verify complete audit replay and Pronto readback preserve applicable, not_applicable, unknown, stale, blocked, failed, and missing states without publishing cache paths."
+      ],
+      "status": "applicable"
+    },
+    {
       "id": "fleet-consumers",
       "scope": "external",
       "distribution": "public_adapter",
       "contract_fixtures": [
         "fixtures/contracts/public-adapters/pronto-maturity-feed.json"
       ],
-      "path": "installed qr, plugins, Pronto, quality-runner-maturity-feed/v2, and quality-runner-repository-maturity/v2",
+      "path": "installed qr, plugins, Pronto, quality-runner-maturity-feed/v2, quality-runner-cache-design-assessment-v1, and quality-runner-repository-maturity/v2",
       "owner": "integration-owner",
       "condition": "command, plugin, feed schema, taxonomy, publication behavior, maturity pillar, applicability, coverage, cap, or source-dimension changes",
       "operations": ["add", "change", "remove"],

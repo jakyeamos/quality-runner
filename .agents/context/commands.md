@@ -12,10 +12,10 @@ inventory, use a static-only standard scope:
 ```sh
 uv run --locked qr fleet audit run --all \
   --projects-root /path/to/projects \
-  --standard matrix-maintenance --json
+  --standard cache-design --json
 ```
 
-The result writes a private `standard-report.json` that lists every audited
+Use `matrix-maintenance` or `cache-design` as the standard. The result writes a private `standard-report.json` that lists every audited
 repository and its honest state. A standard-scoped snapshot is intentionally
 not publishable as the canonical all-standards maturity feed; replay it and
 inspect the report directly. Fleet dynamic execution prefers root aggregate gates,
@@ -23,13 +23,21 @@ fails closed on unbounded package-only surfaces, honors repository gate
 timeouts only within the CLI ceiling, and never runs discovered mutating or
 unknown-risk formatters.
 
-`matrix_maintenance` is also a canonical dimension of the complete fleet audit.
+`matrix_maintenance` and `cache_design` are canonical dimensions of the complete fleet audit.
 It contributes to each applicable repository's `dimension_scores`,
 `maturity_score`, `dimension_gaps`, fleet means, and Pronto maturity
 remediation. The scoped command above is a diagnostic slice; after it identifies
 gaps, rerun the complete audit without `--standard`, pass replay, publish that
 feed, and refresh Pronto before claiming the score or remediation queue reflects
 the latest evidence.
+
+`cache_design` is a non-release-blocking pilot under governance and
+sustainability. It measures lifecycle classification, safe rebuildability,
+bounds, duplication, and growth evidence; raw bytes alone never reduce a score.
+The audit is read-only, never follows symlinks, and never executes cleanup or
+repository-supplied commands. Add literal repository-relative custom surfaces
+with `[[quality_runner.cache_design.paths]]`; a `bounded` lifecycle requires at
+least one of `max_bytes`, `max_entries`, or `max_age_days`.
 
 The published feed is `quality-runner-maturity-feed/v2`. Its repository score
 flows from dimensions to explicit capabilities to seven weighted pillars, not

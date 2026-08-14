@@ -46,6 +46,7 @@
         "architecture_boundaries": 4.0,
         "artifact_supply_chain": 4.0,
         "behavior_assurance": 4.0,
+        "cache_design": 4.0,
         "change_surface_coverage": 4.0,
         "code_health": 4.0,
         "coding_conventions": 4.0,
@@ -74,6 +75,29 @@
         "strict_policy_visibility": 4.0,
         "strict_type_debt": 4.0,
         "web_readiness": 4.0
+      },
+      "cache_design": {
+        "schema": "quality-runner-cache-design-assessment-v1",
+        "status": "maintained",
+        "score": 4,
+        "measurement_complete": true,
+        "totals": {
+          "logical_bytes": 1048576,
+          "allocated_bytes": 1048576,
+          "exclusive_allocated_bytes": 1048576,
+          "shared_allocated_bytes": 0,
+          "file_count": 16,
+          "shared_file_count": 0
+        },
+        "categories": {
+          "tool_cache": {"allocated_bytes": 1048576, "file_count": 16}
+        },
+        "risk_flags": [],
+        "growth": {
+          "snapshot_count": 2,
+          "within_policy": true,
+          "allocated_bytes_delta": 0
+        }
       },
       "repository_maturity": {
         "schema": "quality-runner-repository-maturity/v2",
@@ -146,9 +170,10 @@
               {"id": "ownership_continuity", "applicability": "applicable", "status": "maintained", "score": 4.0, "dimension_scores": {"ownership_continuity": 4.0}, "producer_dimensions": ["ownership_continuity"]},
               {"id": "maintenance_continuity", "applicability": "applicable", "status": "maintained", "score": 4.0, "dimension_scores": {"maintenance_health": 4.0}, "producer_dimensions": ["maintenance_health"]},
               {"id": "license_and_contribution", "applicability": "applicable", "status": "maintained", "score": 4.0, "dimension_scores": {"license_contribution": 4.0}, "producer_dimensions": ["license_contribution"]},
+              {"id": "cache_lifecycle", "applicability": "applicable", "status": "maintained", "score": 4.0, "dimension_scores": {"cache_design": 4.0}, "producer_dimensions": ["cache_design"]},
               {"id": "completion_and_matrix_discipline", "applicability": "applicable", "status": "maintained", "score": 4.0, "dimension_scores": {"definition_of_done": 4.0, "matrix_maintenance": 4.0}, "producer_dimensions": ["definition_of_done", "matrix_maintenance"]}
             ],
-            "dimension_scores": {"definition_of_done": 4.0, "license_contribution": 4.0, "maintenance_health": 4.0, "matrix_maintenance": 4.0, "ownership_continuity": 4.0}, "missing_capabilities": [], "critical_dimensions": []
+            "dimension_scores": {"cache_design": 4.0, "definition_of_done": 4.0, "license_contribution": 4.0, "maintenance_health": 4.0, "matrix_maintenance": 4.0, "ownership_continuity": 4.0}, "missing_capabilities": [], "critical_dimensions": []
           }
         ],
         "evidence": {
@@ -182,5 +207,5 @@
     "raw_transcripts": false,
     "credentials": false
   },
-  "provenance_hash": "d9932343390ff4a9c39e87d6f5f925c360effc8e46a934e7062a657ec0ed62a5"
+  "provenance_hash": "efcf59c79893d75475069b2e2c1f269ce12c1c74ab6ca067adf47b3ce8719071"
 }

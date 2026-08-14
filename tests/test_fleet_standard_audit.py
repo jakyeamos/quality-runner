@@ -155,3 +155,34 @@ def test_cli_exposes_one_standard_scope() -> None:
     )
 
     assert args.standard == "matrix-maintenance"
+
+    cache_args = build_parser().parse_args(
+        ["fleet", "audit", "run", "--all", "--standard", "cache-design", "--json"]
+    )
+    assert cache_args.standard == "cache-design"
+
+
+def test_cache_design_standard_emits_private_assessment_and_is_not_publishable(
+    tmp_path: Path,
+) -> None:
+    projects = tmp_path / "projects"
+    root = projects / "fixture"
+    _init_repo(root)
+    (root / ".cache").mkdir()
+    (root / ".cache/item").write_bytes(b"small")
+
+    audit = fleet_audit_payload(
+        projects_root=projects,
+        output_dir=tmp_path / "audit-output",
+        standard="cache-design",
+        as_of=AS_OF,
+    )
+
+    row = audit["standard_report"]["repositories"][0]
+    assert row["score"] == 1
+    assert row["status"] == "discoverable"
+    assert row["evidence"][0]["schema"] == "quality-runner-cache-design-assessment-v1"
+    assert row["evidence"][0]["surfaces"][0]["path"] == ".cache"
+    assert audit["maturity_feed"]["status"] == "not_applicable"
+    with pytest.raises(MaturityFeedError, match="standard-scoped"):
+        fleet_feed_payload(output_dir=Path(audit["artifact_root"]))
