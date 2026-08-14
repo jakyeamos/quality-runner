@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "sessions": [
+    {
+      "id": "quality-runner-root-realignment-20260814",
+      "mode": "realignment",
+      "compass_id": "project",
+      "scope_kind": "root",
+      "status": "active",
+      "questions": [
+        {
+          "id": "quality-runner-subsystem-model",
+          "category": "subsystem-model",
+          "prompt": "Should child Compasses follow the audit and evidence engine, remediation-plan and handoff output, and fleet or consumer integrations?"
+        },
+        {
+          "id": "quality-runner-evidence-boundary",
+          "category": "evidence-boundary",
+          "prompt": "Should Mac Control ideal-state checks and web-readiness checks be independent child Compasses, or adapters under one quality-evidence Compass?"
+        },
+        {
+          "id": "quality-runner-consumer-authority",
+          "category": "consumer-boundary",
+          "prompt": "Which consumer boundary must be strictly aligned: Pronto, agent handoff, the published CLI, or all of them?"
+        }
+      ],
+      "answers": [],
+      "started_at": "2026-08-14T23:24:00Z",
+      "updated_at": "2026-08-14T23:24:00Z"
+    }
+  ],
+  "updated_at": "2026-08-14T23:24:00Z"
+}
