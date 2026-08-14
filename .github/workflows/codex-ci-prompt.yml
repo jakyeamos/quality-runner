@@ -20,7 +20,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Generate bounded prompt artifacts
-        uses: jakyeamos/ci-incident-router@12751d0a301be03ef628c0ec2a970c143bb7edac
+        uses: jakyeamos/ci-incident-router@e30be990eca3310fc5052896a1df27adc7331f6d
         with:
           run-id: ${{ github.event.workflow_run.id }}
           repository: ${{ github.repository }}
