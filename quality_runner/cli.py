@@ -70,6 +70,7 @@ Advanced operations:
   handoff tools
 
 Fleet environment audit:
+  fleet detector refresh --all  publish full exact-target detector evidence for Pronto
   fleet audit run --all       static-all audit with optional changed-only dynamic checks
   fleet audit run --repo-path PATH  bounded audit slice for selected repositories
   fleet audit show --repo-id  inspect a private repository finding and plan

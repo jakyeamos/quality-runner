@@ -10,15 +10,53 @@ from quality_runner.fleet.audit import (
     fleet_report_payload,
     fleet_show_payload,
 )
+from quality_runner.fleet.detector_refresh import fleet_detector_refresh_payload
 from quality_runner.fleet.feed import fleet_feed_payload
 
 
 def add_fleet_commands(subparsers: Any) -> None:
     fleet_parser = subparsers.add_parser(
         "fleet",
-        help="Run bounded fleet audits without modifying repository checkouts",
+        help="Run bounded fleet audits and explicit detector-evidence publication",
     )
     fleet_actions = fleet_parser.add_subparsers(dest="fleet_action", required=True)
+    detector_parser = fleet_actions.add_parser(
+        "detector", help="Refresh full detector evidence at exact repository targets"
+    )
+    detector_actions = detector_parser.add_subparsers(dest="detector_action", required=True)
+    detector_refresh = detector_actions.add_parser(
+        "refresh",
+        help="Run full skill-pack scans in disposable worktrees and publish QR runs",
+        description=(
+            "Run full skill-pack scans at exact target commits in disposable worktrees, "
+            "publish normal QR runs, and record blocked or unsupported repositories."
+        ),
+    )
+    detector_refresh.add_argument("--all", action="store_true")
+    detector_refresh.add_argument("--repo-path", action="append", default=[])
+    detector_refresh.add_argument("--projects-root", default=str(Path.home() / "projects"))
+    detector_refresh.add_argument("--output-dir", default=None)
+    detector_refresh.add_argument("--timeout-seconds", type=int, default=600)
+    detector_refresh.add_argument(
+        "--agent-review-mode", choices=("off", "auto", "parallel", "required"), default="off"
+    )
+    detector_refresh.add_argument(
+        "--target-override",
+        action="append",
+        default=[],
+        metavar="REPO_ID=BRANCH",
+        help="Override the exact target by QR repository id",
+    )
+    detector_refresh.add_argument(
+        "--target-path-override",
+        action="append",
+        nargs=2,
+        default=[],
+        metavar=("ABSOLUTE_PATH", "BRANCH"),
+        help="Override the exact target by absolute primary path; repeat for orchestrators",
+    )
+    detector_refresh.add_argument("--as-of", default=None)
+    detector_refresh.add_argument("--json", action="store_true")
     audit_parser = fleet_actions.add_parser(
         "audit",
         help="Run, inspect, replay, or report a fleet environment-legibility audit",
@@ -95,6 +133,27 @@ def add_fleet_commands(subparsers: Any) -> None:
 
 
 def fleet_command_payload(args: argparse.Namespace) -> dict[str, Any]:
+    if args.fleet_action == "detector":
+        if args.detector_action != "refresh":
+            raise ValueError(f"unsupported fleet detector action: {args.detector_action}")
+        if not args.all and not args.repo_path:
+            raise ValueError("fleet detector refresh requires --all or at least one --repo-path")
+        if args.all and args.repo_path:
+            raise ValueError("fleet detector refresh accepts --all or --repo-path, not both")
+        if args.timeout_seconds <= 0:
+            raise ValueError("--timeout-seconds must be positive")
+        return fleet_detector_refresh_payload(
+            projects_root=Path(args.projects_root),
+            output_dir=Path(args.output_dir) if args.output_dir else None,
+            repository_paths=[Path(path) for path in args.repo_path] if args.repo_path else None,
+            target_overrides={
+                **_target_overrides(args.target_override),
+                **_target_path_overrides(args.target_path_override),
+            },
+            timeout_seconds=args.timeout_seconds,
+            agent_review_mode=args.agent_review_mode,
+            as_of=args.as_of,
+        )
     if args.fleet_action != "audit":
         raise ValueError(f"unsupported fleet action: {args.fleet_action}")
     if args.audit_action == "run":
@@ -146,4 +205,14 @@ def _target_overrides(values: list[str]) -> dict[str, str]:
         if not repo_id or not branch:
             raise ValueError("--target-override must include both repository id and branch")
         overrides[repo_id] = branch
+    return overrides
+
+
+def _target_path_overrides(values: list[list[str]]) -> dict[str, str]:
+    overrides: dict[str, str] = {}
+    for path, branch in values:
+        primary_path = str(Path(path).expanduser().resolve())
+        if not branch:
+            raise ValueError("--target-path-override must include a branch")
+        overrides[primary_path] = branch
     return overrides

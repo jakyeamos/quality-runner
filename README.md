@@ -123,6 +123,25 @@ qr fleet audit report --audit-id AUDIT_ID --json
 qr fleet audit feed --audit-id AUDIT_ID --json
 ```
 
+Code-quality findings use a separate, explicit publication lane. It resolves
+each repository's documented target branch, scans that exact commit with full
+analysis and deterministic skill packs in a disposable worktree, publishes the
+normal `.quality-runner/runs` evidence Pronto already consumes, and records a
+result for every blocked or unsupported repository:
+
+```bash
+qr fleet detector refresh --all --projects-root /path/to/projects --json
+qr fleet detector refresh --repo-path /path/to/repo \
+  --projects-root /path/to/projects --json
+pronto quality refresh --json
+```
+
+The detector lane does not execute discovered repository gates. Agent review
+is off by default; `--agent-review-mode` changes that separate review surface,
+not deterministic skill-pack scanning. The command intentionally writes only
+published evidence below each repository's `.quality-runner/runs`; its fleet
+ledger and disposable worktrees stay below the runtime-owned output directory.
+
 The fleet audit resolves the documented development branch, preferring `dev`,
 and never selects a branch by commit-count maturity. Dirty, detached, stale,
 prunable, or unverifiable target checkouts receive static findings only. Fleet
