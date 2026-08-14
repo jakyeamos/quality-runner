@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any
 
 from quality_runner.artifacts import prepare_safe_directory, write_json, write_text
+from quality_runner.fleet import audit_coverage
 from quality_runner.fleet.contracts import (
     FLEET_AUDIT_SCHEMA,
     FLEET_FINDING_SCHEMA,
@@ -87,6 +88,9 @@ def fleet_audit_payload(
         target_override = overrides.get(str(repository["repo_id"]))
         target = resolve_target_branch(repository, override=target_override)
         repository_with_target = {**repository, "target_branch": target}
+        repository_with_target["audit_coverage"] = audit_coverage.assess_audit_coverage(
+            repository_with_target
+        )
         static_repository = _static_scan_repository(repository_with_target)
         result = audit_repository(
             repository=static_repository,

@@ -63,6 +63,34 @@ def test_target_branch_prefers_dev_over_more_advanced_feature(tmp_path: Path) ->
     assert target["status"] == "ready"
 
 
+def test_fleet_summary_flags_unfolded_work_without_changing_exact_target_scan(
+    tmp_path: Path,
+) -> None:
+    projects = tmp_path / "projects"
+    root = projects / "fixture"
+    _init_repo(root)
+    _git(root, "switch", "-c", "feature")
+    (root / "feature.txt").write_text("feature\n", encoding="utf-8")
+    _git(root, "add", "feature.txt")
+    _git(root, "commit", "-m", "feature")
+    _git(root, "switch", "dev")
+
+    audit = fleet_audit_payload(
+        projects_root=projects,
+        output_dir=tmp_path / "fleet-output",
+        as_of="2026-07-26T17:00:00+00:00",
+    )
+
+    assert audit["summary"]["audit_coverage_counts"] == {"incomplete_unfolded": 1}
+    assert audit["summary"]["canonical_publication_ready"] is False
+    inventory = json.loads((Path(audit["artifact_root"]) / "inventory.json").read_text())
+    repository = inventory["repositories"][0]
+    assert repository["target_branch"]["branch"] == "dev"
+    assert repository["audit_coverage"]["unfolded_branches"][0]["ref"] == "feature"
+    replay = fleet_replay_payload(output_dir=Path(audit["artifact_root"]))
+    assert replay["status"] == "passed"
+
+
 def test_static_scan_uses_ready_target_checkout_without_replacing_identity() -> None:
     repository = {
         "repo_id": "repo-example",

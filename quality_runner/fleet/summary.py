@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from quality_runner.fleet import audit_coverage
 from quality_runner.fleet.agent_usability_scoring import applicable_agent_usability_scores
 from quality_runner.fleet.contracts import DIMENSIONS, digest, standard_dimension
 
@@ -35,6 +36,8 @@ def build_fleet_summary(
         )
     }
     unresolved: list[str] = []
+    coverage = audit_coverage.summarize_audit_coverage(repositories)
+    unresolved.extend(coverage["gaps"])
     for result in repositories:
         for finding in result.get("findings", []):
             status = str(finding.get("status", "unknown"))
@@ -96,6 +99,7 @@ def build_fleet_summary(
             int(item.get("repository", {}).get("checkout_count", 0)) for item in repositories
         ),
         "static_completed": len(repositories),
+        **coverage["summary"],
         "dynamic_policy": {"enabled": dynamic, "changed_only": changed_only},
         "dynamic_selected": dynamic_counts["selected"],
         "dynamic_reused": dynamic_counts["reused"],
@@ -122,6 +126,7 @@ def build_fleet_summary(
             "not_applicable_requires_bounded_evidence": True,
             "dynamic_scope": "changed, new, dirty, priority, stale, failed, or incomplete evidence only",
             "target_branch_policy": "explicit override, dev, documented fallback, locally verified remote default, or sole local branch; no maturity-based branch selection",
+            "audit_coverage_policy": "canonical findings remain exact-target evidence; unfolded branches, detached commits, and dirty worktrees qualify comparison and publication readiness",
             "source_checkouts_modified": False,
         },
         "provenance_hash": digest(
@@ -132,6 +137,7 @@ def build_fleet_summary(
                     item.get("static_provenance_hash") for item in stable_repositories
                 ],
                 "dynamic": [item.get("dynamic") for item in stable_repositories],
+                "audit_coverage": coverage["provenance"],
                 **({"standard": standard} if standard is not None else {}),
             }
         ),
