@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "quality-runner-maturity-feed-v1",
+  "$id": "quality-runner-maturity-feed-v2",
   "type": "object",
   "required": [
     "schema",
@@ -10,11 +10,13 @@
     "replay",
     "repository_count",
     "repositories",
+    "source_dimension_mean",
+    "pillar_means",
     "provenance_hash",
     "privacy"
   ],
   "properties": {
-    "schema": {"const": "quality-runner-maturity-feed/v1"},
+    "schema": {"const": "quality-runner-maturity-feed/v2"},
     "status": {"enum": ["completed", "complete_with_blockers"]},
     "feed_timestamp": {"type": "string", "minLength": 1},
     "generated_at": {"type": "string", "minLength": 1},
@@ -33,7 +35,86 @@
     "repository_count": {"type": "integer", "minimum": 1},
     "checkout_count": {"type": "integer", "minimum": 0},
     "mean_maturity": {"type": ["number", "null"], "minimum": 0, "maximum": 4},
-    "repositories": {"type": "array", "minItems": 1, "items": {"type": "object"}},
+    "source_dimension_mean": {"type": ["number", "null"], "minimum": 0, "maximum": 4},
+    "pillar_means": {"type": "object"},
+    "behavior_assurance": {"type": "object"},
+    "repositories": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["repo_id", "maturity_score", "repository_maturity"],
+        "properties": {
+          "repo_id": {"type": "string", "minLength": 1},
+          "maturity_score": {"type": ["number", "null"], "minimum": 0, "maximum": 4},
+          "source_dimension_mean": {"type": ["number", "null"], "minimum": 0, "maximum": 4},
+          "repository_maturity": {
+            "type": "object",
+            "required": ["schema", "score", "uncapped_score", "status", "pillars", "evidence", "critical_cap"],
+            "properties": {
+              "schema": {"const": "quality-runner-repository-maturity/v2"},
+              "score": {"type": ["number", "null"], "minimum": 0, "maximum": 4},
+              "uncapped_score": {"type": ["number", "null"], "minimum": 0, "maximum": 4},
+              "status": {"enum": ["certified", "measured", "provisional", "blocked", "unknown"]},
+              "pillars": {
+                "type": "array",
+                "minItems": 7,
+                "maxItems": 7,
+                "items": {
+                  "type": "object",
+                  "required": ["id", "label", "weight", "applicability", "status", "score", "capabilities", "capability_coverage", "fresh_capability_coverage", "dimension_scores", "missing_capabilities", "critical_dimensions"],
+                  "properties": {
+                    "capabilities": {
+                      "type": "array",
+                      "minItems": 3,
+                      "items": {
+                        "type": "object",
+                        "required": ["id", "applicability", "status", "score", "dimension_scores", "producer_dimensions"],
+                        "properties": {
+                          "id": {"type": "string", "minLength": 1},
+                          "applicability": {"enum": ["applicable", "not_applicable", "unknown"]},
+                          "status": {"enum": ["maintained", "attention", "blocked", "stale", "unknown", "not_applicable"]},
+                          "score": {"type": ["number", "null"], "minimum": 0, "maximum": 4},
+                          "dimension_scores": {"type": "object"},
+                          "producer_dimensions": {"type": "array", "items": {"type": "string"}}
+                        }
+                      }
+                    },
+                    "capability_coverage": {"type": "number", "minimum": 0, "maximum": 1},
+                    "fresh_capability_coverage": {"type": "number", "minimum": 0, "maximum": 1}
+                  }
+                }
+              },
+              "evidence": {
+                "type": "object",
+                "required": ["applicable_pillar_count", "assessed_pillar_count", "applicable_weight", "assessed_weight", "evidence_coverage", "fresh_evidence_coverage", "unknown_applicability", "unknown_capability_applicability", "unmapped_dimensions", "diagnostic_dimensions"],
+                "properties": {
+                  "applicable_pillar_count": {"type": "integer", "minimum": 0, "maximum": 7},
+                  "assessed_pillar_count": {"type": "integer", "minimum": 0, "maximum": 7},
+                  "applicable_weight": {"type": "number", "minimum": 0, "maximum": 1},
+                  "assessed_weight": {"type": "number", "minimum": 0, "maximum": 1},
+                  "evidence_coverage": {"type": "number", "minimum": 0, "maximum": 1},
+                  "fresh_evidence_coverage": {"type": "number", "minimum": 0, "maximum": 1},
+                  "unknown_applicability": {"type": "array", "items": {"type": "string"}},
+                  "unknown_capability_applicability": {"type": "array", "items": {"type": "string"}},
+                  "unmapped_dimensions": {"type": "array", "items": {"type": "string"}},
+                  "diagnostic_dimensions": {"type": "array", "items": {"type": "string"}}
+                }
+              },
+              "critical_cap": {
+                "type": "object",
+                "required": ["applied", "maximum_score", "reasons"],
+                "properties": {
+                  "applied": {"type": "boolean"},
+                  "maximum_score": {"type": ["number", "null"], "minimum": 0, "maximum": 4},
+                  "reasons": {"type": "array", "items": {"type": "string"}}
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "provenance_hash": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
     "privacy": {"type": "object"}
   },

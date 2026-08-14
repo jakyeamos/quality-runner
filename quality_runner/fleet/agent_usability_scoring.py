@@ -46,19 +46,4 @@ def applicable_agent_usability_scores(assessment: object) -> list[dict[str, Any]
                         ),
                     }
                 )
-    growth = payload.get("growth_health")
-    if isinstance(growth, dict):
-        growth_payload = cast(dict[str, object], growth)
-        score = growth_health_score(growth_payload.get("status"))
-        if score is not None:
-            scores.append(
-                {
-                    "dimension": f"{AGENT_USABILITY_DIMENSION_PREFIX}growth_health",
-                    "score": float(score),
-                    "status": str(growth_payload.get("status", "unknown")),
-                    "message": str(
-                        growth_payload.get("message", "Growth-health evidence is incomplete.")
-                    ),
-                }
-            )
     return scores

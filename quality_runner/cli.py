@@ -8,6 +8,7 @@ from typing import Any, cast
 
 from quality_runner import __version__
 from quality_runner.cli_artifacts import add_artifact_commands
+from quality_runner.cli_behavior import add_behavior_commands
 from quality_runner.cli_controller_reports import (
     add_controller_report_command,
     add_controller_report_summary_arguments,
@@ -71,9 +72,13 @@ Advanced operations:
   plan, phase, repo-hygiene, maintenance-surface, policy-surfaces, security,
   release-smoke, release-boundary, and worker handoff tools
   web-readiness REPO    produce commit-bound web production evidence
+  behavior verify REPO  execute a bounded validator and seal behavior receipts
+  behavior record-edge  validate a hostile-session trace and seal direct-surface evidence
 
 Fleet environment audit:
   fleet audit run --all       static-all audit with optional changed-only dynamic checks
+  fleet audit run --all --standard matrix-maintenance
+                               audit every selected repository against one standard only
   fleet audit run --repo-path PATH  bounded audit slice for selected repositories
   fleet audit show --repo-id  inspect a private repository finding and plan
   fleet audit replay          verify deterministic artifact regeneration
@@ -114,6 +119,7 @@ def build_parser(prog: str = CANONICAL_PROGRAM) -> argparse.ArgumentParser:
     subparsers = parser.add_subparsers(dest="command")
 
     add_journey_commands(subparsers)
+    add_behavior_commands(subparsers)
     add_fleet_commands(subparsers)
     add_security_commands(subparsers)
 
@@ -453,6 +459,8 @@ def main(argv: list[str] | None = None) -> int:
     if parsed.command == "policy-surfaces" and payload.get("status") != "passed":
         return 1
     if parsed.command == "web-readiness" and payload.get("status") in {"blocked", "unknown"}:
+        return 1
+    if parsed.command == "behavior" and payload.get("status") != "passed":
         return 1
     return 0
 

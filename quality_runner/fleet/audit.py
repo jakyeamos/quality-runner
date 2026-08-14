@@ -6,9 +6,7 @@ from pathlib import Path
 from typing import Any
 
 from quality_runner.artifacts import prepare_safe_directory, write_json, write_text
-from quality_runner.fleet.agent_usability_scoring import applicable_agent_usability_scores
 from quality_runner.fleet.contracts import (
-    DIMENSIONS,
     FLEET_AUDIT_SCHEMA,
     FLEET_FINDING_SCHEMA,
     FLEET_INVENTORY_SCHEMA,
@@ -19,6 +17,7 @@ from quality_runner.fleet.contracts import (
     parse_as_of,
     public_projection,
     stable_id,
+    standard_dimension,
 )
 from quality_runner.fleet.coordinator import (
     coordinate_dynamic_result,
@@ -37,8 +36,11 @@ from quality_runner.fleet.dynamic import (
     dynamic_result as build_dynamic_result,
 )
 from quality_runner.fleet.legibility import audit_repository, build_remediation_plan
+from quality_runner.fleet.replay_integrity import replay_manifest_errors
 from quality_runner.fleet.reporting import plan_markdown, report_markdown, summary_markdown
+from quality_runner.fleet.standard_audit import build_standard_report
 from quality_runner.fleet.static_scan import static_scan_repository as _static_scan_repository
+from quality_runner.fleet.summary import build_fleet_summary
 
 DEFAULT_FLEET_ROOT = Path("~/.quality-runner/fleet-audit")
 DEFAULT_DYNAMIC_MAX_AGE_DAYS = 30
@@ -56,7 +58,11 @@ def fleet_audit_payload(
     target_overrides: dict[str, str] | None = None,
     repository_paths: Sequence[Path] | None = None,
     as_of: str | None = None,
+    standard: str | None = None,
 ) -> dict[str, Any]:
+    standard_dimension(standard)
+    if standard is not None and dynamic:
+        raise ValueError("standard-scoped fleet audits are static-only; omit --dynamic")
     resolved_as_of = parse_as_of(as_of)
     root = projects_root.expanduser().resolve()
     fleet_policy = load_fleet_policy(root)
@@ -69,6 +75,7 @@ def fleet_audit_payload(
         changed_only,
         dynamic_max_age_days,
         timeout_seconds,
+        standard,
         sorted(overrides.items()),
         sorted(str(path.expanduser().resolve()) for path in repository_paths or []),
         fleet_policy,
@@ -85,6 +92,7 @@ def fleet_audit_payload(
             repository=static_repository,
             as_of=resolved_as_of,
             run_id=f"{audit_id}-{repository['repo_id']}",
+            standard=standard,
         )
         # Keep the canonical repository identity (including its primary path)
         # in persisted artifacts. The ready target checkout is only the static
@@ -113,12 +121,13 @@ def fleet_audit_payload(
         )
         results.append(result)
 
-    summary = _build_summary(
+    summary = build_fleet_summary(
         audit_id=audit_id,
         as_of=resolved_as_of,
         repositories=results,
         dynamic=dynamic,
         changed_only=changed_only,
+        standard=standard,
     )
     inventory = {
         "schema": FLEET_INVENTORY_SCHEMA,
@@ -146,14 +155,27 @@ def fleet_audit_payload(
                 "audit_id": audit_id,
                 "as_of": resolved_as_of,
                 "repositories": [item["repository"] for item in results],
+                **({"standard": standard} if standard is not None else {}),
             }
         ),
     }
+    if standard is not None:
+        inventory["standard"] = standard
     artifact_paths = _write_audit_artifacts(
         artifact_root=artifact_root,
         inventory=inventory,
         results=results,
         summary=summary,
+        standard_report=build_standard_report(
+            audit_id=audit_id,
+            as_of=resolved_as_of,
+            projects_root=root,
+            scope=inventory["scope"],
+            repositories=results,
+            standard=standard,
+        )
+        if standard is not None
+        else None,
     )
     maturity_feed = {
         "status": "not_requested",
@@ -165,10 +187,21 @@ def fleet_audit_payload(
         "audit_id": audit_id,
         "as_of": resolved_as_of,
         "repository_count": len(results),
+        "standard": standard,
         "artifact_root": str(artifact_root),
         "artifact_paths": artifact_paths,
         "summary": summary,
-        "maturity_feed": maturity_feed,
+        "standard_report": _read_json(Path(artifact_paths["standard_report_json"]))
+        if "standard_report_json" in artifact_paths
+        else None,
+        "maturity_feed": (
+            {
+                "status": "not_applicable",
+                "reason": "standard-scoped snapshots are not canonical maturity feeds",
+            }
+            if standard is not None
+            else maturity_feed
+        ),
         "public_projection": public_projection(summary),
         "implementation_allowed": False,
     }
@@ -186,7 +219,7 @@ def local_environment_audit_payload(
     audit_id = stable_id("local-audit", str(root), resolved_as_of)
     result = audit_repository(repository=repository, as_of=resolved_as_of, run_id=audit_id)
     artifact_root = _artifact_root(output_dir, audit_id, local=True)
-    summary = _build_summary(
+    summary = build_fleet_summary(
         audit_id=audit_id,
         as_of=resolved_as_of,
         repositories=[result],
@@ -243,23 +276,30 @@ def fleet_replay_payload(
     artifact_root = _resolve_artifact_root(output_dir, audit_id)
     inventory = _read_json(artifact_root / "inventory.json")
     summary = _read_json(artifact_root / "summary.json")
+    manifest = _read_json(artifact_root / "replay-manifest.json")
     results: list[dict[str, Any]] = []
     findings_root = artifact_root / "findings"
     for path in sorted(findings_root.glob("*.json")):
         results.append(_read_json(path))
-    rebuilt = _build_summary(
+    rebuilt = build_fleet_summary(
         audit_id=str(inventory["audit_id"]),
         as_of=str(inventory["as_of"]),
         repositories=results,
         dynamic=bool(inventory.get("dynamic_policy", {}).get("enabled", False)),
         changed_only=bool(inventory.get("dynamic_policy", {}).get("changed_only", True)),
+        standard=inventory.get("standard"),
     )
-    deterministic = canonical_json(rebuilt) == canonical_json(summary)
+    manifest_errors = replay_manifest_errors(
+        manifest=manifest, inventory=inventory, summary=summary, findings=results
+    )
+    deterministic = canonical_json(rebuilt) == canonical_json(summary) and not manifest_errors
     return {
         "schema": FLEET_REPLAY_SCHEMA,
         "status": "passed" if deterministic else "failed",
         "audit_id": inventory.get("audit_id"),
         "deterministic": deterministic,
+        "manifest_valid": not manifest_errors,
+        "manifest_errors": manifest_errors,
         "source_summary_hash": digest(summary),
         "replayed_summary_hash": digest(rebuilt),
         "repository_count": len(results),
@@ -284,133 +324,18 @@ def fleet_report_payload(
         "privacy": projection.get("privacy"),
         "publication": {"manual_review_required": True, "published": False},
     }
+    standard = summary.get("standard")
+    if isinstance(standard, str) and standard:
+        standard_report_path = artifact_root / "standard-report.json"
+        if standard_report_path.is_file():
+            report["standard"] = standard
+            report["standard_report"] = _read_json(standard_report_path)
+            report["publication"]["canonical_maturity_feed"] = "not_applicable"
     paths = {
         "report_json": str(write_json(artifact_root / "report.json", report)),
         "report_md": str(write_text(artifact_root / "report.md", report_markdown(report))),
     }
     return {**report, "artifact_root": str(artifact_root), "artifact_paths": paths}
-
-
-def _build_summary(
-    *,
-    audit_id: str,
-    as_of: str,
-    repositories: list[dict[str, Any]],
-    dynamic: bool,
-    changed_only: bool,
-) -> dict[str, Any]:
-    dimension_scores: dict[str, list[float]] = {dimension: [] for dimension in DIMENSIONS}
-    finding_counts: dict[str, int] = {}
-    priority_counts: dict[str, int] = {}
-    dynamic_counts = {
-        key: 0
-        for key in (
-            "selected",
-            "reused",
-            "passed",
-            "failed",
-            "blocked",
-            "unavailable",
-            "timeout",
-            "unknown",
-            "not_applicable",
-        )
-    }
-    unresolved: list[str] = []
-    for result in repositories:
-        for finding in result.get("findings", []):
-            status = str(finding.get("status", "unknown"))
-            finding_counts[status] = finding_counts.get(status, 0) + 1
-            priority = str(finding.get("priority", "P2"))
-            priority_counts[priority] = priority_counts.get(priority, 0) + 1
-            score = finding.get("score")
-            dimension = finding.get("dimension")
-            if isinstance(score, int | float) and isinstance(dimension, str) and score >= 0:
-                dimension_scores.setdefault(dimension, []).append(float(score))
-            if status in {"unknown", "stale", "blocked"}:
-                unresolved.append(f"{result.get('repo_id')}:{dimension}:{status}")
-        for score_record in applicable_agent_usability_scores(result.get("agent_usability")):
-            dimension = str(score_record["dimension"])
-            status = str(score_record["status"])
-            dimension_scores.setdefault(dimension, []).append(float(score_record["score"]))
-            if status in {"unknown", "stale", "blocked"}:
-                unresolved.append(f"{result.get('repo_id')}:{dimension}:{status}")
-        dynamic_result = result.get("dynamic")
-        if isinstance(dynamic_result, dict):
-            state = str(dynamic_result.get("status", "unknown"))
-            if dynamic_result.get("selected") is True:
-                dynamic_counts["selected"] += 1
-            if state == "reused":
-                dynamic_counts["reused"] += 1
-            elif state == "passed":
-                dynamic_counts["passed"] += 1
-            elif state == "failed":
-                dynamic_counts["failed"] += 1
-            elif state == "blocked":
-                dynamic_counts["blocked"] += 1
-            elif state == "unavailable":
-                dynamic_counts["unavailable"] += 1
-            elif state == "timeout":
-                dynamic_counts["timeout"] += 1
-            elif state == "unknown":
-                dynamic_counts["unknown"] += 1
-            elif state == "not_applicable":
-                dynamic_counts["not_applicable"] += 1
-    all_scores = [score for scores in dimension_scores.values() for score in scores]
-    means = {
-        dimension: round(sum(scores) / len(scores), 3) if scores else None
-        for dimension, scores in sorted(dimension_scores.items())
-    }
-    stable_repositories = sorted(repositories, key=lambda item: str(item.get("repo_id", "")))
-    return {
-        "schema": "quality-runner-fleet-summary-v0.1",
-        "status": "completed",
-        "audit_id": audit_id,
-        "as_of": as_of,
-        "repository_count": len(repositories),
-        "checkout_count": sum(
-            int(item.get("repository", {}).get("checkout_count", 0)) for item in repositories
-        ),
-        "static_completed": len(repositories),
-        "dynamic_policy": {"enabled": dynamic, "changed_only": changed_only},
-        "dynamic_selected": dynamic_counts["selected"],
-        "dynamic_reused": dynamic_counts["reused"],
-        "dynamic_passed": dynamic_counts["passed"],
-        "dynamic_failed": dynamic_counts["failed"],
-        "dynamic_blocked": dynamic_counts["blocked"],
-        "dynamic_unavailable": dynamic_counts["unavailable"],
-        "dynamic_timeout": dynamic_counts["timeout"],
-        "dynamic_unknown": dynamic_counts["unknown"],
-        "dynamic_not_applicable": dynamic_counts["not_applicable"],
-        "mean_maturity": round(sum(all_scores) / len(all_scores), 3) if all_scores else None,
-        "dimension_means": means,
-        "finding_counts": dict(sorted(finding_counts.items())),
-        "priority_counts": dict(sorted(priority_counts.items())),
-        "sample_size": {
-            "repositories": len(repositories),
-            "applicable_dimension_scores": len(all_scores),
-        },
-        "confidence": "medium" if repositories else "low",
-        "unresolved_measurement_gaps": sorted(set(unresolved)),
-        "methodology": {
-            "rubric": "0 absent, 1 informal, 2 discoverable, 3 executable/currently validated, 4 maintained/routed/automatically checked",
-            "unknown_evidence_is_not_green": True,
-            "not_applicable_requires_bounded_evidence": True,
-            "dynamic_scope": "changed, new, dirty, priority, stale, failed, or incomplete evidence only",
-            "target_branch_policy": "explicit override, dev, documented fallback, locally verified remote default, or sole local branch; no maturity-based branch selection",
-            "source_checkouts_modified": False,
-        },
-        "provenance_hash": digest(
-            {
-                "audit_id": audit_id,
-                "as_of": as_of,
-                "repositories": [
-                    item.get("static_provenance_hash") for item in stable_repositories
-                ],
-                "dynamic": [item.get("dynamic") for item in stable_repositories],
-            }
-        ),
-    }
 
 
 def _write_audit_artifacts(
@@ -419,6 +344,7 @@ def _write_audit_artifacts(
     inventory: dict[str, Any],
     results: list[dict[str, Any]],
     summary: dict[str, Any],
+    standard_report: dict[str, Any] | None = None,
 ) -> dict[str, str]:
     prepare_safe_directory(artifact_root)
     findings_dir = prepare_safe_directory(artifact_root / "findings")
@@ -426,17 +352,14 @@ def _write_audit_artifacts(
     write_json(artifact_root / "inventory.json", inventory)
     write_json(artifact_root / "summary.json", summary)
     write_text(artifact_root / "summary.md", summary_markdown(summary))
+    if standard_report is not None:
+        write_json(artifact_root / "standard-report.json", standard_report)
     for result in results:
         repo_id = str(result["repo_id"])
-        finding_path = write_json(findings_dir / f"{repo_id}.json", result)
+        write_json(findings_dir / f"{repo_id}.json", result)
         plan = result.get("plan", {})
-        plan_path = write_json(plans_dir / f"{repo_id}.json", plan)
-        plan_md_path = write_text(plans_dir / f"{repo_id}.md", plan_markdown(plan))
-        result["artifact_paths"] = {
-            "finding_json": str(finding_path),
-            "plan_json": str(plan_path),
-            "plan_md": str(plan_md_path),
-        }
+        write_json(plans_dir / f"{repo_id}.json", plan)
+        write_text(plans_dir / f"{repo_id}.md", plan_markdown(plan))
     replay_manifest = {
         "schema": FLEET_REPLAY_SCHEMA,
         "audit_id": inventory["audit_id"],
@@ -447,7 +370,7 @@ def _write_audit_artifacts(
         "provenance_hash": digest({"inventory": inventory, "summary": summary}),
     }
     write_json(artifact_root / "replay-manifest.json", replay_manifest)
-    return {
+    paths = {
         "inventory_json": str(artifact_root / "inventory.json"),
         "summary_json": str(artifact_root / "summary.json"),
         "summary_md": str(artifact_root / "summary.md"),
@@ -455,6 +378,9 @@ def _write_audit_artifacts(
         "findings_dir": str(findings_dir),
         "plans_dir": str(plans_dir),
     }
+    if standard_report is not None:
+        paths["standard_report_json"] = str(artifact_root / "standard-report.json")
+    return paths
 
 
 def _artifact_root(output_dir: Path | None, audit_id: str, *, local: bool = False) -> Path:

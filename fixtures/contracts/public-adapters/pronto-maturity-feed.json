@@ -1,5 +1,5 @@
 {
-  "schema": "quality-runner-maturity-feed/v1",
+  "schema": "quality-runner-maturity-feed/v2",
   "status": "completed",
   "feed_timestamp": "2026-08-11T00:00:00+00:00",
   "generated_at": "2026-08-11T00:00:00+00:00",
@@ -19,12 +19,152 @@
   "repository_count": 1,
   "checkout_count": 1,
   "mean_maturity": 4.0,
+  "source_dimension_mean": 4.0,
+  "pillar_means": {
+    "correctness_reliability": 4.0,
+    "security_privacy_supply_chain": 4.0,
+    "maintainability_evolvability": 4.0,
+    "operability_release_safety": 4.0,
+    "user_facing_quality": 4.0,
+    "human_agent_usability": 4.0,
+    "governance_sustainability": 4.0
+  },
   "repositories": [
     {
       "repo_id": "fixture-repository",
       "name": "fixture-repository",
       "maturity_score": 4.0,
+      "source_dimension_mean": 4.0,
       "maturity_status": "certified",
+      "dimension_scores": {
+        "accessibility": 4.0,
+        "agent_usability.behavior_evidence": 4.0,
+        "agent_usability.documentation_contract": 4.0,
+        "agent_usability.freshness_portability": 4.0,
+        "agent_usability.tool_skill_coverage": 4.0,
+        "approval_gated_paths": 4.0,
+        "architecture_boundaries": 4.0,
+        "artifact_supply_chain": 4.0,
+        "behavior_assurance": 4.0,
+        "change_surface_coverage": 4.0,
+        "code_health": 4.0,
+        "coding_conventions": 4.0,
+        "compatibility_migration": 4.0,
+        "context_routing": 4.0,
+        "critical_user_journeys": 4.0,
+        "data_integrity_migration": 4.0,
+        "definition_of_done": 4.0,
+        "dependency_vulnerability": 4.0,
+        "deployment_rollback": 4.0,
+        "diagnosability.stable_error_codes": 4.0,
+        "dynamic_verification": 4.0,
+        "failure_modes": 4.0,
+        "implementation_examples": 4.0,
+        "license_contribution": 4.0,
+        "maintenance_health": 4.0,
+        "matrix_maintenance": 4.0,
+        "observability_runtime_health": 4.0,
+        "ownership_continuity": 4.0,
+        "performance": 4.0,
+        "quality_commands": 4.0,
+        "reliability_resilience": 4.0,
+        "secret_privacy": 4.0,
+        "security_constraints": 4.0,
+        "skill_contract_quality": 4.0,
+        "strict_policy_visibility": 4.0,
+        "strict_type_debt": 4.0,
+        "web_readiness": 4.0
+      },
+      "repository_maturity": {
+        "schema": "quality-runner-repository-maturity/v2",
+        "score": 4.0,
+        "uncapped_score": 4.0,
+        "status": "certified",
+        "pillars": [
+          {
+            "id": "correctness_reliability", "label": "Correctness and reliability", "weight": 0.22, "applicability": "applicable", "status": "maintained", "score": 4.0, "capability_coverage": 1.0, "fresh_capability_coverage": 1.0,
+            "capabilities": [
+              {"id": "automated_quality_gates", "applicability": "applicable", "status": "maintained", "score": 4.0, "dimension_scores": {"dynamic_verification": 4.0, "quality_commands": 4.0}, "producer_dimensions": ["dynamic_verification", "quality_commands"]},
+              {"id": "behavior_outcomes", "applicability": "applicable", "status": "maintained", "score": 4.0, "dimension_scores": {"behavior_assurance": 4.0}, "producer_dimensions": ["behavior_assurance"]},
+              {"id": "reliability_and_resilience", "applicability": "applicable", "status": "maintained", "score": 4.0, "dimension_scores": {"reliability_resilience": 4.0}, "producer_dimensions": ["reliability_resilience"]},
+              {"id": "data_integrity_and_migration", "applicability": "applicable", "status": "maintained", "score": 4.0, "dimension_scores": {"data_integrity_migration": 4.0}, "producer_dimensions": ["data_integrity_migration"]}
+            ],
+            "dimension_scores": {"behavior_assurance": 4.0, "data_integrity_migration": 4.0, "dynamic_verification": 4.0, "quality_commands": 4.0, "reliability_resilience": 4.0}, "missing_capabilities": [], "critical_dimensions": []
+          },
+          {
+            "id": "security_privacy_supply_chain", "label": "Security, privacy, and supply chain", "weight": 0.22, "applicability": "applicable", "status": "maintained", "score": 4.0, "capability_coverage": 1.0, "fresh_capability_coverage": 1.0,
+            "capabilities": [
+              {"id": "security_constraints", "applicability": "applicable", "status": "maintained", "score": 4.0, "dimension_scores": {"approval_gated_paths": 4.0, "security_constraints": 4.0}, "producer_dimensions": ["approval_gated_paths", "security_constraints"]},
+              {"id": "dependency_and_vulnerability_risk", "applicability": "applicable", "status": "maintained", "score": 4.0, "dimension_scores": {"dependency_vulnerability": 4.0}, "producer_dimensions": ["dependency_vulnerability"]},
+              {"id": "secret_and_privacy_controls", "applicability": "applicable", "status": "maintained", "score": 4.0, "dimension_scores": {"secret_privacy": 4.0}, "producer_dimensions": ["secret_privacy"]},
+              {"id": "artifact_provenance", "applicability": "applicable", "status": "maintained", "score": 4.0, "dimension_scores": {"artifact_supply_chain": 4.0}, "producer_dimensions": ["artifact_supply_chain"]}
+            ],
+            "dimension_scores": {"approval_gated_paths": 4.0, "artifact_supply_chain": 4.0, "dependency_vulnerability": 4.0, "secret_privacy": 4.0, "security_constraints": 4.0}, "missing_capabilities": [], "critical_dimensions": []
+          },
+          {
+            "id": "maintainability_evolvability", "label": "Maintainability and evolvability", "weight": 0.16, "applicability": "applicable", "status": "maintained", "score": 4.0, "capability_coverage": 1.0, "fresh_capability_coverage": 1.0,
+            "capabilities": [
+              {"id": "architecture_boundaries", "applicability": "applicable", "status": "maintained", "score": 4.0, "dimension_scores": {"architecture_boundaries": 4.0}, "producer_dimensions": ["architecture_boundaries"]},
+              {"id": "change_impact_contract", "applicability": "applicable", "status": "maintained", "score": 4.0, "dimension_scores": {"change_surface_coverage": 4.0}, "producer_dimensions": ["change_surface_coverage"]},
+              {"id": "coding_and_type_health", "applicability": "applicable", "status": "maintained", "score": 4.0, "dimension_scores": {"code_health": 4.0, "coding_conventions": 4.0, "strict_policy_visibility": 4.0, "strict_type_debt": 4.0}, "producer_dimensions": ["code_health", "coding_conventions", "strict_policy_visibility", "strict_type_debt"]},
+              {"id": "compatibility_and_migration", "applicability": "applicable", "status": "maintained", "score": 4.0, "dimension_scores": {"compatibility_migration": 4.0}, "producer_dimensions": ["compatibility_migration"]}
+            ],
+            "dimension_scores": {"architecture_boundaries": 4.0, "change_surface_coverage": 4.0, "code_health": 4.0, "coding_conventions": 4.0, "compatibility_migration": 4.0, "strict_policy_visibility": 4.0, "strict_type_debt": 4.0}, "missing_capabilities": [], "critical_dimensions": []
+          },
+          {
+            "id": "operability_release_safety", "label": "Operability and release safety", "weight": 0.14, "applicability": "applicable", "status": "maintained", "score": 4.0, "capability_coverage": 1.0, "fresh_capability_coverage": 1.0,
+            "capabilities": [
+              {"id": "failure_and_recovery_contract", "applicability": "applicable", "status": "maintained", "score": 4.0, "dimension_scores": {"deployment_rollback": 4.0, "failure_modes": 4.0}, "producer_dimensions": ["deployment_rollback", "failure_modes"]},
+              {"id": "diagnosability", "applicability": "applicable", "status": "maintained", "score": 4.0, "dimension_scores": {"diagnosability.stable_error_codes": 4.0}, "producer_dimensions": ["diagnosability.stable_error_codes"]},
+              {"id": "operational_observability", "applicability": "applicable", "status": "maintained", "score": 4.0, "dimension_scores": {"observability_runtime_health": 4.0}, "producer_dimensions": ["observability_runtime_health"]}
+            ],
+            "dimension_scores": {"deployment_rollback": 4.0, "diagnosability.stable_error_codes": 4.0, "failure_modes": 4.0, "observability_runtime_health": 4.0}, "missing_capabilities": [], "critical_dimensions": []
+          },
+          {
+            "id": "user_facing_quality", "label": "User-facing quality", "weight": 0.1, "applicability": "applicable", "status": "maintained", "score": 4.0, "capability_coverage": 1.0, "fresh_capability_coverage": 1.0,
+            "capabilities": [
+              {"id": "accessible_experience", "applicability": "applicable", "status": "maintained", "score": 4.0, "dimension_scores": {"accessibility": 4.0}, "producer_dimensions": ["accessibility"]},
+              {"id": "performance_evidence", "applicability": "applicable", "status": "maintained", "score": 4.0, "dimension_scores": {"performance": 4.0}, "producer_dimensions": ["performance"]},
+              {"id": "critical_user_journeys", "applicability": "applicable", "status": "maintained", "score": 4.0, "dimension_scores": {"critical_user_journeys": 4.0}, "producer_dimensions": ["critical_user_journeys"]},
+              {"id": "holistic_web_readiness", "applicability": "applicable", "status": "maintained", "score": 4.0, "dimension_scores": {"web_readiness": 4.0}, "producer_dimensions": ["web_readiness"]}
+            ],
+            "dimension_scores": {"accessibility": 4.0, "critical_user_journeys": 4.0, "performance": 4.0, "web_readiness": 4.0}, "missing_capabilities": [], "critical_dimensions": []
+          },
+          {
+            "id": "human_agent_usability", "label": "Human and agent usability", "weight": 0.1, "applicability": "applicable", "status": "maintained", "score": 4.0, "capability_coverage": 1.0, "fresh_capability_coverage": 1.0,
+            "capabilities": [
+              {"id": "documentation_contract", "applicability": "applicable", "status": "maintained", "score": 4.0, "dimension_scores": {"agent_usability.documentation_contract": 4.0, "implementation_examples": 4.0}, "producer_dimensions": ["agent_usability.documentation_contract", "implementation_examples"]},
+              {"id": "tool_skill_coverage", "applicability": "applicable", "status": "maintained", "score": 4.0, "dimension_scores": {"agent_usability.tool_skill_coverage": 4.0, "skill_contract_quality": 4.0}, "producer_dimensions": ["agent_usability.tool_skill_coverage", "skill_contract_quality"]},
+              {"id": "behavior_evidence", "applicability": "applicable", "status": "maintained", "score": 4.0, "dimension_scores": {"agent_usability.behavior_evidence": 4.0}, "producer_dimensions": ["agent_usability.behavior_evidence"]},
+              {"id": "routing_and_portability", "applicability": "applicable", "status": "maintained", "score": 4.0, "dimension_scores": {"agent_usability.freshness_portability": 4.0, "context_routing": 4.0}, "producer_dimensions": ["agent_usability.freshness_portability", "context_routing"]}
+            ],
+            "dimension_scores": {"agent_usability.behavior_evidence": 4.0, "agent_usability.documentation_contract": 4.0, "agent_usability.freshness_portability": 4.0, "agent_usability.tool_skill_coverage": 4.0, "context_routing": 4.0, "implementation_examples": 4.0, "skill_contract_quality": 4.0}, "missing_capabilities": [], "critical_dimensions": []
+          },
+          {
+            "id": "governance_sustainability", "label": "Governance and sustainability", "weight": 0.06, "applicability": "applicable", "status": "maintained", "score": 4.0, "capability_coverage": 1.0, "fresh_capability_coverage": 1.0,
+            "capabilities": [
+              {"id": "ownership_continuity", "applicability": "applicable", "status": "maintained", "score": 4.0, "dimension_scores": {"ownership_continuity": 4.0}, "producer_dimensions": ["ownership_continuity"]},
+              {"id": "maintenance_continuity", "applicability": "applicable", "status": "maintained", "score": 4.0, "dimension_scores": {"maintenance_health": 4.0}, "producer_dimensions": ["maintenance_health"]},
+              {"id": "license_and_contribution", "applicability": "applicable", "status": "maintained", "score": 4.0, "dimension_scores": {"license_contribution": 4.0}, "producer_dimensions": ["license_contribution"]},
+              {"id": "completion_and_matrix_discipline", "applicability": "applicable", "status": "maintained", "score": 4.0, "dimension_scores": {"definition_of_done": 4.0, "matrix_maintenance": 4.0}, "producer_dimensions": ["definition_of_done", "matrix_maintenance"]}
+            ],
+            "dimension_scores": {"definition_of_done": 4.0, "license_contribution": 4.0, "maintenance_health": 4.0, "matrix_maintenance": 4.0, "ownership_continuity": 4.0}, "missing_capabilities": [], "critical_dimensions": []
+          }
+        ],
+        "evidence": {
+          "applicable_pillar_count": 7,
+          "assessed_pillar_count": 7,
+          "applicable_weight": 1.0,
+          "assessed_weight": 1.0,
+          "evidence_coverage": 1.0,
+          "fresh_evidence_coverage": 1.0,
+          "unknown_applicability": [],
+          "unknown_capability_applicability": [],
+          "unmapped_dimensions": [],
+          "diagnostic_dimensions": []
+        },
+        "critical_cap": {"applied": false, "maximum_score": null, "reasons": []}
+      },
       "quality_outcome": {
         "state": "healthy",
         "label": "Quality healthy",
@@ -42,5 +182,5 @@
     "raw_transcripts": false,
     "credentials": false
   },
-  "provenance_hash": "9a7370f7cebd0638211f9d09fa582a3834768423d7eb47f7dc403b0cf54d43d5"
+  "provenance_hash": "d9932343390ff4a9c39e87d6f5f925c360effc8e46a934e7062a657ec0ed62a5"
 }

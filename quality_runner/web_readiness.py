@@ -33,6 +33,11 @@ IGNORED_PARTS = {
 }
 
 
+def has_web_surface(repo_root: Path) -> bool:
+    """Return whether the bounded web-readiness scanner finds supported source."""
+    return bool(_source_files(repo_root.expanduser().resolve()))
+
+
 def create_web_readiness_report(
     repo_root: Path,
     *,

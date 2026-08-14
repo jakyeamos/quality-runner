@@ -1,15 +1,48 @@
 # Commands and quality gates
 
-last_reviewed: 2026-08-11
+last_reviewed: 2026-08-13
 
 Use `uv run pytest -q`, `uv run ruff check .`, `uv run ruff format --check .`,
 and `uv run basedpyright` for source verification. For fleet changes, run the
 scoped audit first, then replay, publish the feed, and read it back through
 Pronto. `--changed-only` constrains dynamic execution only; it does not reduce
-static fleet assessment. Fleet dynamic execution prefers root aggregate gates,
+static fleet assessment. To audit one standard across the entire bounded
+inventory, use a static-only standard scope:
+
+```sh
+uv run --locked qr fleet audit run --all \
+  --projects-root /path/to/projects \
+  --standard matrix-maintenance --json
+```
+
+The result writes a private `standard-report.json` that lists every audited
+repository and its honest state. A standard-scoped snapshot is intentionally
+not publishable as the canonical all-standards maturity feed; replay it and
+inspect the report directly. Fleet dynamic execution prefers root aggregate gates,
 fails closed on unbounded package-only surfaces, honors repository gate
 timeouts only within the CLI ceiling, and never runs discovered mutating or
 unknown-risk formatters.
+
+`matrix_maintenance` is also a canonical dimension of the complete fleet audit.
+It contributes to each applicable repository's `dimension_scores`,
+`maturity_score`, `dimension_gaps`, fleet means, and Pronto maturity
+remediation. The scoped command above is a diagnostic slice; after it identifies
+gaps, rerun the complete audit without `--standard`, pass replay, publish that
+feed, and refresh Pronto before claiming the score or remediation queue reflects
+the latest evidence.
+
+The published feed is `quality-runner-maturity-feed/v2`. Its repository score
+flows from dimensions to explicit capabilities to seven weighted pillars, not
+from the count of flat findings. Use `repository_maturity.pillars` and their
+`capabilities` for the quality vector and
+`repository_maturity.evidence` for measurement coverage, freshness, conditional
+applicability, and unmapped dimensions. Conditional capabilities preserve
+`applicable`, `not_applicable`, or `unknown` state. `source_dimension_mean`
+is retained only for migration diagnostics. Only a finding with
+`confirmed_critical_risk: true` in correctness, security, or operability
+applies the score cap; blocker/P0 state alone remains a quality-outcome signal.
+Agent growth health is diagnostic and does not add a fifth score beside the
+four consolidated human/agent capabilities.
 
 For release preparation, build both archives and run
 `uv run --locked quality-runner release-boundary . --dist-dir dist --json`.

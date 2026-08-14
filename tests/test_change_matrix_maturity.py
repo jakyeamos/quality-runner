@@ -5,6 +5,7 @@ from pathlib import Path
 
 from quality_runner.fleet.agent_usability import assess_agent_usability
 from quality_runner.fleet.change_matrix import assess_change_surface_coverage
+from quality_runner.fleet.matrix_maintenance import assess_matrix_maintenance
 from quality_runner.fleet.skill_contracts import assess_skill_contract_quality
 
 AS_OF = "2026-07-28T17:00:00+00:00"
@@ -145,6 +146,88 @@ def test_change_matrix_requires_distribution_and_public_adapter_fixture(tmp_path
     fixture_missing = assess_change_surface_coverage(tmp_path, {}, AS_OF)
     assert fixture_missing["score"] == 2
     assert "public adapter fixture is missing" in fixture_missing["message"]
+
+
+def _matrix_with_maintenance(*, reviewed: str = "2026-07-28", status: str = "applicable") -> dict:
+    payload = _matrix(reviewed=reviewed)
+    payload["surfaces"].append(
+        {
+            "id": "matrix-maintenance",
+            "scope": "local",
+            "path": ".agents/change-surface-matrix.json",
+            "owner": "repository-owner",
+            "condition": (
+                "A material feature, functionality, behavior, or workflow change is added or changed."
+            ),
+            "operations": ["add", "change", "remove"],
+            "validation": [
+                "Update this matrix in the same change with affected surfaces and evidence.",
+                "For a purely internal refactor, record a reviewed no-impact reason in the same change.",
+            ],
+            "status": status,
+        }
+    )
+    return payload
+
+
+def test_matrix_maintenance_standard_reports_current_and_maintained(tmp_path: Path) -> None:
+    path = _write_matrix(tmp_path, _matrix_with_maintenance())
+
+    current = assess_matrix_maintenance(tmp_path, {}, AS_OF)
+
+    assert current["status"] == "current"
+    assert current["score"] == 3
+
+    payload = _matrix_with_maintenance()
+    payload["operation_evidence"] = {
+        operation: {"status": "passed", "evidence": [f"fixtures/{operation}.json"]}
+        for operation in ("add", "change", "remove")
+    }
+    path.write_text(json.dumps(payload), encoding="utf-8")
+    maintained = assess_matrix_maintenance(tmp_path, {}, AS_OF)
+
+    assert maintained["status"] == "maintained"
+    assert maintained["score"] == 4
+
+
+def test_matrix_maintenance_standard_reports_missing_and_invalid(tmp_path: Path) -> None:
+    missing = _write_matrix(tmp_path, _matrix())
+    absent = assess_matrix_maintenance(tmp_path, {}, AS_OF)
+    assert absent["status"] == "incomplete"
+    assert "matrix-maintenance" in absent["message"]
+
+    payload = _matrix_with_maintenance()
+    payload["surfaces"][-1]["validation"] = ["Update documentation later."]
+    missing.write_text(json.dumps(payload), encoding="utf-8")
+    invalid = assess_matrix_maintenance(tmp_path, {}, AS_OF)
+    assert invalid["status"] == "incomplete"
+    assert invalid["score"] == 2
+
+
+def test_matrix_maintenance_standard_preserves_stale_and_not_applicable_states(
+    tmp_path: Path,
+) -> None:
+    stale_path = _write_matrix(tmp_path, _matrix_with_maintenance(reviewed="2025-01-01"))
+    stale = assess_matrix_maintenance(tmp_path, {}, AS_OF)
+    assert stale["status"] == "stale"
+    assert stale["score"] == 2
+
+    payload = _matrix_with_maintenance(status="not_applicable")
+    payload["surfaces"][-1] = {
+        "id": "matrix-maintenance",
+        "status": "not_applicable",
+        "reason": "This repository is a frozen, generated fixture with no feature lifecycle.",
+        "evidence": ["docs/generated-fixture-boundary.md"],
+    }
+    stale_path.write_text(json.dumps(payload), encoding="utf-8")
+    not_applicable = assess_matrix_maintenance(tmp_path, {}, AS_OF)
+    assert not_applicable["status"] == "not_applicable"
+    assert not_applicable["score"] is None
+
+    payload["surfaces"][-1].pop("evidence")
+    stale_path.write_text(json.dumps(payload), encoding="utf-8")
+    unsupported = assess_matrix_maintenance(tmp_path, {}, AS_OF)
+    assert unsupported["status"] == "incomplete"
 
 
 def test_skill_contract_quality_is_conditional_and_static_only(tmp_path: Path) -> None:

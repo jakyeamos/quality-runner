@@ -14,13 +14,13 @@ from quality_runner.application.journey_outcomes import (
 from quality_runner.application.outcome_projection import LegacyPayload
 from quality_runner.application.verification_workflows import verify_gates_payload
 from quality_runner.cli_artifacts import prune_artifacts_payload
+from quality_runner.cli_assurance import assurance_command_payload
 from quality_runner.cli_controller_reports import (
     controller_report_command_payload,
     controller_report_from_summary_payload,
     load_controller_report_json,
 )
 from quality_runner.cli_fix_proposals import propose_fix_command_payload
-from quality_runner.cli_fleet import fleet_command_payload
 from quality_runner.cli_gate import (
     gate_command_payload,
     gate_respond_command_payload,
@@ -72,8 +72,8 @@ def payload_for_args(
 ) -> dict[str, Any]:
     if args.command == "doctor":
         return doctor_payload(include_environment=True)
-    if args.command == "fleet":
-        return fleet_command_payload(args)
+    if args.command in {"behavior", "fleet"}:
+        return assurance_command_payload(args)
     if args.command == "security":
         return security_command_payload(args)
     if args.command == "phase-check":

@@ -227,7 +227,7 @@ def _unknown(path: str, detail: str) -> dict[str, Any]:
 
 
 def _result(
-    *, score: int, status: str, message: str, evidence: list[dict[str, str]]
+    *, score: int | None, status: str, message: str, evidence: list[dict[str, str]]
 ) -> dict[str, Any]:
     return {"score": score, "status": status, "message": message, "evidence": evidence}
 

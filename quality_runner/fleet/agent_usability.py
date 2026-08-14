@@ -238,7 +238,9 @@ def assess_agent_usability(
     return {
         "schema": AGENT_USABILITY_SCHEMA,
         "status": status,
-        "applicability": "not_applicable" if explicit_not_applicable else "applicable",
+        "applicability": (
+            "not_applicable" if explicit_not_applicable or not surface_present else "applicable"
+        ),
         "manifest_status": "invalid"
         if manifest_error
         else "present"

@@ -2,8 +2,21 @@
   "schema_version": "change-surface-matrix/v1",
   "subject": {"kind": "repository", "id": "quality-runner"},
   "owner": "repository-owner",
-  "last_reviewed": "2026-08-11",
+  "last_reviewed": "2026-08-13",
   "surfaces": [
+    {
+      "id": "matrix-maintenance",
+      "scope": "local",
+      "path": ".agents/change-surface-matrix.json",
+      "owner": "repository-owner",
+      "condition": "A material feature, functionality, behavior, CLI/API, workflow, data, integration, security/privacy, or quality/release change is added or changed.",
+      "operations": ["add", "change", "remove"],
+      "validation": [
+        "Update this matrix in the same change with affected surfaces, contracts, documentation, tests, evidence, owners, and projections.",
+        "For a purely internal refactor or isolated fix with no matrix impact, record a reviewed no-impact reason in the same change record; omission is not an implicit no-impact decision."
+      ],
+      "status": "applicable"
+    },
     {
       "id": "quality-engine",
       "scope": "local",
@@ -15,7 +28,8 @@
       "validation": [
         "uv run pytest -q",
         "uv run ruff check .",
-        "uv run basedpyright"
+        "uv run basedpyright",
+        "For maturity changes, verify dimension-to-capability-to-pillar aggregation, reverse producer coverage, explicit capability applicability, evidence coverage, missing capabilities, and confirmed-risk-only critical caps."
       ],
       "status": "applicable"
     },
@@ -26,11 +40,11 @@
       "contract_fixtures": [
         "fixtures/contracts/public-adapters/pronto-maturity-feed.json"
       ],
-      "path": "installed qr, plugins, Pronto, and the fleet maturity feed",
+      "path": "installed qr, plugins, Pronto, quality-runner-maturity-feed/v2, and quality-runner-repository-maturity/v2",
       "owner": "integration-owner",
-      "condition": "command, plugin, feed schema, taxonomy, or publication behavior changes",
+      "condition": "command, plugin, feed schema, taxonomy, publication behavior, maturity pillar, applicability, coverage, cap, or source-dimension changes",
       "operations": ["add", "change", "remove"],
-      "validation": ["qr fleet replay", "qr fleet feed", "consumer contract readback"],
+      "validation": ["qr fleet replay", "qr fleet feed", "consumer contract readback in Pronto, including v1 migration labeling and v2 capability/pillar projection", "uv run pytest -q tests/test_repository_maturity.py tests/test_release_boundary.py::test_public_pronto_fixture_satisfies_the_feed_contract", "uv run pytest -q tests/test_error_codes.py"],
       "status": "applicable"
     },
     {

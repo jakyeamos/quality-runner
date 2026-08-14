@@ -66,6 +66,38 @@ def test_blocked_dynamic_finding_and_target_evidence_reach_feed_projection() -> 
     assert projection["blocker_count"] == 1
     assert projection["dynamic_status"] == "blocked"
     assert projection["target_state"] == target_state
+    assert projection["repository_maturity"]["critical_cap"]["applied"] is False
+
+
+def test_only_confirmed_critical_risk_caps_repository_maturity() -> None:
+    repository = {
+        "repo_id": "repo-1",
+        "primary_path": "/projects/repo-1",
+        "target_branch": {"branch": "dev", "status": "ready", "head": "abc"},
+    }
+    finding = {
+        "repo_id": "repo-1",
+        "findings": [
+            {
+                "dimension": "security_constraints",
+                "status": "blocked",
+                "score": 4,
+                "severity": "blocker",
+                "priority": "P0",
+                "applicability": "applicable",
+                "confirmed_critical_risk": True,
+                "message": "A confirmed critical risk is present.",
+            }
+        ],
+        "dynamic": {"status": "not_selected"},
+        "agent_usability": {"applicability": "not_applicable"},
+    }
+
+    projection = _repository_projection(repository, finding)
+
+    assert projection["repository_maturity"]["uncapped_score"] == 4
+    assert projection["repository_maturity"]["score"] == 2
+    assert projection["repository_maturity"]["critical_cap"]["applied"] is True
 
 
 def test_feed_projection_preserves_current_and_future_finding_dimensions() -> None:
@@ -306,7 +338,7 @@ def test_feed_is_deterministic_and_redacted(tmp_path: Path) -> None:
 
     assert replay["status"] == "passed"
     assert first == second
-    assert first["schema"] == "quality-runner-maturity-feed/v1"
+    assert first["schema"] == "quality-runner-maturity-feed/v2"
     assert first["repository_count"] == result["repository_count"]
     assert sum(first["quality_outcome_counts"].values()) == first["repository_count"]
     assert first["quality_outcome_taxonomy"]["verification_blocked"]["label"] == (
@@ -317,12 +349,51 @@ def test_feed_is_deterministic_and_redacted(tmp_path: Path) -> None:
         gap["dimension"] == "change_surface_coverage"
         for gap in first["repositories"][0]["dimension_gaps"]
     )
+    assert "matrix_maintenance" in first["repositories"][0]["dimension_scores"]
+    assert any(
+        gap["dimension"] == "matrix_maintenance"
+        for gap in first["repositories"][0]["dimension_gaps"]
+    )
     agent_usability = first["repositories"][0]["agent_usability"]
     assert agent_usability["schema"] == "quality-runner-agent-usability/v1"
+    assert agent_usability["applicability"] == "not_applicable"
     assert len(agent_usability["lanes"]) == 4
+    behavior_assurance = first["repositories"][0]["behavior_assurance"]
+    assert behavior_assurance["schema"] == "quality-runner-behavior-assurance/v2"
+    assert behavior_assurance["contract_status"] == "missing"
+    assert behavior_assurance["release_ready"] is False
+    assert first["behavior_assurance"] == {
+        "schema": "quality-runner-behavior-assurance-summary/v2",
+        "status": "gaps_present",
+        "repository_count": 1,
+        "ready_repository_count": 0,
+        "applicability_counts": {"unknown": 1},
+        "result_status_counts": {"unknown": 1},
+        "contract_schema_counts": {"missing": 1},
+        "edge_profile_status_counts": {"missing": 1},
+        "state_counts": {"missing_contract": 1},
+        "required_scenario_count": 0,
+        "passed_scenario_count": 0,
+        "gap_count": 1,
+        "coverage": {
+            "total": 0,
+            "profiled": 0,
+            "verified": 0,
+            "stale": 0,
+            "failed": 0,
+            "blocked": 0,
+            "unknown": 0,
+        },
+    }
     assert not any(
         key.startswith("agent_usability.") for key in first["repositories"][0]["dimension_scores"]
     )
+    repository_maturity = first["repositories"][0]["repository_maturity"]
+    assert repository_maturity["schema"] == "quality-runner-repository-maturity/v2"
+    assert len(repository_maturity["pillars"]) == 7
+    assert repository_maturity["evidence"]["unknown_applicability"] == []
+    assert first["mean_maturity"] == repository_maturity["score"]
+    assert first["source_dimension_mean"] == result["summary"]["mean_maturity"]
     serialized = json.dumps(first).lower()
     for forbidden in ('"prompt"', '"code"', '"diff"', '"transcript"', '"credential"'):
         assert forbidden not in serialized
@@ -356,17 +427,32 @@ def test_agent_usability_scores_contribute_to_repository_and_fleet_maturity(
         "agent_usability.behavior_evidence": 1.0,
         "agent_usability.documentation_contract": 4.0,
         "agent_usability.freshness_portability": 3.0,
-        "agent_usability.growth_health": 4.0,
         "agent_usability.tool_skill_coverage": 3.0,
     }
-    scored = [value for value in repository["dimension_scores"].values() if value is not None]
-    assert repository["maturity_score"] == round(sum(scored) / len(scored), 3)
+    model = repository["repository_maturity"]
+    assert repository["maturity_score"] == model["score"]
+    assert repository["source_dimension_mean"] != repository["maturity_score"]
+    assert {pillar["id"] for pillar in model["pillars"]} == {
+        "correctness_reliability",
+        "security_privacy_supply_chain",
+        "maintainability_evolvability",
+        "operability_release_safety",
+        "user_facing_quality",
+        "human_agent_usability",
+        "governance_sustainability",
+    }
+    assert (
+        next(pillar for pillar in model["pillars"] if pillar["id"] == "human_agent_usability")[
+            "score"
+        ]
+        == 2.125
+    )
     assert any(
         gap["dimension"] == "agent_usability.behavior_evidence"
         for gap in repository["dimension_gaps"]
     )
     assert result["summary"]["dimension_means"]["agent_usability.behavior_evidence"] == 1.0
-    assert feed["mean_maturity"] == result["summary"]["mean_maturity"]
+    assert feed["source_dimension_mean"] == result["summary"]["mean_maturity"]
 
 
 def test_feed_publish_replaces_stable_file_atomically(tmp_path: Path) -> None:

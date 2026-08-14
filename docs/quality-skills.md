@@ -107,8 +107,15 @@ Quality Runner now owns the command-backed profile and fleet orchestration:
 ```bash
 qr audit /path/to/repo --profile environment-legibility --json
 qr fleet audit run --all --projects-root /path/to/projects --json
+qr fleet audit run --all --projects-root /path/to/projects --standard matrix-maintenance --json
 qr fleet audit feed --audit-id AUDIT_ID --json
 ```
+
+Use `--standard matrix-maintenance` when the question is specifically whether
+each repository's change matrix requires same-change updates for material
+feature/functionality changes and a reviewed no-impact reason. This is a
+static, one-standard audit: inspect its `standard-report.json`, replay it for
+integrity, and do not publish it as the canonical all-standards feed.
 
 The fleet feed is a versioned, private handoff at
 `~/.quality-runner/fleet-audit/current/maturity.json`. It is generated only
@@ -116,6 +123,19 @@ from a complete, replay-valid fleet snapshot and contains redacted maturity
 projections for local consumers. Immutable source artifacts remain in the
 audit-specific directory. `--output-dir` is safe for isolated tests and cannot
 replace the production current feed.
+
+The complete fleet audit includes `matrix_maintenance` as a scored maturity
+dimension. Its repository score, fleet mean, non-passing gap, and Pronto
+remediation action come from the same canonical feed. The scoped
+`--standard matrix-maintenance` command remains a diagnostic inventory and does
+not update that feed by itself.
+
+Maturity v2 aggregates evidence as dimensions, then capabilities, then seven
+weighted pillars. Conditional capabilities preserve explicit applicability,
+and only confirmed critical risk can cap the score. The new capability
+producers cover reliability and data integrity, security/privacy/supply chain,
+code and compatibility health, runtime observability, user-facing web quality,
+consolidated agent usability, and governance continuity.
 
 The profile uses QR's read-only audit and disposable-worktree contracts. Do not
 pass `environment-legibility` to `--only-gate`; that selector remains reserved
