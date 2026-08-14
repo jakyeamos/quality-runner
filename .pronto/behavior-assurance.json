@@ -1,0 +1,103 @@
+{
+  "schema": "pronto-behavior-assurance/v2",
+  "applicability": "applicable",
+  "approved_producers": ["quality-runner"],
+  "behaviors": [
+    {
+      "id": "behavior-contract-compatibility",
+      "title": "Behavior contracts remain compatible and conservative",
+      "tier": 0,
+      "automation": "permanent",
+      "change_triggers": [
+        "quality_runner/fleet/behavior_contract.py",
+        "quality_runner/fleet/behavior_assurance.py",
+        "quality_runner/fleet/behavior_support.py",
+        "tests/test_behavior_assurance.py"
+      ],
+      "invariants": [
+        "Legacy v1 contracts remain valid but never appear edge-profiled.",
+        "Tier 1 and Tier 2 evidence cannot change Tier-0 release readiness."
+      ],
+      "scenarios": [
+        {
+          "id": "v1-compatible-v2-profiled",
+          "title": "Compatibility and profile status remain distinct",
+          "oracle": "A valid v1 contract assesses normally with legacy edge status, while v2 requires behavior invariants and validates any declared edge profile.",
+          "verification_level": "automated",
+          "edge_profile": {
+            "categories": ["input_and_encoding", "environment_and_cross_surface"],
+            "risk": "routine",
+            "side_effects": "none"
+          }
+        },
+        {
+          "id": "tier-zero-release-semantics",
+          "title": "All tiers project without widening release gates",
+          "oracle": "Coverage contains every Tier 0-2 scenario while required and passed counts, gaps, and release_ready continue to depend only on required Tier-0 scenarios.",
+          "verification_level": "automated",
+          "edge_profile": {
+            "categories": ["state_and_ordering"],
+            "risk": "routine",
+            "side_effects": "none"
+          }
+        }
+      ]
+    },
+    {
+      "id": "edge-receipt-producer",
+      "title": "Edge traces become bounded direct-surface receipts",
+      "tier": 0,
+      "automation": "on_demand",
+      "change_triggers": [
+        "quality_runner/behavior_receipts.py",
+        "quality_runner/cli_behavior.py",
+        "quality_runner/cli.py",
+        "tests/test_behavior_assurance.py"
+      ],
+      "invariants": [
+        "Quality Runner never self-issues independent edge verification.",
+        "Production, destructive, unbounded, or unredacted traces never mint repository receipts."
+      ],
+      "scenarios": [
+        {
+          "id": "record-edge-boundaries",
+          "title": "Record-edge enforces provenance and safety boundaries",
+          "oracle": "qr behavior record-edge accepts only committed clean v2 targets in local, test, preview, or staging and emits direct_surface evidence after validating replay, minimization, cleanup, bounds, and redaction.",
+          "verification_level": "direct_surface",
+          "edge_profile": {
+            "categories": ["state_and_ordering", "repetition_and_idempotency", "interruption_and_recovery", "authorization_and_session"],
+            "risk": "hostile",
+            "side_effects": "reversible"
+          }
+        }
+      ]
+    },
+    {
+      "id": "whole-inventory-projection",
+      "title": "Edge durability remains auditable across the inventory",
+      "tier": 1,
+      "automation": "permanent",
+      "change_triggers": [
+        "quality_runner/fleet/behavior_assurance.py",
+        "quality_runner/fleet/maturity.py",
+        "tests/test_behavior_assurance.py"
+      ],
+      "invariants": [
+        "Profile, verification, freshness, failure, blockage, and unknown state remain separate dimensions."
+      ],
+      "scenarios": [
+        {
+          "id": "coverage-projection",
+          "title": "Coverage projects per tier and edge category",
+          "oracle": "The assessment reports bounded per-scenario records and aggregate total, profiled, verified, stale, failed, blocked, and unknown counts per tier and declared edge category.",
+          "verification_level": "automated",
+          "edge_profile": {
+            "categories": ["environment_and_cross_surface"],
+            "risk": "routine",
+            "side_effects": "none"
+          }
+        }
+      ]
+    }
+  ]
+}
