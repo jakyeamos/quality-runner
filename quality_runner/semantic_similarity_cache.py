@@ -12,11 +12,14 @@ from pathlib import Path
 from typing import Any, cast
 
 from quality_runner import __version__
+from quality_runner.cache_limits import allocated_bytes, prune_lru_files
 from quality_runner.code_quality_native_similarity import NATIVE_SIMILARITY_SCHEMA
 
 SEMANTIC_SIMILARITY_CACHE_SCHEMA = "quality-runner-semantic-similarity-cache-v0.1"
 CACHE_DIRECTORY = "semantic-similarity-v1"
 _CACHE_INDEX_NAME = "index.json"
+_MAX_CACHE_ENTRIES = 1024
+_MAX_CACHE_BYTES = 64 * 1024 * 1024
 SimilarityMaterializer = Callable[[Mapping[str, object]], dict[str, Any]]
 
 
@@ -25,6 +28,7 @@ class _CacheStats:
     cache_hits: int = 0
     cache_misses: int = 0
     write_failures: int = 0
+    pruned_entries: int = 0
     invalidation_reasons: Counter[str] = field(default_factory=Counter)
 
 
@@ -131,6 +135,14 @@ class SemanticSimilarityCache:
             return
         self._index[key] = {"cache_key": key, "identity": dict(identity)}
         self._latest_identity = dict(identity)
+        removed = self._prune_entries()
+        if removed:
+            self._stats.pruned_entries += len(removed)
+            self._index = {
+                cache_key: metadata
+                for cache_key, metadata in self._index.items()
+                if cache_key not in removed
+            }
         if not _atomic_write_json(
             self.cache_dir / _CACHE_INDEX_NAME,
             {
@@ -143,6 +155,18 @@ class SemanticSimilarityCache:
             self._stats.write_failures += 1
             return
         self._index_status = "ready"
+
+    def _prune_entries(self) -> set[str]:
+        entries_dir = self.cache_dir / "entries"
+        result = prune_lru_files(
+            owned_root=self.cache_dir,
+            cache_dir=entries_dir,
+            candidates=entries_dir.glob("*.json"),
+            max_entries=_MAX_CACHE_ENTRIES,
+            max_bytes=_MAX_CACHE_BYTES,
+            reserved_bytes=allocated_bytes(self.cache_dir / _CACHE_INDEX_NAME),
+        )
+        return {path.stem for path in result.removed}
 
     def evidence(self, *, cache_status: str, considered_files: int) -> dict[str, object]:
         if self._persist:
@@ -174,7 +198,7 @@ class SemanticSimilarityCache:
             "recomputed_path_samples": [],
             "recomputed_path_sample_truncated": False,
             "write_failures": self._stats.write_failures,
-            "pruned_entries": 0,
+            "pruned_entries": self._stats.pruned_entries,
             "index_status": self._index_status if self._persist else "disabled",
             "index_entries": len(self._index),
             "persisted": self._persist,

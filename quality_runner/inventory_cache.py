@@ -5,14 +5,18 @@ import json
 import os
 import subprocess
 import tempfile
+from contextlib import suppress
 from pathlib import Path
 from typing import Any
 
 from quality_runner import __version__
+from quality_runner.cache_limits import prune_lru_files
 from quality_runner.cache_modes import CacheMode, cache_directory, resolve_cache_mode
 from quality_runner.schema_constants import REPO_SCAN_SCHEMA
 
 SCHEMA = "quality-runner-repository-inventory-cache-v0.1"
+_MAX_CACHE_BYTES = 16 * 1024 * 1024
+_MAX_REPOSITORY_IDENTITIES = 8
 
 
 def load_or_build_inventory(
@@ -132,15 +136,30 @@ def _read(path: Path) -> dict[str, Any] | None:
 
 
 def _write(path: Path, payload: dict[str, Any]) -> None:
+    temporary: str | None = None
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
         fd, temporary = tempfile.mkstemp(prefix="inventory-", suffix=".json", dir=path.parent)
         with os.fdopen(fd, "w", encoding="utf-8") as handle:
             json.dump(payload, handle, indent=2, sort_keys=True)
             handle.write("\n")
+            handle.flush()
+            os.fsync(handle.fileno())
         os.replace(temporary, path)
+        temporary = None
+        prune_lru_files(
+            owned_root=path.parent,
+            cache_dir=path.parent,
+            candidates=path.parent.glob("*.json"),
+            max_entries=_MAX_REPOSITORY_IDENTITIES,
+            max_bytes=_MAX_CACHE_BYTES,
+        )
     except OSError:
         return
+    finally:
+        if temporary is not None:
+            with suppress(OSError):
+                Path(temporary).unlink()
 
 
 def _evidence(

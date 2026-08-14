@@ -3,11 +3,13 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+from quality_runner.cache_modes import default_external_cache_root
+
 
 def controller_command_environment(repo_path: str) -> dict[str, str]:
     cache_root = Path(repo_path) / ".quality-runner" / "cache"
     return {
-        "UV_CACHE_DIR": str(cache_root / "uv"),
+        "UV_CACHE_DIR": str(default_external_cache_root() / "shared-tools" / "uv-v1"),
         "XDG_CACHE_HOME": str(cache_root / "xdg"),
     }
 

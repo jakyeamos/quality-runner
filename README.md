@@ -142,6 +142,9 @@ does not lower maturity, and incomplete or ambiguous traversal is `unknown`.
 A standard-only snapshot writes private
 `quality-runner-cache-design-assessment-v1` evidence to
 `standard-report.json` but cannot replace the canonical complete maturity feed.
+The checked-in [dogfood receipt](docs/baselines/cache-design-dogfood.json)
+records the exact-base before/after allocated bytes, cache hits, and five
+cold/warm equivalence runs used to validate QR's own bounded caches.
 
 The Mac Control ideal-state gate is a separate, explicit fleet lane. It does
 not change the numeric maturity score. Each repository that supports Mac
