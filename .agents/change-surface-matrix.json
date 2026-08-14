@@ -63,6 +63,7 @@
       "operations": ["add", "change", "remove"],
       "validation": [
         "uv run pytest -q tests/test_fleet_detector_refresh.py",
+        "production refresh callback signature bind in the detector refresh happy-path test",
         "qr fleet detector refresh --repo-path FIXTURE --projects-root ROOT --json",
         "Pronto consumer refresh readback"
       ],
