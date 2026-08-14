@@ -316,7 +316,10 @@ def _validate_prepared_execution(payload: Mapping[str, object], context: ReviewP
     if payload.get("run_id") != context["run_id"] or payload.get("mode") != context["mode"]:
         raise ValueError("review execution state does not match the prepared context")
     input_hashes = payload.get("input_hashes")
-    if not isinstance(input_hashes, Mapping) or dict(cast(Mapping[str, object], input_hashes)) != context["input_hashes"]:
+    if (
+        not isinstance(input_hashes, Mapping)
+        or dict(cast(Mapping[str, object], input_hashes)) != context["input_hashes"]
+    ):
         raise ValueError("review execution state does not match the prepared context hashes")
 
 

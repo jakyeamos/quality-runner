@@ -23,7 +23,9 @@ def resolve_agent_review_mode(
         return _validated_mode(requested, source="--agent-review-mode")
 
     skills = config.get("skills")
-    configured = cast(dict[str, Any], skills).get("agent_review_mode") if isinstance(skills, dict) else None
+    configured = (
+        cast(dict[str, Any], skills).get("agent_review_mode") if isinstance(skills, dict) else None
+    )
     if configured is not None:
         return _validated_mode(configured, source="quality_runner.skills.agent_review_mode")
 

@@ -59,7 +59,10 @@ def prior_observations(path: Path) -> dict[str, list[dict[str, Any]]]:
         payload = json.loads(path.read_text(encoding="utf-8"))
     except (FileNotFoundError, OSError, json.JSONDecodeError):
         return {}
-    if not isinstance(payload, dict) or cast(dict[str, Any], payload).get("schema") != CANDIDATE_FLEET_SCHEMA:
+    if (
+        not isinstance(payload, dict)
+        or cast(dict[str, Any], payload).get("schema") != CANDIDATE_FLEET_SCHEMA
+    ):
         return {}
     typed_payload = cast(dict[str, Any], payload)
     return {

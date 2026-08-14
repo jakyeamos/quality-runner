@@ -1,0 +1,57 @@
+{
+  "schema": "quality-runner-fleet-detector-refresh/v1",
+  "status": "partial",
+  "refresh_id": "detector-refresh-public-contract-fixture",
+  "as_of": "2026-08-14T00:00:00+00:00",
+  "projects_root": "/path/to/projects",
+  "analysis": {
+    "mode": "full",
+    "skill_packs": "enabled",
+    "agent_review_mode": "off",
+    "execute_discovered_gates": false
+  },
+  "publication": {
+    "contract": "repository-local-quality-runner-runs",
+    "consumer_next_step": "pronto quality refresh --json"
+  },
+  "repository_count": 3,
+  "counts": {"published": 1, "blocked": 1, "unsupported": 1},
+  "results": [
+    {
+      "repo_id": "published-repository",
+      "primary_path": "/path/to/projects/published-repository",
+      "status": "published",
+      "reason": "full exact-target detector evidence published",
+      "target": {
+        "status": "ready",
+        "branch": "main",
+        "head": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      "run_ids": [
+        "fleet-detector-fixture-published-repository-inspect",
+        "fleet-detector-fixture-published-repository-run",
+        "fleet-detector-fixture-published-repository-verify"
+      ],
+      "finding_count": 2,
+      "source_head_unchanged": true,
+      "cleanup": {"status": "passed", "returncode": 0}
+    },
+    {
+      "repo_id": "blocked-repository",
+      "primary_path": "/path/to/projects/blocked-repository",
+      "status": "blocked",
+      "reason": "target branch is not ready"
+    },
+    {
+      "repo_id": "unsupported-repository",
+      "primary_path": "/path/to/projects/unsupported-repository",
+      "status": "unsupported",
+      "reason": "repository documentation declares an archival generated snapshot"
+    }
+  ],
+  "artifact_root": "/path/to/artifacts/detector-refresh-public-contract-fixture",
+  "artifact_paths": {
+    "ledger_json": "/path/to/artifacts/detector-refresh-public-contract-fixture/detector-refresh.json"
+  },
+  "implementation_allowed": false
+}

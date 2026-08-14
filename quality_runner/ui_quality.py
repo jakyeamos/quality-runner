@@ -8,6 +8,7 @@ from typing import cast
 
 from quality_runner.code_quality_findings import make_finding
 from quality_runner.ui_quality_helpers import cue_type, mapping, stable, strings, text
+from quality_runner.ui_quality_support import _mapping_equals
 
 UI_QUALITY_REPORT_SCHEMA = "quality-runner-ui-quality-report-v0.1"
 _THEMES = ("light", "dark")
@@ -25,6 +26,7 @@ _DEFAULT_RISK = (
 )
 Finding = dict[str, object]
 
+
 def load_ui_quality_fixture(path: Path) -> dict[str, object]:
     try:
         payload = json.loads(path.read_text(encoding="utf-8"))
@@ -33,6 +35,7 @@ def load_ui_quality_fixture(path: Path) -> dict[str, object]:
     if not isinstance(payload, dict):
         raise ValueError("UI quality fixture must be a JSON object")
     return cast(dict[str, object], payload)
+
 
 def build_ui_quality_report(
     *, run_id: str, fixture: Mapping[str, object], fixture_path: str
@@ -77,6 +80,7 @@ def build_ui_quality_report(
         raise ValueError("invalid UI quality report: " + "; ".join(strings(validation["errors"])))
     return report
 
+
 def validate_ui_quality_report(report: Mapping[str, object]) -> dict[str, object]:
     checks = report.get("checks")
     findings = report.get("findings")
@@ -95,6 +99,7 @@ def validate_ui_quality_report(report: Mapping[str, object]) -> dict[str, object
         "errors": [] if valid else ["invalid UI quality report"],
         "finding_count": count,
     }
+
 
 def _ownership(
     path: str,
@@ -168,6 +173,7 @@ def _ownership(
             findings.append(_issue(path, rule, f"component {component_name} -> {reference!r}"))
     return findings
 
+
 def _contrast(
     path: str,
     primitives: Mapping[str, object],
@@ -226,6 +232,7 @@ def _contrast(
                     )
                 )
     return findings
+
 
 def _modifiers(
     path: str, modifiers: Mapping[str, object], raw_compositions: object
@@ -319,6 +326,7 @@ def _modifiers(
             )
     return findings
 
+
 def _states(path: str, states: Mapping[str, object]) -> list[Finding]:
     if not states:
         return [_issue(path, "ui-state-missing-catalog", "states is empty")]
@@ -336,6 +344,7 @@ def _states(path: str, states: Mapping[str, object]) -> list[Finding]:
                 )
             )
     return findings
+
 
 def _resolve_role(
     name: str,
@@ -367,6 +376,7 @@ def _resolve_role(
         )
     return None, "role reference must start with primitive. or semantic."
 
+
 def _contrast_endpoint(
     reference: object,
     theme: str,
@@ -378,6 +388,7 @@ def _contrast_endpoint(
         if isinstance(reference, str) and reference.startswith("semantic.")
         else (None, "contrast endpoint must reference semantic.*")
     )
+
 
 def _dependencies(name: str, modifiers: Mapping[str, object]) -> set[str]:
     pending = [name]
@@ -395,9 +406,11 @@ def _dependencies(name: str, modifiers: Mapping[str, object]) -> set[str]:
                 pending.append(requirement)
     return dependencies
 
+
 def _pair_themes(value: object) -> list[str]:
     themes = [item for item in _list(value) if isinstance(item, str) and item in _THEMES]
     return themes or list(_THEMES)
+
 
 def _parse_hex(value: str | None) -> tuple[float, float, float] | None:
     if value is None or _HEX_COLOR.fullmatch(value) is None:
@@ -407,6 +420,7 @@ def _parse_hex(value: str | None) -> tuple[float, float, float] | None:
         digits = "".join(character * 2 for character in digits)
     red, green, blue = (int(digits[index : index + 2], 16) / 255 for index in (0, 2, 4))
     return red, green, blue
+
 
 def _ratio(foreground: tuple[float, float, float], background: tuple[float, float, float]) -> float:
     def luminance(rgb: tuple[float, float, float]) -> float:
@@ -418,6 +432,7 @@ def _ratio(foreground: tuple[float, float, float], background: tuple[float, floa
 
     first, second = luminance(foreground), luminance(background)
     return (max(first, second) + 0.05) / (min(first, second) + 0.05)
+
 
 def _check_summaries(findings: list[Finding]) -> list[dict[str, object]]:
     return [
@@ -433,6 +448,7 @@ def _check_summaries(findings: list[Finding]) -> list[dict[str, object]]:
         for check_id, prefix in _CHECKS
     ]
 
+
 def _summary(checks: Sequence[object], findings: Sequence[object]) -> dict[str, int]:
     return {
         "check_count": len(checks),
@@ -443,6 +459,7 @@ def _summary(checks: Sequence[object], findings: Sequence[object]) -> dict[str, 
         ),
         "judgment_only_check_count": 0,
     }
+
 
 def _issue(
     path: str,
@@ -471,12 +488,10 @@ def _issue(
         ),
     )
 
+
 def _map(value: object) -> Mapping[str, object] | None:
     return cast(Mapping[str, object], value) if isinstance(value, Mapping) else None
 
+
 def _list(value: object) -> list[object]:
     return cast(list[object], value) if isinstance(value, list) else []
-
-def _mapping_equals(value: object, key: str, expected: object) -> bool:
-    mapped = _map(value)
-    return mapped is not None and mapped.get(key) == expected

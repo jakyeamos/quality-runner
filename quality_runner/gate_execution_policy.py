@@ -238,9 +238,7 @@ def valid_gate_timeouts(gate_timeouts: dict[str, int] | None) -> dict[str, int]:
     if not isinstance(gate_timeouts, dict):
         return {}
     return {
-        gate_id: seconds
-        for gate_id, seconds in gate_timeouts.items()
-        if gate_id and seconds > 0
+        gate_id: seconds for gate_id, seconds in gate_timeouts.items() if gate_id and seconds > 0
     }
 
 
@@ -270,7 +268,8 @@ def _available_capabilities(capability_map: dict[str, Any]) -> list[dict[str, An
     return [
         cast(dict[str, Any], capability)
         for capability in cast(list[Any], available)
-        if isinstance(capability, dict) and _is_executable_capability(cast(dict[str, Any], capability))
+        if isinstance(capability, dict)
+        and _is_executable_capability(cast(dict[str, Any], capability))
     ]
 
 

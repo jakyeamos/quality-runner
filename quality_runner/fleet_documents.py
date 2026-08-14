@@ -313,8 +313,7 @@ def _missing_capabilities(capability: dict[str, Any], result: dict[str, Any]) ->
         return [
             cast(dict[str, Any], item)["id"]
             for item in typed_missing
-            if isinstance(item, dict)
-            and isinstance(cast(dict[str, Any], item).get("id"), str)
+            if isinstance(item, dict) and isinstance(cast(dict[str, Any], item).get("id"), str)
         ]
     return _string_items(result.get("missing_capabilities"))
 

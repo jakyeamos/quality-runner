@@ -297,10 +297,7 @@ def json_safe(value: object) -> object:
     if value is None or isinstance(value, (str, int, float, bool)):
         return value
     if isinstance(value, Mapping):
-        return {
-            str(key): json_safe(item)
-            for key, item in cast(Mapping[Any, Any], value).items()
-        }
+        return {str(key): json_safe(item) for key, item in cast(Mapping[Any, Any], value).items()}
     if isinstance(value, list):
         return [json_safe(item) for item in cast(list[Any], value)]
     return str(value)

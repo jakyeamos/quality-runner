@@ -583,6 +583,38 @@ refresh still writes a final `agent-handoff.json`/`.md` with a
 progress diagnostics with the last traversal directory, recent paths, visited
 path count, and skipped path count.
 
+## `qr fleet detector refresh`
+
+Refreshes Pronto-compatible code-quality evidence across a bounded repository
+fleet. Unlike `fleet audit`, this command intentionally publishes normal QR run
+directories into each repository after scanning the exact committed target in
+a QR-owned detached worktree:
+
+```bash
+qr fleet detector refresh --all \
+  --projects-root /path/to/projects \
+  --timeout-seconds 600 \
+  --json
+```
+
+Use repeatable `--repo-path` options instead of `--all` for a bounded slice;
+the two scope forms are mutually exclusive. `--target-override REPO_ID=BRANCH`
+uses QR's repository identity. Orchestrators such as Pronto use repeatable
+`--target-path-override ABSOLUTE_PATH BRANCH` pairs so configured targets do not
+depend on a second system's repository id. Both use the same fail-closed target
+resolver as fleet audit. Every repository is recorded as `published`,
+`blocked`, or `unsupported`, and a
+`detector-refresh.json` ledger is written below
+`~/.quality-runner/fleet-detector-refresh` unless `--output-dir` is supplied.
+One repository failure does not prevent later repositories from being
+attempted.
+
+The analysis mode is always `full`; deterministic skill packs are always
+enabled. Discovered repository gates are not executed. Agent review is a
+separate opt-in surface controlled by `--agent-review-mode` and defaults to
+`off`. After publication, run `pronto quality refresh --json`, or use Pronto's
+combined detector-refresh command when available, to import the new evidence.
+
 ## `quality-runner rollout`
 
 Runs safe single-repo refreshes across a repo list and captures controller

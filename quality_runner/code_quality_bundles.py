@@ -32,7 +32,7 @@ def bundle_budget_findings(root: Path) -> list[Finding]:
             findings.append(
                 cast(
                     Finding,
-        finding(
+                    finding(
                         category="speed",
                         severity="observation",
                         confidence="medium",

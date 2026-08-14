@@ -348,11 +348,7 @@ def _object(value: object) -> dict[str, Any]:
 def _objects(value: object) -> list[dict[str, Any]]:
     if not isinstance(value, list):
         return []
-    return [
-        cast(dict[str, Any], item)
-        for item in cast(list[Any], value)
-        if isinstance(item, dict)
-    ]
+    return [cast(dict[str, Any], item) for item in cast(list[Any], value) if isinstance(item, dict)]
 
 
 def _number_mapping(value: object) -> dict[str, int | float | None]:

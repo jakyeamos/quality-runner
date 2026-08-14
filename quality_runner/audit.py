@@ -322,7 +322,7 @@ def _structural_summary(
         )
     return (
         f"{count} {rule_id} structural finding{'s' if count != 1 else ''} "
-        f"in {_string_or_default(typed_representative['remediation_bucket'] if 'remediation_bucket' in typed_representative else None, 'structural quality')}."
+        f"in {_string_or_default(typed_representative.get('remediation_bucket'), 'structural quality')}."
     )
 
 
@@ -330,7 +330,7 @@ def _structural_rule_metadata(representative: dict[str, Any]) -> dict[str, str]:
     metadata: dict[str, str] = {}
     typed_representative: dict[str, object] = representative
     for field in ("rule_message", "rule_category"):
-        value = typed_representative[field] if field in typed_representative else None
+        value = typed_representative.get(field)
         if isinstance(value, str) and value:
             metadata[field] = value
     return metadata
