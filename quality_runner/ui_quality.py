@@ -8,6 +8,7 @@ from typing import cast
 
 from quality_runner.code_quality_findings import make_finding
 from quality_runner.ui_quality_helpers import cue_type, mapping, stable, strings, text
+from quality_runner.ui_quality_support import _mapping_equals
 
 UI_QUALITY_REPORT_SCHEMA = "quality-runner-ui-quality-report-v0.1"
 _THEMES = ("light", "dark")
@@ -494,8 +495,3 @@ def _map(value: object) -> Mapping[str, object] | None:
 
 def _list(value: object) -> list[object]:
     return cast(list[object], value) if isinstance(value, list) else []
-
-
-def _mapping_equals(value: object, key: str, expected: object) -> bool:
-    mapped = _map(value)
-    return mapped is not None and mapped.get(key) == expected

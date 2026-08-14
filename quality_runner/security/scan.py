@@ -18,6 +18,7 @@ from quality_runner.security.capabilities import (
     merge_security_capabilities,
 )
 from quality_runner.security.config import security_settings
+from quality_runner.security.scan_support import _string_or_none
 from quality_runner.security_surface_paths import is_api_route_path, is_webhook_path
 
 RAW_CONTENT_MARKERS = (
@@ -484,11 +485,6 @@ def _content_sha256(file_info: dict[str, Any]) -> str | None:
     if isinstance(text, str):
         return hashlib.sha256(text.encode("utf-8")).hexdigest()
     return None
-
-
-def _string_or_none(value: object) -> str | None:
-    return value if isinstance(value, str) else None
-
 
 def _coverage_status(text_scan_scope: TextScanScope | None) -> str:
     if text_scan_scope is None:

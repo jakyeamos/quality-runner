@@ -10,6 +10,7 @@ from typing import Any, cast
 from quality_runner.code_quality_python_performance import python_repository_performance_signals
 from quality_runner.schema_constants import GLOBAL_SKILL_CONFIG_SCHEMA, SKILL_SELECTION_SCHEMA
 from quality_runner.skill_config import load_active_skills, sanitize_skill_id
+from quality_runner.skill_selection_support import _diagnostic_signals, _global_warning
 
 GLOBAL_SKILL_CONFIG_ENV = "QUALITY_RUNNER_GLOBAL_CONFIG"
 GLOBAL_SKILL_CORPUS_ENV = "QUALITY_RUNNER_SKILL_CORPUS"
@@ -496,19 +497,4 @@ def _tokens(value: str) -> set[str]:
         token
         for token in _TOKEN_RE.findall(value.lower().replace("_", " ").replace("-", " "))
         if token not in _SELECTION_STOP_WORDS
-    }
-
-
-def _diagnostic_signals(signals: set[str], *, priority: set[str] | None = None) -> list[str]:
-    meaningful = {token for token in signals if not token.isdigit()}
-    prioritized = sorted(meaningful & (priority or set()))
-    remainder = sorted(meaningful - set(prioritized))
-    return [*prioritized, *remainder][:160]
-
-
-def _global_warning(path: object, message: str) -> dict[str, str]:
-    return {
-        "code": "invalid_quality_runner_global_skill_config",
-        "message": f"global Quality Skill config: {message}",
-        "path": str(path) if path else "<global-quality-runner-config>",
     }

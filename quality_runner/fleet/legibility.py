@@ -564,6 +564,75 @@ def _dimension_finding(
     )
 
 
+def _finding(
+    *,
+    repository: dict[str, Any],
+    dimension: str,
+    score: int | None,
+    as_of: str,
+    status: str,
+    severity: str,
+    priority: str,
+    confidence: str,
+    message: str,
+    evidence: list[dict[str, str]],
+    validation_commands: list[str],
+) -> dict[str, Any]:
+    return {
+        "schema": FLEET_FINDING_SCHEMA,
+        "finding_id": digest([repository["repo_id"], dimension, status, evidence])[:16],
+        "repo_id": repository["repo_id"],
+        "as_of": as_of,
+        "dimension": dimension,
+        "label": DIMENSION_LABELS[dimension],
+        "applicable": status != "not_applicable",
+        "score": score,
+        "status": status,
+        "severity": severity,
+        "priority": priority,
+        "confidence": confidence,
+        "message": message,
+        "evidence": evidence,
+        "validation_commands": validation_commands,
+        "provenance_hash": digest(
+            {"repo_id": repository["repo_id"], "dimension": dimension, "evidence": evidence}
+        ),
+    }
+
+
+def _scan_projection(scan: dict[str, Any]) -> dict[str, Any]:
+    keys = (
+        "schema",
+        "package_manager",
+        "languages",
+        "ecosystems",
+        "scripts",
+        "quality_commands",
+        "agent_instruction_files",
+        "ci_files",
+        "quality_contract",
+        "warnings",
+        "git_provenance",
+    )
+    return {key: scan[key] for key in keys if key in scan}
+
+
+def _validation_commands(dimension: str, scan: dict[str, Any]) -> list[str]:
+    quality_commands = scan.get("quality_commands", [])
+    commands = (
+        [
+            str(cast(dict[str, Any], item).get("command"))
+            for item in cast(list[Any], quality_commands)
+            if isinstance(item, dict) and isinstance(cast(dict[str, Any], item).get("command"), str)
+        ]
+        if isinstance(quality_commands, list)
+        else []
+    )
+    if dimension == "quality_commands" and commands:
+        return commands[:6]
+    return ["qr audit REPO --profile environment-legibility --json"]
+
+
 def _has_deployment_surface(repository: dict[str, Any], scan: dict[str, Any], text: str) -> bool:
     root = Path(str(repository["primary_path"]))
     if any((root / marker).exists() for marker in DEPLOYMENT_MARKERS):
