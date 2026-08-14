@@ -184,11 +184,6 @@ def _refresh_repository(
                 cache_mode="external",
                 cache_root=artifact_root / "cache" / repo_id,
                 agent_review_mode=agent_review_mode,
-                scope_metadata={
-                    "fleet_detector_refresh_id": refresh_id,
-                    "target_branch": target["branch"],
-                    "target_head": target["head"],
-                },
             )
         except Exception as error:  # fleet lane must continue to the next repository
             result["reason"] = f"full detector refresh failed: {type(error).__name__}: {error}"

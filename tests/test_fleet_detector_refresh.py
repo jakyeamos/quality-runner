@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import inspect
 import json
 import subprocess
 import sys
@@ -9,6 +10,7 @@ from typing import Any
 import pytest
 
 from quality_runner.fleet.detector_refresh import fleet_detector_refresh_payload
+from quality_runner.workflow import refresh_payload
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -55,6 +57,11 @@ def _fake_refresh(**kwargs: Any) -> dict[str, Any]:
     return {"status": "completed"}
 
 
+def _contract_checked_fake_refresh(**kwargs: Any) -> dict[str, Any]:
+    inspect.signature(refresh_payload).bind(**kwargs)
+    return _fake_refresh(**kwargs)
+
+
 def _fake_refresh_with_invalid_run(**kwargs: Any) -> dict[str, Any]:
     result = _fake_refresh(**kwargs)
     root = Path(kwargs["repo_root"])
@@ -79,7 +86,7 @@ def test_detector_refresh_scans_exact_target_and_publishes_normal_runs(tmp_path:
         target_overrides={str(repo): "dev"},
         output_dir=tmp_path / "artifacts",
         as_of="2026-08-14T04:45:00Z",
-        refresh_callback=_fake_refresh,
+        refresh_callback=_contract_checked_fake_refresh,
     )
 
     assert payload["status"] == "completed"
