@@ -151,6 +151,12 @@ maturity, not measurement gaps. A missing numeric score or inconclusive dynamic
 result (`unavailable`, `timeout`, `blocked`, `unknown`, or unselected) keeps
 confidence below `high`.
 
+Dynamic verification treats a discovered command excluded by the read-only
+policy as command-level `not_applicable`; it does not hide conclusive results
+from the safe commands that did run. A target with no discovered quality
+commands is a conclusive failed quality surface, not an unknown measurement.
+Locked dependency preparation uses the same audit timeout ceiling as the gates.
+
 The complete fleet audit includes `matrix_maintenance` as a scored maturity
 dimension. Its repository score, fleet mean, non-passing gap, and Pronto
 remediation action come from the same canonical feed. The scoped

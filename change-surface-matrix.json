@@ -17,6 +17,7 @@
       "operations": ["add", "change", "remove"],
       "validation": [
         "uv run --locked pytest -q tests/test_fleet_audit.py",
+        "uv run --locked pytest -q tests/test_fleet_dynamic.py tests/test_discovery_standards_capabilities.py",
         "uv run --locked pytest -q",
         "uv run --locked ruff check .",
         "uv run --locked basedpyright"
