@@ -45,6 +45,22 @@ def test_offline_uv_command_uses_prepared_host_cache(tmp_path, monkeypatch) -> N
     assert env["UV_CACHE_DIR"] == "/inherited/uv-cache"
 
 
+def test_offline_corepack_command_uses_prepared_host_cache(tmp_path, monkeypatch) -> None:
+    home = tmp_path / "home"
+    monkeypatch.setenv("HOME", str(home))
+
+    env = local_command_env(
+        tmp_path,
+        command=(
+            "COREPACK_ENABLE_PROJECT_SPEC=0 corepack pnpm install "
+            "--offline --frozen-lockfile"
+        ),
+    )
+
+    assert env["COREPACK_HOME"] == str(home / ".cache" / "node" / "corepack")
+    assert env["pnpm_config_cache_dir"] == str(home / "Library" / "Caches" / "pnpm")
+
+
 def test_local_command_env_prefers_exact_cached_package_manager(tmp_path, monkeypatch) -> None:
     monkeypatch.setenv("PATH", "/usr/local/bin:/usr/bin")
     home = tmp_path / "home"
