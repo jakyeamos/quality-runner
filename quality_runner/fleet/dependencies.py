@@ -134,7 +134,9 @@ def prepare_dynamic_dependencies(
         result["_cleanup_paths"] = [str(path) for path in local_paths]
         return result
 
-    setup_timeout = min(max(timeout_seconds, 60), 120)
+    # Dependency preparation is part of the bounded dynamic audit. Honor the
+    # caller's ceiling instead of silently imposing a shorter 120-second cap.
+    setup_timeout = max(timeout_seconds, 60)
     try:
         result = run_command(command, cwd=worktree, timeout=setup_timeout)
     except subprocess.TimeoutExpired as error:

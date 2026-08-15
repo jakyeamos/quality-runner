@@ -15,15 +15,18 @@ ShellRunner = Callable[..., dict[str, Any]]
 
 def aggregate_dynamic_status(statuses: list[str]) -> tuple[str, str | None]:
     """Prefer a decisive quality failure while retaining incomplete command receipts."""
-    if "failed" in statuses:
+    applicable = [status for status in statuses if status != "not_applicable"]
+    if statuses and not applicable:
+        return "not_applicable", "all discovered commands were excluded by read-only policy"
+    if "failed" in applicable:
         return "failed", "one or more dynamic quality commands returned a failing result"
-    if "timeout" in statuses:
+    if "timeout" in applicable:
         return "timeout", "one or more dynamic quality commands exceeded their bounded timeout"
-    if "blocked" in statuses:
+    if "blocked" in applicable:
         return "blocked", "one or more dynamic quality commands were blocked by policy"
-    if "unavailable" in statuses:
+    if "unavailable" in applicable:
         return "unavailable", "one or more dynamic quality commands lacked a runtime prerequisite"
-    if statuses and all(status == "passed" for status in statuses):
+    if applicable and all(status == "passed" for status in applicable):
         return "passed", None
     return "unknown", None
 
