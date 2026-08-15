@@ -109,7 +109,18 @@ def fleet_audit_payload(
     for repository in repositories:
         target_override = overrides.get(str(repository["repo_id"]))
         target = resolve_target_branch(repository, override=target_override)
-        repository_with_target = {**repository, "target_branch": target}
+        scope_attestation = (
+            scope_manifest_payload.get("repository_attestations", {}).get(
+                str(repository["primary_path"])
+            )
+            if scope_manifest_payload is not None
+            else None
+        )
+        repository_with_target = {
+            **repository,
+            "target_branch": target,
+            **({"scope_attestation": scope_attestation} if scope_attestation else {}),
+        }
         static_repository = _static_scan_repository(repository_with_target)
         result = audit_repository(
             repository=static_repository,

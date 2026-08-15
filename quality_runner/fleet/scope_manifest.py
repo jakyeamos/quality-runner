@@ -10,6 +10,7 @@ from quality_runner.fleet.contracts import digest
 
 FLEET_SCOPE_MANIFEST_SCHEMA = "quality-runner-fleet-scope/v1"
 _ELIGIBILITY = {"eligible", "excluded"}
+_DISTRIBUTION_VISIBILITY = {"public", "private", "local"}
 
 
 def load_fleet_scope_manifest(path: Path, *, projects_root: Path) -> dict[str, Any]:
@@ -37,7 +38,7 @@ def load_fleet_scope_manifest(path: Path, *, projects_root: Path) -> dict[str, A
         raise ValueError("fleet scope manifest repositories must be a non-empty array")
 
     root = projects_root.expanduser().resolve()
-    normalized: list[dict[str, str]] = []
+    normalized: list[dict[str, Any]] = []
     seen_paths: set[str] = set()
     for index, raw_repository in enumerate(raw_repositories):
         if not isinstance(raw_repository, dict):
@@ -63,7 +64,15 @@ def load_fleet_scope_manifest(path: Path, *, projects_root: Path) -> dict[str, A
         reason = _required_string(raw_repository, "reason")
         if eligibility == "eligible" and not (resolved / ".git").exists():
             raise ValueError(f"eligible fleet repository is not a Git checkout: {resolved}")
-        normalized.append({"path": resolved_path, "eligibility": eligibility, "reason": reason})
+        normalized_repository: dict[str, Any] = {
+            "path": resolved_path,
+            "eligibility": eligibility,
+            "reason": reason,
+        }
+        distribution = _distribution_attestation(raw_repository.get("distribution"), index=index)
+        if distribution is not None:
+            normalized_repository["distribution"] = distribution
+        normalized.append(normalized_repository)
 
     normalized.sort(key=lambda item: item["path"])
     eligible_paths = [item["path"] for item in normalized if item["eligibility"] == "eligible"]
@@ -82,6 +91,11 @@ def load_fleet_scope_manifest(path: Path, *, projects_root: Path) -> dict[str, A
         "source_path": str(source),
         "manifest_hash": digest(provenance),
         "eligible_paths": eligible_paths,
+        "repository_attestations": {
+            item["path"]: {"distribution": item["distribution"]}
+            for item in normalized
+            if item["eligibility"] == "eligible" and "distribution" in item
+        },
         "eligible_path_hash": digest(eligible_paths),
         "eligible_repository_count": len(eligible_paths),
         "excluded_repository_count": len(excluded),
@@ -139,3 +153,22 @@ def _required_string(payload: dict[str, Any], key: str) -> str:
     if not isinstance(value, str) or not value.strip():
         raise ValueError(f"fleet scope manifest field is missing: {key}")
     return value.strip()
+
+
+def _distribution_attestation(value: Any, *, index: int) -> dict[str, str] | None:
+    if value is None:
+        return None
+    if not isinstance(value, dict):
+        raise ValueError(f"fleet scope manifest repository {index} distribution must be an object")
+    visibility = _required_string(value, "visibility")
+    if visibility not in _DISTRIBUTION_VISIBILITY:
+        raise ValueError(
+            "fleet scope manifest distribution visibility must be public, private, or local"
+        )
+    source = _required_string(value, "source")
+    observed_at = _required_string(value, "observed_at")
+    try:
+        datetime.fromisoformat(observed_at.replace("Z", "+00:00"))
+    except ValueError as error:
+        raise ValueError("fleet scope manifest distribution observed_at must be ISO-8601") from error
+    return {"visibility": visibility, "source": source, "observed_at": observed_at}

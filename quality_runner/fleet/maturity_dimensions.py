@@ -332,7 +332,40 @@ def _governance_assessments(
     license_terms = _matched_terms(text, DIMENSION_TERMS["license_contribution"])
     origin = repository.get("identity_provenance")
     has_origin = isinstance(origin, dict) and bool(origin.get("normalized_origin"))
-    if not license_paths and not license_terms and not has_origin:
+    scope_attestation = repository.get("scope_attestation")
+    distribution = (
+        scope_attestation.get("distribution") if isinstance(scope_attestation, dict) else None
+    )
+    visibility = distribution.get("visibility") if isinstance(distribution, dict) else None
+    distribution_evidence: list[dict[str, str]] = []
+    if isinstance(distribution, dict) and visibility in {"public", "private", "local"}:
+        distribution_evidence.append(
+            {
+                "path": "fleet scope manifest",
+                "detail": (
+                    f"Distribution visibility {visibility} was attested by "
+                    f"{distribution.get('source')} at {distribution.get('observed_at')}."
+                ),
+            }
+        )
+    if visibility in {"private", "local"} and not license_paths and not license_terms:
+        license_contract = _not_applicable(
+            "The attested distribution boundary does not expose a public contribution surface.",
+            distribution_evidence,
+        )
+    elif visibility == "public":
+        score = min(4, len(license_paths) + min(2, len(license_terms)))
+        license_contract = _assessment(
+            score,
+            _status(score),
+            "License and contribution maturity reflects a provider-attested public distribution boundary.",
+            [
+                *distribution_evidence,
+                *_path_evidence(license_paths, "policy surface"),
+                *_term_evidence(license_terms),
+            ],
+        )
+    elif not license_paths and not license_terms and not has_origin:
         license_contract = _not_applicable(
             "No external distribution origin or contribution surface was detected.",
             [{"path": ".", "detail": "License and contribution controls are conditional."}],

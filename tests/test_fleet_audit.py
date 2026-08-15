@@ -301,6 +301,11 @@ def test_scope_manifest_attests_an_exact_population_and_preserves_exclusions(
                         "path": str(alpha),
                         "eligibility": "eligible",
                         "reason": "registered and active",
+                        "distribution": {
+                            "visibility": "private",
+                            "source": "fixture provider",
+                            "observed_at": "2026-08-15T15:00:00+00:00",
+                        },
                     },
                     {
                         "path": str(deprecated),
@@ -329,6 +334,16 @@ def test_scope_manifest_attests_an_exact_population_and_preserves_exclusions(
     assert coverage["excluded_repository_count"] == 1
     inventory = json.loads((Path(audit["artifact_root"]) / "inventory.json").read_text())
     assert inventory["scope"] == "complete repository population from a validated scope manifest"
+    repository = inventory["repositories"][0]
+    assert repository["scope_attestation"]["distribution"]["visibility"] == "private"
+    findings = json.loads(
+        (Path(audit["artifact_root"]) / "findings" / f"{repository['repo_id']}.json").read_text()
+    )
+    license_finding = next(
+        item for item in findings["findings"] if item["dimension"] == "license_contribution"
+    )
+    assert license_finding["status"] == "not_applicable"
+    assert license_finding["applicable"] is False
 
 
 def test_scope_manifest_rejects_duplicate_and_out_of_root_paths(tmp_path: Path) -> None:

@@ -134,6 +134,13 @@ its authority. QR hashes the normalized manifest and requires its eligible
 population to match the observed unique repository identities before the audit
 can claim complete population coverage.
 
+An eligible entry may also carry a provider-observed `distribution` attestation
+with `visibility` (`public`, `private`, or `local`), `source`, and `observed_at`.
+QR hashes and validates that evidence before using it to decide whether the
+conditional license/contribution dimension applies. Public visibility makes the
+dimension applicable; a private or local boundary with no policy surface is
+explicitly not applicable. An origin URL alone remains insufficient.
+
 Measurement confidence is separate from maturity. `high` requires an attested
 complete population, complete static scans, full (not changed-only) conclusive
 dynamic results for every eligible repository, no unresolved measurement gaps,
