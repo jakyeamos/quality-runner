@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Sequence
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -85,6 +86,51 @@ def load_fleet_scope_manifest(path: Path, *, projects_root: Path) -> dict[str, A
         "eligible_repository_count": len(eligible_paths),
         "excluded_repository_count": len(excluded),
         "excluded_repositories": excluded,
+    }
+
+
+def population_coverage(
+    *,
+    repositories: list[dict[str, Any]],
+    repository_paths: Sequence[Path] | None,
+    fleet_policy: dict[str, Any],
+    scope_manifest: dict[str, Any] | None,
+) -> dict[str, Any]:
+    if scope_manifest is not None:
+        expected = int(scope_manifest["eligible_repository_count"])
+        observed = len(repositories)
+        if expected != observed:
+            raise ValueError(
+                "fleet scope manifest did not resolve to its expected unique repository count: "
+                f"expected {expected}, observed {observed}"
+            )
+        return {
+            "status": "complete",
+            "source": "scope_manifest",
+            "authority": scope_manifest["authority"],
+            "generated_at": scope_manifest["generated_at"],
+            "manifest_schema": scope_manifest["schema"],
+            "manifest_hash": scope_manifest["manifest_hash"],
+            "eligible_path_hash": scope_manifest["eligible_path_hash"],
+            "expected_repository_count": expected,
+            "observed_repository_count": observed,
+            "excluded_repository_count": int(scope_manifest["excluded_repository_count"]),
+        }
+    if repository_paths is None:
+        return {
+            "status": "complete",
+            "source": "automatic_discovery",
+            "authority": fleet_policy.get("source", "default"),
+            "expected_repository_count": len(repositories),
+            "observed_repository_count": len(repositories),
+            "excluded_repository_count": len(fleet_policy.get("exclude_paths", [])),
+        }
+    return {
+        "status": "bounded",
+        "source": "explicit_repository_paths",
+        "expected_repository_count": len(repository_paths),
+        "observed_repository_count": len(repositories),
+        "excluded_repository_count": 0,
     }
 
 

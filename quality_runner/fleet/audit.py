@@ -7,7 +7,6 @@ from typing import Any, cast
 
 from quality_runner.artifacts import prepare_safe_directory, write_json, write_text
 from quality_runner.fleet.contracts import (
-    DIMENSIONS,
     FLEET_AUDIT_SCHEMA,
     FLEET_FINDING_SCHEMA,
     FLEET_INVENTORY_SCHEMA,
@@ -39,7 +38,7 @@ from quality_runner.fleet.dynamic import (
 from quality_runner.fleet.legibility import audit_repository, build_remediation_plan
 from quality_runner.fleet.replay_integrity import replay_manifest_errors
 from quality_runner.fleet.reporting import plan_markdown, report_markdown, summary_markdown
-from quality_runner.fleet.scope_manifest import load_fleet_scope_manifest
+from quality_runner.fleet.scope_manifest import load_fleet_scope_manifest, population_coverage
 from quality_runner.fleet.standard_audit import build_standard_report
 from quality_runner.fleet.static_scan import static_scan_repository as _static_scan_repository
 from quality_runner.fleet.summary import build_fleet_summary
@@ -100,7 +99,7 @@ def fleet_audit_payload(
     repositories = repositories_for_scope(
         root, resolved_repository_paths, fleet_policy=fleet_policy
     )
-    population_coverage = _population_coverage(
+    coverage = population_coverage(
         repositories=repositories,
         repository_paths=repository_paths,
         fleet_policy=fleet_policy,
@@ -152,7 +151,7 @@ def fleet_audit_payload(
         dynamic=dynamic,
         changed_only=changed_only,
         standard=standard,
-        population_coverage=population_coverage,
+        population_coverage=coverage,
     )
     inventory = {
         "schema": FLEET_INVENTORY_SCHEMA,
@@ -166,7 +165,7 @@ def fleet_audit_payload(
             if resolved_repository_paths is not None
             else "all repository identities under the bounded projects root"
         ),
-        "population_coverage": population_coverage,
+        "population_coverage": coverage,
         "dynamic_policy": {
             "enabled": dynamic,
             "changed_only": changed_only,
@@ -337,51 +336,6 @@ def fleet_replay_payload(
     }
 
 
-def _population_coverage(
-    *,
-    repositories: list[dict[str, Any]],
-    repository_paths: Sequence[Path] | None,
-    fleet_policy: dict[str, Any],
-    scope_manifest: dict[str, Any] | None,
-) -> dict[str, Any]:
-    if scope_manifest is not None:
-        expected = int(scope_manifest["eligible_repository_count"])
-        observed = len(repositories)
-        if expected != observed:
-            raise ValueError(
-                "fleet scope manifest did not resolve to its expected unique repository count: "
-                f"expected {expected}, observed {observed}"
-            )
-        return {
-            "status": "complete",
-            "source": "scope_manifest",
-            "authority": scope_manifest["authority"],
-            "generated_at": scope_manifest["generated_at"],
-            "manifest_schema": scope_manifest["schema"],
-            "manifest_hash": scope_manifest["manifest_hash"],
-            "eligible_path_hash": scope_manifest["eligible_path_hash"],
-            "expected_repository_count": expected,
-            "observed_repository_count": observed,
-            "excluded_repository_count": int(scope_manifest["excluded_repository_count"]),
-        }
-    if repository_paths is None:
-        return {
-            "status": "complete",
-            "source": "automatic_discovery",
-            "authority": fleet_policy.get("source", "default"),
-            "expected_repository_count": len(repositories),
-            "observed_repository_count": len(repositories),
-            "excluded_repository_count": len(fleet_policy.get("exclude_paths", [])),
-        }
-    return {
-        "status": "bounded",
-        "source": "explicit_repository_paths",
-        "expected_repository_count": len(repository_paths),
-        "observed_repository_count": len(repositories),
-        "excluded_repository_count": 0,
-    }
-
-
 def fleet_report_payload(
     *, audit_id: str | None = None, output_dir: Path | None = None
 ) -> dict[str, Any]:
@@ -410,118 +364,6 @@ def fleet_report_payload(
         "report_md": str(write_text(artifact_root / "report.md", report_markdown(report))),
     }
     return {**report, "artifact_root": str(artifact_root), "artifact_paths": paths}
-
-
-def _build_summary(
-    *,
-    audit_id: str,
-    as_of: str,
-    repositories: list[dict[str, Any]],
-    dynamic: bool,
-    changed_only: bool,
-) -> dict[str, Any]:
-    dimension_scores: dict[str, list[float]] = {dimension: [] for dimension in DIMENSIONS}
-    finding_counts: dict[str, int] = {}
-    priority_counts: dict[str, int] = {}
-    dynamic_counts = {
-        key: 0
-        for key in (
-            "selected",
-            "reused",
-            "passed",
-            "failed",
-            "blocked",
-            "unavailable",
-            "timeout",
-            "unknown",
-        )
-    }
-    unresolved: list[str] = []
-    for result in repositories:
-        for finding in result.get("findings", []):
-            status = str(finding.get("status", "unknown"))
-            finding_counts[status] = finding_counts.get(status, 0) + 1
-            priority = str(finding.get("priority", "P2"))
-            priority_counts[priority] = priority_counts.get(priority, 0) + 1
-            score = finding.get("score")
-            dimension = finding.get("dimension")
-            if isinstance(score, int | float) and isinstance(dimension, str) and score >= 0:
-                dimension_scores.setdefault(dimension, []).append(float(score))
-            if status in {"unknown", "stale", "blocked"}:
-                unresolved.append(f"{result.get('repo_id')}:{dimension}:{status}")
-        dynamic_result = result.get("dynamic")
-        if isinstance(dynamic_result, dict):
-            typed_dynamic = cast(dict[str, object], dynamic_result)
-            state = str(typed_dynamic.get("status", "unknown"))
-            if typed_dynamic.get("selected") is True:
-                dynamic_counts["selected"] += 1
-            if state == "reused":
-                dynamic_counts["reused"] += 1
-            elif state == "passed":
-                dynamic_counts["passed"] += 1
-            elif state == "failed":
-                dynamic_counts["failed"] += 1
-            elif state == "blocked":
-                dynamic_counts["blocked"] += 1
-            elif state == "unavailable":
-                dynamic_counts["unavailable"] += 1
-            elif state == "timeout":
-                dynamic_counts["timeout"] += 1
-            elif state == "unknown":
-                dynamic_counts["unknown"] += 1
-    all_scores = [score for scores in dimension_scores.values() for score in scores]
-    means = {
-        dimension: round(sum(scores) / len(scores), 3) if scores else None
-        for dimension, scores in sorted(dimension_scores.items())
-    }
-    stable_repositories = sorted(repositories, key=lambda item: str(item.get("repo_id", "")))
-    return {
-        "schema": "quality-runner-fleet-summary-v0.1",
-        "status": "completed",
-        "audit_id": audit_id,
-        "as_of": as_of,
-        "repository_count": len(repositories),
-        "checkout_count": sum(
-            int(item.get("repository", {}).get("checkout_count", 0)) for item in repositories
-        ),
-        "static_completed": len(repositories),
-        "dynamic_policy": {"enabled": dynamic, "changed_only": changed_only},
-        "dynamic_selected": dynamic_counts["selected"],
-        "dynamic_reused": dynamic_counts["reused"],
-        "dynamic_passed": dynamic_counts["passed"],
-        "dynamic_failed": dynamic_counts["failed"],
-        "dynamic_blocked": dynamic_counts["blocked"],
-        "dynamic_unavailable": dynamic_counts["unavailable"],
-        "dynamic_timeout": dynamic_counts["timeout"],
-        "mean_maturity": round(sum(all_scores) / len(all_scores), 3) if all_scores else None,
-        "dimension_means": means,
-        "finding_counts": dict(sorted(finding_counts.items())),
-        "priority_counts": dict(sorted(priority_counts.items())),
-        "sample_size": {
-            "repositories": len(repositories),
-            "applicable_dimension_scores": len(all_scores),
-        },
-        "confidence": "medium" if repositories else "low",
-        "unresolved_measurement_gaps": sorted(set(unresolved)),
-        "methodology": {
-            "rubric": "0 absent, 1 informal, 2 discoverable, 3 executable/currently validated, 4 maintained/routed/automatically checked",
-            "unknown_evidence_is_not_green": True,
-            "not_applicable_requires_bounded_evidence": True,
-            "dynamic_scope": "changed, new, dirty, priority, stale, failed, or incomplete evidence only",
-            "target_branch_policy": "documented development branch, default dev; no maturity-based branch selection",
-            "source_checkouts_modified": False,
-        },
-        "provenance_hash": digest(
-            {
-                "audit_id": audit_id,
-                "as_of": as_of,
-                "repositories": [
-                    item.get("static_provenance_hash") for item in stable_repositories
-                ],
-                "dynamic": [item.get("dynamic") for item in stable_repositories],
-            }
-        ),
-    }
 
 
 def _write_audit_artifacts(
