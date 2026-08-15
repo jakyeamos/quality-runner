@@ -133,6 +133,7 @@ disposable worktrees for changed or incomplete evidence:
 ```bash
 qr audit /path/to/repo --profile environment-legibility --json
 qr fleet audit run --all --projects-root /path/to/projects --json
+qr fleet audit run --scope-manifest /path/to/fleet-scope.json --projects-root /bounded/root --dynamic --no-changed-only --json
 qr fleet audit replay --audit-id AUDIT_ID --json
 qr fleet audit report --audit-id AUDIT_ID --json
 qr fleet audit feed --audit-id AUDIT_ID --json

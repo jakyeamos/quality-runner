@@ -119,6 +119,20 @@ def test_known_failure_takes_precedence_over_incomplete_command_results() -> Non
     assert reason == "one or more dynamic quality commands returned a failing result"
 
 
+def test_policy_excluded_commands_do_not_hide_conclusive_safe_results() -> None:
+    status, reason = dynamic._aggregate_dynamic_status(["not_applicable", "passed"])
+
+    assert status == "passed"
+    assert reason is None
+
+
+def test_all_policy_excluded_commands_are_conclusively_not_applicable() -> None:
+    status, reason = dynamic._aggregate_dynamic_status(["not_applicable"])
+
+    assert status == "not_applicable"
+    assert reason == "all discovered commands were excluded by read-only policy"
+
+
 def test_dynamic_failure_retains_only_bounded_redacted_output_tail(
     monkeypatch, tmp_path: Path
 ) -> None:
@@ -484,6 +498,29 @@ def test_dynamic_dependency_setup_refuses_unpinned_javascript_environment(tmp_pa
     result = dynamic._prepare_dynamic_dependencies(worktree=tmp_path, timeout_seconds=30)
 
     assert result["status"] == "unavailable"
+
+
+def test_dynamic_dependency_setup_honors_audit_timeout_ceiling(tmp_path: Path) -> None:
+    (tmp_path / "package.json").write_text(
+        '{"packageManager":"pnpm@11.7.0","dependencies":{"tool":"1.0.0"}}',
+        encoding="utf-8",
+    )
+    (tmp_path / "pnpm-lock.yaml").write_text("lockfileVersion: '9.0'\n", encoding="utf-8")
+    observed: dict[str, int] = {}
+
+    def successful_setup(command: str, *, cwd: Path, timeout: int) -> dict[str, object]:
+        del command, cwd
+        observed["timeout"] = timeout
+        return {"returncode": 0, "stdout": "", "stderr": ""}
+
+    result = dependencies.prepare_dynamic_dependencies(
+        worktree=tmp_path,
+        timeout_seconds=600,
+        run_command=successful_setup,
+    )
+
+    assert result["status"] == "passed"
+    assert observed["timeout"] == 600
 
 
 def test_dynamic_dependency_setup_copies_documented_sibling_runtime(tmp_path: Path) -> None:

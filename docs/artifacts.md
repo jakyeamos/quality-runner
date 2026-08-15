@@ -478,6 +478,11 @@ repository's configured per-capability limits; configured limits can shorten but
 cannot exceed that ceiling.
 If any trustworthy command fails, the aggregate status is `failed`; incomplete
 siblings retain their own timeout, blocked, or unavailable status in the receipt.
+Commands excluded by the read-only policy are recorded as `not_applicable` and
+do not mask conclusive safe-command results. If every discovered command is
+excluded, the repository result is `not_applicable`; if no local quality command
+exists, the repository result is a conclusive `failed` quality surface. Locked
+dependency preparation honors the same fleet timeout ceiling as gate execution.
 
 Execution requires both `--execute-gates` and `--worktree-mode disposable`.
 The disposable checkout is created at `HEAD`, QR writes artifacts to the

@@ -19,6 +19,13 @@ To republish an existing valid QR snapshot:
 qr fleet audit feed --audit-id AUDIT_ID --json
 ```
 
+When Pronto's registry is the population authority, provide an owner-reviewed
+`quality-runner-fleet-scope/v1` manifest to `qr fleet audit run` with
+`--scope-manifest`, a bounded common `--projects-root`, `--dynamic`, and
+`--no-changed-only`. The private inventory retains the manifest hash, authority,
+eligible count, and excluded count; the feed publishes only bounded aggregate
+population evidence.
+
 For a whole-inventory audit of one repository standard, run the static scoped
 lane instead:
 
@@ -34,7 +41,13 @@ one-standard result cannot stand in for the full maturity inventory, so
 
 The feed contains the QR audit ID, timestamp, replay status, provenance hash,
 fleet counts, aggregate maturity distributions, unresolved measurement gaps,
-and redacted per-repository projections. Each repository projection includes a
+measurement confidence, and redacted per-repository projections. Confidence is
+`high` only when the exact eligible population is attested, every repository has
+complete static and full dynamic evidence, no measurement gap remains, and the
+published snapshot passes deterministic replay. A known failing check is a
+measured maturity result, not a confidence gap; the same applies to a static
+stale, blocked, or unknown state when the rubric assigns a numeric score. A
+static assessment with no numeric score remains unresolved. Each repository projection includes a
 `quality-runner-repository-maturity/v2` model. Dimensions aggregate through
 explicit capabilities before its seven stable pillars are weighted, so
 overlapping checks do not give one capability extra influence. The projection keeps

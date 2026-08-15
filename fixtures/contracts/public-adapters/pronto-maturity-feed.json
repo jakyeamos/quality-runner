@@ -20,6 +20,30 @@
   "checkout_count": 1,
   "mean_maturity": 4.0,
   "source_dimension_mean": 4.0,
+  "measurement_confidence": {
+    "level": "high",
+    "basis": [
+      "complete_population",
+      "complete_static_scan",
+      "complete_dynamic_verification",
+      "no_unresolved_measurement_gaps"
+    ],
+    "limitations": [],
+    "population_coverage": {
+      "status": "complete",
+      "source": "scope_manifest",
+      "authority": "public fixture registry",
+      "generated_at": "2026-08-11T00:00:00+00:00",
+      "manifest_schema": "quality-runner-fleet-scope/v1",
+      "manifest_hash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "eligible_path_hash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "expected_repository_count": 1,
+      "observed_repository_count": 1,
+      "excluded_repository_count": 0
+    },
+    "unresolved_measurement_gap_count": 0,
+    "deterministic_replay": true
+  },
   "pillar_means": {
     "correctness_reliability": 4.0,
     "security_privacy_supply_chain": 4.0,
@@ -182,5 +206,5 @@
     "raw_transcripts": false,
     "credentials": false
   },
-  "provenance_hash": "d9932343390ff4a9c39e87d6f5f925c360effc8e46a934e7062a657ec0ed62a5"
+  "provenance_hash": "c3a391bd073331173c353d08733a013e66752bba3cc88f92a43cfdea19a12550"
 }

@@ -107,6 +107,8 @@ Quality Runner now owns the command-backed profile and fleet orchestration:
 ```bash
 qr audit /path/to/repo --profile environment-legibility --json
 qr fleet audit run --all --projects-root /path/to/projects --json
+qr fleet audit run --scope-manifest /path/to/fleet-scope.json \
+  --projects-root /bounded/root --dynamic --no-changed-only --json
 qr fleet audit run --all --projects-root /path/to/projects --standard matrix-maintenance --json
 qr fleet audit feed --audit-id AUDIT_ID --json
 ```
@@ -123,6 +125,37 @@ from a complete, replay-valid fleet snapshot and contains redacted maturity
 projections for local consumers. Immutable source artifacts remain in the
 audit-specific directory. `--output-dir` is safe for isolated tests and cannot
 replace the production current feed.
+
+Use `--scope-manifest` when the fleet authority is a registry rather than every
+Git checkout below one directory. The `quality-runner-fleet-scope/v1` manifest
+must enumerate every repository as `eligible` or `excluded`, give a concrete
+reason for each disposition, stay below the bounded `--projects-root`, and name
+its authority. QR hashes the normalized manifest and requires its eligible
+population to match the observed unique repository identities before the audit
+can claim complete population coverage.
+
+An eligible entry may also carry a provider-observed `distribution` attestation
+with `visibility` (`public`, `private`, or `local`), `source`, and `observed_at`.
+QR hashes and validates that evidence before using it to decide whether the
+conditional license/contribution dimension applies. Public visibility makes the
+dimension applicable; a private or local boundary with no policy surface is
+explicitly not applicable. An origin URL alone remains insufficient.
+
+Measurement confidence is separate from maturity. `high` requires an attested
+complete population, complete static scans, full (not changed-only) conclusive
+dynamic results for every eligible repository, no unresolved measurement gaps,
+and—at publication time—deterministic replay. Known failing checks lower the
+maturity result but remain conclusive evidence. Static `unknown`, `stale`, or
+`blocked` labels with a rubric-assigned numeric score are therefore measured low
+maturity, not measurement gaps. A missing numeric score or inconclusive dynamic
+result (`unavailable`, `timeout`, `blocked`, `unknown`, or unselected) keeps
+confidence below `high`.
+
+Dynamic verification treats a discovered command excluded by the read-only
+policy as command-level `not_applicable`; it does not hide conclusive results
+from the safe commands that did run. A target with no discovered quality
+commands is a conclusive failed quality surface, not an unknown measurement.
+Locked dependency preparation uses the same audit timeout ceiling as the gates.
 
 The complete fleet audit includes `matrix_maintenance` as a scored maturity
 dimension. Its repository score, fleet mean, non-passing gap, and Pronto

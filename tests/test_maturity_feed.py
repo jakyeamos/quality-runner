@@ -339,6 +339,9 @@ def test_feed_is_deterministic_and_redacted(tmp_path: Path) -> None:
     assert replay["status"] == "passed"
     assert first == second
     assert first["schema"] == "quality-runner-maturity-feed/v2"
+    assert first["measurement_confidence"]["level"] == "medium"
+    assert first["measurement_confidence"]["deterministic_replay"] is True
+    assert "dynamic_verification_disabled" in first["measurement_confidence"]["limitations"]
     assert first["repository_count"] == result["repository_count"]
     assert sum(first["quality_outcome_counts"].values()) == first["repository_count"]
     assert first["quality_outcome_taxonomy"]["verification_blocked"]["label"] == (
@@ -488,10 +491,10 @@ def test_feed_rejects_failed_replay_and_partial_scope(tmp_path: Path) -> None:
     with pytest.raises(MaturityFeedError):
         build_maturity_feed(artifact_root, replay=failed_replay)
 
-    inventory_path = artifact_root / "inventory.json"
-    inventory = json.loads(inventory_path.read_text(encoding="utf-8"))
-    inventory["scope"] = "explicit repository paths under the bounded projects root"
-    inventory_path.write_text(json.dumps(inventory), encoding="utf-8")
+    summary_path = artifact_root / "summary.json"
+    summary = json.loads(summary_path.read_text(encoding="utf-8"))
+    summary["population_coverage"]["status"] = "bounded"
+    summary_path.write_text(json.dumps(summary), encoding="utf-8")
     with pytest.raises(MaturityFeedError):
         build_maturity_feed(artifact_root, replay=replay)
 

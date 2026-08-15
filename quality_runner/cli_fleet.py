@@ -82,6 +82,14 @@ def add_fleet_commands(subparsers: Any) -> None:
         default=[],
         help="Audit one explicit repository path under --projects-root; repeat for a bounded slice",
     )
+    run_parser.add_argument(
+        "--scope-manifest",
+        default=None,
+        help=(
+            "Audit the exact eligible population in a quality-runner-fleet-scope/v1 manifest; "
+            "mutually exclusive with --all and --repo-path"
+        ),
+    )
     run_parser.add_argument("--projects-root", default=str(Path.home() / "projects"))
     run_parser.add_argument(
         "--output-dir", default=None, help="Runtime-owned audit directory override"
@@ -261,10 +269,11 @@ def fleet_command_payload(args: argparse.Namespace) -> dict[str, Any]:
     if args.fleet_action != "audit":
         raise ValueError(f"unsupported fleet action: {args.fleet_action}")
     if args.audit_action == "run":
-        if not args.all and not args.repo_path:
-            raise ValueError("fleet audit run requires --all or at least one --repo-path")
-        if args.all and args.repo_path:
-            raise ValueError("fleet audit run accepts --all or --repo-path, not both")
+        scope_selectors = int(args.all) + int(bool(args.repo_path)) + int(bool(args.scope_manifest))
+        if scope_selectors != 1:
+            raise ValueError(
+                "fleet audit run requires exactly one of --all, --repo-path, or --scope-manifest"
+            )
         return fleet_audit_payload(
             projects_root=Path(args.projects_root),
             output_dir=Path(args.output_dir) if args.output_dir else None,
@@ -276,6 +285,7 @@ def fleet_command_payload(args: argparse.Namespace) -> dict[str, Any]:
             repository_paths=[Path(path) for path in args.repo_path] if args.repo_path else None,
             as_of=args.as_of,
             standard=args.standard,
+            scope_manifest=Path(args.scope_manifest) if args.scope_manifest else None,
         )
     if args.audit_action == "show":
         return fleet_show_payload(

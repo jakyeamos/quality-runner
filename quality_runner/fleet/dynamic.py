@@ -234,7 +234,8 @@ def _execute_dynamic(
                     "maintained executable quality surface"
                 )
                 return result
-            result["reason"] = "no safe local quality commands were discovered"
+            result["status"] = "failed"
+            result["reason"] = "no local quality commands were discovered on the exact target"
             return result
         dependency_setup = _prepare_dynamic_dependencies(
             worktree=worktree,
@@ -265,7 +266,7 @@ def _execute_dynamic(
                 command_result = {
                     "command_id": command.get("id"),
                     "capability": command.get("id"),
-                    "status": "blocked",
+                    "status": "not_applicable",
                     "reason": _dynamic_policy_block_reason(command),
                     "command_hash": hash_text(str(command.get("command", ""))),
                     "command_source": command.get("source"),

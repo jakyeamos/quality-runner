@@ -489,7 +489,10 @@ def _detect_package_manager(
 def _mutating_risk(*, capability_id: str, command: str, script_command: str | None = None) -> str:
     inspected = f"{command}\n{script_command or ''}".lower()
     if capability_id == "formatter":
-        if any(marker in inspected for marker in ("--check", "--list-different", "check-format")):
+        if any(
+            marker in inspected
+            for marker in ("--check", "--list-different", "check-format", "format:check")
+        ):
             return "safe"
         if any(
             marker in inspected
