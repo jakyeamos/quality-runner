@@ -147,6 +147,13 @@ def local_command_env(cwd: Path, *, command: str | None = None) -> dict[str, str
         else str(cache_root / "uv")
     )
     env["XDG_CACHE_HOME"] = str(cache_root / "xdg")
+    if command and "corepack " in command and "--offline" in command:
+        # The sanitized XDG cache must not make Corepack forget its prepared,
+        # host-owned package-manager cache or make pnpm forget its prepared
+        # registry metadata before the package manager can honor its offline flag.
+        env["COREPACK_HOME"] = str(Path.home() / ".cache" / "node" / "corepack")
+        if " pnpm " in f" {command} ":
+            env["pnpm_config_cache_dir"] = str(Path.home() / "Library" / "Caches" / "pnpm")
     package_manager_root = _package_manager_command_root(cwd, command)
     if (
         package_manager_root is not None
