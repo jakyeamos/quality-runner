@@ -509,6 +509,7 @@ def _package_manager_declaration(worktree: Path) -> tuple[str, str, str] | None:
         # remain immutable for the measurement.
         command_parts = [
             "COREPACK_ENABLE_PROJECT_SPEC=0",
+            "corepack",
             "pnpm",
             "--pm-on-fail=ignore",
             *arguments[manager],

@@ -284,7 +284,7 @@ def test_dynamic_dependency_setup_is_locked_offline_and_script_free(
     assert result["status"] == "passed"
     assert calls == [
         (
-            "COREPACK_ENABLE_PROJECT_SPEC=0 pnpm --pm-on-fail=ignore install --offline --frozen-lockfile --frozen-store --ignore-scripts --reporter=append-only",
+            "COREPACK_ENABLE_PROJECT_SPEC=0 corepack pnpm --pm-on-fail=ignore install --offline --frozen-lockfile --frozen-store --ignore-scripts --reporter=append-only",
             tmp_path,
             60,
         )
@@ -438,7 +438,7 @@ def test_dependency_copy_failure_falls_back_to_locked_offline_setup(
 
     assert result["status"] == "passed"
     assert calls == [
-        "COREPACK_ENABLE_PROJECT_SPEC=0 pnpm --pm-on-fail=ignore install --offline --frozen-lockfile --frozen-store --ignore-scripts --reporter=append-only"
+        "COREPACK_ENABLE_PROJECT_SPEC=0 corepack pnpm --pm-on-fail=ignore install --offline --frozen-lockfile --frozen-store --ignore-scripts --reporter=append-only"
     ]
 
 
