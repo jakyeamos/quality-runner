@@ -107,6 +107,8 @@ Quality Runner now owns the command-backed profile and fleet orchestration:
 ```bash
 qr audit /path/to/repo --profile environment-legibility --json
 qr fleet audit run --all --projects-root /path/to/projects --json
+qr fleet audit run --scope-manifest /path/to/fleet-scope.json \
+  --projects-root /bounded/root --dynamic --no-changed-only --json
 qr fleet audit run --all --projects-root /path/to/projects --standard matrix-maintenance --json
 qr fleet audit feed --audit-id AUDIT_ID --json
 ```
@@ -123,6 +125,21 @@ from a complete, replay-valid fleet snapshot and contains redacted maturity
 projections for local consumers. Immutable source artifacts remain in the
 audit-specific directory. `--output-dir` is safe for isolated tests and cannot
 replace the production current feed.
+
+Use `--scope-manifest` when the fleet authority is a registry rather than every
+Git checkout below one directory. The `quality-runner-fleet-scope/v1` manifest
+must enumerate every repository as `eligible` or `excluded`, give a concrete
+reason for each disposition, stay below the bounded `--projects-root`, and name
+its authority. QR hashes the normalized manifest and requires its eligible
+population to match the observed unique repository identities before the audit
+can claim complete population coverage.
+
+Measurement confidence is separate from maturity. `high` requires an attested
+complete population, complete static scans, full (not changed-only) conclusive
+dynamic results for every eligible repository, no unresolved measurement gaps,
+and—at publication time—deterministic replay. Known failing checks lower the
+maturity result but remain conclusive evidence; unavailable, timed-out, blocked,
+unknown, stale, or unselected evidence keeps confidence below `high`.
 
 The complete fleet audit includes `matrix_maintenance` as a scored maturity
 dimension. Its repository score, fleet mean, non-passing gap, and Pronto

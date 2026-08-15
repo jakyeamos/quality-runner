@@ -17,6 +17,16 @@ python3 scripts/check_environment_contract.py
 gitleaks detect --source . --no-banner --redact
 ```
 
+For a registry-owned high-confidence fleet measurement, use an exact reviewed
+`quality-runner-fleet-scope/v1` manifest and run:
+
+```sh
+uv run --locked qr fleet audit run --scope-manifest /path/to/fleet-scope.json \
+  --projects-root /bounded/root --dynamic --no-changed-only --json
+uv run --locked qr fleet audit replay --audit-id AUDIT_ID --json
+uv run --locked qr fleet audit feed --audit-id AUDIT_ID --json
+```
+
 For the complete pre-release path, also run:
 
 ```sh
