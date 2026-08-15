@@ -208,10 +208,14 @@ intentional override for one-off inspection.
 
 Dynamic Python commands use `uv run --offline --locked` when the repository or
 workspace owns `uv.lock`, including its declared `dev` extra when present.
-Pinned pnpm dependency preparation is also offline and lockfile-frozen, and it
-opens the shared package store read-only so dynamic audits cannot mutate or
-block on store-index maintenance. The executing Node runtime must support
-pnpm's immutable SQLite store mode (Node 22.15+, 23.11+, or 24+).
+pnpm dependency preparation is also offline and lockfile-frozen, and it opens
+the shared package store read-only so dynamic audits cannot mutate it. Fleet
+measurement uses the operator-installed pnpm runtime instead of an older
+repository pin because mixed pnpm 11 releases can retain idle SQLite workers
+forever against a newer shared store after installation has completed. The
+executing Node runtime must support pnpm's immutable SQLite store mode (Node
+22.15+, 23.11+, or 24+); the active pnpm runtime remains observable in setup
+output while repository dependencies stay fixed by the committed lockfile.
 Dynamic selection prefers one root aggregate per capability. Package-level
 commands run only when no root aggregate exists; more than eight non-aggregated
 commands fail closed and request a repository-owned aggregate instead of

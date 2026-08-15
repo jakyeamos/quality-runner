@@ -496,13 +496,24 @@ def _package_manager_declaration(worktree: Path) -> tuple[str, str, str] | None:
             "--frozen-lockfile",
             "--frozen-store",
             "--ignore-scripts",
-            # A read-only store prevents pnpm workers from optimizing the shared
-            # SQLite index during shutdown; append-only remains deterministic.
             "--reporter=append-only",
         ],
         "yarn": ["install", "--offline", "--immutable", "--mode=skip-builds"],
     }
-    command = " ".join([manager, *arguments[manager]])
+    command_parts = [manager, *arguments[manager]]
+    if manager == "pnpm":
+        # Corepack and mise otherwise honor each repository's packageManager pin.
+        # Older pnpm 11 releases can finish installation but retain idle SQLite
+        # workers forever against a newer shared store. The fleet-owned runtime
+        # is independently versioned, while the repository lockfile and store
+        # remain immutable for the measurement.
+        command_parts = [
+            "COREPACK_ENABLE_PROJECT_SPEC=0",
+            "pnpm",
+            "--pm-on-fail=ignore",
+            *arguments[manager],
+        ]
+    command = " ".join(command_parts)
     return manager, lockfiles[manager], command
 
 
