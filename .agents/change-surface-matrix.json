@@ -28,7 +28,7 @@
       "operations": ["add", "change", "remove"],
       "validation": [
         "uv run --locked pytest -q",
-        "pnpm frozen-store dynamic dependency setup regression under a compatible Node runtime using the fleet-owned pnpm runtime and prepared Corepack cache instead of a stale repository pin or registry lookup",
+        "pnpm dynamic dependency setup regressions under a compatible Node runtime: exact declared pnpm 10 lock semantics, fleet-owned pnpm 11 frozen-store behavior, prepared Corepack and metadata caches, and canonical-parent local dependency resolution",
         "collision-safe remediation wiring ID regression for normalized path collisions",
         "uv run --locked ruff check .",
         "uv run --locked basedpyright",

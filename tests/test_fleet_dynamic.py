@@ -291,6 +291,34 @@ def test_dynamic_dependency_setup_is_locked_offline_and_script_free(
     ]
 
 
+def test_pnpm_ten_setup_preserves_declared_lockfile_semantics(
+    monkeypatch, tmp_path: Path
+) -> None:
+    (tmp_path / "package.json").write_text(
+        '{"packageManager":"pnpm@10.12.4","pnpm":{"overrides":{"zod":"3.25.76"}},'
+        '"devDependencies":{"zod":"3.25.76"}}',
+        encoding="utf-8",
+    )
+    (tmp_path / "pnpm-lock.yaml").write_text("lockfileVersion: '9.0'\n", encoding="utf-8")
+    calls: list[str] = []
+
+    monkeypatch.setattr(
+        dynamic,
+        "run_shell_command",
+        lambda command, **_: (
+            calls.append(command) or {"returncode": 0, "stdout": "", "stderr": ""}
+        ),
+    )
+
+    result = dynamic._prepare_dynamic_dependencies(worktree=tmp_path, timeout_seconds=30)
+
+    assert result["status"] == "passed"
+    assert calls == [
+        "COREPACK_ENABLE_PROJECT_SPEC=0 corepack pnpm@10.12.4 install --offline "
+        "--frozen-lockfile --ignore-scripts --reporter=append-only"
+    ]
+
+
 def test_dynamic_dependency_setup_copies_protected_checkout_dependencies(tmp_path: Path) -> None:
     source = tmp_path / "source"
     worktree = tmp_path / "worktree"
@@ -707,3 +735,25 @@ def test_mismatched_lockfile_cannot_donate_dependency_tree(tmp_path: Path) -> No
     repository = {"checkouts": [{"exists": True, "path": str(donor)}]}
 
     assert dynamic._dependency_source(repository, worktree=worktree, default=default) == default
+
+
+def test_canonical_checkout_can_supply_target_declared_local_dependency(tmp_path: Path) -> None:
+    canonical_parent = tmp_path / "canonical"
+    canonical = canonical_parent / "product"
+    local_dependency = canonical_parent / "shared-tool"
+    runtime = tmp_path / "runtime" / "product"
+    attached_target = tmp_path / "attached" / "product"
+    for root in (canonical, local_dependency, runtime, attached_target):
+        root.mkdir(parents=True)
+    (runtime / "package.json").write_text(
+        '{"packageManager":"npm@10.9.2","devDependencies":{"shared-tool":"file:../shared-tool"}}',
+        encoding="utf-8",
+    )
+    repository = {"checkouts": [{"exists": True, "path": str(canonical)}]}
+
+    assert (
+        dynamic._local_dependency_source(
+            repository, worktree=runtime, default=attached_target
+        )
+        == canonical
+    )

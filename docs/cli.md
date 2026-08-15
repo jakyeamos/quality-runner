@@ -498,7 +498,12 @@ formatter reported as `mutating` or `unknown`.
 Offline Corepack setup keeps the subprocess environment sanitized while routing
 `COREPACK_HOME` and pnpm's `cacheDir` to the operator's prepared Corepack and
 pnpm metadata caches. This prevents registry lookups before the selected package
-manager can enforce its own offline install contract.
+manager can enforce its own offline install contract. pnpm 10 targets execute
+with their exact declared Corepack version because pnpm 11 no longer honors
+pnpm 10's `package.json` override location; pnpm 11 targets use the fleet-owned
+runtime and frozen store. Relative `file:` and `link:` dependencies are resolved
+from a canonical checkout parent before being copied into the disposable audit
+scope, so attached worktree placement cannot change repository semantics.
 
 Configured `[[quality_runner.gates]]` may set `mutating_risk` to `safe`,
 `unknown`, or `mutating`. Under `--read-only-gates`, `unknown` and `mutating`

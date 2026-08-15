@@ -19,6 +19,7 @@ def prepare_dynamic_dependencies(
     *,
     worktree: Path,
     source: Path | None = None,
+    local_source: Path | None = None,
     timeout_seconds: int,
     run_command: CommandRunner,
 ) -> dict[str, Any]:
@@ -27,9 +28,10 @@ def prepare_dynamic_dependencies(
     result: dict[str, Any]
     documented_setup: dict[str, Any]
     documented_paths: list[Path]
-    if source is not None:
+    sibling_source = local_source or source
+    if sibling_source is not None:
         documented_setup, documented_paths = _copy_documented_sibling_roots(
-            source=source, worktree=worktree
+            source=sibling_source, worktree=worktree
         )
     else:
         documented_setup, documented_paths = {"status": "passed"}, []
@@ -40,6 +42,7 @@ def prepare_dynamic_dependencies(
         workspace_results = _prepare_nested_javascript_workspaces(
             worktree=worktree,
             source=source,
+            local_source=local_source,
             timeout_seconds=timeout_seconds,
             run_command=run_command,
         )
@@ -107,8 +110,10 @@ def prepare_dynamic_dependencies(
 
     local_setup: dict[str, Any]
     local_paths: list[Path]
-    if source is not None:
-        local_setup, local_paths = _copy_local_file_dependencies(source=source, worktree=worktree)
+    if sibling_source is not None:
+        local_setup, local_paths = _copy_local_file_dependencies(
+            source=sibling_source, worktree=worktree
+        )
     else:
         local_setup, local_paths = {"status": "passed"}, []
     local_paths = [*documented_paths, *local_paths]
@@ -194,6 +199,7 @@ def _prepare_nested_javascript_workspaces(
     *,
     worktree: Path,
     source: Path | None,
+    local_source: Path | None,
     timeout_seconds: int,
     run_command: CommandRunner,
 ) -> list[dict[str, Any]]:
@@ -208,9 +214,15 @@ def _prepare_nested_javascript_workspaces(
             continue
         relative = workspace.relative_to(worktree)
         source_workspace = source / relative if source is not None else None
+        local_source_workspace = local_source / relative if local_source is not None else None
         prepared = prepare_dynamic_dependencies(
             worktree=workspace,
             source=source_workspace if source_workspace and source_workspace.is_dir() else None,
+            local_source=(
+                local_source_workspace
+                if local_source_workspace and local_source_workspace.is_dir()
+                else None
+            ),
             timeout_seconds=timeout_seconds,
             run_command=run_command,
         )
@@ -507,13 +519,28 @@ def _package_manager_declaration(worktree: Path) -> tuple[str, str, str] | None:
         # workers forever against a newer shared store. The fleet-owned runtime
         # is independently versioned, while the repository lockfile and store
         # remain immutable for the measurement.
-        command_parts = [
-            "COREPACK_ENABLE_PROJECT_SPEC=0",
-            "corepack",
-            "pnpm",
-            "--pm-on-fail=ignore",
-            *arguments[manager],
-        ]
+        normalized_version = version.split("+", maxsplit=1)[0]
+        major_match = re.match(r"(\d+)", normalized_version)
+        major = int(major_match.group(1)) if major_match else None
+        if major is not None and major <= 10:
+            # pnpm 11 no longer reads package.json's pnpm.overrides field and can
+            # therefore reject a valid pnpm 10 lockfile as a configuration
+            # mismatch. Corepack's version-qualified invocation preserves the
+            # declared lock semantics while remaining independent of PATH shims.
+            command_parts = [
+                "COREPACK_ENABLE_PROJECT_SPEC=0",
+                "corepack",
+                f"pnpm@{normalized_version}",
+                *[argument for argument in arguments[manager] if argument != "--frozen-store"],
+            ]
+        else:
+            command_parts = [
+                "COREPACK_ENABLE_PROJECT_SPEC=0",
+                "corepack",
+                "pnpm",
+                "--pm-on-fail=ignore",
+                *arguments[manager],
+            ]
     command = " ".join(command_parts)
     return manager, lockfiles[manager], command
 
