@@ -54,7 +54,7 @@ id = "regression-value"
 category = "test-value"
 severity = "observation"
 paths = ["**/*_test.py", "**/*.test.js", "**/*.test.jsx", "**/*.test.ts", "**/*.test.tsx", "**/*.spec.js", "**/*.spec.jsx", "**/*.spec.ts", "**/*.spec.tsx", "**/test_*.py"]
-focus = ["behavior assertions", "regression protection", "implementation-detail coupling", "over-mocking", "redundant tests", "snapshot value"]
+focus = ["behavior assertions", "regression protection", "defective-revision failure evidence", "implementation-detail coupling", "over-mocking", "redundant tests", "snapshot value"]
 rubric = """
 Review tests for whether they provide durable regression value.
 
@@ -66,7 +66,10 @@ fixture clearly identifies a bug or boundary case but the expected behavior is
 not asserted. Cite the exact test and evidence. Prefer high recall and allow
 low-confidence observations when the framework's intent is not fully visible.
 Do not label a mock or snapshot as low value without explaining the protected
-behavior that appears absent.
+behavior that appears absent. For a confirmed regression, distinguish a test
+that demonstrably failed on the defective revision and passed on the fixed
+revision from a test that merely passes after the fix. Preserve unavailable
+evidence instead of reconstructing or claiming an unsafe historical run.
 """
 
 [[agent_reviews]]

@@ -126,6 +126,24 @@ def test_package_manager_preflight_reports_nested_lockfiles(tmp_path: Path) -> N
     } in preflight["warnings"]
 
 
+def test_package_manager_preflight_warnings_are_audit_findings(tmp_path: Path) -> None:
+    from quality_runner.workflow import run_payload
+
+    write_complete_js_fixture(tmp_path)
+    (tmp_path / "package-lock.json").write_text("{}\n", encoding="utf-8")
+
+    payload = run_payload(repo_root=tmp_path, run_id="package-preflight-finding")
+    audit_report = json.loads(Path(payload["artifact_paths"]["quality_audit_json"]).read_text())
+
+    finding = next(
+        item
+        for item in audit_report["findings"]
+        if item["id"] == "package-preflight-multiple-lockfiles"
+    )
+    assert finding["category"] == "package-manager"
+    assert finding["actionability"] == "needs-maintainer-policy"
+
+
 def test_verify_gates_payload_executes_discovered_gates_and_marks_capabilities(
     tmp_path: Path,
 ) -> None:
@@ -611,11 +629,15 @@ def test_verify_gates_does_not_block_on_file_evidence_capabilities(tmp_path: Pat
         worktree_mode="disposable",
     )
     verification = json.loads(Path(payload["artifact_paths"]["gate_verification_json"]).read_text())
+    audit_report = json.loads(Path(payload["artifact_paths"]["quality_audit_json"]).read_text())
 
-    assert payload["status"] == "passed"
+    assert payload["status"] == "passed-with-findings"
     assert [(gate["id"], gate["status"]) for gate in verification["gates"]] == [
         ("tests", "passed"),
     ]
+    assert "missing-security-dependency-audit" in {
+        finding["id"] for finding in audit_report["findings"]
+    }
 
 
 def test_verify_gates_classifies_environment_restricted_failures(tmp_path: Path) -> None:

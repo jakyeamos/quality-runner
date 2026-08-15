@@ -13,12 +13,14 @@ from quality_runner.disposition_config import (
 )
 from quality_runner.integrate_config_parse import parse_integrate_section
 from quality_runner.invariants import parse_invariants
+from quality_runner.maintenance_surface_config_parse import parse_maintenance_surface_section
 from quality_runner.prevention_config import parse_prevention_section
 from quality_runner.readiness_config import parse_readiness_section
 from quality_runner.scan_exclusions_config import parse_scan_exclusions_by_module
 from quality_runner.security.config_parse import parse_security_section
 from quality_runner.skills_config_parse import parse_skills_section
 from quality_runner.structural_scan_config_parse import parse_structural_scan_section
+from quality_runner.web_readiness_config import parse_web_readiness_section
 
 CONFIG_FILE_NAME = ".quality-runner.toml"
 CONFIG_SCHEMA = "quality-runner-config-v0.1"
@@ -55,6 +57,7 @@ def load_repo_config(repo_root: Path) -> dict[str, Any]:
     section = _table(payload_map.get("quality_runner"))
     if section is None:
         return _empty_config(path=CONFIG_FILE_NAME, warnings=[])
+    section = cast(dict[str, object], section)
 
     warnings: list[dict[str, str]] = []
     default_profile = _string_value(
@@ -95,10 +98,14 @@ def load_repo_config(repo_root: Path) -> dict[str, Any]:
     structural_scan = parse_structural_scan_section(section.get("structural_scan"), warnings)
     integrate = parse_integrate_section(section.get("integrate"), warnings)
     architecture = parse_architecture_section(section.get("architecture"), warnings)
+    maintenance_surface = parse_maintenance_surface_section(
+        cast(object, section.get("maintenance_surface")), warnings
+    )
     security = parse_security_section(section.get("security"), warnings)
     skills = parse_skills_section(section.get("skills"), warnings)
     readiness = parse_readiness_section(section.get("readiness"), warnings)
     prevention = parse_prevention_section(section.get("prevention"), warnings)
+    web_readiness = parse_web_readiness_section(section.get("web_readiness"), warnings)
     payload = _config(
         path=CONFIG_FILE_NAME,
         default_profile=default_profile,
@@ -123,12 +130,16 @@ def load_repo_config(repo_root: Path) -> dict[str, Any]:
         payload["integrate"] = integrate
     if architecture:
         payload["architecture"] = architecture
+    if maintenance_surface or "maintenance_surface" in section:
+        payload["maintenance_surface"] = maintenance_surface
     if security:
         payload["security"] = security
     if skills:
         payload["skills"] = skills
     if artifacts or "artifacts" in section:
         payload["artifacts"] = artifacts
+    if web_readiness or "web_readiness" in section:
+        payload["web_readiness"] = web_readiness
     return payload
 
 

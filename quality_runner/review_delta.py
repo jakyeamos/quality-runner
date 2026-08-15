@@ -16,6 +16,7 @@ from quality_runner.artifacts import (
     write_json,
     write_text,
 )
+from quality_runner.branch_diff import BRANCH_DIFF_SCOPE_BASIS
 from quality_runner.schema_constants import REVIEW_DELTA_SCHEMA
 
 _GIT_OBJECT_ID_PATTERN = re.compile(r"(?:[0-9a-fA-F]{40}|[0-9a-fA-F]{64})")
@@ -30,6 +31,7 @@ def build_review_delta(
     intent: dict[str, Any],
     baseline_run_id: str | None = None,
     changed_paths: list[str] | None = None,
+    scope_metadata: dict[str, object] | None = None,
 ) -> dict[str, Any]:
     _validate_review_identity(repo_root, cycle_id, iteration)
     current_run_dir = existing_artifact_dir(repo_root, run_id)
@@ -52,6 +54,17 @@ def build_review_delta(
     blocked = verification["blocked"]
     unresolved = sorted(current_scope)
     clean = bool(scope_paths) and not unresolved and not blocked
+    scope: dict[str, Any] = {
+        "changed_paths": scope_paths,
+        "scope_available": bool(scope_paths),
+        "scope_basis": (
+            BRANCH_DIFF_SCOPE_BASIS
+            if scope_metadata is not None
+            else "baseline-and-working-tree-diff"
+        ),
+    }
+    if scope_metadata is not None:
+        scope["branch_diff"] = dict(scope_metadata)
     payload: dict[str, Any] = {
         "schema": REVIEW_DELTA_SCHEMA,
         "cycle_id": cycle_id,
@@ -62,11 +75,7 @@ def build_review_delta(
             "intent_hash": _hash_payload(intent),
             "goal": intent.get("goal"),
         },
-        "scope": {
-            "changed_paths": scope_paths,
-            "scope_available": bool(scope_paths),
-            "scope_basis": "baseline-and-working-tree-diff",
-        },
+        "scope": scope,
         "findings": {
             "new": [
                 _finding_ref(current_by_fingerprint[key])

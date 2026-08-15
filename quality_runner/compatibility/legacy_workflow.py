@@ -58,6 +58,7 @@ def refresh_payload(
     cache_root: Path | None = None,
     performance_budget_seconds: float | None = None,
     include_ignored_paths: list[str] | None = None,
+    scope_metadata: dict[str, object] | None = None,
 ) -> dict[str, Any]:
     review_enabled = review_cycle_id is not None or review_iteration is not None
     if review_enabled:
@@ -88,6 +89,7 @@ def refresh_payload(
         inspect_timeout_seconds=inspect_timeout_seconds,
         run_timeout_seconds=run_timeout_seconds,
         focus_paths=focus_paths,
+        scope_metadata=scope_metadata,
         cache_state=cache_state,
         analysis_mode=analysis_mode,
         cache_mode=cache_mode,
@@ -131,6 +133,8 @@ def refresh_payload(
         iteration=review_iteration,
         intent=intent,
         baseline_run_id=baseline_run_id,
+        changed_paths=focus_paths if focus_paths is not None else None,
+        scope_metadata=scope_metadata,
     )
     delta_paths = persist_review_delta(repo_root=repo_root, run_id=verify_run_id, payload=delta)
     attach_review_metadata(

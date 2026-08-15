@@ -26,6 +26,36 @@ from quality_runner.schema_constants import (
 type LegacyPayload = dict[str, object]
 
 
+def _analysis_coverage_limitations(payload: LegacyPayload) -> list[str]:
+    coverage = payload.get("analysis_coverage")
+    if not isinstance(coverage, dict) or coverage.get("status") != "partial":
+        return []
+
+    limitations: list[str] = []
+    deferred_checks = coverage.get("deferred_checks")
+    if isinstance(deferred_checks, list):
+        check_names = sorted(
+            {
+                check
+                for item in deferred_checks
+                if isinstance(item, dict)
+                and isinstance((check := item.get("check")), str)
+                and check
+            }
+        )
+        if check_names:
+            limitations.append(
+                f"Analysis coverage is partial; deferred checks: {', '.join(check_names)}."
+            )
+    if coverage.get("scan_budget_exceeded") is True:
+        limitations.append("The code-quality scan exceeded its text-file budget.")
+    if coverage.get("performance_budget_exceeded") is True:
+        limitations.append("The audit exceeded its performance budget.")
+    if not limitations:
+        limitations.append("Analysis coverage is partial.")
+    return limitations
+
+
 def _outcome(
     *,
     journey: OutcomeJourney,
@@ -383,6 +413,7 @@ verify_confidence = _verify_confidence
 requires_verification_authorization = _requires_verification_authorization
 review_finding_count = _review_finding_count
 warning_messages = _warning_messages
+analysis_coverage_limitations = _analysis_coverage_limitations
 run_id = _run_id
 command = _command
 handoff_command = _handoff_command

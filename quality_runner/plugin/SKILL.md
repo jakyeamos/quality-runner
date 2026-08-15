@@ -96,7 +96,14 @@ intent/review-cycle delta loop; read the resulting `review-delta.json` and
 decisions, `review-worker` plus strict report validation for worker handoffs,
 `plan`/`phase` or delivery contracts for bounded planning, `rollout` for
 isolated multi-repository runs, and `release-smoke` before release. The full
-agent protocol is in `docs/agent-usage.md`.
+agent protocol is in `docs/agent-usage.md`. Before publishing, build both
+distributions and run `release-boundary REPOSITORY --dist-dir DIST --json`.
+Treat `public_core`, `public_adapter`, and `local_only` as the exhaustive
+distribution classes; public adapters require sanitized contract fixtures, and
+local-only Pronto, fleet, account, or machine wiring must not enter artifacts or
+the tracked public source tree. Require the persisted
+`quality-runner-release-boundary/v2` receipt to match the exact release branch
+and commit; legacy, stale, dirty, or blocked receipts are not release evidence.
 
 For planning and execution loops, use the additive delivery contract surface:
 

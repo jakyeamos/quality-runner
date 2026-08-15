@@ -57,6 +57,34 @@ def test_audit_journey_emits_outcome_json_without_changing_legacy_run(tmp_path: 
     assert "state" not in legacy_payload
 
 
+def test_audit_journey_projects_balanced_analysis_as_partial_findings(tmp_path: Path) -> None:
+    write_js_fixture(tmp_path)
+
+    journey = _cli(
+        "audit",
+        str(tmp_path),
+        "--run-id",
+        "journey-balanced",
+        "--analysis-mode",
+        "balanced",
+        "--cache-mode",
+        "disabled",
+        "--no-progress",
+        "--json",
+    )
+
+    outcome = json.loads(journey.stdout)
+    audit_report = json.loads(
+        (
+            tmp_path / ".quality-runner" / "runs" / "journey-balanced" / "quality-audit.json"
+        ).read_text(encoding="utf-8")
+    )
+    assert journey.returncode == 0
+    assert outcome["confidence"]["level"] == "limited"
+    assert any("deferred checks" in item for item in outcome["confidence"]["limitations"])
+    assert "analysis-coverage-partial" in {finding["id"] for finding in audit_report["findings"]}
+
+
 def test_verify_journey_reports_evidence_only_block_without_changing_exit_code(
     tmp_path: Path,
 ) -> None:

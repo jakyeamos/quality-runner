@@ -110,6 +110,21 @@ qr runs /path/to/repo --json
 qr repo-hygiene check /path/to/repo --json
 ```
 
+For web repositories, `qr web-readiness` writes the stable categorical report
+`.quality-runner/web-readiness.json`. Source and production-artifact inspection
+remain distinct from project-owned browser or deployment evidence, and the
+repository must explicitly declare whether the surface is public, internal, or
+not applicable:
+
+```bash
+qr web-readiness /path/to/repo --json
+qr web-readiness /path/to/repo \
+  --deployment-evidence /path/to/web-deployment-evidence.json --json
+```
+
+See the [web-readiness evidence contract](docs/integrations/web-readiness.md)
+for policy, bundle budgets, evidence levels, schemas, and producer examples.
+
 For the cross-repository environment contract, QR owns both the review profile
 and the bounded fleet scanner. Static inspection covers every identity under a
 bounded projects root; dynamic commands are opt-in and run only in QR-owned
@@ -147,10 +162,71 @@ published at `~/.quality-runner/fleet-audit/current/mac-control-ideal-state.json
 the ordinary `maturity.json` feed remains unchanged.
 
 The fleet audit resolves the documented development branch, preferring `dev`,
-and never selects a branch by commit-count maturity. Dirty, detached, stale,
-prunable, or unverifiable target checkouts receive static findings only. Fleet
-artifacts are private by default; the report command emits an aggregate-only
-projection that remains explicitly review-required before publication.
+and never selects a branch by commit-count maturity. A checkout from the same
+Git repository may host QR's detached disposable worktree even when it has
+uncommitted work: QR targets the committed branch HEAD and requires the host's
+full source fingerprint to remain identical before and after execution. Branch
+fallbacks are evidence ordered: documented policy, a locally verified remote
+default, then an unambiguous sole local branch. Fleet artifacts are private by
+default; the report command emits an aggregate-only projection that remains
+explicitly review-required before publication.
+
+When a selected local target trails its configured upstream, QR fails closed
+instead of silently scanning the remote-tracking ref. The fleet finding and
+maturity feed expose the local and upstream SHAs, ahead/behind counts, and a
+bounded `safe_action`; a strict behind-only relation permits a fast-forward,
+while divergence requires explicit reconciliation. Dynamic `blocked`, `failed`,
+and `timeout` outcomes are P0 `dynamic_verification` findings. `unavailable` and
+`unknown` outcomes are P1 unknown findings. Passing or reused evidence continues
+to validate the discovered quality-command finding.
+
+Automatic discovery honors `/path/to/projects/.quality-runner/fleet.json` with
+schema `quality-runner-fleet-policy-v0.1`. Its `exclude_paths` are relative to
+the bounded projects root, exclude the named tree and descendants, and are
+recorded in the immutable inventory. Explicit `--repo-path` requests remain an
+intentional override for one-off inspection.
+
+Dynamic Python commands use `uv run --offline --locked` when the repository or
+workspace owns `uv.lock`, including its declared `dev` extra when present.
+Dynamic selection prefers one root aggregate per capability. Package-level
+commands run only when no root aggregate exists; more than eight non-aggregated
+commands fail closed and request a repository-owned aggregate instead of
+silently sampling partial coverage. JavaScript formatter discovery prefers a
+read-only `format:check` script over `format`. Commands discovered with
+`mutating` or `unknown` mutation risk are blocked before execution, including
+package-manager wrappers whose underlying script uses `--write` or `--fix`.
+When trustworthy commands fail alongside incomplete commands, the aggregate
+status is `failed`; blocked, timed-out, and unavailable siblings remain visible
+in the command receipt rather than masking the known quality failure.
+
+`--timeout-seconds` is the hard ceiling for each dynamic command. Repository
+`[quality_runner.gate_timeouts]` values may lower individual capability limits
+within that ceiling. Failed and timed-out command evidence includes its source
+and a private, redacted 4,000-character stdout/stderr tail in addition to full
+output hashes and lengths. QR also derives and records a
+per-repository coordinator watchdog from that limit; a watchdog interruption
+becomes a first-class dynamic `timeout` finding and the audit continues to the
+next repository. Every fleet subprocess starts in a dedicated process group,
+and timeout cleanup escalates across the stored group even when its original
+leader has already exited, preventing descendants with inherited output pipes
+from stalling the coordinator.
+JavaScript dependency trees are either copied into the disposable worktree or
+reproduced from a pinned package manager and lockfile without scripts or
+network access. Nested JavaScript workspaces inherit a pinned root package
+manager when they do not declare a closer one, so their scripts run through the
+prepared dependency tree instead of relying on ambient executables. For
+lockfile-only repositories, script execution may use an
+already cached matching manager binary, but never a Corepack download path.
+When the target branch is attached to an unprepared checkout, QR may copy a
+tree from another discovered checkout only after the package-manager,
+dependency-field, and lockfile signatures match the detached target exactly.
+The dynamic read-only command policy admits configured aggregate `pre_cr`
+commands after the same mutation screening and admits only the exact
+non-mutating `docker compose ... config` form from Docker surfaces.
+Swift packages expose `swift test` as their canonical local
+behavioral gate. A documented generated archival snapshot with no maintained
+executable surface is recorded as `not_applicable`, not as an unexplained
+unknown.
 
 Quality Runner publishes the validated current fleet maturity feed to the fixed
 private path `~/.quality-runner/fleet-audit/current/maturity.json`. Immutable
@@ -161,11 +237,48 @@ that isolated test artifact and never updates the production current feed.
 Leverage and Pronto consume the same stable feed; the legacy leverage maturity
 audit is historical and is not imported.
 
+For presentation, the feed separates observed `checks_failing` from
+`verification_blocked`, and names the remaining machine outcomes `review_needed`,
+`evidence_unknown`, and `healthy`. The legacy `quality_status` field remains in
+v1 for compatibility; consumers should display the bounded `quality_outcome`
+label, repository-level `disposition`, and optional `next_step`, using the
+feed's taxonomy for the category definition. A `review_needed` disposition
+names the below-ideal dimensions and points to their status, score, and
+evidence message. An `evidence_unknown` disposition is presented as
+`Evidence review required`, with the unavailable or stale dimensions named
+explicitly; it is an evidence gap, not a failed-test result. Presentation
+surfaces must not render the raw machine state or the old `unknown` label.
+Consumers must keep the machine states distinct from observed failures and
+verification blockage while making every evidence-review row actionable.
+
 Repository maturity includes `change_surface_coverage`. Repositories that host
-skills also receive `skill_contract_quality`; repositories without skills
-record that dimension as explicitly not applicable. Audits assess only an
-existing repository-owned matrix or validated pointer. They never create or
-infer a matrix, and a missing matrix is an ordinary maturity gap rather than a
+skills also receive conditional `skill_contract_quality`; repositories without
+hosted skills record that dimension as explicitly not applicable. The
+skill-quality audit includes conventional `skills/*/SKILL.md` contracts and
+every repository-relative hosted contract declared in the agent-usability
+manifest, including provider-edge locations such as `.agents/skills` or
+`.codex/skills`. The repository projection also exposes four agent-usability
+lanes—documentation contract, tool-to-skill coverage, behavior evidence, and
+freshness/portability—plus growth health for documentation, tools, skills, and
+skill families. Every applicable lane and growth-health score contributes to
+repository and fleet maturity under a stable `agent_usability.*` dimension ID;
+explicit `not_applicable` evidence remains outside the denominator.
+The relationship is declared in `.agents/agent-usability.json` using
+`agent-usability/v1`. Growth health scores blocked, attention, and healthy
+structure as 0, 2, and 4; adding more prose or more skills cannot improve it by
+itself.
+Repositories without an agent-facing tool or skill surface declare
+`applicability: not_applicable` with a concrete reason and empty `tools` and
+`skills` arrays. This keeps them in the fleet inventory without manufacturing
+coverage or penalizing ordinary application repositories for missing a skill.
+A declared tool whose maintained command documentation already is
+the complete agent interface may instead set `skill_mapping.status` to
+`not_applicable`, with a concrete reason and evidence paths. This records a
+deliberate exemption without manufacturing a duplicate wrapper skill.
+
+Audits assess only an existing repository-owned matrix or validated pointer.
+They never create or infer a matrix, and a missing matrix is an ordinary maturity
+gap rather than a
 blocker to unrelated checks.
 
 `audit` creates evidence and a remediation plan without editing source files.
@@ -320,6 +433,7 @@ qr refresh /path/to/repo --run-id-prefix task-001-pass-1 \
   --intent "Implement the requested task" --review-cycle-id task-001 \
   --review-iteration 1 --json
 qr release-smoke --json
+qr release-boundary . --dist-dir dist --json
 qr validate-report worker-report.json --json
 qr validate-handoff handoff.json --json
 qr validate-remediation-context remediation-context.json --remediation-plan remediation-plan.json --json
@@ -379,6 +493,15 @@ findings are retained as `out_of_scope` without blocking the task.
 Before release, run `qr release-smoke --json` to verify the public
 doctor contract, v2 audit outcome, handoff export, report compatibility, and
 the packaged `quality_evidence_contract` / `repo_quality_certifier` surfaces.
+After `uv build`, run `qr release-boundary . --dist-dir dist --json`. It blocks
+when an applicable change surface lacks a `public_core`, `public_adapter`, or
+`local_only` classification; scans tracked public code and docs for
+workstation/private-inventory markers; blocks tracked paths declared local-only;
+validates the wheel and sdist allowlists; verifies sanitized public-adapter
+fixtures; and installs the wheel under a temporary home with Pronto, Leverage,
+and Mac Control absent. It also writes the privacy-safe
+`.quality-runner/release-boundary.json` v2 receipt with exact Git provenance,
+the matrix digest, and wheel/sdist digests for downstream release consumers.
 
 ## MCP
 
@@ -544,6 +667,8 @@ uv run --locked vulture quality_runner quality_evidence_contract repo_quality_ce
 uv run --locked pip-audit
 uv run --locked python scripts/run_pytest_with_lcov.py
 uv run --locked qr release-smoke --json
+uv build
+uv run --locked qr release-boundary . --dist-dir dist --json
 pre-cr run --workspace . --json  # changed-line readiness; expects changed files
 ```
 

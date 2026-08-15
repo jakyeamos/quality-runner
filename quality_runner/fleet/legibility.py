@@ -3,15 +3,23 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, cast
 
+from quality_runner.config import load_repo_config
 from quality_runner.discovery import inspect_repo
+from quality_runner.fleet.agent_usability import assess_agent_usability
+from quality_runner.fleet.behavior_assurance import assess_behavior_assurance
+from quality_runner.fleet.behavior_finding import behavior_finding_arguments
 from quality_runner.fleet.change_matrix import assess_change_surface_coverage
 from quality_runner.fleet.contracts import (
+    DEPLOYMENT_MARKERS,
     DIMENSION_LABELS,
+    DIMENSION_TERMS,
     DIMENSIONS,
     FLEET_FINDING_SCHEMA,
     FLEET_PLAN_SCHEMA,
     digest,
+    standard_dimension,
 )
+from quality_runner.fleet.error_codes import stable_error_code_finding_arguments
 from quality_runner.fleet.legibility_contract import maintained_control
 from quality_runner.fleet.legibility_evidence import (
     collect_documents,
@@ -20,50 +28,20 @@ from quality_runner.fleet.legibility_evidence import (
     contains_any,
     term_evidence,
 )
+from quality_runner.fleet.legibility_finding import (
+    finding as _finding,
+)
+from quality_runner.fleet.legibility_finding import (
+    validation_commands as _validation_commands,
+)
+from quality_runner.fleet.legibility_support import plan_confidence, scan_projection
+from quality_runner.fleet.maturity_dimensions import assess_maturity_dimensions
 from quality_runner.fleet.projection import build_local_projection
 from quality_runner.fleet.skill_contracts import assess_skill_contract_quality
-
-DIMENSION_TERMS: dict[str, tuple[str, ...]] = {
-    "architecture_boundaries": ("architecture", "boundary", "ownership", "module", "system design"),
-    "change_surface_coverage": ("change surface", "change matrix", "dependency map"),
-    "coding_conventions": ("convention", "style", "strict", "format", "coding standard"),
-    "security_constraints": ("security", "credential", "secret", "authentication", "do not commit"),
-    "failure_modes": ("failure", "troubleshoot", "recovery", "incident", "common issue"),
-    "implementation_examples": (
-        "example",
-        "good implementation",
-        "reference implementation",
-        "pattern",
-    ),
-    "definition_of_done": (
-        "definition of done",
-        "acceptance criteria",
-        "quality gate",
-        "done when",
-        "verify",
-    ),
-    "approval_gated_paths": (
-        "approval",
-        "forbidden",
-        "do not change",
-        "destructive",
-        "human review",
-    ),
-    "deployment_rollback": ("deploy", "deployment", "rollback", "release", "revert"),
-    "context_routing": ("read when", "load when", "routing", "minimum context", "context index"),
-    "skill_contract_quality": ("skill", "trigger", "observable output"),
-}
-
-DEPLOYMENT_MARKERS = (
-    ".github/workflows",
-    "vercel.json",
-    "fly.toml",
-    "dockerfile",
-    "docker-compose",
-    "render.yaml",
-    "railway.json",
-    "terraform",
-    "pulumi",
+from quality_runner.fleet.standard_audit import matrix_maintenance_finding_arguments
+from quality_runner.fleet.strict_debt import (
+    assess_strict_policy_visibility,
+    assess_strict_type_debt,
 )
 
 
@@ -72,17 +50,35 @@ def audit_repository(
     repository: dict[str, Any],
     as_of: str,
     run_id: str,
+    standard: str | None = None,
 ) -> dict[str, Any]:
+    selected_standard_dimension = standard_dimension(standard)
     root = Path(str(repository["primary_path"])).expanduser().resolve()
+    config = load_repo_config(root)
     scan: dict[str, Any]
     scan_error: str | None = None
     try:
-        scan = inspect_repo(root, run_id, cache_mode="disabled")
+        scan = inspect_repo(root, run_id, config=config, cache_mode="disabled")
     except (OSError, ValueError) as error:
         scan = {"repo_root": str(root), "warnings": []}
         scan_error = str(error)
     documents = collect_documents(root)
     link_evidence = collect_link_evidence(root, documents)
+    selected_dimensions = (
+        (selected_standard_dimension,) if selected_standard_dimension is not None else DIMENSIONS
+    )
+    maturity_assessments = (
+        assess_maturity_dimensions(
+            root=root,
+            repository=repository,
+            scan=scan,
+            documents=documents,
+            config=config,
+            as_of=as_of,
+        )
+        if standard is None
+        else {}
+    )
     findings = [
         _dimension_finding(
             repository=repository,
@@ -91,10 +87,25 @@ def audit_repository(
             link_evidence=link_evidence,
             dimension=dimension,
             as_of=as_of,
+            maturity_assessments=maturity_assessments,
         )
-        for dimension in DIMENSIONS
+        for dimension in selected_dimensions
     ]
-    if scan_error:
+    if standard is None:
+        agent_usability = assess_agent_usability(
+            root,
+            documents,
+            link_evidence,
+            as_of,
+        )
+        behavior_assurance = assess_behavior_assurance(root, repository, as_of)
+        findings.append(
+            _finding(**behavior_finding_arguments(repository, behavior_assurance, as_of))
+        )
+    else:
+        agent_usability = {}
+        behavior_assurance = {}
+    if scan_error and standard is None:
         findings.append(
             {
                 "schema": FLEET_FINDING_SCHEMA,
@@ -125,17 +136,28 @@ def audit_repository(
         "repo_id": repository["repo_id"],
         "audit_id": run_id,
         "as_of": as_of,
+        "standard": standard,
         "repository": repository,
-        "scan": _scan_projection(scan),
+        "scan": scan_projection(scan),
         "documents": {
             "paths": sorted(documents),
             "link_evidence": link_evidence,
             "freshness": collect_freshness_evidence(documents, as_of),
         },
+        "agent_usability": agent_usability,
+        "behavior_assurance": behavior_assurance,
         "findings": findings,
         "plan": plan,
         "static_provenance_hash": digest(
-            {"repo": repository, "scan": scan, "documents": documents, "findings": findings}
+            {
+                "repo": repository,
+                "scan": scan,
+                "documents": documents,
+                "agent_usability": agent_usability,
+                "behavior_assurance": behavior_assurance,
+                "standard": standard,
+                "findings": findings,
+            }
         ),
     }
 
@@ -181,7 +203,7 @@ def build_remediation_plan(
         "status": "ready" if any(tasks.values()) else "complete",
         "observed_gap_summary": f"{sum(len(items) for items in tasks.values())} remediation task(s) remain below full maturity.",
         "impact": "Agents may spend more context, choose unverified commands, or make unsafe assumptions when the environment contract is incomplete.",
-        "confidence": _plan_confidence(findings),
+        "confidence": plan_confidence(findings),
         "affected_surfaces": sorted(
             {
                 path
@@ -209,12 +231,29 @@ def _dimension_finding(
     link_evidence: dict[str, Any],
     dimension: str,
     as_of: str,
+    maturity_assessments: dict[str, dict[str, Any]],
 ) -> dict[str, Any]:
     combined = "\n".join(documents.values()).lower()
     evidence: list[dict[str, str]] = []
     score = 0
     status = "absent"
     confidence = "medium"
+    if dimension in maturity_assessments:
+        assessment = maturity_assessments[dimension]
+        return _finding(
+            repository=repository,
+            dimension=dimension,
+            score=assessment["score"],
+            as_of=as_of,
+            status=str(assessment["status"]),
+            severity=str(assessment["severity"]),
+            priority=str(assessment["priority"]),
+            confidence=str(assessment["confidence"]),
+            message=str(assessment["message"]),
+            evidence=list(assessment["evidence"]),
+            validation_commands=list(assessment["validation_commands"]),
+            applicability=str(assessment["applicability"]),
+        )
     if dimension == "change_surface_coverage":
         assessment = assess_change_surface_coverage(
             Path(str(repository["primary_path"])).expanduser().resolve(),
@@ -234,6 +273,14 @@ def _dimension_finding(
             evidence=assessment["evidence"],
             validation_commands=["qr fleet audit run --repo-path REPO --json"],
         )
+    if dimension == "diagnosability.stable_error_codes":
+        return _finding(**stable_error_code_finding_arguments(repository=repository, as_of=as_of))
+    if dimension == "matrix_maintenance":
+        return _finding(
+            **matrix_maintenance_finding_arguments(
+                repository=repository, documents=documents, as_of=as_of
+            )
+        )
     if dimension == "skill_contract_quality":
         assessment = assess_skill_contract_quality(
             Path(str(repository["primary_path"])).expanduser().resolve()
@@ -250,6 +297,40 @@ def _dimension_finding(
             message=assessment["message"],
             evidence=assessment["evidence"],
             validation_commands=["qr fleet audit run --repo-path REPO --json"],
+        )
+    if dimension == "strict_policy_visibility":
+        assessment = assess_strict_policy_visibility(
+            Path(str(repository["primary_path"])).expanduser().resolve(), scan
+        )
+        return _finding(
+            repository=repository,
+            dimension=dimension,
+            score=assessment["score"],
+            as_of=as_of,
+            status=assessment["status"],
+            severity="observation",
+            priority="P1",
+            confidence="high",
+            message=assessment["message"],
+            evidence=assessment["evidence"],
+            validation_commands=["uv run --locked qr fleet audit run --repo-path REPO --json"],
+        )
+    if dimension == "strict_type_debt":
+        assessment = assess_strict_type_debt(
+            Path(str(repository["primary_path"])).expanduser().resolve()
+        )
+        return _finding(
+            repository=repository,
+            dimension=dimension,
+            score=assessment["score"],
+            as_of=as_of,
+            status=assessment["status"],
+            severity="high" if assessment["status"] == "blocked" else "observation",
+            priority="P0" if assessment["status"] == "blocked" else "P1",
+            confidence="high",
+            message=assessment["message"],
+            evidence=assessment["evidence"],
+            validation_commands=["uv run --locked python scripts/check_strict_baseline.py"],
         )
     maintained = maintained_control(
         root=Path(str(repository["primary_path"])).expanduser().resolve(),
@@ -365,7 +446,7 @@ def _dimension_finding(
                 "detail": "One or more relative context/document links are invalid.",
             }
         )
-    if freshness.get("stale_paths") and dimension in {
+    if freshness.get("status") == "stale" and dimension in {
         "context_routing",
         "definition_of_done",
         "quality_commands",
@@ -417,75 +498,6 @@ def _dimension_finding(
     )
 
 
-def _finding(
-    *,
-    repository: dict[str, Any],
-    dimension: str,
-    score: int | None,
-    as_of: str,
-    status: str,
-    severity: str,
-    priority: str,
-    confidence: str,
-    message: str,
-    evidence: list[dict[str, str]],
-    validation_commands: list[str],
-) -> dict[str, Any]:
-    return {
-        "schema": FLEET_FINDING_SCHEMA,
-        "finding_id": digest([repository["repo_id"], dimension, status, evidence])[:16],
-        "repo_id": repository["repo_id"],
-        "as_of": as_of,
-        "dimension": dimension,
-        "label": DIMENSION_LABELS[dimension],
-        "applicable": status != "not_applicable",
-        "score": score,
-        "status": status,
-        "severity": severity,
-        "priority": priority,
-        "confidence": confidence,
-        "message": message,
-        "evidence": evidence,
-        "validation_commands": validation_commands,
-        "provenance_hash": digest(
-            {"repo_id": repository["repo_id"], "dimension": dimension, "evidence": evidence}
-        ),
-    }
-
-
-def _scan_projection(scan: dict[str, Any]) -> dict[str, Any]:
-    keys = (
-        "schema",
-        "package_manager",
-        "languages",
-        "ecosystems",
-        "scripts",
-        "quality_commands",
-        "agent_instruction_files",
-        "ci_files",
-        "quality_contract",
-        "warnings",
-        "git_provenance",
-    )
-    return {key: scan[key] for key in keys if key in scan}
-
-
-def _validation_commands(dimension: str, scan: dict[str, Any]) -> list[str]:
-    quality_commands = scan.get("quality_commands", [])
-    commands = (
-        [
-            str(cast(dict[str, Any], item).get("command"))
-            for item in cast(list[Any], quality_commands)
-            if isinstance(item, dict) and isinstance(cast(dict[str, Any], item).get("command"), str)
-        ]
-        if isinstance(quality_commands, list)
-        else []
-    )
-    if dimension == "quality_commands" and commands:
-        return commands[:6]
-    return ["qr audit REPO --profile environment-legibility --json"]
-
-
 def _has_deployment_surface(repository: dict[str, Any], scan: dict[str, Any], text: str) -> bool:
     root = Path(str(repository["primary_path"]))
     if any((root / marker).exists() for marker in DEPLOYMENT_MARKERS):
@@ -494,12 +506,3 @@ def _has_deployment_surface(repository: dict[str, Any], scan: dict[str, Any], te
     return bool(isinstance(ci_files, list) and cast(list[Any], ci_files)) and contains_any(
         text, ("deploy", "release")
     )
-
-
-def _plan_confidence(findings: list[dict[str, Any]]) -> str:
-    statuses = {str(item.get("status")) for item in findings}
-    if "blocked" in statuses:
-        return "high"
-    if "unknown" in statuses or "stale" in statuses:
-        return "medium"
-    return "medium"

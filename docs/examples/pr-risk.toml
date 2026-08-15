@@ -21,7 +21,7 @@ id = "changed-surface-map"
 category = "pr-surface"
 severity = "observation"
 paths = ["**/*.py", "**/*.js", "**/*.jsx", "**/*.ts", "**/*.tsx", "**/*.go", "**/*.rs", "**/*.java", "**/*.sql", "**/*.yml", "**/*.yaml", "**/*.toml", "**/*.json", "**/*.md"]
-focus = ["touched files", "entry points", "public contracts", "data flows", "permissions", "generated artifacts"]
+focus = ["touched files", "production and test lines", "new dependencies", "entry points", "public contracts", "flags and configuration", "compatibility paths", "concepts consolidated", "data flows", "permissions", "generated artifacts"]
 rubric = """
 Review the change surface for a pull request or branch.
 
@@ -31,6 +31,9 @@ operational paths they affect. Report plausible unreviewed surfaces with
 concrete file, line, and source evidence. If diff metadata is unavailable,
 state that evidence gap instead of inferring which files changed. Prefer high
 recall and use low confidence when the dependency path is incomplete.
+Treat counts as descriptive evidence, never as a design-quality score or a
+standalone merge gate. Check whether new surfaces have a natural owner and
+whether declared consolidation actually reduced parallel concepts.
 """
 
 [[agent_reviews]]

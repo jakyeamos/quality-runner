@@ -1,0 +1,167 @@
+{
+  "schema_version": "change-surface-matrix/v1",
+  "subject": {"kind": "repository", "id": "quality-runner"},
+  "owner": "quality-runner-maintainers",
+  "last_reviewed": "2026-08-15",
+  "surfaces": [
+    {
+      "id": "matrix-maintenance",
+      "scope": "local",
+      "distribution": "local_only",
+      "path": ".agents/change-surface-matrix.json",
+      "owner": "quality-runner-maintainers",
+      "condition": "A material feature, functionality, behavior, CLI/API, workflow, data, integration, security/privacy, or quality/release change is added or changed.",
+      "operations": ["add", "change", "remove"],
+      "validation": [
+        "Update this matrix in the same change with affected surfaces, contracts, documentation, tests, evidence, owners, and projections.",
+        "For a purely internal refactor or isolated fix with no matrix impact, record a reviewed no-impact reason in the same change record; omission is not an implicit no-impact decision."
+      ],
+      "status": "applicable"
+    },
+    {
+      "id": "quality-engine",
+      "scope": "local",
+      "distribution": "public_core",
+      "path": "quality_runner/, quality_evidence_contract/, repo_quality_certifier/, and public documentation",
+      "owner": "quality-runner-maintainers",
+      "condition": "scan, policy, finding, CLI, certification, or public documentation behavior changes",
+      "operations": ["add", "change", "remove"],
+      "validation": [
+        "uv run --locked pytest -q",
+        "uv run --locked ruff check .",
+        "uv run --locked basedpyright",
+        "For maturity changes, verify dimension-to-capability-to-pillar aggregation, reverse producer coverage, explicit capability applicability, evidence coverage, missing capabilities, and confirmed-risk-only critical caps."
+      ],
+      "status": "applicable"
+    },
+    {
+      "id": "fleet-consumers",
+      "scope": "external",
+      "distribution": "public_adapter",
+      "contract_fixtures": [
+        "fixtures/contracts/public-adapters/pronto-maturity-feed.json"
+      ],
+      "path": "installed qr, plugins, Pronto, quality-runner-maturity-feed/v2, and quality-runner-repository-maturity/v2",
+      "owner": "integration-owner",
+      "condition": "command, plugin, feed schema, taxonomy, publication behavior, maturity pillar, applicability, coverage, cap, or source-dimension changes",
+      "operations": ["add", "change", "remove"],
+      "validation": ["qr fleet replay", "qr fleet feed", "consumer contract readback in Pronto, including v1 migration labeling and v2 capability/pillar projection", "uv run --locked pytest -q tests/test_repository_maturity.py tests/test_release_boundary.py::test_public_pronto_fixture_satisfies_the_feed_contract", "uv run --locked pytest -q tests/test_error_codes.py"],
+      "status": "applicable"
+    },
+    {
+      "id": "mac-control-semantic-contract",
+      "scope": "external",
+      "distribution": "public_adapter",
+      "contract_fixtures": [
+        "fixtures/contracts/public-adapters/mac-control-ideal-state.json"
+      ],
+      "path": ".mac-control/ideal-state.json, the installed validator, and the public maturity contract",
+      "owner": "Quality Runner and integration owners",
+      "condition": "manifest schema, semantic dimension, source grounding, provider boundary, score, or disposition behavior changes",
+      "operations": ["add", "change", "remove"],
+      "validation": [
+        "uv run --locked pytest -q tests/test_mac_control.py",
+        "consumer contract readback"
+      ],
+      "status": "applicable"
+    },
+    {
+      "id": "ci-and-release",
+      "scope": "external",
+      "distribution": "public_core",
+      "path": ".github/workflows/, packaging metadata, and docs/release.md",
+      "owner": "quality-runner-maintainers",
+      "condition": "CI, packaging, release, or distribution boundary behavior changes",
+      "operations": ["add", "change", "remove"],
+      "validation": [
+        "uv run --locked pytest -q tests/test_entrypoints.py tests/test_release_boundary.py",
+        "uv run --locked quality-runner release-smoke --json",
+        "uv build"
+      ],
+      "status": "applicable"
+    },
+    {
+      "id": "operator-local-overlay",
+      "scope": "local",
+      "distribution": "local_only",
+      "path": "private fleet inventories, Pronto wiring, machine paths, credentials, and operator planning",
+      "owner": "local-operator",
+      "condition": "a change depends on a particular workstation, private repository, account, or fleet inventory",
+      "operations": ["add", "change", "remove"],
+      "validation": [
+        "uv run --locked quality-runner release-boundary . --dist-dir dist --json"
+      ],
+      "status": "applicable"
+    }
+  ],
+  "release_boundary": {
+    "tracked_content": {
+      "include_globs": [
+        "README.md",
+        "docs/*.md",
+        "quality_runner/*.py",
+        "quality_evidence_contract/*.py",
+        "repo_quality_certifier/*.py"
+      ],
+      "local_only_globs": [".agents/context/archives/qr-rollout-20260702.md"],
+      "forbidden_patterns": [
+        {
+          "id": "personal-home-path",
+          "pattern": "/(?:Users|home)/[A-Za-z0-9._-]+/"
+        },
+        {
+          "id": "private-operator-inventory",
+          "pattern": "(?:Documents/pronto|projects/(?:Leverage|mac-control)(?:/|\\b)|\\.local/state/quality-runner/fleet)"
+        }
+      ]
+    },
+    "artifacts": {
+      "wheel": {
+        "allow_prefixes": [
+          "quality_runner/",
+          "quality_evidence_contract/",
+          "repo_quality_certifier/"
+        ],
+        "allow_globs": ["quality_runner-*.dist-info/*"]
+      },
+      "sdist": {
+        "allow_paths": [
+          "LICENSE",
+          "MANIFEST.in",
+          "PKG-INFO",
+          "README.md",
+          "pyproject.toml",
+          "setup.cfg"
+        ],
+        "allow_prefixes": [
+          "quality_runner/",
+          "quality_evidence_contract/",
+          "repo_quality_certifier/",
+          "quality_runner.egg-info/",
+          "fixtures/contracts/public-adapters/"
+        ]
+      }
+    }
+  },
+  "unresolved_surfaces": [],
+  "operation_evidence": {
+    "add": {
+      "status": "passed",
+      "evidence": [
+        "tests/test_change_matrix_maturity.py::test_change_matrix_scores_incomplete_stale_unknown_validated_and_proven"
+      ]
+    },
+    "change": {
+      "status": "passed",
+      "evidence": [
+        "tests/test_change_matrix_maturity.py::test_change_matrix_scores_incomplete_stale_unknown_validated_and_proven"
+      ]
+    },
+    "remove": {
+      "status": "passed",
+      "evidence": [
+        "tests/test_change_matrix_maturity.py::test_change_matrix_scores_incomplete_stale_unknown_validated_and_proven"
+      ]
+    }
+  }
+}

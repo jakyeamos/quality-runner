@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "quality-runner-regression-proof-v0.1",
+  "title": "Quality Runner regression proof",
+  "oneOf": [
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema",
+        "status",
+        "test",
+        "defective_revision",
+        "defective_result",
+        "fixed_revision",
+        "fixed_result"
+      ],
+      "properties": {
+        "schema": { "const": "quality-runner-regression-proof-v0.1" },
+        "status": { "const": "verified" },
+        "test": { "type": "string", "minLength": 1 },
+        "defective_revision": { "type": "string", "minLength": 1 },
+        "defective_result": { "const": "failed" },
+        "fixed_revision": { "type": "string", "minLength": 1 },
+        "fixed_result": { "const": "passed" },
+        "evidence": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema", "status", "reason"],
+      "properties": {
+        "schema": { "const": "quality-runner-regression-proof-v0.1" },
+        "status": { "const": "unavailable" },
+        "reason": { "type": "string", "minLength": 1 }
+      }
+    }
+  ]
+}

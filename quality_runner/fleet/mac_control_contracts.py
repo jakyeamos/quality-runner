@@ -3,8 +3,12 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-MAC_CONTROL_MANIFEST_SCHEMA = "mac-control-task-manifest/v1"
-MAC_CONTROL_EVIDENCE_SCHEMA = "mac-control-task-evidence/v1"
+MAC_CONTROL_MANIFEST_SCHEMA = "mac-control-task-manifest/v4"
+MAC_CONTROL_PREVIOUS_MANIFEST_SCHEMA = "mac-control-task-manifest/v3"
+MAC_CONTROL_V2_MANIFEST_SCHEMA = "mac-control-task-manifest/v2"
+MAC_CONTROL_LEGACY_MANIFEST_SCHEMA = "mac-control-task-manifest/v1"
+MAC_CONTROL_EVIDENCE_SCHEMA = "mac-control-task-evidence/v2"
+MAC_CONTROL_PREVIOUS_EVIDENCE_SCHEMA = "mac-control-task-evidence/v1"
 MAC_CONTROL_REPORT_SCHEMA = "pronto-mac-control-ideal-state/v1"
 MAC_CONTROL_AUDIT_SCHEMA = "quality-runner-mac-control-audit/v1"
 MAC_CONTROL_REPLAY_SCHEMA = "quality-runner-mac-control-replay/v1"
@@ -41,6 +45,113 @@ ROUTES = (
     "scrolling",
     "visual_fallback_approved",
 )
+PROVIDERS = (
+    "native",
+    "mac_control",
+    "app_connector",
+    "browser_connector",
+    "computer_use",
+    "caller",
+)
+METHODS = (
+    "native_api",
+    "adapter",
+    "accessibility",
+    "keyboard",
+    "shortcut",
+    "scroll",
+    "pointer",
+    "visual",
+    "drag",
+)
+INTERACTION_MODES = ("semantic", "keyboard", "pointer", "scroll", "drag", "mixed")
+ORACLE_KINDS = (
+    "element_state",
+    "window_state",
+    "application_state",
+    "task_state",
+    "receipt_state",
+    "provider_readback",
+)
+SHORTCUT_DISPOSITIONS = ("built_in_verified", "customizable_verified", "not_applicable")
+SHORTCUT_CUSTOMIZATION_SURFACES = ("macos_app_shortcut", "app_managed", "chrome_extension")
+SHORTCUT_CONFLICT_POLICIES = ("app_managed", "detect_before_assignment", "system_resolved")
+SURFACE_KINDS = ("native_app_ui", "browser_chrome", "web_content", "os_dialog", "hybrid_transition")
+SEMANTIC_EVIDENCE_LEVEL = "source_grounded"
+SEMANTIC_CLAIM_KEYS = {
+    "stable_identity": ("selector_kind", "selector_value", "scope", "uniqueness"),
+    "correct_semantics": ("role", "accessible_name", "action"),
+    "observable_state": ("property", "unavailable_behavior"),
+    "useful_hierarchy": ("container", "relationship", "uniqueness"),
+    "efficient_navigation": ("strategy", "entry_point"),
+    "verifiable_outcomes": ("readback_provider", "property", "operator", "expected"),
+    "route_flexibility": ("primary_provider", "secondary_provider", "fallback_policy"),
+    "stable_change_behavior": ("scenarios", "failure_behavior"),
+}
+SELECTOR_KINDS = (
+    "ax_identifier",
+    "aria_label",
+    "data_attribute",
+    "dom_test_id",
+    "command_id",
+)
+NAVIGATION_STRATEGIES = (
+    "direct_semantic",
+    "menu_command",
+    "search",
+    "shortcut",
+    "typed_provider_handoff",
+)
+READBACK_OPERATORS = ("equals", "not_equals", "contains", "exists")
+GENERIC_EXPECTED_STATES = ("visible", "readable", "available", "success", "succeeded", "completed")
+FAILURE_BEHAVIORS = ("fail_closed", "block_and_explain", "provider_handoff", "retryable_no_change")
+EVIDENCE_PRODUCER_KINDS = ("mac_control", "browser_connector", "app_connector")
+EXECUTION_RESULTS = ("succeeded", "failed", "blocked")
+VERIFICATION_RESULTS = ("passed", "failed", "blocked")
+NATIVE_SURFACES = {"native_app_ui", "browser_chrome", "os_dialog"}
+BROWSER_PROVIDERS = {"browser_connector"}
+NATIVE_PROVIDERS = {"native", "mac_control", "app_connector"}
+SOURCE_EVIDENCE_MAX_BYTES = 2 * 1024 * 1024
+SOURCE_EVIDENCE_CONTEXT_RADIUS = 6_000
+IMPLEMENTATION_SOURCE_SUFFIXES = {
+    ".c",
+    ".cpp",
+    ".cs",
+    ".dart",
+    ".go",
+    ".h",
+    ".html",
+    ".java",
+    ".js",
+    ".json",
+    ".jsx",
+    ".kt",
+    ".kts",
+    ".m",
+    ".mm",
+    ".plist",
+    ".py",
+    ".rb",
+    ".rs",
+    ".storyboard",
+    ".svelte",
+    ".swift",
+    ".toml",
+    ".ts",
+    ".tsx",
+    ".vue",
+    ".xib",
+    ".yaml",
+    ".yml",
+}
+NON_IMPLEMENTATION_SOURCE_COMPONENTS = {
+    ".mac-control",
+    "docs",
+    "fixtures",
+    "snapshots",
+    "test",
+    "tests",
+}
 
 
 class MacControlAuditError(ValueError):
@@ -51,8 +162,18 @@ def validate_manifest(manifest: object) -> list[str]:
     if not isinstance(manifest, dict):
         return ["manifest must be a JSON object"]
     errors: list[str] = []
-    if manifest.get("schema") != MAC_CONTROL_MANIFEST_SCHEMA:
-        errors.append(f"schema must be {MAC_CONTROL_MANIFEST_SCHEMA}")
+    schema = manifest.get("schema")
+    if schema not in {
+        MAC_CONTROL_MANIFEST_SCHEMA,
+        MAC_CONTROL_PREVIOUS_MANIFEST_SCHEMA,
+        MAC_CONTROL_V2_MANIFEST_SCHEMA,
+        MAC_CONTROL_LEGACY_MANIFEST_SCHEMA,
+    }:
+        errors.append(
+            f"schema must be {MAC_CONTROL_MANIFEST_SCHEMA}, "
+            f"{MAC_CONTROL_PREVIOUS_MANIFEST_SCHEMA}, {MAC_CONTROL_V2_MANIFEST_SCHEMA}, "
+            f"or {MAC_CONTROL_LEGACY_MANIFEST_SCHEMA}"
+        )
     applicability = _normalize_applicability(manifest.get("applicability"))
     if applicability is None:
         errors.append("applicability must be applicable or not_applicable")
@@ -67,7 +188,12 @@ def validate_manifest(manifest: object) -> list[str]:
             errors.append("not_applicable manifests must not declare tasks")
         return errors
     criteria = manifest.get("criteria")
-    if not isinstance(criteria, dict):
+    if schema == MAC_CONTROL_MANIFEST_SCHEMA:
+        if criteria not in (None, {}):
+            errors.append(
+                "v4 criteria must be empty; semantic dimensions are derived from task evidence"
+            )
+    elif not isinstance(criteria, dict):
         errors.append("criteria must be an object")
     else:
         for criterion in CRITERIA:
@@ -98,10 +224,29 @@ def validate_manifest(manifest: object) -> list[str]:
             "semantic_action",
             "observable_postcondition",
             "navigation_strategy",
-            "selected_route",
         ):
             if not _nonempty(task.get(key)):
                 errors.append(f"task {label} requires {key}")
+        accessibility = task.get("accessibility")
+        if accessibility is not None and not isinstance(accessibility, dict):
+            errors.append(f"task {label} accessibility must be an object")
+        elif isinstance(accessibility, dict) and not any(
+            _nonempty(accessibility.get(key)) for key in ("identifier", "label", "role")
+        ):
+            errors.append(f"task {label} accessibility needs identifier, label, or role")
+        if schema in {
+            MAC_CONTROL_MANIFEST_SCHEMA,
+            MAC_CONTROL_PREVIOUS_MANIFEST_SCHEMA,
+            MAC_CONTROL_V2_MANIFEST_SCHEMA,
+        }:
+            _validate_v2_task(task, label, errors)
+            if schema in {MAC_CONTROL_MANIFEST_SCHEMA, MAC_CONTROL_PREVIOUS_MANIFEST_SCHEMA}:
+                _validate_shortcut_acceleration(task, label, errors)
+            if schema == MAC_CONTROL_MANIFEST_SCHEMA:
+                _validate_v4_task(task, label, errors)
+            continue
+        if not _nonempty(task.get("selected_route")):
+            errors.append(f"task {label} requires selected_route")
         if str(task.get("navigation_strategy", "")).strip().casefold() in {
             "sequential_tabbing",
             "sequential tabbing",
@@ -127,64 +272,7 @@ def validate_manifest(manifest: object) -> list[str]:
                 errors.append(f"task {label} has unsupported route {route}")
             if _normalize_token(task.get("selected_route")) not in normalized_routes:
                 errors.append(f"task {label} selected_route must be eligible")
-        accessibility = task.get("accessibility")
-        if accessibility is not None and not isinstance(accessibility, dict):
-            errors.append(f"task {label} accessibility must be an object")
-        elif isinstance(accessibility, dict) and not any(
-            _nonempty(accessibility.get(key)) for key in ("identifier", "label", "role")
-        ):
-            errors.append(f"task {label} accessibility needs identifier, label, or role")
     return errors
-
-
-def task_entries(value: object) -> list[dict[str, Any]]:
-    if not isinstance(value, list):
-        return []
-    entries: list[dict[str, Any]] = []
-    for task in value:
-        if not isinstance(task, dict):
-            continue
-        entries.append(
-            {
-                "task_id": str(task.get("task_id", "")),
-                "stable_target_id": str(task.get("stable_target_id", "")),
-                "hierarchy": str(task.get("hierarchy", "")),
-                "semantic_action": str(task.get("semantic_action", "")),
-                "observable_postcondition": str(task.get("observable_postcondition", "")),
-                "observable_states": string_list(task.get("observable_states")),
-                "navigation_strategy": str(task.get("navigation_strategy", "")),
-                "eligible_routes": string_list(task.get("eligible_routes")),
-                "selected_route": str(task.get("selected_route", "")),
-                "change_states": string_list(task.get("change_states")),
-                "attempts": 0,
-                "successes": 0,
-                "evidence": [],
-            }
-        )
-    return entries
-
-
-def merge_task_evidence(tasks: list[dict[str, Any]], value: object, errors: list[str]) -> None:
-    by_id = {task.get("task_id"): task for task in tasks}
-    if not isinstance(value, list):
-        return
-    for item in value:
-        if not isinstance(item, dict):
-            continue
-        task_id = str(item.get("task_id", ""))
-        task = by_id.get(task_id)
-        if task is None:
-            errors.append(f"evidence:unknown_task={task_id or 'unnamed'}")
-            continue
-        attempts = item.get("attempts")
-        successes = item.get("successes")
-        if isinstance(attempts, int) and attempts >= 0:
-            task["attempts"] = attempts
-        if isinstance(successes, int) and successes >= 0:
-            task["successes"] = successes
-        if isinstance(item.get("selected_route"), str) and item["selected_route"].strip():
-            task["selected_route"] = item["selected_route"].strip()
-        task["evidence"] = string_list(item.get("evidence"))
 
 
 def nonempty(value: object) -> bool:
@@ -218,6 +306,30 @@ def string_list(value: object) -> list[str]:
     )
 
 
+def string_mapping(value: object) -> dict[str, str]:
+    return (
+        {
+            str(key): child
+            for key, child in value.items()
+            if isinstance(key, str) and isinstance(child, str)
+        }
+        if isinstance(value, dict)
+        else {}
+    )
+
+
+def object_mapping(value: object) -> dict[str, Any]:
+    return {str(key): child for key, child in value.items()} if isinstance(value, dict) else {}
+
+
+def object_list(value: object) -> list[dict[str, Any]]:
+    return (
+        [object_mapping(item) for item in value if isinstance(item, dict)]
+        if isinstance(value, list)
+        else []
+    )
+
+
 def _nonempty(value: object) -> bool:
     return nonempty(value)
 
@@ -237,3 +349,98 @@ def _require_values(
     for expected in required:
         if expected not in values:
             errors.append(f"{label} is missing {expected}")
+
+
+def task_entries(value: object) -> list[dict[str, Any]]:
+    from quality_runner.fleet.mac_control_task_evidence import task_entries as implementation
+
+    return implementation(value)
+
+
+def merge_task_evidence(
+    tasks: list[dict[str, Any]],
+    value: object,
+    errors: list[str],
+    *,
+    evidence_schema: str,
+) -> None:
+    from quality_runner.fleet.mac_control_task_evidence import (
+        merge_task_evidence as implementation,
+    )
+
+    implementation(tasks, value, errors, evidence_schema=evidence_schema)
+
+
+def validate_evidence_producer(value: object) -> list[str]:
+    from quality_runner.fleet.mac_control_task_evidence import (
+        validate_evidence_producer as implementation,
+    )
+
+    return implementation(value)
+
+
+def semantic_source_paths(manifest: object) -> list[str]:
+    from quality_runner.fleet.mac_control_task_evidence import (
+        semantic_source_paths as implementation,
+    )
+
+    return implementation(manifest)
+
+
+def _validate_v2_task(task: dict[str, Any], label: str, errors: list[str]) -> None:
+    from quality_runner.fleet.mac_control_task_validation import validate_v2_task
+
+    validate_v2_task(task, label, errors)
+
+
+def _validate_shortcut_acceleration(task: dict[str, Any], label: str, errors: list[str]) -> None:
+    from quality_runner.fleet.mac_control_task_validation import (
+        validate_shortcut_acceleration,
+    )
+
+    validate_shortcut_acceleration(task, label, errors)
+
+
+def _validate_v4_task(task: dict[str, Any], label: str, errors: list[str]) -> None:
+    from quality_runner.fleet.mac_control_semantic import validate_v4_task
+
+    validate_v4_task(task, label, errors)
+
+
+def evaluate_semantic_evidence(repository_root: Path, manifest: object) -> dict[str, Any]:
+    from quality_runner.fleet.mac_control_semantic import (
+        evaluate_semantic_evidence as implementation,
+    )
+
+    return implementation(repository_root, manifest)
+
+
+def _require_accounting(
+    declared: object,
+    exemptions: object,
+    supported: tuple[str, ...],
+    label: str,
+    errors: list[str],
+) -> None:
+    present = {_normalize_token(item) for item in declared} if isinstance(declared, list) else set()
+    exemption_map = (
+        {
+            _normalize_token(key): value
+            for key, value in exemptions.items()
+            if isinstance(key, str) and isinstance(value, str)
+        }
+        if isinstance(exemptions, dict)
+        else {}
+    )
+    for state in present - set(supported):
+        errors.append(f"{label} contains unsupported state {state}")
+    for state in set(exemption_map) - set(supported):
+        errors.append(f"{label} exempts unsupported state {state}")
+    for state in present.intersection(exemption_map):
+        errors.append(f"{label} must not both declare and exempt {state}")
+    for state in supported:
+        if state not in present and state not in exemption_map:
+            errors.append(f"{label} must declare or exempt {state}")
+    for state, reason in exemption_map.items():
+        if not reason.strip():
+            errors.append(f"{label} exemption for {state} requires a reason")

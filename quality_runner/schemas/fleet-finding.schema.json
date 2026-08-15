@@ -8,6 +8,8 @@
     "finding_id": {"type": "string", "minLength": 1},
     "repo_id": {"type": "string", "minLength": 1},
     "dimension": {"type": "string", "minLength": 1},
+    "applicability": {"enum": ["applicable", "not_applicable", "unknown"]},
+    "confirmed_critical_risk": {"type": "boolean"},
     "status": {"enum": ["absent", "discoverable", "validated", "maintained", "unknown", "stale", "blocked", "not_applicable"]},
     "score": {"type": ["integer", "null"], "minimum": 0, "maximum": 4},
     "provenance_hash": {"type": "string", "minLength": 16}

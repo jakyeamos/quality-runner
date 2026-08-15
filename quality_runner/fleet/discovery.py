@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+import json
 import os
-import re
 import subprocess
+from collections.abc import Sequence
 from pathlib import Path
 from typing import Any, cast
 from urllib.parse import urlparse
@@ -13,6 +14,7 @@ from quality_runner.fleet.contracts import (
     relative_path,
     stable_id,
 )
+from quality_runner.process_runner import run_command
 
 EXCLUDED_DIRECTORIES = {
     ".git",
@@ -48,12 +50,59 @@ EXCLUDED_DIRECTORIES = {
     "DerivedData",
 }
 
+FLEET_POLICY_RELATIVE_PATH = Path(".quality-runner/fleet.json")
+FLEET_POLICY_SCHEMA = "quality-runner-fleet-policy-v0.1"
 
-def discover_repositories(projects_root: Path) -> list[dict[str, Any]]:
+
+def load_fleet_policy(projects_root: Path) -> dict[str, Any]:
+    root = projects_root.expanduser().resolve()
+    path = root / FLEET_POLICY_RELATIVE_PATH
+    if not path.is_file():
+        return {
+            "schema": FLEET_POLICY_SCHEMA,
+            "source": "default",
+            "path": str(path),
+            "exclude_paths": [],
+        }
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as error:
+        raise ValueError(f"fleet policy is not valid JSON: {path}") from error
+    if not isinstance(payload, dict) or payload.get("schema") != FLEET_POLICY_SCHEMA:
+        raise ValueError(f"fleet policy must declare schema {FLEET_POLICY_SCHEMA}: {path}")
+    raw_exclusions = payload.get("exclude_paths", [])
+    if not isinstance(raw_exclusions, list):
+        raise ValueError(f"fleet policy exclude_paths must be an array: {path}")
+    exclusions: list[str] = []
+    for raw in raw_exclusions:
+        if not isinstance(raw, str) or not raw.strip():
+            raise ValueError(f"fleet policy exclusions must be non-empty strings: {path}")
+        candidate = Path(raw)
+        if candidate.is_absolute() or ".." in candidate.parts:
+            raise ValueError(f"fleet policy exclusions must stay under projects_root: {raw}")
+        normalized = candidate.as_posix().strip("/")
+        if normalized in {"", "."}:
+            raise ValueError("fleet policy cannot exclude the projects root")
+        exclusions.append(normalized)
+    return {
+        "schema": FLEET_POLICY_SCHEMA,
+        "source": "projects_root",
+        "path": str(path),
+        "exclude_paths": sorted(set(exclusions)),
+    }
+
+
+def discover_repositories(
+    projects_root: Path, *, policy: dict[str, Any] | None = None
+) -> list[dict[str, Any]]:
     root = projects_root.expanduser().resolve()
     if not root.exists() or not root.is_dir():
         raise ValueError(f"projects root is not a directory: {root}")
-    candidates = _discover_roots(root)
+    resolved_policy = policy or load_fleet_policy(root)
+    excluded_paths = {
+        str(path) for path in resolved_policy.get("exclude_paths", []) if isinstance(path, str)
+    }
+    candidates = _discover_roots(root, excluded_paths=excluded_paths)
     grouped: dict[str, list[Path]] = {}
     for candidate in candidates:
         identity_key = _identity_key(candidate)
@@ -117,12 +166,22 @@ def repository_record_for_root(root: Path) -> dict[str, Any]:
     identity_key = _identity_key(resolved)
     origin = _normalized_origin(resolved)
     repo_id = stable_id("repo", identity_key)
-    checkout = _checkout_record(
-        repo_id=repo_id,
-        path=resolved,
-        primary=True,
-        projects_root=resolved.parent,
-    )
+    checkout_paths: dict[str, Path] = {str(resolved): resolved}
+    for worktree in _registered_worktrees(resolved):
+        path = worktree.get("path")
+        if isinstance(path, str) and path:
+            checkout_paths[str(Path(path).expanduser().resolve())] = (
+                Path(path).expanduser().resolve()
+            )
+    checkouts = [
+        _checkout_record(
+            repo_id=repo_id,
+            path=path,
+            primary=path == resolved,
+            projects_root=resolved.parent,
+        )
+        for path in sorted(checkout_paths.values(), key=lambda item: item.as_posix())
+    ]
     return {
         "schema": "quality-runner-fleet-repository-v0.1",
         "repo_id": repo_id,
@@ -134,10 +193,38 @@ def repository_record_for_root(root: Path) -> dict[str, Any]:
         },
         "primary_path": str(resolved),
         "repository_class": _repository_class(resolved, origin),
-        "checkouts": [checkout],
-        "checkout_count": 1,
-        "repository_provenance": digest({"identity_key": identity_key, "checkout": checkout}),
+        "checkouts": checkouts,
+        "checkout_count": len(checkouts),
+        "repository_provenance": digest(
+            {
+                "identity_key": identity_key,
+                "checkouts": [checkout["checkout_id"] for checkout in checkouts],
+            }
+        ),
     }
+
+
+def repositories_for_scope(
+    projects_root: Path,
+    repository_paths: Sequence[Path] | None,
+    *,
+    fleet_policy: dict[str, Any] | None = None,
+) -> list[dict[str, Any]]:
+    if repository_paths is None:
+        return discover_repositories(projects_root, policy=fleet_policy)
+    root = projects_root.expanduser().resolve()
+    records: dict[str, dict[str, Any]] = {}
+    for path in repository_paths:
+        resolved = path.expanduser().resolve()
+        try:
+            resolved.relative_to(root)
+        except ValueError as error:
+            raise ValueError(
+                f"repository path is outside the bounded projects root: {resolved}"
+            ) from error
+        record = repository_record_for_root(resolved)
+        records[str(record["repo_id"])] = record
+    return [records[repo_id] for repo_id in sorted(records)]
 
 
 def resolve_target_branch(
@@ -145,71 +232,9 @@ def resolve_target_branch(
     *,
     override: str | None = None,
 ) -> dict[str, Any]:
-    raw_checkouts = repository.get("checkouts", [])
-    checkouts = [
-        cast(dict[str, Any], item)
-        for item in cast(list[object], raw_checkouts)
-        if isinstance(item, dict)
-    ]
-    branches = sorted(
-        {
-            branch
-            for checkout in checkouts
-            for branch in checkout.get("local_branches", [])
-            if isinstance(branch, str) and branch
-        }
-    )
-    if override:
-        if override not in branches:
-            return {
-                "branch": override,
-                "source": "explicit_override",
-                "status": "blocked",
-                "reason": "explicit target branch is not present in a discovered checkout",
-                "checkout_id": None,
-            }
-        source = "explicit_override"
-        target_branch = override
-    elif "dev" in branches:
-        source = "default_dev"
-        target_branch = "dev"
-    else:
-        documented = _documented_branch(repository)
-        if documented is None or documented[0] not in branches:
-            return {
-                "branch": None,
-                "source": "unresolved",
-                "status": "blocked",
-                "reason": "no dev branch or documented canonical fallback was found",
-                "checkout_id": None,
-            }
-        target_branch, source = documented
+    from quality_runner.fleet.targeting import resolve_target_branch as resolve
 
-    candidates = [
-        checkout
-        for checkout in checkouts
-        if checkout.get("branch") == target_branch and checkout.get("exists") is True
-    ]
-    candidates.sort(key=lambda item: (item.get("dirty") is True, str(item.get("path", ""))))
-    target_checkout = candidates[0] if candidates else None
-    if target_checkout is None:
-        return {
-            "branch": target_branch,
-            "source": source,
-            "status": "blocked",
-            "reason": "target branch exists but no attached checkout is currently available",
-            "checkout_id": None,
-        }
-    state = _target_state(target_checkout)
-    return {
-        "branch": target_branch,
-        "source": source,
-        "status": "ready" if state["status"] == "ready" else state["status"],
-        "reason": state["reason"],
-        "checkout_id": target_checkout.get("checkout_id"),
-        "head": target_checkout.get("head"),
-        "target_state": state,
-    }
+    return resolve(repository, override=override)
 
 
 def checkout_fingerprint(path: Path) -> dict[str, Any]:
@@ -231,15 +256,34 @@ def checkout_fingerprint(path: Path) -> dict[str, Any]:
     }
 
 
-def _discover_roots(root: Path) -> list[Path]:
+def _discover_roots(root: Path, *, excluded_paths: set[str] | None = None) -> list[Path]:
+    exclusions = excluded_paths or set()
     found: list[Path] = []
     for current, directories, files in os.walk(root, topdown=True, followlinks=False):
-        has_git = ".git" in directories or ".git" in files
-        directories[:] = [name for name in directories if name not in EXCLUDED_DIRECTORIES]
         current_path = Path(current)
+        relative_current = current_path.relative_to(root).as_posix()
+        if relative_current != "." and _fleet_path_is_excluded(relative_current, exclusions):
+            directories[:] = []
+            continue
+        has_git = ".git" in directories or ".git" in files
+        directories[:] = [
+            name
+            for name in directories
+            if name not in EXCLUDED_DIRECTORIES
+            and not _fleet_path_is_excluded(
+                (current_path / name).relative_to(root).as_posix(), exclusions
+            )
+        ]
         if has_git:
             found.append(current_path.resolve())
     return sorted(set(found), key=lambda path: path.as_posix())
+
+
+def _fleet_path_is_excluded(relative_path: str, exclusions: set[str]) -> bool:
+    return any(
+        relative_path == excluded or relative_path.startswith(f"{excluded}/")
+        for excluded in exclusions
+    )
 
 
 def _identity_key(root: Path) -> str:
@@ -306,16 +350,15 @@ def _checkout_record(
 ) -> dict[str, Any]:
     root = path.expanduser().resolve()
     exists = root.exists() and root.is_dir()
+    working_tree = (
+        _git_output(root, "rev-parse", "--is-inside-work-tree") == "true" if exists else False
+    )
     head = _git_output(root, "rev-parse", "HEAD") if exists else None
-    branch = _git_output(root, "symbolic-ref", "--short", "-q", "HEAD") if exists else None
-    if (
-        exists
-        and branch is None
-        and _git_output(root, "rev-parse", "--is-inside-work-tree") == "true"
-    ):
-        branch = None
+    branch = _git_output(root, "symbolic-ref", "--short", "-q", "HEAD") if working_tree else None
     status = (
-        _git_output(root, "status", "--porcelain=v1", "--untracked-files=all") if exists else None
+        _git_output(root, "status", "--porcelain=v1", "--untracked-files=all")
+        if working_tree
+        else None
     )
     upstream = (
         _git_output(root, "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{upstream}")
@@ -345,10 +388,11 @@ def _checkout_record(
         "relative_to_projects_root": relative_path(projects_root, root),
         "is_primary": primary,
         "is_registered_worktree": bool(worktree_record),
+        "working_tree": working_tree,
         "exists": exists,
         "head": head,
         "branch": branch,
-        "detached": exists and branch is None,
+        "detached": working_tree and branch is None,
         "dirty": None if status is None else bool(status),
         "prunable": prunable,
         "upstream": upstream,
@@ -379,56 +423,6 @@ def _checkout_record(
     }
 
 
-def _target_state(checkout: dict[str, Any]) -> dict[str, str]:
-    if checkout.get("exists") is not True:
-        return {"status": "blocked", "reason": "target checkout does not exist"}
-    if checkout.get("detached") is True:
-        return {"status": "blocked", "reason": "target checkout is detached"}
-    if checkout.get("prunable") is True:
-        return {"status": "blocked", "reason": "target checkout is prunable"}
-    if checkout.get("dirty") is True:
-        return {"status": "blocked", "reason": "target checkout is dirty"}
-    if not isinstance(checkout.get("head"), str) or not checkout.get("head"):
-        return {"status": "blocked", "reason": "target checkout has no verifiable HEAD"}
-    if checkout.get("stale") is True:
-        return {"status": "stale", "reason": "target checkout is behind its configured upstream"}
-    return {"status": "ready", "reason": "target checkout is clean, attached, and verifiable"}
-
-
-def _documented_branch(repository: dict[str, Any]) -> tuple[str, str] | None:
-    root = Path(str(repository.get("primary_path", ".")))
-    texts: list[tuple[str, str]] = []
-    for relative in (
-        "AGENTS.md",
-        "CLAUDE.md",
-        "README.md",
-        "CONTRIBUTING.md",
-        ".agents/context/README.md",
-    ):
-        path = root / relative
-        if path.is_file():
-            try:
-                texts.append((relative, path.read_text(encoding="utf-8")[:100_000]))
-            except OSError:
-                continue
-    patterns = (
-        (
-            r"(?:canonical|default|primary|routine|development)\s+(?:branch|lane)[^\n]{0,80}\b(develop|trunk|main)\b",
-            "documented_fallback",
-        ),
-        (
-            r"\b(develop|trunk|main)\b\s+(?:branch|is)\s+(?:the\s+)?(?:canonical|default|primary)",
-            "documented_fallback",
-        ),
-    )
-    for path, text in texts:
-        for pattern, source in patterns:
-            match = re.search(pattern, text, re.IGNORECASE)
-            if match:
-                return match.group(1), f"{source}:{path}"
-    return None
-
-
 def _repository_class(root: Path, origin: str | None) -> str:
     if (root / "Package.swift").exists() or any(root.glob("*.xcodeproj")):
         return "apple"
@@ -448,10 +442,12 @@ def _local_branches(root: Path) -> list[str]:
     return sorted(output.splitlines()) if output else []
 
 
-def _ahead_behind(root: Path, upstream: str | None) -> tuple[int | None, int | None]:
+def _ahead_behind(
+    root: Path, upstream: str | None, *, head: str = "HEAD"
+) -> tuple[int | None, int | None]:
     if not upstream:
         return None, None
-    output = _git_output(root, "rev-list", "--left-right", "--count", f"HEAD...{upstream}")
+    output = _git_output(root, "rev-list", "--left-right", "--count", f"{head}...{upstream}")
     if not output:
         return None, None
     parts = output.split()
@@ -465,17 +461,10 @@ def _ahead_behind(root: Path, upstream: str | None) -> tuple[int | None, int | N
 
 def _git_run(root: Path, *args: str) -> str | None:
     try:
-        result = subprocess.run(
-            ["git", *args],
-            cwd=root,
-            check=False,
-            capture_output=True,
-            text=True,
-            timeout=10,
-        )
+        result = run_command(["git", *args], cwd=root, timeout=10)
     except (OSError, subprocess.SubprocessError):
         return None
-    return result.stdout if result.returncode == 0 else None
+    return str(result["stdout"]) if result["returncode"] == 0 else None
 
 
 def _git_output(root: Path, *args: str) -> str | None:

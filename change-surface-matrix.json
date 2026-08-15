@@ -5,11 +5,12 @@
     "id": "quality-runner"
   },
   "owner": "quality-runner-maintainers",
-  "last_reviewed": "2026-08-14",
+  "last_reviewed": "2026-08-15",
   "surfaces": [
     {
       "id": "python-source-and-contracts",
       "scope": "local",
+      "distribution": "public_core",
       "path": "quality_runner/",
       "owner": "quality-runner-maintainers",
       "condition": "Python implementation, CLI, MCP, or artifact behavior changes",
@@ -25,6 +26,7 @@
     {
       "id": "public-contracts",
       "scope": "external",
+      "distribution": "public_core",
       "path": "docs/cli.md and quality_runner/schemas/",
       "owner": "quality-runner-maintainers",
       "condition": "CLI, MCP, schema, or artifact contract changes",
@@ -38,6 +40,7 @@
     {
       "id": "ci-and-release",
       "scope": "external",
+      "distribution": "public_core",
       "path": ".github/workflows/",
       "owner": "quality-runner-maintainers",
       "condition": "CI, packaging, release, or deployment boundary changes",

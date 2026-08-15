@@ -53,6 +53,7 @@ def refresh_payload(
     cache_root: Path | None = None,
     performance_budget_seconds: float | None = None,
     include_ignored_paths: list[str] | None = None,
+    scope_metadata: dict[str, object] | None = None,
 ) -> dict[str, Any]:
     return _refresh_payload(
         repo_root=repo_root,
@@ -69,6 +70,7 @@ def refresh_payload(
         inspect_timeout_seconds=inspect_timeout_seconds,
         run_timeout_seconds=run_timeout_seconds,
         focus_paths=focus_paths,
+        scope_metadata=scope_metadata,
         cache_state=cache_state,
         analysis_mode=analysis_mode,
         cache_mode=cache_mode,

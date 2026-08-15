@@ -44,6 +44,9 @@ All notable changes to Quality Runner are documented here.
 
 ## 0.6.0 - 2026-07-17
 
+- Added a fail-closed public release boundary with distribution classification,
+  source and archive hygiene checks, sanitized consumer fixtures, and an
+  installed-wheel clean-room smoke test.
 - Added Quality Skills corpus classification, canonical selection, append and
   synchronization commands, with selected-skill review coverage and QR-native
   similarity/status evidence.

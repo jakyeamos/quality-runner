@@ -8,6 +8,7 @@ from typing import Any, cast
 
 from quality_runner import __version__
 from quality_runner.cli_artifacts import add_artifact_commands
+from quality_runner.cli_behavior import add_behavior_commands
 from quality_runner.cli_candidates import add_candidate_commands
 from quality_runner.cli_controller_reports import (
     add_controller_report_command,
@@ -20,11 +21,13 @@ from quality_runner.cli_gate import add_gate_commands
 from quality_runner.cli_handoff import add_handoff_commands
 from quality_runner.cli_human_summary import human_summary
 from quality_runner.cli_journeys import add_journey_commands
+from quality_runner.cli_maintenance_surface import add_maintenance_surface_command
 from quality_runner.cli_outcome import OUTCOME_SCHEMA, render_outcome
 from quality_runner.cli_payload import payload_for_args
 from quality_runner.cli_phase import add_phase_commands
 from quality_runner.cli_planning import add_planning_commands
 from quality_runner.cli_policy_surfaces import add_policy_surface_commands
+from quality_runner.cli_release_boundary import add_release_boundary_command
 from quality_runner.cli_remediation import add_remediation_commands
 from quality_runner.cli_repo_hygiene import add_repo_hygiene_commands
 from quality_runner.cli_review import add_review_command
@@ -33,6 +36,7 @@ from quality_runner.cli_security import add_security_commands
 from quality_runner.cli_skills import add_skill_commands
 from quality_runner.cli_task import add_task_commands
 from quality_runner.cli_update import add_update_command
+from quality_runner.cli_web_readiness import add_web_readiness_command
 from quality_runner.cli_workflow_args import (
     add_verify_arguments,
     add_workflow_arguments,
@@ -72,6 +76,8 @@ Advanced operations:
 
 Fleet environment audit:
   fleet audit run --all       static-all audit with optional changed-only dynamic checks
+  fleet audit run --all --standard matrix-maintenance
+                               audit every selected repository against one standard only
   fleet audit run --repo-path PATH  bounded audit slice for selected repositories
   fleet audit show --repo-id  inspect a private repository finding and plan
   fleet audit replay          verify deterministic artifact regeneration
@@ -112,6 +118,7 @@ def build_parser(prog: str = CANONICAL_PROGRAM) -> argparse.ArgumentParser:
     subparsers = parser.add_subparsers(dest="command")
 
     add_journey_commands(subparsers)
+    add_behavior_commands(subparsers)
     add_fleet_commands(subparsers)
     add_candidate_commands(subparsers)
     add_security_commands(subparsers)
@@ -228,6 +235,21 @@ def build_parser(prog: str = CANONICAL_PROGRAM) -> argparse.ArgumentParser:
         action="store_true",
         help="Limit inspect/run analysis to paths changed from the baseline and working tree",
     )
+    refresh_parser.add_argument(
+        "--diff-base",
+        default=None,
+        help=(
+            "Scope findings to the merge-base-to-head branch diff; implies --changed-only "
+            "and records resolved Git provenance"
+        ),
+    )
+    refresh_parser.add_argument(
+        "--diff-head",
+        default=None,
+        help=(
+            "Head ref for --diff-base; it must resolve to the checked-out HEAD (defaults to HEAD)"
+        ),
+    )
     add_worktree_verify_arguments(refresh_parser)
     refresh_parser.add_argument(
         "--handoff-output",
@@ -323,7 +345,9 @@ def build_parser(prog: str = CANONICAL_PROGRAM) -> argparse.ArgumentParser:
 
     add_artifact_commands(subparsers)
     add_repo_hygiene_commands(subparsers)
+    add_maintenance_surface_command(subparsers)
     add_policy_surface_commands(subparsers)
+    add_release_boundary_command(subparsers)
 
     add_handoff_commands(subparsers)
 
@@ -336,6 +360,7 @@ def build_parser(prog: str = CANONICAL_PROGRAM) -> argparse.ArgumentParser:
     doctor_parser.add_argument("--json", action="store_true", help="Emit JSON output")
 
     add_update_command(subparsers)
+    add_web_readiness_command(subparsers)
 
     release_smoke_parser = subparsers.add_parser(
         "release-smoke",
@@ -419,6 +444,8 @@ def main(argv: list[str] | None = None) -> int:
     if parsed.command == "skill" and payload.get("status") == "rejected":
         return 1
     if parsed.command == "release-smoke" and payload.get("status") != "passed":
+        return 1
+    if parsed.command == "release-boundary" and payload.get("status") != "passed":
         return 1
     if parsed.command == "summarize-run" and has_rejected_self_check(payload):
         return 1

@@ -3,6 +3,10 @@ from __future__ import annotations
 from typing import Any, cast
 
 from quality_runner.actionability import enrich_audit_findings
+from quality_runner.audit_evidence import (
+    analysis_evidence_findings,
+    package_manager_preflight_findings,
+)
 from quality_runner.code_quality_findings import CATEGORY_ORDER
 from quality_runner.finding_quality import compute_finding_quality, compute_leverage
 from quality_runner.findings import AUDIT_REPORT_SCHEMA
@@ -18,6 +22,8 @@ def build_audit_report(
     capability_map: dict[str, Any],
     code_quality_scan: dict[str, Any] | None = None,
     security_scan: dict[str, Any] | None = None,
+    package_manager_preflight: dict[str, Any] | None = None,
+    agent_review_mode: str | None = None,
     resolution_ledger: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     config = _dict(standards_packet.get("config"))
@@ -27,6 +33,8 @@ def build_audit_report(
         *_standards_requirement_findings(standards_packet, scan),
         *security_audit_findings(security_scan, security_config),
         *_code_quality_findings(code_quality_scan),
+        *analysis_evidence_findings(code_quality_scan, agent_review_mode=agent_review_mode),
+        *package_manager_preflight_findings(package_manager_preflight),
         *_warning_findings(capability_map),
     ]
 

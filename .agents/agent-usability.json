@@ -1,0 +1,33 @@
+{
+  "schema": "agent-usability/v1",
+  "reviewed_at": "2026-08-09",
+  "applicability": "applicable",
+  "tools": [
+    {
+      "id": "quality-runner",
+      "kind": "cli-and-mcp",
+      "documentation": [
+        "README.md"
+      ],
+      "skills": [
+        "quality-runner",
+        "repo-quality-certifier"
+      ],
+      "behavior_evidence": []
+    }
+  ],
+  "skills": [
+    {
+      "id": "quality-runner",
+      "family": "quality-assessment",
+      "source": "hosted",
+      "contract_path": "quality_runner/plugin/SKILL.md"
+    },
+    {
+      "id": "repo-quality-certifier",
+      "family": "quality-certification",
+      "source": "hosted",
+      "contract_path": "repo_quality_certifier/plugin/SKILL.md"
+    }
+  ]
+}

@@ -10,6 +10,7 @@ from quality_runner.fleet.audit import (
     fleet_report_payload,
     fleet_show_payload,
 )
+from quality_runner.fleet.contracts import SUPPORTED_FLEET_STANDARDS
 from quality_runner.fleet.feed import fleet_feed_payload
 from quality_runner.fleet.mac_control import (
     mac_control_audit_payload,
@@ -48,6 +49,15 @@ def add_fleet_commands(subparsers: Any) -> None:
         "--output-dir", default=None, help="Runtime-owned audit directory override"
     )
     run_parser.add_argument(
+        "--standard",
+        choices=SUPPORTED_FLEET_STANDARDS,
+        default=None,
+        help=(
+            "Audit every selected repository against only one named standard; "
+            "standard-scoped audits are static-only and do not publish the canonical feed"
+        ),
+    )
+    run_parser.add_argument(
         "--dynamic", action="store_true", help="Run selected dynamic checks in disposable worktrees"
     )
     run_parser.add_argument(
@@ -57,7 +67,12 @@ def add_fleet_commands(subparsers: Any) -> None:
         help="Select dynamic work only for changed, new, stale, failed, priority, or incomplete evidence",
     )
     run_parser.add_argument("--dynamic-max-age-days", type=int, default=30)
-    run_parser.add_argument("--timeout-seconds", type=int, default=120)
+    run_parser.add_argument(
+        "--timeout-seconds",
+        type=int,
+        default=120,
+        help="Cap each dynamic command; QR also derives a bounded per-repository watchdog",
+    )
     run_parser.add_argument(
         "--target-override",
         action="append",
@@ -201,6 +216,7 @@ def fleet_command_payload(args: argparse.Namespace) -> dict[str, Any]:
             target_overrides=_target_overrides(args.target_override),
             repository_paths=[Path(path) for path in args.repo_path] if args.repo_path else None,
             as_of=args.as_of,
+            standard=args.standard,
         )
     if args.audit_action == "show":
         return fleet_show_payload(

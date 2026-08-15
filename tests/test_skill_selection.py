@@ -55,11 +55,15 @@ def _corpus(tmp_path: Path) -> Path:
         _pack(pack_id="security-privacy", focus="security privacy authorization"),
     )
     _write(
+        root / "packs/performance-readiness.toml",
+        _pack(pack_id="performance-readiness", focus="performance scaling io concurrency"),
+    )
+    _write(
         root / "quality-runner-corpus.toml",
         """schema = "quality-runner-skill-corpus-v0.1"
 id = "personal"
 version = "0.1.0"
-active = ["ui-foundations", "security-privacy"]
+active = ["ui-foundations", "security-privacy", "performance-readiness"]
 
 [[packs]]
 id = "ui-foundations"
@@ -70,6 +74,11 @@ focus = ["ui", "visual", "components"]
 id = "security-privacy"
 path = "packs/security-privacy.toml"
 focus = ["security", "privacy", "authorization"]
+
+[[packs]]
+id = "performance-readiness"
+path = "packs/performance-readiness.toml"
+focus = ["performance", "scaling", "io", "concurrency"]
 """,
     )
     return root
@@ -156,6 +165,37 @@ def test_global_selection_respects_pins_and_exclusions(tmp_path: Path) -> None:
     candidates = {item["id"]: item for item in selection["candidates"]}
     assert candidates["security-privacy"]["reason"] == "explicitly pinned"
     assert candidates["ui-foundations"]["status"] == "excluded"
+
+
+def test_python_database_and_async_risks_select_performance_pack(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    source = """async def refresh_all(conn, roster_ids):
+    for roster_id in roster_ids:
+        conn.execute(\"SELECT * FROM rosters WHERE roster_id = ?\", [roster_id])
+    refresh_global_sources(conn)
+"""
+    _write(repo / "backend" / "startup_tasks.py", source)
+    corpus = _corpus(tmp_path)
+    config_path = _global_config(tmp_path, corpus)
+
+    signals = repository_skill_signals(
+        repo,
+        [{"path": "backend/startup_tasks.py", "text": source}],
+    )
+    skills, warnings, selection = load_selected_skills(
+        repo,
+        {},
+        repo_signals=signals,
+        global_config_path=config_path,
+    )
+
+    assert warnings == []
+    assert [skill["id"] for skill in skills] == ["performance-readiness"]
+    candidate = next(
+        item for item in selection["candidates"] if item["id"] == "performance-readiness"
+    )
+    assert candidate["status"] == "selected"
+    assert {"concurrency", "io", "performance", "scaling"} <= set(candidate["matched_terms"])
 
 
 def test_repository_can_disable_global_corpus(tmp_path: Path) -> None:

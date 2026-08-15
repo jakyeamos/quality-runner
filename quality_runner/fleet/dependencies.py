@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -36,6 +37,41 @@ def prepare_dynamic_dependencies(
         documented_setup["_cleanup_paths"] = [str(path) for path in documented_paths]
         return documented_setup
     if not package_json.is_file():
+        workspace_results = _prepare_nested_javascript_workspaces(
+            worktree=worktree,
+            source=source,
+            timeout_seconds=timeout_seconds,
+            run_command=run_command,
+        )
+        if workspace_results:
+            cleanup_paths = [
+                *documented_paths,
+                *(
+                    Path(path)
+                    for item in workspace_results
+                    for path in item.pop("_cleanup_paths", [])
+                ),
+            ]
+            statuses = [str(item.get("status", "unavailable")) for item in workspace_results]
+            status = next(
+                (
+                    candidate
+                    for candidate in ("timeout", "blocked", "unavailable")
+                    if candidate in statuses
+                ),
+                "passed" if "passed" in statuses else "not_required",
+            )
+            return {
+                "status": status,
+                "method": "nested_workspace_dependency_trees",
+                "workspaces": workspace_results,
+                **(
+                    {"reason": "one or more nested workspace dependency trees are unavailable"}
+                    if status not in {"passed", "not_required"}
+                    else {}
+                ),
+                "_cleanup_paths": [str(path) for path in cleanup_paths],
+            }
         result = {
             "status": "not_required",
             "reason": "dependency tree is not required or is present",
@@ -54,6 +90,21 @@ def prepare_dynamic_dependencies(
         result["_cleanup_paths"] = [str(path) for path in documented_paths]
         return result
 
+    source_dependencies = (source / "node_modules") if source is not None else None
+    if (
+        source is not None
+        and source_dependencies is not None
+        and source_dependencies.is_dir()
+        and _copy_javascript_dependency_trees(source=source, worktree=worktree)
+    ):
+        result = {
+            "status": "passed",
+            "method": "copied_from_protected_checkout",
+            "source_dependency_tree": "present",
+        }
+        result["_cleanup_paths"] = [str(path) for path in documented_paths]
+        return result
+
     local_setup: dict[str, Any]
     local_paths: list[Path]
     if source is not None:
@@ -64,22 +115,6 @@ def prepare_dynamic_dependencies(
     if local_setup["status"] != "passed":
         local_setup["_cleanup_paths"] = [str(path) for path in local_paths]
         return local_setup
-
-    source_dependencies = (source / "node_modules") if source is not None else None
-    if source_dependencies is not None and source_dependencies.is_dir():
-        if _copy_source_dependencies(source_dependencies, worktree / "node_modules"):
-            result = {
-                "status": "passed",
-                "method": "copied_from_protected_checkout",
-                "source_dependency_tree": "present",
-            }
-            result["_cleanup_paths"] = [str(path) for path in local_paths]
-            return result
-        return {
-            "status": "unavailable",
-            "reason": "protected checkout dependency tree could not be copied safely",
-            "_cleanup_paths": [str(path) for path in local_paths],
-        }
 
     package_manager = _package_manager_declaration(worktree)
     if package_manager is None:
@@ -153,6 +188,34 @@ def prepare_dynamic_dependencies(
     return result
 
 
+def _prepare_nested_javascript_workspaces(
+    *,
+    worktree: Path,
+    source: Path | None,
+    timeout_seconds: int,
+    run_command: CommandRunner,
+) -> list[dict[str, Any]]:
+    results: list[dict[str, Any]] = []
+    manifests = [
+        *worktree.glob("*/package.json"),
+        *worktree.glob("*/*/package.json"),
+    ]
+    for manifest in sorted(set(manifests)):
+        workspace = manifest.parent
+        if not _has_declared_dependencies(manifest):
+            continue
+        relative = workspace.relative_to(worktree)
+        source_workspace = source / relative if source is not None else None
+        prepared = prepare_dynamic_dependencies(
+            worktree=workspace,
+            source=source_workspace if source_workspace and source_workspace.is_dir() else None,
+            timeout_seconds=timeout_seconds,
+            run_command=run_command,
+        )
+        results.append({"workspace": relative.as_posix(), **prepared})
+    return results
+
+
 def _has_declared_dependencies(package_json: Path) -> bool:
     try:
         payload = json.loads(package_json.read_text(encoding="utf-8"))
@@ -167,21 +230,105 @@ def _has_declared_dependencies(package_json: Path) -> bool:
     )
 
 
-def _copy_source_dependencies(source: Path, destination: Path) -> bool:
+def _copy_source_dependencies(
+    source: Path,
+    destination: Path,
+    source_scope: Path | None = None,
+    destination_scope: Path | None = None,
+) -> bool:
     try:
         shutil.copytree(source, destination, symlinks=True)
     except OSError:
         shutil.rmtree(destination, ignore_errors=True)
         return False
-    for path in destination.rglob("*"):
+    source_root = (source_scope or source.parent).resolve()
+    destination_root = (destination_scope or destination.parent).resolve()
+    external_copies: list[tuple[Path, Path]] = []
+    for path in sorted(destination.rglob("*"), key=lambda item: len(item.parts)):
         if not path.is_symlink():
             continue
+        source_link = source / path.relative_to(destination)
+        target = source_link.resolve()
         try:
-            path.resolve().relative_to(destination.resolve())
+            relative = target.relative_to(source_root)
         except ValueError:
+            mapped = next(
+                (
+                    copied / target.relative_to(original)
+                    for original, copied in external_copies
+                    if target == original or original in target.parents
+                ),
+                None,
+            )
+            if mapped is None:
+                if not _trusted_dependency_cache_target(target):
+                    shutil.rmtree(destination, ignore_errors=True)
+                    return False
+                try:
+                    path.unlink()
+                    if target.is_dir():
+                        shutil.copytree(target, path, symlinks=True)
+                    else:
+                        path.parent.mkdir(parents=True, exist_ok=True)
+                        shutil.copy2(target, path)
+                except OSError:
+                    shutil.rmtree(destination, ignore_errors=True)
+                    return False
+                external_copies.append((target, path.resolve()))
+                continue
+        else:
+            mapped = destination_root / relative
+        try:
+            path.unlink()
+            path.symlink_to(
+                os.path.relpath(mapped, path.parent.resolve()),
+                target_is_directory=mapped.is_dir(),
+            )
+        except OSError:
             shutil.rmtree(destination, ignore_errors=True)
             return False
+    if not _contained_symlinks(destination_root):
+        shutil.rmtree(destination, ignore_errors=True)
+        return False
     return True
+
+
+def _copy_javascript_dependency_trees(*, source: Path, worktree: Path) -> bool:
+    destinations: list[Path] = []
+    roots = [(source / "node_modules", worktree / "node_modules")]
+    manifests = [
+        *worktree.glob("*/package.json"),
+        *worktree.glob("*/*/package.json"),
+    ]
+    for manifest in sorted(set(manifests)):
+        relative = manifest.parent.relative_to(worktree)
+        nested_source = source / relative / "node_modules"
+        if nested_source.is_dir():
+            roots.append((nested_source, worktree / relative / "node_modules"))
+    for source_tree, destination in roots:
+        if _copy_source_dependencies(source_tree, destination, source, worktree):
+            destinations.append(destination)
+            continue
+        for copied in destinations:
+            shutil.rmtree(copied, ignore_errors=True)
+        return False
+    try:
+        marker = worktree / ".quality-runner" / "copied-dependencies"
+        marker.parent.mkdir(parents=True, exist_ok=True)
+        marker.write_text("locked dependency tree copied by Quality Runner\n", encoding="utf-8")
+    except OSError:
+        for copied in destinations:
+            shutil.rmtree(copied, ignore_errors=True)
+        return False
+    return True
+
+
+def _trusted_dependency_cache_target(target: Path) -> bool:
+    roots = (
+        Path.home() / "Library" / "pnpm" / "store",
+        Path.home() / ".cache" / "node" / "corepack",
+    )
+    return any(target == root.resolve() or root.resolve() in target.parents for root in roots)
 
 
 def _copy_documented_sibling_roots(
@@ -338,13 +485,20 @@ def _package_manager_declaration(worktree: Path) -> tuple[str, str, str] | None:
         "pnpm": "pnpm-lock.yaml",
         "yarn": "yarn.lock",
     }
-    commands = {
-        "bun": "bun install --offline --no-save --no-scripts",
-        "npm": "npm ci --offline --ignore-scripts --no-audit --no-fund",
-        "pnpm": "pnpm install --offline --frozen-lockfile --ignore-scripts --reporter=append-only",
-        "yarn": "yarn install --offline --immutable --mode=skip-builds",
+    arguments = {
+        "bun": ["install", "--offline", "--no-save", "--no-scripts"],
+        "npm": ["ci", "--offline", "--ignore-scripts", "--no-audit", "--no-fund"],
+        "pnpm": [
+            "install",
+            "--offline",
+            "--frozen-lockfile",
+            "--ignore-scripts",
+            "--reporter=append-only",
+        ],
+        "yarn": ["install", "--offline", "--immutable", "--mode=skip-builds"],
     }
-    return manager, lockfiles[manager], commands[manager]
+    command = " ".join([manager, *arguments[manager]])
+    return manager, lockfiles[manager], command
 
 
 remove_runtime_path = _remove_runtime_path

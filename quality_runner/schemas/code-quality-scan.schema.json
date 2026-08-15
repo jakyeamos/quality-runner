@@ -24,7 +24,25 @@
     "skipped_files": { "type": "array", "items": { "type": "object" } },
     "quality_skills": { "type": "array", "items": { "$ref": "#/$defs/quality_skill" } },
     "skill_coverage": { "type": "array", "items": { "$ref": "#/$defs/skill_coverage" } },
-    "skill_selection": { "$ref": "skill-selection.schema.json" }
+    "skill_selection": { "$ref": "skill-selection.schema.json" },
+    "maintenance_surface": {
+      "type": "object",
+      "required": ["schema", "status", "finding_count"],
+      "properties": {
+        "schema": { "const": "quality-runner-maintenance-surface-v0.1" },
+        "status": {
+          "enum": ["ready", "review_required", "blocked", "unavailable", "disabled"]
+        },
+        "finding_count": { "type": "integer", "minimum": 0 },
+        "reason": { "type": "string" },
+        "source_status": { "enum": ["ready", "review_required", "blocked"] },
+        "provenance": { "type": "object" },
+        "contract_status": { "type": "string" },
+        "candidate_counts": { "type": "object" },
+        "projected_counts": { "type": "object" }
+      },
+      "additionalProperties": false
+    }
   },
   "$defs": {
     "finding": {

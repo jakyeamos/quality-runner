@@ -7,6 +7,7 @@ from collections.abc import Iterable
 from pathlib import Path
 from typing import Any, cast
 
+from quality_runner.code_quality_python_performance import python_repository_performance_signals
 from quality_runner.schema_constants import GLOBAL_SKILL_CONFIG_SCHEMA, SKILL_SELECTION_SCHEMA
 from quality_runner.skill_config import load_active_skills, sanitize_skill_id
 
@@ -357,6 +358,8 @@ def repository_skill_signals(
         suffix = Path(path).suffix.lower().lstrip(".")
         if suffix in _EXTENSION_SIGNALS:
             values.append(_EXTENSION_SIGNALS[suffix])
+        if suffix == "py":
+            values.extend(python_repository_performance_signals(path, item.get("text")))
     try:
         entries = list(root.iterdir())
     except OSError:

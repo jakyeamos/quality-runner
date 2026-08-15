@@ -15,8 +15,33 @@ from quality_runner.fleet.dependencies import (
 from quality_runner.fleet.dependencies import (
     remove_runtime_path,
 )
+from quality_runner.fleet.dependency_sources import (
+    compatible_dependency_source as _dependency_source,
+)
 from quality_runner.fleet.discovery import checkout_fingerprint
-from quality_runner.process_runner import run_shell_command
+from quality_runner.fleet.dynamic_commands import (
+    aggregate_dynamic_status as _aggregate_dynamic_status,
+)
+from quality_runner.fleet.dynamic_commands import command_timeout as _command_timeout
+from quality_runner.fleet.dynamic_commands import (
+    configured_gate_timeouts as _configured_gate_timeouts,
+)
+from quality_runner.fleet.dynamic_commands import (
+    dynamic_policy_block_reason as _dynamic_policy_block_reason,
+)
+from quality_runner.fleet.dynamic_commands import run_dynamic_command
+from quality_runner.fleet.dynamic_commands import safe_dynamic_command as _safe_dynamic_command
+from quality_runner.fleet.dynamic_findings import apply_dynamic_quality_evidence
+from quality_runner.fleet.dynamic_scan import quality_commands_from_worktree
+from quality_runner.fleet.repository_lifecycle import (
+    documented_archival_repository as _documented_archival_repository,
+)
+from quality_runner.fleet.repository_lifecycle import (
+    documented_deprecated_repository as _documented_deprecated_repository,
+)
+from quality_runner.process_runner import run_command, run_shell_command
+
+__all__ = ["apply_dynamic_quality_evidence", "dynamic_result"]
 
 
 def _prepare_dynamic_dependencies(
@@ -99,6 +124,8 @@ def dynamic_result(
             "selection_reasons": reasons or ["priority or incomplete evidence"],
             "reason": target.get("reason", "target branch is not ready"),
             "target_branch": target.get("branch"),
+            "target_head": target_head,
+            "target_state": target_state,
             "signature": signature,
         }
     source_checkout_id = target.get("checkout_id")
@@ -143,7 +170,6 @@ def _execute_dynamic(
     del audit_id
     source = Path(str(source_checkout["path"])).expanduser().resolve()
     head = str(target.get("head"))
-    commands = _quality_commands_from_scan(repository)
     result: dict[str, Any] = {
         "status": "unknown",
         "selected": True,
@@ -155,9 +181,6 @@ def _execute_dynamic(
         "commands": [],
         "implementation_allowed": False,
     }
-    if not commands:
-        result["reason"] = "no safe local quality commands were discovered"
-        return result
     worktree = artifact_root / "worktrees" / str(repository["repo_id"])
     prepare_safe_directory(worktree.parent)
     before = checkout_fingerprint(source)
@@ -187,9 +210,35 @@ def _execute_dynamic(
     dependency_cleanup_paths: list[Path] = []
     try:
         statuses: list[str] = []
+        if _documented_deprecated_repository(worktree):
+            result["status"] = "not_applicable"
+            result["reason"] = (
+                "repository documentation declares that this retained historical checkout is "
+                "deprecated and has an active replacement"
+            )
+            return result
+        commands, scan_error = quality_commands_from_worktree(
+            worktree,
+            run_id=f"{repository['repo_id']}-dynamic",
+        )
+        if scan_error is not None:
+            result["status"] = "blocked"
+            result["reason"] = f"target worktree command discovery failed: {scan_error}"
+            return result
+        result["command_discovery"] = "target_worktree"
+        if not commands:
+            if _documented_archival_repository(worktree):
+                result["status"] = "not_applicable"
+                result["reason"] = (
+                    "repository documentation declares an archival generated snapshot with no "
+                    "maintained executable quality surface"
+                )
+                return result
+            result["reason"] = "no safe local quality commands were discovered"
+            return result
         dependency_setup = _prepare_dynamic_dependencies(
             worktree=worktree,
-            source=source,
+            source=_dependency_source(repository, worktree=worktree, default=source),
             timeout_seconds=timeout_seconds,
         )
         dependency_cleanup_paths = [
@@ -202,31 +251,33 @@ def _execute_dynamic(
                 dependency_setup.get("reason", "dependency setup did not complete")
             )
             return result
+        configured_gate_timeouts = _configured_gate_timeouts(worktree)
+        result["timeout_ceiling_seconds"] = timeout_seconds
+        result["configured_gate_timeouts"] = configured_gate_timeouts
         for command in commands:
+            capability_id = str(command.get("id", "unknown"))
+            command_timeout = _command_timeout(
+                capability_id,
+                configured_gate_timeouts,
+                timeout_seconds,
+            )
             if not _safe_dynamic_command(command):
                 command_result = {
                     "command_id": command.get("id"),
                     "capability": command.get("id"),
                     "status": "blocked",
-                    "reason": "command is outside the local read-only dynamic allowlist",
+                    "reason": _dynamic_policy_block_reason(command),
                     "command_hash": hash_text(str(command.get("command", ""))),
+                    "command_source": command.get("source"),
+                    "timeout_seconds": command_timeout,
                 }
             else:
-                command_result = _run_dynamic_command(command, worktree, timeout_seconds)
+                command_result = _run_dynamic_command(command, worktree, command_timeout)
             result["commands"].append(command_result)
             statuses.append(str(command_result["status"]))
-        if "timeout" in statuses:
-            result["status"] = "timeout"
-        elif "blocked" in statuses:
-            result["status"] = "blocked"
-        elif "unavailable" in statuses:
-            result["status"] = "unavailable"
-        elif "failed" in statuses:
-            result["status"] = "failed"
-        elif statuses and all(status == "passed" for status in statuses):
-            result["status"] = "passed"
-        else:
-            result["status"] = "unknown"
+        result["status"], aggregate_reason = _aggregate_dynamic_status(statuses)
+        if aggregate_reason is not None:
+            result["reason"] = aggregate_reason
     finally:
         cleanup = _git_command(source, "worktree", "remove", "--force", str(worktree), timeout=30)
         result["cleanup"] = {
@@ -250,51 +301,7 @@ def _execute_dynamic(
 def _run_dynamic_command(
     command: dict[str, Any], worktree: Path, timeout_seconds: int
 ) -> dict[str, Any]:
-    command_text = str(command.get("command", ""))
-    try:
-        result = run_shell_command(command_text, cwd=worktree, timeout=timeout_seconds)
-    except subprocess.TimeoutExpired as error:
-        return {
-            "command_id": command.get("id"),
-            "capability": command.get("id"),
-            "status": "timeout",
-            "timeout_seconds": timeout_seconds,
-            "command_hash": hash_text(command_text),
-            "stdout_length": len(str(error.output or "")),
-            "stderr_length": len(str(error.stderr or "")),
-        }
-    except OSError as error:
-        return {
-            "command_id": command.get("id"),
-            "capability": command.get("id"),
-            "status": "unavailable",
-            "reason": redact_text(str(error), root=worktree)[:500],
-            "command_hash": hash_text(command_text),
-        }
-    stdout = str(result.get("stdout", ""))
-    stderr = str(result.get("stderr", ""))
-    unavailable_reason = _missing_runtime_requirement(command_text, stdout, stderr)
-    command_status = (
-        "passed"
-        if result.get("returncode") == 0
-        else "unavailable"
-        if unavailable_reason
-        else "failed"
-    )
-    command_result = {
-        "command_id": command.get("id"),
-        "capability": command.get("id"),
-        "status": command_status,
-        "returncode": result.get("returncode"),
-        "command_hash": hash_text(command_text),
-        "stdout_hash": hash_text(stdout),
-        "stderr_hash": hash_text(stderr),
-        "stdout_length": len(stdout),
-        "stderr_length": len(stderr),
-    }
-    if unavailable_reason:
-        command_result["reason"] = unavailable_reason
-    return command_result
+    return run_dynamic_command(command, worktree, timeout_seconds, runner=run_shell_command)
 
 
 def _missing_runtime_requirement(command: str, stdout: str, stderr: str) -> str | None:
@@ -306,30 +313,6 @@ def _missing_runtime_requirement(command: str, stdout: str, stderr: str) -> str 
     if "public agent-config engine not found" in combined:
         return "the documented public agent-config sibling runtime is unavailable"
     return None
-
-
-def apply_dynamic_quality_evidence(result: dict[str, Any]) -> None:
-    dynamic = result.get("dynamic")
-    if not isinstance(dynamic, dict) or cast(dict[str, Any], dynamic).get("status") not in {
-        "passed",
-        "reused",
-    }:
-        return
-    for finding in cast(list[object], result.get("findings", [])):
-        if (
-            isinstance(finding, dict)
-            and cast(dict[str, Any], finding).get("dimension") == "quality_commands"
-        ):
-            finding = cast(dict[str, Any], finding)
-            finding["score"] = 4
-            finding["status"] = "validated"
-            finding["message"] = (
-                "Discovered local quality commands passed in a protected disposable worktree."
-            )
-            finding["evidence"].append(
-                {"path": "dynamic disposable worktree", "detail": "all selected commands passed"}
-            )
-            break
 
 
 def _quality_commands_from_scan(repository: dict[str, Any]) -> list[dict[str, Any]]:
@@ -358,38 +341,6 @@ def _quality_commands_from_scan(repository: dict[str, Any]) -> list[dict[str, An
         for item in cast(list[object], commands)
         if isinstance(item, dict) and cast(dict[str, Any], item).get("id") in allowed_capabilities
     ][:12]
-
-
-def _safe_dynamic_command(command: dict[str, Any]) -> bool:
-    text = str(command.get("command", "")).lower()
-    if not text:
-        return False
-    denied = (
-        "install",
-        "sync",
-        "download",
-        "curl ",
-        "wget ",
-        "git ",
-        "docker",
-        "vercel",
-        "deploy",
-        "push",
-        "merge",
-        "reset",
-        "switch",
-        "checkout",
-        "rm ",
-        "mv ",
-        "cp ",
-        "chmod",
-        "--with",
-        " >",
-        ">>",
-        "secret",
-        "credential",
-    )
-    return not any(marker in text for marker in denied)
 
 
 def _selection_reasons(
@@ -475,16 +426,13 @@ def _read_json(path: Path) -> dict[str, Any]:
 
 def _git_command(cwd: Path, *args: str, timeout: int) -> dict[str, Any]:
     try:
-        result = subprocess.run(
-            ["git", *args],
-            cwd=cwd,
-            check=False,
-            capture_output=True,
-            text=True,
-            timeout=timeout,
-        )
+        result = run_command(["git", *args], cwd=cwd, timeout=timeout)
     except subprocess.TimeoutExpired as error:
         return {"returncode": 124, "stdout": str(error.stdout or ""), "stderr": "timeout"}
     except OSError as error:
         return {"returncode": 1, "stdout": "", "stderr": str(error)}
-    return {"returncode": result.returncode, "stdout": result.stdout, "stderr": result.stderr}
+    return {
+        "returncode": result["returncode"],
+        "stdout": result["stdout"],
+        "stderr": result["stderr"],
+    }

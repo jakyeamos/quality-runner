@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import argparse
 import json
 import sys
@@ -16,6 +14,7 @@ from quality_runner.application.journey_outcomes import (
 from quality_runner.application.outcome_projection import LegacyPayload
 from quality_runner.application.verification_workflows import verify_gates_payload
 from quality_runner.cli_artifacts import prune_artifacts_payload
+from quality_runner.cli_assurance import assurance_command_payload
 from quality_runner.cli_candidates import candidate_command_payload
 from quality_runner.cli_controller_reports import (
     controller_report_command_payload,
@@ -30,10 +29,12 @@ from quality_runner.cli_gate import (
     gate_status_command_payload,
 )
 from quality_runner.cli_handoff import handoff_command_payload
+from quality_runner.cli_maintenance_surface import maintenance_surface_command_payload
 from quality_runner.cli_phase import phase_command_payload
 from quality_runner.cli_planning import planning_command_payload
 from quality_runner.cli_policy_surfaces import policy_surfaces_payload
 from quality_runner.cli_refresh import refresh_command_payload
+from quality_runner.cli_release_boundary import release_boundary_command_payload
 from quality_runner.cli_remediation import remediation_delta_command_payload
 from quality_runner.cli_repo_hygiene import repo_hygiene_payload
 from quality_runner.cli_review import review_command_payload
@@ -42,6 +43,7 @@ from quality_runner.cli_security import security_command_payload
 from quality_runner.cli_skills import skill_command_payload
 from quality_runner.cli_status import export_handoff_payload, status_payload
 from quality_runner.cli_update import update_command_payload
+from quality_runner.cli_web_readiness import web_readiness_command_payload
 from quality_runner.code_quality import preview_ignored_paths
 from quality_runner.config import CONFIG_FILE_NAME, load_repo_config
 from quality_runner.controller_reports import validate_controller_report
@@ -73,6 +75,8 @@ def payload_for_args(
 ) -> dict[str, Any]:
     if args.command == "doctor":
         return doctor_payload(include_environment=True)
+    if args.command == "behavior":
+        return assurance_command_payload(args)
     if args.command == "fleet":
         return fleet_command_payload(args)
     if args.command == "candidates":
@@ -85,7 +89,9 @@ def payload_for_args(
         return phase_command_payload(args)
     if args.command == "self-update":
         return update_command_payload(args.source)
-    if args.command == "release-smoke":
+    if args.command in {"release-smoke", "release-boundary"}:
+        if args.command == "release-boundary":
+            return release_boundary_command_payload(args)
         from quality_runner.cli import build_parser
 
         return release_smoke_payload(
@@ -198,10 +204,15 @@ def payload_for_args(
                 agent_review_mode=args.agent_review_mode,
                 include_paths=_include_paths_from_args(args),
                 scan_exclusion_overlay=_scan_exclusion_overlay(args, repo_root),
+                analysis_mode=args.analysis_mode,
+                cache_mode=args.cache_mode,
+                cache_root=_cache_root(args),
+                performance_budget_seconds=args.performance_budget_seconds,
                 intent=_legacy_payload(
                     workflow_intent_from_cli_args(args, repo_root=repo_root, run_id=args.run_id)
                 ),
                 inspect_only=args.inspect_only,
+                progress=progress,
             )
         )
     if args.command == "inspect":
@@ -338,8 +349,12 @@ def payload_for_args(
         )
     if args.command == "repo-hygiene":
         return repo_hygiene_payload(args, validated_repo_path=_validated_repo_path)
+    if args.command == "maintenance-surface":
+        return maintenance_surface_command_payload(args, validated_repo_path=_validated_repo_path)
     if args.command == "policy-surfaces":
         return policy_surfaces_payload(args, repo_path=_validated_repo_path)
+    if args.command == "web-readiness":
+        return web_readiness_command_payload(args, repo_root=_validated_repo_path(args.repo_path))
     raise ValueError(f"unsupported command: {args.command}")
 
 
@@ -420,7 +435,6 @@ def _include_paths_from_args(args: argparse.Namespace) -> tuple[str, ...]:
 def _interactive_include_ignored_paths(args: argparse.Namespace, repo_root: Path) -> list[str]:
     if not _should_prompt_for_ignored_paths(args):
         return []
-
     preview = preview_ignored_paths(repo_root, config=load_repo_config(repo_root))
     expensive = [
         item
@@ -433,7 +447,6 @@ def _interactive_include_ignored_paths(args: argparse.Namespace, repo_root: Path
     ]
     if not expensive:
         return []
-
     _print_ignored_path_prompt(expensive)
     answer = sys.stdin.readline().strip().lower()
     if answer in {"n", "no"}:
@@ -490,10 +503,4 @@ def _float_value(value: object) -> float:
 
 
 def _unique_strings(values: list[str]) -> list[str]:
-    unique: list[str] = []
-    seen: set[str] = set()
-    for value in values:
-        if value and value not in seen:
-            unique.append(value)
-            seen.add(value)
-    return unique
+    return list(dict.fromkeys(value for value in values if value))

@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "quality-runner-maintenance-surface-v0.1",
+  "title": "Quality Runner maintenance surface evidence",
+  "type": "object",
+  "required": [
+    "schema",
+    "status",
+    "implementation_allowed",
+    "repository",
+    "provenance",
+    "supported_behavior",
+    "maintenance_surface_delta",
+    "contracts",
+    "vertical_slice_removal",
+    "regression_proof",
+    "observations",
+    "limitations"
+  ],
+  "properties": {
+    "schema": { "const": "quality-runner-maintenance-surface-v0.1" },
+    "status": { "enum": ["ready", "review_required", "blocked"] },
+    "implementation_allowed": { "const": false },
+    "repository": { "type": "string", "minLength": 1 },
+    "provenance": {
+      "type": "object",
+      "required": [
+        "requested_base",
+        "requested_head",
+        "base_commit",
+        "head_commit",
+        "comparison_base_commit",
+        "working_tree"
+      ]
+    },
+    "supported_behavior": { "type": "object" },
+    "maintenance_surface_delta": { "type": "object" },
+    "contracts": { "type": "object" },
+    "vertical_slice_removal": { "type": "object" },
+    "regression_proof": { "type": "object" },
+    "observations": { "type": "array" },
+    "limitations": { "type": "array", "items": { "type": "string" } }
+  }
+}

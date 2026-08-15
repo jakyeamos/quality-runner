@@ -6,6 +6,7 @@ from pathlib import Path
 
 import pytest
 
+from quality_runner.branch_diff import BranchDiffScope
 from quality_runner.review_delta import build_review_delta, git_changed_paths, persist_review_delta
 
 
@@ -201,6 +202,34 @@ def test_review_delta_rejects_invalid_identity(tmp_path: Path) -> None:
             intent=_intent(),
             changed_paths=["src/main.py"],
         )
+
+
+def test_review_delta_records_branch_diff_scope_provenance(tmp_path: Path) -> None:
+    _write_run(tmp_path, "current", [_finding("changed", "src/changed.py")])
+    provenance = BranchDiffScope(
+        requested_base="main",
+        requested_head="dev",
+        base_commit="a" * 40,
+        head_commit="b" * 40,
+        comparison_base_commit="a" * 40,
+        checked_out_head_commit="b" * 40,
+        changed_paths=("src/changed.py",),
+        working_tree_included=True,
+        working_tree_changed=False,
+    ).to_payload()
+
+    delta = build_review_delta(
+        repo_root=tmp_path,
+        run_id="current",
+        cycle_id="cycle-1",
+        iteration=1,
+        intent=_intent(),
+        changed_paths=["src/changed.py"],
+        scope_metadata=provenance,
+    )
+
+    assert delta["scope"]["scope_basis"] == "branch-merge-base-and-working-tree-diff"
+    assert delta["scope"]["branch_diff"] == provenance
 
 
 def test_review_delta_ignores_untrusted_baseline_sha_options(tmp_path: Path) -> None:

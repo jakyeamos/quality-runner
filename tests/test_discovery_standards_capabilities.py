@@ -31,13 +31,8 @@ def test_inspect_repo_detects_python_quality_commands(tmp_path: Path) -> None:
     assert scan["package_manager"] is None
     assert scan["languages"] == ["python"]
     commands = {command["id"]: command for command in scan["quality_commands"]}
-    assert commands["formatter"] == {
-        "id": "formatter",
-        "command": "ruff format --check .",
-        "source_type": "pyproject",
-        "source": "pyproject.toml:tool.ruff",
-        "language": "python",
-    }
+    assert commands["formatter"]["command"] == "uv run --with ruff ruff format --check ."
+    assert commands["formatter"]["source_type"] == "github_workflow"
     assert commands["lint"]["command"] == "ruff check ."
     assert commands["typecheck"]["source"] == "pyproject.toml:tool.basedpyright"
     assert commands["tests"]["source"] == "pyproject.toml:tool.pytest.ini_options"
@@ -192,6 +187,82 @@ def test_inspect_repo_detects_lockfile_languages_and_truth_policy(tmp_path: Path
     assert commands["tests"]["source"] == "package.json:scripts.tests"
     assert commands["runtime_smoke"]["source"] == "package.json:scripts.smoke-test"
     assert commands["pre_pr"]["source"] == "package.json:scripts.prepr"
+    assert commands["tests"]["language"] == "javascript"
+
+
+def test_inspect_repo_prefers_read_only_format_check_script(tmp_path: Path) -> None:
+    from quality_runner.discovery import inspect_repo
+
+    (tmp_path / "package.json").write_text(
+        json.dumps(
+            {
+                "packageManager": "pnpm@11.20.0",
+                "scripts": {
+                    "format": "prettier --write .",
+                    "format:check": "prettier --check .",
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    scan = inspect_repo(tmp_path, run_id="format-check-preference")
+    formatter = next(item for item in scan["quality_commands"] if item["id"] == "formatter")
+
+    assert formatter["command"] == "pnpm run format:check"
+    assert formatter["source"] == "package.json:scripts.format:check"
+    assert "mutating_risk" not in formatter
+
+
+def test_inspect_repo_detects_swift_package_test_gate(tmp_path: Path) -> None:
+    from quality_runner.discovery import inspect_repo
+
+    (tmp_path / "Package.swift").write_text("// swift-tools-version: 6.0\n", encoding="utf-8")
+
+    scan = inspect_repo(tmp_path, run_id="swift-package-001")
+
+    assert {
+        "id": "tests",
+        "command": "swift test",
+        "source_type": "swift_package",
+        "source": "Package.swift",
+        "language": "swift",
+    } in scan["quality_commands"]
+
+
+def test_locked_python_project_commands_use_offline_uv_environment(tmp_path: Path) -> None:
+    from quality_runner.discovery import inspect_repo
+
+    (tmp_path / "pyproject.toml").write_text(
+        "\n".join(
+            [
+                "[project]",
+                'name = "locked-python"',
+                'version = "0.1.0"',
+                "",
+                "[project.optional-dependencies]",
+                'dev = ["pytest", "ruff"]',
+                "",
+                "[tool.pytest.ini_options]",
+                'testpaths = ["tests"]',
+                "",
+                "[tool.ruff]",
+                "line-length = 100",
+                "",
+                "[tool.ruff.format]",
+                'quote-style = "double"',
+            ]
+        ),
+        encoding="utf-8",
+    )
+    (tmp_path / "uv.lock").write_text("version = 1\n", encoding="utf-8")
+
+    scan = inspect_repo(tmp_path, run_id="locked-python-001")
+    commands = {command["id"]: command["command"] for command in scan["quality_commands"]}
+
+    assert commands["formatter"] == ("uv run --offline --locked --extra dev ruff format --check .")
+    assert commands["lint"] == "uv run --offline --locked --extra dev ruff check ."
+    assert commands["tests"] == "uv run --offline --locked --extra dev pytest -q"
 
 
 def test_inspect_repo_warns_on_invalid_pyproject_toml(tmp_path: Path) -> None:
@@ -326,6 +397,33 @@ def test_inspect_repo_detects_ci_only_python_commands(tmp_path: Path) -> None:
     assert commands["pre_pr"]["command"] == "github-actions pull_request quality"
 
 
+def test_ci_python_commands_are_offline_and_locked_when_uv_lock_exists(
+    tmp_path: Path,
+) -> None:
+    from quality_runner.discovery import inspect_repo
+
+    (tmp_path / "pyproject.toml").write_text(
+        '[project]\nname = "locked-ci"\nversion = "0.1.0"\n', encoding="utf-8"
+    )
+    (tmp_path / "uv.lock").write_text("version = 1\n", encoding="utf-8")
+    workflows = tmp_path / ".github" / "workflows"
+    workflows.mkdir(parents=True)
+    (workflows / "ci.yml").write_text(
+        "jobs:\n  quality:\n    steps:\n"
+        "      - run: uv run --with basedpyright basedpyright\n"
+        "      - run: uv run --with vulture vulture package tests --min-confidence 70\n",
+        encoding="utf-8",
+    )
+
+    scan = inspect_repo(tmp_path, run_id="locked-ci-001")
+    commands = {command["id"]: command["command"] for command in scan["quality_commands"]}
+
+    assert commands["typecheck"] == "uv run --offline --locked basedpyright"
+    assert commands["dead_code"] == (
+        "uv run --offline --locked vulture package tests --min-confidence 70"
+    )
+
+
 def test_inspect_repo_detects_nested_workspaces_and_quality_aliases(tmp_path: Path) -> None:
     from quality_runner.discovery import inspect_repo
 
@@ -424,6 +522,49 @@ def test_nested_javascript_workspace_uses_its_own_lockfile_package_manager(
         commands[("typecheck", "dashboard/package.json:scripts.typecheck")]["command"]
         == "cd dashboard && " + "n" + "pm run typecheck"
     )
+
+
+def test_nested_javascript_workspace_inherits_root_package_manager(tmp_path: Path) -> None:
+    from quality_runner.discovery import inspect_repo
+
+    (tmp_path / "package.json").write_text(
+        json.dumps({"packageManager": "pnpm@11.9.0", "scripts": {}}),
+        encoding="utf-8",
+    )
+    workspace = tmp_path / "apps" / "web"
+    workspace.mkdir(parents=True)
+    (workspace / "package.json").write_text(
+        json.dumps({"scripts": {"lint": "eslint .", "test": "vitest run"}}),
+        encoding="utf-8",
+    )
+
+    scan = inspect_repo(tmp_path, run_id="nested-root-package-manager")
+    commands = {(item["id"], item["source"]): item["command"] for item in scan["quality_commands"]}
+
+    assert commands[("lint", "apps/web/package.json:scripts.lint")] == (
+        "cd apps/web && pnpm run lint"
+    )
+    assert commands[("tests", "apps/web/package.json:scripts.test")] == (
+        "cd apps/web && pnpm run test"
+    )
+
+
+def test_ci_setup_step_is_not_misclassified_as_typecheck(tmp_path: Path) -> None:
+    from quality_runner.discovery import inspect_repo
+
+    workflows = tmp_path / ".github" / "workflows"
+    workflows.mkdir(parents=True)
+    (workflows / "ci.yml").write_text(
+        "jobs:\n  quality:\n    steps:\n"
+        "      - run: python -m pip install ruff==1.0 basedpyright==1.0\n"
+        "      - run: basedpyright\n",
+        encoding="utf-8",
+    )
+
+    scan = inspect_repo(tmp_path, run_id="ci-setup-filter")
+    commands = {item["id"]: item["command"] for item in scan["quality_commands"]}
+
+    assert commands["typecheck"] == "basedpyright"
 
 
 def test_inspect_repo_discovery_prunes_excluded_trees_before_recursive_walk(
@@ -653,426 +794,3 @@ def test_workflow_applies_configured_scan_exclusions(tmp_path: Path) -> None:
     assert scan["workspaces"] == [
         {"path": "app", "kind": "javascript", "manifest": "app/package.json"}
     ]
-
-
-def test_inspect_repo_caps_workspace_inventory_with_warning(tmp_path: Path) -> None:
-    from quality_runner.discovery import inspect_repo
-
-    for index in range(205):
-        workspace = tmp_path / f"packages/package-{index:03d}"
-        workspace.mkdir(parents=True)
-        (workspace / "package.json").write_text(
-            json.dumps({"scripts": {"test": "vitest run"}}),
-            encoding="utf-8",
-        )
-
-    scan = inspect_repo(tmp_path, run_id="workspace-cap-001")
-
-    assert len(scan["workspaces"]) == 200
-    assert {
-        "code": "workspace_scan_limit_reached",
-        "message": "workspace discovery reached the 200 workspace limit",
-        "path": "workspaces",
-    } in scan["warnings"]
-
-
-def test_inspect_repo_detects_mature_repo_surfaces_and_promotes_quality_commands(
-    tmp_path: Path,
-) -> None:
-    from quality_runner.discovery import inspect_repo
-
-    (tmp_path / "Makefile").write_text(
-        "\n".join(
-            [
-                "lint:",
-                "\truff check .",
-                "test:",
-                "\tpytest -q",
-                "build:",
-                "\tuv build",
-                "smoke:",
-                "\tquality-runner doctor --json",
-                "",
-            ]
-        ),
-        encoding="utf-8",
-    )
-    (tmp_path / "Dockerfile").write_text("FROM python:3.14-slim\n", encoding="utf-8")
-    (tmp_path / "docker-compose.yml").write_text("services: {}\n", encoding="utf-8")
-    terraform_dir = tmp_path / "infra" / "terraform"
-    terraform_dir.mkdir(parents=True)
-    (terraform_dir / "main.tf").write_text("terraform {}\n", encoding="utf-8")
-    migration_dir = tmp_path / "alembic" / "versions"
-    migration_dir.mkdir(parents=True)
-    (migration_dir / "001_create_users.py").write_text("revision = '001'\n", encoding="utf-8")
-    (tmp_path / "openapi.yaml").write_text("openapi: 3.1.0\n", encoding="utf-8")
-    proto_dir = tmp_path / "proto"
-    proto_dir.mkdir()
-    (proto_dir / "service.proto").write_text('syntax = "proto3";\n', encoding="utf-8")
-    generated_dir = tmp_path / "src" / "generated"
-    generated_dir.mkdir(parents=True)
-    (generated_dir / "client.py").write_text("# generated by fixture\n", encoding="utf-8")
-    (tmp_path / "turbo.json").write_text('{"tasks":{"lint":{},"test":{}}}\n', encoding="utf-8")
-    (tmp_path / "pnpm-workspace.yaml").write_text("packages:\n  - packages/*\n", encoding="utf-8")
-
-    scan = inspect_repo(tmp_path, run_id="mature-scan-001")
-
-    surfaces = {surface["id"]: surface for surface in scan["repo_surfaces"]}
-    assert {"makefile", "dockerfile", "docker_compose", "terraform", "db_migrations"}.issubset(
-        surfaces
-    )
-    assert {"openapi_contract", "protobuf_contract", "generated_code", "turborepo"}.issubset(
-        surfaces
-    )
-    assert "make" in scan["ecosystems"]
-    assert "terraform" in scan["ecosystems"]
-    assert scan["generated_code"] == [{"path": "src/generated", "evidence": "generated directory"}]
-    commands = {
-        (command["id"], command["source_type"]): command for command in scan["quality_commands"]
-    }
-    assert commands[("lint", "make_target")] == {
-        "id": "lint",
-        "command": "make lint",
-        "source_type": "make_target",
-        "source": "Makefile:lint",
-        "language": "make",
-    }
-    assert commands[("formatter", "terraform")] == {
-        "id": "formatter",
-        "command": "terraform fmt -check",
-        "source_type": "terraform",
-        "source": "infra/terraform",
-        "language": "terraform",
-    }
-    assert commands[("runtime_smoke", "make_target")]["command"] == "make smoke"
-
-
-def test_inspect_repo_skips_symlinked_workflow_directory_and_caps_huge_reads(
-    tmp_path: Path,
-) -> None:
-    from quality_runner.discovery import inspect_repo
-
-    external = tmp_path.parent / f"{tmp_path.name}-external-workflows"
-    external.mkdir()
-    (external / "ci.yml").write_text("run: pytest -q\n", encoding="utf-8")
-    workflow_parent = tmp_path / ".github"
-    workflow_parent.mkdir()
-    (workflow_parent / "workflows").symlink_to(external, target_is_directory=True)
-
-    scan = inspect_repo(tmp_path, run_id="symlink-workflow-001")
-
-    assert scan["ci_files"] == []
-    assert scan["quality_commands"] == []
-    assert {
-        "code": "skipped_symlinked_ci_path",
-        "message": ".github/workflows is a symlink and was skipped",
-        "path": ".github/workflows",
-    } in scan["warnings"]
-
-
-def test_inspect_repo_ignores_oversized_workflow_files(tmp_path: Path) -> None:
-    from quality_runner.discovery import inspect_repo
-
-    workflow_root = tmp_path / ".github" / "workflows"
-    workflow_root.mkdir(parents=True)
-    (workflow_root / "ci.yml").write_text(
-        "run: pytest -q\n" + ("#" * 1_000_001),
-        encoding="utf-8",
-    )
-
-    scan = inspect_repo(tmp_path, run_id="huge-workflow-001")
-
-    assert scan["ci_files"] == [".github/workflows"]
-    assert scan["quality_commands"] == []
-
-
-def test_package_json_warnings_propagate_to_standards_and_capabilities(tmp_path: Path) -> None:
-    from quality_runner.capabilities import detect_capabilities
-    from quality_runner.discovery import inspect_repo
-    from quality_runner.standards import compile_standards
-
-    (tmp_path / "package.json").write_text("{not-json", encoding="utf-8")
-
-    scan = inspect_repo(tmp_path, run_id="invalid-package-002")
-    packet = compile_standards(repo_root=tmp_path, scan=scan, profile="default")
-    capability_map = detect_capabilities(scan=scan, standards_packet=packet)
-
-    expected_warning = {
-        "code": "invalid_package_json",
-        "message": "package.json could not be parsed as JSON",
-        "path": "package.json",
-    }
-    assert expected_warning in packet["warnings"]
-    assert expected_warning in capability_map["warnings"]
-
-
-def test_inspect_repo_expands_home_before_validating(
-    tmp_path: Path,
-    monkeypatch,
-) -> None:
-    from quality_runner.discovery import inspect_repo
-
-    home = tmp_path / "home"
-    repo = home / "repo"
-    repo.mkdir(parents=True)
-    monkeypatch.setenv("HOME", str(home))
-
-    scan = inspect_repo(Path("~/repo"), run_id="home-001")
-
-    assert scan["repo_root"] == str(repo.resolve())
-
-
-def test_inspect_repo_rejects_missing_repo_root(tmp_path: Path) -> None:
-    from quality_runner.discovery import inspect_repo
-
-    missing_root = tmp_path / "missing"
-
-    try:
-        inspect_repo(missing_root, run_id="missing-001")
-    except FileNotFoundError as error:
-        assert str(error) == f"repo root does not exist: {missing_root}"
-    else:
-        raise AssertionError("inspect_repo accepted a missing repo root")
-
-
-def test_inspect_repo_rejects_file_repo_root(tmp_path: Path) -> None:
-    from quality_runner.discovery import inspect_repo
-
-    file_root = tmp_path / "not-a-directory"
-    file_root.write_text("content", encoding="utf-8")
-
-    try:
-        inspect_repo(file_root, run_id="file-001")
-    except NotADirectoryError as error:
-        assert str(error) == f"repo root is not a directory: {file_root}"
-    else:
-        raise AssertionError("inspect_repo accepted a file repo root")
-
-
-def test_compile_standards_preserves_profile_and_local_provenance(tmp_path: Path) -> None:
-    from quality_runner.discovery import inspect_repo
-    from quality_runner.standards import compile_standards
-
-    write_js_fixture(tmp_path)
-    scan = inspect_repo(tmp_path, run_id="scan-001")
-
-    packet = compile_standards(repo_root=tmp_path, scan=scan, profile="default")
-
-    assert packet["schema"] == "quality-runner-standards-packet-v0.1"
-    assert packet["profile"] == "default"
-    sources = {source["path"] for source in packet["sources"]}
-    assert "AGENTS.md" in sources
-    requirement_ids = {requirement["id"] for requirement in packet["requirements"]}
-    assert "use_pnpm" in requirement_ids
-    assert "state_file_current" not in requirement_ids
-
-
-def test_compile_standards_rejects_unsupported_profiles(tmp_path: Path) -> None:
-    from quality_runner.discovery import inspect_repo
-    from quality_runner.standards import compile_standards
-
-    scan = inspect_repo(tmp_path, run_id="scan-001")
-
-    try:
-        compile_standards(repo_root=tmp_path, scan=scan, profile="someone-else")
-    except ValueError as error:
-        assert str(error) == "unsupported standards profile: someone-else"
-    else:
-        raise AssertionError("compile_standards accepted an unsupported profile")
-
-
-def test_compile_standards_handles_malformed_package_manager() -> None:
-    from quality_runner.standards import compile_standards
-
-    packet = compile_standards(
-        repo_root=Path("/tmp"),
-        scan={"package_manager": []},
-        profile="default",
-    )
-
-    assert {
-        "code": "invalid_package_manager",
-        "message": "scan package_manager must be a string or null",
-        "path": "package_manager",
-    } in packet["warnings"]
-    requirement_ids = {requirement["id"] for requirement in packet["requirements"]}
-    assert "package_manager_mismatch" in requirement_ids
-
-
-def test_detect_capabilities_includes_standards_warnings() -> None:
-    from quality_runner.capabilities import detect_capabilities
-    from quality_runner.standards import compile_standards
-
-    scan = {"package_manager": []}
-    packet = compile_standards(repo_root=Path("/tmp"), scan=scan, profile="default")
-
-    capability_map = detect_capabilities(scan=scan, standards_packet=packet)
-
-    assert {
-        "code": "invalid_package_manager",
-        "message": "scan package_manager must be a string or null",
-        "path": "package_manager",
-    } in capability_map["warnings"]
-
-
-def test_detect_capabilities_records_missing_expected_surfaces(tmp_path: Path) -> None:
-    from quality_runner.capabilities import detect_capabilities
-    from quality_runner.discovery import inspect_repo
-    from quality_runner.standards import compile_standards
-
-    scan = inspect_repo(tmp_path, run_id="empty-001")
-    packet = compile_standards(repo_root=tmp_path, scan=scan, profile="default")
-
-    capability_map = detect_capabilities(scan=scan, standards_packet=packet)
-
-    assert capability_map["schema"] == "quality-runner-capability-map-v0.1"
-    missing_ids = {item["id"] for item in capability_map["missing"]}
-    assert "lint" in missing_ids
-    assert "tests" in missing_ids
-    assert "state_file" not in missing_ids
-
-
-def test_detect_capabilities_accepts_python_quality_commands(tmp_path: Path) -> None:
-    from quality_runner.capabilities import detect_capabilities
-    from quality_runner.discovery import inspect_repo
-    from quality_runner.standards import compile_standards
-
-    write_python_quality_fixture(tmp_path)
-    scan = inspect_repo(tmp_path, run_id="python-capabilities-001")
-    packet = compile_standards(repo_root=tmp_path, scan=scan, profile="default")
-
-    capability_map = detect_capabilities(scan=scan, standards_packet=packet)
-
-    available = {item["id"]: item for item in capability_map["available"]}
-    missing_ids = {item["id"] for item in capability_map["missing"]}
-    assert {
-        "formatter",
-        "lint",
-        "typecheck",
-        "tests",
-        "build",
-        "dead_code",
-        "runtime_smoke",
-        "pre_pr",
-        "pre_cr",
-    }.issubset(available)
-    assert "state_file" not in missing_ids
-    assert available["lint"] == {
-        "id": "lint",
-        "type": "command",
-        "capability_kind": "local_command",
-        "source": "pyproject.toml:tool.ruff",
-        "command": "ruff check .",
-        "language": "python",
-        "verification_state": {
-            "discovery": "command-discovered",
-            "execution": "not-run",
-            "result": "unknown",
-        },
-    }
-
-
-def test_detect_capabilities_records_pre_cr_script_with_stable_id(tmp_path: Path) -> None:
-    from quality_runner.capabilities import detect_capabilities
-    from quality_runner.discovery import inspect_repo
-    from quality_runner.standards import compile_standards
-
-    (tmp_path / "package.json").write_text(
-        json.dumps({"scripts": {"pre-cr": "pre-cr"}}),
-        encoding="utf-8",
-    )
-    scan = inspect_repo(tmp_path, run_id="pre-cr-script-001")
-    packet = compile_standards(repo_root=tmp_path, scan=scan, profile="default")
-
-    capability_map = detect_capabilities(scan=scan, standards_packet=packet)
-
-    available_ids = {item["id"] for item in capability_map["available"]}
-    missing_ids = {item["id"] for item in capability_map["missing"]}
-    assert "pre_cr" in available_ids
-    assert "pre_cr" not in missing_ids
-    assert "pre_pr" in missing_ids
-
-
-def test_detect_capabilities_accepts_recommended_dead_code_script_name(tmp_path: Path) -> None:
-    from quality_runner.capabilities import detect_capabilities
-    from quality_runner.discovery import inspect_repo
-    from quality_runner.standards import compile_standards
-
-    (tmp_path / "package.json").write_text(
-        json.dumps({"scripts": {"audit:dead-code": "knip --production"}}),
-        encoding="utf-8",
-    )
-    scan = inspect_repo(tmp_path, run_id="dead-code-script-001")
-    packet = compile_standards(repo_root=tmp_path, scan=scan, profile="default")
-
-    capability_map = detect_capabilities(scan=scan, standards_packet=packet)
-
-    available = {item["id"]: item for item in capability_map["available"]}
-    missing_ids = {item["id"] for item in capability_map["missing"]}
-    assert available["dead_code"]["source"] == "package.json:scripts.audit:dead-code"
-    assert "dead_code" not in missing_ids
-
-
-def test_detect_capabilities_records_pre_cr_config_with_stable_id(tmp_path: Path) -> None:
-    from quality_runner.capabilities import detect_capabilities
-    from quality_runner.discovery import inspect_repo
-    from quality_runner.standards import compile_standards
-
-    (tmp_path / "package.json").write_text(
-        json.dumps({"scripts": {"test": "vitest run"}}),
-        encoding="utf-8",
-    )
-    (tmp_path / ".pre-cr.json").write_text("{}", encoding="utf-8")
-    scan = inspect_repo(tmp_path, run_id="pre-cr-config-001")
-    packet = compile_standards(repo_root=tmp_path, scan=scan, profile="default")
-
-    capability_map = detect_capabilities(scan=scan, standards_packet=packet)
-
-    available_ids = {item["id"] for item in capability_map["available"]}
-    missing_ids = {item["id"] for item in capability_map["missing"]}
-    assert "pre_cr" in available_ids
-    assert "pre_cr" not in missing_ids
-
-
-def test_detect_capabilities_treats_malformed_scripts_as_missing() -> None:
-    from quality_runner.capabilities import detect_capabilities
-
-    capability_map = detect_capabilities(
-        scan={"schema": "quality-runner-repo-scan-v0.1", "scripts": "not-a-dict"},
-        standards_packet={"profile": "default"},
-    )
-
-    missing_ids = {item["id"] for item in capability_map["missing"]}
-    assert "lint" in missing_ids
-    assert "tests" in missing_ids
-
-
-def test_detect_capabilities_ignores_malformed_quality_commands_and_requires_truth_policy(
-    tmp_path: Path,
-) -> None:
-    from quality_runner.capabilities import detect_capabilities
-    from quality_runner.discovery import inspect_repo
-    from quality_runner.standards import compile_standards
-
-    (tmp_path / "AGENTS.md").write_text(
-        "Maintain planning notes before completion.\n",
-        encoding="utf-8",
-    )
-    scan = inspect_repo(tmp_path, run_id="malformed-quality-command-001")
-    scan["quality_commands"] = [
-        "invalid",
-        {"id": "lint", "command": "ruff check .", "source": "pyproject.toml:tool.ruff"},
-    ]
-    packet = compile_standards(repo_root=tmp_path, scan=scan, profile="default")
-
-    capability_map = detect_capabilities(scan=scan, standards_packet=packet)
-
-    missing = {item["id"]: item for item in capability_map["missing"]}
-    assert missing["lint"] == {
-        "id": "lint",
-        "type": "command",
-        "reason": "no quality command found for lint",
-        "language": "unknown",
-        "required_by": "profile",
-    }
-    assert "state_file" not in missing

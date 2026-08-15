@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import re
 from pathlib import Path
 from typing import Any
@@ -10,8 +11,10 @@ MAX_SKILLS = 120
 
 
 def assess_skill_contract_quality(root: Path) -> dict[str, Any]:
+    root = root.resolve()
     skill_root = root / "skills"
-    paths = sorted(skill_root.glob("*/SKILL.md"))[:MAX_SKILLS] if skill_root.is_dir() else []
+    conventional = list(skill_root.glob("*/SKILL.md")) if skill_root.is_dir() else []
+    paths = sorted(set(conventional) | set(_declared_hosted_skill_paths(root)))[:MAX_SKILLS]
     if not paths:
         return {
             "score": None,
@@ -87,6 +90,38 @@ def assess_skill_contract_quality(root: Path) -> dict[str, Any]:
     }
 
 
+def _declared_hosted_skill_paths(root: Path) -> list[Path]:
+    manifest_path = root / ".agents/agent-usability.json"
+    try:
+        if (
+            not manifest_path.is_file()
+            or manifest_path.is_symlink()
+            or manifest_path.stat().st_size > MAX_DOCUMENT_BYTES
+        ):
+            return []
+        payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError):
+        return []
+    if not isinstance(payload, dict) or not isinstance(payload.get("skills"), list):
+        return []
+
+    paths: list[Path] = []
+    for item in payload["skills"]:
+        if not isinstance(item, dict) or item.get("source") != "hosted":
+            continue
+        contract_path = item.get("contract_path")
+        if not isinstance(contract_path, str) or not contract_path:
+            continue
+        candidate = root / contract_path
+        try:
+            candidate.resolve().relative_to(root)
+        except (OSError, ValueError):
+            continue
+        if candidate.name == "SKILL.md" and candidate.is_file():
+            paths.append(candidate)
+    return paths
+
+
 def _static_findings(root: Path, path: Path, text: str) -> list[dict[str, str]]:
     lower = text.lower()
     lines = text.splitlines()
@@ -104,18 +139,56 @@ def _static_findings(root: Path, path: Path, text: str) -> list[dict[str, str]]:
     if re.search(r"\b(any task|all tasks|always use|whenever you)\b", description):
         details.append("overbroad trigger: frontmatter does not establish a narrow task boundary")
     if not any(
-        term in lower for term in ("output", "report", "return", "produce", "show", "end with")
+        term in lower
+        for term in (
+            "output",
+            "report",
+            "return",
+            "produce",
+            "show",
+            "end with",
+            "artifact",
+            "ledger",
+            "recommendation",
+            "candidate portfolio",
+        )
     ):
         details.append(
             "missing observable output: the contract does not name a user-visible result"
         )
     if not any(
         term in lower
-        for term in ("definition of done", "done when", "complete when", "acceptance criteria")
+        for term in (
+            "definition of done",
+            "done when",
+            "complete when",
+            "acceptance criteria",
+            "## completion",
+            "stopping condition",
+            "completion criterion",
+            "verification_and_done",
+            "before finalizing",
+            "verification rule",
+            "require a succeeded response",
+        )
     ):
         details.append("unclear definition of done: completion criteria are not explicit")
+    observable_verification = any(
+        term in lower
+        for term in (
+            "observed result",
+            "verification signal",
+            "evidence reference",
+            "postcondition",
+            "readback",
+            "verifier",
+            "verification.state",
+        )
+    )
     if any(term in lower for term in ("verify", "validate", "test")) and not (
-        "```" in text or re.search(r"\b(?:pnpm|npm|pytest|cargo|python3|make)\b", lower)
+        "```" in text
+        or re.search(r"\b(?:pnpm|npm|pytest|cargo|python3|make)\b", lower)
+        or observable_verification
     ):
         details.append("vague verification: verification is named without an observable command")
     read_lines = [
@@ -137,7 +210,8 @@ def _static_findings(root: Path, path: Path, text: str) -> list[dict[str, str]]:
     ):
         details.append("precedence hazard: contract appears to override higher-level instructions")
     mandatory = len(re.findall(r"\b(?:must|always|never|required)\b", lower))
-    if mandatory > 30:
+    word_count = max(1, len(re.findall(r"\b\w+\b", lower)))
+    if mandatory > 30 and mandatory / word_count > 0.03:
         details.append(
             f"excessive mandatory structure: {mandatory} mandatory terms reduce routing clarity"
         )

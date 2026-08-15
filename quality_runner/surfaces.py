@@ -55,7 +55,23 @@ def quality_commands_from_surfaces(
     _detect_make(root, surfaces, commands)
     _detect_docker(root, surfaces, commands)
     _detect_terraform(root, surfaces, commands, resolved_exclusions)
+    _detect_swift_package(root, commands)
     return commands
+
+
+def _detect_swift_package(root: Path, commands: list[dict[str, str]]) -> None:
+    manifest = root / "Package.swift"
+    if not manifest.is_file() or manifest.is_symlink():
+        return
+    commands.append(
+        _quality_command(
+            capability_id="tests",
+            command="swift test",
+            source_type="swift_package",
+            source="Package.swift",
+            language="swift",
+        )
+    )
 
 
 def _detect_make(

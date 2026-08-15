@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://quality-runner.local/schemas/web-deployment-evidence.schema.json",
+  "title": "Project-owned browser evidence for Quality Runner",
+  "type": "object",
+  "required": ["schema", "observed_at", "target", "routes"],
+  "properties": {
+    "schema": { "const": "quality-runner-web-deployment-evidence/v1" },
+    "observed_at": { "type": "string", "format": "date-time" },
+    "target": {
+      "type": "object",
+      "required": ["kind", "commit", "url"],
+      "properties": {
+        "kind": { "const": "deployment" },
+        "commit": { "type": "string" },
+        "url": { "type": "string" },
+        "provider": { "type": "string" },
+        "deployment_id": { "type": "string" }
+      },
+      "additionalProperties": true
+    },
+    "routes": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["route", "status_code"],
+        "properties": {
+          "route": { "type": "string" },
+          "status_code": { "type": "integer" },
+          "not_found_probe": { "type": "boolean" },
+          "title": { "type": "string" },
+          "primary_heading_count": { "type": "integer", "minimum": 0 },
+          "html_lang": { "type": "string" },
+          "missing_alt_count": { "type": "integer", "minimum": 0 },
+          "console_error_count": { "type": "integer", "minimum": 0 },
+          "network_error_count": { "type": "integer", "minimum": 0 },
+          "asset_error_count": { "type": "integer", "minimum": 0 },
+          "favicon_loaded": { "type": "boolean" },
+          "meta_description": { "type": "string" },
+          "og_image": { "type": "string" }
+        },
+        "additionalProperties": true
+      }
+    }
+  },
+  "additionalProperties": false
+}

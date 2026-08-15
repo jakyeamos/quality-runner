@@ -9,6 +9,7 @@ from quality_runner.fleet.contracts import canonical_json, digest
 from quality_runner.fleet.mac_control_contracts import (
     CRITERIA,
     MAC_CONTROL_DEFAULT_ROOT,
+    MAC_CONTROL_MANIFEST_SCHEMA,
     MAC_CONTROL_REPLAY_SCHEMA,
     MAC_CONTROL_REPORT_RELATIVE_PATH,
     MAC_CONTROL_SUMMARY_RELATIVE_PATH,
@@ -116,6 +117,8 @@ def build_summary(
     success_count = 0
     implementation_criteria_passed_count = 0
     implementation_criteria_total = 0
+    declaration_criteria_count = 0
+    implementation_evidence_levels: dict[str, int] = {}
     implementation_statuses: list[str] = []
     live_statuses: list[str] = []
     failing_repositories: list[str] = []
@@ -142,6 +145,11 @@ def build_summary(
         live_statuses.append(live_lane["status"])
         implementation_criteria_passed_count += int(implementation["criteria_passed_count"])
         implementation_criteria_total += int(implementation["criteria_total"])
+        declaration_criteria_count += int(implementation["declaration_criteria_count"])
+        evidence_level = str(implementation["evidence_level"])
+        implementation_evidence_levels[evidence_level] = (
+            implementation_evidence_levels.get(evidence_level, 0) + 1
+        )
         if (
             applicability == "unknown"
             or implementation_status in {"failed", "blocked"}
@@ -169,6 +177,8 @@ def build_summary(
         "implementation_status": implementation_status,
         "implementation_criteria_passed_count": implementation_criteria_passed_count,
         "implementation_criteria_total": implementation_criteria_total,
+        "declaration_criteria_count": declaration_criteria_count,
+        "implementation_evidence_levels": dict(sorted(implementation_evidence_levels.items())),
         "live_status": live_status,
         "live_task_count": task_count,
         "failing_repository_ids": sorted(failing_repositories),
@@ -184,6 +194,7 @@ def build_summary(
 
 def _implementation_lane(entry: dict[str, Any]) -> dict[str, Any]:
     applicability = str(entry.get("applicability", "unknown"))
+    current_manifest = str(entry.get("manifest_schema", "")).strip() == MAC_CONTROL_MANIFEST_SCHEMA
     lane = entry.get("implementation_contract")
     if isinstance(lane, dict):
         if applicability != "applicable":
@@ -193,6 +204,8 @@ def _implementation_lane(entry: dict[str, Any]) -> dict[str, Any]:
                 ),
                 "criteria_passed_count": 0,
                 "criteria_total": 0,
+                "declaration_criteria_count": 0,
+                "evidence_level": "not_applicable",
             }
         criteria_passed_count = lane.get("criteria_passed_count")
         criteria_total = lane.get("criteria_total")
@@ -200,10 +213,22 @@ def _implementation_lane(entry: dict[str, Any]) -> dict[str, Any]:
             criteria_passed_count = _criteria_passed_count(entry.get("criteria"))
         if not isinstance(criteria_total, int):
             criteria_total = len(CRITERIA)
+        declaration_criteria_count = lane.get("declaration_criteria_count")
+        if not isinstance(declaration_criteria_count, int):
+            declaration_criteria_count = 0
+        evidence_level = str(lane.get("evidence_level", "not_source_grounded"))
+        status = _normalize_lane_status(lane.get("status"), applicability, fallback="failed")
+        if not current_manifest:
+            criteria_passed_count = 0
+            criteria_total = len(CRITERIA)
+            if status == "passed":
+                status = "review_required"
         return {
-            "status": _normalize_lane_status(lane.get("status"), applicability, fallback="failed"),
+            "status": status,
             "criteria_passed_count": criteria_passed_count,
             "criteria_total": criteria_total,
+            "declaration_criteria_count": declaration_criteria_count,
+            "evidence_level": evidence_level,
         }
     criteria_passed_count = _criteria_passed_count(entry.get("criteria"))
     validation_errors = string_list(entry.get("validation_errors"))
@@ -215,10 +240,15 @@ def _implementation_lane(entry: dict[str, Any]) -> dict[str, Any]:
         status = "failed"
     else:
         status = "passed"
+    if applicability == "applicable" and not current_manifest:
+        criteria_passed_count = 0
+        status = "review_required" if status == "passed" else status
     return {
         "status": status,
         "criteria_passed_count": criteria_passed_count,
         "criteria_total": len(CRITERIA) if applicability == "applicable" else 0,
+        "declaration_criteria_count": _criteria_passed_count(entry.get("criteria")),
+        "evidence_level": "declaration_only",
     }
 
 
@@ -353,10 +383,14 @@ def summary_markdown(summary: dict[str, Any]) -> str:
             f"- Audit: `{summary.get('audit_id')}`",
             f"- Repositories: {summary.get('repository_count', 0)}",
             (
-                f"- Implementation contract: "
+                f"- Semantic source evidence: "
                 f"{summary.get('implementation_criteria_passed_count', 0)}/"
-                f"{summary.get('implementation_criteria_total', 0)} criteria · "
+                f"{summary.get('implementation_criteria_total', 0)} dimensions · "
                 f"{summary.get('implementation_status', 'review_required')}"
+            ),
+            (
+                f"- Legacy declarations (non-scoring): "
+                f"{summary.get('declaration_criteria_count', 0)}"
             ),
             (
                 f"- Live task evidence: {summary.get('measured_task_count', 0)}/"

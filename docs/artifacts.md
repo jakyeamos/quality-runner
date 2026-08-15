@@ -1,5 +1,40 @@
 # Artifact Contract
 
+## Public release-boundary receipt
+
+`quality-runner release-boundary` writes
+`<repo>/.quality-runner/release-boundary.json` using schema
+`quality-runner-release-boundary/v2`. The receipt is a privacy-safe consumer
+handoff: it contains the repository identifier, exact branch and commit,
+producer version, change-matrix digest, wheel and sdist names and digests,
+sanitized public-adapter fixture digests, check results, and blocking check IDs.
+It never contains the absolute repository or matrix path.
+
+Consumers must fail closed unless the v2 receipt is current for their exact
+target, its policy digest still matches, its two artifact hashes are present,
+and every check passed. Version 1 is readable only as legacy evidence and must
+be regenerated before release. The distributed schema is
+`quality_runner/schemas/release-boundary.schema.json`.
+
+## Web-readiness artifact
+
+`quality-runner web-readiness` writes
+`<repo>/.quality-runner/web-readiness.json` using schema
+`quality-runner-web-readiness/v1`. It is a stable projection rather than a run
+directory artifact and records categorical status, applicability, exact Git
+identity, target identity, evidence levels, bundle budgets, route checks, and
+producer warnings. Its `implementation_allowed` field is always false.
+
+Project-owned browser producers may supply
+`quality-runner-web-deployment-evidence/v1`. QR accepts that evidence only when
+its commit matches the scanned repository's exact `HEAD`; mismatches and
+invalid evidence remain blocked. The distributed schemas are
+`quality_runner/schemas/web-readiness.schema.json` and
+`quality_runner/schemas/web-deployment-evidence.schema.json`.
+
+The web-readiness artifact is local evidence that may contain repository paths
+and deployment identifiers, so the handling and retention rules below apply.
+
 Artifacts are written under:
 
 ```text
@@ -366,6 +401,26 @@ For a small change review, `refresh --changed-only` limits source analysis to th
 baseline and working-tree changed paths. It fails closed when no changed path is
 available rather than silently claiming a focused review.
 
+To scope a refresh to one branch relative to another, use an explicit head that
+is checked out in the repository:
+
+```bash
+qr refresh /path/to/repo \
+  --run-id-prefix tenure-dev-diff \
+  --diff-base main \
+  --diff-head dev \
+  --json
+```
+
+`--diff-base` implies changed-only analysis. The committed scope is the
+merge-base-to-head diff, and tracked, staged, unstaged, and untracked worktree
+paths are included when the checked-out commit matches the requested head. The
+refresh result and each `repo-scan.json` record the requested refs, resolved
+commits, merge base, path list, and worktree status under `scan_scope`. A
+different checked-out head fails closed before scanning. This is a changed-path
+scope, not an added-line-only filter; use the full scan when findings in an
+unchanged file or line-level diff semantics are required.
+
 To bound generated run output, configure one or both limits:
 
 ```toml
@@ -413,6 +468,16 @@ phase/total budgets. When a complete full run is eligible for calibration, QR
 copies the baseline payload to `timeout-baseline.json` in the verify run and
 updates the local, uncommitted cache at
 `.quality-runner/cache/refresh-timeout-baseline-v1.json`.
+
+Fleet dynamic command receipts use the same evidence separation while remaining
+private to the immutable fleet finding. Each receipt records capability,
+repository source, effective timeout, command/output hashes, and output lengths.
+Failed and timed-out commands additionally retain only redacted 4,000-character
+stdout/stderr tails. The fleet selector records its CLI timeout ceiling and the
+repository's configured per-capability limits; configured limits can shorten but
+cannot exceed that ceiling.
+If any trustworthy command fails, the aggregate status is `failed`; incomplete
+siblings retain their own timeout, blocked, or unavailable status in the receipt.
 
 Execution requires both `--execute-gates` and `--worktree-mode disposable`.
 The disposable checkout is created at `HEAD`, QR writes artifacts to the

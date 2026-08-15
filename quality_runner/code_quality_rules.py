@@ -16,6 +16,7 @@ from quality_runner.code_quality_paths import (
     nested_ternary,
     verification_for_path,
 )
+from quality_runner.code_quality_python_performance import python_performance_findings
 from quality_runner.code_quality_rule_groups import (
     clarify_findings,
     harden_findings,
@@ -160,6 +161,9 @@ def _scan_file(
                     remediation_bucket="debloat candidate review",
                 )
             )
+
+    if "speed" not in disabled_groups:
+        findings.extend(python_performance_findings(relative_path, text, lines))
 
     if (
         "ui_structural" not in disabled_groups

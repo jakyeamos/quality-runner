@@ -200,6 +200,7 @@ def test_dynamic_audit_uses_disposable_worktree_and_replays(tmp_path: Path) -> N
     replay = fleet_replay_payload(output_dir=Path(first["artifact_root"]))
     assert replay["status"] == "passed"
     assert replay["deterministic"] is True
+    assert replay["manifest_valid"] is True
 
     second = fleet_audit_payload(
         projects_root=projects,
@@ -228,6 +229,31 @@ def test_fleet_replay_is_deterministic_for_multiple_repositories(tmp_path: Path)
 
     assert replay["status"] == "passed"
     assert replay["deterministic"] is True
+    assert replay["manifest_valid"] is True
+
+
+def test_fleet_replay_rejects_a_tampered_finding_even_when_summary_is_unchanged(
+    tmp_path: Path,
+) -> None:
+    projects = tmp_path / "projects"
+    _init_repo(projects / "fixture")
+    first = fleet_audit_payload(
+        projects_root=projects,
+        output_dir=tmp_path / "fleet-output",
+        as_of="2026-07-26T17:00:00+00:00",
+    )
+    artifact_root = Path(first["artifact_root"])
+    finding_path = next((artifact_root / "findings").glob("*.json"))
+    finding = json.loads(finding_path.read_text(encoding="utf-8"))
+    finding["tampered_without_summary_effect"] = True
+    finding_path.write_text(json.dumps(finding), encoding="utf-8")
+
+    replay = fleet_replay_payload(output_dir=artifact_root)
+
+    assert replay["status"] == "failed"
+    assert replay["deterministic"] is False
+    assert replay["manifest_valid"] is False
+    assert replay["manifest_errors"] == ["finding hashes mismatch"]
 
 
 def test_fleet_audit_accepts_a_bounded_repository_slice(tmp_path: Path) -> None:
@@ -249,6 +275,7 @@ def test_fleet_audit_accepts_a_bounded_repository_slice(tmp_path: Path) -> None:
     assert audit["summary"]["dynamic_policy"]["changed_only"] is True
     inventory = json.loads((Path(audit["artifact_root"]) / "inventory.json").read_text())
     assert inventory["scope"] == "explicit repository paths under the bounded projects root"
+    assert inventory["dynamic_policy"]["repository_watchdog_timeout_seconds"] == 1170
 
 
 def test_public_report_contains_aggregates_only(tmp_path: Path) -> None:

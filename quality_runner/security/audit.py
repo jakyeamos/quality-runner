@@ -17,8 +17,7 @@ def security_audit_findings(
 
     findings: list[dict[str, Any]] = []
     findings.extend(_candidate_findings(security_scan))
-    if _explicit_security_requirements(security_config):
-        findings.extend(_missing_capability_findings(security_scan))
+    findings.extend(_missing_capability_findings(security_scan))
     findings.extend(_agent_review_findings(security_scan))
     return findings
 

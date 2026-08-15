@@ -9,8 +9,22 @@ from typing import Any, cast
 
 from quality_runner.artifacts import prepare_safe_directory
 from quality_runner.fleet.contracts import digest
+from quality_runner.fleet.maturity_projection import (
+    MaturityProjectionError,
+)
+from quality_runner.fleet.maturity_projection import (
+    repository_projection as build_repository_projection,
+)
+from quality_runner.fleet.quality_outcomes import (
+    QUALITY_OUTCOME_TAXONOMY,
+    quality_outcome_counts,
+)
+from quality_runner.fleet.repository_maturity import (
+    PILLAR_DEFINITIONS,
+    pillar_means,
+)
 
-FLEET_MATURITY_FEED_SCHEMA = "quality-runner-maturity-feed/v1"
+FLEET_MATURITY_FEED_SCHEMA = "quality-runner-maturity-feed/v2"
 DEFAULT_FLEET_ROOT = Path("~/.quality-runner/fleet-audit")
 MATURITY_FEED_RELATIVE_PATH = Path("current") / "maturity.json"
 _VALID_AUDIT_STATUSES = {"completed", "complete_with_blockers"}
@@ -51,12 +65,17 @@ def build_maturity_feed(
     expected_projects_root: Path | None = None,
 ) -> dict[str, Any]:
     """Build a redacted, Pronto-facing feed from one persisted QR audit."""
-
     root = artifact_root.expanduser().resolve()
     inventory = _read_object(root / "inventory.json")
     summary = _read_object(root / "summary.json")
     if not inventory or not summary:
         raise MaturityFeedError(f"fleet audit is missing inventory or summary: {root}")
+    standard = inventory.get("standard")
+    if isinstance(standard, str) and standard.strip():
+        raise MaturityFeedError(
+            "standard-scoped fleet audits do not publish the canonical maturity feed; "
+            "inspect standard-report.json instead"
+        )
     audit_id = _required_string(inventory, "audit_id")
     if _required_string(summary, "audit_id") != audit_id:
         raise MaturityFeedError("inventory and summary audit IDs do not match")
@@ -98,6 +117,12 @@ def build_maturity_feed(
         "artifact_schema": _required_string(summary, "schema"),
         "summary_hash": digest(summary),
     }
+    maturity_models = [_object(projection.get("repository_maturity")) for projection in projections]
+    holistic_scores = [
+        float(model["score"])
+        for model in maturity_models
+        if isinstance(model.get("score"), (int, float))
+    ]
     feed: dict[str, Any] = {
         "schema": FLEET_MATURITY_FEED_SCHEMA,
         "status": str(summary["status"]),
@@ -112,12 +137,19 @@ def build_maturity_feed(
         },
         "repository_count": int(summary["repository_count"]),
         "checkout_count": int(summary.get("checkout_count", 0)),
-        "mean_maturity": summary.get("mean_maturity"),
+        "mean_maturity": (
+            round(sum(holistic_scores) / len(holistic_scores), 3) if holistic_scores else None
+        ),
+        "source_dimension_mean": summary.get("mean_maturity"),
         "dimension_means": _number_mapping(summary.get("dimension_means")),
+        "pillar_means": pillar_means(maturity_models),
         "maturity_certified_repository_count": sum(
             1 for item in projections if item.get("maturity_status") == "certified"
         ),
         "maturity_status_counts": _count_values(projections, "maturity_status", fallback="unknown"),
+        "quality_outcome_counts": quality_outcome_counts(projections),
+        "quality_outcome_taxonomy": QUALITY_OUTCOME_TAXONOMY,
+        "behavior_assurance": _behavior_assurance_summary(projections),
         "finding_counts": _number_mapping(summary.get("finding_counts")),
         "unresolved_measurement_gaps": _string_list(summary.get("unresolved_measurement_gaps")),
         "repositories": projections,
@@ -206,6 +238,8 @@ def validate_maturity_feed(feed: Mapping[str, Any]) -> None:
     repository_ids = [_required_string(repository, "repo_id") for repository in repositories]
     if len(set(repository_ids)) != len(repository_ids):
         raise MaturityFeedError("maturity feed repository IDs must be unique")
+    for repository in repositories:
+        _validate_repository_maturity(repository)
     if not isinstance(feed.get("provenance_hash"), str):
         raise MaturityFeedError("maturity feed provenance hash is missing")
     if _feed_hash(feed) != feed.get("provenance_hash"):
@@ -226,83 +260,99 @@ def validate_maturity_feed(feed: Mapping[str, Any]) -> None:
     _assert_safe_tree(feed)
 
 
-def _repository_projection(repository: dict[str, Any], finding: dict[str, Any]) -> dict[str, Any]:
-    repo_id = _required_string(repository, "repo_id")
-    finding_repo_id = _required_string(finding, "repo_id")
-    if repo_id != finding_repo_id:
-        raise MaturityFeedError(f"repository and finding IDs do not match: {repo_id}")
-    primary_path = _required_string(repository, "primary_path")
-    target = _object(repository.get("target_branch"))
-    findings = _objects(finding.get("findings"))
-    dimension_scores: dict[str, float | None] = {}
-    dimension_gaps: list[dict[str, Any]] = []
-    applicable_scores: list[float] = []
-    statuses: list[str] = []
-    blockers = 0
-    for item in findings:
-        dimension = _required_string(item, "dimension")
-        status = str(item.get("status", "unknown"))
-        statuses.append(status)
-        raw_score = item.get("score")
-        score = float(raw_score) if isinstance(raw_score, (int, float)) else None
-        dimension_scores[dimension] = score if status != "not_applicable" else None
-        if status != "not_applicable" and score is not None:
-            applicable_scores.append(score)
-        if status != "not_applicable" and (score is None or score < 4):
-            dimension_gaps.append(
-                {
-                    "dimension": dimension,
-                    "status": status,
-                    "score": score,
-                    "message": str(item.get("message", "Evidence is incomplete."))[:240],
-                }
+def _validate_repository_maturity(repository: Mapping[str, Any]) -> None:
+    model = _object(repository.get("repository_maturity"))
+    if model.get("schema") != "quality-runner-repository-maturity/v2":
+        raise MaturityFeedError("repository maturity model is missing or unsupported")
+    pillars = _objects(model.get("pillars"))
+    expected_ids = [str(definition["id"]) for definition in PILLAR_DEFINITIONS]
+    pillar_ids = [str(pillar.get("id", "")) for pillar in pillars]
+    if pillar_ids != expected_ids:
+        raise MaturityFeedError("repository maturity pillars are incomplete or out of order")
+    if round(sum(float(pillar.get("weight", 0)) for pillar in pillars), 6) != 1.0:
+        raise MaturityFeedError("repository maturity pillar weights must sum to one")
+    for definition, pillar in zip(PILLAR_DEFINITIONS, pillars, strict=True):
+        score = pillar.get("score")
+        if score is not None and (
+            not isinstance(score, (int, float)) or not 0 <= float(score) <= 4
+        ):
+            raise MaturityFeedError("repository maturity pillar score is invalid")
+        capabilities = _objects(pillar.get("capabilities"))
+        expected_capability_ids = list(definition["capabilities"])
+        if [str(item.get("id", "")) for item in capabilities] != expected_capability_ids:
+            raise MaturityFeedError(
+                "repository maturity capabilities are incomplete or out of order"
             )
-        if status == "blocked" or item.get("severity") == "blocker" or item.get("priority") == "P0":
-            blockers += 1
+        for capability in capabilities:
+            if capability.get("applicability") not in {
+                "applicable",
+                "not_applicable",
+                "unknown",
+            }:
+                raise MaturityFeedError("repository maturity capability applicability is invalid")
+            capability_score = capability.get("score")
+            if capability_score is not None and (
+                not isinstance(capability_score, (int, float))
+                or not 0 <= float(capability_score) <= 4
+            ):
+                raise MaturityFeedError("repository maturity capability score is invalid")
+            if not isinstance(capability.get("dimension_scores"), dict) or not isinstance(
+                capability.get("producer_dimensions"), list
+            ):
+                raise MaturityFeedError("repository maturity capability evidence is invalid")
+        for coverage_key in ("capability_coverage", "fresh_capability_coverage"):
+            coverage = pillar.get(coverage_key)
+            if not isinstance(coverage, (int, float)) or not 0 <= float(coverage) <= 1:
+                raise MaturityFeedError("repository maturity capability coverage is invalid")
+    score = model.get("score")
+    if score is not None and (not isinstance(score, (int, float)) or not 0 <= float(score) <= 4):
+        raise MaturityFeedError("repository maturity score is invalid")
+    if repository.get("maturity_score") != score:
+        raise MaturityFeedError("repository maturity projection score does not match its model")
+    critical_cap = _object(model.get("critical_cap"))
+    if critical_cap.get("applied") is True:
+        maximum = critical_cap.get("maximum_score")
+        if not isinstance(maximum, (int, float)) or score is None or float(score) > float(maximum):
+            raise MaturityFeedError("repository maturity critical cap is invalid")
 
-    dynamic = _object(finding.get("dynamic"))
-    dynamic_status = str(dynamic.get("status", "not_selected"))
-    if blockers or dynamic_status in {"failed", "timeout", "blocked"}:
-        quality_status = "blocked"
-    elif any(status in {"unknown", "stale"} for status in statuses):
-        quality_status = "unknown"
-    elif (
-        dynamic_status in {"passed", "reused"}
-        and statuses
-        and all(status in {"validated", "maintained", "not_applicable"} for status in statuses)
-    ):
-        quality_status = "healthy"
-    else:
-        quality_status = "attention"
 
-    maturity_score = (
-        round(sum(applicable_scores) / len(applicable_scores), 3) if applicable_scores else None
-    )
-    target_status = str(target.get("status", "unknown"))
-    certified = bool(
-        target_status == "ready"
-        and applicable_scores
-        and all(score == 4 for score in applicable_scores)
-        and dynamic_status in {"passed", "reused"}
-    )
-    maturity_status = (
-        "certified" if certified else "not_certified" if maturity_score is not None else "unknown"
-    )
+def _repository_projection(repository: dict[str, Any], finding: dict[str, Any]) -> dict[str, Any]:
+    try:
+        return build_repository_projection(repository, finding)
+    except MaturityProjectionError as error:
+        raise MaturityFeedError(str(error)) from error
+
+
+def _behavior_assurance_summary(projections: list[dict[str, Any]]) -> dict[str, Any]:
+    assessments = [_object(item.get("behavior_assurance")) for item in projections]
+    status_counts = _count_values(assessments, "result_status", fallback="unknown")
+    applicability_counts = _count_values(assessments, "applicability", fallback="unknown")
+    ready_count = sum(1 for item in assessments if item.get("release_ready") is True)
+    required_count = sum(int(item.get("required_scenario_count", 0)) for item in assessments)
+    passed_count = sum(int(item.get("passed_scenario_count", 0)) for item in assessments)
+    gap_count = sum(len(_objects(item.get("gaps"))) for item in assessments)
+    coverages = [_object(item.get("coverage")) for item in assessments]
+    coverage = {
+        key: sum(int(item.get(key, 0)) for item in coverages)
+        for key in ("total", "profiled", "verified", "stale", "failed", "blocked", "unknown")
+    }
+    contract_schema_counts = _count_values(assessments, "contract_schema", fallback="missing")
+    profile_status_counts = _count_values(assessments, "edge_profile_status", fallback="missing")
+    state_counts = _count_values(assessments, "state", fallback="unknown")
     return {
-        "repo_id": repo_id,
-        "display_name": Path(primary_path).name,
-        "local_identity": {"primary_path": primary_path},
-        "target_branch": str(target.get("branch")) if target.get("branch") else None,
-        "target_branch_status": target_status,
-        "target_head": target.get("head"),
-        "maturity_score": maturity_score,
-        "maturity_status": maturity_status,
-        "dimension_scores": dict(sorted(dimension_scores.items())),
-        "dimension_gaps": sorted(dimension_gaps, key=lambda item: item["dimension"])[:16],
-        "quality_status": quality_status,
-        "finding_count": len(findings),
-        "blocker_count": blockers,
-        "dynamic_status": dynamic_status,
+        "schema": "quality-runner-behavior-assurance-summary/v2",
+        "status": "ready" if ready_count == len(assessments) else "gaps_present",
+        "repository_count": len(assessments),
+        "ready_repository_count": ready_count,
+        "applicability_counts": applicability_counts,
+        "result_status_counts": status_counts,
+        "contract_schema_counts": contract_schema_counts,
+        "edge_profile_status_counts": profile_status_counts,
+        "state_counts": state_counts,
+        "required_scenario_count": required_count,
+        "passed_scenario_count": passed_count,
+        "gap_count": gap_count,
+        "coverage": coverage,
     }
 
 

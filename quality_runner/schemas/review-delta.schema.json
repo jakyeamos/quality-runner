@@ -27,7 +27,44 @@
       "properties": {
         "changed_paths": { "type": "array", "items": { "type": "string" } },
         "scope_available": { "type": "boolean" },
-        "scope_basis": { "const": "baseline-and-working-tree-diff" }
+        "scope_basis": {
+          "enum": [
+            "baseline-and-working-tree-diff",
+            "branch-merge-base-and-working-tree-diff"
+          ]
+        },
+        "branch_diff": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "scope_basis",
+            "requested_base",
+            "requested_head",
+            "base_commit",
+            "head_commit",
+            "comparison_base_commit",
+            "checked_out_head_commit",
+            "head_matches_checked_out",
+            "changed_paths",
+            "scope_available",
+            "working_tree_included",
+            "working_tree_changed"
+          ],
+          "properties": {
+            "scope_basis": { "const": "branch-merge-base-and-working-tree-diff" },
+            "requested_base": { "type": "string", "minLength": 1 },
+            "requested_head": { "type": "string", "minLength": 1 },
+            "base_commit": { "type": "string", "minLength": 1 },
+            "head_commit": { "type": "string", "minLength": 1 },
+            "comparison_base_commit": { "type": "string", "minLength": 1 },
+            "checked_out_head_commit": { "type": "string", "minLength": 1 },
+            "head_matches_checked_out": { "const": true },
+            "changed_paths": { "type": "array", "items": { "type": "string" } },
+            "scope_available": { "type": "boolean" },
+            "working_tree_included": { "type": "boolean" },
+            "working_tree_changed": { "type": "boolean" }
+          }
+        }
       }
     },
     "findings": {

@@ -2,10 +2,14 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shlex
 import shutil
 import signal
 import subprocess
+import time
+from collections.abc import Sequence
+from contextlib import suppress
 from pathlib import Path
 from typing import Any, cast
 
@@ -22,20 +26,33 @@ SUPPORTED_PACKAGE_MANAGERS = frozenset({"bun", "npm", "pnpm", "yarn"})
 
 
 def run_shell_command(command: str, *, cwd: Path, timeout: int) -> dict[str, object]:
+    return _run_command(command, cwd=cwd, timeout=timeout, shell=True)
+
+
+def run_command(command: Sequence[str], *, cwd: Path, timeout: int) -> dict[str, object]:
+    return _run_command(command, cwd=cwd, timeout=timeout, shell=False)
+
+
+def _run_command(
+    command: str | Sequence[str], *, cwd: Path, timeout: int, shell: bool
+) -> dict[str, object]:
     process = subprocess.Popen(
         command,
         cwd=cwd,
-        shell=True,
+        shell=shell,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         text=True,
         start_new_session=True,
-        env=local_command_env(cwd),
+        env=local_command_env(cwd, command=command if isinstance(command, str) else None),
     )
+    process_group_id = _process_group_id(process)
     try:
         stdout, stderr = process.communicate(timeout=timeout)
     except subprocess.TimeoutExpired as error:
-        captured_stdout, captured_stderr = terminate_process_group(process)
+        captured_stdout, captured_stderr = terminate_process_group(
+            process, process_group_id=process_group_id
+        )
         raise subprocess.TimeoutExpired(
             cmd=error.cmd,
             timeout=error.timeout,
@@ -43,7 +60,7 @@ def run_shell_command(command: str, *, cwd: Path, timeout: int) -> dict[str, obj
             stderr=captured_stderr or error.stderr,
         ) from error
     except BaseException:
-        terminate_process_group(process)
+        terminate_process_group(process, process_group_id=process_group_id)
         raise
     return {
         "stdout": stdout,
@@ -52,26 +69,46 @@ def run_shell_command(command: str, *, cwd: Path, timeout: int) -> dict[str, obj
     }
 
 
-def terminate_process_group(process: subprocess.Popen[Any]) -> tuple[str, str]:
+def _process_group_id(process: subprocess.Popen[Any]) -> int:
     try:
-        process_group_id = os.getpgid(process.pid)
+        return os.getpgid(process.pid)
     except ProcessLookupError:
-        return "", ""
+        # start_new_session=True makes the child pid the process-group id. Keep
+        # that stable identifier even if the leader exits before pipe cleanup.
+        return process.pid
+
+
+def terminate_process_group(
+    process: subprocess.Popen[Any], *, process_group_id: int | None = None
+) -> tuple[str, str]:
+    resolved_group_id = process_group_id or _process_group_id(process)
     try:
-        os.killpg(process_group_id, signal.SIGTERM)
-    except ProcessLookupError:
-        return "", ""
-    wait = getattr(process, "wait", None)
-    if not callable(wait):
-        return "", ""
-    try:
-        wait(timeout=0.2)
-    except subprocess.TimeoutExpired:
         try:
-            os.killpg(process_group_id, signal.SIGKILL)
+            os.killpg(resolved_group_id, signal.SIGTERM)
         except ProcessLookupError:
             return _communicate_after_termination(process)
-    return _communicate_after_termination(process)
+        wait = getattr(process, "wait", None)
+        if not callable(wait):
+            return "", ""
+        grace_started = time.monotonic()
+        with suppress(subprocess.TimeoutExpired):
+            wait(timeout=0.2)
+        grace_remaining = 0.2 - (time.monotonic() - grace_started)
+        if grace_remaining > 0:
+            time.sleep(grace_remaining)
+        # The group leader can exit after SIGTERM while descendants keep inherited
+        # pipes open. Escalate the stored group id regardless of the leader's state.
+        with suppress(ProcessLookupError):
+            os.killpg(resolved_group_id, signal.SIGKILL)
+        return _communicate_after_termination(process)
+    except BaseException:
+        # A coordinator signal or external interruption must not leave the group
+        # alive just because it arrived during the bounded cleanup window.
+        with suppress(ProcessLookupError):
+            os.killpg(resolved_group_id, signal.SIGKILL)
+        raise
+    finally:
+        _close_process_pipes(process)
 
 
 def _communicate_after_termination(process: subprocess.Popen[Any]) -> tuple[str, str]:
@@ -79,23 +116,46 @@ def _communicate_after_termination(process: subprocess.Popen[Any]) -> tuple[str,
         stdout, stderr = process.communicate(timeout=0.2)
     except (OSError, subprocess.SubprocessError):
         return "", ""
+    finally:
+        _close_process_pipes(process)
     return _text_value(stdout), _text_value(stderr)
+
+
+def _close_process_pipes(process: subprocess.Popen[Any]) -> None:
+    for name in ("stdout", "stderr"):
+        stream = getattr(process, name, None)
+        close = getattr(stream, "close", None)
+        if callable(close):
+            with suppress(OSError, ValueError):
+                close()
 
 
 def _text_value(value: object) -> str:
     return value if isinstance(value, str) else ""
 
 
-def local_command_env(cwd: Path) -> dict[str, str]:
+def local_command_env(cwd: Path, *, command: str | None = None) -> dict[str, str]:
     env = {
         key: value
         for key in LOCAL_COMMAND_ENV_ALLOWLIST
         if (value := os.environ.get(key)) is not None
     }
     cache_root = cwd / ".quality-runner" / "cache"
-    env["UV_CACHE_DIR"] = str(cache_root / "uv")
+    env["UV_CACHE_DIR"] = (
+        os.environ.get("UV_CACHE_DIR", str(Path.home() / ".cache" / "uv"))
+        if command and "uv run" in command and "--offline" in command
+        else str(cache_root / "uv")
+    )
     env["XDG_CACHE_HOME"] = str(cache_root / "xdg")
-    package_manager_bin = _cached_package_manager_bin(cwd)
+    package_manager_root = _package_manager_command_root(cwd, command)
+    if (
+        package_manager_root is not None
+        and (package_manager_root / ".quality-runner" / "copied-dependencies").is_file()
+    ):
+        # pnpm 11 treats the copied workspace-state path as stale and otherwise
+        # starts an implicit install. QR already prepared this locked tree.
+        env["pnpm_config_verify_deps_before_run"] = "false"
+    package_manager_bin = _cached_package_manager_bin(package_manager_root)
     if package_manager_bin and env.get("PATH"):
         env["PATH"] = f"{package_manager_bin}{os.pathsep}{env['PATH']}"
     return env
@@ -104,13 +164,20 @@ def local_command_env(cwd: Path) -> dict[str, str]:
 def _cached_package_manager_bin(cwd: Path) -> str | None:
     package_manager = _declared_package_manager(cwd)
     if package_manager is None:
+        manager = _lockfile_package_manager(cwd)
+        version = None
+    else:
+        manager, version = package_manager
+    if manager is None:
         return None
-    manager, version = package_manager
     cache_roots = (
         Path.home() / ".cache" / "node" / "corepack" / "v1",
         Path.home() / "Library" / "pnpm" / ".tools",
     )
-    candidates = [root / manager / version / "bin" for root in cache_roots]
+    versions = [version] if version is not None else _cached_versions(cache_roots, manager)
+    candidates = [
+        root / manager / candidate / "bin" for candidate in versions for root in cache_roots
+    ]
     for candidate in candidates:
         if (candidate / manager).is_file():
             return str(candidate)
@@ -122,6 +189,49 @@ def _cached_package_manager_bin(cwd: Path) -> str | None:
         if shim is not None:
             return shim
     return None
+
+
+def _package_manager_command_root(cwd: Path, command: str | None) -> Path:
+    if not command:
+        return cwd
+    match = re.match(r"\s*cd\s+([A-Za-z0-9_./-]+)\s*&&\s*(?:pnpm|yarn|npm|bun)\b", command)
+    if not match:
+        return cwd
+    candidate = (cwd / match.group(1)).resolve()
+    try:
+        candidate.relative_to(cwd.resolve())
+    except ValueError:
+        return cwd
+    return candidate
+
+
+def _lockfile_package_manager(cwd: Path) -> str | None:
+    for lockfile, manager in (
+        ("pnpm-lock.yaml", "pnpm"),
+        ("yarn.lock", "yarn"),
+        ("package-lock.json", "npm"),
+        ("bun.lock", "bun"),
+        ("bun.lockb", "bun"),
+    ):
+        if (cwd / lockfile).is_file():
+            return manager
+    return None
+
+
+def _cached_versions(cache_roots: tuple[Path, ...], manager: str) -> list[str]:
+    versions = {
+        path.name
+        for root in cache_roots
+        if (manager_root := root / manager).is_dir()
+        for path in manager_root.iterdir()
+        if path.is_dir()
+    }
+    return sorted(versions, key=_version_key, reverse=True)
+
+
+def _version_key(value: str) -> tuple[int, ...]:
+    parts = re.findall(r"\d+", value)
+    return tuple(int(part) for part in parts) if parts else (0,)
 
 
 def _declared_package_manager(cwd: Path) -> tuple[str, str] | None:

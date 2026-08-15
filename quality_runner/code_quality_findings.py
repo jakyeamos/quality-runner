@@ -17,6 +17,7 @@ CATEGORY_ORDER = [
     "ui_structural",
     "architecture",
     "integrate",
+    "maintenance-surface",
 ]
 CONFIDENCE_WEIGHT = {"high": 3, "medium": 2, "low": 1}
 SEVERITY_WEIGHT = {"warning": 3, "observation": 1}

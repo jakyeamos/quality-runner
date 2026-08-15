@@ -488,6 +488,13 @@ tests = 300
 pre_cr = 600
 ```
 
+Fleet dynamic audits honor the same capability timeout table, bounded by the
+fleet command's `--timeout-seconds` ceiling. For example, a repository timeout
+of `tests = 300` takes effect when the fleet run uses
+`--timeout-seconds 300` or higher; a lower CLI value remains the hard cap.
+Fleet formatter discovery prefers `format:check` and will not execute a
+formatter reported as `mutating` or `unknown`.
+
 Configured `[[quality_runner.gates]]` may set `mutating_risk` to `safe`,
 `unknown`, or `mutating`. Under `--read-only-gates`, `unknown` and `mutating`
 gates stay skipped unless `--allow-mutating-gates` is also explicit.
@@ -645,6 +652,31 @@ per-check statuses plus the generated handoff path. The handoff examples in
 outputs for manual release review. See
 [`slice-spec-structural-harden.md`](examples/slice-spec-structural-harden.md)
 for a cold-executor slice spec example.
+
+## `quality-runner release-boundary`
+
+Runs the fail-closed public/private distribution gate against a repository and
+exactly one built wheel plus one built source archive:
+
+```bash
+uv build
+quality-runner release-boundary . --dist-dir dist --json
+```
+
+The command requires every applicable change-matrix surface to be classified
+as `public_core`, `public_adapter`, or `local_only`. Public adapters must name
+sanitized JSON contract fixtures. It then scans tracked public source/docs for
+personal home paths and private inventory markers, blocks tracked paths declared
+local-only, enforces per-archive path allowlists, and installs the wheel in a
+temporary home whose executable path does not expose `pronto`, `leverage`, or
+`macctl`. The command atomically writes
+`.quality-runner/release-boundary.json` by default; `--output` selects another
+receipt path. The privacy-safe receipt uses
+`quality-runner-release-boundary/v2` and records the exact branch and commit,
+producer version, change-matrix SHA-256, wheel and sdist SHA-256 values,
+sanitized fixture hashes, and every check result without embedding the local
+repository path. A dirty release input, missing provenance, stale policy, or
+blocked check produces exit code 1.
 
 ## `quality-runner validate-report`
 

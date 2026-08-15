@@ -115,6 +115,21 @@ they authorize repository changes.
 - Reassess this target after the `0.7.0` fold and before any claim that
   type-checking has reached 4/4 maturity.
 
+## Outstanding Maturity Target
+
+- `basedpyright-strict` remains required for **4/4 type-checking maturity**.
+- The passing full-package standard BasedPyright command is the certified
+  interim gate, not the terminal maturity state.
+- The last strict-mode trial reported 4,192 existing diagnostics, so strict
+  enforcement is blocked; the target must not be removed or marked complete
+  because standard mode passes.
+- Promotion requires a pinned, repeatable full-package strict command with
+  equivalent local and CI evidence, an intentional-failure fixture, and either
+  zero strict diagnostics or deterministic occurrence-level baselining that
+  blocks new diagnostics without treating persisted legacy debt as new.
+- Reassess this target after the `0.7.0` fold and before any claim that
+  type-checking has reached 4/4 maturity.
+
 ## Next Step
 
 Commit the evidence-backed gate fixes and reconciled release truth, dogfood

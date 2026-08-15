@@ -49,6 +49,21 @@ def actionability_for_finding(finding: dict[str, Any]) -> tuple[str, str]:
             "needs-maintainer-policy",
             "Standards-profile mismatch is a repository policy decision.",
         )
+    if category == "package-manager":
+        return (
+            "needs-maintainer-policy",
+            "Package-manager declarations and lockfiles are repository-owned dependency policy.",
+        )
+    if category == "analysis:coverage":
+        return (
+            "informational",
+            "Incomplete scan coverage limits confidence and requires a complete rerun, not a source-code fix.",
+        )
+    if category == "skill:agent-review":
+        return (
+            "needs-author-decision",
+            "Selected code-quality agent reviews require explicit review evidence or correction.",
+        )
     if category.startswith("security:agent-review"):
         return (
             "needs-author-decision",

@@ -45,6 +45,7 @@ def inspect_payload(
     cache_root: Path | None = None,
     performance_budget_seconds: float | None = None,
     include_paths: tuple[str, ...] = (),
+    scope_metadata: AuditPayload | None = None,
     progress: ProgressCallback | None = None,
     refresh_context: dict[str, object] | None = None,
 ) -> dict[str, Any]:
@@ -73,6 +74,7 @@ def inspect_payload(
             cache_mode=cache_mode,
             cache_root=cache_root,
             performance_budget_seconds=performance_budget_seconds,
+            scope_metadata=scope_metadata,
         ),
         progress=progress,
     )
@@ -87,6 +89,7 @@ def inspect_payload(
         "run_id": resolved_run_id,
         "artifact_paths": artifact_paths,
         "module_status": _module_status_from_artifacts(artifact_paths),
+        "analysis_coverage": _analysis_coverage(analysis),
         **_optional_field("skill_review", skill_review),
         "warnings": combined_warnings(
             _legacy_payload(analysis.scan), _legacy_payload(analysis.capability_map)
@@ -113,6 +116,7 @@ def run_payload(
     cache_root: Path | None = None,
     performance_budget_seconds: float | None = None,
     include_paths: tuple[str, ...] = (),
+    scope_metadata: AuditPayload | None = None,
     progress: ProgressCallback | None = None,
     refresh_context: dict[str, object] | None = None,
 ) -> dict[str, Any]:
@@ -141,6 +145,7 @@ def run_payload(
             cache_mode=cache_mode,
             cache_root=cache_root,
             performance_budget_seconds=performance_budget_seconds,
+            scope_metadata=scope_metadata,
         ),
         progress=progress,
     )
@@ -155,6 +160,7 @@ def run_payload(
         "run_id": resolved_run_id,
         "artifact_paths": artifact_paths,
         "module_status": _module_status_from_artifacts(artifact_paths),
+        "analysis_coverage": _analysis_coverage(analysis),
         **_optional_field("skill_review", skill_review),
         "warnings": combined_warnings(
             _legacy_payload(analysis.scan), _legacy_payload(analysis.capability_map)
@@ -182,6 +188,7 @@ def _audit_request(
     cache_root: Path | None,
     performance_budget_seconds: float | None,
     include_paths: tuple[str, ...],
+    scope_metadata: AuditPayload | None,
 ) -> AuditRequest:
     return AuditRequest(
         repo_root=repo_root,
@@ -208,6 +215,7 @@ def _audit_request(
         cache_root=cache_root,
         performance_budget_seconds=performance_budget_seconds,
         include_paths=include_paths,
+        scope_metadata=scope_metadata,
     )
 
 
@@ -251,6 +259,30 @@ def _skill_review_from_analysis(
         ),
         agent_review_mode=_agent_review_mode(analysis),
     )
+
+
+def _analysis_coverage(analysis: Any) -> dict[str, Any]:
+    code_quality_scan = _legacy_payload(analysis.code_quality_scan)
+    deferred_checks = code_quality_scan.get("deferred_checks")
+    if not isinstance(deferred_checks, list):
+        deferred_checks = []
+    summary = code_quality_scan.get("summary")
+    scan_budget = summary.get("scan_budget") if isinstance(summary, dict) else None
+    budget_exceeded = isinstance(scan_budget, dict) and scan_budget.get("budget_exceeded") is True
+    performance = getattr(analysis, "performance", None)
+    performance_partial = isinstance(performance, dict) and performance.get("status") == "partial"
+    partial = (
+        code_quality_scan.get("coverage") == "partial"
+        or bool(deferred_checks)
+        or budget_exceeded
+        or performance_partial
+    )
+    return {
+        "status": "partial" if partial else "complete",
+        "deferred_checks": [item for item in deferred_checks if isinstance(item, dict)],
+        "scan_budget_exceeded": budget_exceeded,
+        "performance_budget_exceeded": performance_partial,
+    }
 
 
 def _optional_field(key: str, value: object) -> dict[str, Any]:

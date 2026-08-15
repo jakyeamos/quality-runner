@@ -9,6 +9,7 @@ from quality_runner.fleet.contracts import FRESHNESS_DAYS, MAX_DOCUMENT_BYTES, r
 
 MATRIX_SCHEMA = "change-surface-matrix/v1"
 POINTER_SCHEMA = "change-surface-pointer/v1"
+SURFACE_DISTRIBUTIONS = {"public_core", "public_adapter", "local_only"}
 REPOSITORY_MATRIX_PATHS = (
     ".agents/change-surface-matrix.json",
     ".context/change-surface-matrix.json",
@@ -154,6 +155,7 @@ def assess_matrix_path(path: Path, *, root: Path, as_of: str) -> dict[str, Any]:
             continue
         applicable += 1
         operations = set(_string_list(surface.get("operations")))
+        distribution = surface.get("distribution")
         if not _nonempty(surface.get("owner")):
             problems.append(f"surface {index + 1} owner is missing")
         if not _nonempty(surface.get("condition")):
@@ -162,6 +164,10 @@ def assess_matrix_path(path: Path, *, root: Path, as_of: str) -> dict[str, Any]:
             problems.append(f"surface {index + 1} validation is missing")
         if operations != {"add", "change", "remove"}:
             problems.append(f"surface {index + 1} does not cover add/change/remove")
+        if distribution not in SURFACE_DISTRIBUTIONS:
+            problems.append(f"surface {index + 1} distribution is missing or unsupported")
+        if distribution == "public_adapter" and not _string_list(surface.get("contract_fixtures")):
+            problems.append(f"surface {index + 1} public adapter fixture is missing")
         if status in {"unknown", "unresolved", "stale", "contradictory"}:
             unresolved += 1
     if applicable and not local_declared:
@@ -226,7 +232,7 @@ def _unknown(path: str, detail: str) -> dict[str, Any]:
 
 
 def _result(
-    *, score: int, status: str, message: str, evidence: list[dict[str, str]]
+    *, score: int | None, status: str, message: str, evidence: list[dict[str, str]]
 ) -> dict[str, Any]:
     return {"score": score, "status": status, "message": message, "evidence": evidence}
 

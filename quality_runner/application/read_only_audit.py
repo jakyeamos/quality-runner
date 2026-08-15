@@ -226,14 +226,23 @@ def analyze_read_only_audit(
         code_quality_scan=code_quality_scan,
         cache_mode=cache_mode,
     )
-    scan["scan_scope"] = {
-        "mode": "focused-changed-surface" if request.focus_paths else "repository",
+    scan_scope: AuditPayload = {
+        "mode": (
+            "branch-diff"
+            if request.scope_metadata is not None
+            else "focused-changed-surface"
+            if request.focus_paths
+            else "repository"
+        ),
         "paths": list(request.focus_paths),
         "include_paths": list(request.include_paths),
         "scan_inclusions": list(text_scan_scope.scan_inclusions),
         "fail_closed_on_empty_focus": bool(request.focus_paths),
         "analysis_mode": request.analysis_mode,
     }
+    if request.scope_metadata is not None:
+        scan_scope["provenance"] = dict(request.scope_metadata)
+    scan["scan_scope"] = scan_scope
     with recorder.stage("package-preflight"):
         package_manager_preflight = build_package_manager_preflight(repo_root, scan)
     for cache_payload in (security_scan, code_quality_scan):
@@ -377,6 +386,8 @@ def build_audit_plan(
         capability_map=_legacy_payload(analysis.capability_map),
         code_quality_scan=code_quality_scan,
         security_scan=security_scan,
+        package_manager_preflight=_legacy_payload(analysis.package_manager_preflight),
+        agent_review_mode=analysis.request.agent_review_mode,
         resolution_ledger=_legacy_optional_payload(resolution_ledger),
     )
     require_valid("audit report", validate_audit_report(audit_report))
