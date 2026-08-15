@@ -18,6 +18,9 @@ from quality_runner.fleet.dependencies import (
 from quality_runner.fleet.dependency_sources import (
     compatible_dependency_source as _dependency_source,
 )
+from quality_runner.fleet.dependency_sources import (
+    compatible_local_dependency_source as _local_dependency_source,
+)
 from quality_runner.fleet.discovery import checkout_fingerprint
 from quality_runner.fleet.dynamic_commands import (
     aggregate_dynamic_status as _aggregate_dynamic_status,
@@ -45,11 +48,16 @@ __all__ = ["apply_dynamic_quality_evidence", "dynamic_result"]
 
 
 def _prepare_dynamic_dependencies(
-    *, worktree: Path, source: Path | None = None, timeout_seconds: int
+    *,
+    worktree: Path,
+    source: Path | None = None,
+    local_source: Path | None = None,
+    timeout_seconds: int,
 ) -> dict[str, Any]:
     return _prepare_dependency_tree(
         worktree=worktree,
         source=source,
+        local_source=local_source,
         timeout_seconds=timeout_seconds,
         run_command=run_shell_command,
     )
@@ -237,9 +245,13 @@ def _execute_dynamic(
             result["status"] = "failed"
             result["reason"] = "no local quality commands were discovered on the exact target"
             return result
+        dependency_source = _dependency_source(repository, worktree=worktree, default=source)
         dependency_setup = _prepare_dynamic_dependencies(
             worktree=worktree,
-            source=_dependency_source(repository, worktree=worktree, default=source),
+            source=dependency_source,
+            local_source=_local_dependency_source(
+                repository, worktree=worktree, default=dependency_source
+            ),
             timeout_seconds=timeout_seconds,
         )
         dependency_cleanup_paths = [
