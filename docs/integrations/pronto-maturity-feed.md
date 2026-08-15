@@ -45,7 +45,9 @@ measurement confidence, and redacted per-repository projections. Confidence is
 `high` only when the exact eligible population is attested, every repository has
 complete static and full dynamic evidence, no measurement gap remains, and the
 published snapshot passes deterministic replay. A known failing check is a
-measured maturity result, not a confidence gap. Each repository projection includes a
+measured maturity result, not a confidence gap; the same applies to a static
+stale, blocked, or unknown state when the rubric assigns a numeric score. A
+static assessment with no numeric score remains unresolved. Each repository projection includes a
 `quality-runner-repository-maturity/v2` model. Dimensions aggregate through
 explicit capabilities before its seven stable pillars are weighted, so
 overlapping checks do not give one capability extra influence. The projection keeps

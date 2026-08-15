@@ -55,12 +55,7 @@ def build_fleet_summary(
                 continue
             if isinstance(score, int | float) and isinstance(dimension, str) and score >= 0:
                 dimension_scores.setdefault(dimension, []).append(float(score))
-            conclusive_dynamic_failure = (
-                dimension == "dynamic_verification"
-                and status == "blocked"
-                and dynamic_state == "failed"
-            )
-            if status in {"unknown", "stale", "blocked"} and not conclusive_dynamic_failure:
+            if _is_unresolved_measurement(finding):
                 unresolved.append(f"{result.get('repo_id')}:{dimension}:{status}")
         for score_record in (
             applicable_agent_usability_scores(result.get("agent_usability"))
@@ -70,8 +65,6 @@ def build_fleet_summary(
             dimension = str(score_record["dimension"])
             status = str(score_record["status"])
             dimension_scores.setdefault(dimension, []).append(float(score_record["score"]))
-            if status in {"unknown", "stale", "blocked"}:
-                unresolved.append(f"{result.get('repo_id')}:{dimension}:{status}")
         if isinstance(dynamic_result, dict):
             state = dynamic_state
             if dynamic_result.get("selected") is True:
@@ -183,6 +176,15 @@ def build_fleet_summary(
             "fleet maturity verdict."
         )
     return summary
+
+
+def _is_unresolved_measurement(finding: dict[str, Any]) -> bool:
+    """Separate unknown measurement from a conclusively low maturity result."""
+
+    if finding.get("applicable") is False or finding.get("status") == "not_applicable":
+        return False
+    score = finding.get("score")
+    return not isinstance(score, int | float) or isinstance(score, bool) or score < 0
 
 
 def _measurement_confidence(

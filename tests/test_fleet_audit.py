@@ -461,6 +461,94 @@ def test_conclusive_dynamic_failure_does_not_masquerade_as_a_measurement_gap() -
     assert summary["unresolved_measurement_gaps"] == []
 
 
+def test_conclusive_low_static_states_do_not_masquerade_as_measurement_gaps() -> None:
+    summary = build_fleet_summary(
+        audit_id="audit-known-low",
+        as_of="2026-08-15T15:00:00+00:00",
+        repositories=[
+            {
+                "repo_id": "repo-fixture",
+                "repository": {"checkout_count": 1},
+                "findings": [
+                    {
+                        "dimension": "behavior_assurance",
+                        "status": "unknown",
+                        "score": 0,
+                        "applicable": True,
+                        "priority": "P0",
+                    },
+                    {
+                        "dimension": "context_routing",
+                        "status": "stale",
+                        "score": 2,
+                        "applicable": True,
+                        "priority": "P1",
+                    },
+                    {
+                        "dimension": "architecture_boundaries",
+                        "status": "blocked",
+                        "score": 1,
+                        "applicable": True,
+                        "priority": "P1",
+                    },
+                ],
+                "agent_usability": {"applicability": "not_applicable"},
+                "dynamic": {"selected": True, "status": "failed"},
+            }
+        ],
+        dynamic=True,
+        changed_only=False,
+        population_coverage={
+            "status": "complete",
+            "source": "scope_manifest",
+            "expected_repository_count": 1,
+            "observed_repository_count": 1,
+            "excluded_repository_count": 0,
+        },
+    )
+
+    assert summary["confidence"] == "high"
+    assert summary["unresolved_measurement_gaps"] == []
+
+
+def test_unknown_applicability_without_a_numeric_score_is_a_measurement_gap() -> None:
+    summary = build_fleet_summary(
+        audit_id="audit-unknown-applicability",
+        as_of="2026-08-15T15:00:00+00:00",
+        repositories=[
+            {
+                "repo_id": "repo-fixture",
+                "repository": {"checkout_count": 1},
+                "findings": [
+                    {
+                        "dimension": "license_contribution",
+                        "status": "unknown",
+                        "score": None,
+                        "applicable": None,
+                        "priority": "P1",
+                    }
+                ],
+                "agent_usability": {"applicability": "not_applicable"},
+                "dynamic": {"selected": True, "status": "passed"},
+            }
+        ],
+        dynamic=True,
+        changed_only=False,
+        population_coverage={
+            "status": "complete",
+            "source": "scope_manifest",
+            "expected_repository_count": 1,
+            "observed_repository_count": 1,
+            "excluded_repository_count": 0,
+        },
+    )
+
+    assert summary["confidence"] == "medium"
+    assert summary["unresolved_measurement_gaps"] == [
+        "repo-fixture:license_contribution:unknown"
+    ]
+
+
 def test_public_report_contains_aggregates_only(tmp_path: Path) -> None:
     projects = tmp_path / "projects"
     root = projects / "fixture"

@@ -138,8 +138,11 @@ Measurement confidence is separate from maturity. `high` requires an attested
 complete population, complete static scans, full (not changed-only) conclusive
 dynamic results for every eligible repository, no unresolved measurement gaps,
 and—at publication time—deterministic replay. Known failing checks lower the
-maturity result but remain conclusive evidence; unavailable, timed-out, blocked,
-unknown, stale, or unselected evidence keeps confidence below `high`.
+maturity result but remain conclusive evidence. Static `unknown`, `stale`, or
+`blocked` labels with a rubric-assigned numeric score are therefore measured low
+maturity, not measurement gaps. A missing numeric score or inconclusive dynamic
+result (`unavailable`, `timeout`, `blocked`, `unknown`, or unselected) keeps
+confidence below `high`.
 
 The complete fleet audit includes `matrix_maintenance` as a scored maturity
 dimension. Its repository score, fleet mean, non-passing gap, and Pronto
