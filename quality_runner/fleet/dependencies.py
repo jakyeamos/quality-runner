@@ -494,10 +494,11 @@ def _package_manager_declaration(worktree: Path) -> tuple[str, str, str] | None:
             "install",
             "--offline",
             "--frozen-lockfile",
+            "--frozen-store",
             "--ignore-scripts",
-            # append-only can retain pnpm worker threads after linking completes;
-            # silent preserves deterministic captured output and exits promptly.
-            "--reporter=silent",
+            # A read-only store prevents pnpm workers from optimizing the shared
+            # SQLite index during shutdown; append-only remains deterministic.
+            "--reporter=append-only",
         ],
         "yarn": ["install", "--offline", "--immutable", "--mode=skip-builds"],
     }
