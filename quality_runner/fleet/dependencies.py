@@ -495,7 +495,9 @@ def _package_manager_declaration(worktree: Path) -> tuple[str, str, str] | None:
             "--offline",
             "--frozen-lockfile",
             "--ignore-scripts",
-            "--reporter=append-only",
+            # append-only can retain pnpm worker threads after linking completes;
+            # silent preserves deterministic captured output and exits promptly.
+            "--reporter=silent",
         ],
         "yarn": ["install", "--offline", "--immutable", "--mode=skip-builds"],
     }
