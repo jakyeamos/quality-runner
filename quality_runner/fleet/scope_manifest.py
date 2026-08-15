@@ -1,0 +1,95 @@
+from __future__ import annotations
+
+import json
+from datetime import datetime
+from pathlib import Path
+from typing import Any
+
+from quality_runner.fleet.contracts import digest
+
+FLEET_SCOPE_MANIFEST_SCHEMA = "quality-runner-fleet-scope/v1"
+_ELIGIBILITY = {"eligible", "excluded"}
+
+
+def load_fleet_scope_manifest(path: Path, *, projects_root: Path) -> dict[str, Any]:
+    """Load and normalize an exact, operator-owned fleet population manifest."""
+
+    source = path.expanduser().resolve()
+    try:
+        payload = json.loads(source.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as error:
+        raise ValueError(f"fleet scope manifest is not valid JSON: {source}") from error
+    if not isinstance(payload, dict) or payload.get("schema") != FLEET_SCOPE_MANIFEST_SCHEMA:
+        raise ValueError(
+            f"fleet scope manifest must declare schema {FLEET_SCOPE_MANIFEST_SCHEMA}: {source}"
+        )
+
+    authority = _required_string(payload, "authority")
+    generated_at = _required_string(payload, "generated_at")
+    try:
+        datetime.fromisoformat(generated_at.replace("Z", "+00:00"))
+    except ValueError as error:
+        raise ValueError("fleet scope manifest generated_at must be ISO-8601") from error
+
+    raw_repositories = payload.get("repositories")
+    if not isinstance(raw_repositories, list) or not raw_repositories:
+        raise ValueError("fleet scope manifest repositories must be a non-empty array")
+
+    root = projects_root.expanduser().resolve()
+    normalized: list[dict[str, str]] = []
+    seen_paths: set[str] = set()
+    for index, raw_repository in enumerate(raw_repositories):
+        if not isinstance(raw_repository, dict):
+            raise ValueError(f"fleet scope manifest repository {index} must be an object")
+        raw_path = _required_string(raw_repository, "path")
+        resolved = Path(raw_path).expanduser().resolve()
+        try:
+            resolved.relative_to(root)
+        except ValueError as error:
+            raise ValueError(
+                f"fleet scope manifest repository is outside projects_root: {resolved}"
+            ) from error
+        resolved_path = str(resolved)
+        if resolved_path in seen_paths:
+            raise ValueError(f"fleet scope manifest repository path is duplicated: {resolved}")
+        seen_paths.add(resolved_path)
+
+        eligibility = _required_string(raw_repository, "eligibility")
+        if eligibility not in _ELIGIBILITY:
+            raise ValueError(
+                f"fleet scope manifest eligibility must be eligible or excluded: {resolved}"
+            )
+        reason = _required_string(raw_repository, "reason")
+        if eligibility == "eligible" and not (resolved / ".git").exists():
+            raise ValueError(f"eligible fleet repository is not a Git checkout: {resolved}")
+        normalized.append({"path": resolved_path, "eligibility": eligibility, "reason": reason})
+
+    normalized.sort(key=lambda item: item["path"])
+    eligible_paths = [item["path"] for item in normalized if item["eligibility"] == "eligible"]
+    excluded = [item for item in normalized if item["eligibility"] == "excluded"]
+    if not eligible_paths:
+        raise ValueError("fleet scope manifest must include at least one eligible repository")
+
+    provenance = {
+        "schema": FLEET_SCOPE_MANIFEST_SCHEMA,
+        "authority": authority,
+        "generated_at": generated_at,
+        "repositories": normalized,
+    }
+    return {
+        **provenance,
+        "source_path": str(source),
+        "manifest_hash": digest(provenance),
+        "eligible_paths": eligible_paths,
+        "eligible_path_hash": digest(eligible_paths),
+        "eligible_repository_count": len(eligible_paths),
+        "excluded_repository_count": len(excluded),
+        "excluded_repositories": excluded,
+    }
+
+
+def _required_string(payload: dict[str, Any], key: str) -> str:
+    value = payload.get(key)
+    if not isinstance(value, str) or not value.strip():
+        raise ValueError(f"fleet scope manifest field is missing: {key}")
+    return value.strip()

@@ -14,6 +14,7 @@ def build_fleet_summary(
     dynamic: bool,
     changed_only: bool,
     standard: str | None = None,
+    population_coverage: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     selected_dimension = standard_dimension(standard)
     selected_dimensions = (selected_dimension,) if selected_dimension is not None else DIMENSIONS
@@ -32,10 +33,17 @@ def build_fleet_summary(
             "timeout",
             "unknown",
             "not_applicable",
+            "not_selected",
         )
     }
     unresolved: list[str] = []
     for result in repositories:
+        dynamic_result = result.get("dynamic")
+        dynamic_state = (
+            str(dynamic_result.get("status", "unknown"))
+            if isinstance(dynamic_result, dict)
+            else "unknown"
+        )
         for finding in result.get("findings", []):
             status = str(finding.get("status", "unknown"))
             finding_counts[status] = finding_counts.get(status, 0) + 1
@@ -47,7 +55,12 @@ def build_fleet_summary(
                 continue
             if isinstance(score, int | float) and isinstance(dimension, str) and score >= 0:
                 dimension_scores.setdefault(dimension, []).append(float(score))
-            if status in {"unknown", "stale", "blocked"}:
+            conclusive_dynamic_failure = (
+                dimension == "dynamic_verification"
+                and status == "blocked"
+                and dynamic_state == "failed"
+            )
+            if status in {"unknown", "stale", "blocked"} and not conclusive_dynamic_failure:
                 unresolved.append(f"{result.get('repo_id')}:{dimension}:{status}")
         for score_record in (
             applicable_agent_usability_scores(result.get("agent_usability"))
@@ -59,9 +72,8 @@ def build_fleet_summary(
             dimension_scores.setdefault(dimension, []).append(float(score_record["score"]))
             if status in {"unknown", "stale", "blocked"}:
                 unresolved.append(f"{result.get('repo_id')}:{dimension}:{status}")
-        dynamic_result = result.get("dynamic")
         if isinstance(dynamic_result, dict):
-            state = str(dynamic_result.get("status", "unknown"))
+            state = dynamic_state
             if dynamic_result.get("selected") is True:
                 dynamic_counts["selected"] += 1
             if state == "reused":
@@ -80,12 +92,31 @@ def build_fleet_summary(
                 dynamic_counts["unknown"] += 1
             elif state == "not_applicable":
                 dynamic_counts["not_applicable"] += 1
+            elif state == "not_selected":
+                dynamic_counts["not_selected"] += 1
     all_scores = [score for scores in dimension_scores.values() for score in scores]
     means = {
         dimension: round(sum(scores) / len(scores), 3) if scores else None
         for dimension, scores in sorted(dimension_scores.items())
     }
     stable_repositories = sorted(repositories, key=lambda item: str(item.get("repo_id", "")))
+    resolved_population = population_coverage or {
+        "status": "bounded",
+        "source": "unspecified",
+        "expected_repository_count": len(repositories),
+        "observed_repository_count": len(repositories),
+        "excluded_repository_count": 0,
+    }
+    unresolved_gaps = sorted(set(unresolved))
+    confidence, confidence_basis, confidence_limitations = _measurement_confidence(
+        repository_count=len(repositories),
+        static_completed=len(repositories),
+        dynamic=dynamic,
+        changed_only=changed_only,
+        dynamic_counts=dynamic_counts,
+        unresolved_gaps=unresolved_gaps,
+        population_coverage=resolved_population,
+    )
     summary = {
         "schema": "quality-runner-fleet-summary-v0.1",
         "status": "completed",
@@ -106,6 +137,7 @@ def build_fleet_summary(
         "dynamic_timeout": dynamic_counts["timeout"],
         "dynamic_unknown": dynamic_counts["unknown"],
         "dynamic_not_applicable": dynamic_counts["not_applicable"],
+        "dynamic_not_selected": dynamic_counts["not_selected"],
         "mean_maturity": round(sum(all_scores) / len(all_scores), 3) if all_scores else None,
         "dimension_means": means,
         "finding_counts": dict(sorted(finding_counts.items())),
@@ -114,13 +146,20 @@ def build_fleet_summary(
             "repositories": len(repositories),
             "applicable_dimension_scores": len(all_scores),
         },
-        "confidence": "medium" if repositories else "low",
-        "unresolved_measurement_gaps": sorted(set(unresolved)),
+        "confidence": confidence,
+        "confidence_basis": confidence_basis,
+        "confidence_limitations": confidence_limitations,
+        "population_coverage": resolved_population,
+        "unresolved_measurement_gaps": unresolved_gaps,
         "methodology": {
             "rubric": "0 absent, 1 informal, 2 discoverable, 3 executable/currently validated, 4 maintained/routed/automatically checked",
             "unknown_evidence_is_not_green": True,
             "not_applicable_requires_bounded_evidence": True,
-            "dynamic_scope": "changed, new, dirty, priority, stale, failed, or incomplete evidence only",
+            "dynamic_scope": (
+                "every eligible repository"
+                if dynamic and not changed_only
+                else "changed, new, dirty, priority, stale, failed, or incomplete evidence only"
+            ),
             "target_branch_policy": "explicit override, dev, documented fallback, locally verified remote default, or sole local branch; no maturity-based branch selection",
             "source_checkouts_modified": False,
         },
@@ -132,6 +171,7 @@ def build_fleet_summary(
                     item.get("static_provenance_hash") for item in stable_repositories
                 ],
                 "dynamic": [item.get("dynamic") for item in stable_repositories],
+                "population_coverage": resolved_population,
                 **({"standard": standard} if standard is not None else {}),
             }
         ),
@@ -143,3 +183,55 @@ def build_fleet_summary(
             "fleet maturity verdict."
         )
     return summary
+
+
+def _measurement_confidence(
+    *,
+    repository_count: int,
+    static_completed: int,
+    dynamic: bool,
+    changed_only: bool,
+    dynamic_counts: dict[str, int],
+    unresolved_gaps: list[str],
+    population_coverage: dict[str, Any],
+) -> tuple[str, list[str], list[str]]:
+    if repository_count == 0:
+        return "low", [], ["empty_repository_population"]
+
+    basis: list[str] = []
+    limitations: list[str] = []
+    expected_count = int(population_coverage.get("expected_repository_count", 0))
+    observed_count = int(population_coverage.get("observed_repository_count", 0))
+    if (
+        population_coverage.get("status") == "complete"
+        and expected_count == repository_count
+        and observed_count == repository_count
+    ):
+        basis.append("complete_population")
+    else:
+        limitations.append("population_not_attested_complete")
+
+    if static_completed == repository_count:
+        basis.append("complete_static_scan")
+    else:
+        limitations.append("static_scan_incomplete")
+
+    conclusive_dynamic_count = sum(
+        dynamic_counts[state] for state in ("reused", "passed", "failed", "not_applicable")
+    )
+    if dynamic and not changed_only and conclusive_dynamic_count == repository_count:
+        basis.append("complete_dynamic_verification")
+    else:
+        if not dynamic:
+            limitations.append("dynamic_verification_disabled")
+        elif changed_only:
+            limitations.append("dynamic_verification_changed_only")
+        if conclusive_dynamic_count != repository_count:
+            limitations.append("dynamic_verification_incomplete")
+
+    if unresolved_gaps:
+        limitations.append("unresolved_measurement_gaps")
+    else:
+        basis.append("no_unresolved_measurement_gaps")
+
+    return ("high" if not limitations else "medium"), basis, limitations

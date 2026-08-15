@@ -39,6 +39,7 @@ from quality_runner.fleet.dynamic import (
 from quality_runner.fleet.legibility import audit_repository, build_remediation_plan
 from quality_runner.fleet.replay_integrity import replay_manifest_errors
 from quality_runner.fleet.reporting import plan_markdown, report_markdown, summary_markdown
+from quality_runner.fleet.scope_manifest import load_fleet_scope_manifest
 from quality_runner.fleet.standard_audit import build_standard_report
 from quality_runner.fleet.static_scan import static_scan_repository as _static_scan_repository
 from quality_runner.fleet.summary import build_fleet_summary
@@ -60,6 +61,7 @@ def fleet_audit_payload(
     repository_paths: Sequence[Path] | None = None,
     as_of: str | None = None,
     standard: str | None = None,
+    scope_manifest: Path | None = None,
 ) -> dict[str, Any]:
     standard_dimension(standard)
     if standard is not None and dynamic:
@@ -68,6 +70,18 @@ def fleet_audit_payload(
     root = projects_root.expanduser().resolve()
     fleet_policy = load_fleet_policy(root)
     overrides = target_overrides or {}
+    if scope_manifest is not None and repository_paths is not None:
+        raise ValueError("scope manifest and explicit repository paths are mutually exclusive")
+    scope_manifest_payload = (
+        load_fleet_scope_manifest(scope_manifest, projects_root=root)
+        if scope_manifest is not None
+        else None
+    )
+    resolved_repository_paths = (
+        [Path(path) for path in scope_manifest_payload["eligible_paths"]]
+        if scope_manifest_payload is not None
+        else repository_paths
+    )
     audit_id = stable_id(
         "audit",
         str(root),
@@ -78,11 +92,20 @@ def fleet_audit_payload(
         timeout_seconds,
         standard,
         sorted(overrides.items()),
-        sorted(str(path.expanduser().resolve()) for path in repository_paths or []),
+        sorted(str(path.expanduser().resolve()) for path in resolved_repository_paths or []),
+        scope_manifest_payload.get("manifest_hash") if scope_manifest_payload else None,
         fleet_policy,
     )
     artifact_root = _artifact_root(output_dir, audit_id)
-    repositories = repositories_for_scope(root, repository_paths, fleet_policy=fleet_policy)
+    repositories = repositories_for_scope(
+        root, resolved_repository_paths, fleet_policy=fleet_policy
+    )
+    population_coverage = _population_coverage(
+        repositories=repositories,
+        repository_paths=repository_paths,
+        fleet_policy=fleet_policy,
+        scope_manifest=scope_manifest_payload,
+    )
     results: list[dict[str, Any]] = []
     for repository in repositories:
         target_override = overrides.get(str(repository["repo_id"]))
@@ -129,6 +152,7 @@ def fleet_audit_payload(
         dynamic=dynamic,
         changed_only=changed_only,
         standard=standard,
+        population_coverage=population_coverage,
     )
     inventory = {
         "schema": FLEET_INVENTORY_SCHEMA,
@@ -136,10 +160,13 @@ def fleet_audit_payload(
         "as_of": resolved_as_of,
         "projects_root": str(root),
         "scope": (
-            "explicit repository paths under the bounded projects root"
-            if repository_paths is not None
+            "complete repository population from a validated scope manifest"
+            if scope_manifest_payload is not None
+            else "explicit repository paths under the bounded projects root"
+            if resolved_repository_paths is not None
             else "all repository identities under the bounded projects root"
         ),
+        "population_coverage": population_coverage,
         "dynamic_policy": {
             "enabled": dynamic,
             "changed_only": changed_only,
@@ -289,6 +316,7 @@ def fleet_replay_payload(
         dynamic=bool(inventory.get("dynamic_policy", {}).get("enabled", False)),
         changed_only=bool(inventory.get("dynamic_policy", {}).get("changed_only", True)),
         standard=inventory.get("standard"),
+        population_coverage=cast(dict[str, Any], inventory.get("population_coverage", {})),
     )
     manifest_errors = replay_manifest_errors(
         manifest=manifest, inventory=inventory, summary=summary, findings=results
@@ -306,6 +334,51 @@ def fleet_replay_payload(
         "repository_count": len(results),
         "artifact_root": str(artifact_root),
         "implementation_allowed": False,
+    }
+
+
+def _population_coverage(
+    *,
+    repositories: list[dict[str, Any]],
+    repository_paths: Sequence[Path] | None,
+    fleet_policy: dict[str, Any],
+    scope_manifest: dict[str, Any] | None,
+) -> dict[str, Any]:
+    if scope_manifest is not None:
+        expected = int(scope_manifest["eligible_repository_count"])
+        observed = len(repositories)
+        if expected != observed:
+            raise ValueError(
+                "fleet scope manifest did not resolve to its expected unique repository count: "
+                f"expected {expected}, observed {observed}"
+            )
+        return {
+            "status": "complete",
+            "source": "scope_manifest",
+            "authority": scope_manifest["authority"],
+            "generated_at": scope_manifest["generated_at"],
+            "manifest_schema": scope_manifest["schema"],
+            "manifest_hash": scope_manifest["manifest_hash"],
+            "eligible_path_hash": scope_manifest["eligible_path_hash"],
+            "expected_repository_count": expected,
+            "observed_repository_count": observed,
+            "excluded_repository_count": int(scope_manifest["excluded_repository_count"]),
+        }
+    if repository_paths is None:
+        return {
+            "status": "complete",
+            "source": "automatic_discovery",
+            "authority": fleet_policy.get("source", "default"),
+            "expected_repository_count": len(repositories),
+            "observed_repository_count": len(repositories),
+            "excluded_repository_count": len(fleet_policy.get("exclude_paths", [])),
+        }
+    return {
+        "status": "bounded",
+        "source": "explicit_repository_paths",
+        "expected_repository_count": len(repository_paths),
+        "observed_repository_count": len(repositories),
+        "excluded_repository_count": 0,
     }
 
 

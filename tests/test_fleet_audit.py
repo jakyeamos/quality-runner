@@ -4,6 +4,8 @@ import json
 import subprocess
 from pathlib import Path
 
+import pytest
+
 from quality_runner.fleet.audit import (
     _static_scan_repository,
     fleet_audit_payload,
@@ -16,6 +18,7 @@ from quality_runner.fleet.discovery import (
 )
 from quality_runner.fleet.legibility import audit_repository
 from quality_runner.fleet.projection import build_local_projection
+from quality_runner.fleet.summary import build_fleet_summary
 
 
 def _git(root: Path, *args: str) -> str:
@@ -276,6 +279,186 @@ def test_fleet_audit_accepts_a_bounded_repository_slice(tmp_path: Path) -> None:
     inventory = json.loads((Path(audit["artifact_root"]) / "inventory.json").read_text())
     assert inventory["scope"] == "explicit repository paths under the bounded projects root"
     assert inventory["dynamic_policy"]["repository_watchdog_timeout_seconds"] == 1170
+
+
+def test_scope_manifest_attests_an_exact_population_and_preserves_exclusions(
+    tmp_path: Path,
+) -> None:
+    projects = tmp_path / "projects"
+    alpha = projects / "alpha"
+    deprecated = projects / "deprecated"
+    _init_repo(alpha)
+    _init_repo(deprecated)
+    manifest = tmp_path / "fleet-scope.json"
+    manifest.write_text(
+        json.dumps(
+            {
+                "schema": "quality-runner-fleet-scope/v1",
+                "authority": "fixture registry with owner-reviewed exclusions",
+                "generated_at": "2026-08-15T15:00:00+00:00",
+                "repositories": [
+                    {
+                        "path": str(alpha),
+                        "eligibility": "eligible",
+                        "reason": "registered and active",
+                    },
+                    {
+                        "path": str(deprecated),
+                        "eligibility": "excluded",
+                        "reason": "deprecated by the repository owner",
+                    },
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    audit = fleet_audit_payload(
+        projects_root=projects,
+        scope_manifest=manifest,
+        output_dir=tmp_path / "fleet-output",
+        as_of="2026-08-15T15:01:00+00:00",
+    )
+
+    assert audit["repository_count"] == 1
+    coverage = audit["summary"]["population_coverage"]
+    assert coverage["status"] == "complete"
+    assert coverage["source"] == "scope_manifest"
+    assert coverage["expected_repository_count"] == 1
+    assert coverage["observed_repository_count"] == 1
+    assert coverage["excluded_repository_count"] == 1
+    inventory = json.loads((Path(audit["artifact_root"]) / "inventory.json").read_text())
+    assert inventory["scope"] == "complete repository population from a validated scope manifest"
+
+
+def test_scope_manifest_rejects_duplicate_and_out_of_root_paths(tmp_path: Path) -> None:
+    projects = tmp_path / "projects"
+    alpha = projects / "alpha"
+    outside = tmp_path / "outside"
+    _init_repo(alpha)
+    _init_repo(outside)
+    manifest = tmp_path / "fleet-scope.json"
+    base = {
+        "schema": "quality-runner-fleet-scope/v1",
+        "authority": "fixture registry",
+        "generated_at": "2026-08-15T15:00:00+00:00",
+    }
+    manifest.write_text(
+        json.dumps(
+            {
+                **base,
+                "repositories": [
+                    {"path": str(alpha), "eligibility": "eligible", "reason": "active"},
+                    {"path": str(alpha), "eligibility": "excluded", "reason": "duplicate"},
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="duplicated"):
+        fleet_audit_payload(projects_root=projects, scope_manifest=manifest)
+
+    manifest.write_text(
+        json.dumps(
+            {
+                **base,
+                "repositories": [
+                    {"path": str(outside), "eligibility": "eligible", "reason": "outside"}
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="outside projects_root"):
+        fleet_audit_payload(projects_root=projects, scope_manifest=manifest)
+
+
+def test_measurement_confidence_requires_population_static_dynamic_and_gap_coverage() -> None:
+    repository = {
+        "repo_id": "repo-fixture",
+        "repository": {"checkout_count": 1},
+        "findings": [
+            {
+                "dimension": "quality_commands",
+                "status": "maintained",
+                "score": 4,
+                "priority": "P2",
+            }
+        ],
+        "agent_usability": {"applicability": "not_applicable"},
+        "dynamic": {"selected": True, "status": "passed"},
+    }
+    coverage = {
+        "status": "complete",
+        "source": "scope_manifest",
+        "expected_repository_count": 1,
+        "observed_repository_count": 1,
+        "excluded_repository_count": 0,
+    }
+
+    high = build_fleet_summary(
+        audit_id="audit-high",
+        as_of="2026-08-15T15:00:00+00:00",
+        repositories=[repository],
+        dynamic=True,
+        changed_only=False,
+        population_coverage=coverage,
+    )
+    static_only = build_fleet_summary(
+        audit_id="audit-medium",
+        as_of="2026-08-15T15:00:00+00:00",
+        repositories=[repository],
+        dynamic=False,
+        changed_only=True,
+        population_coverage=coverage,
+    )
+
+    assert high["confidence"] == "high"
+    assert high["confidence_limitations"] == []
+    assert high["confidence_basis"] == [
+        "complete_population",
+        "complete_static_scan",
+        "complete_dynamic_verification",
+        "no_unresolved_measurement_gaps",
+    ]
+    assert static_only["confidence"] == "medium"
+    assert static_only["confidence_limitations"] == ["dynamic_verification_disabled"]
+
+
+def test_conclusive_dynamic_failure_does_not_masquerade_as_a_measurement_gap() -> None:
+    summary = build_fleet_summary(
+        audit_id="audit-known-failure",
+        as_of="2026-08-15T15:00:00+00:00",
+        repositories=[
+            {
+                "repo_id": "repo-fixture",
+                "repository": {"checkout_count": 1},
+                "findings": [
+                    {
+                        "dimension": "dynamic_verification",
+                        "status": "blocked",
+                        "score": 0,
+                        "priority": "P0",
+                    }
+                ],
+                "agent_usability": {"applicability": "not_applicable"},
+                "dynamic": {"selected": True, "status": "failed"},
+            }
+        ],
+        dynamic=True,
+        changed_only=False,
+        population_coverage={
+            "status": "complete",
+            "source": "scope_manifest",
+            "expected_repository_count": 1,
+            "observed_repository_count": 1,
+            "excluded_repository_count": 0,
+        },
+    )
+
+    assert summary["confidence"] == "high"
+    assert summary["dynamic_failed"] == 1
+    assert summary["unresolved_measurement_gaps"] == []
 
 
 def test_public_report_contains_aggregates_only(tmp_path: Path) -> None:

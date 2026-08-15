@@ -85,14 +85,23 @@ def build_maturity_feed(
         raise MaturityFeedError("fleet audit status is not publishable")
 
     projects_root = _required_string(inventory, "projects_root")
-    if expected_projects_root is not None:
+    population_coverage = _object(summary.get("population_coverage"))
+    if population_coverage.get("status") != "complete":
+        raise MaturityFeedError("maturity feed requires an attested complete population")
+    population_source = str(population_coverage.get("source", ""))
+    if expected_projects_root is not None and population_source == "automatic_discovery":
         expected = str(expected_projects_root.expanduser().resolve())
         if projects_root != expected:
             raise MaturityFeedError(
                 f"fleet audit projects root does not match the production scope: {projects_root}"
             )
     scope = _required_string(inventory, "scope")
-    if "all repository identities" not in scope:
+    if population_source == "scope_manifest":
+        if "validated scope manifest" not in scope:
+            raise MaturityFeedError("maturity feed scope manifest provenance is incomplete")
+        if not _required_string(population_coverage, "manifest_hash"):
+            raise MaturityFeedError("maturity feed scope manifest hash is missing")
+    elif "all repository identities" not in scope:
         raise MaturityFeedError("maturity feed requires a fleet-wide audit scope")
 
     repositories = _objects(inventory.get("repositories"))
@@ -141,6 +150,16 @@ def build_maturity_feed(
             round(sum(holistic_scores) / len(holistic_scores), 3) if holistic_scores else None
         ),
         "source_dimension_mean": summary.get("mean_maturity"),
+        "measurement_confidence": {
+            "level": str(summary.get("confidence", "low")),
+            "basis": _string_list(summary.get("confidence_basis")),
+            "limitations": _string_list(summary.get("confidence_limitations")),
+            "population_coverage": population_coverage,
+            "unresolved_measurement_gap_count": len(
+                _string_list(summary.get("unresolved_measurement_gaps"))
+            ),
+            "deterministic_replay": True,
+        },
         "dimension_means": _number_mapping(summary.get("dimension_means")),
         "pillar_means": pillar_means(maturity_models),
         "maturity_certified_repository_count": sum(
@@ -232,6 +251,21 @@ def validate_maturity_feed(feed: Mapping[str, Any]) -> None:
         or replay.get("replayed_summary_hash") != summary_hash
     ):
         raise MaturityFeedError("maturity feed replay hashes do not match its source summary")
+    measurement_confidence = feed.get("measurement_confidence")
+    if measurement_confidence is not None:
+        confidence = _object(measurement_confidence)
+        if confidence.get("level") not in {"low", "medium", "high"}:
+            raise MaturityFeedError("maturity feed measurement confidence is invalid")
+        if confidence.get("deterministic_replay") is not True:
+            raise MaturityFeedError("maturity feed confidence requires deterministic replay")
+        population = _object(confidence.get("population_coverage"))
+        if population.get("status") != "complete":
+            raise MaturityFeedError("maturity feed confidence population is incomplete")
+        if confidence.get("level") == "high" and (
+            _string_list(confidence.get("limitations"))
+            or int(confidence.get("unresolved_measurement_gap_count", -1)) != 0
+        ):
+            raise MaturityFeedError("high measurement confidence cannot retain limitations")
     repositories = _objects(feed.get("repositories"))
     if int(feed.get("repository_count", 0)) != len(repositories) or not repositories:
         raise MaturityFeedError("maturity feed repository count is invalid")
