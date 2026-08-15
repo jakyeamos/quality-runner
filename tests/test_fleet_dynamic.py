@@ -284,7 +284,7 @@ def test_dynamic_dependency_setup_is_locked_offline_and_script_free(
     assert result["status"] == "passed"
     assert calls == [
         (
-            "pnpm install --offline --frozen-lockfile --ignore-scripts --reporter=append-only",
+            "pnpm install --offline --frozen-lockfile --ignore-scripts --reporter=silent",
             tmp_path,
             60,
         )
@@ -438,7 +438,7 @@ def test_dependency_copy_failure_falls_back_to_locked_offline_setup(
 
     assert result["status"] == "passed"
     assert calls == [
-        "pnpm install --offline --frozen-lockfile --ignore-scripts --reporter=append-only"
+        "pnpm install --offline --frozen-lockfile --ignore-scripts --reporter=silent"
     ]
 
 
