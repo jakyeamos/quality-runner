@@ -202,7 +202,8 @@ def _finding_from_sarif(item: dict[str, Any], root: Path) -> dict[str, Any]:
     fingerprint = None
     if isinstance(partial, dict):
         fingerprint = next((value for value in partial.values() if isinstance(value, str)), None)
-    properties = item.get("properties") if isinstance(item.get("properties"), dict) else {}
+    raw_properties = item.get("properties")
+    properties = raw_properties if isinstance(raw_properties, dict) else {}
     return _make_external_finding(
         rule_id=rule_id,
         file=file,
