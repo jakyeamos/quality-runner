@@ -44,6 +44,14 @@ def test_large_source_file_positive_promotion_fixture(tmp_path: Path) -> None:
     assert "large-source-file" in _large_source_rules(tmp_path)
 
 
+def test_large_source_file_rust_positive_promotion_fixture(tmp_path: Path) -> None:
+    source = tmp_path / "src-tauri" / "src" / "quality.rs"
+    source.parent.mkdir(parents=True)
+    source.write_text("\n".join(f"fn value_{index}() -> usize {{ {index} }}" for index in range(6)))
+
+    assert "large-source-file" in _large_source_rules(tmp_path)
+
+
 def test_large_source_file_negative_promotion_fixture(tmp_path: Path) -> None:
     source = tmp_path / "src" / "service.py"
     source.parent.mkdir()

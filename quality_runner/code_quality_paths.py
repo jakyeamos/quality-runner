@@ -8,7 +8,19 @@ from quality_runner.scan_exclusions import (
     TOP_LEVEL_ARTIFACT_DIRECTORY_NAMES,
 )
 
-CODE_EXTENSIONS = {".cjs", ".css", ".html", ".js", ".jsx", ".mjs", ".py", ".sh", ".ts", ".tsx"}
+CODE_EXTENSIONS = {
+    ".cjs",
+    ".css",
+    ".html",
+    ".js",
+    ".jsx",
+    ".mjs",
+    ".py",
+    ".rs",
+    ".sh",
+    ".ts",
+    ".tsx",
+}
 TEXT_EXTENSIONS = {*CODE_EXTENSIONS, ".json", ".md", ".toml", ".yaml", ".yml"}
 STRUCTURAL_ARTIFACT_TOP_LEVEL_DIRS = TOP_LEVEL_ARTIFACT_DIRECTORY_NAMES - {
     "data",
@@ -319,7 +331,16 @@ def _previous_token(previous: str, char: str) -> str:
 
 
 def _is_source_file(relative_path: str) -> bool:
-    return Path(relative_path).suffix in {".cjs", ".js", ".jsx", ".mjs", ".py", ".ts", ".tsx"}
+    return Path(relative_path).suffix in {
+        ".cjs",
+        ".js",
+        ".jsx",
+        ".mjs",
+        ".py",
+        ".rs",
+        ".ts",
+        ".tsx",
+    }
 
 
 def _is_javascript_source_file(relative_path: str) -> bool:
