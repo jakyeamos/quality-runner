@@ -75,6 +75,20 @@ def test_actionability_maps_integrate_findings_to_author_decision() -> None:
     assert "wire" in rationale
 
 
+def test_actionability_requires_author_decision_for_test_quality_dispositions() -> None:
+    actionability, rationale = actionability_for_finding(
+        {
+            "category": "structural:improve-tests",
+            "severity": "observation",
+            "summary": "removed behavior lock",
+            "suggested_disposition": "delete_candidate",
+        }
+    )
+
+    assert actionability == "needs-author-decision"
+    assert "not mutation authority" in rationale
+
+
 def test_enrich_audit_findings_adds_actionability() -> None:
     findings = enrich_audit_findings(
         [

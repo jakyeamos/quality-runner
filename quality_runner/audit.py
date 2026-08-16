@@ -334,13 +334,23 @@ def _structural_summary(
     )
 
 
-def _structural_rule_metadata(representative: dict[str, Any]) -> dict[str, str]:
-    metadata: dict[str, str] = {}
+def _structural_rule_metadata(representative: dict[str, Any]) -> dict[str, Any]:
+    metadata: dict[str, Any] = {}
     typed_representative: dict[str, object] = representative
-    for field in ("rule_message", "rule_category"):
+    for field in (
+        "rule_message",
+        "rule_category",
+        "suggested_disposition",
+        "disposition_rationale",
+    ):
         value = typed_representative.get(field)
         if isinstance(value, str) and value:
             metadata[field] = value
+    evidence_needed = typed_representative.get("evidence_needed")
+    if isinstance(evidence_needed, list) and all(
+        isinstance(item, str) and item for item in evidence_needed
+    ):
+        metadata["evidence_needed"] = evidence_needed
     return metadata
 
 

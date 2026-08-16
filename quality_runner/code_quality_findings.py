@@ -38,6 +38,9 @@ def _finding(
     remediation_bucket: str,
     rule_message: str | None = None,
     rule_category: str | None = None,
+    suggested_disposition: str | None = None,
+    disposition_rationale: str | None = None,
+    evidence_needed: list[str] | None = None,
 ) -> dict[str, Any]:
     redacted_evidence = redact_secret_like_literals(evidence).strip()
     fingerprint = _fingerprint(rule_id, file, redacted_evidence)
@@ -61,6 +64,12 @@ def _finding(
         finding["rule_message"] = rule_message
     if isinstance(rule_category, str) and rule_category:
         finding["rule_category"] = rule_category
+    if isinstance(suggested_disposition, str) and suggested_disposition:
+        finding["suggested_disposition"] = suggested_disposition
+    if isinstance(disposition_rationale, str) and disposition_rationale:
+        finding["disposition_rationale"] = disposition_rationale
+    if evidence_needed:
+        finding["evidence_needed"] = evidence_needed
     return finding
 
 

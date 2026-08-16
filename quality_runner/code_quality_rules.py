@@ -22,6 +22,7 @@ from quality_runner.code_quality_rule_groups import (
     harden_findings,
     test_quality_findings,
 )
+from quality_runner.code_quality_test_quality import test_file_quality_findings
 from quality_runner.code_quality_ui_rules import (
     ui_file_level_findings,
     ui_structural_findings,
@@ -188,6 +189,9 @@ def _scan_file(
 
     if "ui_structural" not in disabled_groups:
         findings.extend(ui_file_level_findings(relative_path, text, lines))
+
+    if "improve-tests" not in disabled_groups:
+        findings.extend(test_file_quality_findings(relative_path, text))
 
     if "harden" not in disabled_groups or "speed" not in disabled_groups:
         findings.extend(

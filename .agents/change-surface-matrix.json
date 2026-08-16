@@ -30,6 +30,7 @@
         "uv run --locked pytest -q",
         "pnpm dynamic dependency setup regressions under a compatible Node runtime: exact declared pnpm 10 lock semantics, fleet-owned pnpm 11 frozen-store behavior, prepared Corepack and metadata caches, and canonical-parent local dependency resolution",
         "collision-safe remediation wiring ID regression for normalized path collisions",
+        "uv run --locked pytest -q tests/test_code_quality.py::test_test_quality_findings_are_bounded_and_include_remediation_dispositions tests/test_phase1_semantics.py::test_actionability_requires_author_decision_for_test_quality_dispositions",
         "uv run --locked ruff check .",
         "uv run --locked basedpyright",
         "For maturity changes, verify dimension-to-capability-to-pillar aggregation, reverse producer coverage, explicit capability applicability, evidence coverage, missing capabilities, and confirmed-risk-only critical caps."
