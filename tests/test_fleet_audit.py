@@ -559,9 +559,7 @@ def test_unknown_applicability_without_a_numeric_score_is_a_measurement_gap() ->
     )
 
     assert summary["confidence"] == "medium"
-    assert summary["unresolved_measurement_gaps"] == [
-        "repo-fixture:license_contribution:unknown"
-    ]
+    assert summary["unresolved_measurement_gaps"] == ["repo-fixture:license_contribution:unknown"]
 
 
 def test_public_report_contains_aggregates_only(tmp_path: Path) -> None:
