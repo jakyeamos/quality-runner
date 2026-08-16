@@ -107,6 +107,23 @@ Returns:
 - package version
 - local Python/platform details
 
+## `quality-runner fleet custody validate`
+
+Validates isolated-change-workflow custody from independent live Git and local
+receipt evidence. The command is read-only and never claims authority to adopt,
+integrate, delete, push, or repair a lane:
+
+```bash
+qr fleet custody validate /path/to/repository --json
+```
+
+The result uses `quality-runner-custody-validation/v1`. Read `state` as the
+lifecycle projection and `disposition`/`dispositions` as the actionable reason.
+Malformed, integrity-invalid, unsupported, legacy unsigned, binding-mismatched, dirty, active
+operation, and unavailable-evidence lanes remain explicit and are never folded
+into an unexplained `unknown` result. See
+[Isolated-change custody validation](integrations/pronto-custody.md).
+
 ## `quality-runner task`
 
 `task` is the preventative implementation-loop contract. It compares the exact
@@ -954,6 +971,7 @@ the compatibility command does not edit Git ignore configuration.
 - `2`: argument parsing error.
 
 Errors are printed to stderr without Python tracebacks.
+
 ## `quality-runner review`
 
 Fresh Review is a local, two-phase evidence workflow. It never edits source

@@ -1,0 +1,54 @@
+{
+  "schema_version": "quality-runner-custody-validation/v1",
+  "generated_at": "2026-08-16T20:00:00Z",
+  "repository": "/path/to/projects/fixture-repository",
+  "common_git_dir": "/path/to/projects/fixture-repository/.git",
+  "receipt_root": "/path/to/projects/fixture-repository/.git/isolated-change-workflow/tasks",
+  "source": "quality_runner_live_git_plus_local_receipts",
+  "read_only": true,
+  "implementation_allowed": false,
+  "mutation_risk": "read-only",
+  "status": "attention_required",
+  "next_safe_step": "Preserve unresolved lanes and obtain the named live evidence.",
+  "lanes": [
+    {
+      "task_id": "fixture-legacy",
+      "state": "unknown",
+      "disposition": "legacy_unsigned_receipt",
+      "dispositions": ["legacy_unsigned_receipt"],
+      "next_action": "Use the bounded legacy owner-return or adoption review; do not infer custody from age.",
+      "blockers": ["legacy-receipt-requires-review"],
+      "evidence": ["receipt-integrity=legacy_unsigned"]
+    },
+    {
+      "task_id": "fixture-adoptable",
+      "state": "adoptable",
+      "disposition": "adoption_ready",
+      "dispositions": ["receipt_integrity_unverified", "adoption_ready"],
+      "next_action": "Recheck negative evidence and use an exact-head custody adoption claim.",
+      "blockers": [],
+      "evidence": [
+        "receipt-integrity=present_unverified",
+        "worktree-clean",
+        "no-open-files-observed"
+      ]
+    }
+  ],
+  "unleased_worktrees": [],
+  "counts": { "unknown": 1, "adoptable": 1 },
+  "disposition_counts": { "legacy_unsigned_receipt": 1, "adoption_ready": 1 },
+  "overlaps": [],
+  "wip": { "records": [], "errors": [] },
+  "integrity": {
+    "receipt_states": { "legacy_unsigned": 1, "present_unverified": 1 },
+    "hmac_identity": "not_verified_by_quality_runner",
+    "live_git": "observed",
+    "provider_review": "not_queried"
+  },
+  "provenance": {
+    "producer": "quality-runner",
+    "observed_at": "2026-08-16T20:00:00Z",
+    "stale_seconds": 86400,
+    "adoptable_seconds": 259200
+  }
+}

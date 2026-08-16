@@ -98,6 +98,61 @@
           }
         }
       ]
+    },
+    {
+      "id": "fleet-custody-validation",
+      "title": "Custody validation preserves granular evidence and read-only authority",
+      "tier": 0,
+      "automation": "permanent",
+      "change_triggers": [
+        "quality_runner/fleet/custody.py",
+        "quality_runner/cli_fleet.py",
+        "quality_runner/cli.py",
+        "quality_runner/schemas/custody-validation.schema.json",
+        "tests/test_fleet_custody.py",
+        "docs/integrations/pronto-custody.md"
+      ],
+      "invariants": [
+        "The validator uses live Git and local receipt evidence rather than cached custody labels.",
+        "Lifecycle state is separate from stable dispositions; malformed, unsupported, legacy unsigned, binding-mismatched, dirty, active-operation, and unavailable evidence remain actionable.",
+        "A clean expired lane may be adoptable only when exact live binding and negative evidence support it; QR never verifies the workflow HMAC identity.",
+        "The validator is read-only and cannot authorize adoption, integration, deletion, branch publication, or push."
+      ],
+      "scenarios": [
+        {
+          "id": "granular-dispositions",
+          "title": "Unsupported and unsigned receipts remain distinguishable",
+          "oracle": "Malformed, unsupported-schema, legacy-unsigned, binding-mismatch, dirty, active-operation, and unavailable-evidence lanes carry distinct disposition codes and a next action while retaining the correct lifecycle state.",
+          "verification_level": "automated",
+          "edge_profile": {
+            "categories": ["input_and_encoding", "state_and_ordering", "environment_and_cross_surface"],
+            "risk": "hostile",
+            "side_effects": "none"
+          }
+        },
+        {
+          "id": "abandoned-lane-adoptable",
+          "title": "Safe abandoned work is surfaced without owner return",
+          "oracle": "A clean inactive lane beyond the adoption window is reported as adoptable with adoption_ready, while dirty, open, operation-active, or contradictory evidence remains blocked or unknown.",
+          "verification_level": "automated",
+          "edge_profile": {
+            "categories": ["timing_and_concurrency", "interruption_and_recovery"],
+            "risk": "hostile",
+            "side_effects": "none"
+          }
+        },
+        {
+          "id": "read-only-no-authority",
+          "title": "Validation never mutates custody or Git",
+          "oracle": "The command leaves repository status, branches, worktrees, receipt files, and WIP files unchanged and explicitly returns implementation_allowed=false and mutation_risk=read-only.",
+          "verification_level": "automated",
+          "edge_profile": {
+            "categories": ["authorization_and_session", "repetition_and_idempotency"],
+            "risk": "hostile",
+            "side_effects": "none"
+          }
+        }
+      ]
     }
   ]
 }

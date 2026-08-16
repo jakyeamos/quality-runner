@@ -1,0 +1,115 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "quality-runner-custody-validation-v1",
+  "title": "Quality Runner isolated-change custody validation",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "repository",
+    "source",
+    "read_only",
+    "implementation_allowed",
+    "mutation_risk",
+    "status",
+    "next_safe_step",
+    "lanes",
+    "unleased_worktrees",
+    "counts",
+    "disposition_counts",
+    "overlaps",
+    "wip",
+    "integrity",
+    "provenance"
+  ],
+  "properties": {
+    "schema_version": { "const": "quality-runner-custody-validation/v1" },
+    "generated_at": { "type": "string", "format": "date-time" },
+    "repository": { "type": "string", "minLength": 1 },
+    "common_git_dir": { "type": "string", "minLength": 1 },
+    "receipt_root": { "type": "string", "minLength": 1 },
+    "source": { "const": "quality_runner_live_git_plus_local_receipts" },
+    "read_only": { "const": true },
+    "implementation_allowed": { "const": false },
+    "mutation_risk": { "const": "read-only" },
+    "status": { "enum": ["observed", "attention_required"] },
+    "next_safe_step": { "type": "string", "minLength": 1 },
+    "lanes": { "type": "array", "items": { "$ref": "#/$defs/lane" } },
+    "unleased_worktrees": { "type": "array", "items": { "type": "string" } },
+    "counts": {
+      "type": "object",
+      "additionalProperties": { "type": "integer", "minimum": 0 }
+    },
+    "disposition_counts": {
+      "type": "object",
+      "additionalProperties": { "type": "integer", "minimum": 0 }
+    },
+    "overlaps": { "type": "array", "items": { "type": "object" } },
+    "wip": { "type": "object" },
+    "integrity": { "type": "object" },
+    "provenance": { "type": "object" }
+  },
+  "$defs": {
+    "lane": {
+      "type": "object",
+      "required": [
+        "task_id",
+        "state",
+        "disposition",
+        "dispositions",
+        "next_action"
+      ],
+      "properties": {
+        "task_id": { "type": "string", "minLength": 1 },
+        "state": {
+          "enum": [
+            "active",
+            "paused",
+            "stale",
+            "adoptable",
+            "contested",
+            "integrating",
+            "closed",
+            "unknown"
+          ]
+        },
+        "disposition": { "$ref": "#/$defs/disposition" },
+        "dispositions": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/disposition" },
+          "uniqueItems": true
+        },
+        "next_action": { "type": "string", "minLength": 1 },
+        "blockers": { "type": "array", "items": { "type": "string" } },
+        "evidence": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "disposition": {
+      "enum": [
+        "receipt_integrity_verified",
+        "receipt_integrity_unverified",
+        "receipt_integrity_invalid",
+        "legacy_unsigned_receipt",
+        "receipt_malformed",
+        "receipt_schema_unsupported",
+        "competing_custody",
+        "worktree_not_live",
+        "worktree_binding_mismatch",
+        "branch_binding_mismatch",
+        "head_binding_mismatch",
+        "git_operation_active",
+        "dirty_worktree",
+        "open_files_observed",
+        "live_git_evidence_unavailable",
+        "lease_expiry_unavailable",
+        "lease_current",
+        "lease_expired_grace",
+        "adoption_ready",
+        "adoption_blocked",
+        "owner_paused",
+        "integration_locked",
+        "closed_recorded",
+        "custody_evidence_insufficient"
+      ]
+    }
+  }
+}

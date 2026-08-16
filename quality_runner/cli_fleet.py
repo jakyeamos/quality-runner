@@ -11,6 +11,7 @@ from quality_runner.fleet.audit import (
     fleet_show_payload,
 )
 from quality_runner.fleet.contracts import SUPPORTED_FLEET_STANDARDS
+from quality_runner.fleet.custody import custody_validation_payload
 from quality_runner.fleet.detector_refresh import fleet_detector_refresh_payload
 from quality_runner.fleet.feed import fleet_feed_payload
 from quality_runner.fleet.mac_control import (
@@ -84,6 +85,21 @@ def add_fleet_commands(subparsers: Any) -> None:
     )
     detector_refresh.add_argument("--as-of", default=None)
     detector_refresh.add_argument("--json", action="store_true")
+    custody_parser = fleet_actions.add_parser(
+        "custody",
+        help="Validate isolated-change-workflow custody from independent live evidence",
+    )
+    custody_actions = custody_parser.add_subparsers(dest="custody_action", required=True)
+    custody_validate = custody_actions.add_parser(
+        "validate",
+        help="Read-only custody validation; this command never grants mutation authority",
+    )
+    custody_validate.add_argument("repository", nargs="?", default=None)
+    custody_validate.add_argument("--repo-path", default=None)
+    custody_validate.add_argument("--stale-seconds", type=int, default=86400)
+    custody_validate.add_argument("--adoptable-seconds", type=int, default=259200)
+    custody_validate.add_argument("--as-of", default=None)
+    custody_validate.add_argument("--json", action="store_true")
     audit_parser = fleet_actions.add_parser(
         "audit",
         help="Run, inspect, replay, or report a fleet environment-legibility audit",
@@ -225,6 +241,17 @@ def add_fleet_commands(subparsers: Any) -> None:
 
 
 def fleet_command_payload(args: argparse.Namespace) -> dict[str, Any]:
+    if args.fleet_action == "custody":
+        if args.custody_action != "validate":
+            raise ValueError(f"unsupported fleet custody action: {args.custody_action}")
+        if bool(args.repository) == bool(args.repo_path):
+            raise ValueError("fleet custody validate requires exactly one repository path")
+        return custody_validation_payload(
+            Path(args.repository or args.repo_path),
+            stale_seconds=args.stale_seconds,
+            adoptable_seconds=args.adoptable_seconds,
+            as_of=args.as_of,
+        )
     if args.fleet_action == "mac-control":
         if args.mac_control_action != "audit":
             raise ValueError(f"unsupported Mac Control action: {args.mac_control_action}")

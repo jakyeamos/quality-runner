@@ -53,6 +53,26 @@
       "status": "applicable"
     },
     {
+      "id": "custody-validation-contract",
+      "scope": "external",
+      "distribution": "public_adapter",
+      "contract_fixtures": [
+        "fixtures/contracts/public-adapters/pronto-custody-validation.json"
+      ],
+      "path": "quality_runner/fleet/custody.py, quality_runner/cli_fleet.py, quality_runner/cli.py, quality_runner/schemas/custody-validation.schema.json, tests/test_fleet_custody.py, docs/integrations/pronto-custody.md, and Pronto custody consumer readback",
+      "owner": "Quality Runner and Pronto integration owners",
+      "condition": "Isolated-change custody state, receipt integrity classification, granular disposition taxonomy, adoption readiness, WIP safety, or read-only authority boundaries change.",
+      "operations": ["add", "change", "remove"],
+      "validation": [
+        "uv run --locked pytest -q tests/test_fleet_custody.py",
+        "uv run --locked ruff check quality_runner/fleet/custody.py quality_runner/cli_fleet.py quality_runner/cli.py tests/test_fleet_custody.py",
+        "uv run --locked pytest -q tests/test_release_boundary.py tests/test_entrypoints.py",
+        "Validate the sanitized custody-validation schema and public adapter fixture.",
+        "Run qr fleet custody validate against a synthetic repository and confirm the result is read-only, granular, and consumer-readable by Pronto."
+      ],
+      "status": "applicable"
+    },
+    {
       "id": "mac-control-semantic-contract",
       "scope": "external",
       "distribution": "public_adapter",
