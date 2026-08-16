@@ -37,6 +37,19 @@ def test_local_command_env_uses_allowlist_and_repo_local_caches(tmp_path, monkey
     assert "AWS_SECRET_ACCESS_KEY" not in env
 
 
+def test_command_capture_replaces_invalid_utf8_in_stdout_and_stderr(tmp_path) -> None:
+    script = (
+        "import sys; "
+        "sys.stdout.buffer.write(bytes([111, 107, 128])); "
+        "sys.stderr.buffer.write(bytes([101, 114, 114, 255]))"
+    )
+    command = f"{shlex.quote(sys.executable)} -c {shlex.quote(script)}"
+
+    result = run_shell_command(command, cwd=tmp_path, timeout=10)
+
+    assert result == {"stdout": "ok�", "stderr": "err�", "returncode": 0}
+
+
 def test_offline_uv_command_uses_prepared_host_cache(tmp_path, monkeypatch) -> None:
     monkeypatch.setenv("UV_CACHE_DIR", "/inherited/uv-cache")
 

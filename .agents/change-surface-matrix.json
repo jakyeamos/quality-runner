@@ -28,6 +28,7 @@
       "operations": ["add", "change", "remove"],
       "validation": [
         "uv run --locked pytest -q",
+        "malformed subprocess stdout/stderr decoding regression preserves bounded fleet evidence",
         "pnpm dynamic dependency setup regressions under a compatible Node runtime: exact declared pnpm 10 lock semantics, fleet-owned pnpm 11 frozen-store behavior, prepared Corepack and metadata caches, and canonical-parent local dependency resolution",
         "collision-safe remediation wiring ID regression for normalized path collisions",
         "uv run --locked pytest -q tests/test_code_quality.py::test_test_quality_findings_are_bounded_and_include_remediation_dispositions tests/test_phase1_semantics.py::test_actionability_requires_author_decision_for_test_quality_dispositions",

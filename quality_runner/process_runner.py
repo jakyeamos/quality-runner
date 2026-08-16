@@ -43,6 +43,7 @@ def _run_command(
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         text=True,
+        errors="replace",
         start_new_session=True,
         env=local_command_env(cwd, command=command if isinstance(command, str) else None),
     )

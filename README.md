@@ -250,6 +250,10 @@ next repository. Every fleet subprocess starts in a dedicated process group,
 and timeout cleanup escalates across the stored group even when its original
 leader has already exited, preventing descendants with inherited output pipes
 from stalling the coordinator.
+Captured subprocess output is decoded as UTF-8 with replacement for malformed
+bytes, so an invalid repository command byte remains bounded evidence instead
+of aborting the fleet coordinator. Redaction still applies before failure tails
+are persisted.
 JavaScript dependency trees are either copied into the disposable worktree or
 reproduced from a pinned package manager and lockfile without scripts or
 network access. Nested JavaScript workspaces inherit a pinned root package

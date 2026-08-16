@@ -495,6 +495,10 @@ of `tests = 300` takes effect when the fleet run uses
 Fleet formatter discovery prefers `format:check` and will not execute a
 formatter reported as `mutating` or `unknown`.
 
+Fleet subprocess stdout and stderr are decoded as UTF-8 with replacement for
+malformed bytes. This keeps invalid repository command output as bounded,
+redacted evidence instead of aborting the coordinator.
+
 Offline Corepack setup keeps the subprocess environment sanitized while routing
 `COREPACK_HOME` and pnpm's `cacheDir` to the operator's prepared Corepack and
 pnpm metadata caches. This prevents registry lookups before the selected package

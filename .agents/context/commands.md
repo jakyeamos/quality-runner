@@ -27,6 +27,10 @@ uv run --locked qr fleet audit replay --audit-id AUDIT_ID --json
 uv run --locked qr fleet audit feed --audit-id AUDIT_ID --json
 ```
 
+Fleet subprocess stdout and stderr are captured as UTF-8 with replacement for
+malformed bytes. This preserves a bounded, redacted command receipt when a
+repository tool emits non-UTF-8 output instead of aborting the coordinator.
+
 For the complete pre-release path, also run:
 
 ```sh
