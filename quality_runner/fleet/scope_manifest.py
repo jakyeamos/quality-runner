@@ -170,5 +170,7 @@ def _distribution_attestation(value: Any, *, index: int) -> dict[str, str] | Non
     try:
         datetime.fromisoformat(observed_at.replace("Z", "+00:00"))
     except ValueError as error:
-        raise ValueError("fleet scope manifest distribution observed_at must be ISO-8601") from error
+        raise ValueError(
+            "fleet scope manifest distribution observed_at must be ISO-8601"
+        ) from error
     return {"visibility": visibility, "source": source, "observed_at": observed_at}

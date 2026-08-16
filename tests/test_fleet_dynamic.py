@@ -291,9 +291,7 @@ def test_dynamic_dependency_setup_is_locked_offline_and_script_free(
     ]
 
 
-def test_pnpm_ten_setup_preserves_declared_lockfile_semantics(
-    monkeypatch, tmp_path: Path
-) -> None:
+def test_pnpm_ten_setup_preserves_declared_lockfile_semantics(monkeypatch, tmp_path: Path) -> None:
     (tmp_path / "package.json").write_text(
         '{"packageManager":"pnpm@10.12.4","pnpm":{"overrides":{"zod":"3.25.76"}},'
         '"devDependencies":{"zod":"3.25.76"}}',
@@ -305,9 +303,7 @@ def test_pnpm_ten_setup_preserves_declared_lockfile_semantics(
     monkeypatch.setattr(
         dynamic,
         "run_shell_command",
-        lambda command, **_: (
-            calls.append(command) or {"returncode": 0, "stdout": "", "stderr": ""}
-        ),
+        lambda command, **_: calls.append(command) or {"returncode": 0, "stdout": "", "stderr": ""},
     )
 
     result = dynamic._prepare_dynamic_dependencies(worktree=tmp_path, timeout_seconds=30)
@@ -752,8 +748,6 @@ def test_canonical_checkout_can_supply_target_declared_local_dependency(tmp_path
     repository = {"checkouts": [{"exists": True, "path": str(canonical)}]}
 
     assert (
-        dynamic._local_dependency_source(
-            repository, worktree=runtime, default=attached_target
-        )
+        dynamic._local_dependency_source(repository, worktree=runtime, default=attached_target)
         == canonical
     )

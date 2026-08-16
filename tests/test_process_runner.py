@@ -52,8 +52,7 @@ def test_offline_corepack_command_uses_prepared_host_cache(tmp_path, monkeypatch
     env = local_command_env(
         tmp_path,
         command=(
-            "COREPACK_ENABLE_PROJECT_SPEC=0 corepack pnpm install "
-            "--offline --frozen-lockfile"
+            "COREPACK_ENABLE_PROJECT_SPEC=0 corepack pnpm install --offline --frozen-lockfile"
         ),
     )
 
