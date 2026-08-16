@@ -136,6 +136,14 @@ blockers, gates, coverage, and finding buckets:
   `semantic_similarity_cache` object records the corresponding whole-report
   cache state under
   `.quality-runner/cache/semantic-similarity-v1/`.
+  When the fleet detector adapter is enabled, compatible JavaScript/TypeScript
+  repositories also carry `detector_evidence` receipts and optional
+  `detector_relations`. The Anti-Slop receipt records the exact target SHA,
+  QR version, pinned producer version/source SHA, producer-resolved enabled
+  rules, ruleset and configuration hashes, command result, cache key, scan
+  time, and overlap relations. A blocked or malformed external detector is
+  blocked evidence, never an empty finding set; a successful rerun keeps
+  unchanged findings deduplicated.
 - `package-manager-preflight.json`: detected package-manager state, declared
   `packageManager`, lockfiles, and non-blocking warnings such as mixed lockfiles.
 - `standards.json`: compiled standards packet for the selected profile,

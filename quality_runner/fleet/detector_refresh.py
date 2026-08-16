@@ -8,8 +8,17 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from quality_runner._version import __version__
 from quality_runner.artifacts import prepare_safe_directory, write_json
+from quality_runner.fleet.anti_slop import (
+    ANTI_SLOP_DETECTOR,
+    ANTI_SLOP_PRESET,
+    ANTI_SLOP_SOURCE_SHA,
+    merge_anti_slop_scan,
+    run_anti_slop_detector,
+)
 from quality_runner.fleet.contracts import parse_as_of, stable_id
+from quality_runner.fleet.detector_publication import publish_detector_runs
 from quality_runner.fleet.discovery import (
     discover_repositories,
     repository_record_for_root,
@@ -35,6 +44,9 @@ def fleet_detector_refresh_payload(
     timeout_seconds: int = 600,
     agent_review_mode: str = "off",
     as_of: str | None = None,
+    anti_slop_root: Path | None = None,
+    anti_slop_preset: str = ANTI_SLOP_PRESET,
+    anti_slop_format: str = "json",
     refresh_callback: RefreshCallback = refresh_payload,
 ) -> dict[str, Any]:
     """Run full detector scans at exact target commits and publish normal QR runs.
@@ -55,6 +67,10 @@ def fleet_detector_refresh_payload(
         resolved_as_of,
         sorted(overrides.items()),
         sorted(str(path.expanduser().resolve()) for path in repository_paths or []),
+        str(anti_slop_root.expanduser().resolve()) if anti_slop_root is not None else None,
+        anti_slop_preset,
+        anti_slop_format,
+        ANTI_SLOP_SOURCE_SHA if anti_slop_root is not None else None,
     )
     artifact_root = _artifact_root(output_dir, refresh_id)
     prepare_safe_directory(artifact_root)
@@ -70,6 +86,9 @@ def fleet_detector_refresh_payload(
                 artifact_root=artifact_root,
                 timeout_seconds=timeout_seconds,
                 agent_review_mode=agent_review_mode,
+                anti_slop_root=anti_slop_root,
+                anti_slop_preset=anti_slop_preset,
+                anti_slop_format=anti_slop_format,
                 refresh_callback=refresh_callback,
             )
         except Exception as error:  # preserve one ledger row and continue the fleet
@@ -95,6 +114,16 @@ def fleet_detector_refresh_payload(
             "skill_packs": "enabled",
             "agent_review_mode": agent_review_mode,
             "execute_discovered_gates": False,
+            "external_detectors": {
+                ANTI_SLOP_DETECTOR: {
+                    "status": "enabled" if anti_slop_root is not None else "disabled",
+                    "producer_source_sha": ANTI_SLOP_SOURCE_SHA
+                    if anti_slop_root is not None
+                    else None,
+                    "preset": anti_slop_preset if anti_slop_root is not None else None,
+                    "format": anti_slop_format if anti_slop_root is not None else None,
+                }
+            },
         },
         "publication": {
             "contract": "repository-local-quality-runner-runs",
@@ -120,6 +149,9 @@ def _refresh_repository(
     artifact_root: Path,
     timeout_seconds: int,
     agent_review_mode: str,
+    anti_slop_root: Path | None,
+    anti_slop_preset: str,
+    anti_slop_format: str,
     refresh_callback: RefreshCallback,
 ) -> dict[str, Any]:
     repo_id = str(repository["repo_id"])
@@ -202,13 +234,44 @@ def _refresh_repository(
             result["refresh_diagnostics"] = diagnostics
             result["reason"] = _incomplete_refresh_reason(diagnostics)
             return result
+        detector_result: dict[str, Any] | None = None
+        if anti_slop_root is not None:
+            detector_result = run_anti_slop_detector(
+                target_root=worktree,
+                target_sha=str(target["head"]),
+                qr_version=__version__,
+                anti_slop_root=anti_slop_root,
+                preset=anti_slop_preset,
+                output_format=anti_slop_format,
+                timeout_seconds=timeout_seconds,
+                cache_root=artifact_root / "cache" / repo_id,
+            )
+            result["detector"] = detector_result.get("receipt")
+            if detector_result.get("status") == "blocked":
+                result["reason"] = (
+                    "external anti-slop detector blocked evidence: "
+                    f"{detector_result.get('reason', 'unknown detector failure')}"
+                )
+                return result
         try:
-            published = _publish_runs(
+            if detector_result is not None:
+                _merge_external_detector(
+                    worktree=worktree,
+                    run_ids=run_ids,
+                    detector_result=detector_result,
+                )
+            published = publish_detector_runs(
                 worktree=worktree,
                 publication_root=publication_root,
                 run_ids=run_ids,
                 target_branch=str(target["branch"]),
                 target_head=str(target["head"]),
+                detector_provenance=(
+                    [detector_result["receipt"]]
+                    if detector_result is not None
+                    and isinstance(detector_result.get("receipt"), dict)
+                    else []
+                ),
             )
             finding_count = _finding_count(publication_root, run_ids)
         except (OSError, ValueError, json.JSONDecodeError) as error:
@@ -289,47 +352,6 @@ def _incomplete_refresh_reason(diagnostics: dict[str, Any]) -> str:
     return f"full detector refresh incomplete; missing expected runs: {missing}"
 
 
-def _publish_runs(
-    *,
-    worktree: Path,
-    publication_root: Path,
-    run_ids: list[str],
-    target_branch: str,
-    target_head: str,
-) -> list[str]:
-    source_runs = worktree / ".quality-runner" / "runs"
-    destination_runs = publication_root / ".quality-runner" / "runs"
-    prepare_safe_directory(destination_runs)
-    publications: list[tuple[Path, Path]] = []
-    for run_id in run_ids:
-        source = source_runs / run_id
-        destination = destination_runs / run_id
-        if not source.is_dir() or source.is_symlink():
-            raise ValueError(f"refresh did not produce expected run: {run_id}")
-        if destination.exists() or destination.is_symlink():
-            raise ValueError(f"publication destination already exists: {destination}")
-        if any(path.is_symlink() for path in source.rglob("*")):
-            raise ValueError(f"refusing to publish a run containing symlinks: {run_id}")
-        publications.append((source, destination))
-    published: list[Path] = []
-    try:
-        for source, destination in publications:
-            shutil.copytree(source, destination)
-            published.append(destination)
-            _rewrite_published_json(
-                destination,
-                worktree=worktree,
-                publication_root=publication_root,
-                target_branch=target_branch,
-                target_head=target_head,
-            )
-    except (OSError, ValueError, json.JSONDecodeError):
-        for destination in published:
-            shutil.rmtree(destination, ignore_errors=True)
-        raise
-    return [str(destination) for destination in published]
-
-
 def _target_override(repository: dict[str, Any], overrides: dict[str, str]) -> str | None:
     repo_id = str(repository["repo_id"])
     primary_path = str(repository["primary_path"])
@@ -392,31 +414,25 @@ def _resolve_detector_target(repository: dict[str, Any], *, override: str | None
     }
 
 
-def _rewrite_published_json(
-    run_dir: Path,
-    *,
-    worktree: Path,
-    publication_root: Path,
-    target_branch: str,
-    target_head: str,
+def _merge_external_detector(
+    *, worktree: Path, run_ids: list[str], detector_result: dict[str, Any]
 ) -> None:
-    for path in run_dir.rglob("*.json"):
-        payload = json.loads(path.read_text(encoding="utf-8"))
-        text = json.dumps(payload, indent=2, sort_keys=True) + "\n"
-        text = text.replace(str(worktree), str(publication_root))
-        text = text.replace('"branch": "HEAD"', f'"branch": {json.dumps(target_branch)}')
-        text = text.replace(
-            '"ref": "refs/heads/HEAD"', f'"ref": {json.dumps(f"refs/heads/{target_branch}")}'
+    receipt = detector_result.get("receipt")
+    if not isinstance(receipt, dict):
+        raise ValueError("external detector result is missing provenance")
+    for run_id in run_ids:
+        scan_path = worktree / ".quality-runner" / "runs" / run_id / "code-quality-scan.json"
+        if not scan_path.is_file():
+            raise ValueError(f"external detector scan target is missing: {scan_path}")
+        payload = json.loads(scan_path.read_text(encoding="utf-8"))
+        if not isinstance(payload, dict):
+            raise ValueError(f"external detector scan target is not an object: {scan_path}")
+        merged = merge_anti_slop_scan(payload, detector_result)
+        write_json(scan_path, merged)
+        write_json(
+            scan_path.parent / "anti-slop-detector.json",
+            {"schema": "quality-runner-anti-slop-detector/v1", **receipt},
         )
-        path.write_text(text, encoding="utf-8")
-    provenance = {
-        "schema": "quality-runner-fleet-detector-publication/v1",
-        "target_branch": target_branch,
-        "target_head": target_head,
-        "analysis_mode": "full",
-        "skill_packs": "enabled",
-    }
-    write_json(run_dir / "fleet-detector-publication.json", provenance)
 
 
 def _finding_count(root: Path, run_ids: list[str]) -> int | None:

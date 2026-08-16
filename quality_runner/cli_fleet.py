@@ -45,6 +45,26 @@ def add_fleet_commands(subparsers: Any) -> None:
     detector_refresh.add_argument("--output-dir", default=None)
     detector_refresh.add_argument("--timeout-seconds", type=int, default=600)
     detector_refresh.add_argument(
+        "--anti-slop-root",
+        default=None,
+        help=(
+            "Exact clean checkout of the pinned eslint-plugin-anti-slop source; "
+            "when supplied, compatible JS/TS repositories receive the evidence detector"
+        ),
+    )
+    detector_refresh.add_argument(
+        "--anti-slop-preset",
+        choices=("evidence",),
+        default="evidence",
+        help="Pinned Anti-Slop preset used by the external detector",
+    )
+    detector_refresh.add_argument(
+        "--anti-slop-format",
+        choices=("json", "sarif"),
+        default="json",
+        help="Machine-readable Anti-Slop output consumed by QR",
+    )
+    detector_refresh.add_argument(
         "--agent-review-mode", choices=("off", "auto", "parallel", "required"), default="off"
     )
     detector_refresh.add_argument(
@@ -265,6 +285,9 @@ def fleet_command_payload(args: argparse.Namespace) -> dict[str, Any]:
             timeout_seconds=args.timeout_seconds,
             agent_review_mode=args.agent_review_mode,
             as_of=args.as_of,
+            anti_slop_root=Path(args.anti_slop_root) if args.anti_slop_root else None,
+            anti_slop_preset=args.anti_slop_preset,
+            anti_slop_format=args.anti_slop_format,
         )
     if args.fleet_action != "audit":
         raise ValueError(f"unsupported fleet action: {args.fleet_action}")

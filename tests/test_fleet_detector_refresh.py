@@ -9,10 +9,71 @@ from typing import Any
 
 import pytest
 
+from quality_runner.fleet.anti_slop import (
+    _parse_output,
+    anti_slop_cache_key,
+    merge_anti_slop_scan,
+)
 from quality_runner.fleet.detector_refresh import fleet_detector_refresh_payload
 from quality_runner.workflow import refresh_payload
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+def _anti_slop_receipt(status: str = "passed") -> dict[str, Any]:
+    return {
+        "schema": "quality-runner-external-detector/v1",
+        "detector": "anti-slop",
+        "status": status,
+        "applicable": True,
+        "target_sha": "target-sha",
+        "qr_version": "0.7.0",
+        "producer": {
+            "name": "eslint-plugin-anti-slop",
+            "version": "0.5.0",
+            "source_sha": "source-sha",
+        },
+        "ruleset_hash": "ruleset-sha",
+        "configuration_hash": "config-sha",
+        "enabled_rules": ["anti-slop/no-known-value-widening"],
+        "command_result": {"status": "passed", "exit_code": 0},
+        "scan_time": "2026-08-16T00:00:00Z",
+        "cache_key": "sha256:cache-sha",
+        "finding_count": 0,
+        "overlap_count": 0,
+        "relations": [],
+    }
+
+
+def _anti_slop_result(*rule_ids: str, status: str = "passed") -> dict[str, Any]:
+    findings = [
+        {
+            "id": "",
+            "fingerprint": f"anti-slop:{rule_id}",
+            "category": "anti-slop",
+            "severity": "warning",
+            "confidence": "high",
+            "score": 9,
+            "file": "src/app.ts",
+            "line": index + 1,
+            "rule_id": rule_id,
+            "evidence": f"evidence for {rule_id}",
+            "expected_improvement": "preserve evidence",
+            "risk": "review required",
+            "verification": "rerun detector",
+            "remediation_bucket": "anti-slop",
+            "detector": "anti-slop",
+            "producer": "eslint-plugin-anti-slop",
+            "producer_version": "0.5.0",
+        }
+        for index, rule_id in enumerate(rule_ids)
+    ]
+    receipt = _anti_slop_receipt(status)
+    receipt["finding_count"] = len(findings) if status == "passed" else 0
+    if status != "passed":
+        receipt["reason"] = "detector execution failed"
+        receipt["command_result"] = {"status": "failed", "exit_code": 1}
+    return {"status": status, "receipt": receipt, "findings": findings}
 
 
 def _git(root: Path, *args: str) -> str:
@@ -96,6 +157,133 @@ def _fake_refresh_with_missing_run(**kwargs: Any) -> dict[str, Any]:
             "verify": {"run_id": f"{prefix}-verify", "status": "completed"},
         },
     }
+
+
+def test_anti_slop_rule_addition_changes_the_merged_fleet_result() -> None:
+    first = merge_anti_slop_scan(
+        {"findings": [], "summary": {}},
+        _anti_slop_result("anti-slop/no-known-value-widening"),
+    )
+    second = merge_anti_slop_scan(
+        {"findings": [], "summary": {}},
+        _anti_slop_result(
+            "anti-slop/no-known-value-widening",
+            "anti-slop/no-widen-then-assert",
+        ),
+    )
+
+    assert first["summary"]["total_findings"] == 1
+    assert second["summary"]["total_findings"] == 2
+    assert {item["rule_id"] for item in second["findings"]} == {
+        "anti-slop/no-known-value-widening",
+        "anti-slop/no-widen-then-assert",
+    }
+
+
+def test_anti_slop_unchanged_rerun_deduplicates() -> None:
+    result = _anti_slop_result("anti-slop/no-known-value-widening")
+    first = merge_anti_slop_scan({"findings": [], "summary": {}}, result)
+    second = merge_anti_slop_scan(first, result)
+
+    assert second["summary"]["total_findings"] == 1
+    assert second["detector_evidence"][-1]["relations"] == [
+        {
+            "relation": "duplicate",
+            "anti_slop_fingerprint": "anti-slop:anti-slop/no-known-value-widening",
+            "existing_finding_id": "CQ-0001",
+        }
+    ]
+
+
+def test_failed_anti_slop_detector_cannot_erase_prior_valid_evidence() -> None:
+    valid = merge_anti_slop_scan(
+        {"findings": [], "summary": {}},
+        _anti_slop_result("anti-slop/no-known-value-widening"),
+    )
+    failed = merge_anti_slop_scan(valid, _anti_slop_result(status="blocked"))
+
+    assert failed["summary"]["total_findings"] == 1
+    assert failed["findings"][0]["rule_id"] == "anti-slop/no-known-value-widening"
+    assert failed["detector_evidence"][0]["status"] == "passed"
+    assert failed["detector_evidence"][-1]["status"] == "blocked"
+
+
+def test_anti_slop_adapter_consumes_json_and_sarif_shapes(tmp_path: Path) -> None:
+    (tmp_path / "src").mkdir()
+    (tmp_path / "src" / "app.ts").write_text("const value = 1;\n", encoding="utf-8")
+    json_findings = _parse_output(
+        json.dumps(
+            {
+                "analysis": {"status": "complete"},
+                "newFindings": [
+                    {
+                        "ruleId": "anti-slop/no-known-value-widening",
+                        "file": "src/app.ts",
+                        "line": 1,
+                        "severity": "warning",
+                        "message": "Preserve the value evidence.",
+                        "fingerprint": "json-fingerprint",
+                    }
+                ],
+            }
+        ),
+        "json",
+        tmp_path,
+    )
+    sarif_findings = _parse_output(
+        json.dumps(
+            {
+                "version": "2.1.0",
+                "runs": [
+                    {
+                        "invocations": [{"executionSuccessful": True}],
+                        "results": [
+                            {
+                                "ruleId": "anti-slop/no-widen-then-assert",
+                                "level": "warning",
+                                "message": {"text": "Keep the narrow value."},
+                                "locations": [
+                                    {
+                                        "physicalLocation": {
+                                            "artifactLocation": {"uri": "src/app.ts"},
+                                            "region": {"startLine": 1},
+                                        }
+                                    }
+                                ],
+                            }
+                        ],
+                    }
+                ],
+            }
+        ),
+        "sarif",
+        tmp_path,
+    )
+
+    assert json_findings[0]["rule_id"] == "anti-slop/no-known-value-widening"
+    assert json_findings[0]["file"] == "src/app.ts"
+    assert sarif_findings[0]["rule_id"] == "anti-slop/no-widen-then-assert"
+    assert sarif_findings[0]["file"] == "src/app.ts"
+
+
+def test_anti_slop_cache_identity_changes_for_every_provenance_input() -> None:
+    base = {
+        "target_sha": "target-a",
+        "qr_version": "0.7.0",
+        "ruleset_hash": "rules-a",
+        "configuration_hash": "config-a",
+    }
+    keys = {
+        anti_slop_cache_key(**base),
+        anti_slop_cache_key(**{**base, "target_sha": "target-b"}),
+        anti_slop_cache_key(**{**base, "qr_version": "0.7.1"}),
+        anti_slop_cache_key(**{**base, "ruleset_hash": "rules-b"}),
+        anti_slop_cache_key(**{**base, "configuration_hash": "config-b"}),
+        anti_slop_cache_key(**{**base, "anti_slop_version": "0.5.1"}),
+        anti_slop_cache_key(**{**base, "anti_slop_source_sha": "source-b"}),
+    }
+
+    assert len(keys) == 7
 
 
 def test_detector_refresh_scans_exact_target_and_publishes_normal_runs(tmp_path: Path) -> None:
