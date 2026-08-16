@@ -60,6 +60,15 @@ not become task failures. Do not copy every QR finding into static agent rules;
 promote a repeatedly trusted deterministic finding into a behavior-verified QR
 rule or a faster native checker with its own maturity evidence.
 
+For `structural:improve-tests` findings, read `suggested_disposition`,
+`disposition_rationale`, and `evidence_needed` before changing the suite. QR's
+`merge`, `rewrite`, and `delete_candidate` values require an author decision;
+they are review evidence, not permission to mutate tests. Do not add an
+absence-only tombstone when behavior is intentionally removed. Delete tests,
+fixtures, snapshots, and helpers whose sole contract disappeared, and create
+new coverage only if a requested restoration or another durable contract
+creates a real accidental-failure path.
+
 This is a baseline and completion/CI checkpoint, not a continuous-save or
 editor-hook workflow. Re-run it after correcting violations or blockers. Use
 `qr task rebaseline --reason ...` only when configuration, policy, rule-pack,

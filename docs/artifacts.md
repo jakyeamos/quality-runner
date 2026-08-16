@@ -115,6 +115,20 @@ blockers, gates, coverage, and finding buckets:
   Oversized source files and fat routers use category `debloat`. These findings
   are review candidates, never deletion authorization: callers, runtime behavior,
   and an approved verification plan must be established before any removal.
+  Test-quality findings use category `improve-tests` and carry a bounded
+  `suggested_disposition`: `merge`, `rewrite`, `delete_candidate`, or
+  `insufficient_evidence`, together with a rationale and any evidence still
+  needed. QR reports exact duplicate test bodies, tautological assertions, and
+  tests whose names explicitly describe removed behavior while their bodies
+  assert only absence. Ambiguous static matches such as test console output use
+  `insufficient_evidence` until executable context is confirmed. QR does not
+  create tests, delete tests, or treat a
+  suggestion as mutation authority. In particular, an intentionally removed
+  surface does not need a tombstone regression test; if it is later restored by
+  request, that restored contract should receive its own current tests. A clean
+  static scan means only that these bounded patterns were not found, not that
+  every remaining test is valuable. Dynamic or mutation evidence can strengthen
+  a disposition when available but is not silently substituted when absent.
   Category ownership is intentionally non-overlapping: `debloat` owns repository-
   shape pressure, `simplify` owns local control-flow complexity, `deduplicate`
   owns repeated implementations, `ponytail` owns concrete speculative

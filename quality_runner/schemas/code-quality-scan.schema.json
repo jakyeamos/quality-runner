@@ -86,7 +86,15 @@
         "rule_message": { "type": "string", "minLength": 1 },
         "rule_category": { "type": "string", "minLength": 1 },
         "skill_id": { "type": "string", "minLength": 1 },
-        "review_id": { "type": "string", "minLength": 1 }
+        "review_id": { "type": "string", "minLength": 1 },
+        "suggested_disposition": {
+          "enum": ["merge", "rewrite", "delete_candidate", "insufficient_evidence"]
+        },
+        "disposition_rationale": { "type": "string", "minLength": 1 },
+        "evidence_needed": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        }
       },
       "additionalProperties": false,
       "allOf": [

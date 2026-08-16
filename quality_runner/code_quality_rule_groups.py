@@ -273,12 +273,23 @@ def _clarify_findings(relative_path: str, line: str, line_number: int) -> list[d
 
 
 def _test_quality_findings(relative_path: str, line: str, line_number: int) -> list[dict[str, Any]]:
-    if not _is_test_file(relative_path) or not _is_javascript_source_file(relative_path):
+    if not _is_test_file(relative_path):
         return []
     findings: list[dict[str, Any]] = []
-    if re.search(
-        r"\bexpect\(\s*(true|false)\s*\)\.(?:toBe|toEqual|toStrictEqual)\(\s*\1\s*\)", line
-    ) or re.search(r"\.toHaveBeenCalled\(\s*\)", line):
+    javascript_tautology = _is_javascript_source_file(relative_path) and bool(
+        re.search(
+            r"\bexpect\(\s*(true|false)\s*\)\.(?:toBe|toEqual|toStrictEqual)\(\s*\1\s*\)",
+            line,
+        )
+        or re.search(
+            r"\bexpect\(\s*([A-Za-z_$][\w$]*)\s*\)\.(?:toBe|toEqual|toStrictEqual)\(\s*\1\s*\)",
+            line,
+        )
+    )
+    python_tautology = relative_path.endswith(".py") and bool(
+        re.search(r"^\s*assert\s+(?:True|([A-Za-z_]\w*)\s*==\s*\1)\s*(?:#.*)?$", line)
+    )
+    if javascript_tautology or python_tautology:
         findings.append(
             _finding(
                 category="improve-tests",
@@ -292,9 +303,16 @@ def _test_quality_findings(relative_path: str, line: str, line_number: int) -> l
                 risk="Weak tests can pass while behavior regresses.",
                 verification=_verification_for_path(relative_path),
                 remediation_bucket="tests, E2E, scripts, CI cleanup",
+                suggested_disposition="rewrite",
+                disposition_rationale=(
+                    "The assertion proves a constant or a value against itself, not a product contract."
+                ),
+                evidence_needed=[
+                    "Identify the externally observable behavior or invariant this test should prove."
+                ],
             )
         )
-    if "console.log(" in line:
+    if _is_javascript_source_file(relative_path) and "console.log(" in line:
         findings.append(
             _finding(
                 category="improve-tests",
@@ -308,6 +326,14 @@ def _test_quality_findings(relative_path: str, line: str, line_number: int) -> l
                 risk="Noisy test logs hide real failures.",
                 verification=_verification_for_path(relative_path),
                 remediation_bucket="tests, E2E, scripts, CI cleanup",
+                suggested_disposition="insufficient_evidence",
+                disposition_rationale=(
+                    "A static line match cannot prove whether this is executed diagnostic output, "
+                    "fixture text, or an asserted logging contract."
+                ),
+                evidence_needed=[
+                    "Confirm the line executes during the test and whether the output is part of the supported contract."
+                ],
             )
         )
     return findings

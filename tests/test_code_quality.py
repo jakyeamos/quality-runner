@@ -107,6 +107,12 @@ def test_code_quality_scan_reports_deterministic_rule_groups_and_fingerprints(
     assert result["duplicate_clusters"]
     assert all(finding["fingerprint"] for finding in result["findings"])
     assert result["summary"]["findings_by_category"]["ui_structural"] >= 6
+    test_console = next(
+        finding
+        for finding in result["findings"]
+        if finding["category"] == "improve-tests" and finding["rule_id"] == "console-output"
+    )
+    assert test_console["suggested_disposition"] == "insufficient_evidence"
 
 
 def test_nested_ternary_rule_ignores_typescript_non_ternary_question_marks(
@@ -586,7 +592,10 @@ def test_code_quality_scan_ignores_generated_build_large_tests_and_non_frontend(
     _write(tmp_path / "src" / "generated" / "client.ts", "const generated: any = {};\n")
     _write(tmp_path / "src" / "client.generated.ts", "const generated: any = {};\n")
     _write(tmp_path / "build" / "bundle.ts", "const bundled: any = {};\n")
-    _write(tmp_path / "tests" / "test_large.py", "\n".join(["assert True"] * 12))
+    _write(
+        tmp_path / "tests" / "test_large.py",
+        "\n".join(f"fixture_value_{index} = {index}" for index in range(12)),
+    )
     _write(tmp_path / "src" / "service.py", "\n".join(['declared = {"ok": any([True])}'] * 12))
 
     result = create_code_quality_scan(
@@ -646,28 +655,6 @@ def test_code_quality_scan_can_disable_debloat_candidates(tmp_path: Path) -> Non
     assert not any(finding["category"] == "debloat" for finding in result["findings"])
 
 
-def test_code_quality_scan_ignores_shadow_vendor_cache_and_build_variants(
-    tmp_path: Path,
-) -> None:
-    from quality_runner.code_quality import create_code_quality_scan
-
-    _write(tmp_path / "src" / "service.py", "\n".join(["value = 1"] * 12))
-
-    result = create_code_quality_scan(
-        tmp_path,
-        scan={"run_id": "scan-001"},
-        config={
-            "structural_scan": {
-                "disabled_rule_groups": ["debloat"],
-                "large_file_lines": 10,
-            }
-        },
-    )
-
-    assert result["summary"]["findings_by_category"]["debloat"] == 0
-    assert not any(finding["category"] == "debloat" for finding in result["findings"])
-
-
 def test_fat_router_owns_overlapping_large_file_signal(tmp_path: Path) -> None:
     from quality_runner.code_quality import create_code_quality_scan
 
@@ -691,3 +678,76 @@ def test_fat_router_owns_overlapping_large_file_signal(tmp_path: Path) -> None:
     )
     assert fat_router["confidence"] == "low"
     assert "legacy routes" in fat_router["expected_improvement"]
+
+
+def test_test_quality_findings_are_bounded_and_include_remediation_dispositions(
+    tmp_path: Path,
+) -> None:
+    from quality_runner.audit import _code_quality_findings
+    from quality_runner.code_quality import create_code_quality_scan
+
+    removed_test = "\n".join(
+        [
+            "test('retired graph stays gone', () => {",
+            "  expect(screen.queryByText('Workspace activity')).not.toBeInTheDocument();",
+            "});",
+        ]
+    )
+    duplicate_body = "\n".join(
+        [
+            "test('saves the record', () => {",
+            "  const result = saveRecord({ name: 'Ada' });",
+            "  expect(result.name).toBe('Ada');",
+            "});",
+        ]
+    )
+    _write(tmp_path / "src" / "removed.test.tsx", removed_test)
+    _write(
+        tmp_path / "src" / "mixed-removed.test.tsx",
+        "\n".join(
+            [
+                "test('retired redirect remains gone', () => {",
+                "  expect(screen.queryByText('Legacy')).not.toBeInTheDocument();",
+                "  expect(currentRoute()).toBe('/home');",
+                "});",
+            ]
+        ),
+    )
+    _write(tmp_path / "src" / "duplicate-a.test.ts", duplicate_body)
+    _write(tmp_path / "src" / "duplicate-b.test.ts", duplicate_body.replace("saves", "persists"))
+    _write(
+        tmp_path / "src" / "interaction.test.ts",
+        "test('calls save', () => { save(); expect(save).toHaveBeenCalled(); });\n",
+    )
+    _write(tmp_path / "tests" / "test_tautology.py", "def test_value():\n    assert True\n")
+    _write(
+        tmp_path / "tests" / "test_removed_widget.py",
+        "def test_removed_widget():\n    assert 'widget' not in rendered\n",
+    )
+
+    result = create_code_quality_scan(tmp_path, scan={"run_id": "scan-001"}, config={})
+    test_findings = {
+        finding["rule_id"]: finding
+        for finding in result["findings"]
+        if finding["category"] == "improve-tests"
+    }
+
+    assert test_findings["removed-behavior-lock"]["suggested_disposition"] == ("delete_candidate")
+    assert test_findings["exact-duplicate-test-body"]["suggested_disposition"] == "merge"
+    assert test_findings["weak-test-assertion"]["suggested_disposition"] == "rewrite"
+    assert all(finding["disposition_rationale"] for finding in test_findings.values())
+    removed_files = {
+        finding["file"]
+        for finding in result["findings"]
+        if finding["rule_id"] == "removed-behavior-lock"
+    }
+    assert removed_files == {"src/removed.test.tsx", "tests/test_removed_widget.py"}
+    assert not any(
+        finding["rule_id"] == "weak-test-assertion" and finding["file"] == "src/interaction.test.ts"
+        for finding in result["findings"]
+    )
+    audit_findings = {finding["id"]: finding for finding in _code_quality_findings(result)}
+    assert (
+        audit_findings["structural-improve-tests-removed-behavior-lock"]["suggested_disposition"]
+        == "delete_candidate"
+    )

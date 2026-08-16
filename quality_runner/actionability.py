@@ -108,6 +108,11 @@ def actionability_for_finding(finding: dict[str, Any]) -> tuple[str, str]:
             "needs-author-decision",
             "Unwired or partial work requires an explicit wire, finish, descope, or WIP decision.",
         )
+    if category == "structural:improve-tests":
+        return (
+            "needs-author-decision",
+            "Test consolidation, rewriting, or deletion requires contract evidence; QR suggestions are not mutation authority.",
+        )
     if category.startswith("structural:"):
         if severity == "observation":
             return ("informational", "Structural observation is advisory and non-blocking.")

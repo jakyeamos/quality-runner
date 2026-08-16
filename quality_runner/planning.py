@@ -430,6 +430,8 @@ def _optional_disposition(finding: dict[str, Any]) -> dict[str, Any]:
         "disposition_required",
         "owner_role",
         "disposition_rationale",
+        "suggested_disposition",
+        "evidence_needed",
     ):
         if key in finding and finding[key] is not None:
             payload[key] = finding[key]

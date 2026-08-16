@@ -27,6 +27,7 @@ from quality_runner.code_quality_rules import scan_file
 from quality_runner.code_quality_similarity import collect_deduplicate_scan
 from quality_runner.code_quality_skill_selection import scan_quality_skills_with_selection
 from quality_runner.code_quality_summary import quality_summary_fields
+from quality_runner.code_quality_test_quality import duplicate_test_findings
 from quality_runner.code_quality_unwired import unwired_findings
 from quality_runner.core.audit_contracts import AuditPayload, TextScanScope
 from quality_runner.evidence_redaction import redact_secret_like_source_lines
@@ -203,6 +204,9 @@ def create_code_quality_scan(
             cache_root=cache_root,
         )
         findings.extend(deduplicate_findings)
+
+        if "improve-tests" not in disabled_groups:
+            findings.extend(duplicate_test_findings(scanned_files))
 
         if "ponytail" not in disabled_groups:
             findings.extend(ponytail_findings(scanned_files))
