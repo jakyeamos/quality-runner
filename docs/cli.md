@@ -612,6 +612,13 @@ qr fleet detector refresh --all \
   --projects-root /path/to/projects \
   --timeout-seconds 600 \
   --json
+
+# Enable the pinned external Anti-Slop adapter for eligible JS/TS repositories.
+qr fleet detector refresh --all \
+  --projects-root /path/to/projects \
+  --anti-slop-root /path/to/pinned/eslint-plugin-anti-slop \
+  --anti-slop-format json \
+  --json
 ```
 
 Use repeatable `--repo-path` options instead of `--all` for a bounded slice;

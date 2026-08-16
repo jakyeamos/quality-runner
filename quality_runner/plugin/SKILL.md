@@ -110,8 +110,13 @@ Use `qr fleet detector refresh --all --projects-root ROOT --json` only when the
 operator explicitly wants repository-local detector evidence refreshed. It
 scans disposable exact-target worktrees with full deterministic skill packs,
 does not execute discovered gates, and publishes normal QR runs into each
-repository for Pronto. Inspect the per-repository `published`, `blocked`, and
-`unsupported` results before running `pronto quality refresh --json`.
+repository for Pronto. Add `--anti-slop-root PINNED_CHECKOUT` to enable the
+explicit pinned Anti-Slop adapter for compatible JavaScript/TypeScript
+repositories. The adapter consumes the producer's JSON or SARIF output,
+records exact provenance and cache identity, relates overlapping native QR
+findings, and blocks malformed or failed external evidence. Inspect the
+per-repository `published`, `blocked`, and `unsupported` results before running
+`pronto quality refresh --json`.
 
 For planning and execution loops, use the additive delivery contract surface:
 

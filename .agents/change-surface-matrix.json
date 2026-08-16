@@ -2,7 +2,7 @@
   "schema_version": "change-surface-matrix/v1",
   "subject": {"kind": "repository", "id": "quality-runner"},
   "owner": "quality-runner-maintainers",
-  "last_reviewed": "2026-08-15",
+  "last_reviewed": "2026-08-16",
   "surfaces": [
     {
       "id": "matrix-maintenance",
@@ -76,13 +76,17 @@
       ],
       "path": "qr fleet detector refresh, repository-local .quality-runner/runs, Pronto quality ingestion, and operator documentation",
       "owner": "Quality Runner and Pronto integration owners",
-      "condition": "exact-target detector scanning, skill-pack selection, publication, status taxonomy, or consumer orchestration changes",
+      "condition": "exact-target detector scanning, external detector adapters, pinned producer provenance, ruleset/configuration cache invalidation, overlap/deduplication, skill-pack selection, publication, status taxonomy, or consumer orchestration changes",
       "operations": ["add", "change", "remove"],
       "validation": [
         "uv run --locked pytest -q tests/test_fleet_detector_refresh.py",
         "production refresh callback signature bind in the detector refresh happy-path test",
         "explicit repository deadline propagation to inspect, run, verify, and total refresh budgets",
         "missing phase artifact diagnostic retention and no-partial-publication regression",
+        "pinned Anti-Slop JSON/SARIF adapter provenance and compatible JavaScript/TypeScript applicability regression",
+        "target SHA, QR version, producer version, source SHA, ruleset, and configuration cache invalidation regression",
+        "blocked or malformed external detector evidence cannot publish as zero findings or erase prior valid evidence",
+        "native/external overlap relation and unchanged rerun deduplication regression",
         "qr fleet detector refresh --repo-path FIXTURE --projects-root ROOT --json",
         "Pronto consumer refresh readback"
       ],

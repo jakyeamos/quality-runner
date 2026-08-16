@@ -8,7 +8,17 @@
     "mode": "full",
     "skill_packs": "enabled",
     "agent_review_mode": "off",
-    "execute_discovered_gates": false
+    "execute_discovered_gates": false,
+    "external_detectors": {
+      "anti-slop": {
+        "status": "enabled",
+        "producer": "eslint-plugin-anti-slop",
+        "version": "0.5.0",
+        "source_sha": "a0f8dfa1ff5f0f2b6143536445d62297cdf55b2c",
+        "preset": "evidence",
+        "formats": ["json", "sarif"]
+      }
+    }
   },
   "publication": {
     "contract": "repository-local-quality-runner-runs",
@@ -33,6 +43,28 @@
         "fleet-detector-fixture-published-repository-verify"
       ],
       "finding_count": 2,
+      "detector": {
+        "schema": "quality-runner-external-detector/v1",
+        "detector": "anti-slop",
+        "status": "passed",
+        "applicable": true,
+        "target_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "qr_version": "0.7.0",
+        "producer": {
+          "name": "eslint-plugin-anti-slop",
+          "version": "0.5.0",
+          "source_sha": "a0f8dfa1ff5f0f2b6143536445d62297cdf55b2c"
+        },
+        "ruleset_hash": "sha256:fixture-ruleset",
+        "configuration_hash": "sha256:fixture-configuration",
+        "enabled_rules": ["anti-slop/no-known-value-widening"],
+        "command_result": {"status": "passed", "exit_code": 0, "format": "json"},
+        "scan_time": "2026-08-14T00:00:00Z",
+        "cache_key": "sha256:fixture-cache",
+        "finding_count": 1,
+        "overlap_count": 0,
+        "relations": []
+      },
       "source_head_unchanged": true,
       "cleanup": {"status": "passed", "returncode": 0}
     },

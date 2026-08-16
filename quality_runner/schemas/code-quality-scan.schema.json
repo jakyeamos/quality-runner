@@ -20,6 +20,8 @@
     "summary": { "type": "object" },
     "accountability": { "type": "array", "items": { "type": "object" } },
     "findings": { "type": "array", "items": { "$ref": "#/$defs/finding" } },
+    "detector_evidence": { "type": "array", "items": { "$ref": "#/$defs/detector_evidence" } },
+    "detector_relations": { "type": "array", "items": { "type": "object" } },
     "duplicate_clusters": { "type": "array", "items": { "type": "object" } },
     "skipped_files": { "type": "array", "items": { "type": "object" } },
     "quality_skills": { "type": "array", "items": { "$ref": "#/$defs/quality_skill" } },
@@ -86,7 +88,10 @@
         "rule_message": { "type": "string", "minLength": 1 },
         "rule_category": { "type": "string", "minLength": 1 },
         "skill_id": { "type": "string", "minLength": 1 },
-        "review_id": { "type": "string", "minLength": 1 }
+        "review_id": { "type": "string", "minLength": 1 },
+        "detector": { "type": "string", "minLength": 1 },
+        "producer": { "type": "string", "minLength": 1 },
+        "producer_version": { "type": "string", "minLength": 1 }
       },
       "additionalProperties": false,
       "allOf": [
@@ -98,6 +103,32 @@
           "then": { "required": ["verification_requirements"] }
         }
       ]
+    },
+    "detector_evidence": {
+      "type": "object",
+      "required": ["schema", "detector", "status", "applicable", "target_sha", "scan_time"],
+      "properties": {
+        "schema": { "const": "quality-runner-external-detector/v1" },
+        "detector": { "type": "string", "minLength": 1 },
+        "status": { "enum": ["passed", "blocked", "not_applicable"] },
+        "applicable": { "type": "boolean" },
+        "target_sha": { "type": "string", "minLength": 1 },
+        "qr_version": { "type": "string", "minLength": 1 },
+        "producer": { "type": "object" },
+        "ruleset_hash": { "type": "string", "minLength": 1 },
+        "configuration_hash": { "type": "string", "minLength": 1 },
+        "enabled_rules": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "command_result": { "type": "object" },
+        "scan_time": { "type": "string", "minLength": 1 },
+        "cache_key": { "type": "string", "minLength": 1 },
+        "cache_hit": { "type": "boolean" },
+        "finding_count": { "type": "integer", "minimum": 0 },
+        "overlap_count": { "type": "integer", "minimum": 0 },
+        "relations": { "type": "array", "items": { "type": "object" } },
+        "reason": { "type": "string", "minLength": 1 },
+        "compatibility": { "type": "object" }
+      },
+      "additionalProperties": true
     },
     "quality_skill": {
       "type": "object",

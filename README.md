@@ -172,12 +172,23 @@ result for every blocked or unsupported repository:
 qr fleet detector refresh --all --projects-root /path/to/projects --json
 qr fleet detector refresh --repo-path /path/to/repo \
   --projects-root /path/to/projects --json
+qr fleet detector refresh --all --projects-root /path/to/projects \
+  --anti-slop-root /path/to/pinned/eslint-plugin-anti-slop --json
 pronto quality refresh --json
 ```
 
 The detector lane does not execute discovered repository gates. Agent review
 is off by default; `--agent-review-mode` changes that separate review surface,
-not deterministic skill-pack scanning. The command intentionally writes only
+not deterministic skill-pack scanning. `--anti-slop-root` enables the explicit
+external adapter for compatible JavaScript/TypeScript repositories. QR verifies
+the clean producer checkout at the pinned `eslint-plugin-anti-slop` 0.5.0 SHA,
+selects its public `evidence` preset, and consumes JSON or SARIF without
+reimplementing its rules. Each scan records target SHA, QR and producer
+versions, the producer-resolved enabled rules, ruleset/configuration hashes,
+command outcome, and scan time. Missing tools, malformed output, or execution
+failure block that repository and never become a zero-finding result. Cache
+keys include every target, version, ruleset, and configuration identity; native
+QR overlaps are related and counted once. The command intentionally writes only
 published evidence below each repository's `.quality-runner/runs`; its fleet
 ledger and disposable worktrees stay below the runtime-owned output directory.
 
