@@ -1,0 +1,35 @@
+name: Codex CI prompt
+
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+
+permissions:
+  actions: write
+  contents: read
+  pull-requests: read
+
+jobs:
+  codex-ci-prompt:
+    if: >-
+      github.event.workflow_run.conclusion == 'failure' ||
+      github.event.workflow_run.conclusion == 'cancelled' ||
+      github.event.workflow_run.conclusion == 'timed_out' ||
+      github.event.workflow_run.conclusion == 'action_required'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Generate bounded prompt artifacts
+        uses: jakyeamos/ci-incident-router@e30be990eca3310fc5052896a1df27adc7331f6d
+        with:
+          run-id: ${{ github.event.workflow_run.id }}
+          repository: ${{ github.repository }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+          output-dir: codex-ci-prompt
+
+      - name: Upload Codex prompt artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: codex-ci-prompt-${{ github.event.workflow_run.id }}
+          path: codex-ci-prompt/
+          if-no-files-found: error
