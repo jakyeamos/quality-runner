@@ -85,6 +85,8 @@
         "failure_modes": 4.0,
         "implementation_examples": 4.0,
         "license_contribution": 4.0,
+        "long_running_task_observability": 4.0,
+        "long_running_task_optimization": 4.0,
         "maintenance_health": 4.0,
         "matrix_maintenance": 4.0,
         "observability_runtime_health": 4.0,
@@ -140,9 +142,9 @@
             "capabilities": [
               {"id": "failure_and_recovery_contract", "applicability": "applicable", "status": "maintained", "score": 4.0, "dimension_scores": {"deployment_rollback": 4.0, "failure_modes": 4.0}, "producer_dimensions": ["deployment_rollback", "failure_modes"]},
               {"id": "diagnosability", "applicability": "applicable", "status": "maintained", "score": 4.0, "dimension_scores": {"diagnosability.stable_error_codes": 4.0}, "producer_dimensions": ["diagnosability.stable_error_codes"]},
-              {"id": "operational_observability", "applicability": "applicable", "status": "maintained", "score": 4.0, "dimension_scores": {"observability_runtime_health": 4.0}, "producer_dimensions": ["observability_runtime_health"]}
+              {"id": "operational_observability", "applicability": "applicable", "status": "maintained", "score": 4.0, "dimension_scores": {"long_running_task_observability": 4.0, "long_running_task_optimization": 4.0, "observability_runtime_health": 4.0}, "producer_dimensions": ["long_running_task_observability", "long_running_task_optimization", "observability_runtime_health"]}
             ],
-            "dimension_scores": {"deployment_rollback": 4.0, "diagnosability.stable_error_codes": 4.0, "failure_modes": 4.0, "observability_runtime_health": 4.0}, "missing_capabilities": [], "critical_dimensions": []
+            "dimension_scores": {"deployment_rollback": 4.0, "diagnosability.stable_error_codes": 4.0, "failure_modes": 4.0, "long_running_task_observability": 4.0, "long_running_task_optimization": 4.0, "observability_runtime_health": 4.0}, "missing_capabilities": [], "critical_dimensions": []
           },
           {
             "id": "user_facing_quality", "label": "User-facing quality", "weight": 0.1, "applicability": "applicable", "status": "maintained", "score": 4.0, "capability_coverage": 1.0, "fresh_capability_coverage": 1.0,
@@ -206,5 +208,5 @@
     "raw_transcripts": false,
     "credentials": false
   },
-  "provenance_hash": "c3a391bd073331173c353d08733a013e66752bba3cc88f92a43cfdea19a12550"
+  "provenance_hash": "a0176499b0d671fff022aea9b9155c9466aef3556583ec66dabf278ef0e68302"
 }

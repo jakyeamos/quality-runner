@@ -155,3 +155,46 @@ def test_cli_exposes_one_standard_scope() -> None:
     )
 
     assert args.standard == "matrix-maintenance"
+
+
+def test_long_running_task_standard_reports_two_dimensions(tmp_path: Path) -> None:
+    projects = tmp_path / "projects"
+    repository = projects / "worker"
+    _init_repo(repository)
+    (repository / "worker.py").write_text(
+        "# quality-runner: long-running-task id=reconcile\n"
+        "def reconcile(items):\n"
+        "    return [process(item) for item in items]\n",
+        encoding="utf-8",
+    )
+    _git(repository, "add", "worker.py")
+    _git(repository, "commit", "-m", "add worker")
+
+    audit = fleet_audit_payload(
+        projects_root=projects,
+        output_dir=tmp_path / "audit-output",
+        standard="long-running-tasks",
+        as_of=AS_OF,
+    )
+
+    assert audit["standard_report"]["dimensions"] == [
+        "long_running_task_observability",
+        "long_running_task_optimization",
+    ]
+    assert "dimension" not in audit["standard_report"]
+    assert set(audit["summary"]["dimension_means"]) == {
+        "long_running_task_observability",
+        "long_running_task_optimization",
+    }
+    row = audit["standard_report"]["repositories"][0]
+    assert {assessment["dimension"] for assessment in row["assessments"]} == set(
+        audit["standard_report"]["dimensions"]
+    )
+    persisted = [
+        json.loads(path.read_text())
+        for path in Path(audit["artifact_paths"]["findings_dir"]).glob("*.json")
+    ][0]
+    assert {finding["dimension"] for finding in persisted["findings"]} == {
+        "long_running_task_observability",
+        "long_running_task_optimization",
+    }

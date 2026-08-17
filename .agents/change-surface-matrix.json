@@ -39,6 +39,22 @@
       "status": "applicable"
     },
     {
+      "id": "long-running-task-standard",
+      "scope": "external",
+      "distribution": "public_core",
+      "path": "quality_runner/fleet/long_running_tasks.py, fleet standard reports, quality-runner-maturity-feed/v2, and Pronto maturity remediation",
+      "owner": "Quality Runner and Pronto integration owners",
+      "condition": "Long-running task qualification, heartbeat/diagnostic evidence, optimization evidence, maturity dimensions, or downstream triage behavior changes.",
+      "operations": ["add", "change", "remove"],
+      "validation": [
+        "uv run --locked pytest -q tests/test_long_running_tasks.py tests/test_fleet_standard_audit.py tests/test_repository_maturity.py tests/test_maturity_feed.py",
+        "qr fleet audit run --all --standard long-running-tasks --json",
+        "Confirm task names alone remain not_applicable and concrete qualifiers produce two independent findings.",
+        "Confirm Pronto imports both dimensions and creates deferred P2 maturity reconciliation actions without treating them as blockers."
+      ],
+      "status": "applicable"
+    },
+    {
       "id": "fleet-consumers",
       "scope": "external",
       "distribution": "public_adapter",

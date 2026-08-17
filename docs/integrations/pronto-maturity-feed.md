@@ -32,6 +32,8 @@ lane instead:
 ```bash
 qr fleet audit run --all --projects-root /path/to/projects \
   --standard matrix-maintenance --json
+qr fleet audit run --all --projects-root /path/to/projects \
+  --standard long-running-tasks --json
 ```
 
 The snapshot contains `standard-report.json` with one redacted row per audited
@@ -107,6 +109,14 @@ fleet audit and contributes to repository scores, fleet means, gaps,
 certification decisions, and Pronto maturity remediation. The one-standard
 `--standard matrix-maintenance` run remains a diagnostic report and cannot
 replace the complete feed.
+
+The complete audit also carries `long_running_task_observability` and
+`long_running_task_optimization`. QR only applies them when an explicit
+long-running-task annotation or a concrete timeout qualifies a task; task names
+alone are insufficient. Missing machine-readable progress/diagnostics or
+optimization evidence becomes an ordinary maturity gap. Pronto imports those
+gaps into deferred maturity remediation; it does not treat them as an immediate
+blocker or automatically modify the task.
 
 The feed also carries `diagnosability.stable_error_codes` when a repository has
 a supported runtime source surface. Quality Runner assesses this dimension from
