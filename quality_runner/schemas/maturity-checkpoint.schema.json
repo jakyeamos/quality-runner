@@ -1,0 +1,94 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "quality-runner-maturity-checkpoint-v1",
+  "type": "object",
+  "required": [
+    "schema",
+    "status",
+    "publication_status",
+    "quality_status",
+    "checkpoint_id",
+    "observed_at",
+    "freshness_policy",
+    "target",
+    "components",
+    "provenance",
+    "pointer_hash"
+  ],
+  "properties": {
+    "schema": {"const": "quality-runner-maturity-checkpoint/v1"},
+    "status": {"const": "complete"},
+    "publication_status": {"const": "ready"},
+    "quality_status": {"enum": ["ready", "ready_with_blockers"]},
+    "checkpoint_id": {"type": "string", "minLength": 1},
+    "observed_at": {"type": "string", "minLength": 1},
+    "freshness_policy": {
+      "type": "object",
+      "required": ["max_age_days", "evaluation"],
+      "properties": {
+        "max_age_days": {"const": 7},
+        "evaluation": {"const": "consumer_evaluated"}
+      },
+      "additionalProperties": true
+    },
+    "target": {
+      "type": "object",
+      "required": ["projects_root", "repository_count", "repositories"],
+      "properties": {
+        "projects_root": {"type": "string", "minLength": 1},
+        "repository_count": {"type": "integer", "minimum": 1},
+        "repositories": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": ["repo_id", "observed_commit"],
+            "properties": {
+              "repo_id": {"type": "string", "minLength": 1},
+              "observed_commit": {"type": "string", "minLength": 1}
+            },
+            "additionalProperties": true
+          }
+        }
+      },
+      "additionalProperties": true
+    },
+    "components": {
+      "type": "object",
+      "required": ["qr_maturity", "mac_control"],
+      "properties": {
+        "qr_maturity": {"$ref": "#/$defs/component"},
+        "mac_control": {"$ref": "#/$defs/component"}
+      },
+      "additionalProperties": true
+    },
+    "provenance": {
+      "type": "object",
+      "required": ["qr_feed_hash", "mac_control_report_hash", "mac_control_replay_hash"],
+      "properties": {
+        "qr_feed_hash": {"$ref": "#/$defs/sha256"},
+        "mac_control_report_hash": {"$ref": "#/$defs/sha256"},
+        "mac_control_replay_hash": {"$ref": "#/$defs/sha256"}
+      },
+      "additionalProperties": true
+    },
+    "supporting_artifacts": {"type": "object"},
+    "pointer_hash": {"$ref": "#/$defs/sha256"}
+  },
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "component": {
+      "type": "object",
+      "required": ["schema", "audit_id", "as_of", "path", "sha256"],
+      "properties": {
+        "schema": {"type": "string", "minLength": 1},
+        "audit_id": {"type": "string", "minLength": 1},
+        "as_of": {"type": "string", "minLength": 1},
+        "path": {"type": "string", "minLength": 1},
+        "sha256": {"$ref": "#/$defs/sha256"}
+      },
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": true
+}

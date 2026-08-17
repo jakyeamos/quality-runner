@@ -113,18 +113,36 @@ qr fleet audit run --all --projects-root /path/to/projects --standard matrix-mai
 qr fleet audit feed --audit-id AUDIT_ID --json
 ```
 
+The normal fleet run includes the static Mac Control lane and the feed command
+publishes one `quality-runner-maturity-checkpoint/v1` pointer alongside the
+compatibility `maturity.json` feed. The checkpoint binds both lanes to one
+timestamp, population, and primary commit set. Use `--no-mac-control` only for
+an explicitly legacy or diagnostic feed; use `--mac-control-live` for an
+explicit live Mac Control lane in the same checkpoint.
+
 Use `--standard matrix-maintenance` when the question is specifically whether
 each repository's change matrix requires same-change updates for material
 feature/functionality changes and a reviewed no-impact reason. This is a
 static, one-standard audit: inspect its `standard-report.json`, replay it for
 integrity, and do not publish it as the canonical all-standards feed.
 
-The fleet feed is a versioned, private handoff at
-`~/.quality-runner/fleet-audit/current/maturity.json`. It is generated only
-from a complete, replay-valid fleet snapshot and contains redacted maturity
-projections for local consumers. Immutable source artifacts remain in the
-audit-specific directory. `--output-dir` is safe for isolated tests and cannot
-replace the production current feed.
+The coordinated fleet handoff is a versioned, private pointer at
+`~/.quality-runner/fleet-audit/current/maturity-checkpoint.json`. It references
+an immutable bundle containing the QR feed and Mac Control report, and is
+generated only from a complete, replay-valid fleet snapshot. The compatibility
+feed remains at `~/.quality-runner/fleet-audit/current/maturity.json` for older
+consumers. Immutable source artifacts remain in the audit-specific directory.
+`--output-dir` is safe for isolated tests and cannot replace the production
+current feed.
+
+The checkpoint uses `quality-runner-maturity-checkpoint/v1`. Its pointer binds
+the QR and Mac Control audit IDs, one observation timestamp, the exact
+repository population, and each primary observed commit. It carries SHA-256
+hashes for both scored components and is written last, so a consumer can reject
+partial or mixed snapshots. `quality_status` may still be
+`ready_with_blockers`: coherence and freshness do not turn a failed or
+review-required repository into a pass. The schema is
+`quality_runner/schemas/maturity-checkpoint.schema.json`.
 
 Use `--scope-manifest` when the fleet authority is a registry rather than every
 Git checkout below one directory. The `quality-runner-fleet-scope/v1` manifest

@@ -479,8 +479,40 @@ def test_feed_command_publishes_to_an_override_without_touching_production(tmp_p
 
     assert result["status"] == "published"
     assert result["feed_path"] == str(tmp_path / "fleet" / "current" / "maturity.json")
+    assert result["checkpoint"]["schema"] == "quality-runner-maturity-checkpoint/v1"
+    assert Path(str(result["checkpoint_path"])).is_file()
+    checkpoint = json.loads(Path(str(result["checkpoint_path"])).read_text(encoding="utf-8"))
+    assert checkpoint["status"] == "complete"
+    assert checkpoint["components"]["qr_maturity"]["audit_id"] == result["audit_id"]
+    assert checkpoint["target"]["repository_count"] == result["feed"]["repository_count"]
     production_after = production_path.read_bytes() if production_path.is_file() else None
     assert production_after == production_before
+
+
+def test_feed_rejects_mixed_qr_and_mac_control_commits(tmp_path: Path) -> None:
+    _, artifact_root = _audit(tmp_path)
+    mac_inventory_path = next((artifact_root / "mac-control").glob("*/inventory.json"))
+    mac_inventory = json.loads(mac_inventory_path.read_text(encoding="utf-8"))
+    mac_inventory["repositories"][0]["observed_commit"] = "not-the-qr-commit"
+    mac_inventory_path.write_text(json.dumps(mac_inventory), encoding="utf-8")
+
+    with pytest.raises(MaturityFeedError, match="observed commits"):
+        fleet_feed_payload(output_dir=artifact_root)
+
+
+def test_feed_does_not_downgrade_a_blocked_coordinated_lane_to_legacy(tmp_path: Path) -> None:
+    _, artifact_root = _audit(tmp_path)
+    checkpoint_path = artifact_root / "maturity-checkpoint.json"
+    checkpoint = {
+        "status": "blocked",
+        "reason": "Mac Control lane could not be created",
+    }
+    checkpoint_path.write_text(json.dumps(checkpoint), encoding="utf-8")
+    mac_control_root = artifact_root / "mac-control"
+    (next(mac_control_root.glob("*/inventory.json"))).unlink()
+
+    with pytest.raises(MaturityFeedError, match="coordinated Mac Control lane is blocked"):
+        fleet_feed_payload(output_dir=artifact_root)
 
 
 def test_feed_rejects_failed_replay_and_partial_scope(tmp_path: Path) -> None:

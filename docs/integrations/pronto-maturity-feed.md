@@ -1,7 +1,25 @@
 # Pronto maturity feed
 
-Quality Runner is the canonical owner of fleet environment-legibility maturity.
-Pronto must read this fixed private JSON path:
+Quality Runner is the canonical owner of fleet environment-legibility maturity
+and the freshness boundary for the Mac Control ideal-state lane. A complete
+`qr fleet audit run` includes a bounded, static Mac Control audit by default;
+the two lanes keep their own evidence and scores, but `qr fleet audit feed`
+publishes them as one coordinated checkpoint.
+
+Pronto should read this coordination pointer first:
+
+```text
+~/.quality-runner/fleet-audit/current/maturity-checkpoint.json
+```
+
+The pointer uses schema `quality-runner-maturity-checkpoint/v1` and references
+an immutable bundle under
+`~/.quality-runner/fleet-audit/current/checkpoints/<checkpoint-id>/`. The
+bundle contains the QR maturity feed, the Mac Control ideal-state report, and
+the Mac Control summary. The pointer records hashes for the two scored
+components and is atomically replaced after the bundle is complete.
+
+The existing QR feed remains at this compatibility path:
 
 ```text
 ~/.quality-runner/fleet-audit/current/maturity.json
@@ -13,11 +31,36 @@ coverage, provenance, and privacy validation. The stable file is atomically
 replaced; snapshots remain available at
 `~/.quality-runner/fleet-audit/<audit-id>/`.
 
+The coordinated checkpoint binds the QR and Mac Control audit IDs, the exact
+`as_of` timestamp, the repository population, and every primary observed
+commit. Its `publication_status: "ready"` means the evidence is coherent and
+replay-valid; `quality_status: "ready_with_blockers"` is still possible when a
+repository's quality or Mac Control evidence failed or needs review. Consumers
+must evaluate the checkpoint's seven-day freshness window separately from its
+quality status. A missing pointer is legacy separate-feed evidence. An invalid
+pointer is blocked and must not silently fall back to the two sidecars.
+
 To republish an existing valid QR snapshot:
 
 ```bash
 qr fleet audit feed --audit-id AUDIT_ID --json
 ```
+
+For the normal coordinated flow, run and publish the same immutable QR
+snapshot:
+
+```bash
+qr fleet audit run --all --projects-root /path/to/projects --json
+qr fleet audit replay --audit-id AUDIT_ID --json
+qr fleet audit feed --audit-id AUDIT_ID --json
+```
+
+Use `--no-mac-control` only for an explicitly legacy or diagnostic QR feed.
+`--mac-control-live` opts into foreground Mac Control checks in the same QR
+checkpoint; live execution is never implicit. The standalone
+`qr fleet mac-control audit ...` commands remain available for targeted
+replay, inspection, and compatibility publication, but they do not create a
+coordinated checkpoint without a containing QR audit.
 
 When Pronto's registry is the population authority, provide an owner-reviewed
 `quality-runner-fleet-scope/v1` manifest to `qr fleet audit run` with

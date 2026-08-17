@@ -165,6 +165,23 @@ def add_fleet_commands(subparsers: Any) -> None:
     run_parser.add_argument(
         "--as-of", default=None, help="Fixed ISO-8601 timestamp for deterministic replay"
     )
+    run_parser.add_argument(
+        "--mac-control",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Include the static Mac Control lane in the QR maturity checkpoint",
+    )
+    run_parser.add_argument(
+        "--mac-control-live",
+        action="store_true",
+        help="Explicitly run live Mac Control foreground checks as part of this checkpoint",
+    )
+    run_parser.add_argument("--macctl", default="macctl")
+    run_parser.add_argument(
+        "--mac-control-evidence-dir",
+        default=None,
+        help="Directory of redacted Mac Control task evidence files named REPO_ID.json",
+    )
     run_parser.add_argument("--json", action="store_true", help="Emit JSON output")
 
     show_parser = audit_actions.add_parser(
@@ -336,6 +353,12 @@ def fleet_command_payload(args: argparse.Namespace) -> dict[str, Any]:
             as_of=args.as_of,
             standard=args.standard,
             scope_manifest=Path(args.scope_manifest) if args.scope_manifest else None,
+            mac_control=args.mac_control,
+            mac_control_live=args.mac_control_live,
+            macctl_path=args.macctl,
+            mac_control_evidence_dir=(
+                Path(args.mac_control_evidence_dir) if args.mac_control_evidence_dir else None
+            ),
         )
     if args.audit_action == "show":
         return fleet_show_payload(

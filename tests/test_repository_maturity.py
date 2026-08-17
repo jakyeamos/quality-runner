@@ -64,6 +64,21 @@ def test_public_schema_requires_capability_and_applicability_evidence() -> None:
     } <= set(evidence["required"])
 
 
+def test_maturity_checkpoint_schema_binds_both_components() -> None:
+    schema = json.loads(
+        (ROOT / "quality_runner/schemas/maturity-checkpoint.schema.json").read_text(
+            encoding="utf-8"
+        )
+    )
+
+    assert schema["properties"]["schema"]["const"] == ("quality-runner-maturity-checkpoint/v1")
+    assert set(schema["properties"]["components"]["required"]) == {
+        "qr_maturity",
+        "mac_control",
+    }
+    assert schema["$defs"]["sha256"]["pattern"] == "^[0-9a-f]{64}$"
+
+
 def test_pillars_prevent_dimension_volume_from_domination() -> None:
     baseline = build_repository_maturity(
         {

@@ -1,9 +1,11 @@
 # Mac Control ideal-state audit
 
 Quality Runner owns the bounded fleet audit for the additional Mac Control
-ideal-state gate. The audit is deliberately separate from the numeric
-`0–4` maturity feed: it produces a companion report for Pronto and never
-changes `maturity.json`.
+ideal-state gate. The Mac Control lane remains distinct from the numeric
+`0–4` maturity score, but the normal QR fleet audit runs both lanes under one
+freshness boundary and publishes a coordinated checkpoint. Mac Control does
+not change the QR score; it contributes a separately displayed gate and
+quality status inside the checkpoint.
 
 ## Repository contract
 
@@ -60,7 +62,15 @@ commit, criteria evidence, task attempts, successful postconditions, selected
 route, and evidence references. QR verifies the sidecar identity against its
 own discovered repository commit.
 
-The optional live lane is explicit:
+The optional live lane is explicit. To include it in the same QR checkpoint:
+
+```bash
+qr fleet audit run --all --projects-root /path/to/projects \
+  --mac-control-live --macctl macctl --json
+```
+
+The lower-level lane command remains available for targeted or compatibility
+audits:
 
 ```bash
 qr fleet mac-control audit run --all --projects-root /path/to/projects \
@@ -74,7 +84,28 @@ when measured task evidence is also present.
 
 ## Publication and Pronto scope
 
-Replay first, then publish the companion report:
+For the normal flow, replay and publish the containing QR audit. This creates
+the Mac Control report and the coordinated checkpoint together:
+
+```bash
+qr fleet audit replay --audit-id AUDIT_ID --json
+qr fleet audit feed --audit-id AUDIT_ID --json
+```
+
+The coordination pointer is:
+
+```text
+~/.quality-runner/fleet-audit/current/maturity-checkpoint.json
+```
+
+It uses `quality-runner-maturity-checkpoint/v1` and binds both audit IDs, one
+`as_of`, one repository population, and matching primary observed commits.
+Publication fails closed if either replay or any binding check fails. The
+existing sidecars are still written for older consumers, but new consumers
+must use the pointer and its hashed versioned bundle.
+
+For a standalone Mac Control audit, replay first, then publish the companion
+report:
 
 ```bash
 qr fleet mac-control audit replay --audit-id AUDIT_ID --json
