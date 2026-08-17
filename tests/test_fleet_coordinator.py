@@ -3,6 +3,7 @@ from __future__ import annotations
 import shlex
 import sys
 import time
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 from quality_runner.fleet.coordinator import (
@@ -104,3 +105,23 @@ def test_coordinator_watchdog_is_not_applied_to_static_only_audits() -> None:
 
     assert result == {"status": "not_selected"}
     assert calls == [{"enabled": False, "timeout_seconds": 30}]
+
+
+def test_coordinator_is_safe_in_parallel_worker_threads() -> None:
+    def builder(**_arguments: object) -> dict[str, object]:
+        return {"status": "passed"}
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        results = list(
+            executor.map(
+                lambda _item: coordinate_dynamic_result(
+                    build=builder,
+                    enabled=True,
+                    timeout_seconds=30,
+                    repository={"target_branch": {"branch": "dev", "head": "abc123"}},
+                ),
+                range(2),
+            )
+        )
+
+    assert results == [{"status": "passed"}, {"status": "passed"}]

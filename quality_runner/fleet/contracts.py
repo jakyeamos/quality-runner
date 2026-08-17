@@ -14,6 +14,7 @@ FLEET_FINDING_SCHEMA = "quality-runner-environment-legibility-finding-v0.1"
 FLEET_PLAN_SCHEMA = "quality-runner-environment-legibility-plan-v0.1"
 FLEET_REPLAY_SCHEMA = "quality-runner-fleet-replay-v0.1"
 FLEET_REPORT_SCHEMA = "quality-runner-fleet-report-v0.1"
+FLEET_CERTIFICATION_SCHEMA = "quality-runner-fleet-certification-v0.1"
 FLEET_STANDARD_REPORT_SCHEMA = "quality-runner-fleet-standard-report-v1"
 
 MATRIX_MAINTENANCE_STANDARD = "matrix-maintenance"

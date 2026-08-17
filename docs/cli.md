@@ -143,6 +143,35 @@ it never protects a ref, grants custody, or deletes a worktree. JAS enforces
 the policy at task-lane creation, while Pronto projects the observed policy
 and drift.
 
+## `quality-runner fleet certify`
+
+Runs the complete read-only fleet proof stack for an exact scope manifest and
+emits explicit certification totals. Repository checks run concurrently up to
+the bounded `--parallelism` value; the commands within one repository remain
+isolated in that repository's disposable audit worktree.
+
+```bash
+qr fleet certify \
+  --scope-manifest /path/to/fleet-scope.json \
+  --projects-root /bounded/root \
+  --parallelism 8 \
+  --json
+```
+
+The result uses `quality-runner-fleet-certification-v0.1` and writes
+`certification.json` and `certification.md` beside the source fleet audit.
+`certification.certified_count` and `certification.not_certified_count` are
+integers for the complete eligible population. `proof_check_counts` separately
+records `passed`, `failed`, `blocked`, `unavailable`, `unknown`, and
+`not_applicable` evidence for population coverage, replay, target branch,
+maturity model, dynamic verification, and behavior assurance.
+
+Use `--audit-id AUDIT_ID` to project an existing immutable audit without
+rerunning repository gates. This mode still validates the scope-manifest hash
+and deterministic replay. A failed, blocked, unavailable, or unknown proof
+check keeps the repository `not_certified`; it is never converted to a green
+result because a count or evidence field is missing.
+
 ## `quality-runner task`
 
 `task` is the preventative implementation-loop contract. It compares the exact

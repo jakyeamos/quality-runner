@@ -105,8 +105,10 @@ intent/review-cycle delta loop; read the resulting `review-delta.json` and
 decisions, `review-worker` plus strict report validation for worker handoffs,
 `plan`/`phase` or delivery contracts for bounded planning, `rollout` for
 isolated multi-repository runs, `fleet detector refresh` for full exact-target
-skill-pack evidence publication consumed by Pronto, and `release-smoke` before
-release. The full agent protocol is in `docs/agent-usage.md`. Before publishing, build both
+skill-pack evidence publication consumed by Pronto, and `fleet certify` for a
+complete scope-manifest proof run with explicit numeric certification counts.
+Use `--audit-id` when the immutable audit already exists and only its replayed
+certification projection is needed. Run `release-smoke` before release. The full agent protocol is in `docs/agent-usage.md`. Before publishing, build both
 distributions and run `release-boundary REPOSITORY --dist-dir DIST --json`.
 Treat `public_core`, `public_adapter`, and `local_only` as the exhaustive
 distribution classes; public adapters require sanitized contract fixtures, and

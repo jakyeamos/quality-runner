@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Sequence
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any, cast
 
@@ -67,8 +68,11 @@ def fleet_audit_payload(
     mac_control_live: bool = False,
     macctl_path: str = "macctl",
     mac_control_evidence_dir: Path | None = None,
+    parallelism: int = 1,
 ) -> dict[str, Any]:
     standard_dimensions(standard)
+    if parallelism <= 0:
+        raise ValueError("parallelism must be positive")
     if standard is not None and dynamic:
         raise ValueError("standard-scoped fleet audits are static-only; omit --dynamic")
     if mac_control_live and not mac_control:
@@ -113,8 +117,8 @@ def fleet_audit_payload(
         fleet_policy=fleet_policy,
         scope_manifest=scope_manifest_payload,
     )
-    results: list[dict[str, Any]] = []
-    for repository in repositories:
+
+    def audit_one(repository: dict[str, Any]) -> dict[str, Any]:
         target_override = overrides.get(str(repository["repo_id"]))
         target = resolve_target_branch(repository, override=target_override)
         scope_attestation = (
@@ -164,7 +168,13 @@ def fleet_audit_payload(
             scan=result["scan"],
             as_of=resolved_as_of,
         )
-        results.append(result)
+        return result
+
+    if parallelism == 1 or len(repositories) < 2:
+        results = [audit_one(repository) for repository in repositories]
+    else:
+        with ThreadPoolExecutor(max_workers=min(parallelism, len(repositories))) as executor:
+            results = list(executor.map(audit_one, repositories))
 
     summary = build_fleet_summary(
         audit_id=audit_id,

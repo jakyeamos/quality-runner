@@ -91,6 +91,24 @@ blockers, gates, coverage, and finding buckets:
 `new_enforced`, `persisted`, `resolved`, `waived`, `advisory`,
 `out_of_scope`, and `unknown`.
 
+## Fleet Certification Artifacts
+
+`qr fleet certify` writes beside the source immutable fleet audit:
+
+```text
+<fleet-audit>/<audit-id>/
+  certification.json
+  certification.md
+```
+
+`certification.json` is canonical and uses
+`quality-runner-fleet-certification-v0.1`. It records integer
+`certified_count` and `not_certified_count` totals, per-check state counters,
+the validated scope-manifest hash, deterministic replay evidence, and a
+bounded per-repository proof projection. Failed, blocked, unavailable, and
+unknown proof states remain explicit; no missing evidence is synthesized into
+a pass. The command never modifies a source checkout.
+
 ## Inspect Artifacts
 
 `quality-runner inspect` writes:

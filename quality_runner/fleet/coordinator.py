@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import threading
 from collections.abc import Callable
 from typing import Any
 
@@ -26,6 +27,13 @@ def coordinate_dynamic_result(
     **builder_arguments: Any,
 ) -> dict[str, Any]:
     if builder_arguments.get("enabled") is not True:
+        return build(**builder_arguments)
+    # ``workflow_deadline`` uses SIGALRM and Python only permits installing
+    # signal handlers in the main thread. Parallel fleet certification still
+    # has bounded per-command timeouts in worker threads, so preserve the
+    # dynamic result instead of turning a valid worker invocation into a
+    # process-level error.
+    if threading.current_thread() is not threading.main_thread():
         return build(**builder_arguments)
     per_command_timeout = int(builder_arguments["timeout_seconds"])
     watchdog_timeout = (

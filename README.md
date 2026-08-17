@@ -139,6 +139,10 @@ qr fleet audit run --all --projects-root /path/to/projects \
 qr fleet audit replay --audit-id AUDIT_ID --json
 qr fleet audit report --audit-id AUDIT_ID --json
 qr fleet audit feed --audit-id AUDIT_ID --json
+qr fleet certify --scope-manifest /path/to/fleet-scope.json \
+  --projects-root /bounded/root --parallelism 8 --json
+qr fleet certify --scope-manifest /path/to/fleet-scope.json \
+  --projects-root /bounded/root --audit-id AUDIT_ID --json
 ```
 
 The non-release-blocking `cache-design` standard inventories derived storage
@@ -168,6 +172,14 @@ changing the target-attached score:
 ```bash
 qr fleet audit feed --audit-id AUDIT_ID --allow-incomplete-coverage --json
 ```
+
+`fleet certify` runs the complete scope-manifest audit with bounded repository
+parallelism and writes `certification.json` beside the immutable audit. Its
+`certification.certified_count` and `not_certified_count` fields are always
+numeric. The per-check counters distinguish passed, failed, blocked,
+unavailable, unknown, and not-applicable evidence; missing or uncertain proof
+never becomes a certification pass. Supplying `--audit-id` replays and
+projects an existing audit without rerunning repository gates.
 
 The Mac Control ideal-state gate is a separate, explicit fleet lane. It does
 not change the numeric maturity score. Each repository that supports Mac

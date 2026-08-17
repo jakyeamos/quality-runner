@@ -1,6 +1,6 @@
 # Canonical commands and quality gates
 
-Last reviewed: 2026-08-16
+Last reviewed: 2026-08-17
 
 Run from the repository root with the locked development environment:
 
@@ -38,6 +38,8 @@ uv run --locked qr fleet audit run --scope-manifest /path/to/fleet-scope.json \
   --projects-root /bounded/root --dynamic --no-changed-only --json
 uv run --locked qr fleet audit replay --audit-id AUDIT_ID --json
 uv run --locked qr fleet audit feed --audit-id AUDIT_ID --json
+uv run --locked qr fleet certify --scope-manifest /path/to/fleet-scope.json \
+  --projects-root /bounded/root --parallelism 8 --json
 ```
 `matrix_maintenance` and `cache_design` are canonical dimensions of the complete fleet audit.
 It contributes to each applicable repository's `dimension_scores`,
@@ -75,6 +77,10 @@ is retained only for migration diagnostics. Only a finding with
 applies the score cap; blocker/P0 state alone remains a quality-outcome signal.
 Agent growth health is diagnostic and does not add a fifth score beside the
 four consolidated human/agent capabilities.
+
+Use `qr fleet certify` for the complete read-only proof projection with
+explicit numeric certification totals. Add `--audit-id AUDIT_ID` to reuse an
+immutable audit without rerunning repository gates.
 
 Fleet subprocess stdout and stderr are captured as UTF-8 with replacement for
 malformed bytes. This preserves a bounded, redacted command receipt when a

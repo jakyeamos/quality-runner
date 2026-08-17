@@ -76,6 +76,8 @@ Advanced operations:
 
 Fleet environment audit:
   fleet detector refresh --all  publish full exact-target detector evidence for Pronto
+  fleet certify --scope-manifest PATH
+                               run proof checks and emit explicit certification counts
   fleet custody validate REPO  read-only custody validation from live Git and receipts
   fleet audit run --all       static-all audit with optional changed-only dynamic checks
   fleet audit run --all --standard matrix-maintenance

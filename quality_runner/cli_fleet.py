@@ -10,6 +10,7 @@ from quality_runner.fleet.audit import (
     fleet_report_payload,
     fleet_show_payload,
 )
+from quality_runner.fleet.certification import fleet_certification_payload
 from quality_runner.fleet.contracts import SUPPORTED_FLEET_STANDARDS
 from quality_runner.fleet.custody import custody_validation_payload
 from quality_runner.fleet.detector_refresh import fleet_detector_refresh_payload
@@ -86,6 +87,48 @@ def add_fleet_commands(subparsers: Any) -> None:
     )
     detector_refresh.add_argument("--as-of", default=None)
     detector_refresh.add_argument("--json", action="store_true")
+    certify_parser = fleet_actions.add_parser(
+        "certify",
+        help="Run bounded fleet proof checks and emit explicit certification counts",
+        description=(
+            "Run the complete scope-manifest fleet audit with bounded repository parallelism, "
+            "then emit per-repository proof-check states and numeric certification totals. "
+            "Use --audit-id to project an existing immutable audit without rerunning gates."
+        ),
+    )
+    certify_parser.add_argument(
+        "--scope-manifest",
+        required=True,
+        help="Exact quality-runner-fleet-scope/v1 population to certify",
+    )
+    certify_parser.add_argument("--projects-root", default=str(Path.home() / "projects"))
+    certify_parser.add_argument(
+        "--audit-id",
+        default=None,
+        help="Reuse one persisted fleet audit instead of running a fresh audit",
+    )
+    certify_parser.add_argument("--output-dir", default=None)
+    certify_parser.add_argument(
+        "--parallelism",
+        type=int,
+        default=8,
+        help="Maximum number of repositories checked concurrently in fresh mode",
+    )
+    certify_parser.add_argument(
+        "--timeout-seconds",
+        type=int,
+        default=120,
+        help="Cap each read-only dynamic command in fresh mode",
+    )
+    certify_parser.add_argument(
+        "--target-override",
+        action="append",
+        default=[],
+        metavar="REPO_ID=BRANCH",
+        help="Override the documented development branch by repository id in fresh mode",
+    )
+    certify_parser.add_argument("--as-of", default=None)
+    certify_parser.add_argument("--json", action="store_true", help="Emit JSON output")
     custody_parser = fleet_actions.add_parser(
         "custody",
         help="Validate isolated-change-workflow custody from independent live evidence",
@@ -284,6 +327,17 @@ def add_fleet_commands(subparsers: Any) -> None:
 
 
 def fleet_command_payload(args: argparse.Namespace) -> dict[str, Any]:
+    if args.fleet_action == "certify":
+        return fleet_certification_payload(
+            projects_root=Path(args.projects_root),
+            scope_manifest=Path(args.scope_manifest),
+            output_dir=Path(args.output_dir) if args.output_dir else None,
+            audit_id=args.audit_id,
+            parallelism=args.parallelism,
+            timeout_seconds=args.timeout_seconds,
+            target_overrides=_target_overrides(args.target_override),
+            as_of=args.as_of,
+        )
     if args.fleet_action == "workspace-target":
         if args.workspace_target_action != "calculate":
             raise ValueError(

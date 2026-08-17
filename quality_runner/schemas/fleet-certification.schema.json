@@ -1,0 +1,87 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "quality-runner-fleet-certification-v0.1",
+  "type": "object",
+  "required": [
+    "schema",
+    "status",
+    "audit_id",
+    "as_of",
+    "certification",
+    "source",
+    "replay",
+    "population_coverage",
+    "repositories",
+    "provenance_hash",
+    "implementation_allowed"
+  ],
+  "properties": {
+    "schema": {"const": "quality-runner-fleet-certification-v0.1"},
+    "status": {"enum": ["certified", "review_required", "blocked"]},
+    "audit_id": {"type": "string", "minLength": 1},
+    "as_of": {"type": "string", "minLength": 1},
+    "certification": {
+      "type": "object",
+      "required": [
+        "status",
+        "complete",
+        "repository_count",
+        "certified_count",
+        "not_certified_count",
+        "proof_check_counts",
+        "blocking_reason_counts"
+      ],
+      "properties": {
+        "status": {"enum": ["certified", "review_required", "blocked"]},
+        "complete": {"type": "boolean"},
+        "repository_count": {"type": "integer", "minimum": 0},
+        "certified_count": {"type": "integer", "minimum": 0},
+        "not_certified_count": {"type": "integer", "minimum": 0},
+        "proof_check_counts": {"type": "object"},
+        "blocking_reason_counts": {"type": "object"}
+      }
+    },
+    "source": {"type": "object"},
+    "replay": {"type": "object"},
+    "population_coverage": {
+      "type": "object",
+      "required": [
+        "status",
+        "expected_repository_count",
+        "observed_repository_count",
+        "manifest_hash"
+      ],
+      "properties": {
+        "status": {"enum": ["complete", "blocked"]},
+        "expected_repository_count": {"type": "integer", "minimum": 0},
+        "observed_repository_count": {"type": "integer", "minimum": 0},
+        "manifest_hash": {"type": "string", "minLength": 1}
+      }
+    },
+    "repositories": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "repo_id",
+          "display_name",
+          "certification_status",
+          "evidence_state",
+          "proof_checks",
+          "blocking_reasons"
+        ],
+        "properties": {
+          "repo_id": {"type": "string", "minLength": 1},
+          "display_name": {"type": "string", "minLength": 1},
+          "certification_status": {"enum": ["certified", "not_certified"]},
+          "evidence_state": {"enum": ["complete", "blocked", "unavailable", "not_applicable"]},
+          "proof_checks": {"type": "object"},
+          "blocking_reasons": {"type": "array", "items": {"type": "string"}}
+        }
+      }
+    },
+    "provenance_hash": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "implementation_allowed": {"const": false}
+  },
+  "additionalProperties": true
+}
