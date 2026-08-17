@@ -11,9 +11,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def _git(repo: Path, *args: str) -> str:
-    result = subprocess.run(
-        ["git", *args], cwd=repo, check=True, capture_output=True, text=True
-    )
+    result = subprocess.run(["git", *args], cwd=repo, check=True, capture_output=True, text=True)
     return result.stdout.strip()
 
 
@@ -30,7 +28,11 @@ def _repo(root: Path) -> Path:
 
 
 def _receipt_root(repo: Path) -> Path:
-    return Path(_git(repo, "rev-parse", "--path-format=absolute", "--git-common-dir")) / "isolated-change-workflow" / "tasks"
+    return (
+        Path(_git(repo, "rev-parse", "--path-format=absolute", "--git-common-dir"))
+        / "isolated-change-workflow"
+        / "tasks"
+    )
 
 
 def test_custody_validation_is_read_only_and_reports_unleased_worktree(tmp_path: Path) -> None:

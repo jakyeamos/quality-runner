@@ -195,17 +195,23 @@ def _disposition_action(dispositions: list[str], state: str) -> str:
     if "receipt_schema_unsupported" in dispositions:
         return "Preserve the lane and upgrade the receipt through the supported workflow."
     if "legacy_unsigned_receipt" in dispositions:
-        return "Use the bounded legacy owner-return or adoption review; do not infer custody from age."
+        return (
+            "Use the bounded legacy owner-return or adoption review; do not infer custody from age."
+        )
     if "competing_custody" in dispositions:
         return "Freeze competing mutation and resolve the exact custody claim before integration."
     if "worktree_not_live" in dispositions:
-        return "Verify branch reachability and closure evidence before archiving or deleting anything."
+        return (
+            "Verify branch reachability and closure evidence before archiving or deleting anything."
+        )
     if "worktree_binding_mismatch" in dispositions or "branch_binding_mismatch" in dispositions:
         return "Preserve the lane and reconcile the receipt against live Git bindings."
     if "head_binding_mismatch" in dispositions:
         return "Re-read the exact branch head and require an owner-bound custody refresh."
     if "live_git_evidence_unavailable" in dispositions:
-        return "Retry with complete live Git and process evidence; no adoption decision is authorized."
+        return (
+            "Retry with complete live Git and process evidence; no adoption decision is authorized."
+        )
     if state == "adoptable":
         return "Recheck negative evidence and use an exact-head custody adoption claim."
     if state == "stale":
@@ -346,7 +352,8 @@ def _lane(
     expiry = _lease_expiry(payload, stale_seconds)
     return {
         "task_id": task_id,
-        "work_item_id": string_value(payload.get("work_item_id")) or string_value(payload.get("task")),
+        "work_item_id": string_value(payload.get("work_item_id"))
+        or string_value(payload.get("task")),
         "branch": branch,
         "worktree": worktree,
         "base_ref": string_value(payload.get("base_ref")),
@@ -357,7 +364,8 @@ def _lane(
         "disposition": _primary_disposition(dispositions),
         "dispositions": dispositions,
         "next_action": _disposition_action(dispositions, state),
-        "custodian": string_value(payload.get("custodian")) or string_value(payload.get("thread_id")),
+        "custodian": string_value(payload.get("custodian"))
+        or string_value(payload.get("thread_id")),
         "declared_scope": string_values(payload.get("declared_scope")),
         "changed_paths": changed_paths,
         "created_at": string_value(payload.get("created_at")),
@@ -411,13 +419,17 @@ def _wip_records(root: Path) -> tuple[list[dict[str, Any]], list[str]]:
             errors.append(f"{path}: validation evidence is required")
             continue
         source_sha = value["source_sha"]
-        if not isinstance(source_sha, str) or not _git_text(root, "rev-parse", "--verify", f"{source_sha}^{{commit}}"):
+        if not isinstance(source_sha, str) or not _git_text(
+            root, "rev-parse", "--verify", f"{source_sha}^{{commit}}"
+        ):
             errors.append(f"{path}: source_sha is not a resolvable Git commit")
             continue
         if not isinstance(value["id"], str) or not value["id"].startswith("wip/"):
             errors.append(f"{path}: id must use the wip/ prefix")
             continue
-        records.append({"path": str(path), "id": value["id"], "source_sha": source_sha, "status": "valid"})
+        records.append(
+            {"path": str(path), "id": value["id"], "source_sha": source_sha, "status": "valid"}
+        )
     return records, errors
 
 
@@ -481,15 +493,19 @@ def custody_validation_payload(
     disposition_counts = dict(Counter(lane["disposition"] for lane in lanes))
     if unleased_worktrees:
         wip_errors.append("unleased task worktree observed")
-    status = "attention_required" if wip_errors or any(
-        lane["state"] in {"unknown", "contested"} for lane in lanes
-    ) else "observed"
+    status = (
+        "attention_required"
+        if wip_errors or any(lane["state"] in {"unknown", "contested"} for lane in lanes)
+        else "observed"
+    )
     if unleased_worktrees:
         next_safe_step = "Register unleased task worktrees through isolated-change-workflow before editing or integrating."
     elif any(lane["state"] == "adoptable" for lane in lanes):
         next_safe_step = "Recheck negative evidence and use an exact-head custody adoption claim."
     elif status == "attention_required":
-        next_safe_step = "Preserve unresolved lanes and obtain the missing receipt, WIP, or live Git evidence."
+        next_safe_step = (
+            "Preserve unresolved lanes and obtain the missing receipt, WIP, or live Git evidence."
+        )
     else:
         next_safe_step = "Use the workflow integration queue; this validation is read-only and grants no mutation authority."
     return {

@@ -112,6 +112,7 @@ def test_packaged_console_script_invokes_cli(tmp_path: Path) -> None:
     build_command = [
         _uv_executable(),
         "build",
+        "--offline",
         "--wheel",
         "--out-dir",
         str(dist_dir),
