@@ -1,0 +1,15 @@
+{
+  "canonical_workspaces": [
+    {
+      "id": "working",
+      "path": null,
+      "protected": true,
+      "ref": "dev",
+      "role": "working"
+    }
+  ],
+  "repository_id": "repository:/Users/jakyeamos/projects/quality-runner",
+  "repository_role": "supporting_project",
+  "retention_exceptions": [],
+  "schema_version": "workspace-policy/v1"
+}
