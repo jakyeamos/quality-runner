@@ -17,6 +17,7 @@
     "counts",
     "disposition_counts",
     "overlaps",
+    "workspace_policy",
     "wip",
     "integrity",
     "provenance"
@@ -44,6 +45,7 @@
       "additionalProperties": { "type": "integer", "minimum": 0 }
     },
     "overlaps": { "type": "array", "items": { "type": "object" } },
+    "workspace_policy": { "type": "object" },
     "wip": { "type": "object" },
     "integrity": { "type": "object" },
     "provenance": { "type": "object" }
@@ -79,6 +81,8 @@
           "uniqueItems": true
         },
         "next_action": { "type": "string", "minLength": 1 },
+        "workspace_class": { "const": "temporary" },
+        "lease_required": { "const": true },
         "blockers": { "type": "array", "items": { "type": "string" } },
         "evidence": { "type": "array", "items": { "type": "string" } }
       }

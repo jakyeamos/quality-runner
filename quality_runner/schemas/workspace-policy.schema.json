@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "workspace-policy-v1",
+  "title": "Role-based canonical workspace policy",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "repository_role",
+    "canonical_workspaces",
+    "retention_exceptions"
+  ],
+  "properties": {
+    "schema_version": { "const": "workspace-policy/v1" },
+    "repository_id": { "type": "string", "minLength": 1 },
+    "repository_role": {
+      "enum": ["production_product", "supporting_project", "role_unresolved"]
+    },
+    "canonical_workspaces": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/canonical_workspace" }
+    },
+    "retention_exceptions": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/retention_exception" }
+    }
+  },
+  "$defs": {
+    "canonical_workspace": {
+      "type": "object",
+      "required": ["id", "role", "ref", "protected"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "role": { "enum": ["release", "integration", "working"] },
+        "ref": { "type": "string", "minLength": 1 },
+        "path": { "type": ["string", "null"] },
+        "protected": { "const": true }
+      }
+    },
+    "retention_exception": {
+      "type": "object",
+      "required": ["lane_id", "reason", "retained_by", "review_by"],
+      "properties": {
+        "lane_id": { "type": "string", "minLength": 1 },
+        "reason": { "type": "string", "minLength": 1 },
+        "retained_by": { "type": "string", "minLength": 1 },
+        "review_by": { "type": "string", "format": "date-time" }
+      }
+    }
+  }
+}

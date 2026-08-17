@@ -15,6 +15,13 @@ from pathlib import Path
 from typing import Any
 
 from quality_runner.fleet.behavior_support import iso_timestamp, string_value, string_values
+from quality_runner.fleet.workspace_policy import (
+    default_workspace_policy_path,
+    invalid_workspace_policy_projection,
+    is_canonical_workspace,
+    load_workspace_policy,
+    workspace_policy_projection,
+)
 
 CUSTODY_VALIDATION_SCHEMA = "quality-runner-custody-validation/v1"
 TASK_SCHEMA = "isolated-change-task/v2"
@@ -365,6 +372,8 @@ def _lane(
         or string_value(payload.get("last_heartbeat_at")),
         "lease_expires_at": expiry.isoformat() if expiry else None,
         "provider_review": string_value(payload.get("provider_review")),
+        "workspace_class": "temporary",
+        "lease_required": True,
         "blockers": blockers,
         "evidence": evidence,
         "receipt": str(receipt_path),
@@ -427,6 +436,7 @@ def custody_validation_payload(
     stale_seconds: int = DEFAULT_STALE_SECONDS,
     adoptable_seconds: int = DEFAULT_ADOPTABLE_SECONDS,
     as_of: str | None = None,
+    workspace_policy_path: Path | None = None,
 ) -> dict[str, Any]:
     root = _canonical(repository_path)
     if stale_seconds <= 0 or adoptable_seconds <= 0:
@@ -437,6 +447,16 @@ def custody_validation_payload(
     common_git_dir = _common_git_dir(root)
     records = _worktrees(root)
     live_by_path = _live_state(root, records)
+    policy_file = workspace_policy_path or default_workspace_policy_path(root)
+    if workspace_policy_path is not None and not policy_file.exists():
+        raise ValueError(f"workspace policy does not exist: {policy_file}")
+    policy = None
+    policy_error: str | None = None
+    if policy_file.exists():
+        try:
+            policy = load_workspace_policy(policy_file)
+        except ValueError as error:
+            policy_error = str(error)
     receipts = _receipt_files(root)
     binding_counts = Counter(
         binding for _, payload in receipts if (binding := _receipt_binding(payload))
@@ -470,21 +490,44 @@ def custody_validation_payload(
                     }
                 )
     bound_paths = {lane["worktree"] for lane in lanes if lane.get("worktree")}
-    primary_path = str(_canonical(root))
+    active_temporary_lanes = sum(1 for lane in lanes if lane["state"] != "closed")
+    workspace_policy = (
+        invalid_workspace_policy_projection(
+            policy_error,
+            policy_path=policy_file,
+            active_temporary_lanes=active_temporary_lanes,
+        )
+        if policy_error
+        else workspace_policy_projection(
+            policy,
+            repository=root,
+            observed_workspaces=records,
+            active_temporary_lanes=active_temporary_lanes,
+            policy_path=policy_file if policy_file.exists() else None,
+        )
+    )
     unleased_worktrees = [
         str(record["path"])
         for record in records
-        if str(record["path"]) != primary_path and str(record["path"]) not in bound_paths
+        if not is_canonical_workspace(record, policy, root)
+        and str(record["path"]) not in bound_paths
     ]
     wip_records, wip_errors = _wip_records(root)
     counts = dict(Counter(lane["state"] for lane in lanes))
     disposition_counts = dict(Counter(lane["disposition"] for lane in lanes))
     if unleased_worktrees:
         wip_errors.append("unleased task worktree observed")
-    status = "attention_required" if wip_errors or any(
+    status = "attention_required" if wip_errors or workspace_policy["status"] in {
+        "canonical_drift",
+        "invalid",
+    } or any(
         lane["state"] in {"unknown", "contested"} for lane in lanes
     ) else "observed"
-    if unleased_worktrees:
+    if workspace_policy["status"] == "invalid":
+        next_safe_step = "Repair the invalid workspace policy before relying on canonical protection or temporary-lane counts."
+    elif workspace_policy["status"] == "canonical_drift":
+        next_safe_step = "Restore the role-defined canonical workspaces before treating temporary-lane counts as settled."
+    elif unleased_worktrees:
         next_safe_step = "Register unleased task worktrees through isolated-change-workflow before editing or integrating."
     elif any(lane["state"] == "adoptable" for lane in lanes):
         next_safe_step = "Recheck negative evidence and use an exact-head custody adoption claim."
@@ -509,6 +552,7 @@ def custody_validation_payload(
         "counts": counts,
         "disposition_counts": disposition_counts,
         "overlaps": overlaps,
+        "workspace_policy": workspace_policy,
         "wip": {"records": wip_records, "errors": wip_errors},
         "integrity": {
             "receipt_states": dict(Counter(_receipt_integrity(payload) for _, payload in receipts)),

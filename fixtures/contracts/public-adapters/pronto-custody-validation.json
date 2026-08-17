@@ -17,6 +17,8 @@
       "disposition": "legacy_unsigned_receipt",
       "dispositions": ["legacy_unsigned_receipt"],
       "next_action": "Use the bounded legacy owner-return or adoption review; do not infer custody from age.",
+      "workspace_class": "temporary",
+      "lease_required": true,
       "blockers": ["legacy-receipt-requires-review"],
       "evidence": ["receipt-integrity=legacy_unsigned"]
     },
@@ -26,6 +28,8 @@
       "disposition": "adoption_ready",
       "dispositions": ["receipt_integrity_unverified", "adoption_ready"],
       "next_action": "Recheck negative evidence and use an exact-head custody adoption claim.",
+      "workspace_class": "temporary",
+      "lease_required": true,
       "blockers": [],
       "evidence": [
         "receipt-integrity=present_unverified",
@@ -38,6 +42,25 @@
   "counts": { "unknown": 1, "adoptable": 1 },
   "disposition_counts": { "legacy_unsigned_receipt": 1, "adoption_ready": 1 },
   "overlaps": [],
+  "workspace_policy": {
+    "schema_version": "workspace-policy/v1",
+    "repository_role": "role_unresolved",
+    "status": "role_unresolved",
+    "disposition": "policy_missing",
+    "baseline_target": null,
+    "canonical_target": null,
+    "canonical_observed": 0,
+    "temporary_observed": 0,
+    "active_temporary_lanes": 2,
+    "retained_lane_count": 0,
+    "managed_target_total": null,
+    "canonical_workspaces": [],
+    "protected_refs": [],
+    "lease_required_for": "temporary",
+    "canonical_protection": "unresolved",
+    "policy_path": null,
+    "drift": ["repository-role-unresolved"]
+  },
   "wip": { "records": [], "errors": [] },
   "integrity": {
     "receipt_states": { "legacy_unsigned": 1, "present_unverified": 1 },
