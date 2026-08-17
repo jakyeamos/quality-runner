@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Any
 
 from quality_runner.fleet.behavior_support import iso_timestamp, string_value, string_values
+from quality_runner.fleet.wip import records as read_wip_records
 from quality_runner.fleet.workspace_policy import (
     default_workspace_policy_path,
     invalid_workspace_policy_projection,
@@ -386,50 +387,6 @@ def _overlap_paths(left: dict[str, Any], right: dict[str, Any]) -> list[str]:
     return sorted(left_paths & right_paths)
 
 
-def _wip_records(root: Path) -> tuple[list[dict[str, Any]], list[str]]:
-    records: list[dict[str, Any]] = []
-    errors: list[str] = []
-    for path in sorted((root / ".pronto" / "wip").glob("*.json")):
-        try:
-            value = json.loads(path.read_text(encoding="utf-8"))
-        except (OSError, UnicodeError, json.JSONDecodeError) as error:
-            errors.append(f"{path}: invalid JSON: {error}")
-            continue
-        required = {
-            "id",
-            "state",
-            "source_branch",
-            "source_sha",
-            "adopted_by",
-            "affected_paths",
-            "implemented",
-            "remaining",
-            "activation_default",
-            "activation_condition",
-            "validation",
-            "next_owner",
-        }
-        missing = sorted(required - set(value)) if isinstance(value, dict) else ["object"]
-        if missing:
-            errors.append(f"{path}: missing fields: {', '.join(missing)}")
-            continue
-        if value["state"] != "in_progress" or value["activation_default"] != "disabled":
-            errors.append(f"{path}: WIP must be in_progress and disabled by default")
-            continue
-        if not isinstance(value["validation"], list) or not value["validation"]:
-            errors.append(f"{path}: validation evidence is required")
-            continue
-        source_sha = value["source_sha"]
-        if not isinstance(source_sha, str) or not _git_text(root, "rev-parse", "--verify", f"{source_sha}^{{commit}}"):
-            errors.append(f"{path}: source_sha is not a resolvable Git commit")
-            continue
-        if not isinstance(value["id"], str) or not value["id"].startswith("wip/"):
-            errors.append(f"{path}: id must use the wip/ prefix")
-            continue
-        records.append({"path": str(path), "id": value["id"], "source_sha": source_sha, "status": "valid"})
-    return records, errors
-
-
 def custody_validation_payload(
     repository_path: Path,
     *,
@@ -512,7 +469,7 @@ def custody_validation_payload(
         if not is_canonical_workspace(record, policy, root)
         and str(record["path"]) not in bound_paths
     ]
-    wip_records, wip_errors = _wip_records(root)
+    wip_records, wip_errors = read_wip_records(root)
     counts = dict(Counter(lane["state"] for lane in lanes))
     disposition_counts = dict(Counter(lane["disposition"] for lane in lanes))
     if unleased_worktrees:
