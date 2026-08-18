@@ -124,6 +124,25 @@ operation, and unavailable-evidence lanes remain explicit and are never folded
 into an unexplained `unknown` result. See
 [Isolated-change custody validation](integrations/pronto-custody.md).
 
+## `quality-runner fleet workspace-target calculate`
+
+The workspace-target calculator separates repository role from temporary-lane
+custody. A production product contributes two protected canonical workspaces
+(release and integration); a supporting project contributes one protected
+working workspace. The fleet baseline is therefore `2P + 1N`, while active
+temporary lanes and explicit retention exceptions are reported separately:
+
+```bash
+qr fleet workspace-target calculate --manifest /path/to/workspace-fleet.json --json
+```
+
+The manifest uses `workspace-fleet-manifest/v1` and embeds one
+`workspace-policy/v1` document per repository. `role_unresolved` prevents a
+baseline total from being presented as complete. The calculator is read-only;
+it never protects a ref, grants custody, or deletes a worktree. JAS enforces
+the policy at task-lane creation, while Pronto projects the observed policy
+and drift.
+
 ## `quality-runner task`
 
 `task` is the preventative implementation-loop contract. It compares the exact

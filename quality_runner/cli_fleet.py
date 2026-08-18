@@ -14,6 +14,7 @@ from quality_runner.fleet.contracts import SUPPORTED_FLEET_STANDARDS
 from quality_runner.fleet.custody import custody_validation_payload
 from quality_runner.fleet.detector_refresh import fleet_detector_refresh_payload
 from quality_runner.fleet.feed import fleet_feed_payload
+from quality_runner.fleet.workspace_policy import fleet_workspace_target_payload
 from quality_runner.fleet.mac_control import (
     mac_control_audit_payload,
     mac_control_feed_payload,
@@ -99,7 +100,26 @@ def add_fleet_commands(subparsers: Any) -> None:
     custody_validate.add_argument("--stale-seconds", type=int, default=86400)
     custody_validate.add_argument("--adoptable-seconds", type=int, default=259200)
     custody_validate.add_argument("--as-of", default=None)
+    custody_validate.add_argument(
+        "--workspace-policy",
+        default=None,
+        help="Optional repository policy; defaults to .agents/workspace-policy.json when present",
+    )
     custody_validate.add_argument("--json", action="store_true")
+    target_parser = fleet_actions.add_parser(
+        "workspace-target",
+        help="Calculate role-based canonical workspace targets without mutation",
+    )
+    target_actions = target_parser.add_subparsers(
+        dest="workspace_target_action", required=True
+    )
+    target_calculate = target_actions.add_parser(
+        "calculate",
+        help="Calculate 2P + 1N plus explicitly active temporary lanes",
+    )
+    target_calculate.add_argument("--manifest", required=True)
+    target_calculate.add_argument("--as-of", default=None)
+    target_calculate.add_argument("--json", action="store_true")
     audit_parser = fleet_actions.add_parser(
         "audit",
         help="Run, inspect, replay, or report a fleet environment-legibility audit",
@@ -241,6 +261,12 @@ def add_fleet_commands(subparsers: Any) -> None:
 
 
 def fleet_command_payload(args: argparse.Namespace) -> dict[str, Any]:
+    if args.fleet_action == "workspace-target":
+        if args.workspace_target_action != "calculate":
+            raise ValueError(
+                f"unsupported fleet workspace-target action: {args.workspace_target_action}"
+            )
+        return fleet_workspace_target_payload(Path(args.manifest), as_of=args.as_of)
     if args.fleet_action == "custody":
         if args.custody_action != "validate":
             raise ValueError(f"unsupported fleet custody action: {args.custody_action}")
@@ -251,6 +277,9 @@ def fleet_command_payload(args: argparse.Namespace) -> dict[str, Any]:
             stale_seconds=args.stale_seconds,
             adoptable_seconds=args.adoptable_seconds,
             as_of=args.as_of,
+            workspace_policy_path=(
+                Path(args.workspace_policy) if args.workspace_policy else None
+            ),
         )
     if args.fleet_action == "mac-control":
         if args.mac_control_action != "audit":

@@ -55,3 +55,29 @@ The sanitized public contract fixture is
 `fixtures/contracts/public-adapters/pronto-custody-validation.json`. It uses
 synthetic paths and receipt identities; live private fleet data must not be
 committed or published.
+
+## Workspace policy
+
+Repositories may declare `.agents/workspace-policy.json` using
+`workspace-policy/v1`:
+
+```json
+{
+  "schema_version": "workspace-policy/v1",
+  "repository_role": "production_product",
+  "canonical_workspaces": [
+    {"id": "release", "role": "release", "ref": "main", "protected": true},
+    {"id": "integration", "role": "integration", "ref": "dev", "protected": true}
+  ],
+  "retention_exceptions": []
+}
+```
+
+`production_product` has a baseline target of two, and `supporting_project` has
+a baseline target of one. `role_unresolved` is explicit policy evidence, not a
+claim that the repository is supporting or production. Canonical workspaces
+are protected by role; every other workspace is temporary and requires an
+isolated-change lease. A retained temporary lane must carry a reason,
+retainer, and review deadline. This policy dimension is separate from custody
+state and disposition, so an abandoned lane can be adoptable without becoming
+a canonical workspace.
