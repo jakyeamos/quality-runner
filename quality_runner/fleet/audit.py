@@ -36,6 +36,7 @@ from quality_runner.fleet.dynamic import (
     dynamic_result as build_dynamic_result,
 )
 from quality_runner.fleet.legibility import audit_repository, build_remediation_plan
+from quality_runner.fleet.mac_control import mac_control_audit_payload
 from quality_runner.fleet.replay_integrity import replay_manifest_errors
 from quality_runner.fleet.reporting import plan_markdown, report_markdown, summary_markdown
 from quality_runner.fleet.scope_manifest import load_fleet_scope_manifest, population_coverage
@@ -61,10 +62,16 @@ def fleet_audit_payload(
     as_of: str | None = None,
     standard: str | None = None,
     scope_manifest: Path | None = None,
+    mac_control: bool = True,
+    mac_control_live: bool = False,
+    macctl_path: str = "macctl",
+    mac_control_evidence_dir: Path | None = None,
 ) -> dict[str, Any]:
     standard_dimensions(standard)
     if standard is not None and dynamic:
         raise ValueError("standard-scoped fleet audits are static-only; omit --dynamic")
+    if mac_control_live and not mac_control:
+        raise ValueError("--mac-control-live requires the Mac Control lane")
     resolved_as_of = parse_as_of(as_of)
     root = projects_root.expanduser().resolve()
     fleet_policy = load_fleet_policy(root)
@@ -199,6 +206,48 @@ def fleet_audit_payload(
     }
     if standard is not None:
         inventory["standard"] = standard
+    maturity_feed = {
+        "status": "not_requested",
+        "reason": "immutable snapshot created; run fleet audit feed to update the stable feed",
+    }
+    if standard is not None:
+        maturity_checkpoint = {
+            "status": "not_applicable",
+            "reason": "standard-scoped snapshots do not form the canonical maturity checkpoint",
+        }
+    elif not mac_control:
+        maturity_checkpoint = {
+            "status": "not_requested",
+            "reason": "Mac Control was explicitly disabled for this QR audit",
+        }
+    else:
+        mac_control_repository_paths = [
+            Path(str(repository["primary_path"])) for repository in inventory["repositories"]
+        ]
+        try:
+            mac_control_audit = mac_control_audit_payload(
+                projects_root=root,
+                output_dir=artifact_root / "mac-control",
+                repository_paths=mac_control_repository_paths,
+                as_of=resolved_as_of,
+                live=mac_control_live,
+                macctl_path=macctl_path,
+                evidence_dir=mac_control_evidence_dir,
+            )
+        except (OSError, ValueError) as error:
+            maturity_checkpoint = {
+                "status": "blocked",
+                "reason": f"Mac Control lane could not be created: {error}",
+            }
+        else:
+            maturity_checkpoint = {
+                "status": "ready_for_publication",
+                "audit_id": mac_control_audit["audit_id"],
+                "as_of": mac_control_audit["as_of"],
+                "artifact_root": mac_control_audit["artifact_root"],
+                "live": mac_control_live,
+            }
+    inventory["maturity_checkpoint"] = maturity_checkpoint
     artifact_paths = _write_audit_artifacts(
         artifact_root=artifact_root,
         inventory=inventory,
@@ -215,10 +264,9 @@ def fleet_audit_payload(
         if standard is not None
         else None,
     )
-    maturity_feed = {
-        "status": "not_requested",
-        "reason": "immutable snapshot created; run fleet audit feed to update the stable feed",
-    }
+    checkpoint_path = artifact_root / "maturity-checkpoint.json"
+    write_json(checkpoint_path, maturity_checkpoint)
+    artifact_paths["maturity_checkpoint_json"] = str(checkpoint_path)
     return {
         "schema": FLEET_AUDIT_SCHEMA,
         "status": "completed" if results else "blocked",
@@ -240,6 +288,7 @@ def fleet_audit_payload(
             if standard is not None
             else maturity_feed
         ),
+        "maturity_checkpoint": maturity_checkpoint,
         "public_projection": public_projection(summary),
         "implementation_allowed": False,
     }

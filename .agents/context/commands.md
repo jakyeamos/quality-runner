@@ -1,6 +1,6 @@
 # Canonical commands and quality gates
 
-Last reviewed: 2026-08-02
+Last reviewed: 2026-08-16
 
 Run from the repository root with the locked development environment:
 
@@ -26,6 +26,15 @@ uv run --locked qr fleet audit run --scope-manifest /path/to/fleet-scope.json \
 uv run --locked qr fleet audit replay --audit-id AUDIT_ID --json
 uv run --locked qr fleet audit feed --audit-id AUDIT_ID --json
 ```
+
+The complete `fleet audit run` includes the bounded static Mac Control lane by
+default. `fleet audit feed` then publishes the QR maturity feed and a
+`quality-runner-maturity-checkpoint/v1` pointer bound to the same audit time,
+repository population, and primary observed commits. Use `--no-mac-control`
+only for an explicitly legacy or diagnostic feed; `--mac-control-live` opts
+into live Mac Control checks in that same checkpoint. Consumers must treat a
+missing pointer as legacy separate-feed evidence and an invalid pointer as
+blocked, never as permission to mix the two stable sidecars.
 
 Fleet subprocess stdout and stderr are captured as UTF-8 with replacement for
 malformed bytes. This preserves a bounded, redacted command receipt when a
