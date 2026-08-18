@@ -145,7 +145,11 @@ def build_fleet_summary(
         "population_coverage": resolved_population,
         "unresolved_measurement_gaps": unresolved_gaps,
         "methodology": {
-            "rubric": "0 absent, 1 informal, 2 discoverable, 3 executable/currently validated, 4 maintained/routed/automatically checked",
+            "rubric": (
+                "0 unknown, 1 ad hoc, 2 defined, 3 enforced, 4 newcomer verified"
+                if standard == "developer-legibility"
+                else "0 absent, 1 informal, 2 discoverable, 3 executable/currently validated, 4 maintained/routed/automatically checked"
+            ),
             "unknown_evidence_is_not_green": True,
             "not_applicable_requires_bounded_evidence": True,
             "dynamic_scope": (

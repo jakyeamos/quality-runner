@@ -1,6 +1,22 @@
 # Pronto maturity feed
 
 Quality Runner is the canonical owner of fleet environment-legibility maturity.
+It also owns the static evidence for two repository-evolution gates:
+
+- `developer_legibility` measures eight lanes: orientation, navigation and
+  traceability, architecture visibility, semantic naming, public contracts,
+  rationale and invariant comments, executable understanding, and bounded
+  ownership/freshness. Static evidence is capped at level 3; level 4 requires
+  commit-bound newcomer-exercise evidence.
+- `change_surface_hotspots` combines Git co-change, local structural coupling,
+  and repeated-concept signals. A hotspot is reported only when at least two
+  evidence families agree; “tokenization” is a remediation hypothesis, not a
+  score input.
+
+These dimensions are deliberately separate from `change_surface_coverage`.
+The matrix answers whether known add/change/remove surfaces have owners and
+validation. The hotspot audit answers where future changes are likely to
+amplify or become difficult to remove.
 Pronto must read this fixed private JSON path:
 
 ```text
@@ -31,7 +47,7 @@ lane instead:
 
 ```bash
 qr fleet audit run --all --projects-root /path/to/projects \
-  --standard matrix-maintenance --json
+  --standard developer-legibility --json
 ```
 
 The snapshot contains `standard-report.json` with one redacted row per audited
@@ -101,7 +117,8 @@ Pronto's quality refresh. Fleet maturity findings remain `dimension_gaps` and
 must not be duplicated as code-quality findings.
 The feed preserves every scored finding dimension in `dimension_scores` and up
 to 64 non-passing `dimension_gaps`, which covers the current native, dynamic,
-agent-usability, and `matrix_maintenance` dimension set while keeping the
+agent-usability, `developer_legibility`, `change_surface_hotspots`, and
+`matrix_maintenance` dimension set while keeping the
 private projection bounded. `matrix_maintenance` is assessed by the complete
 fleet audit and contributes to repository scores, fleet means, gaps,
 certification decisions, and Pronto maturity remediation. The one-standard
@@ -184,6 +201,14 @@ checkout; public exports must use only aggregate projections.
 
 The older leverage audit directory is historical evidence only. It is not a
 source for the current feed.
+
+The private finding artifact retains bounded gate detail under the finding's
+`audit` field. The published Pronto projection intentionally keeps only the
+dimension score, status, bounded gap message, and repository identity; it does
+not publish source code, diffs, transcripts, or raw command output. Static
+validation is not semantic proof: a valid line anchor can still point to a
+misleading explanation, and a hotspot still requires reviewer judgment before
+introducing a shared abstraction.
 
 The sanitized public consumer fixture is
 `fixtures/contracts/public-adapters/pronto-maturity-feed.json`. Consumer tests

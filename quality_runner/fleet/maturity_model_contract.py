@@ -65,7 +65,7 @@ PILLAR_DEFINITIONS: tuple[dict[str, Any], ...] = (
             },
             "change_impact_contract": {
                 "applicability": "required",
-                "patterns": ("change_surface_coverage",),
+                "patterns": ("change_surface_coverage", "change_surface_hotspots"),
             },
             "coding_and_type_health": {
                 "applicability": "required",
@@ -135,6 +135,7 @@ PILLAR_DEFINITIONS: tuple[dict[str, Any], ...] = (
             "documentation_contract": {
                 "applicability": "agent_conditional",
                 "patterns": (
+                    "developer_legibility",
                     "implementation_examples",
                     "agent_usability.documentation_contract",
                 ),

@@ -14,6 +14,7 @@ from quality_runner.fleet.audit import (
 )
 from quality_runner.fleet.feed import fleet_feed_payload
 from quality_runner.fleet.maturity_feed import MaturityFeedError
+from quality_runner.fleet.summary import build_fleet_summary
 
 AS_OF = "2026-08-13T17:00:00+00:00"
 
@@ -155,3 +156,26 @@ def test_cli_exposes_one_standard_scope() -> None:
     )
 
     assert args.standard == "matrix-maintenance"
+
+
+def test_cli_exposes_developer_legibility_standard() -> None:
+    args = build_parser().parse_args(
+        ["fleet", "audit", "run", "--all", "--standard", "developer-legibility"]
+    )
+
+    assert args.standard == "developer-legibility"
+
+
+def test_developer_legibility_summary_uses_its_maturity_scale() -> None:
+    summary = build_fleet_summary(
+        audit_id="audit-legibility",
+        as_of=AS_OF,
+        repositories=[],
+        dynamic=False,
+        changed_only=True,
+        standard="developer-legibility",
+    )
+
+    assert summary["methodology"]["rubric"] == (
+        "0 unknown, 1 ad hoc, 2 defined, 3 enforced, 4 newcomer verified"
+    )
