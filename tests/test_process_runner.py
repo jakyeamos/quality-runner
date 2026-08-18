@@ -5,6 +5,7 @@ import shlex
 import subprocess
 import sys
 import time
+from pathlib import Path
 
 import pytest
 
@@ -31,8 +32,10 @@ def test_local_command_env_uses_allowlist_and_repo_local_caches(tmp_path, monkey
 
     assert set(env) == {*LOCAL_COMMAND_ENV_ALLOWLIST, "UV_CACHE_DIR", "XDG_CACHE_HOME"}
     assert env["PATH"] == "/usr/local/bin:/usr/bin"
-    assert env["UV_CACHE_DIR"] == str(tmp_path / ".quality-runner" / "cache" / "uv")
-    assert env["XDG_CACHE_HOME"] == str(tmp_path / ".quality-runner" / "cache" / "xdg")
+    assert env["UV_CACHE_DIR"] == "/inherited/uv-cache"
+    assert Path(env["XDG_CACHE_HOME"]).parent == (
+        tmp_path / ".quality-runner" / "cache" / "xdg" / "isolated-v1"
+    )
     assert "GITHUB_TOKEN" not in env
     assert "AWS_SECRET_ACCESS_KEY" not in env
 
@@ -71,6 +74,29 @@ def test_offline_corepack_command_uses_prepared_host_cache(tmp_path, monkeypatch
 
     assert env["COREPACK_HOME"] == str(home / ".cache" / "node" / "corepack")
     assert env["pnpm_config_cache_dir"] == str(home / "Library" / "Caches" / "pnpm")
+
+
+def test_uv_uses_one_qr_owned_external_cache_when_not_explicitly_configured(
+    tmp_path, monkeypatch
+) -> None:
+    monkeypatch.delenv("UV_CACHE_DIR", raising=False)
+    monkeypatch.setenv("QUALITY_RUNNER_CACHE_DIR", str(tmp_path / "external"))
+
+    env = local_command_env(tmp_path)
+
+    assert env["UV_CACHE_DIR"] == str(tmp_path / "external/shared-tools/uv-v1")
+
+
+def test_qr_command_uses_only_the_versioned_shared_xdg_allowlist(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("QUALITY_RUNNER_CACHE_DIR", str(tmp_path / "external"))
+
+    qr_env = local_command_env(tmp_path, command="uv run --locked qr audit . --json")
+    unknown_env = local_command_env(tmp_path, command="uv run --locked mystery-tool")
+
+    assert "shared-tools/quality-runner-" in qr_env["XDG_CACHE_HOME"]
+    assert Path(unknown_env["XDG_CACHE_HOME"]).parent == (
+        tmp_path / ".quality-runner" / "cache" / "xdg" / "isolated-v1"
+    )
 
 
 def test_local_command_env_prefers_exact_cached_package_manager(tmp_path, monkeypatch) -> None:

@@ -182,6 +182,10 @@ PILLAR_DEFINITIONS: tuple[dict[str, Any], ...] = (
                 "applicability": "conditional",
                 "patterns": ("license_contribution",),
             },
+            "cache_lifecycle": {
+                "applicability": "conditional",
+                "patterns": ("cache_design",),
+            },
             "completion_and_matrix_discipline": {
                 "applicability": "required",
                 "patterns": ("definition_of_done", "matrix_maintenance"),

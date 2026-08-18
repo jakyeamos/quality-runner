@@ -16,7 +16,7 @@ def finding(
     priority: str,
     confidence: str,
     message: str,
-    evidence: list[dict[str, str]],
+    evidence: list[dict[str, Any]],
     validation_commands: list[str],
     applicability: str | None = None,
     confirmed_critical_risk: bool = False,

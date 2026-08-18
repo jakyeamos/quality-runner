@@ -144,6 +144,25 @@ fingerprints, missing mandatory evidence, uncovered plan obligations, and
 deferred hard checks block reconciliation; advisory obligations remain visible.
 
 Audit and remediation workflow:
+For fleet audits, automatic discovery honors the projects-root
+`.quality-runner/fleet.json` exclusion policy and records it in inventory.
+Dynamic checks always target a committed ref in a detached disposable worktree;
+a dirty source checkout is an eligible host because QR fingerprints it before
+and after and blocks the result if anything changes. Safe configured `pre_cr`
+aggregates and the exact read-only `docker compose ... config` form are eligible
+for dynamic execution; dependency install, synchronization, and unpinned
+`uv --with` commands remain blocked.
+An alternate checkout may donate a JavaScript dependency tree only when its
+package-manager declaration, dependency fields, and lockfile signature match
+the detached target.
+
+Use `qr fleet audit run --all --standard cache-design --json` for a read-only
+derived-storage maturity slice. Inspect its private `standard-report.json`; do
+not publish a standard-scoped snapshot as the canonical feed. The detector does
+not execute cleanup or repository commands, raw size alone is not a failure,
+and unknown traversal evidence must remain unknown.
+
+Agent workflow:
 
 1. Run QR before editing source.
 2. Read `.quality-runner/runs/qr-<date-or-task>/agent-handoff.md` and the referenced artifacts from that run.

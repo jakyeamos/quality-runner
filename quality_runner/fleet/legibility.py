@@ -42,6 +42,7 @@ from quality_runner.fleet.maturity_dimensions import assess_maturity_dimensions
 from quality_runner.fleet.projection import build_local_projection
 from quality_runner.fleet.skill_contracts import assess_skill_contract_quality
 from quality_runner.fleet.standard_audit import (
+    cache_design_finding_arguments,
     long_running_task_finding_arguments,
     matrix_maintenance_finding_arguments,
 )
@@ -98,6 +99,7 @@ def audit_repository(
             link_evidence=link_evidence,
             dimension=dimension,
             as_of=as_of,
+            config=config,
             maturity_assessments=maturity_assessments,
             long_running_task_assessments=long_running_task_assessments,
         )
@@ -243,6 +245,7 @@ def _dimension_finding(
     link_evidence: dict[str, Any],
     dimension: str,
     as_of: str,
+    config: dict[str, Any],
     maturity_assessments: dict[str, dict[str, Any]],
     long_running_task_assessments: dict[str, dict[str, Any]],
 ) -> dict[str, Any]:
@@ -325,6 +328,10 @@ def _dimension_finding(
         )
     if dimension == "diagnosability.stable_error_codes":
         return _finding(**stable_error_code_finding_arguments(repository=repository, as_of=as_of))
+    if dimension == "cache_design":
+        return _finding(
+            **cache_design_finding_arguments(repository=repository, config=config, as_of=as_of)
+        )
     if dimension == "matrix_maintenance":
         return _finding(
             **matrix_maintenance_finding_arguments(

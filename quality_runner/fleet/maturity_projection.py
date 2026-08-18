@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any, cast
 
 from quality_runner.fleet.agent_usability_scoring import applicable_agent_usability_scores
+from quality_runner.fleet.cache_design import public_cache_design_projection
 from quality_runner.fleet.quality_outcomes import classify_quality_outcome
 from quality_runner.fleet.repository_maturity import build_repository_maturity
 
@@ -32,6 +33,7 @@ def repository_projection(repository: dict[str, Any], finding: dict[str, Any]) -
     blockers = 0
     non_dynamic_blockers = 0
     agent_attention = False
+    cache_design: dict[str, Any] = {}
 
     for item in findings:
         dimension = _required_string(item, "dimension")
@@ -40,6 +42,17 @@ def repository_projection(repository: dict[str, Any], finding: dict[str, Any]) -
         dimension_statuses[dimension] = status
         applicability = _applicability(item, status)
         dimension_applicability[dimension] = applicability
+        if dimension == "cache_design":
+            assessment = next(
+                (
+                    evidence
+                    for evidence in _objects(item.get("evidence"))
+                    if evidence.get("schema") == "quality-runner-cache-design-assessment-v1"
+                ),
+                {},
+            )
+            if assessment:
+                cache_design = public_cache_design_projection(assessment)
         raw_score = item.get("score")
         score = float(raw_score) if isinstance(raw_score, (int, float)) else None
         scores[dimension] = score if applicability != "not_applicable" else None
@@ -118,6 +131,7 @@ def repository_projection(repository: dict[str, Any], finding: dict[str, Any]) -
         "dynamic_status": dynamic_status,
         "agent_usability": agent_usability,
         "behavior_assurance": _object(finding.get("behavior_assurance")),
+        "cache_design": cache_design,
     }
 
 

@@ -63,7 +63,9 @@ def validate_workspace_policy(value: Mapping[str, Any]) -> dict[str, Any]:
         raise _error(f"schema_version must be {WORKSPACE_POLICY_SCHEMA}")
     role = payload.get("repository_role")
     if role not in ROLE_TARGETS:
-        raise _error("repository_role must be production_product, supporting_project, or role_unresolved")
+        raise _error(
+            "repository_role must be production_product, supporting_project, or role_unresolved"
+        )
 
     canonical_value = payload.get("canonical_workspaces")
     if not isinstance(canonical_value, list):
@@ -178,9 +180,8 @@ def is_canonical_workspace(
 
     if policy is None:
         return _canonical(Path(str(record["path"]))) == _canonical(repository)
-    if (
-        policy.get("repository_role") == "role_unresolved"
-        and not policy.get("canonical_workspaces")
+    if policy.get("repository_role") == "role_unresolved" and not policy.get(
+        "canonical_workspaces"
     ):
         return _canonical(Path(str(record["path"]))) == _canonical(repository)
     branch = record.get("branch")
@@ -236,9 +237,7 @@ def workspace_policy_projection(
         path = _canonical(Path(str(record["path"])))
         for workspace in canonical:
             expected_path = _workspace_path(repository, workspace.get("path"))
-            if branch == workspace["ref"] or (
-                expected_path is not None and path == expected_path
-            ):
+            if branch == workspace["ref"] or (expected_path is not None and path == expected_path):
                 observed_roles.add(workspace["role"])
                 break
     expected_roles = EXPECTED_CANONICAL_ROLES[role]

@@ -106,10 +106,15 @@ def assess_long_running_tasks(root: Path) -> dict[str, dict[str, Any]]:
 def _assessment(
     candidates: list[dict[str, Any]], *, first: str, second: str, label: str
 ) -> dict[str, Any]:
-    scores = [4 if item[first] and item[second] else 2 if item[first] or item[second] else 0 for item in candidates]
+    scores = [
+        4 if item[first] and item[second] else 2 if item[first] or item[second] else 0
+        for item in candidates
+    ]
     score = min(scores)
     status = "maintained" if score == 4 else "partial" if score == 2 else "missing"
-    deficient = [item for item, item_score in zip(candidates, scores, strict=True) if item_score < 4]
+    deficient = [
+        item for item, item_score in zip(candidates, scores, strict=True) if item_score < 4
+    ]
     message = (
         f"All {len(candidates)} identified long-running task(s) expose {label} evidence."
         if not deficient
@@ -194,7 +199,9 @@ def _source_files(root: Path) -> list[Path]:
     for path in sorted(root.rglob("*")):
         if len(selected) >= MAX_SOURCE_FILES:
             break
-        if not path.is_file() or any(part in IGNORED_PARTS for part in path.relative_to(root).parts):
+        if not path.is_file() or any(
+            part in IGNORED_PARTS for part in path.relative_to(root).parts
+        ):
             continue
         if path.suffix.lower() not in SOURCE_SUFFIXES:
             continue

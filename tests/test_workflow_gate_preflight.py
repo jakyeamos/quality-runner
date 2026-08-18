@@ -509,10 +509,10 @@ def test_verify_gate_kills_process_group_when_workflow_timeout_interrupts(
     def fake_popen(*_: object, **kwargs: object) -> FakeProcess:
         assert kwargs["start_new_session"] is True
         assert kwargs["env"]["UV_CACHE_DIR"] == str(
-            execution_root / ".quality-runner" / "cache" / "uv"
+            process_runner.default_external_cache_root() / "shared-tools" / "uv-v1"
         )
-        assert kwargs["env"]["XDG_CACHE_HOME"] == str(
-            execution_root / ".quality-runner" / "cache" / "xdg"
+        assert Path(kwargs["env"]["XDG_CACHE_HOME"]).parent == (
+            execution_root / ".quality-runner" / "cache" / "xdg" / "isolated-v1"
         )
         return FakeProcess()
 

@@ -1,0 +1,49 @@
+{
+  "schema": "quality-runner-cache-design-equivalence/v1",
+  "observed_at": "2026-08-14T18:31:00+00:00",
+  "fixture": {
+    "kind": "synthetic-typescript-repository",
+    "file_count": 240
+  },
+  "automated_enforcement": true,
+  "cold_warm_equivalent": true,
+  "within_policy": true,
+  "median_warm_regression_percent": 0.52,
+  "maximum_allowed_warm_regression_percent": 15.0,
+  "snapshots": [
+    {
+      "label": "before",
+      "observed_at": "2026-08-14T18:30:00+00:00",
+      "allocated_bytes": 1212416,
+      "cache_hit_count": 1200,
+      "median_cold_seconds": 0.954222,
+      "median_warm_seconds": 0.127155,
+      "canonical_equivalent_runs": 5
+    },
+    {
+      "label": "after",
+      "observed_at": "2026-08-14T18:31:00+00:00",
+      "allocated_bytes": 1212416,
+      "cache_hit_count": 1200,
+      "median_cold_seconds": 0.954138,
+      "median_warm_seconds": 0.127812,
+      "canonical_equivalent_runs": 5
+    }
+  ],
+  "runs": {
+    "before": [
+      {"cold_seconds": 0.948613, "warm_seconds": 0.136008, "cold_cache_hits": 0, "warm_cache_hits": 240, "allocated_bytes": 1212416, "canonical_equivalent": true},
+      {"cold_seconds": 0.954222, "warm_seconds": 0.126999, "cold_cache_hits": 0, "warm_cache_hits": 240, "allocated_bytes": 1212416, "canonical_equivalent": true},
+      {"cold_seconds": 0.936444, "warm_seconds": 0.132823, "cold_cache_hits": 0, "warm_cache_hits": 240, "allocated_bytes": 1212416, "canonical_equivalent": true},
+      {"cold_seconds": 0.954407, "warm_seconds": 0.127155, "cold_cache_hits": 0, "warm_cache_hits": 240, "allocated_bytes": 1212416, "canonical_equivalent": true},
+      {"cold_seconds": 0.954618, "warm_seconds": 0.125449, "cold_cache_hits": 0, "warm_cache_hits": 240, "allocated_bytes": 1212416, "canonical_equivalent": true}
+    ],
+    "after": [
+      {"cold_seconds": 0.943761, "warm_seconds": 0.127812, "cold_cache_hits": 0, "warm_cache_hits": 240, "allocated_bytes": 1212416, "canonical_equivalent": true},
+      {"cold_seconds": 1.037209, "warm_seconds": 0.124716, "cold_cache_hits": 0, "warm_cache_hits": 240, "allocated_bytes": 1212416, "canonical_equivalent": true},
+      {"cold_seconds": 0.951748, "warm_seconds": 0.13098, "cold_cache_hits": 0, "warm_cache_hits": 240, "allocated_bytes": 1212416, "canonical_equivalent": true},
+      {"cold_seconds": 1.000865, "warm_seconds": 0.126384, "cold_cache_hits": 0, "warm_cache_hits": 240, "allocated_bytes": 1212416, "canonical_equivalent": true},
+      {"cold_seconds": 0.954138, "warm_seconds": 0.138888, "cold_cache_hits": 0, "warm_cache_hits": 240, "allocated_bytes": 1212416, "canonical_equivalent": true}
+    ]
+  }
+}

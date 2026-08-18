@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import cast
 
 from quality_runner import __version__
+from quality_runner.cache_limits import allocated_bytes, prune_lru_files
 from quality_runner.cache_modes import CacheMode, cache_directory, resolve_cache_mode
 from quality_runner.incremental_analysis_cache_io import (
     atomic_write_json as _atomic_write_json,
@@ -42,6 +43,7 @@ INCREMENTAL_ANALYSIS_CACHE_SCHEMA = "quality-runner-incremental-analysis-cache-v
 INCREMENTAL_ANALYSIS_CACHE_DIRECTORY = "incremental-analysis-v1"
 _CACHE_INDEX_NAME = "index.json"
 _MAX_CACHE_ENTRIES = 4096
+_MAX_CACHE_BYTES = 64 * 1024 * 1024
 _MAX_RECOMPUTED_PATH_SAMPLES = 100
 AnalysisResult = dict[str, object]
 AnalysisResultValidator = Callable[[AnalysisResult], bool]
@@ -461,19 +463,15 @@ class IncrementalAnalysisCache:
                 for path in entries_dir.glob("*.json")
                 if not path.is_symlink() and path.is_file()
             ]
-            if len(entries) <= _MAX_CACHE_ENTRIES:
-                return
-            entries.sort(key=lambda path: path.stat().st_mtime_ns, reverse=True)
-            removed_keys = {
-                path.stem for path in entries[_MAX_CACHE_ENTRIES:] if _is_safe_cache_key(path.stem)
-            }
-            for path in entries[_MAX_CACHE_ENTRIES:]:
-                if path.stem not in removed_keys:
-                    continue
-                try:
-                    path.unlink()
-                except OSError:
-                    continue
+            result = prune_lru_files(
+                owned_root=self.cache_dir,
+                cache_dir=entries_dir,
+                candidates=entries,
+                max_entries=_MAX_CACHE_ENTRIES,
+                max_bytes=_MAX_CACHE_BYTES,
+                reserved_bytes=allocated_bytes(self.cache_dir / _CACHE_INDEX_NAME),
+            )
+            removed_keys = {path.stem for path in result.removed if _is_safe_cache_key(path.stem)}
             if removed_keys:
                 self._index = {
                     lookup_key: metadata

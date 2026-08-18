@@ -222,7 +222,9 @@ def test_controller_report_from_summary_builds_valid_blocked_report() -> None:
     assert report["ignored_generated_artifacts"] == [".quality-runner/"]
     assert report["controller_status_recommendation"]["status"] == "blocked"
     assert report["controller_command_environment"] == {
-        "UV_CACHE_DIR": "/repos/example/.quality-runner/cache/uv",
+        "UV_CACHE_DIR": str(
+            Path.home() / "Library" / "Caches" / "quality-runner" / "shared-tools" / "uv-v1"
+        ),
         "XDG_CACHE_HOME": "/repos/example/.quality-runner/cache/xdg",
     }
     assert report["blockers"] == [

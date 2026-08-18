@@ -9,12 +9,13 @@ from contextlib import suppress
 from pathlib import Path
 from typing import Any, cast
 
+from quality_runner.cache_limits import prune_lru_files
 from quality_runner.cache_modes import CacheMode, cache_directory, resolve_cache_mode
 
 SOURCE_ANALYSIS_CACHE_SCHEMA = "quality-runner-source-analysis-cache-v0.1"
 _CACHE_DIRECTORY = "source-analysis-v1"
 _MAX_CACHE_ENTRIES = 1024
-_CACHE_PRUNE_HEADROOM = 64
+_MAX_CACHE_BYTES = 64 * 1024 * 1024
 
 
 class SourceAnalysisCache:
@@ -164,14 +165,13 @@ class SourceAnalysisCache:
                 for path in cache_dir.glob("*.json")
                 if not path.is_symlink() and path.is_file()
             ]
-            if len(entries) <= _MAX_CACHE_ENTRIES + _CACHE_PRUNE_HEADROOM:
-                return
-            entries.sort(key=lambda path: path.stat().st_mtime_ns, reverse=True)
-            for path in entries[_MAX_CACHE_ENTRIES:]:
-                try:
-                    path.unlink()
-                except OSError:
-                    continue
+            prune_lru_files(
+                owned_root=cache_dir,
+                cache_dir=cache_dir,
+                candidates=entries,
+                max_entries=_MAX_CACHE_ENTRIES,
+                max_bytes=_MAX_CACHE_BYTES,
+            )
         except OSError:
             return
 

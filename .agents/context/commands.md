@@ -15,10 +15,23 @@ uv run --locked pip-audit
 uv build
 python3 scripts/check_environment_contract.py
 gitleaks detect --source . --no-banner --redact
+uv run --locked qr fleet audit run --all \
+  --projects-root /path/to/projects \
+  --standard cache-design --json
+uv run --locked qr fleet audit run --all \
+  --projects-root /path/to/projects \
+  --standard matrix-maintenance --json
 ```
 
 For a registry-owned high-confidence fleet measurement, use an exact reviewed
 `quality-runner-fleet-scope/v1` manifest and run:
+The scoped `matrix-maintenance` and `cache-design` lanes write a private
+`standard-report.json` with every audited repository and its honest state.
+A standard-scoped snapshot is intentionally not publishable as the canonical
+all-standards maturity feed; replay it and inspect the report directly. Fleet
+dynamic execution prefers root aggregate gates, fails closed on unbounded
+package-only surfaces, honors repository gate timeouts only within the CLI
+ceiling, and never runs discovered mutating or unknown-risk formatters.
 
 ```sh
 uv run --locked qr fleet audit run --scope-manifest /path/to/fleet-scope.json \
@@ -26,6 +39,13 @@ uv run --locked qr fleet audit run --scope-manifest /path/to/fleet-scope.json \
 uv run --locked qr fleet audit replay --audit-id AUDIT_ID --json
 uv run --locked qr fleet audit feed --audit-id AUDIT_ID --json
 ```
+`matrix_maintenance` and `cache_design` are canonical dimensions of the complete fleet audit.
+It contributes to each applicable repository's `dimension_scores`,
+`maturity_score`, `dimension_gaps`, fleet means, and Pronto maturity
+remediation. The scoped command above is a diagnostic slice; after it identifies
+gaps, rerun the complete audit without `--standard`, pass replay, publish that
+feed, and refresh Pronto before claiming the score or remediation queue reflects
+the latest evidence.
 
 The complete `fleet audit run` includes the bounded static Mac Control lane by
 default. `fleet audit feed` then publishes the QR maturity feed and a
@@ -35,6 +55,26 @@ only for an explicitly legacy or diagnostic feed; `--mac-control-live` opts
 into live Mac Control checks in that same checkpoint. Consumers must treat a
 missing pointer as legacy separate-feed evidence and an invalid pointer as
 blocked, never as permission to mix the two stable sidecars.
+`cache_design` is a non-release-blocking pilot under governance and
+sustainability. It measures lifecycle classification, safe rebuildability,
+bounds, duplication, and growth evidence; raw bytes alone never reduce a score.
+The audit is read-only, never follows symlinks, and never executes cleanup or
+repository-supplied commands. Add literal repository-relative custom surfaces
+with `[[quality_runner.cache_design.paths]]`; a `bounded` lifecycle requires at
+least one of `max_bytes`, `max_entries`, or `max_age_days`.
+
+The published feed is `quality-runner-maturity-feed/v2`. Its repository score
+flows from dimensions to explicit capabilities to seven weighted pillars, not
+from the count of flat findings. Use `repository_maturity.pillars` and their
+`capabilities` for the quality vector and
+`repository_maturity.evidence` for measurement coverage, freshness, conditional
+applicability, and unmapped dimensions. Conditional capabilities preserve
+`applicable`, `not_applicable`, or `unknown` state. `source_dimension_mean`
+is retained only for migration diagnostics. Only a finding with
+`confirmed_critical_risk: true` in correctness, security, or operability
+applies the score cap; blocker/P0 state alone remains a quality-outcome signal.
+Agent growth health is diagnostic and does not add a fifth score beside the
+four consolidated human/agent capabilities.
 
 Fleet subprocess stdout and stderr are captured as UTF-8 with replacement for
 malformed bytes. This preserves a bounded, redacted command receipt when a

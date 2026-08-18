@@ -19,6 +19,7 @@ FLEET_STANDARD_REPORT_SCHEMA = "quality-runner-fleet-standard-report-v1"
 MATRIX_MAINTENANCE_STANDARD = "matrix-maintenance"
 DEVELOPER_LEGIBILITY_STANDARD = "developer-legibility"
 LONG_RUNNING_TASKS_STANDARD = "long-running-tasks"
+CACHE_DESIGN_STANDARD = "cache-design"
 STANDARD_DIMENSIONS = {
     MATRIX_MAINTENANCE_STANDARD: ("matrix_maintenance",),
     DEVELOPER_LEGIBILITY_STANDARD: ("developer_legibility",),
@@ -26,6 +27,7 @@ STANDARD_DIMENSIONS = {
         "long_running_task_observability",
         "long_running_task_optimization",
     ),
+    CACHE_DESIGN_STANDARD: ("cache_design",),
 }
 SUPPORTED_FLEET_STANDARDS = tuple(STANDARD_DIMENSIONS)
 
@@ -42,6 +44,7 @@ DIMENSIONS = (
     "dependency_vulnerability",
     "developer_legibility",
     "change_surface_hotspots",
+    "cache_design",
     "matrix_maintenance",
     "quality_commands",
     "coding_conventions",
@@ -80,6 +83,7 @@ DIMENSION_LABELS = {
     "dependency_vulnerability": "dependency and vulnerability risk",
     "developer_legibility": "developer legibility",
     "change_surface_hotspots": "change-surface hotspots",
+    "cache_design": "cache design and lifecycle",
     "quality_commands": "build, test, lint, and quality commands",
     "coding_conventions": "coding conventions",
     "security_constraints": "security and credential constraints",

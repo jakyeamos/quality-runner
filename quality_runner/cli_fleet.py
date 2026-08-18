@@ -110,9 +110,7 @@ def add_fleet_commands(subparsers: Any) -> None:
         "workspace-target",
         help="Calculate role-based canonical workspace targets without mutation",
     )
-    target_actions = target_parser.add_subparsers(
-        dest="workspace_target_action", required=True
-    )
+    target_actions = target_parser.add_subparsers(dest="workspace_target_action", required=True)
     target_calculate = target_actions.add_parser(
         "calculate",
         help="Calculate 2P + 1N plus explicitly active temporary lanes",
@@ -294,9 +292,7 @@ def fleet_command_payload(args: argparse.Namespace) -> dict[str, Any]:
             stale_seconds=args.stale_seconds,
             adoptable_seconds=args.adoptable_seconds,
             as_of=args.as_of,
-            workspace_policy_path=(
-                Path(args.workspace_policy) if args.workspace_policy else None
-            ),
+            workspace_policy_path=(Path(args.workspace_policy) if args.workspace_policy else None),
         )
     if args.fleet_action == "mac-control":
         if args.mac_control_action != "audit":

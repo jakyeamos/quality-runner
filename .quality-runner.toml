@@ -122,3 +122,34 @@ evidence_refs = [
   "local:docs/prevention-readiness.md",
   "ci:.github/workflows/ci.yml",
 ]
+[quality_runner.web_readiness]
+applicability = "not_applicable"
+reason = "Quality Runner is a CLI and Python library with no deployed web surface"
+
+[[quality_runner.cache_design.paths]]
+path = ".quality-runner/cache/incremental-analysis-v1"
+class = "tool_cache"
+lifecycle = "bounded"
+max_bytes = 67108864
+max_entries = 4096
+
+[[quality_runner.cache_design.paths]]
+path = ".quality-runner/cache/source-analysis-v1"
+class = "tool_cache"
+lifecycle = "bounded"
+max_bytes = 67108864
+max_entries = 1024
+
+[[quality_runner.cache_design.paths]]
+path = ".quality-runner/cache/semantic-similarity-v1"
+class = "tool_cache"
+lifecycle = "bounded"
+max_bytes = 67108864
+max_entries = 1024
+
+[[quality_runner.cache_design.paths]]
+path = ".quality-runner/cache/repository-inventory-v1"
+class = "tool_cache"
+lifecycle = "bounded"
+max_bytes = 16777216
+max_entries = 8

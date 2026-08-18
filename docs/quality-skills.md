@@ -111,6 +111,7 @@ qr fleet audit run --scope-manifest /path/to/fleet-scope.json \
   --projects-root /bounded/root --dynamic --no-changed-only --json
 qr fleet audit run --all --projects-root /path/to/projects --standard matrix-maintenance --json
 qr fleet audit run --all --projects-root /path/to/projects --standard long-running-tasks --json
+qr fleet audit run --all --projects-root /path/to/projects --standard cache-design --json
 qr fleet audit feed --audit-id AUDIT_ID --json
 ```
 
@@ -199,6 +200,13 @@ These are triage findings, not automatic repair authority or release blockers.
 The complete fleet audit publishes them through the canonical maturity feed so
 Pronto can retain sub-target dimensions as reconciliation actions. The scoped
 standard report is diagnostic and cannot be published as the canonical feed.
+
+Use `--standard cache-design` for the read-only derived-storage lane. It
+classifies tool caches, build outputs, dependency materializations, durable
+state, and ambiguous storage; it never runs cleanup or repository commands.
+Raw size is diagnostic only. Incomplete traversal stays `unknown`, and a
+standard-only snapshot remains non-publishable until a complete audit passes
+replay.
 
 Maturity v2 aggregates evidence as dimensions, then capabilities, then seven
 weighted pillars. Conditional capabilities preserve explicit applicability,

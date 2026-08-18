@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import re
@@ -13,6 +14,10 @@ from contextlib import suppress
 from pathlib import Path
 from typing import Any, cast
 
+from quality_runner import __version__
+from quality_runner.cache_limits import prune_lru_tree
+from quality_runner.cache_modes import default_external_cache_root
+
 LOCAL_COMMAND_ENV_ALLOWLIST = (
     "PATH",
     "HOME",
@@ -23,6 +28,8 @@ LOCAL_COMMAND_ENV_ALLOWLIST = (
 )
 
 SUPPORTED_PACKAGE_MANAGERS = frozenset({"bun", "npm", "pnpm", "yarn"})
+_XDG_CACHE_MAX_ENTRIES = 4096
+_XDG_CACHE_MAX_BYTES = 64 * 1024 * 1024
 
 
 def run_shell_command(command: str, *, cwd: Path, timeout: int) -> dict[str, object]:
@@ -36,6 +43,8 @@ def run_command(command: Sequence[str], *, cwd: Path, timeout: int) -> dict[str,
 def _run_command(
     command: str | Sequence[str], *, cwd: Path, timeout: int, shell: bool
 ) -> dict[str, object]:
+    command_text = command if isinstance(command, str) else " ".join(command)
+    command_env = local_command_env(cwd, command=command_text)
     process = subprocess.Popen(
         command,
         cwd=cwd,
@@ -45,7 +54,7 @@ def _run_command(
         text=True,
         errors="replace",
         start_new_session=True,
-        env=local_command_env(cwd, command=command if isinstance(command, str) else None),
+        env=command_env,
     )
     process_group_id = _process_group_id(process)
     try:
@@ -63,11 +72,9 @@ def _run_command(
     except BaseException:
         terminate_process_group(process, process_group_id=process_group_id)
         raise
-    return {
-        "stdout": stdout,
-        "stderr": stderr,
-        "returncode": process.returncode,
-    }
+    finally:
+        _enforce_xdg_bound(command_env)
+    return {"stdout": stdout, "stderr": stderr, "returncode": process.returncode}
 
 
 def _process_group_id(process: subprocess.Popen[Any]) -> int:
@@ -142,12 +149,10 @@ def local_command_env(cwd: Path, *, command: str | None = None) -> dict[str, str
         if (value := os.environ.get(key)) is not None
     }
     cache_root = cwd / ".quality-runner" / "cache"
-    env["UV_CACHE_DIR"] = (
-        os.environ.get("UV_CACHE_DIR", str(Path.home() / ".cache" / "uv"))
-        if command and "uv run" in command and "--offline" in command
-        else str(cache_root / "uv")
+    env["UV_CACHE_DIR"] = os.environ.get(
+        "UV_CACHE_DIR", str(default_external_cache_root() / "shared-tools" / "uv-v1")
     )
-    env["XDG_CACHE_HOME"] = str(cache_root / "xdg")
+    env["XDG_CACHE_HOME"] = str(_xdg_cache_root(cache_root, command))
     if command and "corepack " in command and "--offline" in command:
         # The sanitized XDG cache must not make Corepack forget its prepared,
         # host-owned package-manager cache or make pnpm forget its prepared
@@ -167,6 +172,25 @@ def local_command_env(cwd: Path, *, command: str | None = None) -> dict[str, str
     if package_manager_bin and env.get("PATH"):
         env["PATH"] = f"{package_manager_bin}{os.pathsep}{env['PATH']}"
     return env
+
+
+def _xdg_cache_root(repo_cache_root: Path, command: str | None) -> Path:
+    normalized = f" {command or ''} "
+    if any(token in normalized for token in (" qr ", " quality-runner ")):
+        return default_external_cache_root() / "shared-tools" / f"quality-runner-{__version__}"
+    identity = hashlib.sha256((command or "unspecified").encode("utf-8")).hexdigest()[:16]
+    return repo_cache_root / "xdg" / "isolated-v1" / identity
+
+
+def _enforce_xdg_bound(environment: dict[str, str]) -> None:
+    configured = environment.get("XDG_CACHE_HOME")
+    if not configured:
+        return
+    prune_lru_tree(
+        owned_root=Path(configured),
+        max_entries=_XDG_CACHE_MAX_ENTRIES,
+        max_bytes=_XDG_CACHE_MAX_BYTES,
+    )
 
 
 def _cached_package_manager_bin(cwd: Path) -> str | None:

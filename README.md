@@ -134,10 +134,24 @@ disposable worktrees for changed or incomplete evidence:
 qr audit /path/to/repo --profile environment-legibility --json
 qr fleet audit run --all --projects-root /path/to/projects --json
 qr fleet audit run --scope-manifest /path/to/fleet-scope.json --projects-root /bounded/root --dynamic --no-changed-only --json
+qr fleet audit run --all --projects-root /path/to/projects \
+  --standard cache-design --json
 qr fleet audit replay --audit-id AUDIT_ID --json
 qr fleet audit report --audit-id AUDIT_ID --json
 qr fleet audit feed --audit-id AUDIT_ID --json
 ```
+
+The non-release-blocking `cache-design` standard inventories derived storage
+without deleting files or running repository commands. It reports logical and
+allocated bytes, file count, age, hard-link/shared attribution, declared bounds,
+and receipt-to-receipt growth. Its 0-4 score is lifecycle-based: raw size alone
+does not lower maturity, and incomplete or ambiguous traversal is `unknown`.
+A standard-only snapshot writes private
+`quality-runner-cache-design-assessment-v1` evidence to
+`standard-report.json` but cannot replace the canonical complete maturity feed.
+The checked-in [dogfood receipt](docs/baselines/cache-design-dogfood.json)
+records the exact-base before/after allocated bytes, cache hits, and five
+cold/warm equivalence runs used to validate QR's own bounded caches.
 
 The Mac Control ideal-state gate is a separate, explicit fleet lane. It does
 not change the numeric maturity score. Each repository that supports Mac
@@ -280,6 +294,11 @@ replacing the current file. An explicit `--output-dir` publishes only beside
 that isolated test artifact and never updates the production current feed.
 Leverage and Pronto consume the same stable feed; the legacy leverage maturity
 audit is historical and is not imported.
+
+Complete audits project redacted `cache_design` category aggregates and the
+conditional governance capability `cache_lifecycle`. Per-path evidence remains
+inside the private audit snapshot. The pilot may influence the weighted maturity
+score, but it does not cap maturity or block a release.
 
 For presentation, the feed separates observed `checks_failing` from
 `verification_blocked`, and names the remaining machine outcomes `review_needed`,

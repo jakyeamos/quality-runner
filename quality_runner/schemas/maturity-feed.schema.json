@@ -48,6 +48,20 @@
           "repo_id": {"type": "string", "minLength": 1},
           "maturity_score": {"type": ["number", "null"], "minimum": 0, "maximum": 4},
           "source_dimension_mean": {"type": ["number", "null"], "minimum": 0, "maximum": 4},
+          "cache_design": {
+            "type": "object",
+            "properties": {
+              "schema": {"const": "quality-runner-cache-design-assessment-v1"},
+              "status": {"enum": ["absent", "discoverable", "validated", "maintained", "unknown", "stale", "blocked", "failed", "not_applicable", "missing"]},
+              "score": {"type": ["integer", "null"], "minimum": 0, "maximum": 4},
+              "measurement_complete": {"type": "boolean"},
+              "totals": {"type": "object"},
+              "categories": {"type": "object"},
+              "risk_flags": {"type": "array", "items": {"type": "string"}},
+              "growth": {"type": "object"}
+            },
+            "additionalProperties": false
+          },
           "repository_maturity": {
             "type": "object",
             "required": ["schema", "score", "uncapped_score", "status", "pillars", "evidence", "critical_cap"],
