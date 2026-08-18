@@ -1,6 +1,6 @@
 {
   "schema": "agent-usability/v1",
-  "reviewed_at": "2026-08-09",
+  "reviewed_at": "2026-08-11",
   "applicability": "applicable",
   "tools": [
     {
@@ -13,7 +13,13 @@
         "quality-runner",
         "repo-quality-certifier"
       ],
-      "behavior_evidence": []
+      "behavior_evidence": [
+        {
+          "path": "docs/evidence/release-smoke.json",
+          "status": "passed",
+          "observed_at": "2026-08-11"
+        }
+      ]
     }
   ],
   "skills": [
