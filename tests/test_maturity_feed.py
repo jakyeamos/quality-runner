@@ -8,6 +8,10 @@ import pytest
 
 from quality_runner.fleet.audit import fleet_audit_payload, fleet_replay_payload
 from quality_runner.fleet.feed import fleet_feed_payload
+from quality_runner.fleet.maturity_coverage import (
+    AuditCoverageFeedError,
+    validate_feed_audit_coverage,
+)
 from quality_runner.fleet.maturity_feed import (
     MaturityFeedError,
     _repository_projection,
@@ -15,6 +19,17 @@ from quality_runner.fleet.maturity_feed import (
     publish_maturity_feed,
     read_maturity_feed,
 )
+
+
+def test_coverage_validation_accepts_legacy_v1_only_when_metadata_is_wholly_absent() -> None:
+    repositories = [{"repo_id": "legacy"}]
+
+    validate_feed_audit_coverage({}, repositories)
+
+    with pytest.raises(AuditCoverageFeedError, match="partially present"):
+        validate_feed_audit_coverage(
+            {"audit_coverage": {"policy": "require_complete"}}, repositories
+        )
 
 
 def test_blocked_dynamic_finding_and_target_evidence_reach_feed_projection() -> None:
@@ -389,6 +404,16 @@ def test_feed_is_deterministic_and_redacted(tmp_path: Path) -> None:
     assert first["measurement_confidence"]["deterministic_replay"] is True
     assert "dynamic_verification_disabled" in first["measurement_confidence"]["limitations"]
     assert first["repository_count"] == result["repository_count"]
+    assert first["audit_coverage"] == {
+        "status": "complete",
+        "policy": "require_complete",
+        "complete_repository_count": 1,
+        "incomplete_repository_count": 0,
+        "comparison_eligible": True,
+        "canonical_findings_scope": "exact_target_heads",
+    }
+    assert first["repositories"][0]["audit_coverage"]["status"] == "complete"
+    assert first["repositories"][0]["comparison_eligible"] is True
     assert sum(first["quality_outcome_counts"].values()) == first["repository_count"]
     assert first["quality_outcome_taxonomy"]["verification_blocked"]["label"] == (
         "Quality verification blocked"
@@ -575,6 +600,55 @@ def test_feed_rejects_failed_replay_and_partial_scope(tmp_path: Path) -> None:
     summary_path.write_text(json.dumps(summary), encoding="utf-8")
     with pytest.raises(MaturityFeedError):
         build_maturity_feed(artifact_root, replay=replay)
+
+
+def test_feed_requires_complete_fold_coverage_unless_diagnostic_override_is_explicit(
+    tmp_path: Path,
+) -> None:
+    projects = tmp_path / "projects"
+    root = projects / "fixture"
+    _init_repo(root)
+    _git(root, "switch", "-c", "feature")
+    (root / "feature.txt").write_text("feature\n", encoding="utf-8")
+    _git(root, "add", "feature.txt")
+    _git(root, "commit", "-m", "feature")
+    _git(root, "switch", "dev")
+    result = fleet_audit_payload(
+        projects_root=projects,
+        output_dir=tmp_path / "fleet",
+        as_of="2026-07-26T17:00:00+00:00",
+    )
+    artifact_root = Path(str(result["artifact_root"]))
+    replay = fleet_replay_payload(output_dir=artifact_root)
+
+    with pytest.raises(MaturityFeedError, match="complete canonical audit coverage"):
+        build_maturity_feed(artifact_root, replay=replay)
+
+    feed = build_maturity_feed(
+        artifact_root,
+        replay=replay,
+        allow_incomplete_coverage=True,
+    )
+
+    assert feed["audit_coverage"] == {
+        "status": "incomplete",
+        "policy": "allow_incomplete",
+        "complete_repository_count": 0,
+        "incomplete_repository_count": 1,
+        "comparison_eligible": False,
+        "canonical_findings_scope": "exact_target_heads",
+    }
+    repository = feed["repositories"][0]
+    assert repository["audit_coverage"]["status"] == "incomplete_unfolded"
+    assert repository["comparison_eligible"] is False
+    assert repository["maturity_status"] != "certified"
+
+    publication = fleet_feed_payload(
+        output_dir=artifact_root,
+        allow_incomplete_coverage=True,
+    )
+    assert publication["status"] == "published"
+    assert publication["feed"]["audit_coverage"]["comparison_eligible"] is False
 
 
 def test_feed_rejects_replay_hash_mismatch(tmp_path: Path) -> None:

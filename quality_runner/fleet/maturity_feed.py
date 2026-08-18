@@ -9,6 +9,10 @@ from typing import Any, cast
 
 from quality_runner.artifacts import prepare_safe_directory
 from quality_runner.fleet.contracts import digest
+from quality_runner.fleet.maturity_coverage import (
+    AuditCoverageFeedError,
+    validate_feed_audit_coverage,
+)
 from quality_runner.fleet.maturity_projection import (
     MaturityProjectionError,
 )
@@ -63,6 +67,7 @@ def build_maturity_feed(
     *,
     replay: Mapping[str, Any],
     expected_projects_root: Path | None = None,
+    allow_incomplete_coverage: bool = False,
 ) -> dict[str, Any]:
     """Build a redacted, Pronto-facing feed from one persisted QR audit."""
     root = artifact_root.expanduser().resolve()
@@ -110,6 +115,17 @@ def build_maturity_feed(
     if int(summary.get("static_completed", 0)) != len(repositories):
         raise MaturityFeedError("fleet audit static coverage is incomplete")
 
+    coverage_statuses = [
+        str(_object(repository.get("audit_coverage")).get("status", "blocked_ambiguous"))
+        for repository in repositories
+    ]
+    incomplete_coverage = sum(status != "complete" for status in coverage_statuses)
+    if incomplete_coverage and not allow_incomplete_coverage:
+        raise MaturityFeedError(
+            "maturity feed requires complete canonical audit coverage; "
+            f"{incomplete_coverage} repositories have unfolded or ambiguous work"
+        )
+
     projections = [
         _repository_projection(
             repository,
@@ -146,6 +162,14 @@ def build_maturity_feed(
         },
         "repository_count": int(summary["repository_count"]),
         "checkout_count": int(summary.get("checkout_count", 0)),
+        "audit_coverage": {
+            "status": "complete" if incomplete_coverage == 0 else "incomplete",
+            "policy": "allow_incomplete" if allow_incomplete_coverage else "require_complete",
+            "complete_repository_count": len(repositories) - incomplete_coverage,
+            "incomplete_repository_count": incomplete_coverage,
+            "comparison_eligible": incomplete_coverage == 0,
+            "canonical_findings_scope": "exact_target_heads",
+        },
         "mean_maturity": (
             round(sum(holistic_scores) / len(holistic_scores), 3) if holistic_scores else None
         ),
@@ -272,6 +296,10 @@ def validate_maturity_feed(feed: Mapping[str, Any]) -> None:
     repository_ids = [_required_string(repository, "repo_id") for repository in repositories]
     if len(set(repository_ids)) != len(repository_ids):
         raise MaturityFeedError("maturity feed repository IDs must be unique")
+    try:
+        validate_feed_audit_coverage(feed, repositories)
+    except AuditCoverageFeedError as error:
+        raise MaturityFeedError(str(error)) from error
     for repository in repositories:
         _validate_repository_maturity(repository)
     if not isinstance(feed.get("provenance_hash"), str):

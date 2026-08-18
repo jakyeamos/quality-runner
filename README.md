@@ -153,6 +153,22 @@ The checked-in [dogfood receipt](docs/baselines/cache-design-dogfood.json)
 records the exact-base before/after allocated bytes, cache hits, and five
 cold/warm equivalence runs used to validate QR's own bounded caches.
 
+Before scanning, QR compares the canonical target with local and
+remote-tracking refs, detached worktree commits, and dirty registered
+worktrees. The resulting `audit_coverage` status is `complete`,
+`incomplete_unfolded`, `blocked_ambiguous`, or `stale_target`. Checks still run
+against the exact canonical target: unfolded work qualifies the completeness
+of those findings instead of being blended into a repository state that never
+existed.
+
+Canonical feed publication requires complete coverage. For bounded diagnosis,
+an operator may explicitly publish a comparison-ineligible feed without
+changing the target-attached score:
+
+```bash
+qr fleet audit feed --audit-id AUDIT_ID --allow-incomplete-coverage --json
+```
+
 The Mac Control ideal-state gate is a separate, explicit fleet lane. It does
 not change the numeric maturity score. Each repository that supports Mac
 Control owns `.mac-control/ideal-state.json`; missing manifests remain

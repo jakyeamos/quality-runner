@@ -80,6 +80,21 @@ Fleet subprocess stdout and stderr are captured as UTF-8 with replacement for
 malformed bytes. This preserves a bounded, redacted command receipt when a
 repository tool emits non-UTF-8 output instead of aborting the coordinator.
 
+Fleet audit publication requires `audit_coverage.status: complete` for every
+repository. Unique local or remote-tracking work, dirty worktrees, ambiguous
+detached commits, and stale targets remain exact-target coverage qualifiers.
+Use `--allow-incomplete-coverage` only for a diagnostic feed; its
+`comparison_eligible` field remains false and consumers must not rank it.
+
+For release preparation, build both archives and run
+`uv run --locked quality-runner release-boundary . --dist-dir dist --json`.
+Every applicable change-matrix surface must be classified as `public_core`,
+`public_adapter`, or `local_only`; public adapters require sanitized contract
+fixtures, and local operator wiring must not ship. The command persists
+`.quality-runner/release-boundary.json` using schema v2. Release consumers must
+require its exact branch and commit, matching matrix and artifact digests, and
+all checks passed; v1, stale, dirty, or missing evidence is not releasable.
+
 For the complete pre-release path, also run:
 
 ```sh

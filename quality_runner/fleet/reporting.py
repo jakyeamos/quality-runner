@@ -10,6 +10,7 @@ def summary_markdown(summary: dict[str, Any]) -> str:
         f"As of: `{summary['as_of']}`",
         "",
         f"Repositories: **{summary['repository_count']}**  ",
+        f"Canonical coverage complete/incomplete: **{summary.get('audit_coverage_complete', 0)} / {summary.get('audit_coverage_incomplete', 0)}**  ",
         f"Mean applicable maturity: **{summary['mean_maturity']} / 4**  ",
         f"Dynamic selected/reused/passed: **{summary['dynamic_selected']} / {summary['dynamic_reused']} / {summary['dynamic_passed']}**",
         "",
