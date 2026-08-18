@@ -17,7 +17,7 @@ from quality_runner.fleet.contracts import (
     parse_as_of,
     public_projection,
     stable_id,
-    standard_dimension,
+    standard_dimensions,
 )
 from quality_runner.fleet.coordinator import (
     coordinate_dynamic_result,
@@ -62,7 +62,7 @@ def fleet_audit_payload(
     standard: str | None = None,
     scope_manifest: Path | None = None,
 ) -> dict[str, Any]:
-    standard_dimension(standard)
+    standard_dimensions(standard)
     if standard is not None and dynamic:
         raise ValueError("standard-scoped fleet audits are static-only; omit --dynamic")
     resolved_as_of = parse_as_of(as_of)

@@ -18,7 +18,7 @@ from quality_runner.fleet.contracts import (
     FLEET_FINDING_SCHEMA,
     FLEET_PLAN_SCHEMA,
     digest,
-    standard_dimension,
+    standard_dimensions,
 )
 from quality_runner.fleet.documentation_visibility import assess_developer_legibility
 from quality_runner.fleet.error_codes import stable_error_code_finding_arguments
@@ -37,10 +37,14 @@ from quality_runner.fleet.legibility_finding import (
     validation_commands as _validation_commands,
 )
 from quality_runner.fleet.legibility_support import plan_confidence, scan_projection
+from quality_runner.fleet.long_running_tasks import assess_long_running_tasks
 from quality_runner.fleet.maturity_dimensions import assess_maturity_dimensions
 from quality_runner.fleet.projection import build_local_projection
 from quality_runner.fleet.skill_contracts import assess_skill_contract_quality
-from quality_runner.fleet.standard_audit import matrix_maintenance_finding_arguments
+from quality_runner.fleet.standard_audit import (
+    long_running_task_finding_arguments,
+    matrix_maintenance_finding_arguments,
+)
 from quality_runner.fleet.strict_debt import (
     assess_strict_policy_visibility,
     assess_strict_type_debt,
@@ -54,7 +58,7 @@ def audit_repository(
     run_id: str,
     standard: str | None = None,
 ) -> dict[str, Any]:
-    selected_standard_dimension = standard_dimension(standard)
+    selected_standard_dimensions = standard_dimensions(standard)
     root = Path(str(repository["primary_path"])).expanduser().resolve()
     config = load_repo_config(root)
     scan: dict[str, Any]
@@ -67,7 +71,12 @@ def audit_repository(
     documents = collect_documents(root)
     link_evidence = collect_link_evidence(root, documents)
     selected_dimensions = (
-        (selected_standard_dimension,) if selected_standard_dimension is not None else DIMENSIONS
+        selected_standard_dimensions if selected_standard_dimensions else DIMENSIONS
+    )
+    long_running_task_assessments = (
+        assess_long_running_tasks(root)
+        if any(dimension.startswith("long_running_task_") for dimension in selected_dimensions)
+        else {}
     )
     maturity_assessments = (
         assess_maturity_dimensions(
@@ -90,6 +99,7 @@ def audit_repository(
             dimension=dimension,
             as_of=as_of,
             maturity_assessments=maturity_assessments,
+            long_running_task_assessments=long_running_task_assessments,
         )
         for dimension in selected_dimensions
     ]
@@ -234,6 +244,7 @@ def _dimension_finding(
     dimension: str,
     as_of: str,
     maturity_assessments: dict[str, dict[str, Any]],
+    long_running_task_assessments: dict[str, dict[str, Any]],
 ) -> dict[str, Any]:
     combined = "\n".join(documents.values()).lower()
     evidence: list[dict[str, str]] = []
@@ -318,6 +329,15 @@ def _dimension_finding(
         return _finding(
             **matrix_maintenance_finding_arguments(
                 repository=repository, documents=documents, as_of=as_of
+            )
+        )
+    if dimension in long_running_task_assessments:
+        return _finding(
+            **long_running_task_finding_arguments(
+                repository=repository,
+                dimension=dimension,
+                assessments=long_running_task_assessments,
+                as_of=as_of,
             )
         )
     if dimension == "skill_contract_quality":

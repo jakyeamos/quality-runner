@@ -98,7 +98,11 @@ PILLAR_DEFINITIONS: tuple[dict[str, Any], ...] = (
             },
             "operational_observability": {
                 "applicability": "conditional",
-                "patterns": ("observability_runtime_health",),
+                "patterns": (
+                    "observability_runtime_health",
+                    "long_running_task_observability",
+                    "long_running_task_optimization",
+                ),
             },
         },
     },

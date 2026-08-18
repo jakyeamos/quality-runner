@@ -110,6 +110,7 @@ qr fleet audit run --all --projects-root /path/to/projects --json
 qr fleet audit run --scope-manifest /path/to/fleet-scope.json \
   --projects-root /bounded/root --dynamic --no-changed-only --json
 qr fleet audit run --all --projects-root /path/to/projects --standard matrix-maintenance --json
+qr fleet audit run --all --projects-root /path/to/projects --standard long-running-tasks --json
 qr fleet audit feed --audit-id AUDIT_ID --json
 ```
 
@@ -162,6 +163,24 @@ dimension. Its repository score, fleet mean, non-passing gap, and Pronto
 remediation action come from the same canonical feed. The scoped
 `--standard matrix-maintenance` command remains a diagnostic inventory and does
 not update that feed by itself.
+
+Use `--standard long-running-tasks` to inventory repository tasks that have an
+explicit `quality-runner: long-running-task` source annotation, a workflow
+`timeout-minutes` value of at least five minutes, or an explicit command timeout
+of at least 300 seconds. Names such as `crawl`, `fleet`, or `batch` do not qualify
+on their own. Each applicable task is assessed on two independent dimensions:
+
+- `long_running_task_observability` checks for machine-readable heartbeat or
+  progress state together with diagnostic state such as phase, totals, elapsed
+  time, or last progress.
+- `long_running_task_optimization` checks for an execution bound together with
+  reuse or work-reduction evidence such as batching, caching, checkpointing,
+  cursors, incremental work, or one-time materialization.
+
+These are triage findings, not automatic repair authority or release blockers.
+The complete fleet audit publishes them through the canonical maturity feed so
+Pronto can retain sub-target dimensions as reconciliation actions. The scoped
+standard report is diagnostic and cannot be published as the canonical feed.
 
 Maturity v2 aggregates evidence as dimensions, then capabilities, then seven
 weighted pillars. Conditional capabilities preserve explicit applicability,

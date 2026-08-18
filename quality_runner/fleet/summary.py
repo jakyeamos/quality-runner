@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from quality_runner.fleet.agent_usability_scoring import applicable_agent_usability_scores
-from quality_runner.fleet.contracts import DIMENSIONS, digest, standard_dimension
+from quality_runner.fleet.contracts import DIMENSIONS, digest, standard_dimensions
 
 
 def build_fleet_summary(
@@ -16,8 +16,8 @@ def build_fleet_summary(
     standard: str | None = None,
     population_coverage: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    selected_dimension = standard_dimension(standard)
-    selected_dimensions = (selected_dimension,) if selected_dimension is not None else DIMENSIONS
+    selected_standard_dimensions = standard_dimensions(standard)
+    selected_dimensions = selected_standard_dimensions or DIMENSIONS
     dimension_scores: dict[str, list[float]] = {dimension: [] for dimension in selected_dimensions}
     finding_counts: dict[str, int] = {}
     priority_counts: dict[str, int] = {}
@@ -51,7 +51,7 @@ def build_fleet_summary(
             priority_counts[priority] = priority_counts.get(priority, 0) + 1
             score = finding.get("score")
             dimension = finding.get("dimension")
-            if selected_dimension is not None and dimension != selected_dimension:
+            if selected_standard_dimensions and dimension not in selected_standard_dimensions:
                 continue
             if isinstance(score, int | float) and isinstance(dimension, str) and score >= 0:
                 dimension_scores.setdefault(dimension, []).append(float(score))
@@ -59,7 +59,7 @@ def build_fleet_summary(
                 unresolved.append(f"{result.get('repo_id')}:{dimension}:{status}")
         for score_record in (
             applicable_agent_usability_scores(result.get("agent_usability"))
-            if selected_dimension is None
+            if standard is None
             else []
         ):
             dimension = str(score_record["dimension"])

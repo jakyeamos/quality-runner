@@ -18,9 +18,14 @@ FLEET_STANDARD_REPORT_SCHEMA = "quality-runner-fleet-standard-report-v1"
 
 MATRIX_MAINTENANCE_STANDARD = "matrix-maintenance"
 DEVELOPER_LEGIBILITY_STANDARD = "developer-legibility"
+LONG_RUNNING_TASKS_STANDARD = "long-running-tasks"
 STANDARD_DIMENSIONS = {
-    MATRIX_MAINTENANCE_STANDARD: "matrix_maintenance",
-    DEVELOPER_LEGIBILITY_STANDARD: "developer_legibility",
+    MATRIX_MAINTENANCE_STANDARD: ("matrix_maintenance",),
+    DEVELOPER_LEGIBILITY_STANDARD: ("developer_legibility",),
+    LONG_RUNNING_TASKS_STANDARD: (
+        "long_running_task_observability",
+        "long_running_task_optimization",
+    ),
 }
 SUPPORTED_FLEET_STANDARDS = tuple(STANDARD_DIMENSIONS)
 
@@ -48,6 +53,8 @@ DIMENSIONS = (
     "approval_gated_paths",
     "deployment_rollback",
     "license_contribution",
+    "long_running_task_observability",
+    "long_running_task_optimization",
     "maintenance_health",
     "observability_runtime_health",
     "ownership_continuity",
@@ -83,6 +90,8 @@ DIMENSION_LABELS = {
     "approval_gated_paths": "forbidden and approval-gated paths",
     "deployment_rollback": "deployment and rollback",
     "license_contribution": "license and contribution contract",
+    "long_running_task_observability": "long-running task heartbeat and diagnostics",
+    "long_running_task_optimization": "long-running task optimization readiness",
     "maintenance_health": "maintenance continuity",
     "observability_runtime_health": "observability and runtime health",
     "ownership_continuity": "ownership and continuity",
@@ -242,9 +251,9 @@ def parse_as_of(value: str | None) -> str:
     return parsed.astimezone(UTC).replace(microsecond=0).isoformat()
 
 
-def standard_dimension(standard: str | None) -> str | None:
+def standard_dimensions(standard: str | None) -> tuple[str, ...]:
     if standard is None:
-        return None
+        return ()
     try:
         return STANDARD_DIMENSIONS[standard]
     except KeyError as error:
@@ -252,6 +261,12 @@ def standard_dimension(standard: str | None) -> str | None:
         raise ValueError(
             f"unsupported fleet standard {standard!r}; choose one of: {supported}"
         ) from error
+
+
+def standard_dimension(standard: str | None) -> str | None:
+    """Return the sole dimension for legacy single-dimension callers."""
+    dimensions = standard_dimensions(standard)
+    return dimensions[0] if len(dimensions) == 1 else None
 
 
 def relative_path(root: Path, path: Path) -> str:

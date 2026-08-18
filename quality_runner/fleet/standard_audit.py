@@ -6,7 +6,7 @@ from typing import Any
 from quality_runner.fleet.contracts import (
     FLEET_STANDARD_REPORT_SCHEMA,
     digest,
-    standard_dimension,
+    standard_dimensions,
 )
 from quality_runner.fleet.matrix_maintenance import assess_matrix_maintenance
 
@@ -35,6 +35,32 @@ def matrix_maintenance_finding_arguments(
     }
 
 
+def long_running_task_finding_arguments(
+    *,
+    repository: dict[str, Any],
+    dimension: str,
+    assessments: dict[str, dict[str, Any]],
+    as_of: str,
+) -> dict[str, Any]:
+    assessment = assessments[dimension]
+    return {
+        "repository": repository,
+        "dimension": dimension,
+        "score": assessment["score"],
+        "as_of": as_of,
+        "status": assessment["status"],
+        "severity": "observation",
+        "priority": "P2",
+        "confidence": "high",
+        "message": assessment["message"],
+        "evidence": assessment["evidence"],
+        "applicability": assessment["applicability"],
+        "validation_commands": [
+            "qr fleet audit run --all --standard long-running-tasks --json"
+        ],
+    }
+
+
 def build_standard_report(
     *,
     audit_id: str,
@@ -44,48 +70,60 @@ def build_standard_report(
     repositories: list[dict[str, Any]],
     standard: str,
 ) -> dict[str, Any]:
-    dimension = standard_dimension(standard)
-    assert dimension is not None
+    dimensions = standard_dimensions(standard)
+    assert dimensions
     rows: list[dict[str, Any]] = []
     status_counts: dict[str, int] = {}
     score_counts: dict[str, int] = {}
     for result in sorted(repositories, key=lambda item: str(item.get("repo_id", ""))):
         repository_path = _repository_path(result, projects_root)
-        finding = next(
-            (
-                item
-                for item in result.get("findings", [])
-                if isinstance(item, dict) and item.get("dimension") == dimension
-            ),
-            None,
-        )
-        if finding is None:
-            status, score = "unknown", None
-            message = "The selected standard produced no finding for this repository."
-            evidence: list[dict[str, Any]] = []
-        else:
-            status = str(finding.get("status", "unknown"))
-            score = finding.get("score")
-            message = str(finding.get("message", ""))
-            evidence = [item for item in finding.get("evidence", []) if isinstance(item, dict)][:12]
-        status_counts[status] = status_counts.get(status, 0) + 1
-        score_key = "not_applicable" if score is None else str(score)
-        score_counts[score_key] = score_counts.get(score_key, 0) + 1
-        rows.append(
-            {
-                "repo_id": result.get("repo_id"),
-                "repository_path": repository_path,
-                "status": status,
-                "score": score,
-                "message": message,
-                "evidence": evidence,
-            }
-        )
+        assessments = []
+        for dimension in dimensions:
+            finding = next(
+                (
+                    item
+                    for item in result.get("findings", [])
+                    if isinstance(item, dict) and item.get("dimension") == dimension
+                ),
+                None,
+            )
+            if finding is None:
+                assessment = {
+                    "dimension": dimension,
+                    "status": "unknown",
+                    "score": None,
+                    "message": "The selected standard produced no finding for this dimension.",
+                    "evidence": [],
+                }
+            else:
+                assessment = {
+                    "dimension": dimension,
+                    "status": str(finding.get("status", "unknown")),
+                    "score": finding.get("score"),
+                    "message": str(finding.get("message", "")),
+                    "evidence": [
+                        item for item in finding.get("evidence", []) if isinstance(item, dict)
+                    ][:12],
+                }
+            status = str(assessment["status"])
+            score = assessment["score"]
+            status_counts[status] = status_counts.get(status, 0) + 1
+            score_key = "not_applicable" if score is None else str(score)
+            score_counts[score_key] = score_counts.get(score_key, 0) + 1
+            assessments.append(assessment)
+        row = {
+            "repo_id": result.get("repo_id"),
+            "repository_path": repository_path,
+            "assessments": assessments,
+        }
+        if len(assessments) == 1:
+            row.update({key: assessments[0][key] for key in ("status", "score", "message", "evidence")})
+        rows.append(row)
     report = {
         "schema": FLEET_STANDARD_REPORT_SCHEMA,
         "status": "completed" if repositories else "blocked",
         "standard": standard,
-        "dimension": dimension,
+        "dimensions": list(dimensions),
         "audit_id": audit_id,
         "as_of": as_of,
         "projects_root": str(projects_root),
@@ -101,6 +139,8 @@ def build_standard_report(
             "credentials": False,
         },
     }
+    if len(dimensions) == 1:
+        report["dimension"] = dimensions[0]
     report["provenance_hash"] = digest(report)
     return report
 
