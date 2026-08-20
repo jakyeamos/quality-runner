@@ -16,17 +16,16 @@ from quality_runner.fleet.contracts import (
     DIMENSION_TERMS,
     DIMENSIONS,
     FLEET_FINDING_SCHEMA,
-    FLEET_PLAN_SCHEMA,
     digest,
     standard_dimensions,
 )
-from quality_runner.fleet.documentation_visibility import assess_developer_legibility
-from quality_runner.fleet.error_codes import stable_error_code_finding_arguments
-from quality_runner.fleet.legibility_contract import maintained_control
 from quality_runner.fleet.dimension_evidence import (
     assess_dimension_evidence,
     load_dimension_evidence,
 )
+from quality_runner.fleet.documentation_visibility import assess_developer_legibility
+from quality_runner.fleet.error_codes import stable_error_code_finding_arguments
+from quality_runner.fleet.legibility_contract import maintained_control
 from quality_runner.fleet.legibility_evidence import (
     collect_documents,
     collect_freshness_evidence,
@@ -40,10 +39,10 @@ from quality_runner.fleet.legibility_finding import (
 from quality_runner.fleet.legibility_finding import (
     validation_commands as _validation_commands,
 )
-from quality_runner.fleet.legibility_support import plan_confidence, scan_projection
+from quality_runner.fleet.legibility_plan import build_remediation_plan
+from quality_runner.fleet.legibility_support import scan_projection
 from quality_runner.fleet.long_running_tasks import assess_long_running_tasks
 from quality_runner.fleet.maturity_dimensions import assess_maturity_dimensions
-from quality_runner.fleet.projection import build_local_projection
 from quality_runner.fleet.skill_contracts import assess_skill_contract_quality
 from quality_runner.fleet.standard_audit import (
     cache_design_finding_arguments,
@@ -179,67 +178,6 @@ def audit_repository(
                 "findings": findings,
             }
         ),
-    }
-
-
-def build_remediation_plan(
-    *,
-    repository: dict[str, Any],
-    findings: list[dict[str, Any]],
-    scan: dict[str, Any],
-    as_of: str,
-) -> dict[str, Any]:
-    tasks: dict[str, list[dict[str, Any]]] = {"P0": [], "P1": [], "P2": []}
-    for finding in findings:
-        if finding.get("status") == "not_applicable" or finding.get("score") == 4:
-            continue
-        priority = str(finding.get("priority", "P1"))
-        if priority not in tasks:
-            priority = "P1"
-        dimension = str(finding.get("dimension", "environment"))
-        tasks[priority].append(
-            {
-                "task_id": f"{repository['repo_id']}-{dimension}",
-                "dimension": dimension,
-                "observed_gap": finding.get("message"),
-                "evidence": finding.get("evidence", []),
-                "exact_surface": [item.get("path") for item in finding.get("evidence", [])],
-                "owner": "repository-owner",
-                "dependencies": ["preserve existing repository conventions"],
-                "validation_commands": finding.get("validation_commands", []),
-                "acceptance_criteria": [
-                    f"{DIMENSION_LABELS.get(dimension, dimension)} is discoverable, validated, and fresh",
-                    "QR replay records the evidence without modifying the source checkout",
-                ],
-                "rollback_or_removal": "Remove the local projection or revert the documentation-only commit if it conflicts with the repository contract.",
-            }
-        )
-    projection = build_local_projection(repository, findings)
-    return {
-        "schema": FLEET_PLAN_SCHEMA,
-        "plan_id": digest([repository["repo_id"], findings])[:16],
-        "repo_id": repository["repo_id"],
-        "as_of": as_of,
-        "status": "ready" if any(tasks.values()) else "complete",
-        "observed_gap_summary": f"{sum(len(items) for items in tasks.values())} remediation task(s) remain below full maturity.",
-        "impact": "Agents may spend more context, choose unverified commands, or make unsafe assumptions when the environment contract is incomplete.",
-        "confidence": plan_confidence(findings),
-        "affected_surfaces": sorted(
-            {
-                path
-                for finding in findings
-                for item in finding.get("evidence", [])
-                for path in [item.get("path")]
-                if isinstance(path, str)
-            }
-        ),
-        "tasks": tasks,
-        "owner": "repository-owner",
-        "local_projection": projection,
-        "unresolved_questions": [
-            "Which repository-specific command should be the canonical pre-PR gate if several commands are discovered?",
-        ],
-        "provenance_hash": digest({"repo": repository, "scan": scan, "findings": findings}),
     }
 
 

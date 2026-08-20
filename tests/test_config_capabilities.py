@@ -39,6 +39,7 @@ def test_detect_capabilities_applies_required_capabilities_and_active_exceptions
         {
             "id": "tests",
             "type": "command",
+            "evidence_state": "unavailable",
             "reason": "no quality command found for tests",
             "language": "javascript",
             "required_by": "config",
@@ -92,6 +93,7 @@ def test_configured_gates_satisfy_capabilities_and_policy_metadata_reaches_audit
             "command": 'python -c "raise SystemExit(99)"',
             "language": "python",
             "capability_kind": "local_command",
+            "evidence_state": "configured",
             "required_by": "config",
             "owner": "platform",
             "severity": "blocker",
@@ -107,6 +109,7 @@ def test_configured_gates_satisfy_capabilities_and_policy_metadata_reaches_audit
         {
             "id": "tests",
             "type": "command",
+            "evidence_state": "unavailable",
             "reason": "no quality command found for tests",
             "language": "unknown",
             "required_by": "config",
@@ -162,6 +165,7 @@ def test_detect_capabilities_handles_file_sources_and_inactive_exceptions(tmp_pa
             "command": "pre-cr run",
             "language": "javascript",
             "required_by": "config",
+            "evidence_state": "configured",
             "verification_state": {
                 "discovery": "command-discovered",
                 "execution": "not-run",
@@ -173,6 +177,7 @@ def test_detect_capabilities_handles_file_sources_and_inactive_exceptions(tmp_pa
         {
             "id": "tests",
             "type": "command",
+            "evidence_state": "unavailable",
             "reason": "no quality command found for tests",
             "language": "javascript",
             "required_by": "config",
@@ -266,6 +271,7 @@ def test_custom_profile_can_be_selected_from_repo_config(tmp_path) -> None:
         {
             "id": "tests",
             "type": "command",
+            "evidence_state": "unavailable",
             "reason": "no quality command found for tests",
             "language": "javascript",
             "required_by": "profile",

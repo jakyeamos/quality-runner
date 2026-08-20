@@ -49,6 +49,7 @@ def test_detect_capabilities_handles_file_sources_and_inactive_exceptions(tmp_pa
             "command": "pre-cr run",
             "language": "javascript",
             "required_by": "config",
+            "evidence_state": "configured",
             "verification_state": {
                 "discovery": "command-discovered",
                 "execution": "not-run",
@@ -60,6 +61,7 @@ def test_detect_capabilities_handles_file_sources_and_inactive_exceptions(tmp_pa
         {
             "id": "tests",
             "type": "command",
+            "evidence_state": "unavailable",
             "reason": "no quality command found for tests",
             "language": "javascript",
             "required_by": "config",
@@ -153,6 +155,7 @@ def test_custom_profile_can_be_selected_from_repo_config(tmp_path) -> None:
         {
             "id": "tests",
             "type": "command",
+            "evidence_state": "unavailable",
             "reason": "no quality command found for tests",
             "language": "javascript",
             "required_by": "profile",
