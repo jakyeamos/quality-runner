@@ -245,8 +245,9 @@ def fleet_audit_payload(
         }
     else:
         # Mac Control is part of the same coordinated checkpoint as QR. Audit
-        # the exact ready target checkout used by the QR static lane so its
-        # observed commit cannot drift to an unfolded primary worktree. The
+        # the exact target checkout used by the QR target projection, including
+        # stale or blocked targets, so its observed commit cannot drift to an
+        # unfolded primary worktree. The
         # persisted QR repository identity still retains the original primary
         # path and all custody/audit-coverage evidence.
         mac_control_repository_paths = _mac_control_repository_paths(inventory["repositories"])
@@ -367,12 +368,33 @@ def local_environment_audit_payload(
 
 
 def _mac_control_repository_paths(repositories: Sequence[dict[str, Any]]) -> list[Path]:
-    """Select the same ready target checkout used by the QR static lane."""
+    """Select an exact target checkout for the coordinated Mac Control lane."""
 
-    return [
-        Path(str(_static_scan_repository(repository)["primary_path"]))
-        for repository in repositories
-    ]
+    paths: list[Path] = []
+    for repository in repositories:
+        target = repository.get("target_branch")
+        target_head = target.get("head") if isinstance(target, dict) else None
+        target_checkout_id = target.get("checkout_id") if isinstance(target, dict) else None
+        exact_checkout = next(
+            (
+                checkout
+                for checkout in repository.get("checkouts", [])
+                if isinstance(checkout, dict)
+                and isinstance(checkout.get("path"), str)
+                and checkout.get("exists") is True
+                and (
+                    checkout.get("checkout_id") == target_checkout_id
+                    or checkout.get("head") == target_head
+                )
+                and (not target_head or checkout.get("head") == target_head)
+            ),
+            None,
+        )
+        if exact_checkout is not None:
+            paths.append(Path(str(exact_checkout["path"])))
+        else:
+            paths.append(Path(str(_static_scan_repository(repository)["primary_path"])))
+    return paths
 
 
 def fleet_show_payload(

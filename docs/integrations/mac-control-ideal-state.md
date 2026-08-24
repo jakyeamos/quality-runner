@@ -100,8 +100,8 @@ The coordination pointer is:
 
 It uses `quality-runner-maturity-checkpoint/v1` and binds both audit IDs, one
 `as_of`, one repository population, and matching canonical target commits.
-When QR has a ready target checkout, the Mac Control lane audits that same
-checkout; the QR inventory continues to retain the repository's original
+When QR has an exact target checkout, the Mac Control lane audits that same
+checkout, including when the target status is stale or blocked; the QR inventory continues to retain the repository's original
 primary path and custody evidence separately.
 Publication fails closed if either replay or any binding check fails. The
 existing sidecars are still written for older consumers, but new consumers

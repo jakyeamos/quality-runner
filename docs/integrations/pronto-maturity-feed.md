@@ -49,8 +49,8 @@ replaced; snapshots remain available at
 
 The coordinated checkpoint binds the QR and Mac Control audit IDs, the exact
 `as_of` timestamp, the repository population, and every canonical target
-commit. Both lanes inspect the same ready target checkout when one is
-available; the QR repository identity still preserves the original primary
+commit. Both lanes inspect the same exact target checkout when one is
+available, including stale or blocked targets; the QR repository identity still preserves the original primary
 path and custody evidence. Its `publication_status: "ready"` means the evidence is coherent and
 replay-valid; `quality_status: "ready_with_blockers"` is still possible when a
 repository's quality or Mac Control evidence failed or needs review. Consumers

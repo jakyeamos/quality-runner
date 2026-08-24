@@ -145,6 +145,37 @@ def test_mac_control_uses_the_same_ready_target_checkout_as_qr() -> None:
     assert _mac_control_repository_paths(repositories) == [Path("/private/tmp/repository-dev")]
 
 
+def test_mac_control_uses_exact_target_checkout_even_when_target_is_not_ready() -> None:
+    repositories = [
+        {
+            "repo_id": "repo-example",
+            "primary_path": "/projects/repository",
+            "checkouts": [
+                {
+                    "checkout_id": "checkout-target",
+                    "path": "/private/tmp/repository-target",
+                    "exists": True,
+                    "head": "target-head",
+                },
+                {
+                    "checkout_id": "checkout-primary",
+                    "path": "/projects/repository",
+                    "exists": True,
+                    "head": "primary-head",
+                },
+            ],
+            "target_branch": {
+                "branch": "dev",
+                "checkout_id": "checkout-target",
+                "status": "blocked",
+                "head": "target-head",
+            },
+        }
+    ]
+
+    assert _mac_control_repository_paths(repositories) == [Path("/private/tmp/repository-target")]
+
+
 def test_static_scan_preserves_identity_for_unusable_target_metadata() -> None:
     assert _static_scan_repository({"primary_path": "/projects/repository"}) == {
         "primary_path": "/projects/repository"
