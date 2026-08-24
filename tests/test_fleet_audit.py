@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 
 from quality_runner.fleet.audit import (
+    _mac_control_repository_paths,
     _static_scan_repository,
     fleet_audit_payload,
     fleet_replay_payload,
@@ -120,6 +121,28 @@ def test_static_scan_uses_ready_target_checkout_without_replacing_identity() -> 
     assert scanned["primary_path"] == "/private/tmp/repository-dev"
     assert scanned["repo_id"] == repository["repo_id"]
     assert repository["primary_path"] == "/projects/repository"
+
+
+def test_mac_control_uses_the_same_ready_target_checkout_as_qr() -> None:
+    repositories = [
+        {
+            "repo_id": "repo-example",
+            "primary_path": "/projects/repository",
+            "checkouts": [
+                {
+                    "checkout_id": "checkout-dev",
+                    "path": "/private/tmp/repository-dev",
+                }
+            ],
+            "target_branch": {
+                "branch": "dev",
+                "checkout_id": "checkout-dev",
+                "status": "ready",
+            },
+        }
+    ]
+
+    assert _mac_control_repository_paths(repositories) == [Path("/private/tmp/repository-dev")]
 
 
 def test_static_scan_preserves_identity_for_unusable_target_metadata() -> None:

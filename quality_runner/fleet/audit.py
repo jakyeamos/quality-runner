@@ -244,9 +244,12 @@ def fleet_audit_payload(
             "reason": "Mac Control was explicitly disabled for this QR audit",
         }
     else:
-        mac_control_repository_paths = [
-            Path(str(repository["primary_path"])) for repository in inventory["repositories"]
-        ]
+        # Mac Control is part of the same coordinated checkpoint as QR. Audit
+        # the exact ready target checkout used by the QR static lane so its
+        # observed commit cannot drift to an unfolded primary worktree. The
+        # persisted QR repository identity still retains the original primary
+        # path and all custody/audit-coverage evidence.
+        mac_control_repository_paths = _mac_control_repository_paths(inventory["repositories"])
         try:
             mac_control_audit = mac_control_audit_payload(
                 projects_root=root,
@@ -361,6 +364,15 @@ def local_environment_audit_payload(
         "summary": summary,
         "implementation_allowed": False,
     }
+
+
+def _mac_control_repository_paths(repositories: Sequence[dict[str, Any]]) -> list[Path]:
+    """Select the same ready target checkout used by the QR static lane."""
+
+    return [
+        Path(str(_static_scan_repository(repository)["primary_path"]))
+        for repository in repositories
+    ]
 
 
 def fleet_show_payload(
