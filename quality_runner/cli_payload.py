@@ -31,6 +31,7 @@ from quality_runner.cli_gate import (
 )
 from quality_runner.cli_handoff import handoff_command_payload
 from quality_runner.cli_maintenance_surface import maintenance_surface_command_payload
+from quality_runner.cli_onboarding import onboarding_command_payload
 from quality_runner.cli_phase import phase_command_payload
 from quality_runner.cli_planning import planning_command_payload
 from quality_runner.cli_policy_surfaces import policy_surfaces_payload
@@ -88,6 +89,8 @@ def payload_for_args(
         return security_command_payload(args)
     if args.command == "task":
         return task_command_payload(args)
+    if args.command == "onboarding":
+        return onboarding_command_payload(args, validated_repo_path=_validated_repo_path)
     if args.command == "phase-check":
         return phase_command_payload(args)
     if args.command == "self-update":

@@ -8,7 +8,6 @@ from quality_runner.handoff_gate_summary_markdown import (
 from quality_runner.timeout_diagnostics import timeout_diagnostics_markdown
 
 
-
 def build_gate_verification_summary(
     *,
     gate_verification: dict[str, Any] | None,

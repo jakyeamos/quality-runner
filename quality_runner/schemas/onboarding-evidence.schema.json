@@ -1,0 +1,76 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://quality-runner.dev/schemas/onboarding-evidence.schema.json",
+  "title": "Quality Runner repository onboarding evidence",
+  "type": "object",
+  "required": ["schema", "matrix_sha256", "repository", "surfaces"],
+  "properties": {
+    "schema": {"const": "quality-runner-onboarding-evidence/v1"},
+    "matrix_sha256": {"$ref": "#/$defs/sha256"},
+    "repository": {"$ref": "#/$defs/target"},
+    "surfaces": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/surface"}
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "target": {
+      "type": "object",
+      "required": ["id", "branch", "head_sha"],
+      "properties": {
+        "id": {"type": "string", "minLength": 1},
+        "branch": {"type": "string", "minLength": 1},
+        "head_sha": {"type": "string", "minLength": 1}
+      },
+      "additionalProperties": false
+    },
+    "surfaceTarget": {
+      "type": "object",
+      "required": ["branch", "head_sha"],
+      "properties": {
+        "branch": {"type": "string", "minLength": 1},
+        "head_sha": {"type": "string", "minLength": 1}
+      },
+      "additionalProperties": false
+    },
+    "producer": {
+      "type": "object",
+      "required": ["id", "version"],
+      "properties": {
+        "id": {"type": "string", "minLength": 1},
+        "version": {"type": "string", "minLength": 1}
+      },
+      "additionalProperties": false
+    },
+    "surface": {
+      "type": "object",
+      "required": [
+        "surface_id",
+        "status",
+        "producer",
+        "observed_at",
+        "target",
+        "evidence"
+      ],
+      "properties": {
+        "surface_id": {"type": "string", "minLength": 1},
+        "status": {
+          "enum": ["passed", "failed", "blocked", "unknown", "not_applicable"]
+        },
+        "producer": {"$ref": "#/$defs/producer"},
+        "observed_at": {"type": "string", "format": "date-time"},
+        "target": {"$ref": "#/$defs/surfaceTarget"},
+        "evidence": {
+          "type": "array",
+          "minItems": 1,
+          "items": {"type": "string", "minLength": 1}
+        },
+        "reason": {"type": "string", "minLength": 1},
+        "details": {"type": "object"}
+      },
+      "additionalProperties": false
+    }
+  }
+}

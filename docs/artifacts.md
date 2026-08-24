@@ -1,5 +1,27 @@
 # Artifact Contract
 
+## Repository-onboarding evidence and receipt
+
+`qr onboarding check` consumes a caller-assembled
+`quality-runner-onboarding-evidence/v1` envelope and optionally writes a
+`quality-runner-onboarding-check/v1` receipt when `--output` is explicit. The
+input binds approved producer results to the fleet matrix digest and the target
+repository's exact branch and commit. The output records live provenance,
+contract checks, surface decisions, and blocker identifiers.
+
+The distributed schemas are
+`quality_runner/schemas/onboarding-evidence.schema.json` and
+`quality_runner/schemas/onboarding-check.schema.json`. Missing or stale
+evidence, unapproved producers, dirty source, unresolved conditional surfaces,
+quality warnings or errors, absent negative controls, and failed or tampered
+gate receipts produce `not_ready` and a non-zero exit.
+
+The validator is read-only unless an output path is requested. Both envelope
+and receipt may contain absolute local paths and operational evidence, so they
+are local artifacts subject to the handling and retention rules below. See
+[Repository Onboarding Readiness](repository-onboarding.md) for the complete
+admission contract.
+
 ## Public release-boundary receipt
 
 `quality-runner release-boundary` writes

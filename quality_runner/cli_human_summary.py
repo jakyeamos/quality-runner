@@ -21,6 +21,13 @@ def human_summary(payload: dict[str, Any]) -> str:
         return f"Quality Runner {version}: {status}"
     if payload.get("schema") == INIT_RESULT_SCHEMA:
         return f"config: {payload.get('config_path')}"
+    if payload.get("schema") == "quality-runner-onboarding-check/v1":
+        blockers = payload.get("blocking_surface_ids")
+        return (
+            f"status: {status}\n"
+            f"readiness: {payload.get('readiness')}\n"
+            f"blocking surfaces: {blockers if isinstance(blockers, list) else []}"
+        )
     if payload.get("schema") == "quality-runner-review-result-v0.1":
         packet_ready = status == "review-not-run"
         lines = [

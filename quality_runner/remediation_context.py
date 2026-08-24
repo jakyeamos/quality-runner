@@ -115,6 +115,7 @@ def attach_context_refs(
         enriched.append(item)
     return enriched
 
+
 def build_remediation_context_for_plan(
     *,
     remediation_plan: dict[str, Any],

@@ -1,6 +1,6 @@
 # Canonical commands and quality gates
 
-Last reviewed: 2026-08-17
+Last reviewed: 2026-08-24
 
 Run from the repository root with the locked development environment:
 
@@ -15,6 +15,10 @@ uv run --locked pip-audit
 uv build
 python3 scripts/check_environment_contract.py
 gitleaks detect --source . --no-banner --redact
+uv run --locked qr onboarding check /path/to/repository \
+  --matrix ~/.agents/repository-onboarding-change-matrix.json \
+  --evidence /path/to/repository/.quality-runner/onboarding-evidence.json \
+  --json
 uv run --locked qr fleet audit run --all \
   --projects-root /path/to/projects \
   --standard cache-design --json
@@ -22,6 +26,10 @@ uv run --locked qr fleet audit run --all \
   --projects-root /path/to/projects \
   --standard matrix-maintenance --json
 ```
+
+The onboarding command is read-only unless `--output` is explicit and exits
+nonzero for every non-ready state. See `docs/repository-onboarding.md` for the
+versioned evidence and receipt contracts.
 
 For a registry-owned high-confidence fleet measurement, use an exact reviewed
 `quality-runner-fleet-scope/v1` manifest and run:

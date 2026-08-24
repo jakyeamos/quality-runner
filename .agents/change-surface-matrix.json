@@ -2,7 +2,7 @@
   "schema_version": "change-surface-matrix/v1",
   "subject": {"kind": "repository", "id": "quality-runner"},
   "owner": "quality-runner-maintainers",
-  "last_reviewed": "2026-08-16",
+  "last_reviewed": "2026-08-24",
   "surfaces": [
     {
       "id": "matrix-maintenance",
@@ -35,6 +35,24 @@
         "uv run --locked ruff check .",
         "uv run --locked basedpyright",
         "For maturity changes, verify dimension-to-capability-to-pillar aggregation, reverse producer coverage, explicit capability applicability, evidence coverage, missing capabilities, and confirmed-risk-only critical caps."
+      ],
+      "status": "applicable"
+    },
+    {
+      "id": "repository-onboarding-validator",
+      "scope": "external",
+      "distribution": "public_core",
+      "path": "quality_runner/onboarding.py, quality_runner/onboarding_quality.py, quality_runner/cli_onboarding.py, packaged onboarding schemas, global repository-onboarding change matrix, tests, plugin contract, .agents/context/commands.md, and operator documentation",
+      "owner": "Quality Runner and workspace onboarding owners",
+      "condition": "Repository onboarding readiness, evidence-envelope, exact-ref, executable-quality, negative-control, producer allowlist, or machine-receipt behavior changes.",
+      "operations": ["add", "change", "remove"],
+      "validation": [
+        "uv run --locked pytest -q tests/test_onboarding.py tests/test_entrypoints.py",
+        "uv run --locked ruff check quality_runner/onboarding.py quality_runner/onboarding_quality.py quality_runner/cli_onboarding.py tests/test_onboarding.py",
+        "uv run --locked basedpyright quality_runner/onboarding.py quality_runner/onboarding_quality.py quality_runner/cli_onboarding.py",
+        "Run qr onboarding check against complete, missing, stale-ref, tampered-receipt, warning-bearing, missing-negative-control, and unexplained conditional fixtures.",
+        "Confirm the global matrix is valid JSON and declares the same command, evidence schema, receipt schema, quality gates, negative controls, and approved producers.",
+        "Confirm the validator is read-only unless --output is explicit and that every non-ready state exits nonzero."
       ],
       "status": "applicable"
     },
@@ -100,7 +118,6 @@
       ],
       "path": "installed qr, plugins, Pronto, quality-runner-fleet-scope/v1, quality-runner-maturity-feed/v2, quality-runner-cache-design-assessment-v1, and quality-runner-repository-maturity/v2",
       "owner": "integration-owner",
-      "condition": "command, plugin, fleet scope, measurement confidence, feed schema, taxonomy, publication behavior, maturity pillar, applicability, coverage, cap, or source-dimension changes",
       "condition": "command, plugin, audit-coverage, fleet scope, measurement confidence, feed schema, taxonomy, publication behavior, maturity pillar, applicability, coverage, cap, or source-dimension changes",
       "operations": ["add", "change", "remove"],
       "validation": ["qr fleet replay", "qr fleet feed", "scope-manifest population count/hash validation", "high-confidence static/dynamic/gap/replay regressions", "consumer contract readback in Pronto, including measurement confidence, v1 migration labeling, and v2 capability/pillar projection", "uv run --locked pytest -q tests/test_repository_maturity.py tests/test_release_boundary.py::test_public_pronto_fixture_satisfies_the_feed_contract", "uv run --locked pytest -q tests/test_error_codes.py"],
