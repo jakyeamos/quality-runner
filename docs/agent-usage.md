@@ -69,6 +69,27 @@ QR owns evidence and policy evaluation only. The implementing agent still owns
 source changes and decides how to correct a violation; QR does not edit code,
 drive the agent, install prerequisites, commit, or push.
 
+## Admit a new repository only from executable evidence
+
+Repository onboarding is a separate admission boundary from ordinary task
+completion. After the required bounded producers have assembled an exact-ref
+evidence envelope, run:
+
+```bash
+qr onboarding check /path/to/repo \
+  --matrix ~/.agents/repository-onboarding-change-matrix.json \
+  --evidence /path/to/repo/.quality-runner/onboarding-evidence.json \
+  --output /path/to/repo/.quality-runner/onboarding-check.json \
+  --json
+```
+
+Do not treat a present file, a prose claim, a warning-bearing lint result, a
+local-only pass, or CI from another commit as readiness. Continue onboarding
+only when the command exits `0` and the receipt says `readiness: ready` for the
+same matrix digest, branch, and commit. `not_ready` is a hard stop with explicit
+blocking check and surface identifiers. The full contract is documented in
+[Repository Onboarding Readiness](repository-onboarding.md).
+
 ## Choose the QR journey
 
 Use the canonical `qr` command for new work. `quality-runner` is a compatible

@@ -31,6 +31,27 @@ qr doctor --json
 Existing callers can use `quality-runner` in place of `qr` with the same help,
 version, and JSON behavior.
 
+## `quality-runner onboarding check`
+
+`onboarding check` is the read-only, fail-closed admission decision for a new
+fleet repository:
+
+```bash
+qr onboarding check /path/to/repository \
+  --matrix ~/.agents/repository-onboarding-change-matrix.json \
+  --evidence /path/to/repository/.quality-runner/onboarding-evidence.json \
+  --output /path/to/repository/.quality-runner/onboarding-check.json \
+  --json
+```
+
+The default evidence path is `.quality-runner/onboarding-evidence.json` inside
+the target. `--output` is optional; without it, the command does not write.
+Exit `0` means the exact live branch and commit are ready under the current
+matrix digest. Every missing, stale, dirty, partial, unknown, blocked, warning-
+bearing, producer-untrusted, or unexplained state exits `1`. See
+[Repository Onboarding Readiness](repository-onboarding.md) for input and
+receipt schemas and the executable-quality requirements.
+
 ## `quality-runner candidates`
 
 The candidate workflow captures every declared confirmed bug lesson without

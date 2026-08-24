@@ -125,6 +125,23 @@ qr web-readiness /path/to/repo \
 See the [web-readiness evidence contract](docs/integrations/web-readiness.md)
 for policy, bundle budgets, evidence levels, schemas, and producer examples.
 
+Before a new repository is admitted to the fleet, use the global matrix's
+fail-closed onboarding decision. The command validates approved producer
+evidence against the live branch and commit; it never turns file presence,
+warnings, stale CI, or an unexplained conditional surface into readiness:
+
+```bash
+qr onboarding check /path/to/repo \
+  --matrix ~/.agents/repository-onboarding-change-matrix.json \
+  --evidence /path/to/repo/.quality-runner/onboarding-evidence.json \
+  --output /path/to/repo/.quality-runner/onboarding-check.json \
+  --json
+```
+
+See [Repository Onboarding Readiness](docs/repository-onboarding.md) for the
+producer, exact-ref, executable-quality, negative-control, and receipt
+contracts.
+
 For the cross-repository environment contract, QR owns both the review profile
 and the bounded fleet scanner. Static inspection covers every identity under a
 bounded projects root; dynamic commands are opt-in and run only in QR-owned
@@ -531,6 +548,7 @@ qr status /path/to/repo --json
 qr inspect /path/to/repo --json
 qr run /path/to/repo --json
 qr verify-gates /path/to/repo --json
+qr onboarding check /path/to/repo --matrix ~/.agents/repository-onboarding-change-matrix.json --evidence /path/to/repo/.quality-runner/onboarding-evidence.json --json
 qr exclusions suggest /path/to/repo --json
 qr refresh /path/to/repo --run-id-prefix refresh-001 --handoff-output handoff.md --json
 qr refresh /path/to/repo --run-id-prefix task-001-pass-1 \

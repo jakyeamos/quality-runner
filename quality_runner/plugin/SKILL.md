@@ -71,6 +71,25 @@ not become task failures. Do not copy every QR finding into static agent rules;
 promote a repeatedly trusted deterministic finding into a behavior-verified QR
 rule or a faster native checker with its own maturity evidence.
 
+## Repository onboarding admission
+
+When adding or registering a repository, read the fleet repository-onboarding
+matrix first. After approved producers have assembled the exact-ref evidence
+envelope, run the matrix-declared command:
+
+```bash
+qr onboarding check /path/to/repo \
+  --matrix ~/.agents/repository-onboarding-change-matrix.json \
+  --evidence /path/to/repo/.quality-runner/onboarding-evidence.json \
+  --output /path/to/repo/.quality-runner/onboarding-check.json \
+  --json
+```
+
+Treat only exit `0` plus `readiness: ready` as admission. Missing, stale,
+dirty, partial, warning-bearing, unknown, blocked, or unexplained evidence is a
+hard stop. The command is read-only unless `--output` is explicit; it does not
+run producer workflows or create readiness evidence.
+
 For `structural:improve-tests` findings, read `suggested_disposition`,
 `disposition_rationale`, and `evidence_needed` before changing the suite. QR's
 `merge`, `rewrite`, and `delete_candidate` values require an author decision;
