@@ -521,6 +521,7 @@ def _content_sha256(file_info: dict[str, Any]) -> str | None:
         return hashlib.sha256(text.encode("utf-8")).hexdigest()
     return None
 
+
 def _coverage_status(text_scan_scope: TextScanScope | None) -> str:
     if text_scan_scope is None:
         return "unknown"

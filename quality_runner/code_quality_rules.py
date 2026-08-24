@@ -18,9 +18,9 @@ from quality_runner.code_quality_paths import (
 )
 from quality_runner.code_quality_python_performance import python_performance_findings
 from quality_runner.code_quality_rule_groups import (
+    _python_silent_except_findings,
     clarify_findings,
     harden_findings,
-    _python_silent_except_findings,
     test_quality_findings,
 )
 from quality_runner.code_quality_test_quality import test_file_quality_findings

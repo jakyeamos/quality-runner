@@ -7,5 +7,3 @@ recursive-include quality_evidence_contract *.py
 recursive-include repo_quality_certifier *.json *.md *.py
 recursive-include fixtures/contracts/public-adapters *.json
 prune tests
-global-exclude *.py[cod]
-global-exclude __pycache__

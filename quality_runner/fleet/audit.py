@@ -9,7 +9,6 @@ from typing import Any, cast
 from quality_runner.artifacts import prepare_safe_directory, write_json, write_text
 from quality_runner.ci_gate_audit import audit_ci_gate_candidates
 from quality_runner.fleet import audit_coverage
-from quality_runner.fleet.agent_usability_scoring import applicable_agent_usability_scores
 from quality_runner.fleet.contracts import (
     FLEET_AUDIT_SCHEMA,
     FLEET_FINDING_SCHEMA,
