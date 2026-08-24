@@ -314,6 +314,25 @@ def _matching_script(
 
 
 def _command_matches_capability(capability_id: str, command_lower: str) -> bool:
+    if capability_id == "security_secrets_scan":
+        # Do not classify credential/bootstrap helpers such as
+        # `tsx scripts/secrets/pull.ts` as scanners merely because they contain
+        # the word "secret". Require a scanner executable or an explicit scan
+        # action instead.
+        return any(
+            marker in command_lower
+            for marker in (
+                "gitleaks",
+                "detect-secrets",
+                "trufflehog",
+                "secret-scan",
+                "secret_scan",
+                "scan-secrets",
+                "scan_secrets",
+                "secret scan",
+                "secrets scan",
+            )
+        )
     terms = SECURITY_COMMAND_CAPABILITIES.get(capability_id, ())
     return any(term in command_lower for term in terms)
 

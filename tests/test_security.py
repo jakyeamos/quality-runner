@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import uuid
 from pathlib import Path
 
 from quality_runner.config import load_repo_config
@@ -17,6 +18,10 @@ def _run_scan(repo: Path, config_text: str | None = None) -> dict:
     return run_security_scan(repo, config_text)
 
 
+def _synthetic_secret() -> str:
+    return f"m7-{uuid.uuid4().hex}"
+
+
 def test_security_capability_detected_from_package_script(tmp_path: Path) -> None:
     write_js_fixture(tmp_path)
     package = json.loads((tmp_path / "package.json").read_text(encoding="utf-8"))
@@ -26,6 +31,20 @@ def test_security_capability_detected_from_package_script(tmp_path: Path) -> Non
     security_scan = _run_scan(tmp_path)
     available_ids = {item["id"] for item in security_scan["available_capabilities"]}
     assert "security_secrets_scan" in available_ids
+
+
+def test_secret_fetch_script_is_not_classified_as_a_secrets_scan(tmp_path: Path) -> None:
+    write_js_fixture(tmp_path)
+    package = json.loads((tmp_path / "package.json").read_text(encoding="utf-8"))
+    package["scripts"]["secrets:pull"] = "tsx scripts/secrets/pull.ts"
+    (tmp_path / "package.json").write_text(json.dumps(package), encoding="utf-8")
+
+    security_scan = _run_scan(tmp_path)
+    available_ids = {item["id"] for item in security_scan["available_capabilities"]}
+    missing_ids = {item["id"] for item in security_scan["missing_capabilities"]}
+
+    assert "security_secrets_scan" not in available_ids
+    assert "security_secrets_scan" in missing_ids
 
 
 def test_missing_dependency_audit_for_js_project(tmp_path: Path) -> None:
@@ -78,7 +97,7 @@ def test_candidate_detection_for_secret_exposure(tmp_path: Path) -> None:
 
 def test_secret_candidate_evidence_is_redacted_before_artifact_persistence(tmp_path: Path) -> None:
     write_js_fixture(tmp_path)
-    secret = "m7-security-redaction-regression-secret-42"
+    secret = _synthetic_secret()
     src = tmp_path / "src"
     src.mkdir()
     (src / "secrets.js").write_text(f'const apiKey = "{secret}";\n', encoding="utf-8")
@@ -110,7 +129,7 @@ def test_secret_like_source_evidence_is_redacted_across_generated_artifacts(tmp_
     from quality_runner.handoff_lint import validate_slice_spec_content
 
     write_js_fixture(tmp_path)
-    secret = "m7-shared-redaction-regression-secret-42"
+    secret = _synthetic_secret()
     src = tmp_path / "src"
     src.mkdir()
     (src / "secrets.js").write_text(
@@ -204,7 +223,7 @@ def test_secret_like_source_evidence_is_redacted_across_generated_artifacts(tmp_
 
 def test_secret_assignment_context_redacts_comments_and_expressions(tmp_path: Path) -> None:
     write_js_fixture(tmp_path)
-    secret = "m7-secret-assignment-context-regression-42"
+    secret = _synthetic_secret()
     src = tmp_path / "src"
     src.mkdir()
     (src / "assignment-context-secrets.js").write_text(
@@ -261,7 +280,7 @@ def test_secret_assignment_context_redacts_comments_and_expressions(tmp_path: Pa
 
 def test_expensive_api_candidate_evidence_redacts_secret_like_source(tmp_path: Path) -> None:
     write_js_fixture(tmp_path)
-    secret = "m7-expensive-api-redaction-regression-secret-42"
+    secret = _synthetic_secret()
     route = tmp_path / "app" / "api" / "chat" / "route.ts"
     route.parent.mkdir(parents=True)
     route.write_text(
@@ -297,7 +316,7 @@ def test_multiline_source_evidence_redacts_typed_and_concatenated_assignments(
     from quality_runner.evidence_excerpts import read_line_excerpt
 
     write_js_fixture(tmp_path)
-    secret = "m7-multiline-source-redaction-regression-secret-42"
+    secret = _synthetic_secret()
     src = tmp_path / "src"
     src.mkdir()
     (src / "multiline-secrets.js").write_text(
@@ -353,7 +372,7 @@ def test_expensive_api_candidate_evidence_redacts_multiline_template_secret(
     tmp_path: Path,
 ) -> None:
     write_js_fixture(tmp_path)
-    secret = "m7-template-expensive-api-redaction-regression-secret-42"
+    secret = _synthetic_secret()
     route = tmp_path / "app" / "api" / "chat" / "route.ts"
     route.parent.mkdir(parents=True)
     route.write_text(
@@ -394,7 +413,7 @@ def test_expensive_api_candidate_evidence_redacts_multiline_secret_like_source(
     tmp_path: Path,
 ) -> None:
     write_js_fixture(tmp_path)
-    secret = "m7-multiline-expensive-api-redaction-regression-secret-42"
+    secret = _synthetic_secret()
     route = tmp_path / "app" / "api" / "chat" / "route.ts"
     route.parent.mkdir(parents=True)
     route.write_text(

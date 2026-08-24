@@ -108,7 +108,7 @@ Quality Runner now owns the command-backed profile and fleet orchestration:
 qr audit /path/to/repo --profile environment-legibility --json
 qr fleet audit run --all --projects-root /path/to/projects --json
 qr fleet audit run --scope-manifest /path/to/fleet-scope.json \
-  --projects-root /bounded/root --dynamic --no-changed-only --json
+  --projects-root /bounded/root --parallelism 8 --dynamic --no-changed-only --json
 qr fleet audit run --all --projects-root /path/to/projects --standard matrix-maintenance --json
 qr fleet audit run --all --projects-root /path/to/projects --standard long-running-tasks --json
 qr fleet audit run --all --projects-root /path/to/projects --standard cache-design --json

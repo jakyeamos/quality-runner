@@ -217,6 +217,12 @@ def add_fleet_commands(subparsers: Any) -> None:
         help="Cap each dynamic command; QR also derives a bounded per-repository watchdog",
     )
     run_parser.add_argument(
+        "--parallelism",
+        type=int,
+        default=1,
+        help="Maximum number of repositories audited concurrently",
+    )
+    run_parser.add_argument(
         "--target-override",
         action="append",
         default=[],
@@ -454,6 +460,7 @@ def fleet_command_payload(args: argparse.Namespace) -> dict[str, Any]:
             mac_control_evidence_dir=(
                 Path(args.mac_control_evidence_dir) if args.mac_control_evidence_dir else None
             ),
+            parallelism=args.parallelism,
         )
     if args.audit_action == "show":
         return fleet_show_payload(

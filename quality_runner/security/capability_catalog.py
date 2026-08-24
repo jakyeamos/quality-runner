@@ -29,7 +29,7 @@ SECURITY_SCRIPT_ALIASES: dict[str, tuple[str, ...]] = {
     "security_secrets_scan": (
         "secret-scan",
         "secret_scan",
-        "secrets",
+        "scan-secrets",
         "gitleaks",
         "detect-secrets",
     ),
