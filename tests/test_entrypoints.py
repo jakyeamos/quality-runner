@@ -141,6 +141,8 @@ def test_packaged_console_script_invokes_cli(tmp_path: Path) -> None:
     assert "repo-quality-certifier-mcp = repo_quality_certifier.mcp:main" in entry_points
     assert "quality_runner/plugin/manifest.json" in wheel_names
     assert "quality_runner/plugin/SKILL.md" in wheel_names
+    assert "quality_runner/schemas/onboarding-check.schema.json" in wheel_names
+    assert "quality_runner/schemas/onboarding-evidence.schema.json" in wheel_names
     assert "quality_runner/core/audit_contracts.py" in wheel_names
     assert "quality_runner/core/outcome_contracts.py" in wheel_names
     assert "quality_runner/core/review_contracts.py" in wheel_names
