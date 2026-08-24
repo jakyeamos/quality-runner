@@ -61,7 +61,7 @@ def build_maturity_checkpoint(
             "QR and Mac Control reports must use the same observed_at timestamp"
         )
 
-    qr_commits = _qr_primary_commits(qr_inventory)
+    qr_commits = _qr_target_commits(qr_inventory)
     mac_control_commits = _mac_control_commits(mac_control_inventory)
     if set(qr_commits) != set(mac_control_commits):
         raise MaturityCheckpointError("QR and Mac Control repository populations do not match")
@@ -198,12 +198,27 @@ def publish_maturity_checkpoint(
     return pointer, checkpoint
 
 
-def _qr_primary_commits(inventory: Mapping[str, Any]) -> dict[str, str]:
+def _qr_target_commits(inventory: Mapping[str, Any]) -> dict[str, str]:
     return {
-        repository_id: _primary_commit(repository)
+        repository_id: _target_commit(repository)
         for repository in _objects(inventory.get("repositories"))
         if (repository_id := _required_string(repository, "repo_id"))
     }
+
+
+def _target_commit(repository: Mapping[str, Any]) -> str:
+    target = _object(repository.get("target_branch"))
+    head = target.get("head")
+    if isinstance(head, str) and head.strip():
+        return head
+    checkout_id = target.get("checkout_id")
+    if isinstance(checkout_id, str) and checkout_id.strip():
+        for checkout in _objects(repository.get("checkouts")):
+            if checkout.get("checkout_id") == checkout_id:
+                checkout_head = checkout.get("head")
+                if isinstance(checkout_head, str) and checkout_head.strip():
+                    return checkout_head
+    return _primary_commit(repository)
 
 
 def _primary_commit(repository: Mapping[str, Any]) -> str:

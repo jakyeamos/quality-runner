@@ -10,6 +10,7 @@ from quality_runner.fleet import feed as feed_module
 from quality_runner.fleet.audit import fleet_audit_payload, fleet_replay_payload
 from quality_runner.fleet.contracts import digest
 from quality_runner.fleet.feed import fleet_feed_payload
+from quality_runner.fleet.maturity_checkpoint import _qr_target_commits
 from quality_runner.fleet.maturity_coverage import (
     AuditCoverageFeedError,
     validate_feed_audit_coverage,
@@ -32,6 +33,37 @@ def test_coverage_validation_accepts_legacy_v1_only_when_metadata_is_wholly_abse
         validate_feed_audit_coverage(
             {"audit_coverage": {"policy": "require_complete"}}, repositories
         )
+
+
+def test_checkpoint_binds_qr_canonical_target_not_primary_worktree() -> None:
+    inventory = {
+        "repositories": [
+            {
+                "repo_id": "repo-1",
+                "primary_path": "/projects/repo-1",
+                "target_branch": {
+                    "branch": "dev",
+                    "checkout_id": "checkout-dev",
+                    "status": "ready",
+                    "head": "canonical-target",
+                },
+                "checkouts": [
+                    {
+                        "checkout_id": "checkout-feature",
+                        "is_primary": True,
+                        "head": "unfolded-feature",
+                    },
+                    {
+                        "checkout_id": "checkout-dev",
+                        "is_primary": False,
+                        "head": "canonical-target",
+                    },
+                ],
+            }
+        ]
+    }
+
+    assert _qr_target_commits(inventory) == {"repo-1": "canonical-target"}
 
 
 def test_blocked_dynamic_finding_and_target_evidence_reach_feed_projection() -> None:
