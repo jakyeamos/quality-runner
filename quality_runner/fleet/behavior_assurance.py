@@ -231,9 +231,7 @@ def _assessment(common: dict[str, Any], **values: Any) -> dict[str, Any]:
         elif applicability == "not_applicable":
             resilience_profile_status = "not_applicable"
         else:
-            resilience_profile_status = str(
-                coverage.get("resilience_profile_status") or "unknown"
-            )
+            resilience_profile_status = str(coverage.get("resilience_profile_status") or "unknown")
     state = _state({**common, **values})
     return {
         **common,

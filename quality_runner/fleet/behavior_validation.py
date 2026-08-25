@@ -114,9 +114,7 @@ def requirements(contract: dict[str, Any]) -> list[dict[str, Any]]:
         invariants = string_values(behavior.get("invariants")) if is_v2 else []
         for scenario in object_values(behavior.get("scenarios")):
             profile = object_value(scenario.get("edge_profile")) if is_v2 else {}
-            resilience_profile = (
-                object_value(scenario.get("resilience_profile")) if is_v2 else {}
-            )
+            resilience_profile = object_value(scenario.get("resilience_profile")) if is_v2 else {}
             resilience_items = {
                 dimension: string_values(resilience_profile.get(dimension))
                 for dimension in RESILIENCE_DIMENSIONS

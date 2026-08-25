@@ -136,9 +136,7 @@ def coverage(
     for dimension in RESILIENCE_DIMENSIONS:
         missing = sum(int(dimension not in item["resilience_dimensions"]) for item in records)
         if missing:
-            result["resilience_gaps"].append(
-                {"dimension": dimension, "scenario_count": missing}
-            )
+            result["resilience_gaps"].append({"dimension": dimension, "scenario_count": missing})
     for category, summary in result["per_edge_category"].items():
         if summary["verified"] < summary["total"]:
             result["category_gaps"].append(
