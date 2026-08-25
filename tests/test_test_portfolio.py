@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import subprocess
 from pathlib import Path
 from typing import Any
 
@@ -185,18 +186,46 @@ def test_removal_proof_rejects_tampered_portfolio_audit() -> None:
 def test_tests_cli_writes_explicit_artifacts_and_returns_nonzero_when_blocked(
     tmp_path: Path, capsys
 ) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    subprocess.run(["git", "init", "-b", "main"], cwd=repo, check=True, capture_output=True)
+    (repo / ".git" / "info" / "exclude").write_text(".quality-runner/\n", encoding="utf-8")
+    subprocess.run(
+        [
+            "git",
+            "-c",
+            "user.name=QR Test",
+            "-c",
+            "user.email=qr@example.test",
+            "commit",
+            "--allow-empty",
+            "-m",
+            "fixture",
+        ],
+        cwd=repo,
+        check=True,
+        capture_output=True,
+    )
+    head = subprocess.run(
+        ["git", "rev-parse", "HEAD"], cwd=repo, check=True, capture_output=True, text=True
+    ).stdout.strip()
+    portfolio = _portfolio_manifest()
+    portfolio["revision"]["head"] = head
     portfolio_path = tmp_path / "portfolio.json"
     audit_path = tmp_path / "audit.json"
     removal_path = tmp_path / "removal.json"
     proof_path = tmp_path / "proof.json"
-    portfolio_path.write_text(json.dumps(_portfolio_manifest()), encoding="utf-8")
+    portfolio_path.write_text(json.dumps(portfolio), encoding="utf-8")
 
     assert (
         main(
             [
                 "tests",
                 "portfolio-audit",
+                str(repo),
                 str(portfolio_path),
+                "--run-id",
+                "portfolio-1",
                 "--output",
                 str(audit_path),
                 "--json",
@@ -205,7 +234,38 @@ def test_tests_cli_writes_explicit_artifacts_and_returns_nonzero_when_blocked(
         == 0
     )
     audit = json.loads(audit_path.read_text(encoding="utf-8"))
+    run_dir = repo / ".quality-runner" / "runs" / "portfolio-1"
+    assert json.loads((run_dir / "test-portfolio-audit.json").read_text()) == audit
+    run_manifest = json.loads((run_dir / "run-manifest.json").read_text())
+    assert run_manifest["mode"] == "test-portfolio-audit"
+    assert run_manifest["git"]["head_sha"] == head
+    assert run_manifest["artifact_paths"]["test_portfolio_audit_json"] == str(
+        run_dir / "test-portfolio-audit.json"
+    )
     removal = _removal_manifest(audit)
+    removal["revision"]["base"] = head
+    removal["revision"]["head"] = head
+    removal["portfolio_audit"]["revision"]["head"] = head
+    removal["portfolio_audit"]["audit_hash"] = audit_test_portfolio(portfolio)["audit_hash"]
+    subprocess.run(
+        [
+            "git",
+            "-c",
+            "user.name=QR Test",
+            "-c",
+            "user.email=qr@example.test",
+            "commit",
+            "--allow-empty",
+            "-m",
+            "after",
+        ],
+        cwd=repo,
+        check=True,
+        capture_output=True,
+    )
+    removal["revision"]["head"] = subprocess.run(
+        ["git", "rev-parse", "HEAD"], cwd=repo, check=True, capture_output=True, text=True
+    ).stdout.strip()
     removal.pop("mutation")
     removal_path.write_text(json.dumps(removal), encoding="utf-8")
 
@@ -214,7 +274,10 @@ def test_tests_cli_writes_explicit_artifacts_and_returns_nonzero_when_blocked(
             [
                 "tests",
                 "removal-proof",
+                str(repo),
                 str(removal_path),
+                "--run-id",
+                "removal-1",
                 "--output",
                 str(proof_path),
                 "--json",
@@ -224,4 +287,36 @@ def test_tests_cli_writes_explicit_artifacts_and_returns_nonzero_when_blocked(
     )
     proof = json.loads(proof_path.read_text(encoding="utf-8"))
     assert proof["status"] == "blocked"
+    proof_run = repo / ".quality-runner" / "runs" / "removal-1"
+    assert (proof_run / "test-removal-proof.json").is_file()
+    assert json.loads((proof_run / "run-manifest.json").read_text())["mode"] == (
+        "test-removal-proof"
+    )
     assert '"status": "blocked"' in capsys.readouterr().out
+
+
+def test_tests_cli_rejects_revision_mismatch_without_creating_a_run(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    subprocess.run(["git", "init", "-b", "main"], cwd=repo, check=True, capture_output=True)
+    subprocess.run(
+        ["git", "-c", "user.name=QR Test", "-c", "user.email=qr@example.test", "commit", "--allow-empty", "-m", "fixture"],
+        cwd=repo,
+        check=True,
+        capture_output=True,
+    )
+    manifest_path = tmp_path / "portfolio.json"
+    manifest_path.write_text(json.dumps(_portfolio_manifest()), encoding="utf-8")
+
+    assert main(
+        [
+            "tests",
+            "portfolio-audit",
+            str(repo),
+            str(manifest_path),
+            "--run-id",
+            "mismatch",
+            "--json",
+        ]
+    ) == 1
+    assert not (repo / ".quality-runner" / "runs" / "mismatch").exists()

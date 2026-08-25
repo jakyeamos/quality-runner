@@ -1,0 +1,45 @@
+{
+  "schema": "quality-runner-pronto-command-run-adapter/v1",
+  "repository": "/path/to/repository",
+  "run_manifest": {
+    "schema": "quality-runner-run-manifest-v0.1",
+    "run_id": "test-portfolio-public-contract-fixture",
+    "mode": "test-portfolio-audit",
+    "repo_root": "/path/to/repository",
+    "created_at": "2026-08-25T00:00:00+00:00",
+    "quality_runner_version": "0.7.0",
+    "implementation_allowed": false,
+    "git": {
+      "is_repo": true,
+      "head_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "branch": "main",
+      "dirty": false
+    },
+    "artifact_paths": {
+      "test_portfolio_audit_json": "/path/to/repository/.quality-runner/runs/test-portfolio-public-contract-fixture/test-portfolio-audit.json",
+      "run_manifest_json": "/path/to/repository/.quality-runner/runs/test-portfolio-public-contract-fixture/run-manifest.json"
+    }
+  },
+  "artifact": {
+    "schema": "quality-runner-test-portfolio-audit/v1",
+    "status": "review-required",
+    "implementation_allowed": false,
+    "revision": {
+      "head": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    "audit_hash": "sha256:fixture-audit",
+    "summary": {
+      "removal_candidates": 1,
+      "dispositions": {
+        "insufficient_evidence": 1
+      }
+    }
+  },
+  "consumer_projection": {
+    "surface": "Pronto repository quality detail",
+    "rollup": "qr_command_runs",
+    "specialized_detail": "test_portfolio",
+    "authority": "advisory"
+  },
+  "implementation_allowed": false
+}

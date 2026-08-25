@@ -108,12 +108,13 @@ qr review /path/to/repo --mode blind --json
 qr verify /path/to/repo --run-id baseline-001-verify --json
 qr runs /path/to/repo --json
 qr repo-hygiene check /path/to/repo --json
-qr tests portfolio-audit /private/path/test-portfolio.json --json
-qr tests removal-proof /private/path/test-removal.json --json
+qr tests portfolio-audit /path/to/repo /private/path/test-portfolio.json --run-id portfolio-001 --json
+qr tests removal-proof /path/to/repo /private/path/test-removal.json --run-id removal-001 --json
 ```
 
 The `tests` workflow operationalizes `improve-tests` findings without turning
-reviewer consensus into deletion authority. It maps each test to protected
+reviewer consensus into deletion authority. Each command writes a canonical QR
+run that Pronto can import, maps each test to protected
 behavior, keeps unique signals visible, and requires a clean exact-revision
 suite plus mutation or defective-revision evidence before a removal proof can
 pass. It reads caller-assembled manifests, writes only an explicit output path,

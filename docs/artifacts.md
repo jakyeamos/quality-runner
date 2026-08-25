@@ -106,14 +106,18 @@ deletion. The distributed schemas are:
 These artifacts may contain local test paths and unpublished review evidence,
 so keep them in a private evidence location unless deliberately sanitized.
 
-Artifacts are written under:
+Both commands require `REPO --run-id RUN_ID`. Canonical artifacts and a standard
+`run-manifest.json` are always written under:
 
 ```text
 <repo>/.quality-runner/runs/<run-id>/
 ```
 
 `run-id` must be a single path segment. Absolute paths, separators, `.` and
-`..` are rejected.
+`..` are rejected. `--output` creates an optional export copy; it does not
+replace the canonical run. Pronto imports the latest audit and latest removal
+proof independently across this ledger, preserving their exact run, branch,
+commit, freshness, status, and non-authoritative disposition.
 
 ## Task Prevention Artifacts
 

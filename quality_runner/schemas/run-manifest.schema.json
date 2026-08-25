@@ -7,7 +7,7 @@
   "properties": {
     "schema": { "const": "quality-runner-run-manifest-v0.1" },
     "run_id": { "type": "string", "minLength": 1 },
-    "mode": { "enum": ["inspect", "run", "verify-gates", "refresh", "exclusion-preflight"] },
+    "mode": { "enum": ["inspect", "run", "verify-gates", "refresh", "exclusion-preflight", "test-portfolio-audit", "test-removal-proof"] },
     "repo_root": { "type": "string", "minLength": 1 },
     "created_at": { "type": "string", "format": "date-time" },
     "quality_runner_version": { "type": "string", "minLength": 1 },

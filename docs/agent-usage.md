@@ -81,9 +81,15 @@ After an implementing owner removes or consolidates nominated tests in an
 isolated lane, assemble exact base/head suite and dynamic evidence and run:
 
 ```bash
-qr tests removal-proof /private/path/test-removal.json \
+qr tests removal-proof /path/to/repo /private/path/test-removal.json \
+  --run-id test-removal-<date-or-task> \
   --output /private/path/test-removal-proof.json --json
 ```
+
+Both test-portfolio commands require the receiving repository and a stable run
+ID. Their canonical artifacts and `run-manifest.json` are always written under
+`.quality-runner/runs/<run-id>/`; `--output` exports an optional second copy.
+Pronto imports the canonical run ledger as advisory repository evidence.
 
 Continue only when the proof is `passed` and the repository's ordinary required
 gates also pass. A blocked proof identifies the missing or regressed evidence;

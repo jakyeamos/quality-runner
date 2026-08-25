@@ -121,6 +121,13 @@ qr runs /path/to/repo --json
 qr ci-gate-audit /path/to/repo --json
 ```
 
+For test-suite reduction evidence, run
+`qr tests portfolio-audit REPO MANIFEST --run-id RUN_ID --json` and
+`qr tests removal-proof REPO MANIFEST --run-id RUN_ID --json`. Read the
+canonical artifacts from `.quality-runner/runs/<run-id>/`; Pronto may roll them
+up, but neither a reviewer recommendation nor a passed proof grants mutation
+authority.
+
 For the four journey commands, read the
 `quality-runner-outcome-v0.2` fields (`state`, `assessment`, evidence, writes,
 safety, and `next_action`) instead of treating exit code `0` as a clean result.

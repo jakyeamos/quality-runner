@@ -201,6 +201,26 @@
       "status": "applicable"
     },
     {
+      "id": "test-portfolio-command-runs",
+      "scope": "external",
+      "distribution": "public_adapter",
+      "path": "qr tests portfolio-audit, qr tests removal-proof, .quality-runner/runs/<run-id>, run-manifest schema, plugin/operator documentation, and Pronto quality/remediation projection",
+      "owner": "Quality Runner and Pronto integration owners",
+      "condition": "Test-portfolio audit, removal-proof, command-run persistence, provenance, authority, or consumer roll-up behavior changes.",
+      "operations": ["add", "change", "remove"],
+      "validation": [
+        "uv run --locked pytest -q tests/test_test_portfolio.py tests/test_config_capabilities.py",
+        "uv run --locked ruff check quality_runner/cli_test_portfolio.py quality_runner/test_portfolio.py tests/test_test_portfolio.py",
+        "uv run --locked basedpyright quality_runner/cli_test_portfolio.py quality_runner/test_portfolio.py",
+        "Run both commands against exact matching, mismatched, clean, dirty, blocked, and passed fixtures; confirm every accepted invocation writes a canonical artifact and run-manifest without granting implementation authority.",
+        "Pronto consumer readback imports latest audit and proof independently, preserves stale and blocked states, and creates only advisory remediation actions."
+      ],
+      "contract_fixtures": [
+        "fixtures/contracts/public-adapters/pronto-test-portfolio-command-runs.json"
+      ],
+      "status": "applicable"
+    },
+    {
       "id": "operator-local-overlay",
       "scope": "local",
       "distribution": "local_only",
