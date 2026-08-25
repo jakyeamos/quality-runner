@@ -6,9 +6,10 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any, cast
 
-from quality_runner.artifacts import prepare_safe_directory, write_json, write_text
+from quality_runner.artifacts import write_json, write_text
 from quality_runner.ci_gate_audit import audit_ci_gate_candidates
 from quality_runner.fleet import audit_coverage
+from quality_runner.fleet.audit_artifacts import write_audit_artifacts
 from quality_runner.fleet.contracts import (
     FLEET_AUDIT_SCHEMA,
     FLEET_FINDING_SCHEMA,
@@ -41,7 +42,7 @@ from quality_runner.fleet.dynamic import (
 from quality_runner.fleet.legibility import audit_repository, build_remediation_plan
 from quality_runner.fleet.mac_control import mac_control_audit_payload
 from quality_runner.fleet.replay_integrity import replay_manifest_errors
-from quality_runner.fleet.reporting import plan_markdown, report_markdown, summary_markdown
+from quality_runner.fleet.reporting import report_markdown
 from quality_runner.fleet.scope_manifest import load_fleet_scope_manifest, population_coverage
 from quality_runner.fleet.standard_audit import build_standard_report
 from quality_runner.fleet.static_scan import static_scan_repository as _static_scan_repository
@@ -288,7 +289,7 @@ def fleet_audit_payload(
                 "live": mac_control_live,
             }
     inventory["maturity_checkpoint"] = maturity_checkpoint
-    artifact_paths = _write_audit_artifacts(
+    artifact_paths = write_audit_artifacts(
         artifact_root=artifact_root,
         inventory=inventory,
         results=results,
@@ -353,7 +354,7 @@ def local_environment_audit_payload(
         dynamic=False,
         changed_only=True,
     )
-    paths = _write_audit_artifacts(
+    paths = write_audit_artifacts(
         artifact_root=artifact_root,
         inventory={
             "schema": FLEET_INVENTORY_SCHEMA,
@@ -494,51 +495,6 @@ def fleet_report_payload(
         "report_md": str(write_text(artifact_root / "report.md", report_markdown(report))),
     }
     return {**report, "artifact_root": str(artifact_root), "artifact_paths": paths}
-
-
-def _write_audit_artifacts(
-    *,
-    artifact_root: Path,
-    inventory: dict[str, Any],
-    results: list[dict[str, Any]],
-    summary: dict[str, Any],
-    standard_report: dict[str, Any] | None = None,
-) -> dict[str, str]:
-    prepare_safe_directory(artifact_root)
-    findings_dir = prepare_safe_directory(artifact_root / "findings")
-    plans_dir = prepare_safe_directory(artifact_root / "plans")
-    write_json(artifact_root / "inventory.json", inventory)
-    write_json(artifact_root / "summary.json", summary)
-    write_text(artifact_root / "summary.md", summary_markdown(summary))
-    if standard_report is not None:
-        write_json(artifact_root / "standard-report.json", standard_report)
-    for result in results:
-        repo_id = str(result["repo_id"])
-        write_json(findings_dir / f"{repo_id}.json", result)
-        plan = result.get("plan", {})
-        write_json(plans_dir / f"{repo_id}.json", plan)
-        write_text(plans_dir / f"{repo_id}.md", plan_markdown(plan))
-    replay_manifest = {
-        "schema": FLEET_REPLAY_SCHEMA,
-        "audit_id": inventory["audit_id"],
-        "as_of": inventory["as_of"],
-        "inventory_hash": digest(inventory),
-        "summary_hash": digest(summary),
-        "finding_hashes": {str(result["repo_id"]): digest(result) for result in results},
-        "provenance_hash": digest({"inventory": inventory, "summary": summary}),
-    }
-    write_json(artifact_root / "replay-manifest.json", replay_manifest)
-    paths = {
-        "inventory_json": str(artifact_root / "inventory.json"),
-        "summary_json": str(artifact_root / "summary.json"),
-        "summary_md": str(artifact_root / "summary.md"),
-        "replay_manifest": str(artifact_root / "replay-manifest.json"),
-        "findings_dir": str(findings_dir),
-        "plans_dir": str(plans_dir),
-    }
-    if standard_report is not None:
-        paths["standard_report_json"] = str(artifact_root / "standard-report.json")
-    return paths
 
 
 def _artifact_root(output_dir: Path | None, audit_id: str, *, local: bool = False) -> Path:

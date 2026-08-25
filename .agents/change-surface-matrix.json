@@ -3,6 +3,12 @@
   "subject": {"kind": "repository", "id": "quality-runner"},
   "owner": "quality-runner-maintainers",
   "last_reviewed": "2026-08-25",
+  "reviewed_no_impact": [
+    {
+      "change": "Extract fleet audit artifact serialization into a focused support module.",
+      "reason": "Function body, schemas, paths, hashes, markdown rendering, and call order are unchanged; this restores the enforced source-file size boundary without changing behavior."
+    }
+  ],
   "surfaces": [
     {
       "id": "behavior-assurance-resilience",
