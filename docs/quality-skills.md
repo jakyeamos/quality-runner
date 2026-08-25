@@ -471,6 +471,13 @@ test frameworks use different assertion and marker conventions. The agent
 review must use repository evidence to distinguish a real coverage gap from an
 intentional integration test, snapshot, fixture, or exception.
 
+When those findings and independent reviews nominate portfolio reduction, use
+`qr tests portfolio-audit` to bind behavior ownership and reviewer evidence,
+then `qr tests removal-proof` after the implementing owner has made the change.
+The second command requires exact-revision suite and dynamic preservation
+evidence; the starter pack and reviewer recommendations never authorize a
+deletion.
+
 ### Starter pack: Performance Readiness
 
 The [Performance Readiness starter pack](examples/performance-readiness.toml)

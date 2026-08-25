@@ -2,6 +2,13 @@
 
 All notable changes to Quality Runner are documented here.
 
+## Unreleased
+
+- Added hash-bound `qr tests portfolio-audit` and `removal-proof` evidence
+  contracts. Independent reviews may nominate redundant tests, but only an
+  exact-revision suite plus mutation or defective-revision preservation can
+  produce a passing removal proof; neither command edits or authorizes source.
+
 ## 0.7.0 - 2026-08-01
 
 - Added delivery contracts, phase contracts, performance evidence, and

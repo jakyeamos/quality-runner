@@ -69,6 +69,43 @@ Quality Runner owns detection and provenance. Repository-owned
 `.pronto/ci-gate-profile.json` remains the only authority that can classify a
 candidate as required, optional, or not applicable.
 
+## Test portfolio and removal-proof artifacts
+
+`qr tests portfolio-audit` consumes
+`quality-runner-test-portfolio-input/v1` and emits the hash-bound
+`quality-runner-test-portfolio-audit/v1`. The input identifies tests, protected
+behaviors, independent reviewer recommendations and rationales, known
+duplication, critical contracts, runtime/flake context, unique dynamic signals,
+and evidence gaps. The audit maps behavior owners and emits `keep`, `merge`,
+`rewrite`, `delete_candidate`, or `insufficient_evidence` dispositions.
+
+Two deletion recommendations can nominate a non-critical test only when its
+behaviors have another owner and no unique signal is declared. Disagreement,
+unmapped value, or incomplete evidence remains `insufficient_evidence`.
+Reviewer consensus never authorizes removal.
+
+`qr tests removal-proof` consumes
+`quality-runner-test-removal-proof-input/v1` and emits
+`quality-runner-test-removal-proof/v1`. The proof binds the portfolio audit hash,
+clean base/head identity, removed test IDs, full-suite replays, and dynamic
+evidence. A mutation comparison must use one stable target-set hash and may not
+increase survived or uncovered mutants. Defective-revision evidence must remain
+detected at both exact revisions. Optional per-test dependency evidence must
+report complete coverage and no uncovered dependency.
+
+The proof fails closed as `blocked`; `passed` means only that the supplied
+evidence preserved its declared signals. Every artifact carries
+`implementation_allowed: false`, and neither command executes or authorizes a
+deletion. The distributed schemas are:
+
+- `quality_runner/schemas/test-portfolio-input.schema.json`
+- `quality_runner/schemas/test-portfolio-audit.schema.json`
+- `quality_runner/schemas/test-removal-proof-input.schema.json`
+- `quality_runner/schemas/test-removal-proof.schema.json`
+
+These artifacts may contain local test paths and unpublished review evidence,
+so keep them in a private evidence location unless deliberately sanitized.
+
 Artifacts are written under:
 
 ```text

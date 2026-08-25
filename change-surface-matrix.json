@@ -5,7 +5,7 @@
     "id": "quality-runner"
   },
   "owner": "quality-runner-maintainers",
-  "last_reviewed": "2026-08-15",
+  "last_reviewed": "2026-08-25",
   "surfaces": [
     {
       "id": "python-source-and-contracts",
@@ -18,6 +18,7 @@
       "validation": [
         "uv run --locked pytest -q tests/test_fleet_audit.py",
         "uv run --locked pytest -q tests/test_fleet_dynamic.py tests/test_discovery_standards_capabilities.py",
+        "uv run --locked pytest -q tests/test_test_portfolio.py",
         "uv run --locked pytest -q",
         "uv run --locked ruff check .",
         "uv run --locked basedpyright"
@@ -33,7 +34,7 @@
       "condition": "CLI, MCP, schema, or artifact contract changes",
       "operations": ["add", "change", "remove"],
       "validation": [
-        "uv run --locked pytest -q tests/test_cli.py tests/test_artifact_contracts.py",
+        "uv run --locked pytest -q tests/test_cli.py tests/test_artifact_contracts.py tests/test_test_portfolio.py",
         "uv run --locked qr release-smoke --json"
       ],
       "status": "applicable"

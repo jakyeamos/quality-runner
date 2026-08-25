@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://quality-runner.dev/schemas/test-removal-proof-input.schema.json",
+  "title": "Quality Runner Test Removal Proof Input",
+  "type": "object",
+  "required": ["schema", "repository", "revision", "portfolio_audit", "removed_test_ids", "suite"],
+  "properties": {
+    "schema": {"const": "quality-runner-test-removal-proof-input/v1"},
+    "repository": {"type": "object"},
+    "revision": {
+      "type": "object",
+      "required": ["base", "head", "worktree_clean"],
+      "properties": {
+        "base": {"type": "string", "minLength": 1},
+        "head": {"type": "string", "minLength": 1},
+        "worktree_clean": {"type": "boolean"}
+      }
+    },
+    "portfolio_audit": {"type": "object"},
+    "removed_test_ids": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}},
+    "suite": {
+      "type": "object",
+      "required": ["baseline", "current"],
+      "properties": {"baseline": {"type": "object"}, "current": {"type": "object"}}
+    },
+    "mutation": {"type": "object"},
+    "defective_revisions": {"type": "array", "items": {"type": "object"}},
+    "impact_map": {"type": "object"}
+  },
+  "additionalProperties": true
+}

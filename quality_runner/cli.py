@@ -37,6 +37,7 @@ from quality_runner.cli_rollout import add_rollout_command
 from quality_runner.cli_security import add_security_commands
 from quality_runner.cli_skills import add_skill_commands
 from quality_runner.cli_task import add_task_commands
+from quality_runner.cli_test_portfolio import add_test_portfolio_commands
 from quality_runner.cli_update import add_update_command
 from quality_runner.cli_web_readiness import add_web_readiness_command
 from quality_runner.cli_workflow_args import (
@@ -74,7 +75,7 @@ Compatibility commands remain available:
 
 Advanced operations:
   task, refresh, rollout, gate, controller-report, skill, proposal, remediation,
-  plan, phase, candidates, repo-hygiene, policy-surfaces, onboarding, security,
+  plan, phase, candidates, tests, repo-hygiene, policy-surfaces, onboarding, security,
   release-smoke, and worker handoff tools
 
 Fleet environment audit:
@@ -131,6 +132,7 @@ def build_parser(prog: str = CANONICAL_PROGRAM) -> argparse.ArgumentParser:
     add_candidate_commands(subparsers)
     add_security_commands(subparsers)
     add_task_commands(subparsers)
+    add_test_portfolio_commands(subparsers)
     add_onboarding_commands(subparsers)
 
     run_parser = subparsers.add_parser("run", help="Inspect a repo and write audit artifacts")
@@ -487,6 +489,8 @@ def main(argv: list[str] | None = None) -> int:
     if parsed.command == "policy-surfaces" and payload.get("status") != "passed":
         return 1
     if parsed.command == "onboarding" and payload.get("status") != "passed":
+        return 1
+    if parsed.command == "tests" and payload.get("status") == "blocked":
         return 1
     return 0
 

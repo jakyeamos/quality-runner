@@ -69,6 +69,26 @@ QR owns evidence and policy evaluation only. The implementing agent still owns
 source changes and decides how to correct a violation; QR does not edit code,
 drive the agent, install prerequisites, commit, or push.
 
+## Review a test portfolio before reducing it
+
+Use `qr tests portfolio-audit` after deterministic scanning and independent
+reviews have produced a caller-owned manifest. Record behavior ownership and
+known dynamic signals; do not paste prompts, transcripts, credentials, or
+private source into the manifest. A model recommendation is a review datum, not
+a vote or deletion authorization.
+
+After an implementing owner removes or consolidates nominated tests in an
+isolated lane, assemble exact base/head suite and dynamic evidence and run:
+
+```bash
+qr tests removal-proof /private/path/test-removal.json \
+  --output /private/path/test-removal-proof.json --json
+```
+
+Continue only when the proof is `passed` and the repository's ordinary required
+gates also pass. A blocked proof identifies the missing or regressed evidence;
+do not reinterpret it as approval. QR never performs the removal itself.
+
 ## Admit a new repository only from executable evidence
 
 Repository onboarding is a separate admission boundary from ordinary task

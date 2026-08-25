@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://quality-runner.dev/schemas/test-portfolio-audit.schema.json",
+  "title": "Quality Runner Test Portfolio Audit",
+  "type": "object",
+  "required": ["schema", "status", "implementation_allowed", "input_hash", "audit_hash", "candidates", "authority"],
+  "properties": {
+    "schema": {"const": "quality-runner-test-portfolio-audit/v1"},
+    "status": {"const": "review-required"},
+    "implementation_allowed": {"const": false},
+    "input_hash": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "audit_hash": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "candidates": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["test_id", "disposition", "confidence", "unique_behaviors", "unique_signals", "critical_contract"],
+        "properties": {
+          "test_id": {"type": "string"},
+          "disposition": {"enum": ["keep", "merge", "rewrite", "delete_candidate", "insufficient_evidence"]},
+          "confidence": {"enum": ["low", "medium", "high"]},
+          "unique_behaviors": {"type": "array"},
+          "unique_signals": {"type": "array"},
+          "critical_contract": {"type": "boolean"}
+        }
+      }
+    },
+    "authority": {"type": "object"}
+  },
+  "additionalProperties": true
+}

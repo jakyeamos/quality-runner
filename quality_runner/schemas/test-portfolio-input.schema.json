@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://quality-runner.dev/schemas/test-portfolio-input.schema.json",
+  "title": "Quality Runner Test Portfolio Input",
+  "type": "object",
+  "required": ["schema", "repository", "revision", "tests"],
+  "properties": {
+    "schema": {"const": "quality-runner-test-portfolio-input/v1"},
+    "repository": {"type": "object"},
+    "revision": {
+      "type": "object",
+      "required": ["head"],
+      "properties": {"head": {"type": "string", "minLength": 1}}
+    },
+    "tests": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["id", "path"],
+        "properties": {
+          "id": {"type": "string", "minLength": 1},
+          "path": {"type": "string", "minLength": 1},
+          "behaviors": {"type": "array", "items": {"type": "string", "minLength": 1}},
+          "unique_signals": {"type": "array", "items": {"type": "string", "minLength": 1}},
+          "duplicate_of": {"type": "array", "items": {"type": "string", "minLength": 1}},
+          "critical_contract": {"type": "boolean"},
+          "runtime_seconds": {"type": "number", "minimum": 0},
+          "flaky": {"type": "boolean"},
+          "evidence_gaps": {"type": "array", "items": {"type": "string", "minLength": 1}},
+          "reviewers": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["reviewer", "recommendation", "rationale"],
+              "properties": {
+                "reviewer": {"type": "string", "minLength": 1},
+                "recommendation": {"enum": ["keep", "merge", "rewrite", "delete_candidate", "unknown"]},
+                "rationale": {"type": "string", "minLength": 1}
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "additionalProperties": true
+}

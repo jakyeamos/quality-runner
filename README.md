@@ -108,7 +108,16 @@ qr review /path/to/repo --mode blind --json
 qr verify /path/to/repo --run-id baseline-001-verify --json
 qr runs /path/to/repo --json
 qr repo-hygiene check /path/to/repo --json
+qr tests portfolio-audit /private/path/test-portfolio.json --json
+qr tests removal-proof /private/path/test-removal.json --json
 ```
+
+The `tests` workflow operationalizes `improve-tests` findings without turning
+reviewer consensus into deletion authority. It maps each test to protected
+behavior, keeps unique signals visible, and requires a clean exact-revision
+suite plus mutation or defective-revision evidence before a removal proof can
+pass. It reads caller-assembled manifests, writes only an explicit output path,
+and never edits or deletes tests.
 
 For web repositories, `qr web-readiness` writes the stable categorical report
 `.quality-runner/web-readiness.json`. Source and production-artifact inspection

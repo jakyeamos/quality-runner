@@ -77,6 +77,39 @@ Unsupported transitions, uncovered regressions, invalid registries, incomplete
 fleet evidence, failed precision/cost/freshness/fixture criteria, or missing
 human approval return a non-zero CLI status. See
 [Bug-learning lifecycle](bug-learning.md) for the schemas and thresholds.
+
+## `quality-runner tests`
+
+`tests portfolio-audit` turns caller-assembled behavior, reviewer, duplication,
+runtime, flake, and dynamic-signal evidence into one deterministic disposition
+per test. Reviewer recommendations are evidence, never removal authority:
+
+```bash
+qr tests portfolio-audit /path/to/test-portfolio.json \
+  --output /private/path/test-portfolio-audit.json --json
+```
+
+`tests removal-proof` validates an attempted reduction against the hash-bound
+portfolio audit and exact baseline/head revisions:
+
+```bash
+qr tests removal-proof /path/to/test-removal.json \
+  --output /private/path/test-removal-proof.json --json
+```
+
+A passing proof requires a clean exact-revision boundary, eligible candidates,
+passing baseline and current suites, and at least one complete mutation
+comparison or defective-revision replay. Mutation target sets must match and
+the current run may not add survivors or uncovered mutants. Optional per-test
+impact evidence must be complete with no uncovered dependency. Missing or
+regressed evidence produces `status: blocked` and exit `1`.
+
+Both commands are evidence-only. They read the supplied manifest, write only an
+explicit `--output`, and never discover tests, invoke models, run a suite,
+delete tests, edit source, or authorize source mutation. See
+[Artifact Contract](artifacts.md#test-portfolio-and-removal-proof-artifacts)
+for the four distributed schemas.
+
 ### `quality-runner ci-gate-audit`
 
 `ci-gate-audit` is Quality Runner's read-only semantic audit for repository-specific
@@ -1059,7 +1092,8 @@ the compatibility command does not edit Git ignore configuration.
 
 - `0`: command completed successfully.
 - `1`: validation or filesystem error (`validate-handoff`, `validate-slice-spec`,
-  and `review-worker` also exit `1` when `status` is `rejected`).
+  and `review-worker` also exit `1` when `status` is `rejected`; `tests
+  removal-proof` exits `1` when its status is `blocked`).
 - `2`: argument parsing error.
 
 Errors are printed to stderr without Python tracebacks.
