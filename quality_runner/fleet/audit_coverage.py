@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import json
 import subprocess
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
@@ -8,13 +10,55 @@ from quality_runner.fleet.contracts import digest
 from quality_runner.process_runner import run_command
 
 AUDIT_COVERAGE_SCHEMA = "quality-runner-audit-coverage/v1"
+CUSTODY_DISPOSITION_SCHEMA = "quality-runner-audit-custody-dispositions/v1"
 AUDIT_COVERAGE_STATUSES = frozenset(
     {"complete", "incomplete_unfolded", "blocked_ambiguous", "stale_target"}
 )
 MAX_COVERAGE_ITEMS = 64
+ALLOWED_CUSTODY_DISPOSITIONS = frozenset(
+    {
+        "folded_into_target",
+        "semantic_superseded",
+        "pruned_stale_ref",
+        "protected_canonical_line",
+        "external_remote_line",
+        "retained_active_lane",
+        "retained_dirty_state",
+    }
+)
 
 
-def assess_audit_coverage(repository: dict[str, Any]) -> dict[str, Any]:
+def load_custody_dispositions(path: Path | None) -> dict[str, list[dict[str, Any]]]:
+    """Load exact, human-reviewable dispositions for live custody gaps.
+
+    The manifest is evidence, not authority: each entry is matched against a
+    live ref, checkout, head, or status hash during coverage assessment. An
+    entry that does not match current state cannot make coverage complete.
+    """
+
+    if path is None:
+        return {}
+    payload = json.loads(path.expanduser().read_text(encoding="utf-8"))
+    if not isinstance(payload, dict) or payload.get("schema") != CUSTODY_DISPOSITION_SCHEMA:
+        raise ValueError(f"unsupported custody disposition schema: {path}")
+    raw_repositories = payload.get("repositories")
+    if not isinstance(raw_repositories, dict):
+        raise ValueError("custody disposition manifest repositories must be an object")
+    result: dict[str, list[dict[str, Any]]] = {}
+    for raw_path, raw_items in raw_repositories.items():
+        if not isinstance(raw_path, str) or not raw_path:
+            raise ValueError("custody disposition repository paths must be non-empty strings")
+        if not isinstance(raw_items, list) or not all(isinstance(item, dict) for item in raw_items):
+            raise ValueError(f"custody dispositions for {raw_path} must be an array of objects")
+        result[str(Path(raw_path).expanduser().resolve())] = [dict(item) for item in raw_items]
+    return result
+
+
+def assess_audit_coverage(
+    repository: dict[str, Any],
+    *,
+    custody_dispositions: list[dict[str, Any]] | None = None,
+) -> dict[str, Any]:
     """Assess whether the canonical target represents all discovered Git work."""
 
     target = _object(repository.get("target_branch"))
@@ -38,12 +82,30 @@ def assess_audit_coverage(repository: dict[str, Any]) -> dict[str, Any]:
 
     dirty_worktrees = _dirty_worktrees(repository)
     unfolded = [item for item in comparisons if item["disposition"] == "unfolded"]
+    observed_unfolded_count = len(unfolded)
+    observed_dirty_count = len(dirty_worktrees)
+    observed_ambiguous_count = len(ambiguous)
     excluded = [item for item in comparisons if item["disposition"] != "unfolded"]
+    (
+        unfolded,
+        dirty_worktrees,
+        ambiguous,
+        dispositioned,
+        disposition_errors,
+    ) = _apply_custody_dispositions(
+        target_head=target_head,
+        unfolded=unfolded,
+        dirty_worktrees=dirty_worktrees,
+        ambiguous=ambiguous,
+        supplied=custody_dispositions or [],
+    )
+    excluded.extend(dispositioned)
     status = _coverage_status(
         target_status=str(target.get("status", "blocked")),
         unfolded=unfolded,
         dirty_worktrees=dirty_worktrees,
         ambiguous=ambiguous,
+        disposition_errors=disposition_errors,
     )
     payload: dict[str, Any] = {
         "schema": AUDIT_COVERAGE_SCHEMA,
@@ -62,10 +124,158 @@ def assess_audit_coverage(repository: dict[str, Any]) -> dict[str, Any]:
         "dirty_worktrees": dirty_worktrees[:MAX_COVERAGE_ITEMS],
         "ambiguous_items": ambiguous[:MAX_COVERAGE_ITEMS],
         "excluded_ref_counts": _count_dispositions(excluded),
+        "observed_unfolded_branch_count": observed_unfolded_count,
+        "observed_dirty_worktree_count": observed_dirty_count,
+        "observed_ambiguous_item_count": observed_ambiguous_count,
+        "custody_dispositioned_count": len(dispositioned),
+        "custody_dispositioned_items": dispositioned[:MAX_COVERAGE_ITEMS],
+        "custody_disposition_errors": disposition_errors[:MAX_COVERAGE_ITEMS],
         "safe_action": _safe_action(status),
     }
+    if dispositioned:
+        payload["evidence_scope"] = "canonical_target_head_with_custody_dispositions"
     payload["provenance_hash"] = digest(payload)
     return payload
+
+
+def _apply_custody_dispositions(
+    *,
+    target_head: str | None,
+    unfolded: list[dict[str, Any]],
+    dirty_worktrees: list[dict[str, Any]],
+    ambiguous: list[dict[str, Any]],
+    supplied: list[dict[str, Any]],
+) -> tuple[
+    list[dict[str, Any]],
+    list[dict[str, Any]],
+    list[dict[str, Any]],
+    list[dict[str, Any]],
+    list[dict[str, Any]],
+]:
+    """Apply only dispositions that match current live gap identity exactly."""
+
+    gaps = [*unfolded, *dirty_worktrees, *ambiguous]
+    dispositioned: list[dict[str, Any]] = []
+    errors: list[dict[str, Any]] = []
+    used: set[int] = set()
+    for gap in gaps:
+        matches = [
+            (index, item)
+            for index, item in enumerate(supplied)
+            if index not in used and _disposition_matches(gap, item, target_head=target_head)
+        ]
+        if not matches:
+            continue
+        if len(matches) > 1:
+            errors.append(
+                {
+                    "kind": "custody_disposition",
+                    "reason": "multiple dispositions match one live custody gap",
+                    "gap": _gap_identity(gap),
+                    "safe_action": "remove_duplicate_dispositions",
+                }
+            )
+            continue
+        index, item = matches[0]
+        used.add(index)
+        disposition = str(item.get("disposition", ""))
+        reason = str(item.get("reason", "")).strip()
+        evidence = item.get("evidence")
+        if disposition not in ALLOWED_CUSTODY_DISPOSITIONS:
+            errors.append(
+                {
+                    "kind": "custody_disposition",
+                    "reason": f"unsupported custody disposition: {disposition or '<missing>'}",
+                    "gap": _gap_identity(gap),
+                    "safe_action": "use_a_supported_disposition",
+                }
+            )
+            continue
+        if not reason or evidence in (None, "", [], {}):
+            errors.append(
+                {
+                    "kind": "custody_disposition",
+                    "reason": "disposition requires a non-empty reason and evidence",
+                    "gap": _gap_identity(gap),
+                    "safe_action": "complete_disposition_evidence",
+                }
+            )
+            continue
+        dispositioned.append(
+            {
+                **gap,
+                "disposition": "custody_dispositioned",
+                "custody_disposition": {
+                    "type": disposition,
+                    "reason": reason,
+                    "evidence": evidence,
+                    "reviewed_at": item.get("reviewed_at"),
+                },
+            }
+        )
+    for index, item in enumerate(supplied):
+        if index not in used:
+            errors.append(
+                {
+                    "kind": "custody_disposition",
+                    "reason": "disposition does not match a live custody gap",
+                    "entry": _manifest_identity(item),
+                    "safe_action": "refresh_the_manifest_against_live_state",
+                }
+            )
+    dispositioned_keys = {_gap_key(item) for item in dispositioned}
+    return (
+        [item for item in unfolded if _gap_key(item) not in dispositioned_keys],
+        [item for item in dirty_worktrees if _gap_key(item) not in dispositioned_keys],
+        [item for item in ambiguous if _gap_key(item) not in dispositioned_keys],
+        dispositioned,
+        errors,
+    )
+
+
+def _disposition_matches(
+    gap: dict[str, Any], item: dict[str, Any], *, target_head: str | None
+) -> bool:
+    if target_head and item.get("target_head") not in (None, target_head):
+        return False
+    kind = item.get("kind")
+    if kind not in (None, gap.get("kind")):
+        return False
+    if item.get("ref") not in (None, gap.get("ref"), *(gap.get("aliases") or [])):
+        return False
+    if item.get("head") not in (None, gap.get("head")):
+        return False
+    if item.get("checkout_id") not in (None, gap.get("checkout_id")):
+        return False
+    if item.get("status_hash") not in (None, gap.get("status_hash")):
+        return False
+    return any(item.get(key) is not None for key in ("ref", "head", "checkout_id", "status_hash"))
+
+
+def _gap_key(item: Mapping[str, Any]) -> tuple[object, ...]:
+    return (
+        item.get("kind"),
+        item.get("ref"),
+        item.get("head"),
+        item.get("checkout_id"),
+        item.get("status_hash"),
+    )
+
+
+def _gap_identity(item: Mapping[str, Any]) -> dict[str, Any]:
+    return {
+        key: item.get(key)
+        for key in ("kind", "ref", "head", "checkout_id", "status_hash")
+        if item.get(key) is not None
+    }
+
+
+def _manifest_identity(item: Mapping[str, Any]) -> dict[str, Any]:
+    return {
+        key: item.get(key)
+        for key in ("kind", "ref", "head", "checkout_id", "status_hash", "disposition")
+        if item.get(key) is not None
+    }
 
 
 def summarize_audit_coverage(results: list[dict[str, Any]]) -> dict[str, Any]:
@@ -249,6 +459,7 @@ def _dirty_worktrees(repository: dict[str, Any]) -> list[dict[str, Any]]:
         fingerprint = _object(checkout.get("fingerprint"))
         items.append(
             {
+                "kind": "dirty_worktree",
                 "checkout_id": checkout.get("checkout_id"),
                 "branch": checkout.get("branch"),
                 "head": checkout.get("head"),
@@ -266,10 +477,11 @@ def _coverage_status(
     unfolded: list[dict[str, Any]],
     dirty_worktrees: list[dict[str, Any]],
     ambiguous: list[dict[str, Any]],
+    disposition_errors: list[dict[str, Any]],
 ) -> str:
     if target_status == "stale":
         return "stale_target"
-    if target_status != "ready" or ambiguous:
+    if target_status != "ready" or ambiguous or disposition_errors:
         return "blocked_ambiguous"
     if unfolded or dirty_worktrees:
         return "incomplete_unfolded"

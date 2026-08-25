@@ -93,6 +93,23 @@ for comparison and lists bounded, path-free evidence for unique local or
 remote-tracking branches, dirty worktrees, and ambiguous detached commits.
 Merged and patch-equivalent refs do not make coverage incomplete.
 
+When a live ref or checkout has been reviewed but cannot be folded safely in
+the current transaction, the audit may consume an exact custody-disposition
+manifest with `--custody-dispositions PATH`. The manifest schema is
+`quality-runner-audit-custody-dispositions/v1` and maps absolute repository
+paths to entries identified by the live `kind` plus `ref`, `head`,
+`checkout_id`, or `status_hash`. Every entry must include a supported
+disposition, a non-empty reason, and evidence; Quality Runner verifies the
+identity against the current refs/checkouts and refuses unmatched or stale
+entries. Dispositioned items remain visible under
+`custody_dispositioned_items`, with observed counts preserved separately, so
+this mechanism accounts for known custody state without converting missing
+evidence into a pass. Use `folded_into_target`, `semantic_superseded`, or
+`pruned_stale_ref` only after the corresponding live Git proof; use
+`protected_canonical_line`, `external_remote_line`, `retained_active_lane`,
+or `retained_dirty_state` when the state is intentionally preserved for a
+later transaction.
+
 The default feed command refuses `incomplete_unfolded`, `blocked_ambiguous`,
 and `stale_target` repositories. `--allow-incomplete-coverage` is an explicit
 diagnostic override: the feed remains valid for local inspection, but its

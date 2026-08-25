@@ -141,3 +141,65 @@ def test_remote_tracking_only_work_is_flagged(tmp_path: Path) -> None:
     assert coverage["status"] == "incomplete_unfolded"
     assert coverage["unfolded_branches"][0]["ref"] == "origin/remote-feature"
     assert coverage["unfolded_branches"][0]["source"] == "remote_tracking"
+
+
+def test_reviewed_custody_disposition_accounts_for_a_live_branch(tmp_path: Path) -> None:
+    root = tmp_path / "repo"
+    _repo(root)
+    feature_head = _feature_commit(root)
+    repository = repository_record_for_root(root)
+    repository["target_branch"] = resolve_target_branch(repository)
+
+    coverage = assess_audit_coverage(repository)
+    covered = assess_audit_coverage(
+        repository,
+        custody_dispositions=[
+            {
+                "kind": "branch",
+                "ref": "feature",
+                "head": feature_head,
+                "target_head": coverage["canonical_head"],
+                "disposition": "semantic_superseded",
+                "reason": "Target contains the reviewed behavior at a newer canonical head.",
+                "evidence": {"reviewed_head": feature_head},
+                "reviewed_at": "2026-08-25T00:00:00Z",
+            }
+        ],
+    )
+
+    assert covered["status"] == "complete"
+    assert covered["comparison_eligible"] is True
+    assert covered["observed_unfolded_branch_count"] == 1
+    assert covered["unfolded_branch_count"] == 0
+    assert covered["custody_dispositioned_count"] == 1
+    assert covered["custody_dispositioned_items"][0]["custody_disposition"]["type"] == (
+        "semantic_superseded"
+    )
+
+
+def test_unmatched_custody_disposition_cannot_hide_a_gap(tmp_path: Path) -> None:
+    root = tmp_path / "repo"
+    _repo(root)
+    _feature_commit(root)
+    repository = repository_record_for_root(root)
+    repository["target_branch"] = resolve_target_branch(repository)
+
+    coverage = assess_audit_coverage(
+        repository,
+        custody_dispositions=[
+            {
+                "kind": "branch",
+                "ref": "not-live",
+                "head": "0" * 40,
+                "disposition": "semantic_superseded",
+                "reason": "This must not match a live branch.",
+                "evidence": {"reviewed": True},
+            }
+        ],
+    )
+
+    assert coverage["status"] == "blocked_ambiguous"
+    assert coverage["unfolded_branch_count"] == 1
+    assert coverage["custody_disposition_errors"][0]["safe_action"] == (
+        "refresh_the_manifest_against_live_state"
+    )

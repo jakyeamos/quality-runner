@@ -69,6 +69,7 @@ def fleet_audit_payload(
     mac_control_live: bool = False,
     macctl_path: str = "macctl",
     mac_control_evidence_dir: Path | None = None,
+    custody_dispositions: Path | None = None,
     parallelism: int = 1,
 ) -> dict[str, Any]:
     standard_dimensions(standard)
@@ -89,6 +90,7 @@ def fleet_audit_payload(
         if scope_manifest is not None
         else None
     )
+    custody_disposition_payload = audit_coverage.load_custody_dispositions(custody_dispositions)
     resolved_repository_paths = (
         [Path(path) for path in scope_manifest_payload["eligible_paths"]]
         if scope_manifest_payload is not None
@@ -106,6 +108,7 @@ def fleet_audit_payload(
         sorted(overrides.items()),
         sorted(str(path.expanduser().resolve()) for path in resolved_repository_paths or []),
         scope_manifest_payload.get("manifest_hash") if scope_manifest_payload else None,
+        digest(custody_disposition_payload) if custody_disposition_payload else None,
         fleet_policy,
     )
     artifact_root = _artifact_root(output_dir, audit_id)
@@ -135,7 +138,10 @@ def fleet_audit_payload(
             **({"scope_attestation": scope_attestation} if scope_attestation else {}),
         }
         repository_with_target["audit_coverage"] = audit_coverage.assess_audit_coverage(
-            repository_with_target
+            repository_with_target,
+            custody_dispositions=custody_disposition_payload.get(
+                str(Path(str(repository["primary_path"])).expanduser().resolve()), []
+            ),
         )
         static_repository = _static_scan_repository(repository_with_target)
         result = audit_repository(
@@ -215,6 +221,13 @@ def fleet_audit_payload(
             "repository_watchdog_timeout_seconds": dynamic_repository_watchdog_seconds(
                 timeout_seconds
             ),
+        },
+        "custody_dispositions": {
+            "status": "applied" if custody_disposition_payload else "not_provided",
+            "repository_count": len(custody_disposition_payload),
+            "provenance_hash": digest(custody_disposition_payload)
+            if custody_disposition_payload
+            else None,
         },
         "fleet_policy": {**fleet_policy, "applies_to": "automatic discovery"},
         "repositories": [item["repository"] for item in results],

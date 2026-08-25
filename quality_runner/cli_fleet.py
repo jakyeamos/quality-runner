@@ -249,6 +249,14 @@ def add_fleet_commands(subparsers: Any) -> None:
         default=None,
         help="Directory of redacted Mac Control task evidence files named REPO_ID.json",
     )
+    run_parser.add_argument(
+        "--custody-dispositions",
+        default=None,
+        help=(
+            "Exact JSON manifest of reviewed live branch, detached-head, and dirty-worktree "
+            "dispositions; every entry is matched against current state"
+        ),
+    )
     run_parser.add_argument("--json", action="store_true", help="Emit JSON output")
 
     show_parser = audit_actions.add_parser(
@@ -459,6 +467,9 @@ def fleet_command_payload(args: argparse.Namespace) -> dict[str, Any]:
             macctl_path=args.macctl,
             mac_control_evidence_dir=(
                 Path(args.mac_control_evidence_dir) if args.mac_control_evidence_dir else None
+            ),
+            custody_dispositions=(
+                Path(args.custody_dispositions) if args.custody_dispositions else None
             ),
             parallelism=args.parallelism,
         )

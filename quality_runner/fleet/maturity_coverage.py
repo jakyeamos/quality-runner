@@ -29,6 +29,12 @@ def project_audit_coverage(value: object) -> dict[str, Any]:
         "dirty_worktrees",
         "ambiguous_items",
         "excluded_ref_counts",
+        "observed_unfolded_branch_count",
+        "observed_dirty_worktree_count",
+        "observed_ambiguous_item_count",
+        "custody_dispositioned_count",
+        "custody_dispositioned_items",
+        "custody_disposition_errors",
         "safe_action",
         "provenance_hash",
     )
