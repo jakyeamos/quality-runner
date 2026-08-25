@@ -62,6 +62,16 @@ def _contract(
             "risk": "routine",
             "side_effects": "reversible",
         }
+        behavior["scenarios"][0]["resilience_profile"] = {
+            "failure_trajectories": [
+                "A stale local value and an interrupted write can combine before reload."
+            ],
+            "defenses": ["Atomic persistence contains interrupted writes."],
+            "degraded_modes": ["Reload reports the last durable value."],
+            "near_misses": ["A retry repaired a write before the user observed loss."],
+            "operator_adaptations": ["Operators compare the durable record before retrying."],
+            "change_risks": ["Changing write ordering can invalidate the recovery defense."],
+        }
     return {
         "schema": schema,
         "applicability": "applicable",
@@ -384,6 +394,82 @@ def test_v1_contract_remains_valid_but_edge_unprofiled(tmp_path: Path) -> None:
     assert result["state"] == "legacy_v1"
     assert result["edge_profile_status"] == "legacy"
     assert result["coverage"]["profiled"] == 0
+    assert result["resilience_profile_status"] == "legacy"
+
+
+def test_v2_requires_complete_resilience_profiles_when_declared(tmp_path: Path) -> None:
+    root = tmp_path / "repo"
+    _init(root)
+    contract = _contract(schema="pronto-behavior-assurance/v2")
+    contract["behaviors"][0]["scenarios"][0]["resilience_profile"]["near_misses"] = []
+    _write_contract(root, contract)
+
+    result = assess_behavior_assurance(root, _repository(root), AS_OF)
+
+    assert result["contract_status"] == "invalid"
+    assert result["resilience_profile_status"] == "invalid"
+    assert any("near_misses" in gap["message"] for gap in result["gaps"])
+
+
+def test_public_pronto_fixture_preserves_resilience_as_a_separate_dimension() -> None:
+    fixture = json.loads(
+        (
+            Path(__file__).resolve().parents[1]
+            / "fixtures/contracts/public-adapters/pronto-behavior-assurance.json"
+        ).read_text(encoding="utf-8")
+    )
+
+    assert fixture["schema"] == "quality-runner-behavior-assurance/v2"
+    assert fixture["release_ready"] is True
+    assert fixture["resilience_profile_status"] == "profiled"
+    assert set(fixture["coverage"]["per_resilience_dimension"]) == {
+        "failure_trajectories",
+        "defenses",
+        "degraded_modes",
+        "near_misses",
+        "operator_adaptations",
+        "change_risks",
+    }
+
+
+def test_resilience_projection_is_evidence_bound_but_not_release_gating(tmp_path: Path) -> None:
+    root = tmp_path / "repo"
+    _init(root)
+    contract = _contract(schema="pronto-behavior-assurance/v2")
+    commit = _write_contract(root, contract)
+    _write_receipt(root, contract, commit)
+
+    result = assess_behavior_assurance(root, _repository(root), AS_OF)
+
+    assert result["release_ready"] is True
+    assert result["resilience_profile_status"] == "profiled"
+    assert result["coverage"]["resilience_profiled"] == 1
+    assert result["coverage"]["scenarios"][0]["status"] == "verified"
+    assert result["coverage"]["per_resilience_dimension"]["defenses"] == {
+        "scenario_count": 1,
+        "item_count": 1,
+    }
+
+
+def test_missing_resilience_profile_is_visible_without_changing_release_semantics(
+    tmp_path: Path,
+) -> None:
+    root = tmp_path / "repo"
+    _init(root)
+    contract = _contract(schema="pronto-behavior-assurance/v2")
+    del contract["behaviors"][0]["scenarios"][0]["resilience_profile"]
+    commit = _write_contract(root, contract)
+    _write_receipt(root, contract, commit)
+
+    result = assess_behavior_assurance(root, _repository(root), AS_OF)
+
+    assert result["release_ready"] is True
+    assert result["state"] == "current"
+    assert result["resilience_profile_status"] == "unprofiled"
+    assert result["coverage"]["resilience_gaps"][0] == {
+        "dimension": "unprofiled",
+        "scenario_count": 1,
+    }
 
 
 def test_v2_requires_invariants_and_valid_edge_profiles(tmp_path: Path) -> None:

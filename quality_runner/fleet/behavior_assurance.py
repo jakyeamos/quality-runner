@@ -219,20 +219,37 @@ def assess_behavior_assurance(
 def _assessment(common: dict[str, Any], **values: Any) -> dict[str, Any]:
     gaps = values.pop("gaps", [])
     release_ready = bool(values.get("release_ready"))
+    coverage = values.get("coverage", _empty_coverage())
+    contract_status = str(values.get("contract_status", "unknown"))
+    applicability = str(values.get("applicability", "unknown"))
+    resilience_profile_status = str(values.get("resilience_profile_status") or "")
+    if not resilience_profile_status:
+        if contract_status == "missing":
+            resilience_profile_status = "missing"
+        elif contract_status == "invalid":
+            resilience_profile_status = "invalid"
+        elif applicability == "not_applicable":
+            resilience_profile_status = "not_applicable"
+        else:
+            resilience_profile_status = str(
+                coverage.get("resilience_profile_status") or "unknown"
+            )
     state = _state({**common, **values})
     return {
         **common,
         **values,
         "state": state,
+        "resilience_profile_status": resilience_profile_status,
         "required_scenario_count": values.get("required_scenario_count", 0),
         "passed_scenario_count": values.get("passed_scenario_count", 0),
         "accepted_defect_count": values.get("accepted_defect_count", 0),
         "receipt_count": values.get("receipt_count", 0),
         "verified": values.get("verified", []),
-        "coverage": values.get("coverage", _empty_coverage()),
+        "coverage": coverage,
         "gaps": gaps,
         "next_step": (
-            "No release-assurance action is required; review edge coverage separately."
+            "No release-assurance action is required; review edge and systemic-resilience "
+            "coverage separately."
             if release_ready
             else "Resolve the listed Tier-0 contract or receipt gaps, then rerun the fleet audit."
         ),

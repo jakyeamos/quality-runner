@@ -31,6 +31,14 @@ EDGE_SIDE_EFFECTS = {"none", "reversible", "destructive"}
 EDGE_ENVIRONMENTS = {"local", "test", "preview", "staging"}
 EDGE_SURFACES = {"ui", "native", "cli", "api", "workflow"}
 EDGE_SENSITIVITIES = {"normal", "security_sensitive"}
+RESILIENCE_DIMENSIONS = (
+    "failure_trajectories",
+    "defenses",
+    "degraded_modes",
+    "near_misses",
+    "operator_adaptations",
+    "change_risks",
+)
 MAX_FILE_BYTES = 250_000
 MAX_TRACE_STEPS = 100
 MAX_TRACE_REPLAY_ATTEMPTS = 3

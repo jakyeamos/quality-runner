@@ -10,6 +10,7 @@ from quality_runner.fleet.behavior_contract import (
     EDGE_RISKS,
     EDGE_SIDE_EFFECTS,
     LEGACY_CONTRACT_SCHEMA,
+    RESILIENCE_DIMENSIONS,
     VERIFICATION_LEVELS,
 )
 from quality_runner.fleet.behavior_support import (
@@ -92,6 +93,17 @@ def contract_errors(contract: dict[str, Any]) -> list[str]:
                     errors.append(
                         f"{scenario_label}.edge_profile.side_effects must be none, reversible, or destructive"
                     )
+            resilience_profile = scenario.get("resilience_profile")
+            if resilience_profile is not None:
+                if not isinstance(resilience_profile, dict):
+                    errors.append(f"{scenario_label}.resilience_profile must be an object")
+                    continue
+                for dimension in RESILIENCE_DIMENSIONS:
+                    if not string_values(resilience_profile.get(dimension)):
+                        errors.append(
+                            f"{scenario_label}.resilience_profile.{dimension} "
+                            "must contain at least one non-empty observation"
+                        )
     return errors
 
 
@@ -102,6 +114,13 @@ def requirements(contract: dict[str, Any]) -> list[dict[str, Any]]:
         invariants = string_values(behavior.get("invariants")) if is_v2 else []
         for scenario in object_values(behavior.get("scenarios")):
             profile = object_value(scenario.get("edge_profile")) if is_v2 else {}
+            resilience_profile = (
+                object_value(scenario.get("resilience_profile")) if is_v2 else {}
+            )
+            resilience_items = {
+                dimension: string_values(resilience_profile.get(dimension))
+                for dimension in RESILIENCE_DIMENSIONS
+            }
             result.append(
                 {
                     "behavior_id": behavior["id"],
@@ -115,6 +134,15 @@ def requirements(contract: dict[str, Any]) -> list[dict[str, Any]]:
                     "categories": string_values(profile.get("categories")),
                     "risk": profile.get("risk"),
                     "side_effects": profile.get("side_effects"),
+                    "resilience_profiled": bool(resilience_profile),
+                    "resilience_dimensions": [
+                        dimension for dimension, items in resilience_items.items() if items
+                    ],
+                    "resilience_item_counts": {
+                        dimension: len(items)
+                        for dimension, items in resilience_items.items()
+                        if items
+                    },
                 }
             )
     return result

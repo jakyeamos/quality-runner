@@ -2,8 +2,28 @@
   "schema_version": "change-surface-matrix/v1",
   "subject": {"kind": "repository", "id": "quality-runner"},
   "owner": "quality-runner-maintainers",
-  "last_reviewed": "2026-08-24",
+  "last_reviewed": "2026-08-25",
   "surfaces": [
+    {
+      "id": "behavior-assurance-resilience",
+      "scope": "external",
+      "distribution": "public_adapter",
+      "contract_fixtures": [
+        "fixtures/contracts/public-adapters/pronto-behavior-assurance.json"
+      ],
+      "path": "quality_runner/fleet/behavior_contract.py, quality_runner/fleet/behavior_validation.py, quality_runner/fleet/behavior_projection.py, quality_runner/fleet/behavior_assurance.py, docs/integrations/pronto-behavior-assurance.md, and the Pronto consumer",
+      "owner": "Quality Runner and Pronto integration owners",
+      "condition": "Behavior-contract resilience dimensions, validation, bounded projection, profile status, or downstream presentation changes.",
+      "operations": ["add", "change", "remove"],
+      "validation": [
+        "uv run --locked pytest -q tests/test_behavior_assurance.py",
+        "uv run --locked ruff check quality_runner/fleet/behavior_contract.py quality_runner/fleet/behavior_validation.py quality_runner/fleet/behavior_projection.py quality_runner/fleet/behavior_assurance.py tests/test_behavior_assurance.py",
+        "uv run --locked basedpyright quality_runner/fleet/behavior_contract.py quality_runner/fleet/behavior_validation.py quality_runner/fleet/behavior_projection.py quality_runner/fleet/behavior_assurance.py",
+        "Confirm absent profiles stay visibly unprofiled, malformed declared profiles fail closed, and profile coverage does not alter Tier-0 release semantics.",
+        "Confirm Pronto imports profile status, bounded dimension counts, and scenario receipt status without treating profile completeness as release evidence."
+      ],
+      "status": "applicable"
+    },
     {
       "id": "matrix-maintenance",
       "scope": "local",

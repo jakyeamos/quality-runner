@@ -6,6 +6,7 @@ from quality_runner.fleet.behavior_contract import (
     EDGE_CATEGORIES,
     LEGACY_CONTRACT_SCHEMA,
     MAX_SCENARIO_RECORDS,
+    RESILIENCE_DIMENSIONS,
 )
 
 
@@ -19,9 +20,13 @@ def empty_coverage() -> dict[str, Any]:
         "blocked": 0,
         "unknown": 0,
         "profile_status": "missing",
+        "resilience_profiled": 0,
+        "resilience_profile_status": "missing",
         "per_tier": {},
         "per_edge_category": {},
+        "per_resilience_dimension": {},
         "category_gaps": [],
+        "resilience_gaps": [],
         "scenarios": [],
         "truncated": False,
     }
@@ -48,6 +53,9 @@ def coverage(
                 "categories": requirement["categories"],
                 "risk": requirement["risk"],
                 "side_effects": requirement["side_effects"],
+                "resilience_profiled": requirement["resilience_profiled"],
+                "resilience_dimensions": requirement["resilience_dimensions"],
+                "resilience_item_counts": requirement["resilience_item_counts"],
                 "status": status,
                 "verification_level": outcome.get("verification_level"),
                 "receipt_id": outcome.get("receipt_id"),
@@ -62,6 +70,7 @@ def coverage(
         )
     total = len(records)
     profiled = sum(int(item["profiled"]) for item in records)
+    resilience_profiled = sum(int(item["resilience_profiled"]) for item in records)
     profile_status = (
         "legacy"
         if contract_schema == LEGACY_CONTRACT_SCHEMA
@@ -69,6 +78,15 @@ def coverage(
         if total and profiled == total
         else "partially_profiled"
         if profiled
+        else "unprofiled"
+    )
+    resilience_profile_status = (
+        "legacy"
+        if contract_schema == LEGACY_CONTRACT_SCHEMA
+        else "profiled"
+        if total and resilience_profiled == total
+        else "partially_profiled"
+        if resilience_profiled
         else "unprofiled"
     )
     result = {
@@ -79,6 +97,8 @@ def coverage(
             for status in ("verified", "stale", "failed", "blocked", "unknown")
         },
         "profile_status": profile_status,
+        "resilience_profiled": resilience_profiled,
+        "resilience_profile_status": resilience_profile_status,
         "per_tier": {
             str(tier): _summary([item for item in records if item["tier"] == tier])
             for tier in (0, 1, 2)
@@ -88,7 +108,20 @@ def coverage(
             for category in sorted(EDGE_CATEGORIES)
             if any(category in item["categories"] for item in records)
         },
+        "per_resilience_dimension": {
+            dimension: {
+                "scenario_count": sum(
+                    int(dimension in item["resilience_dimensions"]) for item in records
+                ),
+                "item_count": sum(
+                    int(item["resilience_item_counts"].get(dimension, 0)) for item in records
+                ),
+            }
+            for dimension in RESILIENCE_DIMENSIONS
+            if any(dimension in item["resilience_dimensions"] for item in records)
+        },
         "category_gaps": [],
+        "resilience_gaps": [],
         "scenarios": records[:MAX_SCENARIO_RECORDS],
         "truncated": len(records) > MAX_SCENARIO_RECORDS,
     }
@@ -96,6 +129,16 @@ def coverage(
         result["category_gaps"].append(
             {"category": "unprofiled", "scenario_count": total - profiled}
         )
+    if resilience_profiled < total:
+        result["resilience_gaps"].append(
+            {"dimension": "unprofiled", "scenario_count": total - resilience_profiled}
+        )
+    for dimension in RESILIENCE_DIMENSIONS:
+        missing = sum(int(dimension not in item["resilience_dimensions"]) for item in records)
+        if missing:
+            result["resilience_gaps"].append(
+                {"dimension": dimension, "scenario_count": missing}
+            )
     for category, summary in result["per_edge_category"].items():
         if summary["verified"] < summary["total"]:
             result["category_gaps"].append(
@@ -115,6 +158,7 @@ def _summary(records: list[dict[str, Any]]) -> dict[str, int]:
     return {
         "total": len(records),
         "profiled": sum(int(item["profiled"]) for item in records),
+        "resilience_profiled": sum(int(item["resilience_profiled"]) for item in records),
         **{
             status: sum(int(item["status"] == status) for item in records)
             for status in ("verified", "stale", "failed", "blocked", "unknown")

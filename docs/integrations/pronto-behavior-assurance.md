@@ -9,7 +9,8 @@ documentation, or mutable checklists.
 The contract lives at .pronto/behavior-assurance.json. Quality Runner reads
 pronto-behavior-assurance/v1 and pronto-behavior-assurance/v2. Version 1 remains
 valid but projects as legacy and edge-unprofiled. Version 2 adds non-empty
-behavior invariants and optional scenario edge profiles:
+behavior invariants, optional scenario edge profiles, and optional systemic
+resilience profiles:
 
     {
       "schema": "pronto-behavior-assurance/v2",
@@ -31,6 +32,14 @@ behavior invariants and optional scenario edge profiles:
             "categories": ["state_and_ordering"],
             "risk": "routine",
             "side_effects": "reversible"
+          },
+          "resilience_profile": {
+            "failure_trajectories": ["An interrupted write and stale local state can combine."],
+            "defenses": ["Atomic persistence contains interrupted writes."],
+            "degraded_modes": ["Reload exposes the last durable value."],
+            "near_misses": ["A retry repaired a write before durable loss was observed."],
+            "operator_adaptations": ["Compare the durable record before retrying."],
+            "change_risks": ["Write-order changes can invalidate recovery assumptions."]
           }
         }]
       }]
@@ -42,10 +51,21 @@ every scenario a baseline requirement. The optional-profile behavior remains
 for existing-fleet migration and audit: those repositories stay visibly
 unprofiled or partially profiled until their source contract is repaired.
 
+Systemic-resilience profiles preserve six distinct observations: plural
+failure trajectories, defenses, degraded modes, near misses, operator
+adaptations, and risks introduced by change. When a profile is declared, every
+dimension must contain at least one observation. Quality Runner publishes only
+dimension names and bounded item counts, not the descriptive text. Missing
+profiles remain visible as unprofiled or partially profiled, but they do not
+alter Tier-0 release readiness, the assurance score, or receipt trust. The
+scenario's existing receipt status remains adjacent to the profile so consumers
+can distinguish a documented resilience model from verified behavior.
+
 Tier 0 is release-blocking. Tiers 1 and 2 remain auditable inventory and do not
 gate release. A separate coverage projection evaluates every scenario and
 reports total, profiled, verified, stale, failed, blocked, and unknown counts
-per tier and declared edge category.
+per tier and declared edge category, plus systemic-resilience profile coverage
+per dimension.
 
 The eight categories are input_and_encoding, state_and_ordering,
 repetition_and_idempotency, timing_and_concurrency,
@@ -122,3 +142,6 @@ Use the immutable fleet flow to publish the result:
 The first adoption audit is expected to report gaps. Add contracts before
 receipts and let change triggers reduce future reruns rather than weakening the
 initial bar.
+
+The sanitized public adapter fixture is
+`fixtures/contracts/public-adapters/pronto-behavior-assurance.json`.

@@ -1,0 +1,106 @@
+{
+  "schema": "quality-runner-behavior-assurance/v2",
+  "applicability": "applicable",
+  "state": "current",
+  "contract_status": "current",
+  "contract_schema": "pronto-behavior-assurance/v2",
+  "edge_profile_status": "profiled",
+  "resilience_profile_status": "profiled",
+  "result_status": "passed",
+  "freshness": "current",
+  "release_ready": true,
+  "score": 4,
+  "contract_path": ".pronto/behavior-assurance.json",
+  "receipt_directory": ".quality-runner/behavior-assurance/receipts",
+  "contract_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "target_branch": "dev",
+  "target_commit": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "observed_at": "2026-08-25T00:00:00+00:00",
+  "required_scenario_count": 1,
+  "passed_scenario_count": 1,
+  "accepted_defect_count": 0,
+  "receipt_count": 1,
+  "verified": [],
+  "coverage": {
+    "total": 1,
+    "profiled": 1,
+    "verified": 1,
+    "stale": 0,
+    "failed": 0,
+    "blocked": 0,
+    "unknown": 0,
+    "profile_status": "profiled",
+    "resilience_profiled": 1,
+    "resilience_profile_status": "profiled",
+    "per_tier": {
+      "0": {
+        "total": 1,
+        "profiled": 1,
+        "resilience_profiled": 1,
+        "verified": 1,
+        "stale": 0,
+        "failed": 0,
+        "blocked": 0,
+        "unknown": 0
+      }
+    },
+    "per_edge_category": {
+      "state_and_ordering": {
+        "total": 1,
+        "profiled": 1,
+        "resilience_profiled": 1,
+        "verified": 1,
+        "stale": 0,
+        "failed": 0,
+        "blocked": 0,
+        "unknown": 0
+      }
+    },
+    "per_resilience_dimension": {
+      "failure_trajectories": {"scenario_count": 1, "item_count": 1},
+      "defenses": {"scenario_count": 1, "item_count": 1},
+      "degraded_modes": {"scenario_count": 1, "item_count": 1},
+      "near_misses": {"scenario_count": 1, "item_count": 1},
+      "operator_adaptations": {"scenario_count": 1, "item_count": 1},
+      "change_risks": {"scenario_count": 1, "item_count": 1}
+    },
+    "category_gaps": [],
+    "resilience_gaps": [],
+    "scenarios": [
+      {
+        "behavior_id": "save-state",
+        "scenario_id": "persists",
+        "tier": 0,
+        "profiled": true,
+        "categories": ["state_and_ordering"],
+        "risk": "routine",
+        "side_effects": "reversible",
+        "resilience_profiled": true,
+        "resilience_dimensions": [
+          "failure_trajectories",
+          "defenses",
+          "degraded_modes",
+          "near_misses",
+          "operator_adaptations",
+          "change_risks"
+        ],
+        "resilience_item_counts": {
+          "failure_trajectories": 1,
+          "defenses": 1,
+          "degraded_modes": 1,
+          "near_misses": 1,
+          "operator_adaptations": 1,
+          "change_risks": 1
+        },
+        "status": "verified",
+        "verification_level": "automated",
+        "receipt_id": "receipt-public-fixture",
+        "freshness": "current"
+      }
+    ],
+    "truncated": false
+  },
+  "gaps": [],
+  "detail": "1/1 required Tier-0 scenarios have current trusted receipts; 1/1 total scenarios are verified.",
+  "next_step": "No release-assurance action is required; review edge and systemic-resilience coverage separately."
+}
