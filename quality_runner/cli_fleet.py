@@ -187,6 +187,14 @@ def add_fleet_commands(subparsers: Any) -> None:
             "mutually exclusive with --all and --repo-path"
         ),
     )
+    run_parser.add_argument(
+        "--custody-dispositions",
+        default=None,
+        help=(
+            "Exact quality-runner-audit-custody-dispositions/v1 manifest accounting for "
+            "reviewed unfolded, dirty, detached, or ambiguous Git state"
+        ),
+    )
     run_parser.add_argument("--projects-root", default=str(Path.home() / "projects"))
     run_parser.add_argument(
         "--output-dir", default=None, help="Runtime-owned audit directory override"
@@ -454,6 +462,9 @@ def fleet_command_payload(args: argparse.Namespace) -> dict[str, Any]:
             as_of=args.as_of,
             standard=args.standard,
             scope_manifest=Path(args.scope_manifest) if args.scope_manifest else None,
+            custody_dispositions=(
+                Path(args.custody_dispositions) if args.custody_dispositions else None
+            ),
             mac_control=args.mac_control,
             mac_control_live=args.mac_control_live,
             macctl_path=args.macctl,

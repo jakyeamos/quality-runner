@@ -99,6 +99,18 @@ diagnostic override: the feed remains valid for local inspection, but its
 aggregate and affected repositories carry `comparison_eligible: false` and
 must not be used for fleet ranking or certification.
 
+When a live branch, dirty worktree, or detached checkout has been reviewed and
+its disposition is known, provide a
+`quality-runner-audit-custody-dispositions/v1` JSON receipt with
+`--custody-dispositions PATH`. Each repository entry must match the live
+`gap_key` emitted by the audit and include the exact ref/head or checkout
+identity, a reason, evidence, and review timestamp. Supported dispositions are
+`folded_into_target`, `semantic_superseded`, `pruned_stale_ref`,
+`protected_canonical_line`, `external_remote_line`, `retained_active_lane`,
+and `retained_dirty_state`. Quality Runner preserves the original finding and
+observed counts while recording the reviewed disposition; an unmatched,
+duplicate, or malformed entry remains a coverage error and cannot hide a gap.
+
 For a whole-inventory audit of one repository standard, run the static scoped
 lane instead:
 

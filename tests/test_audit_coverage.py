@@ -4,7 +4,10 @@ import subprocess
 from pathlib import Path
 from typing import Any
 
-from quality_runner.fleet.audit_coverage import assess_audit_coverage
+from quality_runner.fleet.audit_coverage import (
+    CUSTODY_DISPOSITION_SCHEMA,
+    assess_audit_coverage,
+)
 from quality_runner.fleet.discovery import repository_record_for_root, resolve_target_branch
 
 
@@ -23,10 +26,12 @@ def _repo(root: Path) -> None:
     _git(root, "commit", "-m", "fixture")
 
 
-def _coverage(root: Path) -> dict[str, Any]:
+def _coverage(
+    root: Path, custody_dispositions: dict[str, list[dict[str, Any]]] | None = None
+) -> dict[str, Any]:
     repository = repository_record_for_root(root)
     repository["target_branch"] = resolve_target_branch(repository)
-    return assess_audit_coverage(repository)
+    return assess_audit_coverage(repository, custody_dispositions=custody_dispositions)
 
 
 def _feature_commit(root: Path) -> str:
@@ -65,19 +70,19 @@ def test_unique_feature_branch_marks_canonical_findings_incomplete(tmp_path: Pat
     assert coverage["comparison_eligible"] is False
     assert coverage["publication_ready"] is False
     assert coverage["unfolded_branch_count"] == 1
-    assert coverage["unfolded_branches"] == [
-        {
-            "ref": "feature",
-            "head": feature_head,
-            "source": "local",
-            "aliases": [],
-            "kind": "branch",
-            "unique_commits": 1,
-            "unique_patches": 1,
-            "disposition": "unfolded",
-            "safe_action": "review_and_fold_branch",
-        }
-    ]
+    unfolded = coverage["unfolded_branches"]
+    assert unfolded[0]["gap_key"]
+    assert {key: value for key, value in unfolded[0].items() if key != "gap_key"} == {
+        "ref": "feature",
+        "head": feature_head,
+        "source": "local",
+        "aliases": [],
+        "kind": "branch",
+        "unique_commits": 1,
+        "unique_patches": 1,
+        "disposition": "unfolded",
+        "safe_action": "review_and_fold_branch",
+    }
 
 
 def test_patch_equivalent_branch_does_not_make_coverage_incomplete(tmp_path: Path) -> None:
@@ -141,3 +146,68 @@ def test_remote_tracking_only_work_is_flagged(tmp_path: Path) -> None:
     assert coverage["status"] == "incomplete_unfolded"
     assert coverage["unfolded_branches"][0]["ref"] == "origin/remote-feature"
     assert coverage["unfolded_branches"][0]["source"] == "remote_tracking"
+
+
+def test_reviewed_custody_disposition_accounts_for_a_live_branch(tmp_path: Path) -> None:
+    root = tmp_path / "repo"
+    _repo(root)
+    feature_head = _feature_commit(root)
+    initial = _coverage(root)
+    branch = initial["unfolded_branches"][0]
+    manifest = {
+        str(root): [
+            {
+                "schema": CUSTODY_DISPOSITION_SCHEMA,
+                "kind": "branch",
+                "gap_key": branch["gap_key"],
+                "ref": branch["ref"],
+                "head": feature_head,
+                "target_head": initial["canonical_head"],
+                "disposition": "semantic_superseded",
+                "reason": "The target already contains the stronger current implementation.",
+                "evidence": {
+                    "target_head": initial["canonical_head"],
+                    "diff_inspected": True,
+                },
+                "reviewed_at": "2026-08-25T00:00:00Z",
+            }
+        ]
+    }
+
+    coverage = _coverage(root, manifest)
+
+    assert coverage["status"] == "complete"
+    assert coverage["comparison_eligible"] is True
+    assert coverage["observed_unfolded_branch_count"] == 1
+    assert coverage["unfolded_branch_count"] == 0
+    assert coverage["custody_dispositioned_count"] == 1
+    assert coverage["custody_dispositioned_items"][0]["custody_disposition"] == (
+        "semantic_superseded"
+    )
+
+
+def test_unmatched_custody_disposition_cannot_hide_a_gap(tmp_path: Path) -> None:
+    root = tmp_path / "repo"
+    _repo(root)
+    _feature_commit(root)
+
+    coverage = _coverage(
+        root,
+        {
+            str(root): [
+                {
+                    "kind": "branch",
+                    "gap_key": "stale-gap-key",
+                    "disposition": "semantic_superseded",
+                    "reason": "Stale entry.",
+                    "evidence": {"reviewed": True},
+                }
+            ]
+        },
+    )
+
+    assert coverage["status"] == "blocked_ambiguous"
+    assert coverage["unfolded_branch_count"] == 1
+    assert coverage["custody_disposition_errors"][0]["reason"].startswith(
+        "custody disposition does not match"
+    )

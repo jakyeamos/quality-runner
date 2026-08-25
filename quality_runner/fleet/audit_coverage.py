@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import subprocess
 from pathlib import Path
 from typing import Any
@@ -11,10 +12,47 @@ AUDIT_COVERAGE_SCHEMA = "quality-runner-audit-coverage/v1"
 AUDIT_COVERAGE_STATUSES = frozenset(
     {"complete", "incomplete_unfolded", "blocked_ambiguous", "stale_target"}
 )
+CUSTODY_DISPOSITION_SCHEMA = "quality-runner-audit-custody-dispositions/v1"
+ALLOWED_CUSTODY_DISPOSITIONS = frozenset(
+    {
+        "folded_into_target",
+        "semantic_superseded",
+        "pruned_stale_ref",
+        "protected_canonical_line",
+        "external_remote_line",
+        "retained_active_lane",
+        "retained_dirty_state",
+    }
+)
 MAX_COVERAGE_ITEMS = 64
 
 
-def assess_audit_coverage(repository: dict[str, Any]) -> dict[str, Any]:
+def load_custody_dispositions(path: Path | None) -> dict[str, list[dict[str, Any]]]:
+    """Load exact, reviewable custody dispositions keyed by repository path."""
+
+    if path is None:
+        return {}
+    payload = json.loads(path.expanduser().resolve().read_text(encoding="utf-8"))
+    if not isinstance(payload, dict) or payload.get("schema") != CUSTODY_DISPOSITION_SCHEMA:
+        raise ValueError(f"unsupported custody disposition schema: {path}")
+    repositories = payload.get("repositories")
+    if not isinstance(repositories, dict):
+        raise ValueError("custody disposition manifest requires a repositories object")
+    normalized: dict[str, list[dict[str, Any]]] = {}
+    for raw_path, entries in repositories.items():
+        if not isinstance(raw_path, str) or not raw_path:
+            raise ValueError("custody disposition repository paths must be non-empty strings")
+        if not isinstance(entries, list) or not all(isinstance(entry, dict) for entry in entries):
+            raise ValueError(f"custody dispositions for {raw_path} must be a list of objects")
+        normalized[str(Path(raw_path).expanduser().resolve())] = [dict(entry) for entry in entries]
+    return normalized
+
+
+def assess_audit_coverage(
+    repository: dict[str, Any],
+    *,
+    custody_dispositions: dict[str, list[dict[str, Any]]] | None = None,
+) -> dict[str, Any]:
     """Assess whether the canonical target represents all discovered Git work."""
 
     target = _object(repository.get("target_branch"))
@@ -39,18 +77,43 @@ def assess_audit_coverage(repository: dict[str, Any]) -> dict[str, Any]:
     dirty_worktrees = _dirty_worktrees(repository)
     unfolded = [item for item in comparisons if item["disposition"] == "unfolded"]
     excluded = [item for item in comparisons if item["disposition"] != "unfolded"]
+    unfolded = [_with_gap_key(item) for item in unfolded]
+    dirty_worktrees = [_with_gap_key(item) for item in dirty_worktrees]
+    ambiguous = [_with_gap_key(item) for item in ambiguous]
+    observed_unfolded = list(unfolded)
+    observed_dirty = list(dirty_worktrees)
+    observed_ambiguous = list(ambiguous)
+    repository_path = repository.get("primary_path")
+    disposition_entries = (
+        (custody_dispositions or {}).get(str(Path(repository_path).expanduser().resolve()), [])
+        if isinstance(repository_path, str) and repository_path
+        else []
+    )
+    _, dispositioned, disposition_errors = _apply_custody_dispositions(
+        [*unfolded, *dirty_worktrees, *ambiguous], disposition_entries
+    )
+    dispositioned_keys = {_gap_key(item) for item in dispositioned}
+    unfolded = [item for item in unfolded if _gap_key(item) not in dispositioned_keys]
+    dirty_worktrees = [item for item in dirty_worktrees if _gap_key(item) not in dispositioned_keys]
+    ambiguous = [item for item in ambiguous if _gap_key(item) not in dispositioned_keys]
+    excluded.extend(dispositioned)
     status = _coverage_status(
         target_status=str(target.get("status", "blocked")),
         unfolded=unfolded,
         dirty_worktrees=dirty_worktrees,
         ambiguous=ambiguous,
+        disposition_errors=disposition_errors,
     )
     payload: dict[str, Any] = {
         "schema": AUDIT_COVERAGE_SCHEMA,
         "status": status,
         "canonical_branch": target_branch,
         "canonical_head": target_head,
-        "evidence_scope": "canonical_target_head",
+        "evidence_scope": (
+            "canonical_target_head_with_custody_dispositions"
+            if dispositioned
+            else "canonical_target_head"
+        ),
         "canonical_findings_valid": target.get("status") == "ready" and bool(target_head),
         "comparison_eligible": status == "complete",
         "publication_ready": status == "complete",
@@ -62,6 +125,15 @@ def assess_audit_coverage(repository: dict[str, Any]) -> dict[str, Any]:
         "dirty_worktrees": dirty_worktrees[:MAX_COVERAGE_ITEMS],
         "ambiguous_items": ambiguous[:MAX_COVERAGE_ITEMS],
         "excluded_ref_counts": _count_dispositions(excluded),
+        "observed_unfolded_branch_count": len(observed_unfolded),
+        "observed_dirty_worktree_count": len(observed_dirty),
+        "observed_ambiguous_item_count": len(observed_ambiguous),
+        "custody_disposition_status": (
+            "invalid" if disposition_errors else "applied" if dispositioned else "not_provided"
+        ),
+        "custody_dispositioned_count": len(dispositioned),
+        "custody_dispositioned_items": dispositioned[:MAX_COVERAGE_ITEMS],
+        "custody_disposition_errors": disposition_errors[:MAX_COVERAGE_ITEMS],
         "safe_action": _safe_action(status),
     }
     payload["provenance_hash"] = digest(payload)
@@ -249,6 +321,7 @@ def _dirty_worktrees(repository: dict[str, Any]) -> list[dict[str, Any]]:
         fingerprint = _object(checkout.get("fingerprint"))
         items.append(
             {
+                "kind": "dirty_worktree",
                 "checkout_id": checkout.get("checkout_id"),
                 "branch": checkout.get("branch"),
                 "head": checkout.get("head"),
@@ -266,10 +339,11 @@ def _coverage_status(
     unfolded: list[dict[str, Any]],
     dirty_worktrees: list[dict[str, Any]],
     ambiguous: list[dict[str, Any]],
+    disposition_errors: list[dict[str, Any]],
 ) -> str:
     if target_status == "stale":
         return "stale_target"
-    if target_status != "ready" or ambiguous:
+    if target_status != "ready" or ambiguous or disposition_errors:
         return "blocked_ambiguous"
     if unfolded or dirty_worktrees:
         return "incomplete_unfolded"
@@ -291,6 +365,120 @@ def _count_dispositions(items: list[dict[str, Any]]) -> dict[str, int]:
         disposition = str(item.get("disposition", "unknown"))
         counts[disposition] = counts.get(disposition, 0) + 1
     return dict(sorted(counts.items()))
+
+
+def _apply_custody_dispositions(
+    gaps: list[dict[str, Any]], entries: list[dict[str, Any]]
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]]]:
+    """Account for exact live gaps without allowing stale entries to hide work."""
+
+    by_key = {_gap_key(item): item for item in gaps}
+    matched: set[str] = set()
+    dispositioned: list[dict[str, Any]] = []
+    errors: list[dict[str, Any]] = []
+    for entry in entries:
+        disposition = entry.get("disposition")
+        reason = entry.get("reason")
+        evidence = entry.get("evidence")
+        if disposition not in ALLOWED_CUSTODY_DISPOSITIONS:
+            errors.append(
+                {
+                    "kind": "manifest_entry",
+                    "reason": "unsupported custody disposition",
+                    "disposition": disposition,
+                }
+            )
+            continue
+        if not isinstance(reason, str) or not reason.strip():
+            errors.append(
+                {"kind": "manifest_entry", "reason": "custody disposition reason is required"}
+            )
+            continue
+        if not isinstance(evidence, dict) or not evidence:
+            errors.append(
+                {"kind": "manifest_entry", "reason": "custody disposition evidence is required"}
+            )
+            continue
+        key = entry.get("gap_key") if isinstance(entry.get("gap_key"), str) else None
+        if key is None:
+            key = next(
+                (
+                    candidate_key
+                    for candidate_key, item in by_key.items()
+                    if candidate_key not in matched and _disposition_matches(entry, item)
+                ),
+                None,
+            )
+        if key is None or key not in by_key or key in matched:
+            errors.append(
+                {
+                    "kind": "manifest_entry",
+                    "reason": "custody disposition does not match a current live gap",
+                    "gap_key": entry.get("gap_key"),
+                    "ref": entry.get("ref"),
+                    "head": entry.get("head"),
+                }
+            )
+            continue
+        matched.add(key)
+        item = by_key[key]
+        dispositioned.append(
+            {
+                **item,
+                "observed_disposition": item.get("disposition", "unresolved"),
+                "disposition": "custody_dispositioned",
+                "custody_disposition": disposition,
+                "custody_reason": reason.strip(),
+                "custody_evidence": evidence,
+                "custody_reviewed_at": entry.get("reviewed_at"),
+            }
+        )
+    remaining = [item for key, item in by_key.items() if key not in matched]
+    return remaining, dispositioned, errors
+
+
+def _disposition_matches(entry: dict[str, Any], item: dict[str, Any]) -> bool:
+    if entry.get("kind") != item.get("kind"):
+        return False
+    if entry.get("target_head") is not None and entry.get("target_head") != item.get("target_head"):
+        return False
+    kind = str(item.get("kind"))
+    if kind == "branch":
+        return (
+            bool(entry.get("ref") and entry.get("head"))
+            and entry.get("ref") == item.get("ref")
+            and entry.get("head") == item.get("head")
+        )
+    if kind in {"dirty_worktree", "detached_head"}:
+        return (
+            bool(entry.get("checkout_id") and entry.get("head"))
+            and entry.get("checkout_id") == item.get("checkout_id")
+            and entry.get("head") == item.get("head")
+            and (kind != "dirty_worktree" or entry.get("status_hash") == item.get("status_hash"))
+        )
+    return False
+
+
+def _gap_key(item: dict[str, Any]) -> str:
+    identity = {
+        key: item.get(key)
+        for key in (
+            "kind",
+            "ref",
+            "head",
+            "target_head",
+            "checkout_id",
+            "status_hash",
+            "unique_commits",
+            "unique_patches",
+        )
+        if item.get(key) is not None
+    }
+    return digest(identity)
+
+
+def _with_gap_key(item: dict[str, Any]) -> dict[str, Any]:
+    return {**item, "gap_key": _gap_key(item)}
 
 
 def _command_root(repository: dict[str, Any], target: dict[str, Any]) -> Path | None:
