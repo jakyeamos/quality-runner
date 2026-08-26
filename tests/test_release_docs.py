@@ -156,6 +156,33 @@ def test_agent_instructions_route_current_qr_surfaces() -> None:
     assert "controller-report lint --strict" in agent_usage
 
 
+def test_full_qr_lexicon_is_consistent_across_public_agent_surfaces() -> None:
+    readme = (ROOT / "README.md").read_text(encoding="utf-8")
+    lexicon = (ROOT / "docs" / "lexicon.md").read_text(encoding="utf-8")
+    agent_usage = (ROOT / "docs" / "agent-usage.md").read_text(encoding="utf-8")
+    plugin_skill = (ROOT / "quality_runner" / "plugin" / "SKILL.md").read_text(encoding="utf-8")
+
+    assert "Quality Runner Lexicon" in lexicon
+    assert "Run a Full QR on" in readme
+
+    for content in (lexicon, agent_usage, plugin_skill):
+        normalized = " ".join(content.split())
+        for term in (
+            "Full QR",
+            "full canonical Quality Runner assessment",
+            "exact committed target",
+            "qualitative",
+            "Pronto",
+            "--analysis-mode full",
+            "not a Full QR",
+        ):
+            assert term in normalized
+
+    for content in (agent_usage, plugin_skill):
+        assert "--execute-gates --worktree-mode disposable" in content
+        assert "does not authorize" in content
+
+
 def test_ci_and_release_workflows_smoke_built_wheel_outcome_and_mcp_surfaces() -> None:
     ci = (ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
     release = (ROOT / ".github" / "workflows" / "release.yml").read_text(encoding="utf-8")

@@ -6,6 +6,33 @@ owns source changes, commits, pushes, and execution decisions. Use this page
 for the operating protocol and the [CLI Reference](cli.md) for exhaustive
 options and artifact details.
 
+## Interpret "Full QR" as a complete workflow
+
+**Full QR** (long form: full canonical Quality Runner assessment) is the
+canonical natural-language request for QR jobs 1-4 at one exact committed
+target. It is not a single CLI subcommand. When a user says `Run a Full QR on
+/path/to/repository`, the agent must:
+
+1. run complete automated analysis with every applicable standard, profile,
+   skill pack, and detector, then complete every applicable qualitative review
+   rubric;
+2. execute and record every applicable repository-defined gate through the
+   disposable exact-target path, classifying blocked, unavailable, and
+   not-applicable checks rather than omitting them;
+3. assess applicable onboarding, hygiene, CI, security, web, and release
+   readiness from the same target and evidence set; and
+4. preserve immutable branch-and-SHA-bound evidence, import the canonical
+   receipt into Pronto, and verify the projection by reading it back.
+
+The phrase is explicit authorization for documented disposable gate execution,
+including `--execute-gates --worktree-mode disposable`. It does not authorize
+dependency installation, source remediation, commits, pushes, publishing,
+deployment, credentials, or remote service calls. If any required part cannot
+run, report Full QR as blocked or incomplete; do not substitute a narrower run.
+`--analysis-mode full`, "full scan," and "complete scan" refer only to analysis
+breadth. A request for any one of them is not a Full QR. The canonical
+definition is in the [Quality Runner Lexicon](lexicon.md#full-qr).
+
 ## Invocation
 
 The examples below use `quality-runner` for readability. Consumer repositories

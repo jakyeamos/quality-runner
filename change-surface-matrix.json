@@ -5,7 +5,7 @@
     "id": "quality-runner"
   },
   "owner": "quality-runner-maintainers",
-  "last_reviewed": "2026-08-15",
+  "last_reviewed": "2026-08-26",
   "surfaces": [
     {
       "id": "python-source-and-contracts",
@@ -34,6 +34,20 @@
       "operations": ["add", "change", "remove"],
       "validation": [
         "uv run --locked pytest -q tests/test_cli.py tests/test_artifact_contracts.py",
+        "uv run --locked qr release-smoke --json"
+      ],
+      "status": "applicable"
+    },
+    {
+      "id": "agent-workflow-lexicon",
+      "scope": "external",
+      "distribution": "public_core",
+      "path": "README.md, docs/agent-usage.md, docs/lexicon.md, quality_runner/plugin/SKILL.md, and quality_runner/plugin/manifest.json",
+      "owner": "quality-runner-maintainers",
+      "condition": "Agent-facing terminology or workflow activation semantics change",
+      "operations": ["add", "change", "remove"],
+      "validation": [
+        "uv run --locked pytest -q tests/test_release_docs.py",
         "uv run --locked qr release-smoke --json"
       ],
       "status": "applicable"

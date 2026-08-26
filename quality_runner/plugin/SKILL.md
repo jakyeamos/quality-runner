@@ -1,6 +1,6 @@
 ---
 name: quality-runner
-description: Run standalone audit, planning, and task-scoped prevention for a repository, producing authoritative quality evidence without modifying source files.
+description: Run standalone audit, Full QR, planning, and task-scoped prevention for a repository, producing authoritative quality evidence without modifying source files.
 ---
 
 # Quality Runner
@@ -16,6 +16,30 @@ write local `.quality-runner/` evidence as needed but do not modify target
 source files. Discovered gates remain evidence-only unless a user explicitly
 authorizes `--execute-gates --worktree-mode disposable`; that runs local
 commands in a disposable checkout, not a sandbox.
+
+## Full QR lexicon contract
+
+Treat **Full QR** and full canonical Quality Runner assessment as the same
+explicit workflow request. It is not a single CLI subcommand. At one exact
+committed target, perform all four jobs:
+
+1. complete automated analysis with every applicable standard, profile, skill
+   pack, and detector, plus every applicable qualitative agent-review rubric;
+2. execute and record every applicable repository-defined gate through the
+   disposable exact-target path, preserving blocked, unavailable, and
+   not-applicable outcomes;
+3. assess applicable onboarding, hygiene, CI, security, web, and release
+   readiness from that same target and evidence set; and
+4. preserve immutable branch-and-SHA-bound receipts, import the canonical
+   receipt into Pronto, and verify the projection through readback.
+
+Saying **Full QR** explicitly authorizes `--execute-gates --worktree-mode
+disposable`. It does not authorize dependency installation, target-source
+mutation, remediation, commits, pushes, publication, deployment, credentials,
+or remote service calls. If any required job is unavailable, return a blocked or
+incomplete Full QR rather than silently reducing scope. A detector-only run,
+`--analysis-mode full`, "full scan," or "complete scan" changes analysis breadth
+only and is not a Full QR. The detailed definition is in `docs/lexicon.md`.
 
 When a repository requires `failure_visibility`, inspect its negative-path
 contract and machine-readable readback instead of treating script discovery as

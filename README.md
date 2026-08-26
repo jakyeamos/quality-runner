@@ -101,6 +101,14 @@ installation, then choose the audit, review, verify, or runs journey. Each
 outcome result names the state, the strength of the evidence, what was written,
 the safety mode, and one next action.
 
+To request the complete repository-assurance workflow, say **"Run a Full QR on
+`/path/to/repository`."** Full QR is the canonical shorthand for all four QR
+jobs: complete automated and qualitative inspection, executable gate evidence,
+readiness assessment, and exact-target evidence preservation with Pronto
+readback. It does not authorize source remediation. A full analysis scan alone
+does not qualify. See the [Quality Runner Lexicon](docs/lexicon.md#full-qr) for
+the exact expansion and safety boundary.
+
 ```bash
 qr doctor --json
 qr audit /path/to/repo --run-id baseline-001 --json

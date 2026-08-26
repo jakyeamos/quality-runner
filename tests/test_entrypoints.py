@@ -131,9 +131,11 @@ def test_packaged_console_script_invokes_cli(tmp_path: Path) -> None:
         dist_info_dir = metadata_path.removesuffix("/METADATA")
         entry_points = wheel.read(f"{dist_info_dir}/entry_points.txt").decode()
         plugin_manifest = json.loads(wheel.read("quality_runner/plugin/manifest.json"))
+        plugin_skill = wheel.read("quality_runner/plugin/SKILL.md").decode()
     assert metadata["Name"] == "quality-runner"
     assert metadata["Version"] == __version__
     assert plugin_manifest["version"] == __version__
+    assert "Full QR" in plugin_manifest["description"]
     assert "quality-runner = quality_runner.cli:main" in entry_points
     assert "qr = quality_runner.cli:main" in entry_points
     assert "quality-runner-mcp = quality_runner.mcp:main" in entry_points
@@ -141,6 +143,8 @@ def test_packaged_console_script_invokes_cli(tmp_path: Path) -> None:
     assert "repo-quality-certifier-mcp = repo_quality_certifier.mcp:main" in entry_points
     assert "quality_runner/plugin/manifest.json" in wheel_names
     assert "quality_runner/plugin/SKILL.md" in wheel_names
+    assert "Full QR lexicon contract" in plugin_skill
+    assert "full canonical Quality Runner assessment" in plugin_skill
     assert "quality_runner/schemas/onboarding-check.schema.json" in wheel_names
     assert "quality_runner/schemas/onboarding-evidence.schema.json" in wheel_names
     assert "quality_runner/core/audit_contracts.py" in wheel_names
