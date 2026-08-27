@@ -72,6 +72,10 @@ def test_task_clean_check_passes_and_writes_canonical_artifacts(tmp_path: Path) 
     assert check.returncode == 0
     payload = json.loads(check.stdout)
     assert payload["status"] == "pass"
+    assert payload["mode"] == "authoritative"
+    assert payload["release_readiness"]["status"] == "ready"
+    assert payload["release_readiness"]["eligible"] is True
+    assert all(payload["release_readiness"]["criteria"].values())
     assert "remaining repository-required checks" in payload["next_action"]
     assert payload["delta"]["counts"]["new_enforced"] == 0
     assert payload["analysis"]["analysis_mode"] == "full"
@@ -81,6 +85,46 @@ def test_task_clean_check_passes_and_writes_canonical_artifacts(tmp_path: Path) 
     run_dir = repo / ".quality-runner" / "runs" / payload["run_id"]
     assert (run_dir / "task-check.json").is_file()
     assert (run_dir / "task-check.md").is_file()
+    assert "Release readiness: **ready**" in (run_dir / "task-check.md").read_text()
+
+
+def test_task_fast_check_is_provisional_and_skips_certified_gates(tmp_path: Path) -> None:
+    command = json.dumps(f'{sys.executable} -c "raise SystemExit(7)"')
+    bootstrap = json.dumps(f"{sys.executable} --version")
+    gate = "\n".join(
+        [
+            "[[quality_runner.prevention.gates]]",
+            'id = "intentional-failure"',
+            f"command = {command}",
+            'state = "certified"',
+            "required = true",
+            'owner = "quality"',
+            'rationale = "Intentional failure fixture."',
+            f"bootstrap = {bootstrap}",
+            'mutation_risk = "read-only"',
+            'scope = "fixture"',
+            "timeout_seconds = 10",
+            'evidence_refs = ["failure-fixture:tests/test_cli_task.py", "repeat-pass:tests/test_cli_task.py", "local:tests/test_cli_task.py", "ci:.github/workflows/ci.yml"]',
+        ]
+    )
+    repo = _init_repo(tmp_path, extra_policy=gate)
+    assert _qr(repo, "start", "--task-id", "fast").returncode == 0
+
+    check = _qr(repo, "check", "--task-id", "fast", "--fast")
+    payload = json.loads(check.stdout)
+
+    assert check.returncode == 0
+    assert payload["status"] == "pass"
+    assert payload["mode"] == "fast"
+    assert payload["gate_results"] == []
+    assert payload["required_gate_failures"] == []
+    assert payload["release_readiness"]["status"] == "ineligible"
+    assert payload["release_readiness"]["eligible"] is False
+    assert payload["release_readiness"]["criteria"]["authoritative_check"] is False
+    assert "authoritative `qr task check`" in payload["next_action"]
+
+    record = json.loads((repo / ".quality-runner" / "tasks" / "fast.json").read_text())
+    assert record["last_check_mode"] == "fast"
 
 
 def test_task_new_promoted_finding_is_violation(tmp_path: Path) -> None:

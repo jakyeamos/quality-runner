@@ -42,6 +42,8 @@ def test_task_check_schema_supports_all_cli_outcomes_and_canonical_evidence() ->
         "prevention_readiness",
         "gate_results",
         "blockers",
+        "mode",
+        "release_readiness",
         "next_action",
         "analysis",
         "evidence",

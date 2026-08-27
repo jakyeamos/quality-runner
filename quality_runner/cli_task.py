@@ -29,6 +29,14 @@ def add_task_commands(subparsers: Any) -> None:
         help="Run the authoritative completion check for the exact current workspace",
     )
     _common_arguments(check)
+    check.add_argument(
+        "--fast",
+        action="store_true",
+        help=(
+            "Skip certified gate execution for provisional implementation-time feedback; "
+            "never release evidence"
+        ),
+    )
 
     rebaseline = actions.add_parser(
         "rebaseline",

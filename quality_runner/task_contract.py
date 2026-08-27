@@ -10,9 +10,29 @@ from quality_runner.config import CONFIG_FILE_NAME
 
 TASK_ANALYSIS_MODE = "full"
 TASK_CACHE_MODE = "external"
+TASK_CHECK_MODE_AUTHORITATIVE = "authoritative"
+TASK_CHECK_MODE_FAST = "fast"
 
 
-def task_next_action(status: str) -> str:
+def task_next_action(status: str, *, mode: str = TASK_CHECK_MODE_AUTHORITATIVE) -> str:
+    if mode == TASK_CHECK_MODE_FAST:
+        actions = {
+            "pass": (
+                "Fast Quality Runner feedback passes. Run the authoritative `qr task check` "
+                "before declaring the implementation complete."
+            ),
+            "violation": (
+                "Fix every new enforced finding, or record an eligible exact-fingerprint "
+                "disposition, then rerun `qr task check --fast`; run the authoritative "
+                "`qr task check` before completion."
+            ),
+            "blocked": (
+                "Resolve every blocker, using `qr task rebaseline` with an explicit reason "
+                "only when the evidence contract changed, then rerun `qr task check --fast` "
+                "and the authoritative `qr task check`."
+            ),
+        }
+        return actions.get(status, task_next_action(status))
     actions = {
         "pass": (
             "Quality Runner evidence passes. Complete any remaining repository-required "
@@ -31,6 +51,49 @@ def task_next_action(status: str) -> str:
         ),
     }
     return actions.get(status, actions["invalid"])
+
+
+def release_readiness(
+    *,
+    mode: str,
+    delta: dict[str, Any],
+    repository_blockers: list[dict[str, str]],
+    contract_blockers: list[dict[str, str]],
+    promotion_blockers: list[dict[str, str]],
+    gate_blockers: list[dict[str, str]],
+    readiness_blockers: list[dict[str, str]],
+    required_gate_failures: list[dict[str, Any]],
+) -> dict[str, Any]:
+    counts = cast(dict[str, int], delta.get("counts", {}))
+    delta_blockers = cast(list[dict[str, str]], delta.get("blockers", []))
+    criteria = {
+        "authoritative_check": mode == TASK_CHECK_MODE_AUTHORITATIVE,
+        "no_new_enforced_findings": counts.get("new_enforced", 0) == 0,
+        "no_unknown_findings": counts.get("unknown", 0) == 0,
+        "comparable_coverage_complete": not any(
+            item.get("code") in {"required_coverage_incomplete", "incomplete_comparable_coverage"}
+            for item in delta_blockers
+        ),
+        "finding_delta_valid": not delta_blockers,
+        "evidence_contract_unchanged": not contract_blockers,
+        "repository_identity_matches": not repository_blockers,
+        "promotion_evidence_complete": not promotion_blockers,
+        "required_certified_gates_passed": (
+            mode == TASK_CHECK_MODE_AUTHORITATIVE
+            and not gate_blockers
+            and not readiness_blockers
+            and not required_gate_failures
+        ),
+    }
+    blocking_reasons = [name for name, passed in criteria.items() if not passed]
+    return {
+        "status": "ready" if not blocking_reasons else "ineligible",
+        "eligible": not blocking_reasons,
+        "mode": mode,
+        "predicate": "no_new_enforced_findings",
+        "criteria": criteria,
+        "blocking_reasons": blocking_reasons,
+    }
 
 
 def contract_hashes(repo_root: Path, config: dict[str, Any]) -> dict[str, str]:
@@ -81,10 +144,13 @@ def drift_blockers(
 def render_task_check_markdown(payload: dict[str, Any]) -> str:
     delta = cast(dict[str, Any], payload["delta"])
     counts = cast(dict[str, int], delta["counts"])
+    readiness = cast(dict[str, Any], payload["release_readiness"])
     lines = [
         f"# Quality Runner task check: {payload['task_id']}",
         "",
         f"- Status: **{payload['status']}**",
+        f"- Mode: **{payload['mode']}**",
+        f"- Release readiness: **{readiness['status']}**",
         f"- Baseline: `{payload['baseline_run_id']}`",
         f"- Check run: `{payload['run_id']}`",
         f"- Changed paths: {len(cast(list[str], payload['changed_paths']))}",
