@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 from collections.abc import Sequence
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
@@ -8,7 +7,7 @@ from typing import Any, cast
 
 from quality_runner.artifacts import prepare_safe_directory, write_json, write_text
 from quality_runner.ci_gate_audit import audit_ci_gate_candidates
-from quality_runner.fleet import audit_coverage
+from quality_runner.fleet import audit_artifacts, audit_coverage
 from quality_runner.fleet.contracts import (
     FLEET_AUDIT_SCHEMA,
     FLEET_FINDING_SCHEMA,
@@ -47,7 +46,10 @@ from quality_runner.fleet.standard_audit import build_standard_report
 from quality_runner.fleet.static_scan import static_scan_repository as _static_scan_repository
 from quality_runner.fleet.summary import build_fleet_summary
 
-DEFAULT_FLEET_ROOT = Path("~/.quality-runner/fleet-audit")
+DEFAULT_FLEET_ROOT = audit_artifacts.DEFAULT_FLEET_ROOT
+_artifact_root = audit_artifacts.artifact_root
+_read_json = audit_artifacts.read_json
+resolve_artifact_root = audit_artifacts.resolve_artifact_root
 DEFAULT_DYNAMIC_MAX_AGE_DAYS = 30
 DEFAULT_DYNAMIC_TIMEOUT_SECONDS = 120
 
@@ -413,7 +415,7 @@ def _mac_control_repository_paths(repositories: Sequence[dict[str, Any]]) -> lis
 def fleet_show_payload(
     *, repo_id: str, audit_id: str | None = None, output_dir: Path | None = None
 ) -> dict[str, Any]:
-    artifact_root = _resolve_artifact_root(output_dir, audit_id)
+    artifact_root = resolve_artifact_root(output_dir, audit_id)
     path = artifact_root / "findings" / f"{repo_id}.json"
     payload = _read_json(path)
     return {
@@ -430,7 +432,7 @@ def fleet_show_payload(
 def fleet_replay_payload(
     *, audit_id: str | None = None, output_dir: Path | None = None
 ) -> dict[str, Any]:
-    artifact_root = _resolve_artifact_root(output_dir, audit_id)
+    artifact_root = resolve_artifact_root(output_dir, audit_id)
     inventory = _read_json(artifact_root / "inventory.json")
     summary = _read_json(artifact_root / "summary.json")
     manifest = _read_json(artifact_root / "replay-manifest.json")
@@ -469,7 +471,7 @@ def fleet_replay_payload(
 def fleet_report_payload(
     *, audit_id: str | None = None, output_dir: Path | None = None
 ) -> dict[str, Any]:
-    artifact_root = _resolve_artifact_root(output_dir, audit_id)
+    artifact_root = resolve_artifact_root(output_dir, audit_id)
     summary = _read_json(artifact_root / "summary.json")
     projection = public_projection(summary)
     report = {
@@ -539,44 +541,3 @@ def _write_audit_artifacts(
     if standard_report is not None:
         paths["standard_report_json"] = str(artifact_root / "standard-report.json")
     return paths
-
-
-def _artifact_root(output_dir: Path | None, audit_id: str, *, local: bool = False) -> Path:
-    if output_dir is not None:
-        base = output_dir.expanduser().resolve()
-        return base if base.name == audit_id else base / audit_id
-    base = DEFAULT_FLEET_ROOT.expanduser().resolve()
-    return base / (f"local/{audit_id}" if local else audit_id)
-
-
-def _resolve_artifact_root(output_dir: Path | None, audit_id: str | None) -> Path:
-    if output_dir is not None:
-        candidate = output_dir.expanduser().resolve()
-        if (candidate / "inventory.json").is_file():
-            return candidate
-        if audit_id:
-            return candidate / audit_id
-        return _latest_audit(candidate)
-    base = DEFAULT_FLEET_ROOT.expanduser().resolve()
-    if audit_id:
-        direct = base / audit_id
-        if direct.is_dir():
-            return direct
-        local = base / "local" / audit_id
-        if local.is_dir():
-            return local
-    return _latest_audit(base)
-
-
-resolve_artifact_root = _resolve_artifact_root
-
-
-def _latest_audit(root: Path) -> Path:
-    candidates = [path for path in root.glob("**/inventory.json") if path.is_file()]
-    if not candidates:
-        raise FileNotFoundError(f"no fleet audit artifacts found under {root}")
-    return max(candidates, key=lambda path: path.stat().st_mtime).parent
-
-
-def _read_json(path: Path) -> dict[str, Any]:
-    return json.loads(path.read_text(encoding="utf-8"))
