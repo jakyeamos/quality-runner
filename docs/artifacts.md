@@ -80,7 +80,8 @@ Artifacts are written under:
 
 ## Task Prevention Artifacts
 
-`qr task start` and `qr task check` keep task evidence separate from audit runs:
+`qr task start`, `qr task check`, and `qr task release-check` keep task
+evidence separate from audit runs:
 
 ```text
 <repo>/.quality-runner/tasks/<task-id>.json
@@ -132,6 +133,9 @@ unchanged evidence and repository identity, complete promotion evidence, and
 passing required certified gates. A `--fast` check records the same canonical
 artifact shape with `mode: "fast"`, skips certified gates, and remains
 explicitly ineligible even when its finding feedback status is `pass`.
+`release_enforcement` distinguishes ordinary `advisory` checks from the
+`required` release-check process boundary. A required check cannot return
+`pass` while release readiness is ineligible.
 
 ## Fleet Certification Artifacts
 

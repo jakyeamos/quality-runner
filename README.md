@@ -460,22 +460,26 @@ check the exact dirty workspace before declaring completion:
 qr task start /path/to/repo --task-id feature-123 --json
 # edit externally
 qr task check /path/to/repo --task-id feature-123 --fast --json
-qr task check /path/to/repo --task-id feature-123 --json
+qr task release-check /path/to/repo --task-id feature-123 --json
 ```
 
 Use `qr task check --fast` at meaningful implementation boundaries for
 provisional feedback; it skips certified native gates and is never release
 eligible. Use repository-native checks for even faster feedback only after
 their current applicability and maturity have been established. The default
-`qr task check` is the authoritative completion and CI checkpoint, not a
-continuous-save or editor-hook loop. Re-run it after correcting a violation or
-blocker.
+`qr task check` is an authoritative diagnostic checkpoint.
+`qr task release-check` runs the same authoritative evidence and fails unless
+`release_readiness.eligible` is true; use it for completion and CI. Neither is
+a continuous-save or editor-hook loop. Re-run the appropriate command after
+correcting a violation or blocker.
 
 The result is `pass`, `violation`, or `blocked`. Existing findings remain
 visible without blocking unrelated work; only behavior-verified promoted rules
 and certified native gates can enforce policy. QR does not assume that a
-discovered or CI-listed command is mature. The authoritative result is
-release-eligible only when its `release_readiness.eligible` predicate is true:
+discovered or CI-listed command is mature. An authoritative result is
+release-eligible only when its `release_readiness.eligible` predicate is true.
+The dedicated `release-check` command enforces that predicate at the process
+boundary:
 no new enforced occurrence, no unknown or invalid delta evidence, complete
 comparable coverage, unchanged evidence identity, and passing required
 certified gates. Resolved findings never offset a new finding through a scalar

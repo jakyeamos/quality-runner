@@ -22,16 +22,17 @@ Use the task workflow at meaningful evidence boundaries:
 | --- | --- |
 | Before source edits | Capture one task baseline. |
 | During editing | Use `qr task check --fast` at meaningful boundaries, plus applicable repository-native checks whose current maturity is established. |
-| Before completion | Run the authoritative `qr task check`. |
+| Before completion | Run `qr task release-check` and require exit zero. |
 | After a violation or blocker | Correct the cause and rerun the task check. |
 | Pull request | Use an immutable target revision as the baseline. |
 | Nightly or rule-pack change | Run the full repository audit for debt visibility and reconciliation. |
 
 The task check is deliberately not required on every save. Fast task checks
 skip certified native gates and are useful for short feedback cycles, but even
-a fast `pass` is provisional and cannot authorize release. The default task
-check is the only task mode that can report release-ready evidence. Agent instructions
-guide implementation behavior; they do not replace QR's baseline, coverage,
+a fast `pass` is provisional and cannot authorize release. Authoritative task
+checks can report release-ready evidence, but `release-check` is the fail-closed
+process boundary agents should use for completion. Agent instructions guide
+implementation behavior; they do not replace QR's baseline, coverage,
 matching, readiness, or policy evidence. Do not translate every advisory
 finding into a static prohibition. Promote a repeatedly trusted deterministic
 finding into a behavior-verified QR rule or a faster native checker, with
@@ -54,13 +55,14 @@ qr task check /path/to/repo --task-id <stable-task-id> --fast --json
 After editing and before declaring the implementation complete:
 
 ```bash
-qr task check /path/to/repo --task-id <stable-task-id> --json
+qr task release-check /path/to/repo --task-id <stable-task-id> --json
 ```
 
 Fix new enforced findings and failed certified gates. Do not treat persisted
 legacy debt as a task failure, and do not interpret `blocked` as a pass. The
-authoritative result's `release_readiness.eligible` must be true before the
-task is considered QR-ready; a fast result is explicitly ineligible. When
+release-check result's `release_readiness.eligible` must be true before the
+task is considered QR-ready; its exit code enforces that predicate, and a fast
+result is explicitly ineligible. When
 configuration, rule packs, promoted policy, the toolchain, or the QR version
 changes, review that change and use `task rebaseline --reason ...`; never
 silently enlarge the baseline. PR-target tasks preserve the originally resolved

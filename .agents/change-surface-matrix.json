@@ -2,7 +2,7 @@
   "schema_version": "change-surface-matrix/v1",
   "subject": {"kind": "repository", "id": "quality-runner"},
   "owner": "quality-runner-maintainers",
-  "last_reviewed": "2026-08-26",
+  "last_reviewed": "2026-08-27",
   "change_records": [
     {
       "id": "task-feedback-loop-20260826",
@@ -12,7 +12,10 @@
       "contracts": [
         "quality-runner-task-check-v0.1",
         "quality-runner-task-record-v0.1",
-        "release_readiness predicate: no_new_enforced_findings"
+        "release_readiness predicate: no_new_enforced_findings",
+        "qr task release-check: authoritative and fail-closed",
+        "repository-local toolchain paths use {repo}-relative identity",
+        "task check projection is isolated from task orchestration"
       ],
       "documentation": [
         "README.md",
@@ -26,6 +29,8 @@
       "tests": [
         "tests/test_cli_task.py",
         "tests/test_task_contract.py",
+        "tests/test_task_readiness.py",
+        "tests/test_code_quality_boundaries.py",
         "tests/test_task_schemas.py"
       ],
       "evidence": [
@@ -37,7 +42,13 @@
         "uv run --locked ruff check . and uv run --locked ruff format --check . and uv run --locked basedpyright",
         "uv run --locked vulture quality_runner quality_evidence_contract repo_quality_certifier tests scripts --min-confidence 70",
         "uv run --locked pip-audit, uv build, and gitleaks detect --source . --no-banner --redact",
-        "qr task check authoritative run 20260827T140434Z-ca324ac9-task-check: zero new enforced and zero unknown findings; blocked by toolchain drift and the pre-existing pytest gate failure"
+        "qr task check authoritative run 20260827T140434Z-ca324ac9-task-check: zero new enforced and zero unknown findings; blocked by toolchain drift and the pre-existing pytest gate failure",
+        "pilot hardening baseline run 20260827T150901Z-027d61d1-task-start",
+        "focused regressions cover equivalent-worktree identity, path distinctions, fail-closed release enforcement, release-check success and violation, and absence of --fast",
+        "task_prevention.py reduced from 569 to 494 lines by extracting task_check_projection.py after the broad size gate caught the regression",
+        "targeted rerun: 40 passed with only the pre-existing quality_runner/fleet/audit.py 582-line boundary failure",
+        "final focused task and docs suite: 41 passed",
+        "final authoritative run 20260827T154224Z-c7a0c282-task-release-check: required enforcement, zero new enforced, zero unknown, all identity criteria passed, pytest alone failed on pre-existing quality_runner/fleet/audit.py at 582 lines; 1248 passed"
       ],
       "projections": [
         ".quality-runner/runs/<check-run-id>/task-check.json",

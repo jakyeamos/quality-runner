@@ -60,7 +60,7 @@ jobs:
         run: uv run --locked qr task start "$GITHUB_WORKSPACE" --task-id ci-pr --baseline-ref "${{ github.event.pull_request.base.sha }}" --json
 
       - name: Run authoritative PR task check
-        run: uv run --locked qr task check "$GITHUB_WORKSPACE" --task-id ci-pr --json
+        run: uv run --locked qr task release-check "$GITHUB_WORKSPACE" --task-id ci-pr --json
 
   quality:
     name: Python ${{ matrix.python-version }}

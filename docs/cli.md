@@ -214,10 +214,11 @@ result because a count or evidence field is missing.
 
 `task` is the preventative implementation-loop contract. It compares the exact
 post-edit workspace with a pre-edit baseline, never edits repository source,
-and separates fast implementation feedback from the authoritative release
-check. The default `task check` runs native gates that have been certified for
-preventative use; `--fast` skips those gates for a lower-latency provisional
-check.
+and separates fast implementation feedback from authoritative evidence and
+release enforcement. The default `task check` runs native gates that have been
+certified for preventative use; `--fast` skips those gates for a lower-latency
+provisional check. `task release-check` runs authoritative evidence and exits
+zero only when release readiness is eligible.
 
 Start before editing:
 
@@ -248,12 +249,21 @@ qr task check /path/to/repo --task-id feature-123 --fast --json
 
 Fast mode uses the same complete cached finding analysis but does not execute
 certified native gates. A fast `pass` is provisional: it never produces
-release-ready evidence. Run the default `qr task check` before completion and
-for the CI task checkpoint.
+release-ready evidence.
 
-The default check is the authoritative completion checkpoint and should also be
-rerun after correcting a violation or blocker. Neither mode is a continuous-save
-or editor-hook command; use applicable mature native checks when even faster
+For completion and the CI task checkpoint, enforce the release predicate:
+
+```bash
+qr task release-check /path/to/repo --task-id feature-123 --json
+```
+
+`release-check` has no `--fast` option. It records
+`release_enforcement: "required"`; ordinary checks record `"advisory"`.
+
+The default check is an authoritative diagnostic checkpoint. Release-check is
+the fail-closed completion checkpoint. Rerun the appropriate command after
+correcting a violation or blocker. Neither mode is a continuous-save or
+editor-hook command; use applicable mature native checks when even faster
 feedback is needed.
 
 The check status and process exit code are:

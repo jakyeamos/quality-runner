@@ -12,14 +12,18 @@ the gate as a usable candidate.
 
 Prevention uses a hybrid feedback model:
 
-- Agent guidance requires a task baseline and an authoritative completion
-  check, and explains how to respond to each result.
+- Agent guidance requires a task baseline and a fail-closed
+  `qr task release-check` before completion, and explains how to respond to
+  each result.
 - `qr task check --fast` provides provisional finding feedback during
   implementation by reusing cached analysis without executing certified gates;
   it cannot authorize release.
 - Mature repository-native checks provide faster feedback during editing.
 - QR independently verifies the exact workspace, task-relative finding delta,
   comparable coverage, policy hashes, and certified gate evidence.
+- Repository-local executable paths use a repository-relative identity so
+  equivalent isolated worktrees do not create false toolchain drift; external
+  executable paths remain absolute and distinct.
 
 Static agent rules are not evidence that a check ran and cannot distinguish
 legacy debt from a new occurrence, incomplete coverage from resolution, or a

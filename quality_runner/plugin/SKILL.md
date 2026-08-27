@@ -59,11 +59,11 @@ execution. Its `pass` status is useful implementation feedback only; its
 `release_readiness.eligible` value is always false. Candidate QR gates remain
 advisory and are not executed by either task mode.
 
-After editing, run the authoritative QR checkpoint before declaring the
+After editing, run the fail-closed QR release checkpoint before declaring the
 implementation complete:
 
 ```bash
-qr task check /path/to/repo --task-id <stable-task-id> --json
+qr task release-check /path/to/repo --task-id <stable-task-id> --json
 ```
 
 Interpret the result as follows:
@@ -75,8 +75,8 @@ Interpret the result as follows:
 - `invalid` requires correcting the invocation or prevention configuration.
 
 Read the emitted `task-check.json` as the authority and `task-check.md` as its
-human projection. Only an authoritative check whose
-`release_readiness.eligible` value is true satisfies the QR task release
+human projection. `release-check` runs only authoritative evidence and exits
+zero only when `release_readiness.eligible` is true, satisfying the QR task release
 predicate. The predicate requires no new enforced occurrence, no unknown or
 invalid delta evidence, complete comparable coverage, unchanged evidence
 identity, and passing required certified gates; resolved findings do not cancel
