@@ -71,7 +71,10 @@ bounds, duplication, and growth evidence; raw bytes alone never reduce a score.
 The audit is read-only, never follows symlinks, and never executes cleanup or
 repository-supplied commands. Add literal repository-relative custom surfaces
 with `[[quality_runner.cache_design.paths]]`; a `bounded` lifecycle requires at
-least one of `max_bytes`, `max_entries`, or `max_age_days`.
+least one of `max_bytes`, `max_entries`, or `max_age_days`. Large repositories may
+set positive finite `measurement_max_seconds` and `measurement_max_entries` in
+`[quality_runner.cache_design]` to extend the bounded read-only traversal budget;
+these settings never authorize cleanup or repository commands.
 
 The published feed is `quality-runner-maturity-feed/v2`. Its repository score
 flows from dimensions to explicit capabilities to seven weighted pillars, not

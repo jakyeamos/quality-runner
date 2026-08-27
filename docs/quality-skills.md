@@ -206,7 +206,9 @@ classifies tool caches, build outputs, dependency materializations, durable
 state, and ambiguous storage; it never runs cleanup or repository commands.
 Raw size is diagnostic only. Incomplete traversal stays `unknown`, and a
 standard-only snapshot remains non-publishable until a complete audit passes
-replay.
+replay. A repository with a legitimately large derived-storage surface may set
+positive finite `measurement_max_seconds` or `measurement_max_entries` under
+`[quality_runner.cache_design]`; the traversal remains bounded and read-only.
 
 Maturity v2 aggregates evidence as dimensions, then capabilities, then seven
 weighted pillars. Conditional capabilities preserve explicit applicability,

@@ -190,6 +190,10 @@ applicable, not-applicable, unknown, stale, blocked, failed, and missing states.
 Only redacted class totals, risk flags, and growth metrics are published; the
 private standard report retains repository-relative surface paths. The pilot
 can affect the weighted score but cannot apply a critical cap or release block.
+Repositories with large derived-storage inventories may declare positive finite
+`measurement_max_seconds` or `measurement_max_entries` under
+`[quality_runner.cache_design]`; these extend only the bounded read-only
+measurement budget and do not turn unknown evidence into a pass.
 
 The model draws on the ISO/IEC 25010 product-quality characteristic structure,
 OpenSSF Scorecard's risk-sensitive aggregation and explicit unknown results,

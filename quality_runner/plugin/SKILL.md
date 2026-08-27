@@ -193,7 +193,10 @@ Use `qr fleet audit run --all --standard cache-design --json` for a read-only
 derived-storage maturity slice. Inspect its private `standard-report.json`; do
 not publish a standard-scoped snapshot as the canonical feed. The detector does
 not execute cleanup or repository commands, raw size alone is not a failure,
-and unknown traversal evidence must remain unknown.
+and unknown traversal evidence must remain unknown. A repository may declare
+positive finite `measurement_max_seconds` or `measurement_max_entries` under
+`[quality_runner.cache_design]` when its derived-storage inventory needs a larger
+bounded read-only traversal budget.
 
 Agent workflow:
 

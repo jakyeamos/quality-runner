@@ -181,6 +181,10 @@ def test_config_accepts_literal_bounded_paths_and_rejects_unsafe_overrides(
         """
 [quality_runner]
 
+[quality_runner.cache_design]
+measurement_max_entries = 250000
+measurement_max_seconds = 60
+
 [[quality_runner.cache_design.paths]]
 path = "var/cache"
 class = "tool_cache"
@@ -204,6 +208,8 @@ lifecycle = "durable"
     config = load_repo_config(tmp_path)
 
     assert config["cache_design"] == {
+        "measurement_max_entries": 250000,
+        "measurement_max_seconds": 60.0,
         "paths": [
             {
                 "path": "var/cache",
@@ -211,11 +217,30 @@ lifecycle = "durable"
                 "lifecycle": "bounded",
                 "max_bytes": 1024,
             }
-        ]
+        ],
     }
     assert [warning["message"] for warning in config["warnings"]] == [
         "quality_runner.cache_design.paths[1].path must be a literal repository-relative path",
         "quality_runner.cache_design.paths[2].reason is required when a known disposable path is overridden as durable_state",
+    ]
+
+
+def test_cache_design_measurement_budgets_require_finite_positive_values(tmp_path: Path) -> None:
+    (tmp_path / ".quality-runner.toml").write_text(
+        """
+[quality_runner.cache_design]
+measurement_max_entries = 0
+measurement_max_seconds = "unbounded"
+""",
+        encoding="utf-8",
+    )
+
+    config = load_repo_config(tmp_path)
+
+    assert config["cache_design"] == {"paths": []}
+    assert [warning["message"] for warning in config["warnings"]] == [
+        "quality_runner.cache_design.measurement_max_entries must be a positive integer",
+        "quality_runner.cache_design.measurement_max_seconds must be a positive finite number",
     ]
 
 
