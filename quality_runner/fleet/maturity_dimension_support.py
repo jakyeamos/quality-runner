@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 
 def assessment(
@@ -50,10 +50,13 @@ def commands_by_id(scan: dict[str, Any]) -> dict[str, list[dict[str, Any]]]:
     raw = scan.get("quality_commands")
     if not isinstance(raw, list):
         return result
-    for item in raw:
-        if not isinstance(item, dict) or not isinstance(item.get("id"), str):
+    for item in cast(list[object], raw):
+        if not isinstance(item, dict):
             continue
-        result.setdefault(str(item["id"]), []).append(item)
+        typed_item = cast(dict[str, Any], item)
+        if not isinstance(typed_item.get("id"), str):
+            continue
+        result.setdefault(str(typed_item["id"]), []).append(typed_item)
     return result
 
 
@@ -61,11 +64,12 @@ def surfaces(scan: dict[str, Any]) -> list[dict[str, str]]:
     raw = scan.get("repo_surfaces")
     if not isinstance(raw, list):
         return []
-    return [
-        {str(key): str(value) for key, value in item.items()}
-        for item in raw
-        if isinstance(item, dict)
-    ]
+    values: list[dict[str, str]] = []
+    for item in cast(list[object], raw):
+        if isinstance(item, dict):
+            typed_item = cast(dict[str, Any], item)
+            values.append({str(key): str(value) for key, value in typed_item.items()})
+    return values
 
 
 def command_evidence(
@@ -99,7 +103,8 @@ def surface_evidence(item: dict[str, str]) -> dict[str, str]:
 def path_evidence(value: object, detail: str) -> list[dict[str, str]]:
     if not isinstance(value, list):
         return []
-    return [{"path": str(path), "detail": detail} for path in value[:8] if isinstance(path, str)]
+    values = cast(list[object], value)
+    return [{"path": str(path), "detail": detail} for path in values[:8] if isinstance(path, str)]
 
 
 def existing_paths(root: Path, candidates: tuple[str, ...]) -> list[str]:
@@ -114,7 +119,9 @@ def verification_result(item: dict[str, Any] | None) -> str:
     if item is None:
         return "unknown"
     state = item.get("verification_state")
-    return str(state.get("result", "unknown")) if isinstance(state, dict) else "unknown"
+    if not isinstance(state, dict):
+        return "unknown"
+    return str(cast(dict[str, Any], state).get("result", "unknown"))
 
 
 def capability_evidence(item: dict[str, Any] | None) -> list[dict[str, str]]:

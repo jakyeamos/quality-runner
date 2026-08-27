@@ -5,7 +5,7 @@ import json
 import subprocess
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 from urllib.parse import unquote, urlparse
 
 from quality_runner.code_quality_findings import CATEGORY_ORDER, finding_sort_key, make_finding
@@ -31,19 +31,30 @@ SKIPPED_DIRECTORIES = {
 }
 
 
+def _as_mapping(value: object, message: str) -> dict[str, Any]:
+    if not isinstance(value, dict):
+        raise ValueError(message)
+    return cast(dict[str, Any], value)
+
+
 def merge_anti_slop_scan(
     scan_payload: dict[str, Any], detector_result: dict[str, Any]
 ) -> dict[str, Any]:
     """Merge external findings while preserving blocked evidence and native overlaps."""
     existing_findings = [
-        item for item in scan_payload.get("findings", []) if isinstance(item, dict)
+        cast(dict[str, Any], item)
+        for item in cast(list[object], scan_payload.get("findings", []))
+        if isinstance(item, dict)
     ]
     existing_evidence = [
-        item for item in scan_payload.get("detector_evidence", []) if isinstance(item, dict)
+        cast(dict[str, Any], item)
+        for item in cast(list[object], scan_payload.get("detector_evidence", []))
+        if isinstance(item, dict)
     ]
     receipt = detector_result.get("receipt")
     if not isinstance(receipt, dict):
         raise ValueError("anti-slop detector result is missing its receipt")
+    receipt = cast(dict[str, Any], receipt)
     if receipt.get("detector") != ANTI_SLOP_DETECTOR:
         raise ValueError("unexpected external detector receipt")
     if receipt.get("status") != "passed":
@@ -51,7 +62,7 @@ def merge_anti_slop_scan(
         return _refresh_scan_summary(scan_payload)
 
     relations: list[dict[str, Any]] = []
-    merged = list(existing_findings)
+    merged: list[dict[str, Any]] = list(existing_findings)
     existing_fingerprints = {
         str(item.get("fingerprint")) for item in existing_findings if item.get("fingerprint")
     }
@@ -59,8 +70,7 @@ def merge_anti_slop_scan(
         item for item in existing_findings if item.get("detector") != ANTI_SLOP_DETECTOR
     ]
     for candidate in detector_result.get("findings", []):
-        if not isinstance(candidate, dict):
-            raise ValueError("anti-slop detector finding is malformed")
+        candidate = _as_mapping(candidate, "anti-slop detector finding is malformed")
         fingerprint = str(candidate.get("fingerprint", ""))
         if fingerprint in existing_fingerprints:
             relations.append(
@@ -109,7 +119,7 @@ def anti_slop_cache_key(
     anti_slop_source_sha: str = ANTI_SLOP_SOURCE_SHA,
 ) -> str:
     """Return the complete cache identity for one external detector scan."""
-    return _hash_value(
+    return hash_value(
         {
             "target_sha": target_sha,
             "qr_version": qr_version,
@@ -121,7 +131,7 @@ def anti_slop_cache_key(
     )
 
 
-def _blocked_result(
+def blocked_result(
     base: dict[str, Any], reason: str, *, command_result: dict[str, Any]
 ) -> dict[str, Any]:
     return {
@@ -137,36 +147,53 @@ def _blocked_result(
     }
 
 
-def _parse_output(stdout: str, output_format: str, root: Path) -> list[dict[str, Any]]:
+def parse_output(stdout: str, output_format: str, root: Path) -> list[dict[str, Any]]:
     payload = json.loads(stdout)
+    payload = _as_mapping(payload, "detector output is not an object")
     if output_format == "json":
         analysis = payload.get("analysis")
-        if not isinstance(analysis, dict) or analysis.get("status") != "complete":
+        if not isinstance(analysis, dict):
+            raise ValueError("JSON analysis status is not complete")
+        analysis = cast(dict[str, Any], analysis)
+        if analysis.get("status") != "complete":
             raise ValueError("JSON analysis status is not complete")
         raw_findings = payload.get("newFindings", payload.get("findings"))
         if not isinstance(raw_findings, list):
             raise ValueError("JSON report does not contain a findings list")
-        return [_finding_from_json(item, root) for item in raw_findings]
+        return [
+            _finding_from_json(
+                _as_mapping(item, "JSON finding is not an object"),
+                root,
+            )
+            for item in cast(list[object], raw_findings)
+        ]
     runs = payload.get("runs")
     if not isinstance(runs, list) or not runs:
         raise ValueError("SARIF report does not contain runs")
+    runs = cast(list[object], runs)
     for run in runs:
-        invocations = run.get("invocations") if isinstance(run, dict) else None
+        run_mapping = _as_mapping(run, "SARIF run is not an object")
+        invocations = run_mapping.get("invocations")
         if not isinstance(invocations, list) or not invocations:
             raise ValueError("SARIF report does not contain invocation status")
-        if invocations[0].get("executionSuccessful") is not True:
+        invocation_items = cast(list[object], invocations)
+        first_invocation = _as_mapping(invocation_items[0], "SARIF invocation is not an object")
+        if first_invocation.get("executionSuccessful") is not True:
             raise ValueError("SARIF invocation did not complete successfully")
     raw_results: list[dict[str, Any]] = []
     for run in runs:
-        results = run.get("results")
+        run_mapping = _as_mapping(run, "SARIF run is not an object")
+        results = run_mapping.get("results")
         if isinstance(results, list):
-            raw_results.extend(item for item in results if isinstance(item, dict))
+            raw_results.extend(
+                cast(dict[str, Any], item)
+                for item in cast(list[object], results)
+                if isinstance(item, dict)
+            )
     return [_finding_from_sarif(item, root) for item in raw_results]
 
 
 def _finding_from_json(item: dict[str, Any], root: Path) -> dict[str, Any]:
-    if not isinstance(item, dict):
-        raise ValueError("JSON finding is not an object")
     rule_id = _rule_id(item.get("ruleId") or item.get("rule_id"))
     file = _relative_file(item.get("file") or item.get("filePath"), root)
     line = _line_number(item.get("line") or item.get("startLine"))
@@ -188,22 +215,30 @@ def _finding_from_sarif(item: dict[str, Any], root: Path) -> dict[str, Any]:
     locations = item.get("locations")
     if not isinstance(locations, list) or not locations:
         raise ValueError("SARIF finding has no location")
-    physical = locations[0].get("physicalLocation")
+    location_items = cast(list[object], locations)
+    first_location = _as_mapping(location_items[0], "SARIF finding location is not an object")
+    physical = first_location.get("physicalLocation")
     if not isinstance(physical, dict):
         raise ValueError("SARIF finding has no physical location")
+    physical = cast(dict[str, Any], physical)
     artifact = physical.get("artifactLocation")
     region = physical.get("region")
     if not isinstance(artifact, dict) or not isinstance(region, dict):
         raise ValueError("SARIF finding has incomplete location")
+    artifact = cast(dict[str, Any], artifact)
+    region = cast(dict[str, Any], region)
     file = _relative_file(artifact.get("uri"), root)
     line = _line_number(region.get("startLine"))
-    message = _text((item.get("message") or {}).get("text"), "Anti-Slop evidence finding")
+    raw_message = item.get("message")
+    message_payload = cast(dict[str, Any], raw_message) if isinstance(raw_message, dict) else {}
+    message = _text(message_payload.get("text"), "Anti-Slop evidence finding")
     partial = item.get("partialFingerprints")
     fingerprint = None
     if isinstance(partial, dict):
+        partial = cast(dict[str, Any], partial)
         fingerprint = next((value for value in partial.values() if isinstance(value, str)), None)
     raw_properties = item.get("properties")
-    properties = raw_properties if isinstance(raw_properties, dict) else {}
+    properties = cast(dict[str, Any], raw_properties) if isinstance(raw_properties, dict) else {}
     return _make_external_finding(
         rule_id=rule_id,
         file=file,
@@ -257,8 +292,13 @@ def _make_external_finding(
 
 
 def _refresh_scan_summary(payload: dict[str, Any]) -> dict[str, Any]:
-    findings = [item for item in payload.get("findings", []) if isinstance(item, dict)]
-    summary = dict(payload.get("summary") or {})
+    findings = [
+        cast(dict[str, Any], item)
+        for item in cast(list[object], payload.get("findings", []))
+        if isinstance(item, dict)
+    ]
+    raw_summary = payload.get("summary")
+    summary = cast(dict[str, Any], raw_summary) if isinstance(raw_summary, dict) else {}
     categories = list(dict.fromkeys([*CATEGORY_ORDER, "anti-slop"]))
     summary["total_findings"] = len(findings)
     summary["findings_by_category"] = _counts(findings, "category", categories)
@@ -306,14 +346,14 @@ def _finding_identity(candidate: dict[str, Any], candidates: list[dict[str, Any]
     return str(candidate.get("id") or fingerprint or "unknown")
 
 
-def _validate_producer(root: Path) -> str | None:
+def validate_producer(root: Path) -> str | None:
     if not root.is_dir():
         return f"anti-slop producer root is unavailable: {root}"
-    if _git_output(root, "rev-parse", "--show-toplevel") != str(root):
+    if git_output(root, "rev-parse", "--show-toplevel") != str(root):
         return "anti-slop producer root is not a git checkout"
-    if _git_output(root, "rev-parse", "HEAD") != ANTI_SLOP_SOURCE_SHA:
+    if git_output(root, "rev-parse", "HEAD") != ANTI_SLOP_SOURCE_SHA:
         return "anti-slop producer source SHA does not match the pinned version"
-    dirty = _git_output(root, "status", "--porcelain")
+    dirty = git_output(root, "status", "--porcelain")
     if dirty:
         return "anti-slop producer checkout is dirty"
     package_path = root / "package.json"
@@ -328,7 +368,7 @@ def _validate_producer(root: Path) -> str | None:
     return None
 
 
-def _producer_enabled_rules(
+def producer_enabled_rules(
     root: Path, node: str, preset: str, timeout_seconds: int
 ) -> tuple[list[str] | None, dict[str, Any]]:
     script = (
@@ -364,15 +404,13 @@ def _producer_enabled_rules(
         enabled_rules = json.loads(stdout)
     except json.JSONDecodeError as error:
         return None, {**resolution, "reason": f"producer ruleset resolution was malformed: {error}"}
-    if (
-        not isinstance(enabled_rules, list)
-        or not enabled_rules
-        or not all(
-            isinstance(rule, str) and rule.startswith("anti-slop/") for rule in enabled_rules
-        )
-    ):
+    if not isinstance(enabled_rules, list) or not enabled_rules:
         return None, {**resolution, "reason": "producer ruleset resolution did not return rule ids"}
-    return enabled_rules, resolution
+    raw_rules = cast(list[object], enabled_rules)
+    rules = [rule for rule in raw_rules if isinstance(rule, str)]
+    if len(rules) != len(raw_rules) or not all(rule.startswith("anti-slop/") for rule in rules):
+        return None, {**resolution, "reason": "producer ruleset resolution did not return rule ids"}
+    return rules, resolution
 
 
 def _relative_file(raw: Any, root: Path) -> str:
@@ -426,7 +464,7 @@ def _counts(items: list[dict[str, Any]], field: str, keys: list[str]) -> dict[st
     return result
 
 
-def _hash_value(value: Any) -> str:
+def hash_value(value: Any) -> str:
     content = json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
     return _sha256(content.encode("utf-8"))
 
@@ -435,29 +473,33 @@ def _sha256(value: bytes) -> str:
     return hashlib.sha256(value).hexdigest()
 
 
-def _iso_timestamp(value: datetime) -> str:
+def iso_timestamp(value: datetime) -> str:
     return value.astimezone(UTC).isoformat().replace("+00:00", "Z")
 
 
-def _cache_path(cache_root: Path | None, cache_key: str) -> Path | None:
+def cache_path(cache_root: Path | None, cache_key: str) -> Path | None:
     if cache_root is None:
         return None
     return cache_root.expanduser().resolve() / "anti-slop" / f"{cache_key}.json"
 
 
-def _read_cached_result(path: Path | None, base: dict[str, Any]) -> dict[str, Any] | None:
+def read_cached_result(path: Path | None, base: dict[str, Any]) -> dict[str, Any] | None:
     if path is None or not path.is_file():
         return None
     try:
         payload = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         return None
-    if not isinstance(payload, dict) or payload.get("status") != "passed":
+    if not isinstance(payload, dict):
+        return None
+    payload = cast(dict[str, Any], payload)
+    if payload.get("status") != "passed":
         return None
     receipt = payload.get("receipt")
     findings = payload.get("findings")
     if not isinstance(receipt, dict) or not isinstance(findings, list):
         return None
+    receipt = cast(dict[str, Any], receipt)
     for field in (
         "target_sha",
         "qr_version",
@@ -472,7 +514,7 @@ def _read_cached_result(path: Path | None, base: dict[str, Any]) -> dict[str, An
     return {"receipt": receipt, "findings": findings}
 
 
-def _git_output(root: Path, *args: str) -> str | None:
+def git_output(root: Path, *args: str) -> str | None:
     try:
         result = subprocess.run(
             ["git", "-C", str(root), *args],

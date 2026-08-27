@@ -3,7 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from quality_runner import __version__
 from quality_runner.scan_exclusions import (
@@ -92,9 +92,11 @@ def update_scan_scope_counts(
 ) -> dict[str, Any]:
     """Attach discovered per-module file counts without changing scope identity."""
     raw_scope = scan.get("scan_scope")
-    scope = dict(raw_scope) if isinstance(raw_scope, dict) else {}
+    scope = _mapping(cast(object, raw_scope)) if isinstance(raw_scope, dict) else {}
     current_counts = scope.get("included_file_count")
-    included_counts = dict(current_counts) if isinstance(current_counts, dict) else {}
+    included_counts = (
+        _mapping(cast(object, current_counts)) if isinstance(current_counts, dict) else {}
+    )
     included_counts.update(counts)
     scope["included_file_count"] = included_counts
     scan["scan_scope"] = scope
@@ -116,7 +118,7 @@ def artifact_scan_scope(
     """Validate a module's actual scope and return artifact-safe metadata."""
     raw_scope = scan.get("scan_scope")
     scope = (
-        dict(raw_scope)
+        _mapping(cast(object, raw_scope))
         if isinstance(raw_scope, dict)
         else resolve_effective_scan_scope(repo_root, config)
     )
@@ -126,7 +128,9 @@ def artifact_scan_scope(
         reasons.append(str(scope.get("reason") or "effective scan scope is unavailable"))
     effective_by_module = scope.get("effective_scan_exclusions_by_module")
     expected_exclusions = (
-        effective_by_module.get(module) if isinstance(effective_by_module, dict) else None
+        _mapping(cast(object, effective_by_module)).get(module)
+        if isinstance(effective_by_module, dict)
+        else None
     )
     if not isinstance(expected_exclusions, list):
         reasons.append(f"resolver did not provide {module} exclusions")
@@ -173,25 +177,18 @@ def _config_warnings(config: dict[str, Any]) -> list[dict[str, str]]:
     warnings = config.get("warnings")
     if not isinstance(warnings, list):
         return []
-    return [
-        {
-            key: value
-            for key, value in item.items()
-            if isinstance(key, str) and isinstance(value, str)
-        }
-        for item in warnings
-        if isinstance(item, dict)
-    ]
+    warning_items = cast(list[object], warnings)
+    return [_string_mapping(cast(object, item)) for item in warning_items if isinstance(item, dict)]
 
 
 def _scope_policy(config: dict[str, Any]) -> dict[str, Any]:
     structural = config.get("structural_scan")
     if not isinstance(structural, dict):
         return {}
+    structural = cast(dict[str, Any], structural)
+    ignored_paths = cast(list[object], structural.get("include_ignored_paths", []))
     return {
-        "include_ignored_paths": sorted(
-            item for item in structural.get("include_ignored_paths", []) if isinstance(item, str)
-        ),
+        "include_ignored_paths": sorted(item for item in ignored_paths if isinstance(item, str)),
         "max_text_files": structural.get("max_text_files"),
     }
 
@@ -203,3 +200,16 @@ def _file_sha256(path: Path) -> str | None:
         return f"sha256:{hashlib.sha256(path.read_bytes()).hexdigest()}"
     except OSError:
         return None
+
+
+def _mapping(value: object) -> dict[str, Any]:
+    return cast(dict[str, Any], value)
+
+
+def _string_mapping(value: object) -> dict[str, str]:
+    if not isinstance(value, dict):
+        return {}
+    raw = cast(dict[object, object], cast(object, value))
+    return {
+        key: item for key, item in raw.items() if isinstance(key, str) and isinstance(item, str)
+    }

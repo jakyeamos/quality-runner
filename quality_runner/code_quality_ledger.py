@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from quality_runner.code_quality_findings import counts
 from quality_runner.code_quality_paths import string_or_none
@@ -143,17 +143,20 @@ def render_resolution_ledger_markdown(ledger: dict[str, Any]) -> str:
         "",
     ]
     summary = ledger.get("summary")
-    by_status = summary.get("by_status") if isinstance(summary, dict) else None
+    if isinstance(summary, dict):
+        summary_map = _mapping(cast(object, summary))
+        by_status = summary_map.get("by_status")
+    else:
+        by_status = None
     if isinstance(by_status, dict):
-        for status, count in sorted(by_status.items()):
+        by_status_map = _mapping(cast(object, by_status))
+        for status, count in sorted(by_status_map.items()):
             lines.append(f"- {status}: {count}")
     lines.extend(["", "## Entries", ""])
 
-    entries = ledger.get("entries")
-    if isinstance(entries, list) and entries:
+    entries = _object_mappings(ledger.get("entries"))
+    if entries:
         for entry in entries:
-            if not isinstance(entry, dict):
-                continue
             lines.append(
                 f"- {entry.get('status')}: {entry.get('rule_id')} "
                 f"({entry.get('file')}:{entry.get('line')})"
@@ -183,8 +186,8 @@ def _current_findings(code_quality_scan: dict[str, Any]) -> dict[str, dict[str, 
         return {}
     return {
         finding["fingerprint"]: finding
-        for finding in findings
-        if isinstance(finding, dict) and isinstance(finding.get("fingerprint"), str)
+        for finding in _object_mappings(cast(object, findings))
+        if isinstance(finding.get("fingerprint"), str)
     }
 
 
@@ -250,9 +253,7 @@ def _previous_resolution_entries(repo_root: Path, run_id: str | None) -> list[di
     except (OSError, ValueError):
         return []
     entries = payload.get("entries")
-    return (
-        [entry for entry in entries if isinstance(entry, dict)] if isinstance(entries, list) else []
-    )
+    return _object_mappings(entries)
 
 
 def _accepted_dispositions(config: dict[str, Any]) -> dict[str, dict[str, str]]:
@@ -260,9 +261,11 @@ def _accepted_dispositions(config: dict[str, Any]) -> dict[str, dict[str, str]]:
     if not isinstance(dispositions, list):
         return {}
     accepted: dict[str, dict[str, str]] = {}
-    for item in dispositions:
+    disposition_items = cast(list[object], dispositions)
+    for item in disposition_items:
         if not isinstance(item, dict):
             continue
+        item = _mapping(cast(object, item))
         fingerprint = item.get("fingerprint")
         status = item.get("status")
         reason = item.get("reason")
@@ -286,3 +289,14 @@ def _accepted_dispositions(config: dict[str, Any]) -> dict[str, dict[str, str]]:
                 **({"expires": expires} if isinstance(expires, str) and expires else {}),
             }
     return accepted
+
+
+def _mapping(value: object) -> dict[str, Any]:
+    return cast(dict[str, Any], value)
+
+
+def _object_mappings(value: object) -> list[dict[str, Any]]:
+    if not isinstance(value, list):
+        return []
+    values = cast(list[object], cast(object, value))
+    return [_mapping(cast(object, item)) for item in values if isinstance(item, dict)]

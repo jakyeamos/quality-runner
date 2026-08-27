@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 
 from quality_runner.fleet.contracts import DIMENSION_LABELS, FLEET_FINDING_SCHEMA, digest
 
@@ -65,9 +65,9 @@ def finding(
 
 def validation_commands(dimension: str, scan: dict[str, Any]) -> list[str]:
     commands = [
-        str(item.get("command"))
-        for item in scan.get("quality_commands", [])
-        if isinstance(item, dict) and isinstance(item.get("command"), str)
+        str(cast(dict[str, Any], item).get("command"))
+        for item in cast(list[object], scan.get("quality_commands", []))
+        if isinstance(item, dict) and isinstance(cast(dict[str, Any], item).get("command"), str)
     ]
     if dimension == "quality_commands" and commands:
         return commands[:6]

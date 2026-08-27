@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 
 from quality_runner.fleet.behavior_contract import (
     AUTOMATION_MODES,
@@ -81,6 +81,7 @@ def contract_errors(contract: dict[str, Any]) -> list[str]:
                 if not isinstance(profile, dict):
                     errors.append(f"{scenario_label}.edge_profile must be an object")
                     continue
+                profile = cast(dict[str, Any], profile)
                 categories = string_values(profile.get("categories"))
                 if not categories or any(item not in EDGE_CATEGORIES for item in categories):
                     errors.append(

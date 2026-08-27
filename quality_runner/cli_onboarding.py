@@ -3,7 +3,7 @@ from __future__ import annotations
 import argparse
 from collections.abc import Callable
 from pathlib import Path
-from typing import Any
+from typing import Any, Protocol
 
 from quality_runner.onboarding import onboarding_check_payload, write_onboarding_report
 
@@ -11,8 +11,12 @@ DEFAULT_MATRIX_PATH = Path.home() / ".agents" / "repository-onboarding-change-ma
 DEFAULT_EVIDENCE_PATH = Path(".quality-runner/onboarding-evidence.json")
 
 
+class SubparserCollection(Protocol):
+    def add_parser(self, name: str, **kwargs: Any) -> argparse.ArgumentParser: ...
+
+
 def add_onboarding_commands(
-    subparsers: argparse._SubParsersAction[argparse.ArgumentParser],
+    subparsers: SubparserCollection,
 ) -> None:
     parser = subparsers.add_parser(
         "onboarding",

@@ -219,7 +219,7 @@ def _harden_findings(relative_path: str, line: str, line_number: int) -> list[di
     return findings
 
 
-def _python_silent_except_findings(
+def python_silent_except_findings(
     relative_path: str,
     text: str,
 ) -> list[dict[str, Any]]:
@@ -383,3 +383,4 @@ def _test_quality_findings(relative_path: str, line: str, line_number: int) -> l
 clarify_findings = _clarify_findings
 harden_findings = _harden_findings
 test_quality_findings = _test_quality_findings
+_python_silent_except_findings = python_silent_except_findings

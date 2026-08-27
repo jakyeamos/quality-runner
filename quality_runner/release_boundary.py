@@ -7,7 +7,7 @@ import re
 import subprocess
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from quality_runner import __version__
 from quality_runner.fleet.change_matrix import MATRIX_SCHEMA, SURFACE_DISTRIBUTIONS
@@ -22,6 +22,10 @@ RELEASE_BOUNDARY_SCHEMA = "quality-runner-release-boundary/v2"
 DEFAULT_MATRIX_PATH = Path(".agents/change-surface-matrix.json")
 DEFAULT_REPORT_PATH = Path(".quality-runner/release-boundary.json")
 MAX_SCANNED_FILE_BYTES = 2 * 1024 * 1024
+
+
+def _object_list(value: object) -> list[object]:
+    return cast(list[object], value) if isinstance(value, list) else []
 
 
 def release_boundary_payload(
@@ -41,7 +45,7 @@ def release_boundary_payload(
     checks.append(_source_provenance_check(branch, head_sha, dirty_path_count))
     checks.append(_surface_classification_check(matrix, matrix_path=DEFAULT_MATRIX_PATH.as_posix()))
 
-    release_policy = matrix.get("release_boundary") if isinstance(matrix, dict) else None
+    release_policy = matrix.get("release_boundary")
     if not isinstance(release_policy, dict):
         checks.append(_blocked("release_policy", "release_boundary policy is missing"))
         checks.append(_blocked("tracked_public_content", "release policy is unavailable"))
@@ -49,6 +53,7 @@ def release_boundary_payload(
         checks.append(_blocked("distribution_archives", "release policy is unavailable"))
         checks.append(_blocked("clean_room_install", "release policy is unavailable"))
     else:
+        release_policy = cast(dict[str, Any], release_policy)
         content_policy = release_policy.get("tracked_content")
         checks.append(_tracked_content_check(root, content_policy))
         checks.append(_adapter_fixture_check(root, matrix, content_policy))
@@ -67,9 +72,13 @@ def release_boundary_payload(
             checks.append(_blocked("clean_room_install", "clean-room verification was not run"))
 
     blocked = [check for check in checks if check.get("status") != "passed"]
-    repository_id = (
-        matrix.get("subject", {}).get("id") if isinstance(matrix.get("subject"), dict) else None
-    )
+    subject = matrix.get("subject")
+    repository_id = cast(dict[str, Any], subject).get("id") if isinstance(subject, dict) else None
+    artifacts: list[object] = []
+    for check in checks:
+        if check.get("id") == "distribution_archives":
+            artifacts = _object_list(check.get("artifacts", []))
+            break
     return {
         "schema": RELEASE_BOUNDARY_SCHEMA,
         "status": "passed" if not blocked else "blocked",
@@ -86,14 +95,7 @@ def release_boundary_payload(
             "sha256": _sha256_path(matrix_path),
         },
         "distribution_classes": sorted(SURFACE_DISTRIBUTIONS),
-        "artifacts": next(
-            (
-                list(check.get("artifacts", []))
-                for check in checks
-                if check.get("id") == "distribution_archives"
-            ),
-            [],
-        ),
+        "artifacts": artifacts,
         "checks": checks,
         "blocking_check_ids": [str(check["id"]) for check in blocked],
     }
@@ -134,7 +136,7 @@ def _git_provenance(root: Path, dist_dir: Path) -> tuple[str | None, str | None,
         relative_dist = ""
     if relative_dist:
         excluded_prefixes.add(f"{relative_dist}/")
-    dirty_paths = []
+    dirty_paths: list[str] = []
     for entry in status.split("\0"):
         if len(entry) < 4:
             continue
@@ -175,12 +177,15 @@ def _surface_classification_check(matrix: dict[str, Any], *, matrix_path: str) -
     surfaces = matrix.get("surfaces")
     if not isinstance(surfaces, list) or not surfaces:
         violations.append({"rule": "missing-surfaces", "path": matrix_path})
-        surfaces = []
-    for index, surface in enumerate(surfaces):
+        surface_items: list[object] = []
+    else:
+        surface_items = cast(list[object], surfaces)
+    for index, surface in enumerate(surface_items):
         label = f"surfaces[{index}]"
         if not isinstance(surface, dict):
             violations.append({"rule": "invalid-surface", "path": label})
             continue
+        surface = cast(dict[str, Any], surface)
         if surface.get("status", "applicable") == "not_applicable":
             continue
         distribution = surface.get("distribution")
@@ -194,6 +199,7 @@ def _surface_classification_check(matrix: dict[str, Any], *, matrix_path: str) -
 def _tracked_content_check(root: Path, policy: object) -> dict[str, Any]:
     if not isinstance(policy, dict):
         return _blocked("tracked_public_content", "tracked content policy is missing")
+    policy = cast(dict[str, Any], policy)
     include_globs = _string_list(policy.get("include_globs"))
     local_only_globs = _string_list(policy.get("local_only_globs"))
     patterns, pattern_errors = _content_patterns(policy)
@@ -235,8 +241,11 @@ def _adapter_fixture_check(
     fixture_paths: set[str] = set()
     surfaces = matrix.get("surfaces")
     if isinstance(surfaces, list):
-        for surface in surfaces:
-            if not isinstance(surface, dict) or surface.get("distribution") != "public_adapter":
+        for surface in cast(list[object], surfaces):
+            if not isinstance(surface, dict):
+                continue
+            surface = cast(dict[str, Any], surface)
+            if surface.get("distribution") != "public_adapter":
                 continue
             fixture_paths.update(_string_list(surface.get("contract_fixtures")))
     if not fixture_paths:
@@ -271,21 +280,23 @@ def _content_patterns(
 ) -> tuple[list[tuple[str, re.Pattern[str]]], list[dict[str, Any]]]:
     if not isinstance(policy, dict):
         return [], [{"rule": "tracked-content-policy-missing", "path": str(DEFAULT_MATRIX_PATH)}]
+    policy = cast(dict[str, Any], policy)
     patterns: list[tuple[str, re.Pattern[str]]] = []
     errors: list[dict[str, Any]] = []
     rules = policy.get("forbidden_patterns")
     if not isinstance(rules, list) or not rules:
         return [], [{"rule": "forbidden-patterns-missing", "path": str(DEFAULT_MATRIX_PATH)}]
-    for index, rule in enumerate(rules):
+    for index, rule in enumerate(cast(list[object], rules)):
         if (
             not isinstance(rule, dict)
-            or not isinstance(rule.get("id"), str)
-            or not isinstance(rule.get("pattern"), str)
+            or not isinstance(cast(dict[str, Any], rule).get("id"), str)
+            or not isinstance(cast(dict[str, Any], rule).get("pattern"), str)
         ):
             errors.append(
                 {"rule": "invalid-forbidden-pattern", "path": f"forbidden_patterns[{index}]"}
             )
             continue
+        rule = cast(dict[str, Any], rule)
         try:
             patterns.append((str(rule["id"]), re.compile(str(rule["pattern"]), re.IGNORECASE)))
         except re.error:
@@ -332,7 +343,7 @@ def _read_object(path: Path) -> dict[str, Any]:
         payload = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         return {}
-    return payload if isinstance(payload, dict) else {}
+    return cast(dict[str, Any], payload) if isinstance(payload, dict) else {}
 
 
 def _sha256_path(path: Path) -> str | None:
@@ -349,7 +360,11 @@ def _sha256_path(path: Path) -> str | None:
 def _string_list(value: object) -> list[str]:
     if not isinstance(value, list):
         return []
-    return [str(item).strip() for item in value if isinstance(item, str) and item.strip()]
+    return [
+        str(item).strip()
+        for item in cast(list[object], value)
+        if isinstance(item, str) and item.strip()
+    ]
 
 
 def _check(check_id: str, violations: list[dict[str, Any]]) -> dict[str, Any]:

@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from quality_runner.fleet.contracts import FRESHNESS_DAYS, MAX_DOCUMENT_BYTES, relative_path
 
@@ -62,6 +62,7 @@ def load_dimension_evidence(root: Path, as_of: str) -> dict[str, Any]:
         return _invalid_contract(display_path, str(error))
     if not isinstance(payload, dict):
         return _invalid_contract(display_path, "contract root must be an object")
+    payload = cast(dict[str, Any], payload)
     if payload.get("schema_version") != EVIDENCE_SCHEMA:
         return _invalid_contract(display_path, "schema_version is missing or unsupported")
     owner = payload.get("owner")
@@ -75,6 +76,7 @@ def load_dimension_evidence(root: Path, as_of: str) -> dict[str, Any]:
     dimensions = payload.get("dimensions")
     if not isinstance(dimensions, dict):
         return _invalid_contract(display_path, "dimensions must be an object")
+    dimensions = cast(dict[str, Any], dimensions)
     return {
         "status": status,
         "path": display_path,
@@ -96,17 +98,23 @@ def assess_dimension_evidence(
     if contract_status == "missing":
         return None
     if contract_status == "invalid":
+        raw_evidence = contract.get("evidence", [])
+        evidence = (
+            cast(list[dict[str, str]], raw_evidence) if isinstance(raw_evidence, list) else []
+        )
         return _result(
             score=2,
             status="unknown",
             message="Structured evidence is present but the repository contract is invalid.",
-            evidence=list(contract.get("evidence", [])),
+            evidence=evidence,
         )
     if not isinstance(dimensions, dict) or dimension not in dimensions:
         return None
+    dimensions = cast(dict[str, Any], dimensions)
     item = dimensions.get(dimension)
     if not isinstance(item, dict):
         return _incomplete(contract_path, "dimension entry must be an object")
+    item = cast(dict[str, Any], item)
 
     evidence: list[dict[str, str]] = [
         {"path": contract_path, "detail": f"repository-owned {dimension} evidence contract"}
@@ -126,7 +134,7 @@ def assess_dimension_evidence(
     if not isinstance(validation, list) or not validation:
         problems.append("validation assertions are missing")
     else:
-        for entry in validation:
+        for entry in _object_list(cast(object, validation)):
             result = _validate_assertion(root, entry, automation=False)
             if isinstance(result, str):
                 problems.append(result)
@@ -139,7 +147,7 @@ def assess_dimension_evidence(
         problems.append("automation assertions must be a list")
     elif isinstance(automation, list) and automation:
         automated = True
-        for entry in automation:
+        for entry in _object_list(cast(object, automation)):
             result = _validate_assertion(root, entry, automation=True)
             if isinstance(result, str):
                 problems.append(result)
@@ -186,6 +194,7 @@ def _validate_assertion(
     label = "automation" if automation else "validation"
     if not isinstance(entry, dict):
         return f"{label} assertion must be an object"
+    entry = cast(dict[str, Any], entry)
     value = entry.get("path")
     terms = _string_list(entry.get("contains"))
     if not isinstance(value, str) or not value.strip():
@@ -261,7 +270,12 @@ def _result(
 def _string_list(value: object) -> list[str]:
     if not isinstance(value, list):
         return []
-    return [item for item in value if isinstance(item, str) and item.strip()]
+    values = cast(list[object], value)
+    return [item for item in values if isinstance(item, str) and item.strip()]
+
+
+def _object_list(value: object) -> list[object]:
+    return cast(list[object], value) if isinstance(value, list) else []
 
 
 def _parse_date(value: object) -> datetime | None:

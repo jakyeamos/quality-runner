@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from quality_runner.fleet.contracts import digest, parse_as_of, stable_id
 from quality_runner.fleet.discovery import discover_repositories, repository_record_for_root
@@ -13,7 +13,7 @@ from quality_runner.fleet.mac_control_artifacts import (
     mac_control_report_payload,
     write_artifacts,
 )
-from quality_runner.fleet.mac_control_audit import _audit_repository
+from quality_runner.fleet.mac_control_audit import audit_repository
 from quality_runner.fleet.mac_control_contracts import (
     MAC_CONTROL_AUDIT_SCHEMA,
     MAC_CONTROL_MANIFEST_RELATIVE_PATH,
@@ -59,7 +59,7 @@ def mac_control_audit_payload(
     entries: list[dict[str, Any]] = []
     provider_results: dict[str, dict[str, Any]] = {}
     for repository in repositories:
-        entry, provider = _audit_repository(
+        entry, provider = audit_repository(
             repository,
             commit=_repository_commit(repository),
             observed_at=resolved_as_of,
@@ -166,14 +166,17 @@ def _repositories_for_scope(
 
 
 def _repository_commit(repository: dict[str, Any]) -> str:
-    for checkout in repository.get("checkouts", []):
-        if (
-            isinstance(checkout, dict)
-            and checkout.get("is_primary")
-            and isinstance(checkout.get("head"), str)
-        ):
+    checkouts = cast(list[object], repository.get("checkouts", []))
+    for raw in checkouts:
+        if not isinstance(raw, dict):
+            continue
+        checkout = cast(dict[str, Any], raw)
+        if checkout.get("is_primary") and isinstance(checkout.get("head"), str):
             return checkout["head"]
-    for checkout in repository.get("checkouts", []):
-        if isinstance(checkout, dict) and isinstance(checkout.get("head"), str):
+    for raw in checkouts:
+        if not isinstance(raw, dict):
+            continue
+        checkout = cast(dict[str, Any], raw)
+        if isinstance(checkout.get("head"), str):
             return checkout["head"]
     return ""

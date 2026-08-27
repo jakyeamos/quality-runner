@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from quality_runner.artifacts import prepare_safe_directory, write_json, write_text
 from quality_runner.fleet.contracts import canonical_json, digest
@@ -197,6 +197,7 @@ def _implementation_lane(entry: dict[str, Any]) -> dict[str, Any]:
     current_manifest = str(entry.get("manifest_schema", "")).strip() == MAC_CONTROL_MANIFEST_SCHEMA
     lane = entry.get("implementation_contract")
     if isinstance(lane, dict):
+        lane = cast(dict[str, Any], lane)
         if applicability != "applicable":
             return {
                 "status": _normalize_lane_status(
@@ -256,6 +257,7 @@ def _live_lane(entry: dict[str, Any]) -> dict[str, Any]:
     applicability = str(entry.get("applicability", "unknown"))
     lane = entry.get("live_task_evidence")
     if isinstance(lane, dict):
+        lane = cast(dict[str, Any], lane)
         task_count = lane.get("task_count")
         measured_task_count = lane.get("measured_task_count")
         return {
@@ -288,9 +290,10 @@ def _live_lane(entry: dict[str, Any]) -> dict[str, Any]:
 
 
 def _criteria_passed_count(value: object) -> int:
-    return sum(
-        1 for criterion in CRITERIA if isinstance(value, dict) and value.get(criterion) is True
-    )
+    if not isinstance(value, dict):
+        return 0
+    criteria = cast(dict[str, Any], value)
+    return sum(1 for criterion in CRITERIA if criteria.get(criterion) is True)
 
 
 def _task_is_measured(task: dict[str, Any]) -> bool:
@@ -450,7 +453,7 @@ def read_json(path: Path) -> dict[str, Any] | None:
         value = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return None
-    return value if isinstance(value, dict) else None
+    return cast(dict[str, Any], value) if isinstance(value, dict) else None
 
 
 def read_object(path: Path) -> dict[str, Any]:
@@ -458,8 +461,11 @@ def read_object(path: Path) -> dict[str, Any]:
 
 
 def objects(value: object) -> list[dict[str, Any]]:
-    return [item for item in value if isinstance(item, dict)] if isinstance(value, list) else []
+    if not isinstance(value, list):
+        return []
+    values = cast(list[object], value)
+    return [cast(dict[str, Any], item) for item in values if isinstance(item, dict)]
 
 
 def object_value(value: object) -> dict[str, Any]:
-    return value if isinstance(value, dict) else {}
+    return cast(dict[str, Any], value) if isinstance(value, dict) else {}

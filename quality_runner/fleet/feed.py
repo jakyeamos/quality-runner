@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from quality_runner.fleet.audit import fleet_replay_payload, resolve_artifact_root
 from quality_runner.fleet.mac_control_artifacts import (
@@ -95,18 +95,16 @@ def fleet_feed_payload(
             checkpoint_state = _read_object(artifact_root / "inventory.json").get(
                 "maturity_checkpoint"
             )
-        if isinstance(checkpoint_state, dict) and checkpoint_state.get("status") == "blocked":
-            raise MaturityFeedError(
-                "the QR audit's coordinated Mac Control lane is blocked; maturity feed was not published"
-            )
-        if isinstance(checkpoint_state, dict) and checkpoint_state.get("status") not in {
-            None,
-            "not_requested",
-            "not_applicable",
-        }:
-            raise MaturityFeedError(
-                "the QR audit's coordinated Mac Control artifacts are missing; maturity feed was not published"
-            )
+        if isinstance(checkpoint_state, dict):
+            checkpoint_state = cast(dict[str, Any], checkpoint_state)
+            if checkpoint_state.get("status") == "blocked":
+                raise MaturityFeedError(
+                    "the QR audit's coordinated Mac Control lane is blocked; maturity feed was not published"
+                )
+            if checkpoint_state.get("status") not in {None, "not_requested", "not_applicable"}:
+                raise MaturityFeedError(
+                    "the QR audit's coordinated Mac Control artifacts are missing; maturity feed was not published"
+                )
         feed_path = publish_maturity_feed(feed, publication_root)
     return {
         "schema": "quality-runner-maturity-feed-publication/v1",
@@ -144,7 +142,7 @@ def _read_object(path: Path) -> dict[str, Any]:
         value = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return {}
-    return value if isinstance(value, dict) else {}
+    return cast(dict[str, Any], value) if isinstance(value, dict) else {}
 
 
 def _feed_publication_root(output_dir: Path, artifact_root: Path) -> Path:

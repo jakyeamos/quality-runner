@@ -10,7 +10,7 @@ from __future__ import annotations
 import json
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 CAPABILITY_SCHEMA = "quality-runner-skill-capability/v1"
 DEFAULT_CAPABILITY_FEED = (
@@ -25,7 +25,8 @@ def _now() -> str:
 def _string_list(value: object) -> list[str]:
     if not isinstance(value, list):
         return []
-    return [item for item in value if isinstance(item, str) and item.strip()]
+    values = cast(list[object], value)
+    return [item for item in values if isinstance(item, str) and item.strip()]
 
 
 def _int_value(value: object) -> int:
@@ -95,6 +96,7 @@ def _quality_runner_representation(
     finding_categories: list[str],
     adapter: str = "quality_skill",
 ) -> dict[str, Any]:
+    finding_categories = _string_list(finding_categories)
     if not quality_scan_present:
         return {
             "status": "configured",
@@ -110,20 +112,14 @@ def _quality_runner_representation(
         }
 
     statuses = sorted(
-        {
-            str(item.get("status"))
-            for item in coverage
-            if isinstance(item, dict) and isinstance(item.get("status"), str)
-        }
+        {str(item.get("status")) for item in coverage if isinstance(item.get("status"), str)}
     )
-    finding_count = sum(
-        _int_value(item.get("finding_count")) for item in coverage if isinstance(item, dict)
-    )
+    finding_count = sum(_int_value(item.get("finding_count")) for item in coverage)
     coverage_proven = bool(coverage) and all(
         status in {"evaluated", "matched", "reviewed"} for status in statuses
     )
     status = "coverage_proven" if coverage_proven else "configured"
-    gaps = []
+    gaps: list[str] = []
     if not coverage:
         gaps.append("The active pack has no deterministic or agent-review coverage entries.")
     if any(
@@ -157,10 +153,8 @@ def _skill_pack_capability(
 ) -> dict[str, Any]:
     skill_id = str(skill.get("id") or "unknown")
     skill_name = str(skill.get("name") or skill_id)
-    deterministic_rules = [
-        item for item in skill.get("deterministic_rules", []) if isinstance(item, dict)
-    ]
-    agent_reviews = [item for item in skill.get("agent_reviews", []) if isinstance(item, dict)]
+    deterministic_rules = _object_mappings(skill.get("deterministic_rules", []))
+    agent_reviews = _object_mappings(skill.get("agent_reviews", []))
     classes: list[dict[str, str]] = []
     for rule in deterministic_rules:
         rule_id = str(rule.get("id") or "unknown-rule")
@@ -229,17 +223,19 @@ def _native_debloat_capability(
     *,
     quality_scan: dict[str, Any] | None,
 ) -> dict[str, Any]:
+    scan = quality_scan if quality_scan is not None else {}
     coverage = [
         item
-        for item in (quality_scan or {}).get("skill_coverage", [])
-        if isinstance(item, dict) and item.get("skill_id") == "debloat-repository"
+        for item in _object_mappings(scan.get("skill_coverage", []))
+        if item.get("skill_id") == "debloat-repository"
     ]
     findings = [
         item
-        for item in (quality_scan or {}).get("findings", [])
-        if isinstance(item, dict) and item.get("category") == "debloat"
+        for item in _object_mappings(scan.get("findings", []))
+        if item.get("category") == "debloat"
     ]
-    quality_scan_present = isinstance(quality_scan, dict)
+    quality_scan_present = quality_scan is not None
+    representation: dict[str, Any]
     if quality_scan_present:
         representation = _quality_runner_representation(
             skill_id="debloat-repository",
@@ -313,9 +309,9 @@ def build_skill_capabilities(
 ) -> list[dict[str, Any]]:
     """Return capability records without assigning a scalar skill score."""
 
-    active = [item for item in (quality_skills or []) if isinstance(item, dict)]
-    coverage_items = [item for item in (skill_coverage or []) if isinstance(item, dict)]
-    scan_present = isinstance(quality_scan, dict)
+    active = list(quality_skills or [])
+    coverage_items = list(skill_coverage or [])
+    scan_present = quality_scan is not None
     records: dict[str, dict[str, Any]] = {
         "debloat-repository": _native_debloat_capability(quality_scan=quality_scan)
     }
@@ -333,11 +329,12 @@ def build_skill_capabilities(
     return [records[key] for key in sorted(records)]
 
 
-def build_skill_capability_feed(quality_scan: dict[str, Any]) -> dict[str, Any]:
+def build_skill_capability_feed(quality_scan: object) -> dict[str, Any]:
     """Create the file consumed by Pronto's Skills analysis surface."""
 
     if not isinstance(quality_scan, dict):
         raise ValueError("quality scan must be a JSON object")
+    quality_scan = cast(dict[str, Any], quality_scan)
     capabilities = quality_scan.get("skill_capabilities")
     if not isinstance(capabilities, list):
         capabilities = build_skill_capabilities(
@@ -365,7 +362,7 @@ def load_quality_scan(path: Path) -> dict[str, Any]:
     payload = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(payload, dict):
         raise ValueError("quality scan must be a JSON object")
-    return payload
+    return cast(dict[str, Any], payload)
 
 
 def write_skill_capability_feed(quality_scan: dict[str, Any], output: Path) -> dict[str, Any]:
@@ -373,3 +370,10 @@ def write_skill_capability_feed(quality_scan: dict[str, Any], output: Path) -> d
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     return {"status": "written", "path": str(output), "feed": payload}
+
+
+def _object_mappings(value: object) -> list[dict[str, Any]]:
+    if not isinstance(value, list):
+        return []
+    values = cast(list[object], value)
+    return [cast(dict[str, Any], item) for item in values if isinstance(item, dict)]

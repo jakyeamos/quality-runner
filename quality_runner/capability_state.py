@@ -68,7 +68,7 @@ def matching_ci_status(
         "pre_pr": ("pull request", "pre-pr", "pre pr"),
         "pre_cr": ("pre-cr", "pre cr"),
     }.get(capability_id, (capability_id,))
-    for check in cast(list[Any], checks):
+    for check in cast(list[object], checks):
         if not isinstance(check, dict):
             continue
         typed_check = cast(dict[str, Any], check)
@@ -80,10 +80,10 @@ def matching_ci_status(
             optional = {
                 key: value
                 for key, value in {
-                    "head_sha": _optional_string(check.get("head_sha")),
-                    "ref": _optional_string(check.get("ref")),
-                    "workflow_run_id": _optional_string(check.get("workflow_run_id")),
-                    "captured_at": _optional_string(check.get("captured_at")),
+                    "head_sha": _optional_string(typed_check.get("head_sha")),
+                    "ref": _optional_string(typed_check.get("ref")),
+                    "workflow_run_id": _optional_string(typed_check.get("workflow_run_id")),
+                    "captured_at": _optional_string(typed_check.get("captured_at")),
                 }.items()
                 if value is not None
             }
@@ -129,7 +129,9 @@ def _current_fresh_ci_evidence(
     ci_status: dict[str, str | None],
 ) -> bool:
     provenance_value = scan.get("git_provenance") or scan.get("provenance")
-    provenance = provenance_value if isinstance(provenance_value, dict) else {}
+    provenance = (
+        cast(dict[str, Any], provenance_value) if isinstance(provenance_value, dict) else {}
+    )
     head_sha = provenance.get("head_sha")
     branch = provenance.get("branch")
     if not isinstance(head_sha, str) or not head_sha or ci_status.get("head_sha") != head_sha:

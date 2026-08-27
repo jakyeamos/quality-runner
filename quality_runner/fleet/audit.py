@@ -200,7 +200,7 @@ def fleet_audit_payload(
         standard=standard,
         population_coverage=coverage,
     )
-    inventory = {
+    inventory: dict[str, Any] = {
         "schema": FLEET_INVENTORY_SCHEMA,
         "audit_id": audit_id,
         "as_of": resolved_as_of,
@@ -263,7 +263,9 @@ def fleet_audit_payload(
         # unfolded primary worktree. The
         # persisted QR repository identity still retains the original primary
         # path and all custody/audit-coverage evidence.
-        mac_control_repository_paths = _mac_control_repository_paths(inventory["repositories"])
+        mac_control_repository_paths = _mac_control_repository_paths(
+            cast(list[dict[str, Any]], inventory["repositories"])
+        )
         try:
             mac_control_audit = mac_control_audit_payload(
                 projects_root=root,
@@ -297,7 +299,7 @@ def fleet_audit_payload(
             audit_id=audit_id,
             as_of=resolved_as_of,
             projects_root=root,
-            scope=inventory["scope"],
+            scope=str(inventory["scope"]),
             repositories=results,
             standard=standard,
         )
@@ -385,24 +387,30 @@ def _mac_control_repository_paths(repositories: Sequence[dict[str, Any]]) -> lis
 
     paths: list[Path] = []
     for repository in repositories:
-        target = repository.get("target_branch")
-        target_head = target.get("head") if isinstance(target, dict) else None
-        target_checkout_id = target.get("checkout_id") if isinstance(target, dict) else None
-        exact_checkout = next(
-            (
-                checkout
-                for checkout in repository.get("checkouts", [])
-                if isinstance(checkout, dict)
-                and isinstance(checkout.get("path"), str)
+        target_value = repository.get("target_branch")
+        target = cast(dict[str, Any], target_value) if isinstance(target_value, dict) else {}
+        target_head = target.get("head") if isinstance(target.get("head"), str) else None
+        target_checkout_id = (
+            target.get("checkout_id") if isinstance(target.get("checkout_id"), str) else None
+        )
+        raw_checkouts = repository.get("checkouts", [])
+        checkouts = cast(list[object], raw_checkouts) if isinstance(raw_checkouts, list) else []
+        exact_checkout: dict[str, Any] | None = None
+        for raw_checkout in checkouts:
+            if not isinstance(raw_checkout, dict):
+                continue
+            checkout = cast(dict[str, Any], raw_checkout)
+            if (
+                isinstance(checkout.get("path"), str)
                 and checkout.get("exists") is True
                 and (
                     checkout.get("checkout_id") == target_checkout_id
                     or checkout.get("head") == target_head
                 )
                 and (not target_head or checkout.get("head") == target_head)
-            ),
-            None,
-        )
+            ):
+                exact_checkout = checkout
+                break
         if exact_checkout is not None:
             paths.append(Path(str(exact_checkout["path"])))
         else:
@@ -472,7 +480,7 @@ def fleet_report_payload(
     artifact_root = _resolve_artifact_root(output_dir, audit_id)
     summary = _read_json(artifact_root / "summary.json")
     projection = public_projection(summary)
-    report = {
+    report: dict[str, Any] = {
         "schema": FLEET_REPORT_SCHEMA,
         "status": "review_required",
         "audit_id": summary.get("audit_id"),
@@ -579,4 +587,4 @@ def _latest_audit(root: Path) -> Path:
 
 
 def _read_json(path: Path) -> dict[str, Any]:
-    return json.loads(path.read_text(encoding="utf-8"))
+    return cast(dict[str, Any], json.loads(path.read_text(encoding="utf-8")))

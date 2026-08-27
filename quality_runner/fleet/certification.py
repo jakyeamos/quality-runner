@@ -373,11 +373,10 @@ def _blocking_reasons(
         and check.get("reason")
     ]
     if projection.get("maturity_status") != "certified":
-        for gap in cast(list[object], projection.get("dimension_gaps", []))[:8]:
-            if isinstance(gap, dict):
-                dimension = gap.get("dimension")
-                if isinstance(dimension, str) and dimension:
-                    reasons.append(f"dimension_gap:{dimension}")
+        for gap in _objects(projection.get("dimension_gaps", []))[:8]:
+            dimension = gap.get("dimension")
+            if isinstance(dimension, str) and dimension:
+                reasons.append(f"dimension_gap:{dimension}")
     return list(dict.fromkeys(reasons))
 
 
@@ -448,7 +447,9 @@ def _object(value: object) -> dict[str, Any]:
 def _objects(value: object) -> list[dict[str, Any]]:
     if not isinstance(value, list):
         return []
-    return [cast(dict[str, Any], item) for item in value if isinstance(item, dict)]
+    return [
+        cast(dict[str, Any], item) for item in cast(list[object], value) if isinstance(item, dict)
+    ]
 
 
 def _markdown(payload: Mapping[str, Any]) -> str:

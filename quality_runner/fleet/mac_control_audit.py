@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import subprocess
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from quality_runner.fleet.contracts import digest
 from quality_runner.fleet.mac_control_artifacts import read_json
@@ -24,7 +24,7 @@ from quality_runner.fleet.mac_control_contracts import (
 )
 
 
-def _audit_repository(
+def audit_repository(
     repository: dict[str, Any],
     *,
     observed_at: str,
@@ -78,8 +78,8 @@ def _audit_repository(
                 "source provenance could not be verified against the repository worktree",
             ],
         }
-    criteria = semantic_evaluation["criteria"]
-    grounding_errors = semantic_evaluation["grounding_errors"]
+    criteria = cast(dict[str, bool], semantic_evaluation["criteria"])
+    grounding_errors = cast(list[str], semantic_evaluation["grounding_errors"])
     evidence = [f"manifest:{MAC_CONTROL_MANIFEST_RELATIVE_PATH.as_posix()}"]
     evidence.extend(semantic_evaluation["evidence"])
     live_evidence: list[str] = []
@@ -416,7 +416,8 @@ def _run_mac_control_provider(
     macctl_path: str, manifest_path: Path, manifest: dict[str, Any]
 ) -> dict[str, Any]:
     app = manifest.get("app")
-    app_name = app.get("name") if isinstance(app, dict) else None
+    app_map = cast(dict[str, Any], app) if isinstance(app, dict) else {}
+    app_name = app_map.get("name")
     if not isinstance(app_name, str) or not app_name.strip():
         return {
             "status": "blocked",
@@ -457,13 +458,15 @@ def _run_mac_control_provider(
             "finding_count": 0,
             "reason": "provider returned invalid JSON",
         }
-    result = payload.get("result") if isinstance(payload, dict) else None
-    result = result if isinstance(result, dict) else {}
-    findings = result.get("findings")
+    payload_map = cast(dict[str, Any], payload) if isinstance(payload, dict) else {}
+    result_value = payload_map.get("result")
+    result = cast(dict[str, Any], result_value) if isinstance(result_value, dict) else {}
+    findings_value = result.get("findings")
+    findings = cast(list[object], findings_value) if isinstance(findings_value, list) else []
     return {
-        "status": str(payload.get("status", "failed")) if isinstance(payload, dict) else "failed",
+        "status": str(payload_map.get("status", "failed")),
         "structural_valid": result.get("structural_valid") is True,
-        "finding_count": len(findings) if isinstance(findings, list) else 0,
+        "finding_count": len(findings),
         "redacted": result.get("redacted") is True,
         "exit_code": completed.returncode,
     }

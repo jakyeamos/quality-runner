@@ -2,10 +2,10 @@ from __future__ import annotations
 
 import os
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from quality_runner.fleet.cache_design_measurement import (
     discover_candidates,
@@ -50,6 +50,10 @@ _KNOWN_SURFACES = (
 )
 _CANDIDATE_NAMES = {".cache", "cache", "build", "dist", ".output", "__pycache__"}
 _SKIP_DISCOVERY = {".git", ".hg", ".svn"}
+
+
+def _object_list(value: object) -> list[object]:
+    return cast(list[object], value) if isinstance(value, list) else []
 
 
 def assess_cache_design(
@@ -173,10 +177,12 @@ def _custom_specs(config: dict[str, Any]) -> list[SurfaceSpec]:
     section = config.get("cache_design")
     if not isinstance(section, dict):
         return []
+    section = cast(dict[str, Any], section)
     specs: list[SurfaceSpec] = []
-    for item in section.get("paths", []):
+    for item in _object_list(section.get("paths", [])):
         if not isinstance(item, dict):
             continue
+        item = cast(dict[str, Any], item)
         specs.append(
             SurfaceSpec(
                 path=str(item["path"]),
@@ -197,24 +203,13 @@ def _effective_specs(custom: list[SurfaceSpec]) -> list[SurfaceSpec]:
     known: list[SurfaceSpec] = []
     for item in _KNOWN_SURFACES:
         override = overrides.pop(item.path, None)
-        known.append(
-            SurfaceSpec(**{**override.__dict__, "exclude": item.exclude})
-            if override is not None
-            else item
-        )
+        known.append(replace(override, exclude=item.exclude) if override is not None else item)
     specs = [*known, *sorted(overrides.values(), key=lambda item: item.path)]
     result: list[SurfaceSpec] = []
     for item in specs:
         prefix = f"{item.path}/"
         nested = tuple(candidate.path for candidate in specs if candidate.path.startswith(prefix))
-        result.append(
-            SurfaceSpec(
-                **{
-                    **item.__dict__,
-                    "exclude": tuple(sorted(set(item.exclude) | set(nested))),
-                }
-            )
-        )
+        result.append(replace(item, exclude=tuple(sorted(set(item.exclude) | set(nested)))))
     return result
 
 
@@ -338,12 +333,16 @@ def _receipt_evidence(root: Path, as_of: str) -> dict[str, Any]:
         payload = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         return {"available": False, "qualifies_for_level_4": False, "snapshot_count": 0}
-    snapshots = payload.get("snapshots")
-    valid_snapshots = (
-        [item for item in snapshots if isinstance(item, dict) and item.get("observed_at")]
-        if isinstance(snapshots, list)
-        else []
-    )
+    if not isinstance(payload, dict):
+        return {"available": False, "qualifies_for_level_4": False, "snapshot_count": 0}
+    payload = cast(dict[str, Any], payload)
+    valid_snapshots: list[dict[str, Any]] = []
+    for item in _object_list(payload.get("snapshots")):
+        if not isinstance(item, dict):
+            continue
+        item = cast(dict[str, Any], item)
+        if item.get("observed_at"):
+            valid_snapshots.append(item)
     allocated_delta = _snapshot_delta(valid_snapshots, "allocated_bytes")
     qualifies = bool(
         payload.get("schema") == "quality-runner-cache-design-equivalence/v1"

@@ -161,10 +161,7 @@ def local_command_env(cwd: Path, *, command: str | None = None) -> dict[str, str
         if " pnpm " in f" {command} ":
             env["pnpm_config_cache_dir"] = str(Path.home() / "Library" / "Caches" / "pnpm")
     package_manager_root = _package_manager_command_root(cwd, command)
-    if (
-        package_manager_root is not None
-        and (package_manager_root / ".quality-runner" / "copied-dependencies").is_file()
-    ):
+    if (package_manager_root / ".quality-runner" / "copied-dependencies").is_file():
         # pnpm 11 treats the copied workspace-state path as stale and otherwise
         # starts an implicit install. QR already prepared this locked tree.
         env["pnpm_config_verify_deps_before_run"] = "false"

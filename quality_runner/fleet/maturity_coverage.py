@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import Any
+from typing import Any, cast
 
 from quality_runner.fleet.audit_coverage import AUDIT_COVERAGE_STATUSES
 
@@ -76,4 +76,4 @@ def validate_feed_audit_coverage(
 
 
 def _object(value: object) -> dict[str, Any]:
-    return value if isinstance(value, dict) else {}
+    return cast(dict[str, Any], value) if isinstance(value, dict) else {}

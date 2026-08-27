@@ -22,13 +22,6 @@ def security_audit_findings(
     return findings
 
 
-def _explicit_security_requirements(security_config: dict[str, Any] | None) -> bool:
-    if not isinstance(security_config, dict):
-        return False
-    required = security_config.get("required_capabilities")
-    return isinstance(required, list) and bool(cast(list[Any], required))
-
-
 def _candidate_findings(security_scan: dict[str, Any]) -> list[dict[str, Any]]:
     candidates = security_scan.get("candidates")
     if not isinstance(candidates, list):

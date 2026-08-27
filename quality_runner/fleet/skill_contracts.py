@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import re
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from quality_runner.fleet.contracts import MAX_DOCUMENT_BYTES, relative_path
 
@@ -102,12 +102,19 @@ def _declared_hosted_skill_paths(root: Path) -> list[Path]:
         payload = json.loads(manifest_path.read_text(encoding="utf-8"))
     except (OSError, UnicodeError, json.JSONDecodeError):
         return []
-    if not isinstance(payload, dict) or not isinstance(payload.get("skills"), list):
+    if not isinstance(payload, dict):
+        return []
+    payload = cast(dict[str, Any], payload)
+    skills = payload.get("skills")
+    if not isinstance(skills, list):
         return []
 
     paths: list[Path] = []
-    for item in payload["skills"]:
-        if not isinstance(item, dict) or item.get("source") != "hosted":
+    for raw in cast(list[object], skills):
+        if not isinstance(raw, dict):
+            continue
+        item = cast(dict[str, Any], raw)
+        if item.get("source") != "hosted":
             continue
         contract_path = item.get("contract_path")
         if not isinstance(contract_path, str) or not contract_path:

@@ -116,6 +116,7 @@ def _toml_strict_surface(
     for key in section:
         if not isinstance(current, dict) or key not in current:
             return None
+        current = cast(dict[str, object], current)
         current = current[key]
     config = cast(dict[str, object], current) if isinstance(current, dict) else {}
     return _configured_surface(provider, path, config.get("typeCheckingMode") == "strict")

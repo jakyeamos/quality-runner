@@ -5,7 +5,7 @@ import json
 import os
 import re
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from quality_runner.fleet.behavior_contract import (
     EDGE_CATEGORIES,
@@ -29,7 +29,7 @@ def read_trace(path: Path) -> dict[str, Any]:
         raise ValueError(f"could not read edge trace JSON: {error}") from error
     if not isinstance(value, dict):
         raise ValueError("edge trace JSON root must be an object")
-    return value
+    return cast(dict[str, Any], value)
 
 
 def validate_trace(
@@ -48,11 +48,9 @@ def validate_trace(
     if not isinstance(seed, int) or isinstance(seed, bool) or seed < 0 or seed >= 2**64:
         errors.append("seed must be an unsigned 64-bit integer")
     categories = _string_list(trace.get("categories"))
-    profiled = _string_list(
-        scenario.get("edge_profile", {}).get("categories")
-        if isinstance(scenario.get("edge_profile"), dict)
-        else []
-    )
+    profile = scenario.get("edge_profile", {})
+    profile = cast(dict[str, Any], profile) if isinstance(profile, dict) else {}
+    profiled = _string_list(profile.get("categories"))
     if (
         not categories
         or any(item not in EDGE_CATEGORIES for item in categories)
@@ -69,29 +67,22 @@ def validate_trace(
         errors.append("sensitivity must be normal or security_sensitive")
     if not _bounded_strings(trace.get("preconditions"), maximum=32, length=2_000):
         errors.append("preconditions must contain at most 32 bounded strings")
-    steps = trace.get("steps")
+    raw_steps = trace.get("steps")
+    steps = cast(list[object], raw_steps) if isinstance(raw_steps, list) else []
     if (
-        not isinstance(steps, list)
+        not isinstance(raw_steps, list)
         or not 1 <= len(steps) <= MAX_TRACE_STEPS
-        or any(
-            not isinstance(step, dict)
-            or not _bounded_string(step.get("action"), 4_000)
-            or not _bounded_string(step.get("observation"), 4_000)
-            for step in steps
-        )
+        or any(not _valid_step(step) for step in steps)
     ):
         errors.append(f"steps must contain 1-{MAX_TRACE_STEPS} bounded action/observation objects")
-    replay = trace.get("replay_results")
+    raw_replay = trace.get("replay_results")
+    replay_values = cast(list[object], raw_replay) if isinstance(raw_replay, list) else []
+    replay = [cast(dict[str, Any], item) for item in replay_values if isinstance(item, dict)]
     if (
-        not isinstance(replay, list)
-        or len(replay) > MAX_TRACE_REPLAY_ATTEMPTS
-        or any(
-            not isinstance(item, dict)
-            or item.get("status") not in {"reproduced", "not_reproduced", "blocked"}
-            or not isinstance(item.get("attempt"), int)
-            or not _bounded_string(item.get("observation"), 2_000)
-            for item in replay
-        )
+        not isinstance(raw_replay, list)
+        or len(replay_values) > MAX_TRACE_REPLAY_ATTEMPTS
+        or len(replay) != len(replay_values)
+        or any(not _valid_replay_item(item) for item in replay_values)
     ):
         errors.append("replay_results must contain at most three bounded replay attempts")
         replay = []
@@ -113,38 +104,41 @@ def validate_trace(
         errors.append("passed traces must be classified passed")
     elif status == "blocked" and classification not in {"blocked", "flaky", "inconclusive"}:
         errors.append("blocked traces must be classified blocked, flaky, or inconclusive")
-    minimization = trace.get("minimization")
-    if not isinstance(minimization, dict):
+    raw_minimization = trace.get("minimization")
+    minimization = (
+        cast(dict[str, Any], raw_minimization) if isinstance(raw_minimization, dict) else {}
+    )
+    if not isinstance(raw_minimization, dict):
         errors.append("minimization must be an object")
-    elif (
+    if isinstance(raw_minimization, dict) and (
         minimization.get("status") not in {"not_needed", "complete", "partial", "blocked"}
         or not isinstance(minimization.get("original_step_count"), int)
         or not isinstance(minimization.get("minimized_step_count"), int)
         or minimization["minimized_step_count"] > minimization["original_step_count"]
     ):
         errors.append("minimization counts and status are invalid")
-    elif status == "failed" and minimization.get("status") != "complete":
+    elif (
+        isinstance(raw_minimization, dict)
+        and status == "failed"
+        and minimization.get("status") != "complete"
+    ):
         errors.append("confirmed failed traces must be completely minimized")
-    cleanup = trace.get("cleanup")
+    raw_cleanup = trace.get("cleanup")
+    cleanup = cast(dict[str, Any], raw_cleanup) if isinstance(raw_cleanup, dict) else {}
     if (
-        not isinstance(cleanup, dict)
+        not isinstance(raw_cleanup, dict)
         or cleanup.get("status") not in {"complete", "not_required", "blocked"}
         or not _bounded_string(cleanup.get("observation"), 2_000)
     ):
         errors.append("cleanup must record a bounded status and observation")
     elif status != "blocked" and cleanup.get("status") == "blocked":
         errors.append("passed or failed traces cannot leave cleanup blocked")
-    artifacts = trace.get("artifacts")
+    raw_artifacts = trace.get("artifacts")
+    artifacts = cast(list[object], raw_artifacts) if isinstance(raw_artifacts, list) else []
     if (
-        not isinstance(artifacts, list)
+        not isinstance(raw_artifacts, list)
         or len(artifacts) > 32
-        or any(
-            not isinstance(item, dict)
-            or not _bounded_string(item.get("kind"), 128)
-            or not isinstance(item.get("sha256"), str)
-            or re.fullmatch(r"[0-9a-f]{64}", item["sha256"]) is None
-            for item in artifacts
-        )
+        or any(not _valid_artifact(item) for item in artifacts)
     ):
         errors.append("artifacts must contain at most 32 kind/SHA-256 records")
     if not _bounded_string(trace.get("observation"), 2_000):
@@ -190,8 +184,8 @@ def receipt_trace(
         }
     return {
         **common,
-        "precondition_count": len(trace["preconditions"]),
-        "step_count": len(trace["steps"]),
+        "precondition_count": len(_object_list(trace.get("preconditions"))),
+        "step_count": len(_object_list(trace.get("steps"))),
         "steps": [
             {
                 "index": index,
@@ -200,7 +194,7 @@ def receipt_trace(
                     str(step["observation"]).encode("utf-8")
                 ).hexdigest(),
             }
-            for index, step in enumerate(trace["steps"], start=1)
+            for index, step in enumerate(_object_mappings(trace.get("steps")), start=1)
         ],
         "observation": "Security-sensitive reproduction details are held in the private local evidence store.",
     }
@@ -229,7 +223,8 @@ def store_private_trace(trace: dict[str, Any], trace_sha256: str) -> str:
 def _string_list(value: object) -> list[str]:
     if not isinstance(value, list):
         return []
-    return [item.strip() for item in value if isinstance(item, str) and item.strip()]
+    values = cast(list[object], value)
+    return [item.strip() for item in values if isinstance(item, str) and item.strip()]
 
 
 def _bounded_string(value: object, maximum: int) -> bool:
@@ -237,10 +232,51 @@ def _bounded_string(value: object, maximum: int) -> bool:
 
 
 def _bounded_strings(value: object, *, maximum: int, length: int) -> bool:
+    values = cast(list[object], value) if isinstance(value, list) else []
     return (
         isinstance(value, list)
-        and len(value) <= maximum
-        and all(_bounded_string(item, length) for item in value)
+        and len(values) <= maximum
+        and all(_bounded_string(item, length) for item in values)
+    )
+
+
+def _object_list(value: object) -> list[object]:
+    return cast(list[object], value) if isinstance(value, list) else []
+
+
+def _object_mappings(value: object) -> list[dict[str, Any]]:
+    return [cast(dict[str, Any], item) for item in _object_list(value) if isinstance(item, dict)]
+
+
+def _valid_step(value: object) -> bool:
+    if not isinstance(value, dict):
+        return False
+    step = cast(dict[str, Any], value)
+    return _bounded_string(step.get("action"), 4_000) and _bounded_string(
+        step.get("observation"), 4_000
+    )
+
+
+def _valid_replay_item(value: object) -> bool:
+    if not isinstance(value, dict):
+        return False
+    item = cast(dict[str, Any], value)
+    return (
+        item.get("status") in {"reproduced", "not_reproduced", "blocked"}
+        and isinstance(item.get("attempt"), int)
+        and _bounded_string(item.get("observation"), 2_000)
+    )
+
+
+def _valid_artifact(value: object) -> bool:
+    if not isinstance(value, dict):
+        return False
+    item = cast(dict[str, Any], value)
+    sha256 = item.get("sha256")
+    return (
+        _bounded_string(item.get("kind"), 128)
+        and isinstance(sha256, str)
+        and re.fullmatch(r"[0-9a-f]{64}", sha256) is not None
     )
 
 

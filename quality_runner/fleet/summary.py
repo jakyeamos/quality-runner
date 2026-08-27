@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 
 from quality_runner.fleet import audit_coverage
 from quality_runner.fleet.agent_usability_scoring import applicable_agent_usability_scores
@@ -41,10 +41,13 @@ def build_fleet_summary(
     coverage = audit_coverage.summarize_audit_coverage(repositories)
     unresolved.extend(coverage["gaps"])
     for result in repositories:
-        dynamic_result = result.get("dynamic")
+        dynamic_value = result.get("dynamic")
+        dynamic_result = (
+            cast(dict[str, Any], dynamic_value) if isinstance(dynamic_value, dict) else None
+        )
         dynamic_state = (
             str(dynamic_result.get("status", "unknown"))
-            if isinstance(dynamic_result, dict)
+            if dynamic_result is not None
             else "unknown"
         )
         for finding in result.get("findings", []):
@@ -113,7 +116,7 @@ def build_fleet_summary(
         unresolved_gaps=unresolved_gaps,
         population_coverage=resolved_population,
     )
-    summary = {
+    summary: dict[str, Any] = {
         "schema": "quality-runner-fleet-summary-v0.1",
         "status": "completed",
         "audit_id": audit_id,

@@ -4,7 +4,7 @@ import re
 import subprocess
 from collections.abc import Callable
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from quality_runner.config import load_repo_config
 from quality_runner.fleet.contracts import hash_text, redact_text
@@ -108,6 +108,7 @@ def configured_gate_timeouts(worktree: Path) -> dict[str, int]:
         return {}
     if not isinstance(configured, dict):
         return {}
+    configured = cast(dict[object, object], configured)
     return {
         str(capability_id): seconds
         for capability_id, seconds in configured.items()

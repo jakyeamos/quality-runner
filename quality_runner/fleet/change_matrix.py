@@ -30,7 +30,7 @@ def assess_change_surface_coverage(
     skill_matrices = sorted(path for path in root.glob(SKILL_MATRIX_GLOB) if path.is_file())
     if repository_matrix is None:
         if skill_matrices:
-            return _result(
+            return make_result(
                 score=2,
                 status="partial",
                 message=(
@@ -48,7 +48,7 @@ def assess_change_surface_coverage(
         combined = "\n".join(documents.values()).lower()
         terms = ("change surface", "change matrix", "dependency map", "propagation path")
         if any(term in combined for term in terms):
-            return _result(
+            return make_result(
                 score=1,
                 status="prose_only",
                 message=(
@@ -64,7 +64,7 @@ def assess_change_surface_coverage(
                     if any(term in content.lower() for term in terms)
                 ][:12],
             )
-        return _result(
+        return make_result(
             score=0,
             status="missing",
             message="No repository-owned change-surface matrix or validated pointer was found.",
@@ -82,26 +82,26 @@ def assess_matrix_path(path: Path, *, root: Path, as_of: str) -> dict[str, Any]:
     display_path = relative_path(root, path)
     try:
         if path.is_symlink():
-            return _unknown(display_path, "Matrix path is a symlink and was not followed.")
+            return unknown(display_path, "Matrix path is a symlink and was not followed.")
         if path.stat().st_size > MAX_DOCUMENT_BYTES:
-            return _unknown(display_path, "Matrix exceeds the bounded audit size.")
+            return unknown(display_path, "Matrix exceeds the bounded audit size.")
         payload = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as error:
-        return _unknown(display_path, f"Matrix is unreadable or invalid JSON: {error}")
+        return unknown(display_path, f"Matrix is unreadable or invalid JSON: {error}")
     if not isinstance(payload, dict):
-        return _unknown(display_path, "Matrix root must be an object.")
+        return unknown(display_path, "Matrix root must be an object.")
     payload = cast(dict[str, Any], payload)
 
     if payload.get("schema_version") == POINTER_SCHEMA:
         target = payload.get("artifact_path")
         if not isinstance(target, str) or not target.strip():
-            return _unknown(display_path, "External pointer does not name an artifact_path.")
+            return unknown(display_path, "External pointer does not name an artifact_path.")
         target_path = Path(target).expanduser()
         if not target_path.is_absolute():
             target_path = path.parent / target_path
         resolved = target_path.resolve()
         if resolved == path.resolve():
-            return _unknown(display_path, "External pointer resolves to itself.")
+            return unknown(display_path, "External pointer resolves to itself.")
         result = assess_matrix_path(resolved, root=root, as_of=as_of)
         result["evidence"].insert(
             0,
@@ -113,7 +113,7 @@ def assess_matrix_path(path: Path, *, root: Path, as_of: str) -> dict[str, Any]:
         return result
 
     if payload.get("schema_version") != MATRIX_SCHEMA:
-        return _unknown(display_path, "Unsupported or missing matrix schema_version.")
+        return unknown(display_path, "Unsupported or missing matrix schema_version.")
 
     problems: list[str] = []
     owner = payload.get("owner")
@@ -124,8 +124,8 @@ def assess_matrix_path(path: Path, *, root: Path, as_of: str) -> dict[str, Any]:
         cast(dict[str, Any], subject).get("id"), str
     ):
         problems.append("subject identity is missing")
-    reviewed = _parse_date(payload.get("last_reviewed"))
-    as_of_date = _parse_date(as_of)
+    reviewed = parse_date(payload.get("last_reviewed"))
+    as_of_date = parse_date(as_of)
     if reviewed is None:
         problems.append("freshness is unknown")
     elif as_of_date is not None and as_of_date - reviewed > timedelta(days=FRESHNESS_DAYS):
@@ -150,23 +150,23 @@ def assess_matrix_path(path: Path, *, root: Path, as_of: str) -> dict[str, Any]:
         local_declared = local_declared or scope == "local"
         external_declared = external_declared or scope == "external"
         if status == "not_applicable":
-            if not _nonempty(surface.get("reason")) or not _string_list(surface.get("evidence")):
+            if not nonempty(surface.get("reason")) or not string_list(surface.get("evidence")):
                 problems.append(f"surface {index + 1} has unsupported not_applicable status")
             continue
         applicable += 1
-        operations = set(_string_list(surface.get("operations")))
+        operations = set(string_list(surface.get("operations")))
         distribution = surface.get("distribution")
-        if not _nonempty(surface.get("owner")):
+        if not nonempty(surface.get("owner")):
             problems.append(f"surface {index + 1} owner is missing")
-        if not _nonempty(surface.get("condition")):
+        if not nonempty(surface.get("condition")):
             problems.append(f"surface {index + 1} condition is missing")
-        if not _string_list(surface.get("validation")):
+        if not string_list(surface.get("validation")):
             problems.append(f"surface {index + 1} validation is missing")
         if operations != {"add", "change", "remove"}:
             problems.append(f"surface {index + 1} does not cover add/change/remove")
         if distribution not in SURFACE_DISTRIBUTIONS:
             problems.append(f"surface {index + 1} distribution is missing or unsupported")
-        if distribution == "public_adapter" and not _string_list(surface.get("contract_fixtures")):
+        if distribution == "public_adapter" and not string_list(surface.get("contract_fixtures")):
             problems.append(f"surface {index + 1} public adapter fixture is missing")
         if status in {"unknown", "unresolved", "stale", "contradictory"}:
             unresolved += 1
@@ -191,12 +191,12 @@ def assess_matrix_path(path: Path, *, root: Path, as_of: str) -> dict[str, Any]:
             if (
                 not isinstance(item, dict)
                 or cast(dict[str, Any], item).get("status") != "passed"
-                or not _string_list(cast(dict[str, Any], item).get("evidence"))
+                or not string_list(cast(dict[str, Any], item).get("evidence"))
             ):
                 exercised = False
 
     if problems:
-        return _result(
+        return make_result(
             score=2,
             status="stale" if "matrix is stale" in problems else "incomplete",
             message=f"Structured matrix exists but {'; '.join(sorted(set(problems))[:4])}.",
@@ -205,7 +205,7 @@ def assess_matrix_path(path: Path, *, root: Path, as_of: str) -> dict[str, Any]:
             ],
         )
     if not exercised or unresolved:
-        return _result(
+        return make_result(
             score=3,
             status="validated",
             message=(
@@ -214,7 +214,7 @@ def assess_matrix_path(path: Path, *, root: Path, as_of: str) -> dict[str, Any]:
             ),
             evidence=[{"path": display_path, "detail": "Current validated matrix."}],
         )
-    return _result(
+    return make_result(
         score=4,
         status="maintained",
         message="Add/change/remove behavior is evidenced and no applicable surface is unresolved.",
@@ -222,8 +222,8 @@ def assess_matrix_path(path: Path, *, root: Path, as_of: str) -> dict[str, Any]:
     )
 
 
-def _unknown(path: str, detail: str) -> dict[str, Any]:
-    return _result(
+def unknown(path: str, detail: str) -> dict[str, Any]:
+    return make_result(
         score=2,
         status="unknown",
         message="Structured matrix evidence is present but could not be validated.",
@@ -231,23 +231,23 @@ def _unknown(path: str, detail: str) -> dict[str, Any]:
     )
 
 
-def _result(
+def make_result(
     *, score: int | None, status: str, message: str, evidence: list[dict[str, str]]
 ) -> dict[str, Any]:
     return {"score": score, "status": status, "message": message, "evidence": evidence}
 
 
-def _nonempty(value: object) -> bool:
+def nonempty(value: object) -> bool:
     return isinstance(value, str) and bool(value.strip())
 
 
-def _string_list(value: object) -> list[str]:
+def string_list(value: object) -> list[str]:
     if not isinstance(value, list):
         return []
     return [item for item in cast(list[object], value) if isinstance(item, str) and item.strip()]
 
 
-def _parse_date(value: object) -> datetime | None:
+def parse_date(value: object) -> datetime | None:
     if not isinstance(value, str):
         return None
     try:

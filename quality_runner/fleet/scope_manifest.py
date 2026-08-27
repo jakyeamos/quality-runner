@@ -4,7 +4,7 @@ import json
 from collections.abc import Sequence
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from quality_runner.fleet.contracts import digest
 
@@ -21,7 +21,12 @@ def load_fleet_scope_manifest(path: Path, *, projects_root: Path) -> dict[str, A
         payload = json.loads(source.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as error:
         raise ValueError(f"fleet scope manifest is not valid JSON: {source}") from error
-    if not isinstance(payload, dict) or payload.get("schema") != FLEET_SCOPE_MANIFEST_SCHEMA:
+    if not isinstance(payload, dict):
+        raise ValueError(
+            f"fleet scope manifest must declare schema {FLEET_SCOPE_MANIFEST_SCHEMA}: {source}"
+        )
+    payload = cast(dict[str, Any], payload)
+    if payload.get("schema") != FLEET_SCOPE_MANIFEST_SCHEMA:
         raise ValueError(
             f"fleet scope manifest must declare schema {FLEET_SCOPE_MANIFEST_SCHEMA}: {source}"
         )
@@ -36,6 +41,7 @@ def load_fleet_scope_manifest(path: Path, *, projects_root: Path) -> dict[str, A
     raw_repositories = payload.get("repositories")
     if not isinstance(raw_repositories, list) or not raw_repositories:
         raise ValueError("fleet scope manifest repositories must be a non-empty array")
+    raw_repositories = cast(list[object], raw_repositories)
 
     root = projects_root.expanduser().resolve()
     normalized: list[dict[str, Any]] = []
@@ -43,6 +49,7 @@ def load_fleet_scope_manifest(path: Path, *, projects_root: Path) -> dict[str, A
     for index, raw_repository in enumerate(raw_repositories):
         if not isinstance(raw_repository, dict):
             raise ValueError(f"fleet scope manifest repository {index} must be an object")
+        raw_repository = cast(dict[str, Any], raw_repository)
         raw_path = _required_string(raw_repository, "path")
         resolved = Path(raw_path).expanduser().resolve()
         try:
@@ -160,6 +167,7 @@ def _distribution_attestation(value: Any, *, index: int) -> dict[str, str] | Non
         return None
     if not isinstance(value, dict):
         raise ValueError(f"fleet scope manifest repository {index} distribution must be an object")
+    value = cast(dict[str, Any], value)
     visibility = _required_string(value, "visibility")
     if visibility not in _DISTRIBUTION_VISIBILITY:
         raise ValueError(

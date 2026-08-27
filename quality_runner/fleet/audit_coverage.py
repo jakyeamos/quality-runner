@@ -4,7 +4,7 @@ import json
 import subprocess
 from collections.abc import Mapping
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from quality_runner.fleet.contracts import digest
 from quality_runner.process_runner import run_command
@@ -39,18 +39,27 @@ def load_custody_dispositions(path: Path | None) -> dict[str, list[dict[str, Any
     if path is None:
         return {}
     payload = json.loads(path.expanduser().read_text(encoding="utf-8"))
-    if not isinstance(payload, dict) or payload.get("schema") != CUSTODY_DISPOSITION_SCHEMA:
+    if not isinstance(payload, dict):
         raise ValueError(f"unsupported custody disposition schema: {path}")
-    raw_repositories = payload.get("repositories")
-    if not isinstance(raw_repositories, dict):
+    payload = cast(dict[str, Any], payload)
+    if payload.get("schema") != CUSTODY_DISPOSITION_SCHEMA:
+        raise ValueError(f"unsupported custody disposition schema: {path}")
+    raw_repositories_value = payload.get("repositories")
+    if not isinstance(raw_repositories_value, dict):
         raise ValueError("custody disposition manifest repositories must be an object")
+    raw_repositories = cast(dict[str, Any], raw_repositories_value)
     result: dict[str, list[dict[str, Any]]] = {}
-    for raw_path, raw_items in raw_repositories.items():
-        if not isinstance(raw_path, str) or not raw_path:
+    for raw_path, raw_items_value in raw_repositories.items():
+        if not raw_path:
             raise ValueError("custody disposition repository paths must be non-empty strings")
-        if not isinstance(raw_items, list) or not all(isinstance(item, dict) for item in raw_items):
+        if not isinstance(raw_items_value, list):
             raise ValueError(f"custody dispositions for {raw_path} must be an array of objects")
-        result[str(Path(raw_path).expanduser().resolve())] = [dict(item) for item in raw_items]
+        raw_items = cast(list[object], raw_items_value)
+        if not all(isinstance(item, dict) for item in raw_items):
+            raise ValueError(f"custody dispositions for {raw_path} must be an array of objects")
+        result[str(Path(raw_path).expanduser().resolve())] = [
+            cast(dict[str, Any], item) for item in raw_items
+        ]
     return result
 
 
@@ -539,11 +548,14 @@ def _git_lines(root: Path, *args: str) -> list[str] | None:
 
 
 def _object(value: object) -> dict[str, Any]:
-    return value if isinstance(value, dict) else {}
+    return cast(dict[str, Any], value) if isinstance(value, dict) else {}
 
 
 def _objects(value: object) -> list[dict[str, Any]]:
-    return [item for item in value if isinstance(item, dict)] if isinstance(value, list) else []
+    if not isinstance(value, list):
+        return []
+    raw_items = cast(list[object], value)
+    return [cast(dict[str, Any], item) for item in raw_items if isinstance(item, dict)]
 
 
 def _text(value: object) -> str | None:

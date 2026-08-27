@@ -6,7 +6,7 @@ import os
 import tempfile
 from collections.abc import Mapping
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from quality_runner.artifacts import prepare_safe_directory, write_json
 from quality_runner.fleet.contracts import digest, stable_id
@@ -268,10 +268,12 @@ def _required_string(value: Mapping[str, Any], key: str) -> str:
 
 
 def _object(value: object) -> dict[str, Any]:
-    return dict(value) if isinstance(value, dict) else {}
+    return cast(dict[str, Any], value) if isinstance(value, dict) else {}
 
 
 def _objects(value: object) -> list[dict[str, Any]]:
     return (
-        [dict(item) for item in value if isinstance(item, dict)] if isinstance(value, list) else []
+        [cast(dict[str, Any], item) for item in cast(list[object], value) if isinstance(item, dict)]
+        if isinstance(value, list)
+        else []
     )

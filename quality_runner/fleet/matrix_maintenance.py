@@ -3,18 +3,18 @@ from __future__ import annotations
 import json
 from datetime import timedelta
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from quality_runner.fleet.change_matrix import (
     MATRIX_SCHEMA,
     POINTER_SCHEMA,
     REPOSITORY_MATRIX_PATHS,
     SKILL_MATRIX_GLOB,
-    _nonempty,
-    _parse_date,
-    _result,
-    _string_list,
-    _unknown,
+    make_result,
+    nonempty,
+    parse_date,
+    string_list,
+    unknown,
 )
 from quality_runner.fleet.contracts import (
     FRESHNESS_DAYS,
@@ -43,7 +43,7 @@ def assess_matrix_maintenance(
         combined = "\n".join(documents.values()).lower()
         terms = ("change surface", "change matrix", "dependency map", "propagation path")
         if any(term in combined for term in terms):
-            return _result(
+            return make_result(
                 score=1,
                 status="prose_only",
                 message=(
@@ -72,7 +72,7 @@ def assess_matrix_maintenance(
             }
             for path in skill_matrices[:12]
         )
-        return _result(
+        return make_result(
             score=0,
             status="missing",
             message="No repository-owned matrix was found for the matrix-maintenance standard.",
@@ -81,22 +81,23 @@ def assess_matrix_maintenance(
 
     loaded = _load_matrix_document(repository_matrix, root=root)
     if loaded.get("error"):
-        return _unknown(str(loaded["display_path"]), str(loaded["error"]))
+        return unknown(str(loaded["display_path"]), str(loaded["error"]))
     payload = loaded.get("payload")
     display_path = str(loaded["display_path"])
     if not isinstance(payload, dict):
-        return _unknown(display_path, "Matrix root must be an object.")
+        return unknown(display_path, "Matrix root must be an object.")
+    payload = cast(dict[str, Any], payload)
     if payload.get("schema_version") != MATRIX_SCHEMA:
-        return _unknown(display_path, "Unsupported or missing matrix schema_version.")
+        return unknown(display_path, "Unsupported or missing matrix schema_version.")
 
     problems: list[str] = []
-    if not _nonempty(payload.get("owner")):
+    if not nonempty(payload.get("owner")):
         problems.append("matrix owner is missing")
     subject = payload.get("subject")
-    if not isinstance(subject, dict) or not _nonempty(subject.get("id")):
+    if not isinstance(subject, dict) or not nonempty(cast(dict[str, Any], subject).get("id")):
         problems.append("subject identity is missing")
-    reviewed = _parse_date(payload.get("last_reviewed"))
-    as_of_date = _parse_date(as_of)
+    reviewed = parse_date(payload.get("last_reviewed"))
+    as_of_date = parse_date(as_of)
     if reviewed is None:
         problems.append("freshness is unknown")
     elif as_of_date is not None and as_of_date - reviewed > timedelta(days=FRESHNESS_DAYS):
@@ -104,22 +105,24 @@ def assess_matrix_maintenance(
 
     surfaces = payload.get("surfaces")
     if not isinstance(surfaces, list) or not surfaces:
-        return _result(
+        return make_result(
             score=2,
             status="stale" if "matrix is stale" in problems else "incomplete",
             message="The repository matrix does not contain a usable surfaces list.",
             evidence=_problem_evidence(display_path, problems or ["surfaces are missing"]),
         )
+    surfaces = cast(list[object], surfaces)
     maintenance = next(
         (
-            surface
+            cast(dict[str, Any], surface)
             for surface in surfaces
-            if isinstance(surface, dict) and surface.get("id") == MATRIX_MAINTENANCE_STANDARD
+            if isinstance(surface, dict)
+            and cast(dict[str, Any], surface).get("id") == MATRIX_MAINTENANCE_STANDARD
         ),
         None,
     )
     if maintenance is None:
-        return _result(
+        return make_result(
             score=2,
             status="stale" if "matrix is stale" in problems else "incomplete",
             message=(
@@ -132,25 +135,16 @@ def assess_matrix_maintenance(
             ),
         )
 
-    if not isinstance(maintenance, dict):
-        return _result(
-            score=2,
-            status="incomplete",
-            message="The matrix-maintenance surface is not an object.",
-            evidence=[{"path": display_path, "detail": "matrix-maintenance surface is invalid"}],
-        )
     if problems:
-        return _result(
+        return make_result(
             score=2,
             status="stale" if "matrix is stale" in problems else "incomplete",
             message=f"Matrix-maintenance evidence is incomplete: {'; '.join(sorted(set(problems))[:4])}.",
             evidence=_problem_evidence(display_path, problems),
         )
     if maintenance.get("status") == "not_applicable":
-        if not _nonempty(maintenance.get("reason")) or not _string_list(
-            maintenance.get("evidence")
-        ):
-            return _result(
+        if not nonempty(maintenance.get("reason")) or not string_list(maintenance.get("evidence")):
+            return make_result(
                 score=2,
                 status="incomplete",
                 message=(
@@ -164,7 +158,7 @@ def assess_matrix_maintenance(
                     }
                 ],
             )
-        return _result(
+        return make_result(
             score=None,
             status="not_applicable",
             message="The repository explicitly documents why matrix maintenance is not applicable.",
@@ -172,14 +166,14 @@ def assess_matrix_maintenance(
                 {"path": display_path, "detail": str(maintenance["reason"])},
                 *[
                     {"path": display_path, "detail": item}
-                    for item in _string_list(maintenance.get("evidence"))[:12]
+                    for item in string_list(maintenance.get("evidence"))[:12]
                 ],
             ],
         )
 
     if maintenance.get("status") in {"unknown", "unresolved", "stale", "contradictory"}:
         problems.append(f"matrix-maintenance surface status is {maintenance['status']}")
-    if not _nonempty(maintenance.get("owner")):
+    if not nonempty(maintenance.get("owner")):
         problems.append("matrix-maintenance owner is missing")
     condition = str(maintenance.get("condition", "")).lower()
     if not (
@@ -190,8 +184,8 @@ def assess_matrix_maintenance(
         problems.append(
             "matrix-maintenance condition does not cover material feature or functionality changes"
         )
-    validation = " ".join(_string_list(maintenance.get("validation"))).lower()
-    if not _string_list(maintenance.get("validation")):
+    validation = " ".join(string_list(maintenance.get("validation"))).lower()
+    if not string_list(maintenance.get("validation")):
         problems.append("matrix-maintenance validation is missing")
     if "same change" not in validation or "update" not in validation:
         problems.append(
@@ -201,11 +195,11 @@ def assess_matrix_maintenance(
         problems.append(
             "matrix-maintenance validation does not require a reviewed no-impact reason"
         )
-    if set(_string_list(maintenance.get("operations"))) != {"add", "change", "remove"}:
+    if set(string_list(maintenance.get("operations"))) != {"add", "change", "remove"}:
         problems.append("matrix-maintenance does not cover add/change/remove")
 
     if problems:
-        return _result(
+        return make_result(
             score=2,
             status="stale" if "matrix is stale" in problems else "incomplete",
             message=f"Matrix-maintenance evidence is incomplete: {'; '.join(sorted(set(problems))[:4])}.",
@@ -213,13 +207,16 @@ def assess_matrix_maintenance(
         )
 
     operation_evidence = payload.get("operation_evidence")
-    exercised = isinstance(operation_evidence, dict) and all(
-        isinstance(operation_evidence.get(operation), dict)
-        and operation_evidence[operation].get("status") == "passed"
-        and _string_list(operation_evidence[operation].get("evidence"))
-        for operation in ("add", "change", "remove")
-    )
-    return _result(
+    exercised = False
+    if isinstance(operation_evidence, dict):
+        operation_evidence = cast(dict[str, Any], operation_evidence)
+        exercised = all(
+            isinstance(item := operation_evidence.get(operation), dict)
+            and cast(dict[str, Any], item).get("status") == "passed"
+            and string_list(cast(dict[str, Any], item).get("evidence"))
+            for operation in ("add", "change", "remove")
+        )
+    return make_result(
         score=4 if exercised else 3,
         status="maintained" if exercised else "current",
         message=(
@@ -257,6 +254,7 @@ def _load_matrix_document(
         }
     if not isinstance(payload, dict):
         return {"display_path": display_path, "error": "Matrix root must be an object."}
+    payload = cast(dict[str, Any], payload)
     if payload.get("schema_version") != POINTER_SCHEMA:
         return {"display_path": display_path, "payload": payload}
     target = payload.get("artifact_path")

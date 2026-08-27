@@ -5,7 +5,7 @@ from pathlib import Path, PurePosixPath
 from typing import Any
 
 from quality_runner.branch_diff import BRANCH_DIFF_SCOPE_BASIS
-from quality_runner.code_quality_findings import _finding
+from quality_runner.code_quality_findings import make_finding
 from quality_runner.maintenance_surface import (
     MAINTENANCE_SURFACE_SCHEMA,
     WORKTREE_REF,
@@ -90,7 +90,7 @@ def _comparison_refs(scope_metadata: dict[str, object] | None) -> tuple[str, str
 def _dependency_findings(payload: dict[str, Any]) -> list[dict[str, Any]]:
     dependencies = payload["maintenance_surface_delta"]["dependencies"]
     return [
-        _finding(
+        make_finding(
             category=MAINTENANCE_CATEGORY,
             severity="observation",
             confidence="high",
@@ -163,7 +163,7 @@ def _candidate_findings(
         for path, evidence_items in grouped.items():
             evidence = _grouped_evidence(evidence_items)
             findings.append(
-                _finding(
+                make_finding(
                     category=MAINTENANCE_CATEGORY,
                     severity="observation",
                     confidence=confidence,
@@ -210,7 +210,7 @@ def _observation_findings(repo_root: Path, payload: dict[str, Any]) -> list[dict
         path = _observation_path(repo_root, evidence_items)
         evidence = " | ".join(evidence_items) or str(item["message"])
         findings.append(
-            _finding(
+            make_finding(
                 category=MAINTENANCE_CATEGORY,
                 severity="observation",
                 confidence=str(item.get("confidence", "low")),

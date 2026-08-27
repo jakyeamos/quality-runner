@@ -13,7 +13,7 @@ import json
 import tomllib
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from quality_runner.config import load_repo_config
 from quality_runner.fleet.change_matrix import assess_matrix_path
@@ -62,7 +62,7 @@ def validate_policy_surfaces(
     root = repo_root.expanduser().resolve()
     selected = _candidate_paths(root, paths)
     observed_at = as_of or datetime.now(UTC).replace(microsecond=0).isoformat()
-    surfaces = []
+    surfaces: list[dict[str, Any]] = []
     for relative in selected:
         classification = classify_policy_surface(relative)
         if classification is None:
@@ -155,21 +155,23 @@ def _validate_quality_runner_config(root: Path) -> None:
     config = load_repo_config(root)
     warnings = config.get("warnings", [])
     if warnings:
-        messages = [str(item.get("message", item)) for item in warnings if isinstance(item, dict)]
+        warning_values = cast(list[object], warnings) if isinstance(warnings, list) else []
+        messages: list[str] = []
+        for item in warning_values:
+            if isinstance(item, dict):
+                messages.append(str(cast(dict[str, Any], item).get("message", item)))
         raise ValueError(".quality-runner.toml warnings: " + "; ".join(messages))
 
 
 def _validate_toml(path: Path, label: str) -> None:
     try:
-        payload = tomllib.loads(path.read_text(encoding="utf-8"))
+        tomllib.loads(path.read_text(encoding="utf-8"))
     except tomllib.TOMLDecodeError as error:
         raise ValueError(f"{label} is invalid TOML: {error}") from error
-    if not isinstance(payload, dict):
-        raise ValueError(f"{label} must contain a TOML table")
 
 
 def _load_json(path: Path) -> dict[str, Any]:
     payload = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(payload, dict):
         raise ValueError(f"{path.name} must contain a JSON object")
-    return payload
+    return cast(dict[str, Any], payload)

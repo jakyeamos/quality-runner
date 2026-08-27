@@ -317,18 +317,7 @@ def _run_dynamic_command(
     return run_dynamic_command(command, worktree, timeout_seconds, runner=run_shell_command)
 
 
-def _missing_runtime_requirement(command: str, stdout: str, stderr: str) -> str | None:
-    combined = f"{stdout}\n{stderr}".lower()
-    if "golangci-lint" in combined and "no such file or directory" in combined:
-        return "required executable golangci-lint is unavailable in the bounded runtime"
-    if "command not found" in combined or "executable file not found" in combined:
-        return "a required executable is unavailable in the bounded runtime"
-    if "public agent-config engine not found" in combined:
-        return "the documented public agent-config sibling runtime is unavailable"
-    return None
-
-
-def _quality_commands_from_scan(repository: dict[str, Any]) -> list[dict[str, Any]]:
+def quality_commands_from_scan(repository: dict[str, Any]) -> list[dict[str, Any]]:
     scan = repository.get("scan")
     if not isinstance(scan, dict):
         return []
@@ -356,6 +345,9 @@ def _quality_commands_from_scan(repository: dict[str, Any]) -> list[dict[str, An
         for item in cast(list[object], commands)
         if isinstance(item, dict) and cast(dict[str, Any], item).get("id") in allowed_capabilities
     ][:12]
+
+
+_quality_commands_from_scan = quality_commands_from_scan
 
 
 def _selection_reasons(

@@ -6,7 +6,7 @@ import re
 import subprocess
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from quality_runner import web_readiness_deployment
 from quality_runner.code_quality_bundles import JS_BUNDLE_DIRS
@@ -71,7 +71,7 @@ def create_web_readiness_report(
     target: dict[str, Any] = {"kind": "source", "commit": head_sha}
     route_config = web_config.get("routes")
     configured_routes = (
-        [item for item in route_config if isinstance(item, str)]
+        [item for item in cast(list[object], route_config) if isinstance(item, str)]
         if isinstance(route_config, list)
         else []
     )

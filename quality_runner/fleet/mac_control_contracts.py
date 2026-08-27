@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 MAC_CONTROL_MANIFEST_SCHEMA = "mac-control-task-manifest/v4"
 MAC_CONTROL_PREVIOUS_MANIFEST_SCHEMA = "mac-control-task-manifest/v3"
@@ -161,6 +161,7 @@ class MacControlAuditError(ValueError):
 def validate_manifest(manifest: object) -> list[str]:
     if not isinstance(manifest, dict):
         return ["manifest must be a JSON object"]
+    manifest = object_mapping(cast(object, manifest))
     errors: list[str] = []
     schema = manifest.get("schema")
     if schema not in {
@@ -174,14 +175,14 @@ def validate_manifest(manifest: object) -> list[str]:
             f"{MAC_CONTROL_PREVIOUS_MANIFEST_SCHEMA}, {MAC_CONTROL_V2_MANIFEST_SCHEMA}, "
             f"or {MAC_CONTROL_LEGACY_MANIFEST_SCHEMA}"
         )
-    applicability = _normalize_applicability(manifest.get("applicability"))
+    applicability = normalize_applicability(manifest.get("applicability"))
     if applicability is None:
         errors.append("applicability must be applicable or not_applicable")
-    if not _nonempty(manifest.get("repository_id")):
+    if not nonempty(manifest.get("repository_id")):
         errors.append("repository_id is required")
-    if not _nonempty(manifest.get("repository_name")):
+    if not nonempty(manifest.get("repository_name")):
         errors.append("repository_name is required")
-    if not _nonempty(manifest.get("applicability_reason")):
+    if not nonempty(manifest.get("applicability_reason")):
         errors.append("applicability_reason is required")
     if applicability == "not_applicable":
         if manifest.get("tasks") not in (None, []):
@@ -196,6 +197,7 @@ def validate_manifest(manifest: object) -> list[str]:
     elif not isinstance(criteria, dict):
         errors.append("criteria must be an object")
     else:
+        criteria = object_mapping(cast(object, criteria))
         for criterion in CRITERIA:
             if criteria.get(criterion) is not True:
                 errors.append(f"criteria.{criterion} must be true")
@@ -206,11 +208,13 @@ def validate_manifest(manifest: object) -> list[str]:
     if not isinstance(tasks, list) or not tasks:
         errors.append("applicable manifests must declare at least one task")
         return errors
+    tasks = cast(list[object], tasks)
     task_ids: set[str] = set()
     for index, task in enumerate(tasks):
         if not isinstance(task, dict):
             errors.append(f"tasks[{index}] must be an object")
             continue
+        task = object_mapping(cast(object, task))
         task_id = str(task.get("task_id", "")).strip()
         label = task_id or f"tasks[{index}]"
         if not task_id:
@@ -225,15 +229,15 @@ def validate_manifest(manifest: object) -> list[str]:
             "observable_postcondition",
             "navigation_strategy",
         ):
-            if not _nonempty(task.get(key)):
+            if not nonempty(task.get(key)):
                 errors.append(f"task {label} requires {key}")
         accessibility = task.get("accessibility")
         if accessibility is not None and not isinstance(accessibility, dict):
             errors.append(f"task {label} accessibility must be an object")
-        elif isinstance(accessibility, dict) and not any(
-            _nonempty(accessibility.get(key)) for key in ("identifier", "label", "role")
-        ):
-            errors.append(f"task {label} accessibility needs identifier, label, or role")
+        elif isinstance(accessibility, dict):
+            accessibility = object_mapping(cast(object, accessibility))
+            if not any(nonempty(accessibility.get(key)) for key in ("identifier", "label", "role")):
+                errors.append(f"task {label} accessibility needs identifier, label, or role")
         if schema in {
             MAC_CONTROL_MANIFEST_SCHEMA,
             MAC_CONTROL_PREVIOUS_MANIFEST_SCHEMA,
@@ -245,7 +249,7 @@ def validate_manifest(manifest: object) -> list[str]:
             if schema == MAC_CONTROL_MANIFEST_SCHEMA:
                 _validate_v4_task(task, label, errors)
             continue
-        if not _nonempty(task.get("selected_route")):
+        if not nonempty(task.get("selected_route")):
             errors.append(f"task {label} requires selected_route")
         if str(task.get("navigation_strategy", "")).strip().casefold() in {
             "sequential_tabbing",
@@ -265,12 +269,13 @@ def validate_manifest(manifest: object) -> list[str]:
         if not isinstance(eligible, list) or not eligible:
             errors.append(f"task {label} requires eligible_routes")
         else:
+            eligible = cast(list[object], eligible)
             normalized_routes = {
-                _normalize_token(item) for item in eligible if isinstance(item, str)
+                normalize_token(item) for item in eligible if isinstance(item, str)
             }
             for route in normalized_routes - set(ROUTES):
                 errors.append(f"task {label} has unsupported route {route}")
-            if _normalize_token(task.get("selected_route")) not in normalized_routes:
+            if normalize_token(task.get("selected_route")) not in normalized_routes:
                 errors.append(f"task {label} selected_route must be eligible")
     return errors
 
@@ -292,7 +297,11 @@ def normalize_token(value: object) -> str:
 
 def bool_mapping(value: object) -> dict[str, bool]:
     return (
-        {str(key): child for key, child in value.items() if isinstance(child, bool)}
+        {
+            str(key): child
+            for key, child in cast(dict[object, object], value).items()
+            if isinstance(child, bool)
+        }
         if isinstance(value, dict)
         else {}
     )
@@ -300,7 +309,9 @@ def bool_mapping(value: object) -> dict[str, bool]:
 
 def string_list(value: object) -> list[str]:
     return (
-        sorted({item for item in value if isinstance(item, str) and item.strip()})
+        sorted(
+            {item for item in cast(list[object], value) if isinstance(item, str) and item.strip()}
+        )
         if isinstance(value, list)
         else []
     )
@@ -310,7 +321,7 @@ def string_mapping(value: object) -> dict[str, str]:
     return (
         {
             str(key): child
-            for key, child in value.items()
+            for key, child in cast(dict[object, object], value).items()
             if isinstance(key, str) and isinstance(child, str)
         }
         if isinstance(value, dict)
@@ -319,33 +330,33 @@ def string_mapping(value: object) -> dict[str, str]:
 
 
 def object_mapping(value: object) -> dict[str, Any]:
-    return {str(key): child for key, child in value.items()} if isinstance(value, dict) else {}
+    return (
+        {str(key): child for key, child in cast(dict[object, object], value).items()}
+        if isinstance(value, dict)
+        else {}
+    )
 
 
 def object_list(value: object) -> list[dict[str, Any]]:
     return (
-        [object_mapping(item) for item in value if isinstance(item, dict)]
+        [
+            object_mapping(cast(object, item))
+            for item in cast(list[object], value)
+            if isinstance(item, dict)
+        ]
         if isinstance(value, list)
         else []
     )
 
 
-def _nonempty(value: object) -> bool:
-    return nonempty(value)
-
-
-def _normalize_applicability(value: object) -> str | None:
-    return normalize_applicability(value)
-
-
-def _normalize_token(value: object) -> str:
-    return normalize_token(value)
-
-
 def _require_values(
     value: object, required: tuple[str, ...], label: str, errors: list[str]
 ) -> None:
-    values = {normalize_token(item) for item in value} if isinstance(value, list) else set()
+    values: set[str] = (
+        {normalize_token(item) for item in cast(list[object], value)}
+        if isinstance(value, list)
+        else set()
+    )
     for expected in required:
         if expected not in values:
             errors.append(f"{label} is missing {expected}")
@@ -415,18 +426,22 @@ def evaluate_semantic_evidence(repository_root: Path, manifest: object) -> dict[
     return implementation(repository_root, manifest)
 
 
-def _require_accounting(
+def require_accounting(
     declared: object,
     exemptions: object,
     supported: tuple[str, ...],
     label: str,
     errors: list[str],
 ) -> None:
-    present = {_normalize_token(item) for item in declared} if isinstance(declared, list) else set()
-    exemption_map = (
+    present: set[str] = (
+        {normalize_token(item) for item in cast(list[object], declared)}
+        if isinstance(declared, list)
+        else set()
+    )
+    exemption_map: dict[str, str] = (
         {
-            _normalize_token(key): value
-            for key, value in exemptions.items()
+            normalize_token(key): value
+            for key, value in cast(dict[object, object], exemptions).items()
             if isinstance(key, str) and isinstance(value, str)
         }
         if isinstance(exemptions, dict)

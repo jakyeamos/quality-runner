@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import PurePosixPath
-from typing import Any
+from typing import Any, cast
 
 CACHE_DESIGN_CLASSES = {
     "tool_cache",
@@ -32,12 +32,14 @@ def parse_cache_design_section(value: object, warnings: list[dict[str, str]]) ->
     if not isinstance(value, dict):
         warnings.append(_warning("quality_runner.cache_design must be a table"))
         return {}
+    value = cast(dict[str, Any], value)
     paths = value.get("paths")
     if paths is None:
         return {"paths": []}
     if not isinstance(paths, list):
         warnings.append(_warning("quality_runner.cache_design.paths must be a list of tables"))
         return {"paths": []}
+    paths = cast(list[object], paths)
 
     parsed: list[dict[str, Any]] = []
     seen: set[str] = set()
@@ -46,6 +48,7 @@ def parse_cache_design_section(value: object, warnings: list[dict[str, str]]) ->
         if not isinstance(item, dict):
             warnings.append(_warning(f"{field} must be a table"))
             continue
+        item = cast(dict[str, Any], item)
         path = item.get("path")
         storage_class = item.get("class")
         lifecycle = item.get("lifecycle")

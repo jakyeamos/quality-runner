@@ -6,8 +6,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from quality_runner.code_quality_findings import _finding
-from quality_runner.code_quality_paths import _is_test_file, _verification_for_path
+from quality_runner.code_quality_findings import finding as build_finding
+from quality_runner.code_quality_paths import is_test_file, verification_for_path
 
 _DATABASE_METHODS = frozenset(
     {
@@ -75,7 +75,9 @@ def python_performance_signals(text: str) -> set[str]:
 def python_repository_performance_signals(relative_path: str, text: object) -> set[str]:
     if _is_performance_test_path(relative_path):
         return set()
-    signals = python_performance_signals(text) if isinstance(text, str) and text else set()
+    signals: set[str] = (
+        python_performance_signals(text) if isinstance(text, str) and text else set()
+    )
     path_tokens = set(re.findall(r"[a-z0-9]+", relative_path.lower()))
     if "backend" in path_tokens and path_tokens & {
         "backfill",
@@ -101,7 +103,7 @@ def python_performance_findings(
     for risk in python_performance_risks(text, lines):
         if risk.kind == "query-in-loop":
             findings.append(
-                _finding(
+                build_finding(
                     category="speed",
                     severity="observation",
                     confidence="medium",
@@ -117,13 +119,13 @@ def python_performance_findings(
                         "Per-item database access can create N+1 query growth and hold a writer or "
                         "request path longer than expected."
                     ),
-                    verification=_verification_for_path(relative_path),
+                    verification=verification_for_path(relative_path),
                     remediation_bucket="performance and batching improvements",
                 )
             )
         elif risk.kind == "blocking-call-in-async":
             findings.append(
-                _finding(
+                build_finding(
                     category="speed",
                     severity="observation",
                     confidence="medium",
@@ -139,13 +141,13 @@ def python_performance_findings(
                         "Synchronous database, network, process, or sleep work inside an async "
                         "function can block its event loop and inflate tail latency."
                     ),
-                    verification=_verification_for_path(relative_path),
+                    verification=verification_for_path(relative_path),
                     remediation_bucket="performance and concurrency improvements",
                 )
             )
         else:
             findings.append(
-                _finding(
+                build_finding(
                     category="speed",
                     severity="observation",
                     confidence="low",
@@ -161,7 +163,7 @@ def python_performance_findings(
                         "Refresh, rebuild, ingest, migration, or backfill work invoked without await "
                         "may monopolize an async lifecycle or request path."
                     ),
-                    verification=_verification_for_path(relative_path),
+                    verification=verification_for_path(relative_path),
                     remediation_bucket="performance and concurrency improvements",
                 )
             )
@@ -171,25 +173,37 @@ def python_performance_findings(
 class _PythonPerformanceVisitor(ast.NodeVisitor):
     def __init__(self, lines: list[str]) -> None:
         self._lines = lines
-        self._async_depth = 0
-        self._await_depth = 0
-        self._loop_depth = 0
+        self._async_depth: int = 0
+        self._await_depth: int = 0
+        self._loop_depth: int = 0
         self.risks: list[PythonPerformanceRisk] = []
 
     def visit_AsyncFunctionDef(self, node: ast.AsyncFunctionDef) -> None:
-        prior = (self._async_depth, self._await_depth, self._loop_depth)
+        prior: tuple[int, int, int] = (
+            self._async_depth,
+            self._await_depth,
+            self._loop_depth,
+        )
         self._async_depth, self._await_depth, self._loop_depth = 1, 0, 0
         self.generic_visit(node)
         self._async_depth, self._await_depth, self._loop_depth = prior
 
     def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
-        prior = (self._async_depth, self._await_depth, self._loop_depth)
+        prior: tuple[int, int, int] = (
+            self._async_depth,
+            self._await_depth,
+            self._loop_depth,
+        )
         self._async_depth, self._await_depth, self._loop_depth = 0, 0, 0
         self.generic_visit(node)
         self._async_depth, self._await_depth, self._loop_depth = prior
 
     def visit_Lambda(self, node: ast.Lambda) -> None:
-        prior = (self._async_depth, self._await_depth, self._loop_depth)
+        prior: tuple[int, int, int] = (
+            self._async_depth,
+            self._await_depth,
+            self._loop_depth,
+        )
         self._async_depth, self._await_depth, self._loop_depth = 0, 0, 0
         self.generic_visit(node)
         self._async_depth, self._await_depth, self._loop_depth = prior
@@ -249,7 +263,7 @@ class _PythonPerformanceVisitor(ast.NodeVisitor):
 
 def _is_performance_test_path(relative_path: str) -> bool:
     path = Path(relative_path)
-    return _is_test_file(relative_path) or "tests" in path.parts or path.name == "conftest.py"
+    return is_test_file(relative_path) or "tests" in path.parts or path.name == "conftest.py"
 
 
 def _call_name(node: ast.expr) -> str:

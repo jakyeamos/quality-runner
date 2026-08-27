@@ -51,7 +51,7 @@ def repository_projection(repository: dict[str, Any], finding: dict[str, Any]) -
                     for evidence in _objects(item.get("evidence"))
                     if evidence.get("schema") == "quality-runner-cache-design-assessment-v1"
                 ),
-                {},
+                cast(dict[str, Any], {}),
             )
             if assessment:
                 cache_design = public_cache_design_projection(assessment)
@@ -181,7 +181,7 @@ def _applicability(item: Mapping[str, Any], status: str) -> str:
 
 
 def _target_state_projection(value: object) -> dict[str, Any]:
-    state = value if isinstance(value, dict) else {}
+    state = cast(dict[str, Any], value) if isinstance(value, dict) else {}
     allowed = (
         "status",
         "reason",
@@ -209,4 +209,6 @@ def _object(value: object) -> dict[str, Any]:
 def _objects(value: object) -> list[dict[str, Any]]:
     if not isinstance(value, list):
         return []
-    return [cast(dict[str, Any], item) for item in value if isinstance(item, dict)]
+    return [
+        cast(dict[str, Any], item) for item in cast(list[object], value) if isinstance(item, dict)
+    ]
