@@ -55,6 +55,33 @@
         ".quality-runner/runs/<check-run-id>/task-check.md",
         ".github/workflows/ci.yml prevention job"
       ]
+    },
+    {
+      "id": "fleet-audit-boundary-refactor-20260827",
+      "status": "implemented",
+      "owner": "quality-runner-maintainers",
+      "affected_surfaces": ["quality-engine", "matrix-maintenance"],
+      "contracts": [
+        "fleet audit public payload imports remain available from quality_runner.fleet.audit",
+        "fleet audit artifact schemas, paths, hashes, and projections remain unchanged"
+      ],
+      "documentation": [],
+      "tests": [
+        "tests/test_code_quality_boundaries.py::test_quality_runner_source_files_stay_under_default_large_file_threshold",
+        "tests/test_fleet_audit.py",
+        "tests/test_fleet_standard_audit.py",
+        "tests/test_ci_gate_audit.py",
+        "tests/test_strict_debt.py"
+      ],
+      "evidence": [
+        "quality_runner/fleet/audit.py reduced from 582 to 427 lines by extracting artifact persistence and readback",
+        "public fleet show, replay, report, and artifact-root functions are re-exported from their existing module",
+        "reviewed no-impact reason: this is an internal responsibility split with no CLI, schema, artifact, privacy, publication, or remediation behavior change",
+        "focused regression suite: 44 passed",
+        "dogfood baseline run 20260827T195712Z-6fc8b505-task-start",
+        "fast dogfood run 20260827T200116Z-f626f92d-task-fast-check: zero advisory, zero new enforced, zero unknown, one resolved finding"
+      ],
+      "projections": []
     }
   ],
   "surfaces": [
