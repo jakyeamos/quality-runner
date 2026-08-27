@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import math
+from numbers import Real
 from pathlib import PurePosixPath
 from typing import Any
 
@@ -32,12 +34,42 @@ def parse_cache_design_section(value: object, warnings: list[dict[str, str]]) ->
     if not isinstance(value, dict):
         warnings.append(_warning("quality_runner.cache_design must be a table"))
         return {}
+    parsed_section: dict[str, Any] = {}
+    measurement_max_entries = value.get("measurement_max_entries")
+    if measurement_max_entries is not None:
+        if (
+            not isinstance(measurement_max_entries, int)
+            or isinstance(measurement_max_entries, bool)
+            or measurement_max_entries <= 0
+        ):
+            warnings.append(
+                _warning(
+                    "quality_runner.cache_design.measurement_max_entries must be a positive integer"
+                )
+            )
+        else:
+            parsed_section["measurement_max_entries"] = measurement_max_entries
+    measurement_max_seconds = value.get("measurement_max_seconds")
+    if measurement_max_seconds is not None:
+        if (
+            not isinstance(measurement_max_seconds, Real)
+            or isinstance(measurement_max_seconds, bool)
+            or not math.isfinite(float(measurement_max_seconds))
+            or measurement_max_seconds <= 0
+        ):
+            warnings.append(
+                _warning(
+                    "quality_runner.cache_design.measurement_max_seconds must be a positive finite number"
+                )
+            )
+        else:
+            parsed_section["measurement_max_seconds"] = float(measurement_max_seconds)
     paths = value.get("paths")
     if paths is None:
-        return {"paths": []}
+        return {**parsed_section, "paths": []}
     if not isinstance(paths, list):
         warnings.append(_warning("quality_runner.cache_design.paths must be a list of tables"))
-        return {"paths": []}
+        return {**parsed_section, "paths": []}
 
     parsed: list[dict[str, Any]] = []
     seen: set[str] = set()
@@ -118,7 +150,7 @@ def parse_cache_design_section(value: object, warnings: list[dict[str, str]]) ->
             }
         )
         seen.add(normalized)
-    return {"paths": parsed}
+    return {**parsed_section, "paths": parsed}
 
 
 def _literal_relative_path(value: object) -> bool:

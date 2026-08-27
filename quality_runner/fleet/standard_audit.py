@@ -15,8 +15,24 @@ from quality_runner.fleet.matrix_maintenance import assess_matrix_maintenance
 def cache_design_finding_arguments(
     *, repository: dict[str, Any], config: dict[str, Any], as_of: str
 ) -> dict[str, Any]:
+    cache_config = config.get("cache_design")
+    measurement_options: dict[str, Any] = {}
+    if isinstance(cache_config, dict):
+        max_entries = cache_config.get("measurement_max_entries")
+        if isinstance(max_entries, int) and not isinstance(max_entries, bool) and max_entries > 0:
+            measurement_options["max_entries"] = max_entries
+        max_seconds = cache_config.get("measurement_max_seconds")
+        if (
+            isinstance(max_seconds, (int, float))
+            and not isinstance(max_seconds, bool)
+            and max_seconds > 0
+        ):
+            measurement_options["max_seconds"] = float(max_seconds)
     assessment = assess_cache_design(
-        Path(str(repository["primary_path"])).expanduser().resolve(), config, as_of
+        Path(str(repository["primary_path"])).expanduser().resolve(),
+        config,
+        as_of,
+        **measurement_options,
     )
     return {
         "repository": repository,

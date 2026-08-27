@@ -105,7 +105,7 @@
       "validation": [
         "uv run pytest -q tests/test_cache_design.py tests/test_cache_limits.py tests/test_fleet_standard_audit.py tests/test_maturity_feed.py",
         "uv run --locked qr fleet audit run --all --standard cache-design --json",
-        "Verify complete audit replay and Pronto readback preserve applicable, not_applicable, unknown, stale, blocked, failed, and missing states without publishing cache paths."
+        "Verify complete audit replay and Pronto readback preserve applicable, not_applicable, unknown, stale, blocked, failed, and missing states without publishing cache paths; verify positive finite repository measurement budgets are validated and applied without enabling mutation."
       ],
       "status": "applicable"
     },

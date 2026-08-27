@@ -14,6 +14,7 @@ from quality_runner.fleet.audit import (
 )
 from quality_runner.fleet.feed import fleet_feed_payload
 from quality_runner.fleet.maturity_feed import MaturityFeedError
+from quality_runner.fleet.standard_audit import cache_design_finding_arguments
 from quality_runner.fleet.summary import build_fleet_summary
 
 AS_OF = "2026-08-13T17:00:00+00:00"
@@ -252,3 +253,37 @@ def test_cache_design_standard_emits_private_assessment_and_is_not_publishable(
     assert audit["maturity_feed"]["status"] == "not_applicable"
     with pytest.raises(MaturityFeedError, match="standard-scoped"):
         fleet_feed_payload(output_dir=Path(audit["artifact_root"]))
+
+
+def test_cache_design_finding_applies_repository_measurement_budgets(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    captured: dict[str, object] = {}
+
+    def fake_assess(root: Path, config: dict, as_of: str, **options: object) -> dict:
+        captured.update(options)
+        assert root == tmp_path
+        assert config["cache_design"]["measurement_max_seconds"] == 60.0
+        assert as_of == AS_OF
+        return {
+            "score": 2,
+            "status": "validated",
+            "applicability": "applicable",
+            "message": "Measured",
+        }
+
+    monkeypatch.setattr("quality_runner.fleet.standard_audit.assess_cache_design", fake_assess)
+
+    finding = cache_design_finding_arguments(
+        repository={"primary_path": str(tmp_path)},
+        config={
+            "cache_design": {
+                "measurement_max_entries": 250000,
+                "measurement_max_seconds": 60.0,
+            }
+        },
+        as_of=AS_OF,
+    )
+
+    assert captured == {"max_entries": 250000, "max_seconds": 60.0}
+    assert finding["status"] == "validated"
