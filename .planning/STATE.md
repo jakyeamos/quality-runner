@@ -3,7 +3,7 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: GPT-5.6 modernization
 status: complete
-last_updated: "2026-08-01T21:36:21Z"
+last_updated: "2026-08-27T15:53:08Z"
 progress:
   total_phases: 8
   completed_phases: 8
@@ -17,7 +17,7 @@ maturity_targets:
     target_max_level: 4
     status: blocked
     interim_gate: basedpyright-standard-full-package
-    observed_strict_errors: 4192
+    observed_strict_errors: 0
     promotion_requirement: occurrence-aware ratchet or zero strict diagnostics with repeatable local and CI evidence
 ---
 
@@ -92,9 +92,11 @@ they authorize repository changes.
 - Lead new CLI usage with `qr` while retaining `quality-runner` as a visible
   compatibility alias; keep legacy and advanced commands discoverable in root
   help without making them the first-run path.
-- Certify BasedPyright only for its declared package scope in standard mode.
-  Repository-wide strict mode remains a candidate because the combined fold
-  exposes 4,192 existing errors; presence in CI is not certification evidence.
+- Certify BasedPyright only for its declared package scope in standard mode
+  until the strict maturity promotion receives equivalent CI evidence. The
+  historical 4,192-diagnostic report was not reproduced against the exact-base
+  checkout: the live strict scan began at 1,198 diagnostics and the isolated
+  burndown reduced it to zero locally.
 - Treat `codex/qr-command-surface` as semantically superseded: its useful short
   `qr` command is already present, while merging its stale six-file tree would
   delete the current implementation. Preserve the ref rather than merging or
@@ -105,9 +107,8 @@ they authorize repository changes.
 - `basedpyright-strict` remains required for **4/4 type-checking maturity**.
 - The passing full-package standard BasedPyright command is the certified
   interim gate, not the terminal maturity state.
-- The last strict-mode trial reported 4,192 existing diagnostics, so strict
-  enforcement is blocked; the target must not be removed or marked complete
-  because standard mode passes.
+- The current isolated strict scan reports zero diagnostics locally; the target
+  remains blocked only until the pushed branch provides equivalent CI evidence.
 - Promotion requires a pinned, repeatable full-package strict command with
   equivalent local and CI evidence, an intentional-failure fixture, and either
   zero strict diagnostics or deterministic occurrence-level baselining that
@@ -120,9 +121,8 @@ they authorize repository changes.
 - `basedpyright-strict` remains required for **4/4 type-checking maturity**.
 - The passing full-package standard BasedPyright command is the certified
   interim gate, not the terminal maturity state.
-- The last strict-mode trial reported 4,192 existing diagnostics, so strict
-  enforcement is blocked; the target must not be removed or marked complete
-  because standard mode passes.
+- The current isolated strict scan reports zero diagnostics locally; the target
+  remains blocked only until the pushed branch provides equivalent CI evidence.
 - Promotion requires a pinned, repeatable full-package strict command with
   equivalent local and CI evidence, an intentional-failure fixture, and either
   zero strict diagnostics or deterministic occurrence-level baselining that
