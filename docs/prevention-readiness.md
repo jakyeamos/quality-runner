@@ -14,6 +14,9 @@ Prevention uses a hybrid feedback model:
 
 - Agent guidance requires a task baseline and an authoritative completion
   check, and explains how to respond to each result.
+- `qr task check --fast` provides provisional finding feedback during
+  implementation by reusing cached analysis without executing certified gates;
+  it cannot authorize release.
 - Mature repository-native checks provide faster feedback during editing.
 - QR independently verifies the exact workspace, task-relative finding delta,
   comparable coverage, policy hashes, and certified gate evidence.

@@ -2,7 +2,50 @@
   "schema_version": "change-surface-matrix/v1",
   "subject": {"kind": "repository", "id": "quality-runner"},
   "owner": "quality-runner-maintainers",
-  "last_reviewed": "2026-08-24",
+  "last_reviewed": "2026-08-26",
+  "change_records": [
+    {
+      "id": "task-feedback-loop-20260826",
+      "status": "implemented",
+      "owner": "quality-runner-maintainers",
+      "affected_surfaces": ["quality-engine", "ci-and-release", "matrix-maintenance"],
+      "contracts": [
+        "quality-runner-task-check-v0.1",
+        "quality-runner-task-record-v0.1",
+        "release_readiness predicate: no_new_enforced_findings"
+      ],
+      "documentation": [
+        "README.md",
+        "docs/cli.md",
+        "docs/agent-usage.md",
+        "docs/artifacts.md",
+        "docs/prevention-readiness.md",
+        "quality_runner/plugin/SKILL.md",
+        ".agents/context/commands.md"
+      ],
+      "tests": [
+        "tests/test_cli_task.py",
+        "tests/test_task_contract.py",
+        "tests/test_task_schemas.py"
+      ],
+      "evidence": [
+        "qr task start run 20260826T200008Z-064ba825-task-start",
+        "uv run --locked pytest -q tests/test_task_contract.py tests/test_task_schemas.py",
+        "uv run --locked ruff check quality_runner/task_contract.py quality_runner/task_prevention.py quality_runner/cli_task.py tests/test_task_contract.py tests/test_task_schemas.py tests/test_cli_task.py",
+        "uv run --locked pytest -q tests/test_cli_task.py (11 passed)",
+        "uv run --locked pytest -q (1240 passed; pre-existing large-file boundary failure in quality_runner/fleet/audit.py)",
+        "uv run --locked ruff check . and uv run --locked ruff format --check . and uv run --locked basedpyright",
+        "uv run --locked vulture quality_runner quality_evidence_contract repo_quality_certifier tests scripts --min-confidence 70",
+        "uv run --locked pip-audit, uv build, and gitleaks detect --source . --no-banner --redact",
+        "qr task check authoritative run 20260827T140434Z-ca324ac9-task-check: zero new enforced and zero unknown findings; blocked by toolchain drift and the pre-existing pytest gate failure"
+      ],
+      "projections": [
+        ".quality-runner/runs/<check-run-id>/task-check.json",
+        ".quality-runner/runs/<check-run-id>/task-check.md",
+        ".github/workflows/ci.yml prevention job"
+      ]
+    }
+  ],
   "surfaces": [
     {
       "id": "matrix-maintenance",
@@ -22,7 +65,7 @@
       "id": "quality-engine",
       "scope": "local",
       "distribution": "public_core",
-      "path": "quality_runner/, quality_evidence_contract/, repo_quality_certifier/, and public documentation",
+      "path": "quality_runner/, quality_evidence_contract/, repo_quality_certifier/, task prevention schemas, tests, and public documentation",
       "owner": "quality-runner-maintainers",
       "condition": "scan, audit-coverage, policy, finding, CLI, certification, or public documentation behavior changes",
       "operations": ["add", "change", "remove"],
@@ -34,6 +77,7 @@
         "uv run --locked pytest -q tests/test_code_quality.py::test_test_quality_findings_are_bounded_and_include_remediation_dispositions tests/test_phase1_semantics.py::test_actionability_requires_author_decision_for_test_quality_dispositions",
         "uv run --locked ruff check .",
         "uv run --locked basedpyright",
+        "uv run --locked pytest -q tests/test_cli_task.py tests/test_task_contract.py tests/test_task_schemas.py",
         "For maturity changes, verify dimension-to-capability-to-pillar aggregation, reverse producer coverage, explicit capability applicability, evidence coverage, missing capabilities, and confirmed-risk-only critical caps."
       ],
       "status": "applicable"
@@ -195,6 +239,7 @@
       "operations": ["add", "change", "remove"],
       "validation": [
         "uv run --locked pytest -q tests/test_entrypoints.py tests/test_release_boundary.py",
+        "uv run --locked pytest -q tests/test_cli_task.py tests/test_task_schemas.py",
         "uv run --locked quality-runner release-smoke --json",
         "uv build"
       ],

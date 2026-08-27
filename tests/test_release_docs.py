@@ -113,6 +113,8 @@ def test_plugin_manifest_and_citation_metadata_follow_their_release_contracts() 
     assert ".quality-runner/exports/qr-handoff.md" not in skill
     assert "qr task start /path/to/repo" in skill
     assert "qr task check /path/to/repo" in skill
+    assert "--fast" in skill
+    assert "release_readiness.eligible" in skill
     assert "not a continuous-save" in skill
     assert "editor-hook workflow" in skill
 
@@ -154,6 +156,8 @@ def test_agent_instructions_route_current_qr_surfaces() -> None:
 
     assert "plan contract prepare" in agent_usage
     assert "controller-report lint --strict" in agent_usage
+    assert "qr task check --fast" in agent_usage
+    assert "release_readiness.eligible" in agent_usage
 
 
 def test_ci_and_release_workflows_smoke_built_wheel_outcome_and_mcp_surfaces() -> None:

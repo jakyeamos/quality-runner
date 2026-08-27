@@ -32,7 +32,7 @@ jobs:
         run: uv run --locked quality-runner repo-hygiene check "$GITHUB_WORKSPACE" --json
 
   prevention:
-    name: Task prevention pilot
+    name: Task prevention pilot (authoritative evidence)
     if: github.event_name == 'pull_request'
     continue-on-error: true
     runs-on: ubuntu-latest
@@ -59,7 +59,7 @@ jobs:
       - name: Capture PR target baseline
         run: uv run --locked qr task start "$GITHUB_WORKSPACE" --task-id ci-pr --baseline-ref "${{ github.event.pull_request.base.sha }}" --json
 
-      - name: Check exact PR workspace
+      - name: Run authoritative PR task check
         run: uv run --locked qr task check "$GITHUB_WORKSPACE" --task-id ci-pr --json
 
   quality:

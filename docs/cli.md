@@ -213,8 +213,11 @@ result because a count or evidence field is missing.
 ## `quality-runner task`
 
 `task` is the preventative implementation-loop contract. It compares the exact
-post-edit workspace with a pre-edit baseline, runs only native gates that have
-been certified for preventative use, and never edits repository source.
+post-edit workspace with a pre-edit baseline, never edits repository source,
+and separates fast implementation feedback from the authoritative release
+check. The default `task check` runs native gates that have been certified for
+preventative use; `--fast` skips those gates for a lower-latency provisional
+check.
 
 Start before editing:
 
@@ -237,9 +240,21 @@ Then evaluate tracked edits, tracked deletions, and untracked non-ignored files:
 qr task check /path/to/repo --task-id feature-123 --json
 ```
 
-Run this as the authoritative completion checkpoint and after correcting a
-violation or blocker. It is not a continuous-save or editor-hook command. Use
-applicable mature native checks for faster implementation-time feedback.
+For implementation-time feedback at meaningful boundaries, use the fast mode:
+
+```bash
+qr task check /path/to/repo --task-id feature-123 --fast --json
+```
+
+Fast mode uses the same complete cached finding analysis but does not execute
+certified native gates. A fast `pass` is provisional: it never produces
+release-ready evidence. Run the default `qr task check` before completion and
+for the CI task checkpoint.
+
+The default check is the authoritative completion checkpoint and should also be
+rerun after correcting a violation or blocker. Neither mode is a continuous-save
+or editor-hook command; use applicable mature native checks when even faster
+feedback is needed.
 
 The check status and process exit code are:
 
@@ -248,6 +263,16 @@ The check status and process exit code are:
 - invalid invocation or configuration / `2`
 - `blocked` / `3`: coverage, matching, prerequisites, readiness, or workspace
   evidence is incomplete or unverifiable
+
+Fast mode uses the same status/exit mapping for finding feedback, but a fast
+`pass` remains non-release-eligible because certified gates were not executed.
+The machine-readable `release_readiness` object is the explicit release
+predicate. It is eligible only when the check is authoritative, has no new
+enforced findings, has no unknown findings or delta blockers, has complete
+comparable coverage, has unchanged evidence identity and repository identity,
+has complete promotion evidence, and has passing required certified gates.
+This is a set-based occurrence check: resolved findings do not cancel out a
+new enforced occurrence through a scalar count or net delta.
 
 Every task-check result includes a status-specific `next_action`.
 `task-check.json` is canonical; `task-check.md` is the derived human projection.

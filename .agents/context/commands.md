@@ -134,6 +134,12 @@ deploy, tag, push, call a provider, collect credentials, or execute a
 remediation action. If a dependency cache, tool, or gate is unavailable, keep
 the result visible as unknown or blocked.
 
+For task-scoped implementation feedback, capture a baseline before edits, use
+`uv run --locked qr task check /path/to/repository --task-id ID --fast --json`
+at meaningful boundaries, and run the default `qr task check` before
+completion. Fast mode skips certified native gates and is never release-ready;
+the authoritative result must report `release_readiness.eligible: true`.
+
 BasedPyright is certified over the declared package scope in standard mode.
 Repository-wide strict mode is not certified: the 0.7.0 fold exposed a large
 existing backlog when the environment branch enabled it without end-to-end
