@@ -12,24 +12,49 @@ TASK_ANALYSIS_MODE = "full"
 TASK_CACHE_MODE = "external"
 TASK_CHECK_MODE_AUTHORITATIVE = "authoritative"
 TASK_CHECK_MODE_FAST = "fast"
+TASK_RELEASE_ENFORCEMENT_ADVISORY = "advisory"
+TASK_RELEASE_ENFORCEMENT_REQUIRED = "required"
 
 
-def task_next_action(status: str, *, mode: str = TASK_CHECK_MODE_AUTHORITATIVE) -> str:
+def task_next_action(
+    status: str,
+    *,
+    mode: str = TASK_CHECK_MODE_AUTHORITATIVE,
+    enforcement: str = TASK_RELEASE_ENFORCEMENT_ADVISORY,
+) -> str:
     if mode == TASK_CHECK_MODE_FAST:
         actions = {
             "pass": (
-                "Fast Quality Runner feedback passes. Run the authoritative `qr task check` "
-                "before declaring the implementation complete."
+                "Fast Quality Runner feedback passes. Run `qr task release-check` before "
+                "declaring the implementation complete."
             ),
             "violation": (
                 "Fix every new enforced finding, or record an eligible exact-fingerprint "
-                "disposition, then rerun `qr task check --fast`; run the authoritative "
-                "`qr task check` before completion."
+                "disposition, then rerun `qr task check --fast`; run "
+                "`qr task release-check` before completion."
             ),
             "blocked": (
                 "Resolve every blocker, using `qr task rebaseline` with an explicit reason "
                 "only when the evidence contract changed, then rerun `qr task check --fast` "
-                "and the authoritative `qr task check`."
+                "and `qr task release-check`."
+            ),
+        }
+        return actions.get(status, task_next_action(status))
+    if enforcement == TASK_RELEASE_ENFORCEMENT_REQUIRED:
+        actions = {
+            "pass": (
+                "Quality Runner release evidence passes. Complete any remaining "
+                "repository-required checks before declaring the implementation complete."
+            ),
+            "violation": (
+                "Fix every new enforced finding and failed certified gate, or record an "
+                "eligible exact-fingerprint disposition, then rerun "
+                "`qr task release-check`."
+            ),
+            "blocked": (
+                "Resolve every blocker, using `qr task rebaseline` with an explicit reason "
+                "only when the evidence contract changed, then rerun "
+                "`qr task release-check`."
             ),
         }
         return actions.get(status, task_next_action(status))
@@ -96,6 +121,29 @@ def release_readiness(
     }
 
 
+def enforce_release_eligibility(
+    *,
+    decision: str,
+    enforcement: str,
+    readiness: dict[str, Any],
+    blockers: list[dict[str, str]],
+) -> tuple[str, list[dict[str, str]]]:
+    if enforcement != TASK_RELEASE_ENFORCEMENT_REQUIRED or readiness.get("eligible") is True:
+        return decision, blockers
+    if decision != "pass":
+        return decision, blockers
+    return (
+        "blocked",
+        [
+            *blockers,
+            {
+                "code": "release_readiness_ineligible",
+                "message": "release-check requires every release readiness criterion to pass",
+            },
+        ],
+    )
+
+
 def contract_hashes(repo_root: Path, config: dict[str, Any]) -> dict[str, str]:
     config_path = repo_root / CONFIG_FILE_NAME
     config_content = config_path.read_bytes() if config_path.is_file() else b"<absent>"
@@ -150,6 +198,7 @@ def render_task_check_markdown(payload: dict[str, Any]) -> str:
         "",
         f"- Status: **{payload['status']}**",
         f"- Mode: **{payload['mode']}**",
+        f"- Release enforcement: **{payload['release_enforcement']}**",
         f"- Release readiness: **{readiness['status']}**",
         f"- Baseline: `{payload['baseline_run_id']}`",
         f"- Check run: `{payload['run_id']}`",

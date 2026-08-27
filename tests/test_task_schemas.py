@@ -43,8 +43,19 @@ def test_task_check_schema_supports_all_cli_outcomes_and_canonical_evidence() ->
         "gate_results",
         "blockers",
         "mode",
+        "release_enforcement",
         "release_readiness",
         "next_action",
         "analysis",
         "evidence",
     } <= set(payload["properties"])
+
+
+def test_task_record_schema_tracks_release_enforcement() -> None:
+    schema_root = Path(schema_constants.__file__).parent / "schemas"
+    payload = json.loads((schema_root / "task-record.schema.json").read_text(encoding="utf-8"))
+
+    assert set(payload["properties"]["last_release_enforcement"]["enum"]) == {
+        "advisory",
+        "required",
+    }

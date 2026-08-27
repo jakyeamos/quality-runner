@@ -8,6 +8,7 @@
     "schema": { "const": "quality-runner-task-check-v0.1" },
     "status": { "enum": ["pass", "violation", "blocked", "invalid"] },
     "mode": { "enum": ["authoritative", "fast"] },
+    "release_enforcement": { "enum": ["advisory", "required"] },
     "next_action": { "type": "string", "minLength": 1 },
     "task_id": { "type": "string" },
     "run_id": { "type": "string" },

@@ -45,6 +45,59 @@ def test_candidate_gate_remains_advisory(tmp_path: Path) -> None:
     assert readiness["gates"][0]["state"] == "candidate"
 
 
+def test_repo_local_toolchain_identity_is_stable_across_worktrees(tmp_path: Path) -> None:
+    first_root = tmp_path / "first"
+    second_root = tmp_path / "second"
+
+    assert task_readiness._portable_command_path(
+        first_root, first_root / ".venv/bin/pytest"
+    ) == task_readiness._portable_command_path(second_root, second_root / ".venv/bin/pytest")
+
+
+def test_readiness_hash_is_stable_for_equivalent_worktrees(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def fake_gate(
+        *,
+        repo_root: Path,
+        configured: dict[str, object],
+        global_environment_paths: object,
+    ) -> dict[str, object]:
+        del configured, global_environment_paths
+        return {
+            "id": "pytest",
+            "command_path": str(repo_root / ".venv/bin/pytest"),
+            "command_version": "pytest 9.0.2",
+            "state": "certified",
+        }
+
+    monkeypatch.setattr(task_readiness, "_evaluate_gate", fake_gate)
+
+    first = evaluate_readiness(
+        repo_root=tmp_path / "first",
+        prevention={"gates": [{"id": "pytest"}]},
+    )
+    second = evaluate_readiness(
+        repo_root=tmp_path / "second",
+        prevention={"gates": [{"id": "pytest"}]},
+    )
+
+    assert first["toolchain_hash"] == second["toolchain_hash"]
+
+
+def test_toolchain_identity_preserves_relative_and_external_path_differences(
+    tmp_path: Path,
+) -> None:
+    repo_root = tmp_path / "repo"
+
+    assert task_readiness._portable_command_path(
+        repo_root, repo_root / ".venv/bin/pytest"
+    ) != task_readiness._portable_command_path(repo_root, repo_root / "tools/pytest")
+    assert task_readiness._portable_command_path(repo_root, "/usr/bin/python3") != (
+        task_readiness._portable_command_path(repo_root, "/opt/homebrew/bin/python3")
+    )
+
+
 def test_declared_unavailable_gate_preserves_evidence(tmp_path: Path) -> None:
     readiness = evaluate_readiness(
         repo_root=tmp_path,

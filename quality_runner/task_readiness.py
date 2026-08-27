@@ -46,7 +46,7 @@ def evaluate_readiness(
     toolchain = [
         {
             "id": item["id"],
-            "command_path": item.get("command_path"),
+            "command_path": _portable_command_path(repo_root, item.get("command_path")),
             "command_version": item.get("command_version"),
             "state": item["state"],
         }
@@ -61,6 +61,18 @@ def evaluate_readiness(
         },
         "toolchain_hash": _hash_payload(toolchain),
     }
+
+
+def _portable_command_path(repo_root: Path, value: object) -> str | None:
+    if not isinstance(value, (str, os.PathLike)) or not value:
+        return None
+    root = Path(os.path.abspath(repo_root))
+    command_path = Path(os.path.abspath(Path(value).expanduser()))
+    try:
+        relative = command_path.relative_to(root)
+    except ValueError:
+        return str(command_path)
+    return "{repo}/" + relative.as_posix()
 
 
 def run_certified_gates(

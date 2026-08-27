@@ -38,6 +38,12 @@ def add_task_commands(subparsers: Any) -> None:
         ),
     )
 
+    release_check = actions.add_parser(
+        "release-check",
+        help="Run the authoritative check and fail unless release readiness is eligible",
+    )
+    _common_arguments(release_check)
+
     rebaseline = actions.add_parser(
         "rebaseline",
         help="Capture a new baseline while preserving task lineage",

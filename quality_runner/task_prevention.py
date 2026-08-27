@@ -15,7 +15,6 @@ from quality_runner.artifacts import (
     safe_child_file,
     validate_path_segment,
     write_json,
-    write_text,
 )
 from quality_runner.config import CONFIG_FILE_NAME, load_repo_config
 from quality_runner.core.audit_contracts import AuditRequest
@@ -24,16 +23,20 @@ from quality_runner.schema_constants import (
     TASK_CHECK_SCHEMA,
     TASK_RECORD_SCHEMA,
 )
+from quality_runner.task_check_projection import (
+    analysis_evidence,
+    finalize_task_check,
+    required_readiness_blockers,
+)
 from quality_runner.task_contract import (
     TASK_ANALYSIS_MODE,
     TASK_CACHE_MODE,
     TASK_CHECK_MODE_AUTHORITATIVE,
     TASK_CHECK_MODE_FAST,
+    TASK_RELEASE_ENFORCEMENT_ADVISORY,
+    TASK_RELEASE_ENFORCEMENT_REQUIRED,
     contract_hashes,
-    deduplicate_blockers,
     drift_blockers,
-    release_readiness,
-    render_task_check_markdown,
     task_next_action,
 )
 from quality_runner.task_findings import (
@@ -43,7 +46,6 @@ from quality_runner.task_findings import (
 )
 from quality_runner.task_readiness import (
     evaluate_readiness,
-    required_gate_failures,
     run_certified_gates,
 )
 from quality_runner.task_snapshot import (
@@ -70,6 +72,12 @@ def task_command_payload(args: Any) -> dict[str, Any]:
                 repo_root,
                 task_id=args.task_id,
                 fast=bool(getattr(args, "fast", False)),
+            )
+        if args.task_action == "release-check":
+            return check_task(
+                repo_root,
+                task_id=args.task_id,
+                require_release=True,
             )
         if args.task_action == "rebaseline":
             return rebaseline_task(repo_root, task_id=args.task_id, reason=args.reason)
@@ -176,7 +184,15 @@ def rebaseline_task(repo_root: Path, *, task_id: str, reason: str) -> dict[str, 
     }
 
 
-def check_task(repo_root: Path, *, task_id: str, fast: bool = False) -> dict[str, Any]:
+def check_task(
+    repo_root: Path,
+    *,
+    task_id: str,
+    fast: bool = False,
+    require_release: bool = False,
+) -> dict[str, Any]:
+    if fast and require_release:
+        raise ValueError("release-check cannot use fast evidence")
     _validate_task_id(task_id)
     record = _load_task_record(repo_root, task_id)
     baseline_run_id = str(record["baseline_run_id"])
@@ -186,7 +202,12 @@ def check_task(repo_root: Path, *, task_id: str, fast: bool = False) -> dict[str
         return _invalid_config(config)
     prevention = _prevention(config)
     check_mode = TASK_CHECK_MODE_FAST if fast else TASK_CHECK_MODE_AUTHORITATIVE
-    run_suffix = "task-fast-check" if fast else "task-check"
+    release_enforcement = (
+        TASK_RELEASE_ENFORCEMENT_REQUIRED if require_release else TASK_RELEASE_ENFORCEMENT_ADVISORY
+    )
+    run_suffix = (
+        "task-fast-check" if fast else "task-release-check" if require_release else "task-check"
+    )
     run_id = f"{generated_run_id()}-{run_suffix}"
     run_dir = prepare_artifact_dir(repo_root, run_id)
 
@@ -244,68 +265,39 @@ def check_task(repo_root: Path, *, task_id: str, fast: bool = False) -> dict[str
     repository_blockers = _repository_blockers(baseline, snapshot)
     contract_blockers = drift_blockers(baseline, repo_root, config, readiness)
     promotion_blockers = promotion_issues(prevention)
-    delta_blockers = cast(list[dict[str, str]], delta["blockers"])
-    readiness_blockers = _required_readiness_blockers(readiness)
-    blockers = [
-        *repository_blockers,
-        *contract_blockers,
-        *promotion_blockers,
-        *delta_blockers,
-        *gate_blockers,
-        *readiness_blockers,
-    ]
-    failures = required_gate_failures(gate_results)
-    decision = (
-        "blocked"
-        if blockers
-        else "violation"
-        if delta["counts"]["new_enforced"] or failures
-        else "pass"
-    )
-    readiness_evidence = release_readiness(
-        mode=check_mode,
+    readiness_blockers = required_readiness_blockers(readiness)
+    payload = finalize_task_check(
+        repo_root=repo_root,
+        config=config,
+        run_dir=run_dir,
+        task_id=task_id,
+        run_id=run_id,
+        baseline_run_id=baseline_run_id,
+        check_mode=check_mode,
+        release_enforcement=release_enforcement,
+        snapshot=snapshot,
+        changed_paths=changed,
+        findings=findings,
         delta=delta,
+        readiness=readiness,
+        gate_results=gate_results,
         repository_blockers=repository_blockers,
         contract_blockers=contract_blockers,
         promotion_blockers=promotion_blockers,
         gate_blockers=gate_blockers,
         readiness_blockers=readiness_blockers,
-        required_gate_failures=failures,
+        analysis_evidence=analysis_evidence(analysis),
     )
-    payload = {
-        "schema": TASK_CHECK_SCHEMA,
-        "status": decision,
-        "next_action": task_next_action(decision, mode=check_mode),
-        "mode": check_mode,
-        "task_id": task_id,
-        "run_id": run_id,
-        "baseline_run_id": baseline_run_id,
-        "repository": snapshot["repository"],
-        "snapshot": snapshot,
-        "changed_paths": changed,
-        "coverage": findings["coverage"],
-        "normalized_findings": findings,
-        "delta": delta,
-        "prevention_readiness": readiness,
-        "gate_results": gate_results,
-        "required_gate_failures": failures,
-        "blockers": deduplicate_blockers(blockers),
-        "release_readiness": readiness_evidence,
-        "analysis": _analysis_evidence(analysis),
-        "evidence": {
-            **contract_hashes(repo_root, config),
-            "toolchain_hash": readiness["toolchain_hash"],
-            "task_analysis_mode": TASK_ANALYSIS_MODE,
-            "task_cache_mode": TASK_CACHE_MODE,
-        },
-    }
-    write_json(safe_child_file(run_dir, "workspace-snapshot.json"), snapshot)
-    write_json(safe_child_file(run_dir, "normalized-findings.json"), findings)
-    write_json(safe_child_file(run_dir, "prevention-readiness.json"), readiness)
-    write_json(safe_child_file(run_dir, "task-check.json"), payload)
-    write_text(safe_child_file(run_dir, "task-check.md"), render_task_check_markdown(payload))
+    decision = str(payload["status"])
     checks = [*cast(list[str], record.get("checks", [])), run_id]
-    record.update({"checks": checks, "last_status": decision, "last_check_mode": check_mode})
+    record.update(
+        {
+            "checks": checks,
+            "last_status": decision,
+            "last_check_mode": check_mode,
+            "last_release_enforcement": release_enforcement,
+        }
+    )
     _write_task_record(repo_root, task_id, record)
     return payload
 
@@ -362,7 +354,7 @@ def _capture_baseline(
         "normalized_findings": findings,
         "coverage": findings["coverage"],
         "prevention_readiness": readiness,
-        "analysis": _analysis_evidence(analysis),
+        "analysis": analysis_evidence(analysis),
         "evidence": evidence,
         "intent": intent,
         "reason": reason,
@@ -400,33 +392,6 @@ def _analyze(
         cache_context_identity=snapshot_digest,
     )
     return analyze_read_only_audit(request)
-
-
-def _analysis_evidence(analysis: Any) -> dict[str, Any]:
-    scan = cast(dict[str, Any], analysis.scan)
-    return {
-        "analysis_mode": TASK_ANALYSIS_MODE,
-        "cache_mode": TASK_CACHE_MODE,
-        "performance": analysis.performance,
-        "cache_summary": scan.get("cache_summary"),
-    }
-
-
-def _required_readiness_blockers(readiness: dict[str, Any]) -> list[dict[str, str]]:
-    blockers: list[dict[str, str]] = []
-    for gate in cast(list[Any], readiness.get("gates", [])):
-        if isinstance(gate, dict):
-            typed_gate = cast(dict[str, Any], gate)
-        else:
-            continue
-        if typed_gate.get("required") is True and typed_gate.get("state") != "certified":
-            blockers.append(
-                {
-                    "code": "required_gate_not_ready",
-                    "message": f"required gate {typed_gate.get('id')} is {typed_gate.get('state')}",
-                }
-            )
-    return blockers
 
 
 def _prevention(config: dict[str, Any]) -> dict[str, Any]:
