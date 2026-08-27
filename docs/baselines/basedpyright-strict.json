@@ -1,11 +1,11 @@
 {
   "baseline_reason": "strict BasedPyright burndown completed at zero diagnostics",
-  "baseline_ref": "585891e2e6e8116c9774b8c3afb99d1f39140e0d",
+  "baseline_ref": "787d727a53650108c68f38c9e37d2ee991700b66",
   "config_path": "pyrightconfig.strict.json",
   "config_sha256": "df2c47811d8e65b915dc44955f29b51c82cf3de25b6d7e4a76c8d4e560b20060",
   "coverage": {
     "diagnostics_reported": 0,
-    "files_analyzed": 289,
+    "files_analyzed": 388,
     "state": "complete"
   },
   "occurrences": [],
@@ -13,7 +13,7 @@
   "schema": "quality-runner-basedpyright-strict-baseline-v0.1",
   "summary": {
     "errors": 0,
-    "files_analyzed": 289,
+    "files_analyzed": 388,
     "information": 0,
     "warnings": 0
   },
