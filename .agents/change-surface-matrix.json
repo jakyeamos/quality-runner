@@ -25,7 +25,8 @@
         "tests/test_fleet_audit.py",
         "tests/test_fleet_standard_audit.py",
         "tests/test_ci_gate_audit.py",
-        "tests/test_strict_debt.py"
+        "tests/test_strict_debt.py",
+        "tests/test_progress.py::test_progress_reporter_emits_phases_heartbeats_and_completion"
       ],
       "evidence": [
         "uv run --locked basedpyright --project pyrightconfig.strict.json: 0 errors, 0 warnings, 0 notes",
