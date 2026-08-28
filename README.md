@@ -491,8 +491,8 @@ See
 
 Codex can automate this contract for every repository enrolled with
 `.quality-runner.toml`. Install the lifecycle command as a global
-`SessionStart`, `UserPromptSubmit`, `PreToolUse`, and `Stop` hook. The first
-three events idempotently capture a session baseline; `Stop` allows unchanged
+`SessionStart`, `UserPromptSubmit`, and `Stop` hook. The first two events
+idempotently capture a session baseline; `Stop` allows unchanged
 work without an expensive scan and otherwise requires an eligible authoritative
 release check. The hook ignores repositories that are not enrolled.
 

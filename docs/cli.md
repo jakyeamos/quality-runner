@@ -324,8 +324,8 @@ qr dogfood report --json
 ```
 
 `codex-hook` reads one Codex hook JSON object from standard input. In a Git
-repository containing `.quality-runner.toml`, `SessionStart`,
-`UserPromptSubmit`, and `PreToolUse` idempotently create a task baseline keyed
+repository containing `.quality-runner.toml`, `SessionStart` and
+`UserPromptSubmit` idempotently create a task baseline keyed
 to the Codex session. `Stop` returns immediately for an unchanged workspace,
 reuses matching eligible release evidence, or runs an authoritative release
 check and returns `decision: block` when the task is not release-ready.

@@ -144,8 +144,8 @@ release-ready; release-check fails unless
 `release_readiness.eligible: true`.
 
 For the global Codex adapter, configure the installed `qr dogfood codex-hook
---json` command for `SessionStart`, `UserPromptSubmit`, `PreToolUse`, and
-`Stop`. It is inert outside Git repositories enrolled with
+--json` command for `SessionStart`, `UserPromptSubmit`, and `Stop`. It is inert
+outside Git repositories enrolled with
 `.quality-runner.toml`. Validate positive baseline capture, an unchanged Stop,
 a changed eligible Stop, and a changed blocked Stop before broad use. The local
 report must preserve pseudonymous identifiers and exclude prompts, source

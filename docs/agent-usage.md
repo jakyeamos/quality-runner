@@ -87,11 +87,16 @@ drive the agent, install prerequisites, commit, or push.
 
 The global Codex adapter can make the same protocol automatic for enrolled
 repositories. Configure `qr dogfood codex-hook --json` for `SessionStart`,
-`UserPromptSubmit`, `PreToolUse`, and `Stop`. The adapter derives a
+`UserPromptSubmit`, and `Stop`. The adapter derives a
 pseudonymous task ID from the Codex session, starts at most one baseline, skips
 the release scan when the workspace is unchanged, reuses exact matching
 eligible release evidence, and otherwise blocks task completion until the
 authoritative release check is eligible.
+
+The adapter accepts `PreToolUse` as an idempotent compatibility event, but the
+global default omits it: `SessionStart` and `UserPromptSubmit` already establish
+the baseline, while a process launch before every tool call would lengthen the
+feedback loop for enrolled and unenrolled work.
 
 Keep the global instruction declarative: agents must use the QR baseline and
 non-positive finding delta, but QR's executable hook remains the enforcement

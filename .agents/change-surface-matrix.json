@@ -39,7 +39,8 @@
         "existing task CLI regression suite: 14 passed",
         "canonical full suite: 1256 passed",
         "ruff, formatter, BasedPyright, Vulture, environment contract, package build, dependency audit, and gitleaks passed",
-        "fresh-context global hook and final quality-gate evidence pending"
+        "installed hook smoke: baseline passed, unchanged Stop returned in 0.539 seconds, and a changed policy file produced an authoritative blocked Stop",
+        "fresh ephemeral Codex positive, negative, and unchanged-boundary policy scenarios passed"
       ],
       "projections": [
         "installed qr dogfood command",

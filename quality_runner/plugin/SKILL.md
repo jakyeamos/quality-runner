@@ -87,7 +87,7 @@ rule or a faster native checker with its own maturity evidence.
 
 When Codex has the global lifecycle adapter installed, do not create a second
 manual baseline for the same session. `qr dogfood codex-hook --json` handles
-`SessionStart`, `UserPromptSubmit`, `PreToolUse`, and `Stop` for repositories
+`SessionStart`, `UserPromptSubmit`, and `Stop` for repositories
 that contain `.quality-runner.toml`; it ignores unenrolled repositories. The
 Stop path skips unchanged work and otherwise enforces an exact matching
 authoritative release check. Use `qr dogfood report --json` to inspect local,
