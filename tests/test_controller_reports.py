@@ -3,6 +3,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
+
 
 def test_controller_report_validation_rejects_completed_dirty_worktree() -> None:
     from quality_runner.controller_reports import validate_controller_report
@@ -173,11 +175,18 @@ def test_controller_report_strict_lint_rejects_complete_without_task_commit() ->
     assert "complete reports must set commit_created_by_task true" in result["errors"]
 
 
-def test_controller_report_from_summary_builds_valid_blocked_report() -> None:
+def test_controller_report_from_summary_builds_valid_blocked_report(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     from quality_runner.controller_reports import (
         build_controller_report_from_summary,
         validate_controller_report,
     )
+
+    external_cache_root = tmp_path / "external"
+    monkeypatch.setenv("QUALITY_RUNNER_CACHE_DIR", str(external_cache_root))
+    monkeypatch.delenv("UV_CACHE_DIR", raising=False)
+    monkeypatch.delenv("XDG_CACHE_HOME", raising=False)
 
     report = build_controller_report_from_summary(
         repo_path="/repos/example",
@@ -222,9 +231,7 @@ def test_controller_report_from_summary_builds_valid_blocked_report() -> None:
     assert report["ignored_generated_artifacts"] == [".quality-runner/"]
     assert report["controller_status_recommendation"]["status"] == "blocked"
     assert report["controller_command_environment"] == {
-        "UV_CACHE_DIR": str(
-            Path.home() / "Library" / "Caches" / "quality-runner" / "shared-tools" / "uv-v1"
-        ),
+        "UV_CACHE_DIR": str(external_cache_root / "shared-tools" / "uv-v1"),
         "XDG_CACHE_HOME": "/repos/example/.quality-runner/cache/xdg",
     }
     assert report["blockers"] == [

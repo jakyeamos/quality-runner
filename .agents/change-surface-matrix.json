@@ -2,7 +2,39 @@
   "schema_version": "change-surface-matrix/v1",
   "subject": {"kind": "repository", "id": "quality-runner"},
   "owner": "quality-runner-maintainers",
-  "last_reviewed": "2026-08-24",
+  "last_reviewed": "2026-08-28",
+  "change_records": [
+    {
+      "id": "strict-zero-ci-gates-20260828",
+      "status": "implemented",
+      "owner": "quality-runner-maintainers",
+      "affected_surfaces": ["quality-engine", "ci-and-release", "matrix-maintenance"],
+      "contracts": [
+        "strict BasedPyright diagnostics remain at zero for the declared package scope",
+        "fleet audit public payload imports, artifact paths, schemas, hashes, and projections remain compatible",
+        "cache-path assertions are hermetic to the test environment and do not alter production cache inheritance"
+      ],
+      "documentation": [],
+      "tests": [
+        "tests/test_code_quality_boundaries.py::test_quality_runner_source_files_stay_under_default_large_file_threshold",
+        "tests/test_process_runner.py",
+        "tests/test_workflow_gate_preflight.py::test_verify_gate_kills_process_group_when_workflow_timeout_interrupts",
+        "tests/test_controller_reports.py::test_controller_report_from_summary_builds_valid_blocked_report",
+        "tests/test_fleet_audit.py",
+        "tests/test_fleet_standard_audit.py",
+        "tests/test_ci_gate_audit.py",
+        "tests/test_strict_debt.py"
+      ],
+      "evidence": [
+        "uv run --locked basedpyright --project pyrightconfig.strict.json: 0 errors, 0 warnings, 0 notes",
+        "uv run --locked pytest -q: 1241 passed",
+        "fleet audit artifact persistence and custody coverage helpers were split into focused modules without changing the existing audit import surface",
+        "simulated CI ambient UV_CACHE_DIR and QUALITY_RUNNER_CACHE_DIR assertions pass after test isolation",
+        "reviewed no-impact reason: cache environment setup is test-only and the fleet splits preserve public payload and artifact contracts"
+      ],
+      "projections": []
+    }
+  ],
   "surfaces": [
     {
       "id": "matrix-maintenance",
