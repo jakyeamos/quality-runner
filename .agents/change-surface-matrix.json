@@ -14,7 +14,9 @@
         "fleet audit public payload imports, artifact paths, schemas, hashes, and projections remain compatible",
         "cache-path assertions are hermetic to the test environment and do not alter production cache inheritance"
       ],
-      "documentation": [],
+      "documentation": [
+        ".planning/STATE.md"
+      ],
       "tests": [
         "tests/test_code_quality_boundaries.py::test_quality_runner_source_files_stay_under_default_large_file_threshold",
         "tests/test_process_runner.py",
@@ -27,7 +29,8 @@
       ],
       "evidence": [
         "uv run --locked basedpyright --project pyrightconfig.strict.json: 0 errors, 0 warnings, 0 notes",
-        "uv run --locked pytest -q: 1241 passed",
+        "uv run --locked pytest -q: 1245 passed",
+        "strict baseline delta: new=0 persisted=0 resolved=0 unknown=0",
         "fleet audit artifact persistence and custody coverage helpers were split into focused modules without changing the existing audit import surface",
         "simulated CI ambient UV_CACHE_DIR and QUALITY_RUNNER_CACHE_DIR assertions pass after test isolation",
         "reviewed no-impact reason: cache environment setup is test-only and the fleet splits preserve public payload and artifact contracts"

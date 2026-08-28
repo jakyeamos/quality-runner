@@ -3,7 +3,7 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: GPT-5.6 modernization
 status: complete
-last_updated: "2026-08-27T15:53:08Z"
+last_updated: "2026-08-28T21:24:15Z"
 progress:
   total_phases: 8
   completed_phases: 8
@@ -15,10 +15,10 @@ maturity_targets:
     dimension: typechecking
     target_level: 4
     target_max_level: 4
-    status: blocked
+    status: complete
     interim_gate: basedpyright-standard-full-package
     observed_strict_errors: 0
-    promotion_requirement: occurrence-aware ratchet or zero strict diagnostics with repeatable local and CI evidence
+    promotion_requirement: satisfied by zero strict diagnostics with repeatable local and CI evidence
 ---
 
 # Planning State
@@ -92,53 +92,45 @@ they authorize repository changes.
 - Lead new CLI usage with `qr` while retaining `quality-runner` as a visible
   compatibility alias; keep legacy and advanced commands discoverable in root
   help without making them the first-run path.
-- Certify BasedPyright only for its declared package scope in standard mode
-  until the strict maturity promotion receives equivalent CI evidence. The
-  historical 4,192-diagnostic report was not reproduced against the exact-base
-  checkout: the live strict scan began at 1,198 diagnostics and the isolated
-  burndown reduced it to zero locally.
+- Certify BasedPyright for its declared package scope in both standard and
+  strict mode. Strict maturity promotion is supported by equivalent local and
+  hosted CI evidence. The historical 4,192-diagnostic report was not reproduced
+  against the exact-base checkout: the live strict scan began at 1,198
+  diagnostics and the isolated burndown reduced it to zero.
 - Treat `codex/qr-command-surface` as semantically superseded: its useful short
   `qr` command is already present, while merging its stale six-file tree would
   delete the current implementation. Preserve the ref rather than merging or
   pruning it during this fold.
 
-## Outstanding Maturity Target
+## Completed Maturity Target
 
-- `basedpyright-strict` remains required for **4/4 type-checking maturity**.
-- The passing full-package standard BasedPyright command is the certified
-  interim gate, not the terminal maturity state.
-- The current isolated strict scan reports zero diagnostics locally; the target
-  remains blocked only until the pushed branch provides equivalent CI evidence.
-- Promotion requires a pinned, repeatable full-package strict command with
-  equivalent local and CI evidence, an intentional-failure fixture, and either
-  zero strict diagnostics or deterministic occurrence-level baselining that
-  blocks new diagnostics without treating persisted legacy debt as new.
-- Reassess this target after the `0.7.0` fold and before any claim that
-  type-checking has reached 4/4 maturity.
-
-## Outstanding Maturity Target
-
-- `basedpyright-strict` remains required for **4/4 type-checking maturity**.
-- The passing full-package standard BasedPyright command is the certified
-  interim gate, not the terminal maturity state.
-- The current isolated strict scan reports zero diagnostics locally; the target
-  remains blocked only until the pushed branch provides equivalent CI evidence.
-- Promotion requires a pinned, repeatable full-package strict command with
-  equivalent local and CI evidence, an intentional-failure fixture, and either
-  zero strict diagnostics or deterministic occurrence-level baselining that
-  blocks new diagnostics without treating persisted legacy debt as new.
-- Reassess this target after the `0.7.0` fold and before any claim that
-  type-checking has reached 4/4 maturity.
+- `basedpyright-strict` reached **4/4 type-checking maturity**.
+- The pinned command is `uv run --locked basedpyright --project
+  pyrightconfig.strict.json`; it reports zero errors, warnings, and notes
+  locally, with a zero strict-baseline delta.
+- The intentional-failure fixture and occurrence-aware baseline checks remain
+  in `tests/test_strict_debt.py`.
+- Hosted CI run `33211556277` passed all quality and release-boundary jobs for
+  commit `ca1b21f3264a504407248c6f231e2759900c2e3f`, providing the equivalent
+  CI evidence required for promotion.
+- The historical 4,192-diagnostic report is retained as historical context only;
+  it is not current strict debt.
 
 ## Next Step
 
-Commit the evidence-backed gate fixes and reconciled release truth, dogfood
-`qr task` on the exact candidate, then publish `codex/main-fold-v0-7-0` for
-exact-head CI and review. Keep the `v0.7.0` tag and PyPI publication separate
-until the candidate is reviewed and promoted to canonical `main`.
+Merge PR #18 (`codex/strict-zero-pr-reconciliation`) into canonical `dev` after
+review so the strict-zero implementation, release-boundary fix, and completed
+maturity state become authoritative there. Keep the `v0.7.0` tag and PyPI
+publication separate until the candidate is reviewed and promoted through the
+documented release lane.
 
 ## Recent Progress
 
+- 2026-08-28: `ca1b21f` completes the strict BasedPyright maturity promotion:
+  the pinned local command reports zero diagnostics, the strict baseline delta
+  is zero, the full suite passes 1,245 tests, the release boundary passes, and
+  hosted CI run `33211556277` passes all eight jobs. The planning target is now
+  recorded as complete; PR #18 remains open for canonical `dev` integration.
 - 2026-08-01: The isolated `codex/main-fold-v0-7-0` candidate folds all
   semantically eligible branch tips through `189cbb7`. The ordinary suite
   passes 860 tests in 915.22 seconds and the LCOV-instrumented suite passes the
