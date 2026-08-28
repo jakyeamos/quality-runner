@@ -63,8 +63,11 @@ choosing a new version; never reuse a tag, including `v0.5.0` or `v0.5.1`.
    clean-room check is release-blocking.
    The command also writes `.quality-runner/release-boundary.json`. Treat that
    v2 receipt as the handoff to release consumers: it is bound to the exact Git
-   branch and commit, the change-matrix digest, and the built artifact digests,
-   and it contains no absolute repository path. Regenerate it after any source,
+   branch/ref and commit, the change-matrix digest, and the built artifact
+   digests, and it contains no absolute repository path. On detached CI
+   checkouts, `release-boundary` derives the branch/ref only from an
+   unambiguous local Git ref pointing at `HEAD`; a missing or ambiguous ref
+   remains release-blocking. Regenerate it after any source,
    policy, or artifact change.
 
 2. Run a self-audit and review its capability findings, default structural

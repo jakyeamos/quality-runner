@@ -118,6 +118,11 @@ def _write_archives(dist: Path, *, extra_wheel_path: str | None = None) -> None:
             archive.addfile(info, io.BytesIO(content))
 
 
+def _detach_without_local_branch(root: Path) -> None:
+    subprocess.run(["git", "checkout", "--detach", "-q"], cwd=root, check=True)
+    subprocess.run(["git", "update-ref", "-d", "refs/heads/main"], cwd=root, check=True)
+
+
 def test_release_boundary_passes_classified_sanitized_artifacts(
     tmp_path: Path, monkeypatch
 ) -> None:
@@ -146,6 +151,102 @@ def test_release_boundary_passes_classified_sanitized_artifacts(
     }
     assert all(len(artifact["sha256"]) == 64 for artifact in payload["artifacts"])
     assert str(tmp_path) not in json.dumps(payload)
+
+
+def test_release_boundary_discovers_detached_pull_ref_from_git(tmp_path: Path, monkeypatch) -> None:
+    _write_repository(tmp_path, _policy())
+    _detach_without_local_branch(tmp_path)
+    subprocess.run(
+        ["git", "update-ref", "refs/remotes/pull/42/merge", "HEAD"],
+        cwd=tmp_path,
+        check=True,
+    )
+    dist = tmp_path / "dist"
+    _write_archives(dist)
+    monkeypatch.setattr(
+        "quality_runner.release_boundary._clean_room_install_check",
+        lambda _wheel: {"id": "clean_room_install", "status": "passed"},
+    )
+
+    payload = release_boundary_payload(repo_root=tmp_path, dist_dir=dist)
+
+    assert payload["status"] == "passed"
+    assert payload["repository"]["branch"] == "pull/42/merge"
+    assert len(payload["repository"]["head_sha"]) == 40
+
+
+def test_release_boundary_discovers_detached_tag_ref_from_git(tmp_path: Path, monkeypatch) -> None:
+    _write_repository(tmp_path, _policy())
+    _detach_without_local_branch(tmp_path)
+    subprocess.run(
+        [
+            "git",
+            "-c",
+            "user.name=Release Boundary Tests",
+            "-c",
+            "user.email=release-boundary@example.com",
+            "tag",
+            "-a",
+            "v1.0.0",
+            "-m",
+            "release",
+            "HEAD",
+        ],
+        cwd=tmp_path,
+        check=True,
+    )
+    dist = tmp_path / "dist"
+    _write_archives(dist)
+    monkeypatch.setattr(
+        "quality_runner.release_boundary._clean_room_install_check",
+        lambda _wheel: {"id": "clean_room_install", "status": "passed"},
+    )
+
+    payload = release_boundary_payload(repo_root=tmp_path, dist_dir=dist)
+
+    assert payload["status"] == "passed"
+    assert payload["repository"]["branch"] == "tags/v1.0.0"
+
+
+def test_release_boundary_blocks_detached_commit_without_unambiguous_git_ref(
+    tmp_path: Path, monkeypatch
+) -> None:
+    _write_repository(tmp_path, _policy())
+    _detach_without_local_branch(tmp_path)
+    dist = tmp_path / "dist"
+    _write_archives(dist)
+    monkeypatch.setattr(
+        "quality_runner.release_boundary._clean_room_install_check",
+        lambda _wheel: {"id": "clean_room_install", "status": "passed"},
+    )
+
+    payload = release_boundary_payload(repo_root=tmp_path, dist_dir=dist)
+
+    provenance = next(check for check in payload["checks"] if check["id"] == "source_provenance")
+    assert payload["status"] == "blocked"
+    assert payload["repository"]["branch"] is None
+    assert len(payload["repository"]["head_sha"]) == 40
+    assert provenance["violations"] == [{"rule": "branch-unavailable", "path": "repository.branch"}]
+
+
+def test_release_boundary_blocks_detached_commit_with_ambiguous_git_refs(
+    tmp_path: Path, monkeypatch
+) -> None:
+    _write_repository(tmp_path, _policy())
+    _detach_without_local_branch(tmp_path)
+    for ref_name in ("refs/remotes/origin/one", "refs/remotes/origin/two"):
+        subprocess.run(["git", "update-ref", ref_name, "HEAD"], cwd=tmp_path, check=True)
+    dist = tmp_path / "dist"
+    _write_archives(dist)
+    monkeypatch.setattr(
+        "quality_runner.release_boundary._clean_room_install_check",
+        lambda _wheel: {"id": "clean_room_install", "status": "passed"},
+    )
+
+    payload = release_boundary_payload(repo_root=tmp_path, dist_dir=dist)
+
+    assert payload["status"] == "blocked"
+    assert payload["repository"]["branch"] is None
 
 
 def test_release_boundary_receipt_is_persisted_without_absolute_paths(

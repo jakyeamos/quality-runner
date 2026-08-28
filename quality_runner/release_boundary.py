@@ -125,10 +125,60 @@ def _git_provenance(root: Path, dist_dir: Path) -> tuple[str | None, str | None,
 
     try:
         branch = git("symbolic-ref", "--quiet", "--short", "HEAD").stdout.strip() or None
+    except (OSError, subprocess.CalledProcessError, subprocess.TimeoutExpired):
+        # CI providers commonly check out a detached commit. In that case the
+        # branch name must be recovered from an actual local Git ref below.
+        branch = None
+
+    try:
         head_sha = git("rev-parse", "--verify", "HEAD").stdout.strip() or None
         status = git("status", "--porcelain=v1", "-z", "--untracked-files=all").stdout
     except (OSError, subprocess.CalledProcessError, subprocess.TimeoutExpired):
         return None, None, 0
+
+    if branch is None and head_sha is not None:
+        try:
+            ref_output = git(
+                "for-each-ref",
+                "--format=%(refname)%00%(objectname)%00%(*objectname)",
+                "refs/heads",
+                "refs/remotes",
+                "refs/tags",
+            ).stdout
+        except (OSError, subprocess.CalledProcessError, subprocess.TimeoutExpired):
+            ref_output = ""
+
+        refs_at_head: set[str] = set()
+        for line in ref_output.splitlines():
+            parts = line.split("\0")
+            if len(parts) != 3:
+                continue
+            ref_name, object_name, peeled_object_name = parts
+            if head_sha in {object_name, peeled_object_name} and not ref_name.endswith("/HEAD"):
+                refs_at_head.add(ref_name)
+
+        def short_ref(ref_name: str) -> str:
+            for prefix in ("refs/heads/", "refs/remotes/"):
+                if ref_name.startswith(prefix):
+                    return ref_name[len(prefix) :]
+            return ref_name.removeprefix("refs/")
+
+        pull_merge_refs = sorted(
+            ref
+            for ref in refs_at_head
+            if ref.startswith("refs/remotes/pull/") and ref.endswith("/merge")
+        )
+        tag_refs = sorted(ref for ref in refs_at_head if ref.startswith("refs/tags/"))
+        local_refs = sorted(ref for ref in refs_at_head if ref.startswith("refs/heads/"))
+        if len(pull_merge_refs) == 1:
+            branch = short_ref(pull_merge_refs[0])
+        elif len(tag_refs) == 1:
+            branch = short_ref(tag_refs[0])
+        elif len(local_refs) == 1:
+            branch = short_ref(local_refs[0])
+        elif len(refs_at_head) == 1:
+            branch = short_ref(next(iter(refs_at_head)))
+
     excluded_prefixes = {DEFAULT_REPORT_PATH.as_posix()}
     try:
         relative_dist = dist_dir.expanduser().resolve().relative_to(root).as_posix().rstrip("/")

@@ -622,7 +622,8 @@ workstation/private-inventory markers; blocks tracked paths declared local-only;
 validates the wheel and sdist allowlists; verifies sanitized public-adapter
 fixtures; and installs the wheel under a temporary home with Pronto, Leverage,
 and Mac Control absent. It also writes the privacy-safe
-`.quality-runner/release-boundary.json` v2 receipt with exact Git provenance,
+`.quality-runner/release-boundary.json` v2 receipt with exact Git branch/ref and
+commit provenance,
 the matrix digest, and wheel/sdist digests for downstream release consumers.
 
 ## MCP

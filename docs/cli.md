@@ -839,7 +839,7 @@ temporary home whose executable path does not expose `pronto`, `leverage`, or
 `macctl`. The command atomically writes
 `.quality-runner/release-boundary.json` by default; `--output` selects another
 receipt path. The privacy-safe receipt uses
-`quality-runner-release-boundary/v2` and records the exact branch and commit,
+`quality-runner-release-boundary/v2` and records the exact branch/ref and commit,
 producer version, change-matrix SHA-256, wheel and sdist SHA-256 values,
 sanitized fixture hashes, and every check result without embedding the local
 repository path. A dirty release input, missing provenance, stale policy, or

@@ -33,6 +33,38 @@
         "reviewed no-impact reason: cache environment setup is test-only and the fleet splits preserve public payload and artifact contracts"
       ],
       "projections": []
+    },
+    {
+      "id": "release-boundary-detached-ref-20260828",
+      "status": "implemented",
+      "owner": "quality-runner-maintainers",
+      "affected_surfaces": [
+        "ci-and-release",
+        "matrix-maintenance"
+      ],
+      "contracts": [
+        "detached release-boundary checkouts recover branch/ref only from an unambiguous Git ref pointing at HEAD",
+        "missing or ambiguous refs remain release-blocking and head SHA is never caller supplied"
+      ],
+      "documentation": [
+        "README.md",
+        ".agents/context/commands.md",
+        "docs/artifacts.md",
+        "docs/cli.md",
+        "docs/release.md",
+        "quality_runner/plugin/SKILL.md"
+      ],
+      "tests": [
+        "tests/test_release_boundary.py::test_release_boundary_discovers_detached_pull_ref_from_git",
+        "tests/test_release_boundary.py::test_release_boundary_discovers_detached_tag_ref_from_git",
+        "tests/test_release_boundary.py::test_release_boundary_blocks_detached_commit_without_unambiguous_git_ref"
+      ],
+      "evidence": [
+        "uv run --locked pytest -q tests/test_release_boundary.py: 11 passed",
+        "detached pull and tag fixtures prove ref discovery stays within Git refs while a ref-less detached commit remains blocked",
+        "head_sha remains independently read from Git even when symbolic-ref cannot resolve HEAD"
+      ],
+      "projections": []
     }
   ],
   "surfaces": [
