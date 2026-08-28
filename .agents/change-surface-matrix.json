@@ -2,8 +2,51 @@
   "schema_version": "change-surface-matrix/v1",
   "subject": {"kind": "repository", "id": "quality-runner"},
   "owner": "quality-runner-maintainers",
-  "last_reviewed": "2026-08-27",
+  "last_reviewed": "2026-08-28",
   "change_records": [
+    {
+      "id": "automatic-task-dogfood-telemetry-20260828",
+      "status": "implemented",
+      "owner": "quality-runner-maintainers",
+      "affected_surfaces": ["quality-engine", "fleet-consumers", "matrix-maintenance"],
+      "contracts": [
+        "qr dogfood codex-hook consumes one Codex lifecycle JSON object from stdin",
+        "enrolled Codex sessions receive one idempotent task baseline and an enforced changed-workspace release check",
+        "unchanged Stop events avoid authoritative analysis",
+        "quality-runner-dogfood-capture-v0.1",
+        "quality-runner-dogfood-event-v0.1",
+        "quality-runner-dogfood-report-v0.1",
+        "telemetry excludes prompts, source paths, finding bodies, and raw task or repository identity",
+        "telemetry degradation remains visible and cannot replace or weaken task release evidence"
+      ],
+      "documentation": [
+        "README.md",
+        "docs/cli.md",
+        "docs/agent-usage.md",
+        "docs/artifacts.md",
+        "quality_runner/plugin/SKILL.md",
+        ".agents/context/commands.md"
+      ],
+      "tests": [
+        "tests/test_dogfood.py",
+        "tests/test_codex_dogfood_hook.py",
+        "tests/test_cli_task.py",
+        "tests/test_task_schemas.py"
+      ],
+      "evidence": [
+        "task baseline 20260828T195005Z-8bc40e83-task-start",
+        "focused telemetry and schema tests: 9 passed",
+        "existing task CLI regression suite: 14 passed",
+        "canonical full suite: 1256 passed",
+        "ruff, formatter, BasedPyright, Vulture, environment contract, package build, dependency audit, and gitleaks passed",
+        "fresh-context global hook and final quality-gate evidence pending"
+      ],
+      "projections": [
+        "installed qr dogfood command",
+        "global Codex lifecycle hooks",
+        "global provider-neutral agent contract and quality policy"
+      ]
+    },
     {
       "id": "task-feedback-loop-20260826",
       "status": "implemented",

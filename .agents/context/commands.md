@@ -25,6 +25,7 @@ uv run --locked qr fleet audit run --all \
 uv run --locked qr fleet audit run --all \
   --projects-root /path/to/projects \
   --standard matrix-maintenance --json
+uv run --locked qr dogfood report --json
 ```
 
 The onboarding command is read-only unless `--output` is explicit and exits
@@ -141,6 +142,14 @@ at meaningful boundaries, and run
 before completion. Fast mode skips certified native gates and is never
 release-ready; release-check fails unless
 `release_readiness.eligible: true`.
+
+For the global Codex adapter, configure the installed `qr dogfood codex-hook
+--json` command for `SessionStart`, `UserPromptSubmit`, `PreToolUse`, and
+`Stop`. It is inert outside Git repositories enrolled with
+`.quality-runner.toml`. Validate positive baseline capture, an unchanged Stop,
+a changed eligible Stop, and a changed blocked Stop before broad use. The local
+report must preserve pseudonymous identifiers and exclude prompts, source
+paths, finding bodies, and raw names.
 
 BasedPyright is certified over the declared package scope in standard mode.
 Repository-wide strict mode is not certified: the 0.7.0 fold exposed a large

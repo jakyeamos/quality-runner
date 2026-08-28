@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://quality-runner.dev/schemas/dogfood-capture.schema.json",
+  "title": "Quality Runner Dogfood Capture Result",
+  "type": "object",
+  "required": ["schema", "status", "capture_seconds"],
+  "properties": {
+    "schema": { "const": "quality-runner-dogfood-capture-v0.1" },
+    "status": { "enum": ["recorded", "duplicate", "degraded"] },
+    "event_id": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "capture_seconds": { "type": "number", "minimum": 0 },
+    "error": {
+      "type": "object",
+      "required": ["code", "message"],
+      "properties": {
+        "code": { "const": "dogfood_capture_unavailable" },
+        "message": { "type": "string" }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

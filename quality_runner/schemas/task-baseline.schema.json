@@ -23,6 +23,7 @@
     "intent": { "type": ["object", "null"] },
     "reason": { "type": ["string", "null"] },
     "supersedes": { "type": ["string", "null"] },
-    "analysis_policy_overlay": { "type": "boolean" }
+    "analysis_policy_overlay": { "type": "boolean" },
+    "dogfood_telemetry": { "$ref": "dogfood-capture.schema.json" }
   }
 }

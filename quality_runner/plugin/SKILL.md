@@ -85,6 +85,16 @@ remain visible but do not become task failures. Do not copy every QR finding int
 promote a repeatedly trusted deterministic finding into a behavior-verified QR
 rule or a faster native checker with its own maturity evidence.
 
+When Codex has the global lifecycle adapter installed, do not create a second
+manual baseline for the same session. `qr dogfood codex-hook --json` handles
+`SessionStart`, `UserPromptSubmit`, `PreToolUse`, and `Stop` for repositories
+that contain `.quality-runner.toml`; it ignores unenrolled repositories. The
+Stop path skips unchanged work and otherwise enforces an exact matching
+authoritative release check. Use `qr dogfood report --json` to inspect local,
+HMAC-pseudonymous adoption, latency, delta, gate, and cache metrics. Telemetry
+never contains prompts, source paths, finding bodies, or raw identifiers, and a
+degraded capture never substitutes for the task gate result.
+
 ## Repository onboarding admission
 
 When adding or registering a repository, read the fleet repository-onboarding

@@ -16,6 +16,7 @@ from quality_runner.cli_controller_reports import (
     add_controller_report_summary_arguments,
     has_rejected_self_check,
 )
+from quality_runner.cli_dogfood import add_dogfood_commands
 from quality_runner.cli_fix_proposals import add_fix_proposal_command
 from quality_runner.cli_fleet import add_fleet_commands
 from quality_runner.cli_gate import add_gate_commands
@@ -74,7 +75,7 @@ Compatibility commands remain available:
 
 Advanced operations:
   task, refresh, rollout, gate, controller-report, skill, proposal, remediation,
-  plan, phase, candidates, repo-hygiene, policy-surfaces, onboarding, security,
+  dogfood, plan, phase, candidates, repo-hygiene, policy-surfaces, onboarding, security,
   release-smoke, and worker handoff tools
 
 Fleet environment audit:
@@ -131,6 +132,7 @@ def build_parser(prog: str = CANONICAL_PROGRAM) -> argparse.ArgumentParser:
     add_candidate_commands(subparsers)
     add_security_commands(subparsers)
     add_task_commands(subparsers)
+    add_dogfood_commands(subparsers)
     add_onboarding_commands(subparsers)
 
     run_parser = subparsers.add_parser("run", help="Inspect a repo and write audit artifacts")
@@ -474,6 +476,12 @@ def main(argv: list[str] | None = None) -> int:
             return 2
         if payload.get("status") == "blocked":
             return 3
+    if (
+        parsed.command == "dogfood"
+        and parsed.dogfood_action == "report"
+        and payload.get("status") == "degraded"
+    ):
+        return 1
     if parsed.command == "plan" and payload.get("status") == "blocked":
         return 1
     if parsed.command == "repo-hygiene" and payload.get("status") in {"fail", "blocked"}:

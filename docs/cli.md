@@ -312,6 +312,40 @@ do not become certified merely because their commands are discoverable or
 already appear in CI. See [Prevention Readiness](prevention-readiness.md) for
 the promotion, gate-certification, waiver, and evidence requirements.
 
+## `quality-runner dogfood`
+
+`dogfood` is the local observability and Codex lifecycle adapter for the task
+contract. It does not change source files, install dependencies, call a remote
+service, or authorize release independently of `task release-check`.
+
+```bash
+qr dogfood codex-hook --json
+qr dogfood report --json
+```
+
+`codex-hook` reads one Codex hook JSON object from standard input. In a Git
+repository containing `.quality-runner.toml`, `SessionStart`,
+`UserPromptSubmit`, and `PreToolUse` idempotently create a task baseline keyed
+to the Codex session. `Stop` returns immediately for an unchanged workspace,
+reuses matching eligible release evidence, or runs an authoritative release
+check and returns `decision: block` when the task is not release-ready.
+Repositories without a Quality Runner configuration are ignored.
+
+`report` summarizes the local SQLite event store. The report includes adoption
+coverage, event and result counts, operation-latency percentiles, time to first
+feedback and release check, release eligibility, finding deltas, changed-path
+counts, gate failures, and analysis-cache behavior. Event and report schemas
+are `quality-runner-dogfood-event-v0.1` and
+`quality-runner-dogfood-report-v0.1`.
+
+The default store is `~/.local/state/quality-runner/dogfood/`; tests and bounded
+operators may override it with `QUALITY_RUNNER_DOGFOOD_STATE_DIR`. A mode-0600
+local key HMAC-pseudonymizes repository and task identifiers. Prompts, source
+paths, finding bodies, and raw identifiers are excluded. Capture is fail-open
+for task enforcement because telemetry is observability, not quality evidence;
+every failed capture remains visible as `degraded` in CLI output or a hook
+system message.
+
 ## `quality-runner self-update`
 
 Refreshes the installed Quality Runner tool. An editable installation is

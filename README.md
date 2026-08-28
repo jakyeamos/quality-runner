@@ -489,6 +489,27 @@ See
 [Prevention Readiness](docs/prevention-readiness.md) and the
 [`task` CLI contract](docs/cli.md#quality-runner-task).
 
+Codex can automate this contract for every repository enrolled with
+`.quality-runner.toml`. Install the lifecycle command as a global
+`SessionStart`, `UserPromptSubmit`, `PreToolUse`, and `Stop` hook. The first
+three events idempotently capture a session baseline; `Stop` allows unchanged
+work without an expensive scan and otherwise requires an eligible authoritative
+release check. The hook ignores repositories that are not enrolled.
+
+```bash
+qr dogfood codex-hook --json # receives the Codex hook payload on stdin
+qr dogfood report --json
+```
+
+Dogfood telemetry stays local under
+`~/.local/state/quality-runner/dogfood/`. It records HMAC-pseudonymous task and
+repository identifiers, event/status counts, check latency, time to first
+feedback, time to release check, finding deltas, changed-path counts, gate
+failures, and cache use. It never records prompt text, source paths, finding
+bodies, or raw task/repository names. Telemetry failure is fail-open for the QR
+gate and remains explicit as `dogfood_telemetry.status: degraded` or a hook
+system message.
+
 Quality Runner writes artifacts under the target repo:
 
 ```text

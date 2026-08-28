@@ -12,6 +12,9 @@ SCHEMAS = {
     "task-baseline.schema.json": schema_constants.TASK_BASELINE_SCHEMA,
     "task-check.schema.json": schema_constants.TASK_CHECK_SCHEMA,
     "task-record.schema.json": schema_constants.TASK_RECORD_SCHEMA,
+    "dogfood-event.schema.json": schema_constants.DOGFOOD_EVENT_SCHEMA,
+    "dogfood-report.schema.json": schema_constants.DOGFOOD_REPORT_SCHEMA,
+    "dogfood-capture.schema.json": schema_constants.DOGFOOD_CAPTURE_SCHEMA,
 }
 
 
@@ -59,3 +62,11 @@ def test_task_record_schema_tracks_release_enforcement() -> None:
         "advisory",
         "required",
     }
+
+
+def test_task_payload_schemas_expose_telemetry_health_without_requiring_capture() -> None:
+    schema_root = Path(schema_constants.__file__).parent / "schemas"
+
+    for filename in ("task-baseline.schema.json", "task-check.schema.json"):
+        payload = json.loads((schema_root / filename).read_text(encoding="utf-8"))
+        assert payload["properties"]["dogfood_telemetry"] == {"$ref": "dogfood-capture.schema.json"}

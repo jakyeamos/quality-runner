@@ -51,6 +51,7 @@ from quality_runner.config import CONFIG_FILE_NAME, load_repo_config
 from quality_runner.controller_reports import validate_controller_report
 from quality_runner.core.audit_contracts import ScanExclusionOverlay
 from quality_runner.doctor_contract import doctor_payload
+from quality_runner.dogfood import dogfood_command_payload
 from quality_runner.exclusion_preflight import (
     normalize_run_only_exclusion_overlay,
     run_exclusion_preflight_command,
@@ -89,6 +90,8 @@ def payload_for_args(
         return security_command_payload(args)
     if args.command == "task":
         return task_command_payload(args)
+    if args.command == "dogfood":
+        return dogfood_command_payload(args)
     if args.command == "onboarding":
         return onboarding_command_payload(args, validated_repo_path=_validated_repo_path)
     if args.command == "phase-check":

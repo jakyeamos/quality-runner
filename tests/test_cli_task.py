@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -60,6 +61,10 @@ def _qr(repo: Path, *args: str) -> subprocess.CompletedProcess[str]:
         check=False,
         capture_output=True,
         text=True,
+        env={
+            **os.environ,
+            "QUALITY_RUNNER_DOGFOOD_STATE_DIR": str(repo / ".quality-runner" / "test-dogfood"),
+        },
     )
 
 

@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import shutil
+import time
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, cast
@@ -59,28 +60,35 @@ from quality_runner.workflow_internal import generated_run_id
 
 def task_command_payload(args: Any) -> dict[str, Any]:
     repo_root = Path(args.repo_path).expanduser().resolve()
+    started = time.monotonic()
     try:
         if args.task_action == "start":
-            return start_task(
+            payload = start_task(
                 repo_root,
                 task_id=args.task_id,
                 baseline_ref=args.baseline_ref,
                 intent_path=Path(args.intent).expanduser() if args.intent else None,
             )
+            return _with_dogfood(repo_root, args.task_id, "start", payload, started)
         if args.task_action == "check":
-            return check_task(
+            payload = check_task(
                 repo_root,
                 task_id=args.task_id,
                 fast=bool(getattr(args, "fast", False)),
             )
+            return _with_dogfood(
+                repo_root, args.task_id, "fast_check" if args.fast else "check", payload, started
+            )
         if args.task_action == "release-check":
-            return check_task(
+            payload = check_task(
                 repo_root,
                 task_id=args.task_id,
                 require_release=True,
             )
+            return _with_dogfood(repo_root, args.task_id, "release_check", payload, started)
         if args.task_action == "rebaseline":
-            return rebaseline_task(repo_root, task_id=args.task_id, reason=args.reason)
+            payload = rebaseline_task(repo_root, task_id=args.task_id, reason=args.reason)
+            return _with_dogfood(repo_root, args.task_id, "rebaseline", payload, started)
     except (FileNotFoundError, NotADirectoryError, ValueError) as error:
         return _error_payload("invalid", "invalid_task_contract", str(error))
     except (SnapshotError, OSError) as error:
@@ -446,6 +454,42 @@ def _load_task_record(repo_root: Path, task_id: str) -> dict[str, Any]:
     if payload.get("schema") != TASK_RECORD_SCHEMA:
         raise ValueError(f"task {task_id} record has an unsupported schema")
     return cast(dict[str, Any], payload)
+
+
+def load_task_record(repo_root: Path, task_id: str) -> dict[str, Any]:
+    return _load_task_record(repo_root, task_id)
+
+
+def current_task_snapshot(repo_root: Path, task_id: str) -> dict[str, dict[str, Any]]:
+    record = _load_task_record(repo_root, task_id)
+    baseline = _load_run_json(repo_root, str(record["baseline_run_id"]), "task-baseline.json")
+    config = load_repo_config(repo_root)
+    include_paths = tuple(
+        item
+        for item in _prevention(config).get("snapshot_include_paths", [])
+        if isinstance(item, str)
+    )
+    with workspace_snapshot(repo_root, include_paths=include_paths) as (_root, current):
+        return {"baseline": cast(dict[str, Any], baseline["snapshot"]), "current": current}
+
+
+def _with_dogfood(
+    repo_root: Path,
+    task_id: str,
+    action: str,
+    payload: dict[str, Any],
+    started: float,
+) -> dict[str, Any]:
+    from quality_runner.dogfood import record_task_event
+
+    payload["dogfood_telemetry"] = record_task_event(
+        repo_root=repo_root,
+        task_id=task_id,
+        action=action,
+        payload=payload,
+        operation_seconds=time.monotonic() - started,
+    )
+    return payload
 
 
 def _load_run_json(repo_root: Path, run_id: str, filename: str) -> dict[str, Any]:

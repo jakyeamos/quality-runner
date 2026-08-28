@@ -41,6 +41,7 @@
     },
     "evidence": { "type": "object" },
     "error": { "type": "object" },
-    "warnings": { "type": "array" }
+    "warnings": { "type": "array" },
+    "dogfood_telemetry": { "$ref": "dogfood-capture.schema.json" }
   }
 }
