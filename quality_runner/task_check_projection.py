@@ -18,10 +18,10 @@ from quality_runner.task_contract import (
 from quality_runner.task_readiness import required_gate_failures
 
 
-def analysis_evidence(analysis: Any) -> dict[str, Any]:
+def analysis_evidence(analysis: Any, *, analysis_mode: str = TASK_ANALYSIS_MODE) -> dict[str, Any]:
     scan = cast(dict[str, Any], analysis.scan)
     return {
-        "analysis_mode": TASK_ANALYSIS_MODE,
+        "analysis_mode": analysis_mode,
         "cache_mode": TASK_CACHE_MODE,
         "performance": analysis.performance,
         "cache_summary": scan.get("cache_summary"),
@@ -66,6 +66,7 @@ def finalize_task_check(
     gate_blockers: list[dict[str, str]],
     readiness_blockers: list[dict[str, str]],
     analysis_evidence: dict[str, Any],
+    reused_from_run_id: str | None = None,
 ) -> dict[str, Any]:
     blockers = [
         *repository_blockers,
@@ -124,6 +125,11 @@ def finalize_task_check(
         "blockers": deduplicate_blockers(blockers),
         "release_readiness": readiness_evidence,
         "analysis": analysis_evidence,
+        "receipt_reuse": (
+            {"status": "hit", "source_run_id": reused_from_run_id}
+            if reused_from_run_id is not None
+            else {"status": "miss", "source_run_id": None}
+        ),
         "evidence": {
             **contract_hashes(repo_root, config),
             "toolchain_hash": readiness["toolchain_hash"],

@@ -16,6 +16,7 @@ from typing import Any, cast
 
 from quality_runner import __version__
 from quality_runner.config import CONFIG_FILE_NAME
+from quality_runner.dogfood_metrics import duration_series, duration_summary, percentile
 from quality_runner.schema_constants import (
     DOGFOOD_CAPTURE_SCHEMA,
     DOGFOOD_EVENT_SCHEMA,
@@ -126,6 +127,9 @@ def dogfood_report(state_dir: str | Path | None = None) -> dict[str, Any]:
     ]
     release_checks = [item for item in events if str(item["event_name"]).endswith("release.check")]
     eligible = sum(item["dimensions"].get("release_eligible") is True for item in release_checks)
+    receipt_hits = sum(item["dimensions"].get("receipt_reused") is True for item in checks)
+    gate_durations = duration_series(checks, "gate_durations_seconds")
+    bootstrap_durations = duration_series(checks, "bootstrap_durations_seconds")
     tasks = {(item["repository_id"], item["task_id"]) for item in events}
     repositories = {item["repository_id"] for item in events}
     status_counts = Counter(
@@ -172,12 +176,16 @@ def dogfood_report(state_dir: str | Path | None = None) -> dict[str, Any]:
             "release_eligibility_rate": round(eligible / len(release_checks), 4)
             if release_checks
             else None,
-            "operation_seconds_p50": _percentile(durations, 0.5),
-            "operation_seconds_p95": _percentile(durations, 0.95),
-            "time_to_first_feedback_seconds_p50": _percentile(first_feedback, 0.5),
-            "time_to_first_feedback_seconds_p95": _percentile(first_feedback, 0.95),
-            "task_to_release_check_seconds_p50": _percentile(release_cycles, 0.5),
-            "task_to_release_check_seconds_p95": _percentile(release_cycles, 0.95),
+            "receipt_reuse_hits": receipt_hits,
+            "receipt_reuse_rate": round(receipt_hits / len(checks), 4) if checks else None,
+            "gate_duration_seconds": duration_summary(gate_durations),
+            "bootstrap_duration_seconds": duration_summary(bootstrap_durations),
+            "operation_seconds_p50": percentile(durations, 0.5),
+            "operation_seconds_p95": percentile(durations, 0.95),
+            "time_to_first_feedback_seconds_p50": percentile(first_feedback, 0.5),
+            "time_to_first_feedback_seconds_p95": percentile(first_feedback, 0.95),
+            "task_to_release_check_seconds_p50": percentile(release_cycles, 0.5),
+            "task_to_release_check_seconds_p95": percentile(release_cycles, 0.95),
             "new_enforced_findings": sum(
                 int(item["dimensions"].get("new_enforced_findings", 0)) for item in checks
             ),
@@ -209,7 +217,6 @@ def codex_hook_payload(
         return {}
     task_id = f"codex-{hashlib.sha256(session_id.encode()).hexdigest()[:24]}"
     from quality_runner.task_prevention import (
-        check_task,
         current_task_snapshot,
         load_task_record,
         start_task,
@@ -268,19 +275,27 @@ def codex_hook_payload(
     if last is not None:
         return {}
     started = time.monotonic()
-    result = check_task(repo_root, task_id=task_id, require_release=True)
     capture = record_task_event(
         repo_root=repo_root,
         task_id=task_id,
-        action="release_check",
-        payload=result,
+        action="stop_missing_release",
+        payload={
+            "status": "blocked",
+            "repository": current.get("repository", {}),
+            "changed_paths": [],
+        },
         operation_seconds=time.monotonic() - started,
         state_dir=state_dir,
     )
-    result["dogfood_telemetry"] = capture
-    if result.get("release_readiness", {}).get("eligible") is True:
-        return _capture_system_message(capture)
-    return {"decision": "block", "reason": _hook_failure_reason(result)}
+    capture_notice = _capture_notice(capture)
+    return {
+        "decision": "block",
+        "reason": (
+            "Quality Runner has no eligible exact-current release receipt. Run "
+            f"`qr task release-check {repo_root} --task-id {task_id} --json`, then stop again."
+            f"{capture_notice}"
+        ),
+    }
 
 
 def dogfood_command_payload(args: Any) -> dict[str, Any]:
@@ -321,6 +336,20 @@ def _dimensions(action: str, payload: dict[str, Any], operation_seconds: float) 
         "unknown_findings": int(counts.get("unknown", 0)),
         "gate_count": len(gates),
         "gate_failure_count": sum(item.get("status") != "passed" for item in gates),
+        "gate_durations_seconds": {
+            str(item.get("id")): item.get("duration_seconds")
+            for item in gates
+            if isinstance(item.get("id"), str)
+            and isinstance(item.get("duration_seconds"), (int, float))
+        },
+        "bootstrap_durations_seconds": {
+            str(item.get("id")): item.get("bootstrap", {}).get("duration_seconds")
+            for item in gates
+            if isinstance(item.get("id"), str)
+            and isinstance(item.get("bootstrap"), dict)
+            and isinstance(item.get("bootstrap", {}).get("duration_seconds"), (int, float))
+        },
+        "receipt_reused": payload.get("receipt_reuse", {}).get("status") == "hit",
         "cache_hits": sum(int(item.get("cache_hits", 0)) for item in cache_rows),
         "cache_misses": sum(int(item.get("cache_misses", 0)) for item in cache_rows),
     }
@@ -421,14 +450,6 @@ def _nested_number(payload: dict[str, Any], *keys: str) -> float | None:
     return float(value) if isinstance(value, (int, float)) else None
 
 
-def _percentile(values: list[float], fraction: float) -> float | None:
-    if not values:
-        return None
-    ordered = sorted(values)
-    index = round((len(ordered) - 1) * fraction)
-    return round(ordered[index], 6)
-
-
 def _task_timings(events: list[dict[str, Any]]) -> dict[tuple[str, str], dict[str, float]]:
     timings: dict[tuple[str, str], dict[str, float]] = {}
     for event in events:
@@ -473,6 +494,10 @@ def _empty_report(status: str) -> dict[str, Any]:
             "task_release_coverage_rate": None,
             "eligible_release_checks": 0,
             "release_eligibility_rate": None,
+            "receipt_reuse_hits": 0,
+            "receipt_reuse_rate": None,
+            "gate_duration_seconds": {},
+            "bootstrap_duration_seconds": {},
             "operation_seconds_p50": None,
             "operation_seconds_p95": None,
             "time_to_first_feedback_seconds_p50": None,

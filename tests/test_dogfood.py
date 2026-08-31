@@ -20,7 +20,15 @@ def _check_payload() -> dict[str, object]:
         "repository": {"identity": "repository-secret", "root": "/private/repository"},
         "changed_paths": ["private/source.py"],
         "delta": {"counts": {"new_enforced": 0, "persisted": 2, "resolved": 1, "unknown": 0}},
-        "gate_results": [{"id": "tests", "status": "passed"}],
+        "gate_results": [
+            {
+                "id": "tests",
+                "status": "passed",
+                "duration_seconds": 12.0,
+                "bootstrap": {"duration_seconds": 1.0},
+            }
+        ],
+        "receipt_reuse": {"status": "hit", "source_run_id": "run-0"},
         "release_readiness": {"eligible": True},
         "analysis": {
             "performance": {"elapsed_seconds": 2.5},
@@ -60,6 +68,13 @@ def test_capture_is_idempotent_private_and_reportable(tmp_path: Path) -> None:
     }
     assert report["feedback_loop"]["release_eligibility_rate"] == 1.0
     assert report["feedback_loop"]["resolved_findings"] == 1
+    assert report["feedback_loop"]["receipt_reuse_rate"] == 1.0
+    assert report["feedback_loop"]["gate_duration_seconds"]["tests"] == {
+        "runs": 1,
+        "p50": 12.0,
+        "p95": 12.0,
+    }
+    assert report["feedback_loop"]["bootstrap_duration_seconds"]["tests"]["p50"] == 1.0
     database_bytes = (tmp_path / "state" / "events.sqlite3").read_bytes()
     assert b"private-task-name" not in database_bytes
     assert b"private/source.py" not in database_bytes

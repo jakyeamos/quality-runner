@@ -60,7 +60,7 @@ def test_hook_rejects_invalid_lifecycle_payload(tmp_path: Path) -> None:
     assert result == {"systemMessage": "Quality Runner hook received an invalid lifecycle payload."}
 
 
-def test_hook_starts_allows_unchanged_and_blocks_a_new_finding(tmp_path: Path) -> None:
+def test_hook_starts_allows_unchanged_and_blocks_missing_release_evidence(tmp_path: Path) -> None:
     repo = _enrolled_repo(tmp_path)
     state = tmp_path / "dogfood-state"
     common = {"cwd": str(repo), "session_id": "fresh-session"}
@@ -86,9 +86,10 @@ def test_hook_starts_allows_unchanged_and_blocks_a_new_finding(tmp_path: Path) -
     assert unchanged == {}
     assert blocked["decision"] == "block"
     report = dogfood_report(state)
+    assert "release-check" in blocked["reason"]
     assert report["coverage"]["event_counts"] == {
-        "quality_runner.task.release.check": 1,
         "quality_runner.task.start": 1,
+        "quality_runner.task.stop.missing.release": 1,
         "quality_runner.task.stop.unchanged": 1,
     }
-    assert report["feedback_loop"]["new_enforced_findings"] == 1
+    assert report["feedback_loop"]["new_enforced_findings"] == 0

@@ -247,9 +247,11 @@ For implementation-time feedback at meaningful boundaries, use the fast mode:
 qr task check /path/to/repo --task-id feature-123 --fast --json
 ```
 
-Fast mode uses the same complete cached finding analysis but does not execute
-certified native gates. A fast `pass` is provisional: it never produces
-release-ready evidence.
+Fast mode runs the bounded balanced finding analysis and does not execute
+certified native gates. Deferred full-analysis modules carry baseline findings
+forward instead of claiming resolution. A fast `pass` is provisional: it never
+produces release-ready evidence. Omit `--json` for the compact terminal summary;
+the canonical JSON and Markdown artifacts are still persisted.
 
 For completion and the CI task checkpoint, enforce the release predicate:
 
@@ -257,7 +259,11 @@ For completion and the CI task checkpoint, enforce the release predicate:
 qr task release-check /path/to/repo --task-id feature-123 --json
 ```
 
-`release-check` has no `--fast` option. It records
+`release-check` has no `--fast` option. It first looks for passing authoritative
+evidence bound to the exact current snapshot, policy hashes, toolchain hash, QR
+version, and required gate results. A match creates a new required release
+receipt without rerunning analysis or gates; any mismatch runs the full check.
+It records
 `release_enforcement: "required"`; ordinary checks record `"advisory"`.
 
 The default check is an authoritative diagnostic checkpoint. Release-check is
@@ -326,15 +332,17 @@ qr dogfood report --json
 `codex-hook` reads one Codex hook JSON object from standard input. In a Git
 repository containing `.quality-runner.toml`, `SessionStart` and
 `UserPromptSubmit` idempotently create a task baseline keyed
-to the Codex session. `Stop` returns immediately for an unchanged workspace,
-reuses matching eligible release evidence, or runs an authoritative release
-check and returns `decision: block` when the task is not release-ready.
+to the Codex session. `Stop` returns immediately for an unchanged workspace or
+matching eligible release evidence. Changed work without that evidence blocks
+immediately and tells the agent to run `task release-check`; the hook does not
+hide a multi-minute scan inside task completion.
 Repositories without a Quality Runner configuration are ignored.
 
 `report` summarizes the local SQLite event store. The report includes adoption
 coverage, event and result counts, operation-latency percentiles, time to first
 feedback and release check, release eligibility, finding deltas, changed-path
-counts, gate failures, and analysis-cache behavior. Event and report schemas
+counts, per-gate and bootstrap latency percentiles, authoritative receipt reuse,
+gate failures, and analysis-cache behavior. Event and report schemas
 are `quality-runner-dogfood-event-v0.1` and
 `quality-runner-dogfood-report-v0.1`.
 

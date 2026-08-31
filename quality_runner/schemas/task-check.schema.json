@@ -42,6 +42,14 @@
     "evidence": { "type": "object" },
     "error": { "type": "object" },
     "warnings": { "type": "array" },
-    "dogfood_telemetry": { "$ref": "dogfood-capture.schema.json" }
+    "dogfood_telemetry": { "$ref": "dogfood-capture.schema.json" },
+    "receipt_reuse": {
+      "type": "object",
+      "required": ["status", "source_run_id"],
+      "properties": {
+        "status": { "enum": ["hit", "miss"] },
+        "source_run_id": { "type": ["string", "null"] }
+      }
+    }
   }
 }

@@ -51,11 +51,13 @@ command is preventative merely because it appears in a manifest or CI file.
 For shorter QR feedback cycles, use the provisional fast mode:
 
 ```bash
-qr task check /path/to/repo --task-id <stable-task-id> --fast --json
+qr task check /path/to/repo --task-id <stable-task-id> --fast
 ```
 
-Fast mode reuses the complete cached finding analysis but skips certified gate
-execution. Its `pass` status is useful implementation feedback only; its
+Fast mode runs balanced finding analysis with validated content-cache reuse and
+skips certified gate execution. Deferred full-analysis findings are carried
+forward rather than reported as resolved. Its `pass` status is useful
+implementation feedback only; its
 `release_readiness.eligible` value is always false. Candidate QR gates remain
 advisory and are not executed by either task mode.
 
@@ -90,8 +92,12 @@ manual baseline for the same session. `qr dogfood codex-hook --json` handles
 `SessionStart`, `UserPromptSubmit`, and `Stop` for repositories
 that contain `.quality-runner.toml`; it ignores unenrolled repositories. The
 Stop path skips unchanged work and otherwise enforces an exact matching
-authoritative release check. Use `qr dogfood report --json` to inspect local,
-HMAC-pseudonymous adoption, latency, delta, gate, and cache metrics. Telemetry
+authoritative release receipt. If changed work lacks one, Stop blocks promptly
+with the explicit release-check command and never launches the expensive scan
+itself. Release-check may reuse evidence only when snapshot, policy, toolchain,
+QR version, and required gate identity all match exactly. Use
+`qr dogfood report --json` to inspect local, HMAC-pseudonymous adoption,
+latency, per-gate/bootstrap timing, receipt reuse, delta, gate, and cache metrics. Telemetry
 never contains prompts, source paths, finding bodies, or raw identifiers, and a
 degraded capture never substitutes for the task gate result.
 

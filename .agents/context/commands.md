@@ -136,18 +136,19 @@ remediation action. If a dependency cache, tool, or gate is unavailable, keep
 the result visible as unknown or blocked.
 
 For task-scoped implementation feedback, capture a baseline before edits, use
-`uv run --locked qr task check /path/to/repository --task-id ID --fast --json`
+`uv run --locked qr task check /path/to/repository --task-id ID --fast`
 at meaningful boundaries, and run
 `uv run --locked qr task release-check /path/to/repository --task-id ID --json`
 before completion. Fast mode skips certified native gates and is never
-release-ready; release-check fails unless
-`release_readiness.eligible: true`.
+release-ready; release-check reuses exact-current authoritative and gate receipts
+when valid, otherwise runs live, and fails unless `release_readiness.eligible: true`.
 
 For the global Codex adapter, configure the installed `qr dogfood codex-hook
 --json` command for `SessionStart`, `UserPromptSubmit`, and `Stop`. It is inert
 outside Git repositories enrolled with
 `.quality-runner.toml`. Validate positive baseline capture, an unchanged Stop,
-a changed eligible Stop, and a changed blocked Stop before broad use. The local
+a changed eligible Stop, and a changed blocked Stop before broad use. A changed
+blocked Stop must return promptly and must not launch the release scan. The local
 report must preserve pseudonymous identifiers and exclude prompts, source
 paths, finding bodies, and raw names.
 

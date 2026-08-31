@@ -49,7 +49,7 @@ During implementation, check the exact workspace without waiting for the
 certified gates:
 
 ```bash
-qr task check /path/to/repo --task-id <stable-task-id> --fast --json
+qr task check /path/to/repo --task-id <stable-task-id> --fast
 ```
 
 After editing and before declaring the implementation complete:
@@ -93,6 +93,12 @@ the release scan when the workspace is unchanged, reuses exact matching
 eligible release evidence, and otherwise blocks task completion until the
 authoritative release check is eligible.
 
+Changed work without an exact eligible release receipt blocks immediately and
+returns the explicit `qr task release-check` command. The Stop hook never starts
+the expensive authoritative scan. A release check may reuse a prior passing
+authoritative check only when the snapshot, policy, toolchain, QR version, and
+required gate evidence all match exactly.
+
 The adapter accepts `PreToolUse` as an idempotent compatibility event, but the
 global default omits it: `SessionStart` and `UserPromptSubmit` already establish
 the baseline, while a process launch before every tool call would lengthen the
@@ -103,7 +109,9 @@ non-positive finding delta, but QR's executable hook remains the enforcement
 boundary. Never silently rebaseline. A telemetry failure must be reported but
 must not weaken or replace the underlying task result. Inspect aggregate local
 behavior with `qr dogfood report --json`; the store excludes prompts, source
-paths, finding bodies, and raw repository or task identifiers.
+paths, finding bodies, and raw repository or task identifiers. The report adds
+per-gate/bootstrap latency and exact-receipt reuse rates so regressions are
+visible without collecting source content.
 
 ## Admit a new repository only from executable evidence
 

@@ -184,6 +184,8 @@ def test_certified_gate_pass_and_intentional_failure(tmp_path: Path) -> None:
     )
     assert blockers == []
     assert pass_results[0]["status"] == "passed"
+    assert pass_results[0]["duration_seconds"] >= 0
+    assert pass_results[0]["bootstrap"]["duration_seconds"] >= 0
 
     failing = evaluate_readiness(
         repo_root=tmp_path,
@@ -197,6 +199,42 @@ def test_certified_gate_pass_and_intentional_failure(tmp_path: Path) -> None:
     assert blockers == []
     assert fail_results[0]["status"] == "failed"
     assert required_gate_failures(fail_results) == fail_results
+
+
+def test_certified_gate_receipt_reuses_only_exact_snapshot(tmp_path: Path) -> None:
+    marker = tmp_path / "gate-count.txt"
+    command = (
+        f"{sys.executable} -c "
+        f'"from pathlib import Path; p=Path({str(marker)!r}); '
+        "p.write_text(p.read_text() + 'x' if p.exists() else 'x')\""
+    )
+    readiness = evaluate_readiness(repo_root=tmp_path, prevention={"gates": [_gate(command)]})
+
+    first, first_blockers = run_certified_gates(
+        snapshot_root=tmp_path,
+        repo_root=tmp_path,
+        readiness=readiness,
+        snapshot_digest="snapshot-one",
+    )
+    second, second_blockers = run_certified_gates(
+        snapshot_root=tmp_path,
+        repo_root=tmp_path,
+        readiness=readiness,
+        snapshot_digest="snapshot-one",
+    )
+    third, third_blockers = run_certified_gates(
+        snapshot_root=tmp_path,
+        repo_root=tmp_path,
+        readiness=readiness,
+        snapshot_digest="snapshot-two",
+    )
+
+    assert first_blockers == second_blockers == third_blockers == []
+    assert "receipt_reuse" not in first[0]
+    assert second[0]["receipt_reuse"]["status"] == "hit"
+    assert second[0]["duration_seconds"] == 0.0
+    assert "receipt_reuse" not in third[0]
+    assert marker.read_text() == "xx"
 
 
 def test_certified_gate_timeout_is_unknown_evidence(tmp_path: Path) -> None:

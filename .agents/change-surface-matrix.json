@@ -2,8 +2,59 @@
   "schema_version": "change-surface-matrix/v1",
   "subject": {"kind": "repository", "id": "quality-runner"},
   "owner": "quality-runner-maintainers",
-  "last_reviewed": "2026-08-28",
+  "last_reviewed": "2026-08-31",
   "change_records": [
+    {
+      "id": "task-fast-feedback-receipts-20260831",
+      "status": "implemented",
+      "owner": "quality-runner-maintainers",
+      "affected_surfaces": [
+        "quality-engine",
+        "agent-workflow",
+        "artifact-contracts",
+        "dogfood-observability"
+      ],
+      "contracts": [
+        "qr task check --fast runs bounded balanced analysis and never authorizes release",
+        "unchanged content remains cache-reusable across isolated snapshot metadata changes",
+        "qr task release-check reuses only exact-current passing authoritative evidence",
+        "passing certified gate receipts bind snapshot, QR, command, tool, bootstrap, timeout, scope, and mutation identity",
+        "Codex Stop blocks promptly when changed work lacks an eligible exact-current release receipt and never launches the release scan",
+        "task checks and dogfood reports expose receipt reuse plus gate and bootstrap durations"
+      ],
+      "documentation": [
+        "README.md",
+        "docs/cli.md",
+        "docs/agent-usage.md",
+        "docs/artifacts.md",
+        "docs/prevention-readiness.md",
+        "quality_runner/plugin/SKILL.md",
+        ".agents/context/commands.md"
+      ],
+      "tests": [
+        "tests/test_cli_task.py",
+        "tests/test_codex_dogfood_hook.py",
+        "tests/test_dogfood.py",
+        "tests/test_incremental_analysis.py",
+        "tests/test_task_findings.py",
+        "tests/test_task_readiness.py",
+        "tests/test_task_schemas.py"
+      ],
+      "evidence": [
+        "focused cache and task finding regressions: 23 passed",
+        "focused task CLI and schema regressions: 19 passed",
+        "focused readiness, dogfood, and hook regressions: 24 passed",
+        "repository-wide pytest gate: 1260 passed in 451.04 seconds",
+        "cold cache-migration fast check: 20.66 seconds",
+        "steady-state exact-workspace fast check: 5.06 seconds with 1374 validated cache hits and zero misses"
+      ],
+      "projections": [
+        ".quality-runner/runs/<check-run-id>/task-check.json",
+        ".quality-runner/cache/gate-receipts-v1/<receipt-key>.json",
+        "qr dogfood report --json",
+        "global Codex Stop lifecycle behavior"
+      ]
+    },
     {
       "id": "automatic-task-dogfood-telemetry-20260828",
       "status": "implemented",

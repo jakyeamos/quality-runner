@@ -6,10 +6,13 @@ import os
 import shlex
 import shutil
 import subprocess
+import time
 from pathlib import Path
 from typing import Any, cast
 
 from quality_runner.schema_constants import PREVENTION_READINESS_SCHEMA
+from quality_runner.task_gate_output import bounded_output, timed_result
+from quality_runner.task_gate_receipts import cached_gate_result, store_gate_result
 
 REQUIRED_CERTIFICATION_EVIDENCE = {"failure-fixture", "repeat-pass", "local", "ci"}
 SAFE_MUTATION_RISKS = {"read-only", "isolated-only"}
@@ -80,6 +83,7 @@ def run_certified_gates(
     snapshot_root: Path,
     repo_root: Path,
     readiness: dict[str, Any],
+    snapshot_digest: str | None = None,
 ) -> tuple[list[dict[str, Any]], list[dict[str, str]]]:
     results: list[dict[str, Any]] = []
     blockers: list[dict[str, str]] = []
@@ -132,6 +136,15 @@ def run_certified_gates(
                 }
             )
             continue
+        cached = cached_gate_result(
+            repo_root=repo_root,
+            snapshot_digest=snapshot_digest,
+            gate=gate,
+            bootstrap=bootstrap,
+        )
+        if cached is not None:
+            results.append(cached)
+            continue
         result = _run_gate(
             snapshot_root=snapshot_root,
             repo_root=repo_root,
@@ -139,6 +152,14 @@ def run_certified_gates(
             bootstrap=bootstrap,
         )
         results.append(result)
+        if result["status"] == "passed":
+            store_gate_result(
+                repo_root=repo_root,
+                snapshot_digest=snapshot_digest,
+                gate=gate,
+                bootstrap=bootstrap,
+                result=result,
+            )
         if result["status"] in {"timeout", "unavailable", "blocked"}:
             blockers.append(
                 {
@@ -155,27 +176,34 @@ def _run_bootstrap(
     gate: dict[str, Any],
     environment_paths: list[Path],
 ) -> dict[str, Any]:
+    started = time.monotonic()
     command = str(gate.get("bootstrap") or "")
     try:
         argv = _command_argv(command)
     except ValueError as error:
-        return {
-            "command": command,
-            "status": "blocked",
-            "exit_code": None,
-            "stdout": "",
-            "stderr": str(error),
-        }
+        return timed_result(
+            {
+                "command": command,
+                "status": "blocked",
+                "exit_code": None,
+                "stdout": "",
+                "stderr": str(error),
+            },
+            started,
+        )
     command_path = shutil.which(argv[0], path=_search_path(environment_paths))
     if command_path is None:
-        return {
-            "command": command,
-            "command_path": None,
-            "status": "unavailable",
-            "exit_code": None,
-            "stdout": "",
-            "stderr": f"bootstrap command not found: {argv[0]}",
-        }
+        return timed_result(
+            {
+                "command": command,
+                "command_path": None,
+                "status": "unavailable",
+                "exit_code": None,
+                "stdout": "",
+                "stderr": f"bootstrap command not found: {argv[0]}",
+            },
+            started,
+        )
     argv[0] = command_path
     environment = _gate_environment(snapshot_root, environment_paths)
     command_version = _command_version(
@@ -185,15 +213,18 @@ def _run_bootstrap(
         environment=environment,
     )
     if command_version is None:
-        return {
-            "command": command,
-            "command_path": command_path,
-            "command_version": None,
-            "status": "blocked",
-            "exit_code": None,
-            "stdout": "",
-            "stderr": "bootstrap command did not provide verifiable version output",
-        }
+        return timed_result(
+            {
+                "command": command,
+                "command_path": command_path,
+                "command_version": None,
+                "status": "blocked",
+                "exit_code": None,
+                "stdout": "",
+                "stderr": "bootstrap command did not provide verifiable version output",
+            },
+            started,
+        )
     # The gate timeout measures the check itself. A deliberately short gate
     # timeout (for example, a timeout-behaviour fixture) must not accidentally
     # turn ordinary interpreter/bootstrap startup into the evidence result.
@@ -215,34 +246,43 @@ def _run_bootstrap(
             timeout=timeout,
         )
     except subprocess.TimeoutExpired as error:
-        return {
-            "command": command,
-            "command_path": command_path,
-            "command_version": command_version,
-            "status": "timeout",
-            "exit_code": None,
-            "stdout": _bounded_output(error.stdout),
-            "stderr": _bounded_output(error.stderr),
-        }
+        return timed_result(
+            {
+                "command": command,
+                "command_path": command_path,
+                "command_version": command_version,
+                "status": "timeout",
+                "exit_code": None,
+                "stdout": bounded_output(error.stdout),
+                "stderr": bounded_output(error.stderr),
+            },
+            started,
+        )
     except OSError as error:
-        return {
+        return timed_result(
+            {
+                "command": command,
+                "command_path": command_path,
+                "command_version": command_version,
+                "status": "unavailable",
+                "exit_code": None,
+                "stdout": "",
+                "stderr": str(error),
+            },
+            started,
+        )
+    return timed_result(
+        {
             "command": command,
             "command_path": command_path,
             "command_version": command_version,
-            "status": "unavailable",
-            "exit_code": None,
-            "stdout": "",
-            "stderr": str(error),
-        }
-    return {
-        "command": command,
-        "command_path": command_path,
-        "command_version": command_version,
-        "status": "passed" if result.returncode == 0 else "blocked",
-        "exit_code": result.returncode,
-        "stdout": _bounded_output(result.stdout),
-        "stderr": _bounded_output(result.stderr),
-    }
+            "status": "passed" if result.returncode == 0 else "blocked",
+            "exit_code": result.returncode,
+            "stdout": bounded_output(result.stdout),
+            "stderr": bounded_output(result.stderr),
+        },
+        started,
+    )
 
 
 def required_gate_failures(results: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -331,6 +371,7 @@ def _run_gate(
     gate: dict[str, Any],
     bootstrap: dict[str, Any],
 ) -> dict[str, Any]:
+    started = time.monotonic()
     argv = list(gate.get("argv", []))
     snapshot_command = snapshot_root / ".venv" / "bin" / Path(argv[0]).name
     argv[0] = str(snapshot_command) if snapshot_command.is_file() else str(gate["command_path"])
@@ -355,10 +396,11 @@ def _run_gate(
             gate,
             status="timeout",
             exit_code=None,
-            stdout=_bounded_output(error.stdout),
-            stderr=_bounded_output(error.stderr),
+            stdout=bounded_output(error.stdout),
+            stderr=bounded_output(error.stderr),
             bootstrap=bootstrap,
             executed_command_path=executed_command_path,
+            duration_seconds=time.monotonic() - started,
         )
     except OSError as error:
         return _gate_result(
@@ -369,6 +411,7 @@ def _run_gate(
             stderr=str(error),
             bootstrap=bootstrap,
             executed_command_path=executed_command_path,
+            duration_seconds=time.monotonic() - started,
         )
     output = f"{result.stdout}\n{result.stderr}".lower()
     status = (
@@ -382,10 +425,11 @@ def _run_gate(
         gate,
         status=status,
         exit_code=result.returncode,
-        stdout=_bounded_output(result.stdout),
-        stderr=_bounded_output(result.stderr),
+        stdout=bounded_output(result.stdout),
+        stderr=bounded_output(result.stderr),
         bootstrap=bootstrap,
         executed_command_path=executed_command_path,
+        duration_seconds=time.monotonic() - started,
     )
 
 
@@ -398,6 +442,7 @@ def _gate_result(
     stderr: str,
     bootstrap: dict[str, Any] | None = None,
     executed_command_path: str | None = None,
+    duration_seconds: float = 0.0,
 ) -> dict[str, Any]:
     return {
         "id": gate.get("id"),
@@ -409,6 +454,7 @@ def _gate_result(
         "executed_command_path": executed_command_path or gate.get("command_path"),
         "command_version": gate.get("command_version"),
         "timeout_seconds": gate.get("timeout_seconds"),
+        "duration_seconds": round(duration_seconds, 6),
         "stdout": stdout,
         "stderr": stderr,
         "bootstrap": bootstrap,
@@ -493,14 +539,6 @@ def _gate_environment(snapshot_root: Path, environment_paths: list[Path]) -> dic
         }
     )
     return environment
-
-
-def _bounded_output(value: object, limit: int = 20_000) -> str:
-    if isinstance(value, bytes):
-        text = value.decode("utf-8", errors="replace")
-    else:
-        text = value if isinstance(value, str) else ""
-    return text[-limit:]
 
 
 def _hash_payload(value: object) -> str:

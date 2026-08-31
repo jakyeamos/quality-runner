@@ -18,7 +18,7 @@ from quality_runner.artifacts import (
     write_json,
 )
 from quality_runner.config import CONFIG_FILE_NAME, load_repo_config
-from quality_runner.core.audit_contracts import AuditRequest
+from quality_runner.core.audit_contracts import AnalysisMode, AuditRequest
 from quality_runner.schema_constants import (
     TASK_BASELINE_SCHEMA,
     TASK_CHECK_SCHEMA,
@@ -34,11 +34,16 @@ from quality_runner.task_contract import (
     TASK_CACHE_MODE,
     TASK_CHECK_MODE_AUTHORITATIVE,
     TASK_CHECK_MODE_FAST,
+    TASK_FAST_ANALYSIS_MODE,
     TASK_RELEASE_ENFORCEMENT_ADVISORY,
     TASK_RELEASE_ENFORCEMENT_REQUIRED,
     contract_hashes,
     drift_blockers,
+    prevention_config,
     task_next_action,
+)
+from quality_runner.task_contract import (
+    repository_blockers as repository_identity_blockers,
 )
 from quality_runner.task_findings import (
     compare_findings,
@@ -49,6 +54,7 @@ from quality_runner.task_readiness import (
     evaluate_readiness,
     run_certified_gates,
 )
+from quality_runner.task_release_receipts import reusable_authoritative_check
 from quality_runner.task_snapshot import (
     SnapshotError,
     attach_git_metadata,
@@ -208,11 +214,24 @@ def check_task(
     config = load_repo_config(repo_root)
     if config.get("warnings"):
         return _invalid_config(config)
-    prevention = _prevention(config)
+    prevention = prevention_config(config)
     check_mode = TASK_CHECK_MODE_FAST if fast else TASK_CHECK_MODE_AUTHORITATIVE
+    analysis_mode = TASK_FAST_ANALYSIS_MODE if fast else TASK_ANALYSIS_MODE
     release_enforcement = (
         TASK_RELEASE_ENFORCEMENT_REQUIRED if require_release else TASK_RELEASE_ENFORCEMENT_ADVISORY
     )
+    if require_release:
+        reused = reusable_authoritative_check(
+            repo_root=repo_root,
+            task_id=task_id,
+            record=record,
+            baseline=baseline,
+            config=config,
+            prevention=prevention,
+        )
+        if reused is not None:
+            _record_check_result(repo_root, task_id, record, reused)
+            return reused
     run_suffix = (
         "task-fast-check" if fast else "task-release-check" if require_release else "task-check"
     )
@@ -239,6 +258,7 @@ def check_task(
             run_id,
             cache_repo_root=repo_root,
             snapshot_digest=str(snapshot["snapshot_digest"]),
+            analysis_mode=analysis_mode,
         )
         findings = normalize_findings(
             code_quality_scan=cast(dict[str, Any], analysis.code_quality_scan),
@@ -260,6 +280,7 @@ def check_task(
                 snapshot_root=snapshot_root,
                 repo_root=repo_root,
                 readiness=readiness,
+                snapshot_digest=str(snapshot["snapshot_digest"]),
             )
 
     changed = changed_paths(cast(dict[str, Any], baseline["snapshot"]), snapshot)
@@ -268,9 +289,10 @@ def check_task(
         current=findings,
         changed_paths=changed,
         dispositions=cast(list[dict[str, Any]], config.get("accepted_dispositions", [])),
-        required_modules=cast(list[str], prevention.get("required_modules", [])),
+        required_modules=([] if fast else cast(list[str], prevention.get("required_modules", []))),
+        preserve_incomplete_baseline=fast,
     )
-    repository_blockers = _repository_blockers(baseline, snapshot)
+    repository_blockers = repository_identity_blockers(baseline, snapshot)
     contract_blockers = drift_blockers(baseline, repo_root, config, readiness)
     promotion_blockers = promotion_issues(prevention)
     readiness_blockers = required_readiness_blockers(readiness)
@@ -294,20 +316,30 @@ def check_task(
         promotion_blockers=promotion_blockers,
         gate_blockers=gate_blockers,
         readiness_blockers=readiness_blockers,
-        analysis_evidence=analysis_evidence(analysis),
+        analysis_evidence=analysis_evidence(analysis, analysis_mode=analysis_mode),
     )
-    decision = str(payload["status"])
-    checks = [*cast(list[str], record.get("checks", [])), run_id]
+    _record_check_result(repo_root, task_id, record, payload)
+    return payload
+
+
+def _record_check_result(
+    repo_root: Path,
+    task_id: str,
+    record: dict[str, Any],
+    payload: dict[str, Any],
+) -> None:
     record.update(
         {
-            "checks": checks,
-            "last_status": decision,
-            "last_check_mode": check_mode,
-            "last_release_enforcement": release_enforcement,
+            "checks": [
+                *cast(list[str], record.get("checks", [])),
+                str(payload["run_id"]),
+            ],
+            "last_status": payload["status"],
+            "last_check_mode": payload["mode"],
+            "last_release_enforcement": payload["release_enforcement"],
         }
     )
     _write_task_record(repo_root, task_id, record)
-    return payload
 
 
 def _capture_baseline(
@@ -321,7 +353,7 @@ def _capture_baseline(
     supersedes: str | None,
 ) -> dict[str, Any]:
     config = load_repo_config(repo_root)
-    prevention = _prevention(config)
+    prevention = prevention_config(config)
     run_dir = prepare_artifact_dir(repo_root, run_id)
     include_paths = tuple(
         item for item in prevention.get("snapshot_include_paths", []) if isinstance(item, str)
@@ -382,6 +414,7 @@ def _analyze(
     *,
     cache_repo_root: Path,
     snapshot_digest: str,
+    analysis_mode: AnalysisMode = TASK_ANALYSIS_MODE,
 ) -> Any:
     cache_root = cache_repo_root / ".quality-runner" / "cache" / "task-analysis-v1"
     request = AuditRequest(
@@ -393,18 +426,13 @@ def _analyze(
         branch_warnings=(),
         skill_review_report=None,
         intent=None,
-        analysis_mode=TASK_ANALYSIS_MODE,
+        analysis_mode=analysis_mode,
         cache_mode=TASK_CACHE_MODE,
         cache_root=cache_root,
         cache_namespace_root=cache_repo_root,
         cache_context_identity=snapshot_digest,
     )
     return analyze_read_only_audit(request)
-
-
-def _prevention(config: dict[str, Any]) -> dict[str, Any]:
-    value = config.get("prevention")
-    return cast(dict[str, Any], value) if isinstance(value, dict) else {}
 
 
 def _overlay_config(repo_root: Path, snapshot_root: Path) -> None:
@@ -466,7 +494,7 @@ def current_task_snapshot(repo_root: Path, task_id: str) -> dict[str, dict[str, 
     config = load_repo_config(repo_root)
     include_paths = tuple(
         item
-        for item in _prevention(config).get("snapshot_include_paths", [])
+        for item in prevention_config(config).get("snapshot_include_paths", [])
         if isinstance(item, str)
     )
     with workspace_snapshot(repo_root, include_paths=include_paths) as (_root, current):
@@ -520,19 +548,3 @@ def _invalid_config(config: dict[str, Any]) -> dict[str, Any]:
     )
     payload["warnings"] = config.get("warnings", [])
     return payload
-
-
-def _repository_blockers(
-    baseline: dict[str, Any],
-    snapshot: dict[str, Any],
-) -> list[dict[str, str]]:
-    baseline_repo = cast(dict[str, Any], baseline.get("repository", {}))
-    current_repo = cast(dict[str, Any], snapshot.get("repository", {}))
-    if baseline_repo.get("identity") == current_repo.get("identity"):
-        return []
-    return [
-        {
-            "code": "repository_identity_mismatch",
-            "message": "task baseline belongs to a different Git repository",
-        }
-    ]

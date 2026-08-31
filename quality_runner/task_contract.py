@@ -7,8 +7,10 @@ from typing import Any, cast
 
 from quality_runner import __version__
 from quality_runner.config import CONFIG_FILE_NAME
+from quality_runner.core.audit_contracts import AnalysisMode
 
-TASK_ANALYSIS_MODE = "full"
+TASK_ANALYSIS_MODE: AnalysisMode = "full"
+TASK_FAST_ANALYSIS_MODE: AnalysisMode = "balanced"
 TASK_CACHE_MODE = "external"
 TASK_CHECK_MODE_AUTHORITATIVE = "authoritative"
 TASK_CHECK_MODE_FAST = "fast"
@@ -238,6 +240,24 @@ def deduplicate_blockers(items: list[dict[str, str]]) -> list[dict[str, str]]:
     return [
         {"code": code, "message": message}
         for code, message in sorted({(item["code"], item["message"]) for item in items})
+    ]
+
+
+def prevention_config(config: dict[str, Any]) -> dict[str, Any]:
+    value = config.get("prevention")
+    return cast(dict[str, Any], value) if isinstance(value, dict) else {}
+
+
+def repository_blockers(baseline: dict[str, Any], snapshot: dict[str, Any]) -> list[dict[str, str]]:
+    baseline_repo = cast(dict[str, Any], baseline.get("repository", {}))
+    current_repo = cast(dict[str, Any], snapshot.get("repository", {}))
+    if baseline_repo.get("identity") == current_repo.get("identity"):
+        return []
+    return [
+        {
+            "code": "repository_identity_mismatch",
+            "message": "task baseline belongs to a different Git repository",
+        }
     ]
 
 

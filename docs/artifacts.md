@@ -137,14 +137,24 @@ explicitly ineligible even when its finding feedback status is `pass`.
 `required` release-check process boundary. A required check cannot return
 `pass` while release readiness is ineligible.
 
+`receipt_reuse` records whether the check was computed live or projected from
+an exact-current passing authoritative run. Required certified gates also keep
+local receipts under `.quality-runner/cache/gate-receipts-v1/`, keyed by the
+workspace snapshot, QR version, gate command and version, bootstrap identity,
+timeout, scope, and mutation policy. These ignored cache receipts are
+optimizations, not canonical evidence: malformed, missing, changed, or failed
+receipts force live execution. Gate and bootstrap results record their own
+durations.
+
 Task commands also attempt a privacy-bounded local dogfood event. These events
 are operational telemetry, not repository evidence, and are intentionally
 stored outside the target repository at
 `~/.local/state/quality-runner/dogfood/events.sqlite3`. The accompanying
 mode-0600 `identity.key` HMAC-pseudonymizes task and repository identity.
 Events contain only stable event names, timestamps, QR version, status/mode,
-latencies, aggregate finding deltas, changed-path counts, gate counts, and cache
-counts. They exclude prompts, source paths, finding bodies, raw task IDs, and
+latencies, aggregate finding deltas, changed-path counts, gate counts,
+per-gate/bootstrap durations, receipt-reuse state, and cache counts. They
+exclude prompts, source paths, finding bodies, raw task IDs, and
 raw repository identity. `qr dogfood report --json` emits the aggregate
 `quality-runner-dogfood-report-v0.1` projection. Capture degradation is visible
 but does not mutate canonical task artifacts or release eligibility.

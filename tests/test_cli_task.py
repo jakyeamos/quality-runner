@@ -111,6 +111,28 @@ def test_task_release_check_requires_eligible_authoritative_evidence(tmp_path: P
     assert record["last_release_enforcement"] == "required"
 
 
+def test_task_release_check_reuses_exact_authoritative_receipt(tmp_path: Path) -> None:
+    repo = _init_repo(tmp_path)
+    assert _qr(repo, "start", "--task-id", "release-reuse").returncode == 0
+    authoritative = _qr(repo, "check", "--task-id", "release-reuse")
+    authoritative_payload = json.loads(authoritative.stdout)
+
+    release = _qr(repo, "release-check", "--task-id", "release-reuse")
+    payload = json.loads(release.stdout)
+
+    assert authoritative.returncode == release.returncode == 0
+    assert payload["release_enforcement"] == "required"
+    assert payload["release_readiness"]["eligible"] is True
+    assert payload["receipt_reuse"] == {
+        "status": "hit",
+        "source_run_id": authoritative_payload["run_id"],
+    }
+    assert (
+        payload["snapshot"]["snapshot_digest"]
+        == authoritative_payload["snapshot"]["snapshot_digest"]
+    )
+
+
 def test_task_release_check_rejects_new_enforced_findings(tmp_path: Path) -> None:
     repo = _init_repo(tmp_path)
     assert _qr(repo, "start", "--task-id", "release-finding").returncode == 0
@@ -183,6 +205,7 @@ def test_task_fast_check_is_provisional_and_skips_certified_gates(tmp_path: Path
     assert payload["release_readiness"]["status"] == "ineligible"
     assert payload["release_readiness"]["eligible"] is False
     assert payload["release_readiness"]["criteria"]["authoritative_check"] is False
+    assert payload["analysis"]["analysis_mode"] == "balanced"
     assert "`qr task release-check`" in payload["next_action"]
 
     record = json.loads((repo / ".quality-runner" / "tasks" / "fast.json").read_text())

@@ -16,14 +16,19 @@ Prevention uses a hybrid feedback model:
   `qr task release-check` before completion, and explains how to respond to
   each result.
 - `qr task check --fast` provides provisional finding feedback during
-  implementation by reusing cached analysis without executing certified gates;
-  it cannot authorize release.
+  implementation with balanced analysis and validated content-cache reuse,
+  without executing certified gates; it cannot authorize release.
 - Mature repository-native checks provide faster feedback during editing.
 - QR independently verifies the exact workspace, task-relative finding delta,
   comparable coverage, policy hashes, and certified gate evidence.
 - Repository-local executable paths use a repository-relative identity so
   equivalent isolated worktrees do not create false toolchain drift; external
   executable paths remain absolute and distinct.
+
+An exact-snapshot passing gate receipt may skip repeated gate execution only
+when QR version, command and tool version, bootstrap, timeout, scope, and
+mutation policy still match. An exact authoritative task receipt has the same
+fail-closed identity rule and is the only reusable input to `release-check`.
 
 Static agent rules are not evidence that a check ran and cannot distinguish
 legacy debt from a new occurrence, incomplete coverage from resolution, or a
