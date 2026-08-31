@@ -3,7 +3,7 @@ from __future__ import annotations
 import math
 from numbers import Real
 from pathlib import PurePosixPath
-from typing import Any
+from typing import Any, cast
 
 CACHE_DESIGN_CLASSES = {
     "tool_cache",
@@ -34,6 +34,7 @@ def parse_cache_design_section(value: object, warnings: list[dict[str, str]]) ->
     if not isinstance(value, dict):
         warnings.append(_warning("quality_runner.cache_design must be a table"))
         return {}
+    value = cast(dict[str, Any], value)
     parsed_section: dict[str, Any] = {}
     measurement_max_entries = value.get("measurement_max_entries")
     if measurement_max_entries is not None:
@@ -52,8 +53,8 @@ def parse_cache_design_section(value: object, warnings: list[dict[str, str]]) ->
     measurement_max_seconds = value.get("measurement_max_seconds")
     if measurement_max_seconds is not None:
         if (
-            not isinstance(measurement_max_seconds, Real)
-            or isinstance(measurement_max_seconds, bool)
+            isinstance(measurement_max_seconds, bool)
+            or not isinstance(measurement_max_seconds, Real)
             or not math.isfinite(float(measurement_max_seconds))
             or measurement_max_seconds <= 0
         ):
@@ -69,7 +70,8 @@ def parse_cache_design_section(value: object, warnings: list[dict[str, str]]) ->
         return {**parsed_section, "paths": []}
     if not isinstance(paths, list):
         warnings.append(_warning("quality_runner.cache_design.paths must be a list of tables"))
-        return {**parsed_section, "paths": []}
+        return {"paths": []}
+    paths = cast(list[object], paths)
 
     parsed: list[dict[str, Any]] = []
     seen: set[str] = set()
@@ -78,6 +80,7 @@ def parse_cache_design_section(value: object, warnings: list[dict[str, str]]) ->
         if not isinstance(item, dict):
             warnings.append(_warning(f"{field} must be a table"))
             continue
+        item = cast(dict[str, Any], item)
         path = item.get("path")
         storage_class = item.get("class")
         lifecycle = item.get("lifecycle")

@@ -10,7 +10,7 @@ from typing import Any, cast
 from quality_runner.code_quality_python_performance import python_repository_performance_signals
 from quality_runner.schema_constants import GLOBAL_SKILL_CONFIG_SCHEMA, SKILL_SELECTION_SCHEMA
 from quality_runner.skill_config import load_active_skills, sanitize_skill_id
-from quality_runner.skill_selection_support import _diagnostic_signals, _global_warning
+from quality_runner.skill_selection_support import diagnostic_signals, global_warning
 
 GLOBAL_SKILL_CONFIG_ENV = "QUALITY_RUNNER_GLOBAL_CONFIG"
 GLOBAL_SKILL_CORPUS_ENV = "QUALITY_RUNNER_SKILL_CORPUS"
@@ -135,7 +135,7 @@ def load_selected_skills(
 
     corpus_path = global_config.get("corpus_path")
     if not isinstance(corpus_path, Path):
-        warning = _global_warning(
+        warning = global_warning(
             global_config.get("path"), "global skill config must include a corpus path"
         )
         selection["warnings"].append(warning)
@@ -148,7 +148,7 @@ def load_selected_skills(
     corpus, corpus_errors = load_skill_corpus(corpus_path)
     if corpus is None:
         corpus_warnings = [
-            _global_warning(global_config.get("path"), error) for error in corpus_errors
+            global_warning(global_config.get("path"), error) for error in corpus_errors
         ]
         selection["warnings"].extend(corpus_warnings)
         selection["status"] = "unavailable"
@@ -187,7 +187,7 @@ def load_selected_skills(
             "corpus_id": corpus.get("id"),
             "corpus_version": corpus.get("version"),
             "eligible_global_skill_ids": sorted(eligible_ids),
-            "repo_signals": _diagnostic_signals(signals),
+            "repo_signals": diagnostic_signals(signals),
         }
     )
 
@@ -224,7 +224,7 @@ def load_selected_skills(
             )
         candidates.append(candidate)
 
-    selection["repo_signals"] = _diagnostic_signals(signals, priority=diagnostic_matches)
+    selection["repo_signals"] = diagnostic_signals(signals, priority=diagnostic_matches)
     selected_entries.sort(
         key=lambda item: (
             0 if item[0]["id"] in always else 1,
@@ -273,14 +273,14 @@ def load_global_skill_config(
     if path is None:
         return None, []
     if not path.exists():
-        return None, [_global_warning(path, "global skill config was not found")]
+        return None, [global_warning(path, "global skill config was not found")]
 
     try:
         raw = tomllib.loads(path.read_text(encoding="utf-8"))
     except (OSError, tomllib.TOMLDecodeError) as error:
-        return None, [_global_warning(path, f"global skill config could not be parsed: {error}")]
+        return None, [global_warning(path, f"global skill config could not be parsed: {error}")]
     if raw.get("schema") != GLOBAL_SKILL_CONFIG_SCHEMA:
-        return None, [_global_warning(path, f"config schema must be {GLOBAL_SKILL_CONFIG_SCHEMA}")]
+        return None, [global_warning(path, f"config schema must be {GLOBAL_SKILL_CONFIG_SCHEMA}")]
     raw_map = raw
     quality_runner = raw_map.get("quality_runner")
     quality_runner_map = (
@@ -288,13 +288,13 @@ def load_global_skill_config(
     )
     skills_section = quality_runner_map.get("skills") if quality_runner_map is not None else None
     if not isinstance(skills_section, dict):
-        return None, [_global_warning(path, "config must include [quality_runner.skills]")]
+        return None, [global_warning(path, "config must include [quality_runner.skills]")]
     skills_section = cast(dict[str, Any], skills_section)
 
     warnings: list[dict[str, str]] = []
     enabled = skills_section.get("enabled", True)
     if not isinstance(enabled, bool):
-        warnings.append(_global_warning(path, "quality_runner.skills.enabled must be a boolean"))
+        warnings.append(global_warning(path, "quality_runner.skills.enabled must be a boolean"))
         enabled = False
     corpus_value = skills_section.get("corpus")
     corpus_path: Path | None = None
@@ -304,11 +304,11 @@ def load_global_skill_config(
             corpus_path = path.parent / corpus_path
         corpus_path = corpus_path.resolve()
     else:
-        warnings.append(_global_warning(path, "quality_runner.skills.corpus must be a path"))
+        warnings.append(global_warning(path, "quality_runner.skills.corpus must be a path"))
 
     mode = skills_section.get("mode", "relevant")
     if mode not in {"relevant", "all"}:
-        warnings.append(_global_warning(path, "quality_runner.skills.mode must be relevant or all"))
+        warnings.append(global_warning(path, "quality_runner.skills.mode must be relevant or all"))
         mode = "relevant"
     min_score = skills_section.get("min_score", DEFAULT_MIN_SCORE)
     if (
@@ -317,13 +317,13 @@ def load_global_skill_config(
         or not 0 <= min_score <= 1
     ):
         warnings.append(
-            _global_warning(path, "quality_runner.skills.min_score must be between 0 and 1")
+            global_warning(path, "quality_runner.skills.min_score must be between 0 and 1")
         )
         min_score = DEFAULT_MIN_SCORE
     max_active = skills_section.get("max_active", DEFAULT_MAX_ACTIVE)
     if not isinstance(max_active, int) or isinstance(max_active, bool) or not 1 <= max_active <= 50:
         warnings.append(
-            _global_warning(path, "quality_runner.skills.max_active must be between 1 and 50")
+            global_warning(path, "quality_runner.skills.max_active must be between 1 and 50")
         )
         max_active = DEFAULT_MAX_ACTIVE
     active = _config_ids(skills_section.get("active"), path, "active", warnings)
@@ -438,14 +438,14 @@ def _config_ids(
     if value is None:
         return []
     if not isinstance(value, list):
-        warnings.append(_global_warning(path, f"quality_runner.skills.{key} must be a list"))
+        warnings.append(global_warning(path, f"quality_runner.skills.{key} must be a list"))
         return []
     normalized: list[str] = []
     for item in cast(list[object], value):
         skill_id = sanitize_skill_id(item) if isinstance(item, str) else None
         if skill_id is None:
             warnings.append(
-                _global_warning(path, f"quality_runner.skills.{key} contains an invalid id")
+                global_warning(path, f"quality_runner.skills.{key} contains an invalid id")
             )
             continue
         if skill_id not in normalized:

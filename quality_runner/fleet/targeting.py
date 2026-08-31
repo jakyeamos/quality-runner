@@ -2,20 +2,28 @@ from __future__ import annotations
 
 import re
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
-from quality_runner.fleet.discovery import _ahead_behind, _git_output
+from quality_runner.fleet.discovery import ahead_behind, git_output
+
+
+def _object_list(value: object) -> list[object]:
+    return cast(list[object], value) if isinstance(value, list) else []
 
 
 def resolve_target_branch(
     repository: dict[str, Any], *, override: str | None = None
 ) -> dict[str, Any]:
-    checkouts = [item for item in repository.get("checkouts", []) if isinstance(item, dict)]
+    checkouts = [
+        cast(dict[str, Any], item)
+        for item in _object_list(repository.get("checkouts", []))
+        if isinstance(item, dict)
+    ]
     branches = sorted(
         {
             branch
             for checkout in checkouts
-            for branch in checkout.get("local_branches", [])
+            for branch in _object_list(checkout.get("local_branches", []))
             if isinstance(branch, str) and branch
         }
     )
@@ -129,7 +137,7 @@ def _branch_head(checkout: dict[str, Any], branch: str) -> str | None:
     path = checkout.get("path")
     if not isinstance(path, str) or not path:
         return None
-    return _git_output(Path(path), "rev-parse", "--verify", f"refs/heads/{branch}")
+    return git_output(Path(path), "rev-parse", "--verify", f"refs/heads/{branch}")
 
 
 def _branch_state(checkout: dict[str, Any], branch: str, head: str | None) -> dict[str, Any]:
@@ -149,7 +157,7 @@ def _branch_state(checkout: dict[str, Any], branch: str, head: str | None) -> di
             "safe_action": "verify_local_target",
         }
     root = Path(path)
-    upstream = _git_output(
+    upstream = git_output(
         root, "for-each-ref", "--format=%(upstream:short)", f"refs/heads/{branch}"
     )
     evidence: dict[str, Any] = {
@@ -161,8 +169,8 @@ def _branch_state(checkout: dict[str, Any], branch: str, head: str | None) -> di
         "safe_action": "none",
     }
     if upstream:
-        upstream_head = _git_output(root, "rev-parse", "--verify", upstream)
-        ahead, behind = _ahead_behind(root, upstream, head=head)
+        upstream_head = git_output(root, "rev-parse", "--verify", upstream)
+        ahead, behind = ahead_behind(root, upstream, head=head)
         evidence.update({"upstream_head": upstream_head, "ahead": ahead, "behind": behind})
         if upstream_head is None or ahead is None or behind is None:
             return {
@@ -242,13 +250,16 @@ def _documented_branch(repository: dict[str, Any]) -> tuple[str, str] | None:
 
 
 def _remote_default_branch(repository: dict[str, Any], branches: list[str]) -> str | None:
-    for checkout in repository.get("checkouts", []):
-        if not isinstance(checkout, dict) or checkout.get("exists") is not True:
+    for raw_checkout in _object_list(repository.get("checkouts", [])):
+        if not isinstance(raw_checkout, dict):
+            continue
+        checkout = cast(dict[str, Any], raw_checkout)
+        if checkout.get("exists") is not True:
             continue
         raw_path = checkout.get("path")
         if not isinstance(raw_path, str) or not raw_path:
             continue
-        remote_head = _git_output(
+        remote_head = git_output(
             Path(raw_path), "symbolic-ref", "--short", "refs/remotes/origin/HEAD"
         )
         if remote_head and "/" in remote_head:

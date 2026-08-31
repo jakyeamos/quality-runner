@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from quality_runner.fleet.mac_control_contracts import (
     BROWSER_PROVIDERS,
@@ -23,10 +23,10 @@ from quality_runner.fleet.mac_control_contracts import (
     SOURCE_EVIDENCE_CONTEXT_RADIUS,
     SOURCE_EVIDENCE_MAX_BYTES,
     SURFACE_KINDS,
-    _nonempty,
-    _normalize_applicability,
-    _normalize_token,
     bool_mapping,
+    nonempty,
+    normalize_applicability,
+    normalize_token,
     object_list,
     object_mapping,
     string_list,
@@ -34,12 +34,12 @@ from quality_runner.fleet.mac_control_contracts import (
 
 
 def validate_v4_task(task: dict[str, Any], label: str, errors: list[str]) -> None:
-    surface_kind = _normalize_token(task.get("surface_kind"))
+    surface_kind = normalize_token(task.get("surface_kind"))
     if surface_kind not in SURFACE_KINDS:
         errors.append(f"task {label} surface_kind must be one of {', '.join(SURFACE_KINDS)}")
 
     candidates = object_list(task.get("route_candidates"))
-    providers = {_normalize_token(candidate.get("provider")) for candidate in candidates}
+    providers = {normalize_token(candidate.get("provider")) for candidate in candidates}
     if len(candidates) < 2:
         errors.append(f"task {label} route_flexibility requires at least two route candidates")
     if surface_kind == "web_content":
@@ -60,10 +60,10 @@ def validate_v4_task(task: dict[str, Any], label: str, errors: list[str]) -> Non
 
     accessibility = object_mapping(task.get("accessibility"))
     for candidate in candidates:
-        method = _normalize_token(candidate.get("method"))
-        if method == "accessibility" and not _nonempty(accessibility.get("identifier")):
+        method = normalize_token(candidate.get("method"))
+        if method == "accessibility" and not nonempty(accessibility.get("identifier")):
             errors.append(f"task {label} accessibility route requires accessibility.identifier")
-        if method in {"pointer", "visual", "drag"} and _normalize_token(
+        if method in {"pointer", "visual", "drag"} and normalize_token(
             task.get("fallback_policy")
         ) not in {"explicit_handoff", "fresh_state_handoff"}:
             errors.append(
@@ -71,7 +71,7 @@ def validate_v4_task(task: dict[str, Any], label: str, errors: list[str]) -> Non
             )
 
     oracle = object_mapping(task.get("verification_oracle"))
-    if _normalize_token(oracle.get("expected_state")) in GENERIC_EXPECTED_STATES:
+    if normalize_token(oracle.get("expected_state")) in GENERIC_EXPECTED_STATES:
         errors.append(
             f"task {label} verification_oracle expected_state must name a machine-checkable value"
         )
@@ -80,6 +80,7 @@ def validate_v4_task(task: dict[str, Any], label: str, errors: list[str]) -> Non
     if not isinstance(semantic_evidence, dict):
         errors.append(f"task {label} requires semantic_evidence")
         return
+    semantic_evidence = object_mapping(cast(object, semantic_evidence))
     for criterion in semantic_evidence:
         if criterion not in CRITERIA:
             errors.append(f"task {label} semantic_evidence contains unsupported key {criterion}")
@@ -90,20 +91,24 @@ def validate_v4_task(task: dict[str, Any], label: str, errors: list[str]) -> Non
         if not isinstance(evidence, dict):
             errors.append(f"{evidence_label} is required")
             continue
-        if _normalize_token(evidence.get("level")) != SEMANTIC_EVIDENCE_LEVEL:
+        evidence = object_mapping(cast(object, evidence))
+        if normalize_token(evidence.get("level")) != SEMANTIC_EVIDENCE_LEVEL:
             errors.append(f"{evidence_label}.level must be {SEMANTIC_EVIDENCE_LEVEL}")
         claims = evidence.get("claims")
         if not isinstance(claims, dict):
             errors.append(f"{evidence_label}.claims must be an object")
             claims = {}
+        else:
+            claims = object_mapping(cast(object, claims))
         for key in SEMANTIC_CLAIM_KEYS[criterion]:
-            if not _nonempty(claims.get(key)):
+            if not nonempty(claims.get(key)):
                 errors.append(f"{evidence_label}.claims.{key} is required")
         _validate_semantic_claims(criterion, claims, task, providers, evidence_label, errors)
         refs = evidence.get("source_refs")
         if not isinstance(refs, list) or not refs:
             errors.append(f"{evidence_label}.source_refs requires at least one source reference")
         else:
+            refs = cast(list[object], refs)
             for ref_index, ref in enumerate(refs):
                 _validate_source_ref(ref, f"{evidence_label}.source_refs[{ref_index}]", errors)
         fingerprint = json.dumps(
@@ -123,10 +128,10 @@ def _validate_semantic_claims(
     errors: list[str],
 ) -> None:
     if criterion == "stable_identity":
-        selector_kind = _normalize_token(claims.get("selector_kind"))
+        selector_kind = normalize_token(claims.get("selector_kind"))
         if selector_kind not in SELECTOR_KINDS:
             errors.append(f"{label}.claims.selector_kind is unsupported")
-        surface_kind = _normalize_token(task.get("surface_kind"))
+        surface_kind = normalize_token(task.get("surface_kind"))
         if surface_kind == "web_content" and selector_kind not in {
             "aria_label",
             "data_attribute",
@@ -143,18 +148,18 @@ def _validate_semantic_claims(
             != str(task.get("stable_target_id", "")).strip()
         ):
             errors.append(f"{label}.claims.selector_value must equal stable_target_id")
-        if _normalize_token(claims.get("uniqueness")) != "exactly_one":
+        if normalize_token(claims.get("uniqueness")) != "exactly_one":
             errors.append(f"{label}.claims.uniqueness must be exactly_one")
     elif (
         criterion == "useful_hierarchy"
-        and _normalize_token(claims.get("uniqueness")) != "exactly_one"
+        and normalize_token(claims.get("uniqueness")) != "exactly_one"
     ):
         errors.append(f"{label}.claims.uniqueness must be exactly_one")
     elif criterion == "efficient_navigation":
-        strategy = _normalize_token(claims.get("strategy"))
+        strategy = normalize_token(claims.get("strategy"))
         if strategy not in NAVIGATION_STRATEGIES:
             errors.append(f"{label}.claims.strategy is unsupported")
-        if strategy != _normalize_token(task.get("navigation_strategy")):
+        if strategy != normalize_token(task.get("navigation_strategy")):
             errors.append(f"{label}.claims.strategy must match task navigation_strategy")
         if (
             strategy == "direct_semantic"
@@ -163,9 +168,9 @@ def _validate_semantic_claims(
         ):
             errors.append(f"{label}.claims.entry_point must equal stable_target_id")
     elif criterion == "verifiable_outcomes":
-        if _normalize_token(claims.get("operator")) not in READBACK_OPERATORS:
+        if normalize_token(claims.get("operator")) not in READBACK_OPERATORS:
             errors.append(f"{label}.claims.operator is unsupported")
-        if _normalize_token(claims.get("expected")) in GENERIC_EXPECTED_STATES:
+        if normalize_token(claims.get("expected")) in GENERIC_EXPECTED_STATES:
             errors.append(f"{label}.claims.expected must name a machine-checkable value")
         if (
             str(claims.get("expected", "")).strip()
@@ -174,31 +179,31 @@ def _validate_semantic_claims(
             ).strip()
         ):
             errors.append(f"{label}.claims.expected must match verification_oracle.expected_state")
-        if _normalize_token(claims.get("readback_provider")) not in providers:
+        if normalize_token(claims.get("readback_provider")) not in providers:
             errors.append(f"{label}.claims.readback_provider must match a route candidate")
     elif criterion == "route_flexibility":
-        primary = _normalize_token(claims.get("primary_provider"))
-        secondary = _normalize_token(claims.get("secondary_provider"))
+        primary = normalize_token(claims.get("primary_provider"))
+        secondary = normalize_token(claims.get("secondary_provider"))
         if primary not in providers:
             errors.append(f"{label}.claims.primary_provider must match a route candidate")
         if secondary not in providers:
             errors.append(f"{label}.claims.secondary_provider must match a route candidate")
         if primary == secondary:
             errors.append(f"{label}.claims.secondary_provider must differ from primary_provider")
-        if _normalize_token(claims.get("fallback_policy")) != _normalize_token(
+        if normalize_token(claims.get("fallback_policy")) != normalize_token(
             task.get("fallback_policy")
         ):
             errors.append(f"{label}.claims.fallback_policy must match the task fallback_policy")
     elif criterion == "stable_change_behavior":
         scenarios = {
-            _normalize_token(value)
+            normalize_token(value)
             for value in str(claims.get("scenarios", "")).split(",")
             if value.strip()
         }
         for state in CHANGE_STATES:
             if state not in scenarios:
                 errors.append(f"{label}.claims.scenarios is missing {state}")
-        if _normalize_token(claims.get("failure_behavior")) not in FAILURE_BEHAVIORS:
+        if normalize_token(claims.get("failure_behavior")) not in FAILURE_BEHAVIORS:
             errors.append(f"{label}.claims.failure_behavior is unsupported")
 
 
@@ -206,6 +211,7 @@ def _validate_source_ref(value: object, label: str, errors: list[str]) -> None:
     if not isinstance(value, dict):
         errors.append(f"{label} must be an object")
         return
+    value = object_mapping(cast(object, value))
     path = str(value.get("path", "")).strip()
     path_value = Path(path)
     if not path or path_value.is_absolute() or ".." in path_value.parts:
@@ -217,17 +223,22 @@ def _validate_source_ref(value: object, label: str, errors: list[str]) -> None:
         )
     if path_value.suffix.casefold() not in IMPLEMENTATION_SOURCE_SUFFIXES:
         errors.append(f"{label}.path must use a supported implementation-source extension")
-    if not _nonempty(value.get("anchor")):
+    if not nonempty(value.get("anchor")):
         errors.append(f"{label}.anchor is required")
     tokens = value.get("evidence_tokens")
-    if not isinstance(tokens, list) or not tokens or any(not _nonempty(token) for token in tokens):
+    if (
+        not isinstance(tokens, list)
+        or not tokens
+        or any(not nonempty(token) for token in cast(list[object], tokens))
+    ):
         errors.append(f"{label}.evidence_tokens requires non-empty source tokens")
 
 
 def evaluate_semantic_evidence(repository_root: Path, manifest: object) -> dict[str, Any]:
     if not isinstance(manifest, dict):
         return _empty_semantic_evaluation("not_source_grounded")
-    applicability = _normalize_applicability(manifest.get("applicability"))
+    manifest = object_mapping(cast(object, manifest))
+    applicability = normalize_applicability(manifest.get("applicability"))
     if applicability == "not_applicable":
         return _empty_semantic_evaluation("not_applicable", criteria_total=0)
     schema = str(manifest.get("schema", "")).strip()
@@ -270,6 +281,7 @@ def evaluate_semantic_evidence(repository_root: Path, manifest: object) -> dict[
             if not isinstance(refs, list) or not refs:
                 criterion_errors.append(f"task {task_id} {criterion} has no source references")
                 continue
+            refs = cast(list[object], refs)
             task_errors: list[str] = []
             for ref in refs:
                 ref_errors, ref_evidence = _ground_source_ref(root, ref, cache)
@@ -332,6 +344,7 @@ def _ground_source_ref(
 ) -> tuple[list[str], str | None]:
     if not isinstance(value, dict):
         return ["source reference is not an object"], None
+    value = object_mapping(cast(object, value))
     relative = Path(str(value.get("path", "")).strip())
     if not str(relative) or relative.is_absolute() or ".." in relative.parts:
         return ["source path is not repository-relative"], None

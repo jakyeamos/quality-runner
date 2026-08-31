@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from quality_runner.discovery import inspect_repo
 from quality_runner.fleet.coordinator import MAX_DYNAMIC_COMMANDS
@@ -40,13 +40,15 @@ def quality_commands_from_scan(repository: dict[str, Any]) -> list[dict[str, Any
     scan = repository.get("scan")
     if not isinstance(scan, dict):
         return []
+    scan = cast(dict[str, Any], scan)
     commands = scan.get("quality_commands")
     if not isinstance(commands, list):
         return []
     candidates = [
-        item
-        for item in commands
-        if isinstance(item, dict) and item.get("id") in ALLOWED_DYNAMIC_CAPABILITIES
+        cast(dict[str, Any], item)
+        for item in cast(list[object], commands)
+        if isinstance(item, dict)
+        and cast(dict[str, Any], item).get("id") in ALLOWED_DYNAMIC_CAPABILITIES
     ]
     grouped: dict[str, list[dict[str, Any]]] = {}
     for candidate in candidates:

@@ -1,29 +1,34 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 
 from quality_runner.fleet.contracts import FLEET_FINDING_SCHEMA, digest
 
 
 def apply_dynamic_quality_evidence(result: dict[str, Any]) -> None:
-    dynamic = result.get("dynamic")
-    if not isinstance(dynamic, dict):
+    dynamic_value = result.get("dynamic")
+    if not isinstance(dynamic_value, dict):
         return
+    dynamic = cast(dict[str, Any], dynamic_value)
     status = str(dynamic.get("status", "unknown"))
-    findings = result.get("findings", [])
-    if not isinstance(findings, list):
+    findings_value = result.get("findings", [])
+    if not isinstance(findings_value, list):
         return
+    findings = cast(list[dict[str, Any]], findings_value)
     if status not in {"passed", "reused"}:
         _append_dynamic_finding(result, findings, dynamic, status)
         return
-    for finding in findings:
-        if isinstance(finding, dict) and finding.get("dimension") == "quality_commands":
+    for finding_value in cast(list[object], findings_value):
+        if not isinstance(finding_value, dict):
+            continue
+        finding = cast(dict[str, Any], finding_value)
+        if finding.get("dimension") == "quality_commands":
             finding["score"] = 4
             finding["status"] = "validated"
             finding["message"] = (
                 "Discovered local quality commands passed in a protected disposable worktree."
             )
-            finding["evidence"].append(
+            cast(list[dict[str, Any]], finding["evidence"]).append(
                 {"path": "dynamic disposable worktree", "detail": "all selected commands passed"}
             )
             break
@@ -39,7 +44,7 @@ def _append_dynamic_finding(
         return
     finding_status = "blocked" if status in {"blocked", "failed", "timeout"} else "unknown"
     reason = str(dynamic.get("reason", "dynamic verification did not produce passing evidence"))
-    target_state = dynamic.get("target_state")
+    target_state_value = dynamic.get("target_state")
     evidence: list[dict[str, Any]] = [
         {
             "path": "dynamic disposable worktree",
@@ -47,7 +52,8 @@ def _append_dynamic_finding(
             "dynamic_status": status,
         }
     ]
-    if isinstance(target_state, dict):
+    if isinstance(target_state_value, dict):
+        target_state = cast(dict[str, Any], target_state_value)
         evidence.append(
             {
                 "path": "target branch provenance",

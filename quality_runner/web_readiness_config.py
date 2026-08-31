@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 
 DEFAULT_BUNDLE_BUDGET_GZIP_BYTES = 200_000
 DEFAULT_TOTAL_BUNDLE_BUDGET_GZIP_BYTES = 800_000
@@ -16,6 +16,7 @@ def parse_web_readiness_section(
     if not isinstance(value, dict):
         warnings.append(_warning("quality_runner.web_readiness must be a table"))
         return {}
+    value = cast(dict[str, Any], value)
 
     applicability = value.get("applicability", "unknown")
     if not isinstance(applicability, str) or applicability not in VALID_APPLICABILITY:
@@ -72,8 +73,10 @@ def _string_list(
 ) -> list[str]:
     if value is None:
         return []
-    if isinstance(value, list) and all(isinstance(item, str) and item.strip() for item in value):
-        return sorted({item.strip() for item in value})
+    if isinstance(value, list):
+        values = cast(list[object], value)
+        if all(isinstance(item, str) and item.strip() for item in values):
+            return sorted({item.strip() for item in values if isinstance(item, str)})
     warnings.append(
         _warning(f"quality_runner.web_readiness.{field} must be a list of non-empty strings")
     )

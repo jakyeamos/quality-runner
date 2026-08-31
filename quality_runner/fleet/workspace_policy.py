@@ -11,7 +11,7 @@ import json
 from collections.abc import Iterable, Mapping
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from quality_runner.fleet.behavior_support import iso_timestamp
 
@@ -26,7 +26,7 @@ ROLE_TARGETS: dict[str, int | None] = {
     "role_unresolved": None,
 }
 
-EXPECTED_CANONICAL_ROLES = {
+EXPECTED_CANONICAL_ROLES: dict[str, set[str]] = {
     "production_product": {"release", "integration"},
     "supporting_project": {"working"},
     "role_unresolved": set(),
@@ -40,7 +40,7 @@ def _error(message: str) -> ValueError:
 def _object(value: Any, context: str) -> dict[str, Any]:
     if not isinstance(value, dict):
         raise _error(f"{context} must be an object")
-    return value
+    return cast(dict[str, Any], value)
 
 
 def _nonempty_string(value: Any, field: str) -> str:
@@ -66,6 +66,7 @@ def validate_workspace_policy(value: Mapping[str, Any]) -> dict[str, Any]:
         raise _error(
             "repository_role must be production_product, supporting_project, or role_unresolved"
         )
+    role = cast(str, role)
 
     canonical_value = payload.get("canonical_workspaces")
     if not isinstance(canonical_value, list):
@@ -74,7 +75,7 @@ def validate_workspace_policy(value: Mapping[str, Any]) -> dict[str, Any]:
     ids: set[str] = set()
     refs: set[str] = set()
     roles: set[str] = set()
-    for index, item in enumerate(canonical_value):
+    for index, item in enumerate(cast(list[object], canonical_value)):
         entry = _object(item, f"canonical_workspaces[{index}]")
         entry_id = _nonempty_string(entry.get("id"), f"canonical_workspaces[{index}].id")
         entry_role = _nonempty_string(entry.get("role"), f"canonical_workspaces[{index}].role")
@@ -114,7 +115,7 @@ def validate_workspace_policy(value: Mapping[str, Any]) -> dict[str, Any]:
         raise _error("retention_exceptions must be an array")
     retention: list[dict[str, str]] = []
     retention_ids: set[str] = set()
-    for index, item in enumerate(retention_value):
+    for index, item in enumerate(cast(list[object], retention_value)):
         entry = _object(item, f"retention_exceptions[{index}]")
         lane_id = _nonempty_string(entry.get("lane_id"), f"retention_exceptions[{index}].lane_id")
         reason = _nonempty_string(entry.get("reason"), f"retention_exceptions[{index}].reason")

@@ -8,13 +8,10 @@ import time
 from collections.abc import Sequence
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from quality_runner import __version__
-from quality_runner.edge_trace import read_trace as _read_trace
-from quality_runner.edge_trace import receipt_trace as _receipt_trace
-from quality_runner.edge_trace import store_private_trace as _store_private_trace
-from quality_runner.edge_trace import validate_trace as _validate_trace
+from quality_runner.edge_trace import read_trace, receipt_trace, store_private_trace, validate_trace
 from quality_runner.fleet.behavior_contract import (
     CONTRACT_PATH,
     CONTRACT_SCHEMA,
@@ -57,7 +54,11 @@ def verify_behavior_command(
         or contract.get("applicability") != "applicable"
     ):
         raise ValueError("behavior verify requires a compatible applicable behavior contract")
-    approved = contract.get("approved_producers", ["quality-runner"])
+    approved = [
+        item
+        for item in _object_list(contract.get("approved_producers", ["quality-runner"]))
+        if isinstance(item, str)
+    ]
     if "quality-runner" not in approved:
         raise ValueError("the behavior contract does not approve the quality-runner producer")
     _require_committed_contract(root)
@@ -65,14 +66,14 @@ def verify_behavior_command(
     behavior = next(
         (
             item
-            for item in contract.get("behaviors", [])
-            if isinstance(item, dict) and item.get("id") == behavior_id
+            for item in _object_mappings(contract.get("behaviors", []))
+            if item.get("id") == behavior_id
         ),
         None,
     )
     if behavior is None:
         raise ValueError(f"unknown behavior id: {behavior_id}")
-    scenarios = [item for item in behavior.get("scenarios", []) if isinstance(item, dict)]
+    scenarios = _object_mappings(behavior.get("scenarios", []))
     selected_ids = list(dict.fromkeys(scenario_ids)) or [
         str(item.get("id", "")) for item in scenarios
     ]
@@ -98,7 +99,9 @@ def verify_behavior_command(
     if not branch or not commit:
         raise ValueError("behavior verify requires a named Git branch and target commit")
     dirty_paths = _dirty_paths(root)
-    triggers = [item for item in behavior.get("change_triggers", []) if isinstance(item, str)]
+    triggers = [
+        item for item in _object_list(behavior.get("change_triggers", [])) if isinstance(item, str)
+    ]
     relevant_dirty = sorted(
         path for path in dirty_paths if any(fnmatch.fnmatch(path, pattern) for pattern in triggers)
     )
@@ -210,7 +213,12 @@ def record_edge_trace(
     contract = _read_json_object(root / CONTRACT_PATH)
     if contract.get("schema") != CONTRACT_SCHEMA or contract.get("applicability") != "applicable":
         raise ValueError("behavior record-edge requires an applicable v2 behavior contract")
-    if "quality-runner" not in contract.get("approved_producers", ["quality-runner"]):
+    approved = [
+        item
+        for item in _object_list(contract.get("approved_producers", ["quality-runner"]))
+        if isinstance(item, str)
+    ]
+    if "quality-runner" not in approved:
         raise ValueError("the behavior contract does not approve the quality-runner producer")
     _require_committed_contract(root)
     behavior, scenario = _select_scenario(contract, behavior_id, scenario_id)
@@ -219,12 +227,13 @@ def record_edge_trace(
     profile = scenario.get("edge_profile")
     if not isinstance(profile, dict):
         raise ValueError("record-edge requires a scenario edge_profile")
+    profile = cast(dict[str, Any], profile)
     if profile.get("side_effects") == "destructive":
         raise ValueError("destructive edge scenarios require a separately authorized producer")
     _require_clean_triggers(root, behavior)
 
-    trace = _read_trace(trace_path)
-    _validate_trace(
+    trace = read_trace(trace_path)
+    validate_trace(
         trace,
         behavior=behavior,
         scenario=scenario,
@@ -235,8 +244,8 @@ def record_edge_trace(
     trace_sha256 = digest(trace)
     private_trace_id: str | None = None
     if trace["sensitivity"] == "security_sensitive":
-        private_trace_id = _store_private_trace(trace, trace_sha256)
-    evidence_trace = _receipt_trace(
+        private_trace_id = store_private_trace(trace, trace_sha256)
+    evidence_trace = receipt_trace(
         trace,
         trace_sha256=trace_sha256,
         environment=environment,
@@ -298,8 +307,8 @@ def _select_scenario(
     behavior = next(
         (
             item
-            for item in contract.get("behaviors", [])
-            if isinstance(item, dict) and item.get("id") == behavior_id
+            for item in _object_mappings(contract.get("behaviors", []))
+            if item.get("id") == behavior_id
         ),
         None,
     )
@@ -308,8 +317,8 @@ def _select_scenario(
     scenario = next(
         (
             item
-            for item in behavior.get("scenarios", [])
-            if isinstance(item, dict) and item.get("id") == scenario_id
+            for item in _object_mappings(behavior.get("scenarios", []))
+            if item.get("id") == scenario_id
         ),
         None,
     )
@@ -319,7 +328,9 @@ def _select_scenario(
 
 
 def _require_clean_triggers(root: Path, behavior: dict[str, Any]) -> None:
-    triggers = [item for item in behavior.get("change_triggers", []) if isinstance(item, str)]
+    triggers = [
+        item for item in _object_list(behavior.get("change_triggers", [])) if isinstance(item, str)
+    ]
     relevant = sorted(
         path
         for path in _dirty_paths(root)
@@ -349,7 +360,15 @@ def _read_json_object(path: Path) -> dict[str, Any]:
         raise ValueError(f"could not read behavior contract: {error}") from error
     if not isinstance(value, dict):
         raise ValueError("behavior contract JSON root must be an object")
-    return value
+    return cast(dict[str, Any], value)
+
+
+def _object_list(value: object) -> list[object]:
+    return cast(list[object], value) if isinstance(value, list) else []
+
+
+def _object_mappings(value: object) -> list[dict[str, Any]]:
+    return [cast(dict[str, Any], item) for item in _object_list(value) if isinstance(item, dict)]
 
 
 def _require_committed_contract(root: Path) -> None:

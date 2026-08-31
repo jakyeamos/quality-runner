@@ -109,7 +109,7 @@ Every applicable change-matrix surface must be classified as `public_core`,
 `public_adapter`, or `local_only`; public adapters require sanitized contract
 fixtures, and local operator wiring must not ship. The command persists
 `.quality-runner/release-boundary.json` using schema v2. Release consumers must
-require its exact branch and commit, matching matrix and artifact digests, and
+require its exact branch/ref and commit, matching matrix and artifact digests, and
 all checks passed; v1, stale, dirty, or missing evidence is not releasable.
 
 For the complete pre-release path, also run:

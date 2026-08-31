@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import argparse
 from pathlib import Path
-from typing import Any
+from typing import Any, Protocol
 
 from quality_runner.config import load_repo_config
 from quality_runner.web_readiness import (
@@ -12,8 +12,12 @@ from quality_runner.web_readiness import (
 )
 
 
+class SubparserCollection(Protocol):
+    def add_parser(self, name: str, **kwargs: Any) -> argparse.ArgumentParser: ...
+
+
 def add_web_readiness_command(
-    subparsers: argparse._SubParsersAction[argparse.ArgumentParser],
+    subparsers: SubparserCollection,
 ) -> None:
     parser = subparsers.add_parser(
         "web-readiness",

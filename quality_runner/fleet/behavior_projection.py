@@ -71,7 +71,7 @@ def coverage(
         if profiled
         else "unprofiled"
     )
-    result = {
+    result: dict[str, Any] = {
         "total": total,
         "profiled": profiled,
         **{

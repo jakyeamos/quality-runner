@@ -349,7 +349,7 @@ def _structural_rule_metadata(representative: dict[str, Any]) -> dict[str, Any]:
             metadata[field] = value
     evidence_needed = typed_representative.get("evidence_needed")
     if isinstance(evidence_needed, list) and all(
-        isinstance(item, str) and item for item in evidence_needed
+        isinstance(item, str) and item for item in cast(list[object], evidence_needed)
     ):
         metadata["evidence_needed"] = evidence_needed
     return metadata

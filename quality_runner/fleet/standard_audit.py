@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from quality_runner.fleet.cache_design import assess_cache_design
 from quality_runner.fleet.contracts import (
@@ -18,6 +18,7 @@ def cache_design_finding_arguments(
     cache_config = config.get("cache_design")
     measurement_options: dict[str, Any] = {}
     if isinstance(cache_config, dict):
+        cache_config = cast(dict[str, Any], cache_config)
         max_entries = cache_config.get("measurement_max_entries")
         if isinstance(max_entries, int) and not isinstance(max_entries, bool) and max_entries > 0:
             measurement_options["max_entries"] = max_entries
@@ -114,16 +115,17 @@ def build_standard_report(
     score_counts: dict[str, int] = {}
     for result in sorted(repositories, key=lambda item: str(item.get("repo_id", ""))):
         repository_path = _repository_path(result, projects_root)
-        assessments = []
+        assessments: list[dict[str, Any]] = []
         for dimension in dimensions:
             finding = next(
                 (
                     item
-                    for item in result.get("findings", [])
-                    if isinstance(item, dict) and item.get("dimension") == dimension
+                    for item in _object_mappings(cast(object, result.get("findings", [])))
+                    if item.get("dimension") == dimension
                 ),
                 None,
             )
+            assessment: dict[str, Any]
             if finding is None:
                 assessment = {
                     "dimension": dimension,
@@ -138,9 +140,7 @@ def build_standard_report(
                     "status": str(finding.get("status", "unknown")),
                     "score": finding.get("score"),
                     "message": str(finding.get("message", "")),
-                    "evidence": [
-                        item for item in finding.get("evidence", []) if isinstance(item, dict)
-                    ][:12],
+                    "evidence": _object_mappings(cast(object, finding.get("evidence", [])))[:12],
                 }
             status = str(assessment["status"])
             score = assessment["score"]
@@ -186,10 +186,20 @@ def build_standard_report(
 
 def _repository_path(result: dict[str, Any], projects_root: Path) -> str | None:
     repository = result.get("repository")
-    if not isinstance(repository, dict) or not isinstance(repository.get("primary_path"), str):
+    if not isinstance(repository, dict):
+        return None
+    repository = cast(dict[str, Any], repository)
+    if not isinstance(repository.get("primary_path"), str):
         return None
     primary_path = Path(repository["primary_path"]).expanduser().resolve()
     try:
         return primary_path.relative_to(projects_root.expanduser().resolve()).as_posix()
     except ValueError:
         return None
+
+
+def _object_mappings(value: object) -> list[dict[str, Any]]:
+    if not isinstance(value, list):
+        return []
+    values = cast(list[object], cast(object, value))
+    return [cast(dict[str, Any], cast(object, item)) for item in values if isinstance(item, dict)]

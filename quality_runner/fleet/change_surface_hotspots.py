@@ -87,7 +87,7 @@ def assess_change_surface_hotspots(root: Path, as_of: str) -> dict[str, Any]:
     fan_in, fan_out = _dependency_counts(resolved_root, source_files, source_paths)
     repeated_literals = _repeated_literals(resolved_root, source_files)
     families = _hotspot_families(commit_counts, cochange, fan_in, fan_out, repeated_literals)
-    hotspots = []
+    hotspots: list[dict[str, Any]] = []
     for path, family_values in families.items():
         if len(family_values) < 2:
             continue
@@ -138,7 +138,7 @@ def assess_change_surface_hotspots(root: Path, as_of: str) -> dict[str, Any]:
             f"{len(hotspots)} bounded change-surface hotspot(s) were identified for planned review."
         )
 
-    evidence = [
+    evidence: list[dict[str, str]] = [
         {
             "path": item["path"],
             "detail": (

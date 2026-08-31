@@ -108,15 +108,11 @@ def _matrix_contract_check(
     if not required:
         violations.append({"rule": "missing-required-surfaces", "path": "baseline.required_on_add"})
     surfaces = matrix.get("surfaces")
-    surface_ids = (
-        {
-            str(surface.get("id"))
-            for surface in cast(list[object], surfaces)
-            if isinstance(surface, dict) and isinstance(surface.get("id"), str)
-        }
-        if isinstance(surfaces, list)
-        else set()
-    )
+    surface_ids = {
+        str(surface.get("id"))
+        for surface in _object_list(surfaces)
+        if isinstance(surface.get("id"), str)
+    }
     if not surface_ids:
         violations.append({"rule": "missing-surface-registry", "path": "surfaces"})
     for surface_id in [*required, *conditional]:
@@ -319,9 +315,11 @@ def _surface_entries(value: object) -> dict[str, list[dict[str, Any]]]:
     if not isinstance(value, list):
         return entries
     for raw in cast(list[object], value):
-        if not isinstance(raw, dict) or not isinstance(raw.get("surface_id"), str):
+        if not isinstance(raw, dict):
             continue
         entry = cast(dict[str, Any], raw)
+        if not isinstance(entry.get("surface_id"), str):
+            continue
         entries.setdefault(str(entry["surface_id"]), []).append(entry)
     return entries
 
@@ -368,7 +366,7 @@ def _git_provenance(root: Path) -> tuple[str | None, str | None, list[str]]:
         status = git("status", "--porcelain=v1", "-z", "--untracked-files=all").stdout
     except (OSError, subprocess.CalledProcessError, subprocess.TimeoutExpired):
         return None, None, []
-    dirty_paths = []
+    dirty_paths: list[str] = []
     for entry in status.split("\0"):
         if len(entry) >= 4:
             dirty_paths.append(entry[3:].split(" -> ")[-1])
@@ -419,6 +417,14 @@ def _check(check_id: str, violations: list[dict[str, Any]]) -> dict[str, Any]:
 
 def _object(value: object) -> dict[str, Any]:
     return cast(dict[str, Any], value) if isinstance(value, dict) else {}
+
+
+def _object_list(value: object) -> list[dict[str, Any]]:
+    if not isinstance(value, list):
+        return []
+    return [
+        cast(dict[str, Any], item) for item in cast(list[object], value) if isinstance(item, dict)
+    ]
 
 
 def _string_list(value: object) -> list[str]:

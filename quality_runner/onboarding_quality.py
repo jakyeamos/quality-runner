@@ -232,8 +232,11 @@ def _records_by_id(value: object) -> dict[str, dict[str, Any]]:
     if not isinstance(value, list):
         return result
     for raw in cast(list[object], value):
-        if isinstance(raw, dict) and isinstance(raw.get("id"), str):
-            result[str(raw["id"])] = cast(dict[str, Any], raw)
+        if not isinstance(raw, dict):
+            continue
+        record = cast(dict[str, Any], raw)
+        if isinstance(record.get("id"), str):
+            result[str(record["id"])] = record
     return result
 
 

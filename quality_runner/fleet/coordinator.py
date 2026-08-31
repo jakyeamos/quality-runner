@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import threading
 from collections.abc import Callable
-from typing import Any
+from typing import Any, cast
 
 from quality_runner.refresh_timeout import workflow_deadline
 
@@ -41,8 +41,13 @@ def coordinate_dynamic_result(
         if coordinator_watchdog_timeout_seconds is not None
         else dynamic_repository_watchdog_seconds(per_command_timeout)
     )
-    repository = builder_arguments.get("repository", {})
-    target = repository.get("target_branch", {}) if isinstance(repository, dict) else {}
+    repository_value: object = builder_arguments.get("repository", {})
+    target_value: object = (
+        cast(dict[str, Any], repository_value).get("target_branch", {})
+        if isinstance(repository_value, dict)
+        else {}
+    )
+    target = cast(dict[str, Any], target_value) if isinstance(target_value, dict) else {}
     try:
         with workflow_deadline(
             seconds=watchdog_timeout,
@@ -60,8 +65,8 @@ def coordinate_dynamic_result(
             "timeout_scope": "repository_dynamic",
             "watchdog_timeout_seconds": watchdog_timeout,
             "per_command_timeout_seconds": per_command_timeout,
-            "target_branch": target.get("branch") if isinstance(target, dict) else None,
-            "target_head": target.get("head") if isinstance(target, dict) else None,
+            "target_branch": target.get("branch"),
+            "target_head": target.get("head"),
             "commands": [],
             "implementation_allowed": False,
         }

@@ -20,17 +20,17 @@ from quality_runner.fleet.anti_slop_support import (
     ANTI_SLOP_VERSION,
     JS_TS_SUFFIXES,
     SKIPPED_DIRECTORIES,
-    _blocked_result,
-    _cache_path,
-    _git_output,
-    _hash_value,
-    _iso_timestamp,
-    _parse_output,
-    _producer_enabled_rules,
-    _read_cached_result,
-    _validate_producer,
     anti_slop_cache_key,
+    blocked_result,
+    cache_path,
+    git_output,
+    hash_value,
+    iso_timestamp,
     merge_anti_slop_scan,
+    parse_output,
+    producer_enabled_rules,
+    read_cached_result,
+    validate_producer,
 )
 
 CommandRunner = Callable[[Sequence[str], Path, int], subprocess.CompletedProcess[str]]
@@ -48,6 +48,10 @@ __all__ = [
     "merge_anti_slop_scan",
     "run_anti_slop_detector",
 ]
+
+# Preserve the adapter's existing test-facing helper name while the support
+# module exposes cross-module helpers as public package internals.
+_parse_output = parse_output
 
 
 def run_anti_slop_detector(
@@ -74,16 +78,16 @@ def run_anti_slop_detector(
     root = target_root.expanduser().resolve()
     producer_root = anti_slop_root.expanduser().resolve()
     now = clock or (lambda: datetime.now(UTC))
-    scan_time = _iso_timestamp(now())
-    configuration = {
+    scan_time = iso_timestamp(now())
+    configuration: dict[str, Any] = {
         "files": ["."],
         "format": output_format,
         "ignores": [".next", "build", "coverage", "dist", "node_modules"],
         "mode": "audit",
         "preset": preset,
     }
-    configuration_hash = _hash_value(configuration)
-    base = {
+    configuration_hash = hash_value(configuration)
+    base: dict[str, Any] = {
         "schema": ANTI_SLOP_DETECTOR_SCHEMA,
         "detector": ANTI_SLOP_DETECTOR,
         "applicable": False,
@@ -123,16 +127,16 @@ def run_anti_slop_detector(
     base["applicable"] = True
     base["compatibility"] = compatibility
 
-    target_head = _git_output(root, "rev-parse", "HEAD")
+    target_head = git_output(root, "rev-parse", "HEAD")
     if target_head != target_sha:
-        return _blocked_result(
+        return blocked_result(
             base,
             f"target SHA mismatch: expected {target_sha}, observed {target_head or 'unavailable'}",
             command_result={"status": "not_run", "reason": "target SHA mismatch"},
         )
-    source_error = _validate_producer(producer_root)
+    source_error = validate_producer(producer_root)
     if source_error is not None:
-        return _blocked_result(
+        return blocked_result(
             base,
             source_error,
             command_result={"status": "not_run", "reason": source_error},
@@ -140,21 +144,21 @@ def run_anti_slop_detector(
 
     node = shutil.which("node")
     if node is None:
-        return _blocked_result(
+        return blocked_result(
             base,
             "required node executable is unavailable",
             command_result={"status": "not_run", "reason": "node executable is unavailable"},
         )
-    enabled_rules, ruleset_resolution = _producer_enabled_rules(
+    enabled_rules, ruleset_resolution = producer_enabled_rules(
         producer_root, node, preset, timeout_seconds
     )
     if enabled_rules is None:
-        return _blocked_result(
+        return blocked_result(
             base,
             "anti-slop producer did not expose a valid enabled-rule set",
             command_result={"status": "failed", **ruleset_resolution},
         )
-    ruleset_hash = _hash_value({"preset": preset, "enabled_rules": enabled_rules})
+    ruleset_hash = hash_value({"preset": preset, "enabled_rules": enabled_rules})
     cache_key = anti_slop_cache_key(
         target_sha=target_sha,
         qr_version=qr_version,
@@ -169,14 +173,14 @@ def run_anti_slop_detector(
             "ruleset_resolution": ruleset_resolution,
         }
     )
-    cache_path = _cache_path(cache_root, cache_key)
-    cached = _read_cached_result(cache_path, base)
+    cache_file = cache_path(cache_root, cache_key)
+    cached = read_cached_result(cache_file, base)
     if cached is not None:
         cached_receipt = dict(cached["receipt"])
         cached_receipt["command_result"] = {
             **dict(cached_receipt.get("command_result") or {}),
             "status": "cached",
-            "cache_path": str(cache_path),
+            "cache_path": str(cache_file),
         }
         cached_receipt["cache_hit"] = True
         cached_receipt["refresh_required"] = False
@@ -198,7 +202,7 @@ def run_anti_slop_detector(
     try:
         completed = runner(command, root, timeout_seconds)
     except Exception as error:  # the detector boundary must never look like a clean scan
-        return _blocked_result(
+        return blocked_result(
             base,
             f"anti-slop execution failed: {type(error).__name__}: {error}",
             command_result={"status": "failed", "reason": str(error)},
@@ -227,28 +231,32 @@ def run_anti_slop_detector(
         "stderr_bytes": len(stderr.encode("utf-8")),
     }
     if completed.returncode != 0:
-        return _blocked_result(
+        return blocked_result(
             base, "anti-slop command returned a failure", command_result=command_result
         )
     try:
-        parsed_findings = _parse_output(stdout, output_format, root)
+        parsed_findings = parse_output(stdout, output_format, root)
     except (TypeError, ValueError, KeyError, json.JSONDecodeError) as error:
-        return _blocked_result(
+        return blocked_result(
             base,
             f"anti-slop output is malformed: {error}",
             command_result={**command_result, "status": "failed", "reason": "malformed output"},
         )
-    receipt = {
+    receipt: dict[str, Any] = {
         **base,
         "status": "passed",
         "command_result": command_result,
         "finding_count": len(parsed_findings),
         "refresh_required": False,
     }
-    result = {"status": "passed", "receipt": receipt, "findings": parsed_findings}
-    if cache_path is not None:
-        cache_path.parent.mkdir(parents=True, exist_ok=True)
-        write_json(cache_path, result)
+    result: dict[str, Any] = {
+        "status": "passed",
+        "receipt": receipt,
+        "findings": parsed_findings,
+    }
+    if cache_file is not None:
+        cache_file.parent.mkdir(parents=True, exist_ok=True)
+        write_json(cache_file, result)
     return result
 
 

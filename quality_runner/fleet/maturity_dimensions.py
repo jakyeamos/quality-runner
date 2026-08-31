@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from quality_runner.fleet.contracts import DEPLOYMENT_MARKERS, DIMENSION_TERMS
 from quality_runner.fleet.maturity_dimension_support import (
@@ -331,14 +331,19 @@ def _governance_assessments(
     )
     license_terms = _matched_terms(text, DIMENSION_TERMS["license_contribution"])
     origin = repository.get("identity_provenance")
-    has_origin = isinstance(origin, dict) and bool(origin.get("normalized_origin"))
+    origin_map = cast(dict[str, Any], origin) if isinstance(origin, dict) else {}
+    has_origin = bool(origin_map.get("normalized_origin"))
     scope_attestation = repository.get("scope_attestation")
-    distribution = (
-        scope_attestation.get("distribution") if isinstance(scope_attestation, dict) else None
+    attestation_map = (
+        cast(dict[str, Any], scope_attestation) if isinstance(scope_attestation, dict) else {}
     )
-    visibility = distribution.get("visibility") if isinstance(distribution, dict) else None
+    distribution_value = attestation_map.get("distribution")
+    distribution = (
+        cast(dict[str, Any], distribution_value) if isinstance(distribution_value, dict) else {}
+    )
+    visibility = distribution.get("visibility")
     distribution_evidence: list[dict[str, str]] = []
-    if isinstance(distribution, dict) and visibility in {"public", "private", "local"}:
+    if distribution and visibility in {"public", "private", "local"}:
         distribution_evidence.append(
             {
                 "path": "fleet scope manifest",
@@ -392,7 +397,7 @@ def _governance_assessments(
 
 def _web_assessments(root: Path, config: dict[str, Any], as_of: str) -> dict[str, dict[str, Any]]:
     web_config = config.get("web_readiness")
-    configured = dict(web_config) if isinstance(web_config, dict) else {}
+    configured = cast(dict[str, Any], web_config) if isinstance(web_config, dict) else {}
     if configured.get("applicability") == "not_applicable" or not has_web_surface(root):
         reason = str(configured.get("reason") or "No supported web source surface was detected.")
         return {
@@ -411,7 +416,7 @@ def _web_assessments(root: Path, config: dict[str, Any], as_of: str) -> dict[str
         config={"web_readiness": configured},
         generated_at=as_of,
     )
-    checks = [item for item in report.get("checks", []) if isinstance(item, dict)]
+    checks = _object_mappings(cast(object, report.get("checks")))
     groups = {
         "accessibility": {
             "document_language",
@@ -427,6 +432,13 @@ def _web_assessments(root: Path, config: dict[str, Any], as_of: str) -> dict[str
         dimension: _web_check_assessment(checks, identifiers, dimension)
         for dimension, identifiers in groups.items()
     }
+
+
+def _object_mappings(value: object) -> list[dict[str, Any]]:
+    if not isinstance(value, list):
+        return []
+    values = cast(list[object], cast(object, value))
+    return [cast(dict[str, Any], cast(object, item)) for item in values if isinstance(item, dict)]
 
 
 def _web_check_assessment(

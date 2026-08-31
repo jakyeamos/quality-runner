@@ -3,15 +3,19 @@ from __future__ import annotations
 import argparse
 from collections.abc import Callable
 from pathlib import Path
-from typing import Any
+from typing import Any, Protocol
 
 from quality_runner.artifacts import write_json
 from quality_runner.ci_gate_audit import audit_ci_gate_candidates
 from quality_runner.fleet.contracts import parse_as_of
 
 
+class SubparserCollection(Protocol):
+    def add_parser(self, name: str, **kwargs: Any) -> argparse.ArgumentParser: ...
+
+
 def add_ci_gate_audit_command(
-    subparsers: argparse._SubParsersAction[argparse.ArgumentParser],
+    subparsers: SubparserCollection,
 ) -> None:
     parser = subparsers.add_parser(
         "ci-gate-audit",

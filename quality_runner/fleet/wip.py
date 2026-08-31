@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import subprocess
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 
 def _git_text(root: Path, *args: str) -> str | None:
@@ -50,7 +50,11 @@ def records(root: Path) -> tuple[list[dict[str, Any]], list[str]]:
         except (OSError, UnicodeError, json.JSONDecodeError) as error:
             errors.append(f"{path}: invalid JSON: {error}")
             continue
-        missing = sorted(required - set(value)) if isinstance(value, dict) else ["object"]
+        if not isinstance(value, dict):
+            errors.append(f"{path}: missing fields: object")
+            continue
+        value = cast(dict[str, Any], value)
+        missing = sorted(required - set(value))
         if missing:
             errors.append(f"{path}: missing fields: {', '.join(missing)}")
             continue

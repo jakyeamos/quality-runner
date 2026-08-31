@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import fnmatch
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from quality_runner.fleet.behavior_contract import (
     ASSESSMENT_SCHEMA,
@@ -248,7 +248,7 @@ def _state(values: dict[str, Any]) -> str:
     result_status = str(values.get("result_status", "unknown"))
     freshness = str(values.get("freshness", "unknown"))
     raw_coverage = values.get("coverage")
-    coverage = raw_coverage if isinstance(raw_coverage, dict) else {}
+    coverage = cast(dict[str, Any], raw_coverage) if isinstance(raw_coverage, dict) else {}
     profile_status = str(
         values.get("edge_profile_status") or coverage.get("profile_status") or "unknown"
     )
@@ -371,8 +371,8 @@ def _evaluate_requirement(**values: Any) -> dict[str, Any]:
             "message": "No trusted receipt covers this scenario.",
         }
     for candidate in candidates:
-        receipt = candidate["receipt"]
-        result = candidate["result"]
+        receipt = cast(dict[str, Any], candidate["receipt"])
+        result = cast(dict[str, Any], candidate["result"])
         receipt_commit = str(receipt["target"]["commit"])
         changed_paths = list(values["dirty_paths"])
         if receipt_commit != values["target_commit"]:
@@ -404,7 +404,8 @@ def _evaluate_requirement(**values: Any) -> dict[str, Any]:
                     f"required {requirement['minimum_verification_level']}."
                 ),
             }
-        defect = result.get("defect") if isinstance(result.get("defect"), dict) else {}
+        defect_value = result.get("defect")
+        defect = cast(dict[str, Any], defect_value) if isinstance(defect_value, dict) else {}
         defect_state = defect.get("state", "clear")
         accepted = defect_state == "accepted_with_expiry" and _future_timestamp(
             defect.get("expires_at"), values["as_of"]

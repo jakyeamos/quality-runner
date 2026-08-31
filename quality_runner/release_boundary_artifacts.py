@@ -11,7 +11,7 @@ import tarfile
 import tempfile
 import zipfile
 from pathlib import Path, PurePosixPath
-from typing import Any
+from typing import Any, cast
 
 MAX_SCANNED_FILE_BYTES = 2 * 1024 * 1024
 TEXT_ARCHIVE_SUFFIXES = {
@@ -35,6 +35,7 @@ def distribution_archive_check(
 ) -> tuple[dict[str, Any], Path | None]:
     if not isinstance(artifact_policy, dict):
         return _blocked("distribution_archives", "artifact allowlist is missing"), None
+    artifact_policy = cast(dict[str, Any], artifact_policy)
     wheels = sorted(dist_dir.glob("*.whl")) if dist_dir.is_dir() else []
     sdists = sorted(dist_dir.glob("*.tar.gz")) if dist_dir.is_dir() else []
     violations: list[dict[str, Any]] = []
@@ -71,6 +72,7 @@ def _inspect_wheel(
     violations: list[dict[str, Any]] = []
     if not isinstance(policy, dict):
         return [{"rule": "wheel-allowlist-missing", "path": wheel.name}]
+    policy = cast(dict[str, Any], policy)
     try:
         with zipfile.ZipFile(wheel) as archive:
             for info in archive.infolist():
@@ -95,6 +97,7 @@ def _inspect_sdist(
     violations: list[dict[str, Any]] = []
     if not isinstance(policy, dict):
         return [{"rule": "sdist-allowlist-missing", "path": sdist.name}]
+    policy = cast(dict[str, Any], policy)
     try:
         with tarfile.open(sdist, mode="r:gz") as archive:
             for member in archive.getmembers():
@@ -191,6 +194,7 @@ def _content_patterns(
                 "path": ".agents/change-surface-matrix.json",
             }
         ]
+    policy = cast(dict[str, Any], policy)
     patterns: list[tuple[str, re.Pattern[str]]] = []
     errors: list[dict[str, Any]] = []
     rules = policy.get("forbidden_patterns")
@@ -201,12 +205,15 @@ def _content_patterns(
                 "path": ".agents/change-surface-matrix.json",
             }
         ]
+    rules = cast(list[object], rules)
     for index, rule in enumerate(rules):
-        if (
-            not isinstance(rule, dict)
-            or not isinstance(rule.get("id"), str)
-            or not isinstance(rule.get("pattern"), str)
-        ):
+        if not isinstance(rule, dict):
+            errors.append(
+                {"rule": "invalid-forbidden-pattern", "path": f"forbidden_patterns[{index}]"}
+            )
+            continue
+        rule = cast(dict[str, Any], rule)
+        if not isinstance(rule.get("id"), str) or not isinstance(rule.get("pattern"), str):
             errors.append(
                 {"rule": "invalid-forbidden-pattern", "path": f"forbidden_patterns[{index}]"}
             )
@@ -281,7 +288,8 @@ def _sha256_path(path: Path) -> str | None:
 def _string_list(value: object) -> list[str]:
     if not isinstance(value, list):
         return []
-    return [str(item).strip() for item in value if isinstance(item, str) and item.strip()]
+    values = cast(list[object], value)
+    return [str(item).strip() for item in values if isinstance(item, str) and item.strip()]
 
 
 def _check(check_id: str, violations: list[dict[str, Any]]) -> dict[str, Any]:

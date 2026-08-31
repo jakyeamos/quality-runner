@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 
 
 def analysis_evidence_findings(
@@ -46,9 +46,14 @@ def analysis_evidence_findings(
             }
         )
 
-    summary = code_quality_scan.get("summary")
-    scan_budget = summary.get("scan_budget") if isinstance(summary, dict) else None
-    if isinstance(scan_budget, dict) and scan_budget.get("budget_exceeded") is True:
+    summary_value: object = code_quality_scan.get("summary")
+    summary = cast(dict[str, Any], summary_value) if isinstance(summary_value, dict) else {}
+    scan_budget = summary.get("scan_budget")
+    if (
+        isinstance(scan_budget, dict)
+        and cast(dict[str, Any], scan_budget).get("budget_exceeded") is True
+    ):
+        scan_budget = cast(dict[str, Any], scan_budget)
         skipped = scan_budget.get("skipped_text_files")
         skipped_count = skipped if isinstance(skipped, int) and not isinstance(skipped, bool) else 0
         findings.append(
@@ -191,7 +196,11 @@ def _skill_review_obligation_findings(
 
 
 def _dict_items(value: object) -> list[dict[str, Any]]:
-    return [item for item in value if isinstance(item, dict)] if isinstance(value, list) else []
+    return (
+        [cast(dict[str, Any], item) for item in cast(list[object], value) if isinstance(item, dict)]
+        if isinstance(value, list)
+        else []
+    )
 
 
 def _string_or_default(value: object, default: str) -> str:

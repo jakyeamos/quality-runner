@@ -1,13 +1,17 @@
 from __future__ import annotations
 
 import argparse
-from typing import Any
+from typing import Any, Protocol
 
 from quality_runner.policy_surfaces import validate_policy_surfaces
 
 
+class SubparserCollection(Protocol):
+    def add_parser(self, name: str, **kwargs: Any) -> argparse.ArgumentParser: ...
+
+
 def add_policy_surface_commands(
-    subparsers: argparse._SubParsersAction[argparse.ArgumentParser],
+    subparsers: SubparserCollection,
 ) -> None:
     parser = subparsers.add_parser(
         "policy-surfaces",

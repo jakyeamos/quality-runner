@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from quality_runner.fleet.contracts import hash_text
 
@@ -14,8 +14,12 @@ def compatible_dependency_source(
     if target_signature is None:
         return default
     candidates = [default]
-    for checkout in repository.get("checkouts", []):
-        if not isinstance(checkout, dict) or checkout.get("exists") is not True:
+    checkouts = repository.get("checkouts")
+    for checkout in cast(list[object], checkouts) if isinstance(checkouts, list) else []:
+        if not isinstance(checkout, dict):
+            continue
+        checkout = cast(dict[str, Any], checkout)
+        if checkout.get("exists") is not True:
             continue
         raw_path = checkout.get("path")
         if not isinstance(raw_path, str) or not raw_path:
@@ -36,8 +40,12 @@ def compatible_local_dependency_source(
 ) -> Path:
     """Resolve target-declared local dependencies from a canonical checkout parent."""
     candidates = [default]
-    for checkout in repository.get("checkouts", []):
-        if not isinstance(checkout, dict) or checkout.get("exists") is not True:
+    checkouts = repository.get("checkouts")
+    for checkout in cast(list[object], checkouts) if isinstance(checkouts, list) else []:
+        if not isinstance(checkout, dict):
+            continue
+        checkout = cast(dict[str, Any], checkout)
+        if checkout.get("exists") is not True:
             continue
         raw_path = checkout.get("path")
         if not isinstance(raw_path, str) or not raw_path:
@@ -62,13 +70,17 @@ def _declared_local_dependencies_available(*, worktree: Path, source: Path) -> b
         return False
     if not isinstance(payload, dict):
         return False
-    specs = [
-        value
-        for key in ("dependencies", "devDependencies", "optionalDependencies")
-        if isinstance(payload.get(key), dict)
-        for value in payload[key].values()
-        if isinstance(value, str) and value.startswith(("file:", "link:"))
-    ]
+    payload = cast(dict[str, Any], payload)
+    specs_value: list[object] = []
+    for key in ("dependencies", "devDependencies", "optionalDependencies"):
+        values = payload.get(key)
+        if isinstance(values, dict):
+            specs_value.extend(
+                value
+                for value in cast(dict[object, object], values).values()
+                if isinstance(value, str) and value.startswith(("file:", "link:"))
+            )
+    specs = [value for value in specs_value if isinstance(value, str)]
     return bool(specs) and all(
         (source / spec.split(":", maxsplit=1)[1]).resolve().exists() for spec in specs
     )
@@ -86,6 +98,7 @@ def _javascript_dependency_signature(root: Path) -> dict[str, Any] | None:
             return None
         if not isinstance(payload, dict):
             return None
+        payload = cast(dict[str, Any], payload)
         relative = manifest.relative_to(root).as_posix()
         workspace = manifest.parent
         lockfile = next(

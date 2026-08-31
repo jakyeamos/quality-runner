@@ -2,14 +2,18 @@ from __future__ import annotations
 
 import argparse
 from pathlib import Path
-from typing import Any
+from typing import Any, Protocol
 
 from quality_runner.behavior_receipts import record_edge_trace, verify_behavior_command
 from quality_runner.fleet.behavior_contract import EDGE_ENVIRONMENTS, EDGE_SURFACES
 
 
+class SubparserCollection(Protocol):
+    def add_parser(self, name: str, **kwargs: Any) -> argparse.ArgumentParser: ...
+
+
 def add_behavior_commands(
-    subparsers: argparse._SubParsersAction[argparse.ArgumentParser],
+    subparsers: SubparserCollection,
 ) -> None:
     parser = subparsers.add_parser(
         "behavior", help="Run declared behavior validators and write immutable receipts"

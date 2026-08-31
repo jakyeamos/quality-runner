@@ -267,8 +267,11 @@ def _module_timings_from_artifacts(artifact_paths: dict[str, str]) -> dict[str, 
         payload = json.loads(Path(path).read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         return {}
-    timings = payload.get("module_timings") if isinstance(payload, dict) else None
-    return timings if isinstance(timings, dict) else {}
+    if not isinstance(payload, dict):
+        return {}
+    payload = cast(dict[str, Any], payload)
+    timings = payload.get("module_timings")
+    return cast(dict[str, Any], timings) if isinstance(timings, dict) else {}
 
 
 def _skill_review_from_analysis(
@@ -289,14 +292,20 @@ def _skill_review_from_analysis(
 
 def _analysis_coverage(analysis: Any) -> dict[str, Any]:
     code_quality_scan = _legacy_payload(analysis.code_quality_scan)
-    deferred_checks = code_quality_scan.get("deferred_checks")
-    if not isinstance(deferred_checks, list):
-        deferred_checks = []
-    summary = code_quality_scan.get("summary")
-    scan_budget = summary.get("scan_budget") if isinstance(summary, dict) else None
-    budget_exceeded = isinstance(scan_budget, dict) and scan_budget.get("budget_exceeded") is True
+    raw_deferred_checks = code_quality_scan.get("deferred_checks")
+    deferred_checks = (
+        cast(list[object], raw_deferred_checks) if isinstance(raw_deferred_checks, list) else []
+    )
+    summary_value = code_quality_scan.get("summary")
+    summary = cast(dict[str, Any], summary_value) if isinstance(summary_value, dict) else {}
+    scan_budget_value = summary.get("scan_budget")
+    scan_budget = (
+        cast(dict[str, Any], scan_budget_value) if isinstance(scan_budget_value, dict) else None
+    )
+    budget_exceeded = scan_budget is not None and scan_budget.get("budget_exceeded") is True
     performance = getattr(analysis, "performance", None)
-    performance_partial = isinstance(performance, dict) and performance.get("status") == "partial"
+    performance_map = cast(dict[str, Any], performance) if isinstance(performance, dict) else {}
+    performance_partial = performance_map.get("status") == "partial"
     partial = (
         code_quality_scan.get("coverage") == "partial"
         or bool(deferred_checks)
@@ -305,7 +314,9 @@ def _analysis_coverage(analysis: Any) -> dict[str, Any]:
     )
     return {
         "status": "partial" if partial else "complete",
-        "deferred_checks": [item for item in deferred_checks if isinstance(item, dict)],
+        "deferred_checks": [
+            cast(dict[str, Any], item) for item in deferred_checks if isinstance(item, dict)
+        ],
         "scan_budget_exceeded": budget_exceeded,
         "performance_budget_exceeded": performance_partial,
     }

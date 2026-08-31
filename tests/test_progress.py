@@ -14,7 +14,11 @@ def test_progress_reporter_emits_phases_heartbeats_and_completion() -> None:
 
     with ProgressReporter("run", stream=stream, interval_seconds=0.01) as progress:
         progress.phase("code-quality", "scanning selected skill packs")
-        time.sleep(0.04)
+        deadline = time.monotonic() + 1.0
+        while "event=heartbeat command=run phase=code-quality" not in stream.getvalue():
+            if time.monotonic() >= deadline:
+                break
+            time.sleep(0.005)
         progress.finish("planned")
 
     output = stream.getvalue()

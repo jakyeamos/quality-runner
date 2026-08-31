@@ -12,7 +12,7 @@ import subprocess
 from collections import Counter
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from quality_runner.fleet.behavior_support import iso_timestamp, string_value, string_values
 from quality_runner.fleet.wip import records as read_wip_records
@@ -142,8 +142,9 @@ def _live_state(root: Path, records: list[dict[str, Any]]) -> dict[str, dict[str
 def _receipt_integrity(payload: dict[str, Any]) -> str:
     schema = string_value(payload.get("schema_version"))
     integrity = payload.get("integrity")
-    algorithm = integrity.get("algorithm") if isinstance(integrity, dict) else None
-    digest = integrity.get("digest") if isinstance(integrity, dict) else None
+    integrity_payload = cast(dict[str, Any], integrity) if isinstance(integrity, dict) else {}
+    algorithm = integrity_payload.get("algorithm")
+    digest = integrity_payload.get("digest")
     if schema == TASK_SCHEMA:
         if (
             algorithm == "hmac-sha256"
@@ -171,7 +172,7 @@ def _receipt_files(root: Path) -> list[tuple[Path, dict[str, Any]]]:
     for path in sorted(receipt_root.glob("*.json")):
         try:
             value = json.loads(path.read_text(encoding="utf-8"))
-            payload = value if isinstance(value, dict) else {}
+            payload = cast(dict[str, Any], value) if isinstance(value, dict) else {}
             if not payload:
                 payload = {"schema_version": "invalid", "error": "JSON root must be an object"}
         except (OSError, UnicodeError, json.JSONDecodeError) as error:
@@ -439,7 +440,7 @@ def custody_validation_payload(
         )
         for receipt_path, payload in receipts
     ]
-    overlaps = []
+    overlaps: list[dict[str, Any]] = []
     for index, left in enumerate(lanes):
         for right in lanes[index + 1 :]:
             paths = _overlap_paths(left, right)

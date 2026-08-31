@@ -8,7 +8,7 @@ from typing import cast
 
 from quality_runner.code_quality_findings import make_finding
 from quality_runner.ui_quality_helpers import cue_type, mapping, stable, strings, text
-from quality_runner.ui_quality_support import _mapping_equals
+from quality_runner.ui_quality_support import mapping_equals
 
 UI_QUALITY_REPORT_SCHEMA = "quality-runner-ui-quality-report-v0.1"
 _THEMES = ("light", "dark")
@@ -452,10 +452,10 @@ def _check_summaries(findings: list[Finding]) -> list[dict[str, object]]:
 def _summary(checks: Sequence[object], findings: Sequence[object]) -> dict[str, int]:
     return {
         "check_count": len(checks),
-        "passed_check_count": sum(_mapping_equals(item, "status", "passed") for item in checks),
+        "passed_check_count": sum(mapping_equals(item, "status", "passed") for item in checks),
         "finding_count": len(findings),
         "deterministic_check_count": sum(
-            _mapping_equals(item, "enforceability", "deterministic") for item in checks
+            mapping_equals(item, "enforceability", "deterministic") for item in checks
         ),
         "judgment_only_check_count": 0,
     }

@@ -68,13 +68,16 @@ def load_fleet_policy(projects_root: Path) -> dict[str, Any]:
         payload = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as error:
         raise ValueError(f"fleet policy is not valid JSON: {path}") from error
-    if not isinstance(payload, dict) or payload.get("schema") != FLEET_POLICY_SCHEMA:
+    if not isinstance(payload, dict):
+        raise ValueError(f"fleet policy must declare schema {FLEET_POLICY_SCHEMA}: {path}")
+    payload = cast(dict[str, Any], payload)
+    if payload.get("schema") != FLEET_POLICY_SCHEMA:
         raise ValueError(f"fleet policy must declare schema {FLEET_POLICY_SCHEMA}: {path}")
     raw_exclusions = payload.get("exclude_paths", [])
     if not isinstance(raw_exclusions, list):
         raise ValueError(f"fleet policy exclude_paths must be an array: {path}")
     exclusions: list[str] = []
-    for raw in raw_exclusions:
+    for raw in cast(list[object], raw_exclusions):
         if not isinstance(raw, str) or not raw.strip():
             raise ValueError(f"fleet policy exclusions must be non-empty strings: {path}")
         candidate = Path(raw)
@@ -239,11 +242,11 @@ def resolve_target_branch(
 
 def checkout_fingerprint(path: Path) -> dict[str, Any]:
     root = path.expanduser().resolve()
-    status = _git_output(root, "status", "--porcelain=v1", "--untracked-files=all") or ""
-    diff = _git_output(root, "diff", "--binary") or ""
-    cached_diff = _git_output(root, "diff", "--cached", "--binary") or ""
-    head = _git_output(root, "rev-parse", "HEAD")
-    branch = _git_output(root, "symbolic-ref", "--short", "-q", "HEAD")
+    status = git_output(root, "status", "--porcelain=v1", "--untracked-files=all") or ""
+    diff = git_output(root, "diff", "--binary") or ""
+    cached_diff = git_output(root, "diff", "--cached", "--binary") or ""
+    head = git_output(root, "rev-parse", "HEAD")
+    branch = git_output(root, "symbolic-ref", "--short", "-q", "HEAD")
     return {
         "head": head,
         "branch": branch,
@@ -297,7 +300,7 @@ def _identity_key(root: Path) -> str:
 
 
 def _normalized_origin(root: Path) -> str | None:
-    remote = _git_output(root, "config", "--get", "remote.origin.url")
+    remote = git_output(root, "config", "--get", "remote.origin.url")
     if not remote:
         return None
     value = remote.strip()
@@ -312,7 +315,7 @@ def _normalized_origin(root: Path) -> str | None:
 
 
 def _common_git_dir(root: Path) -> str | None:
-    value = _git_output(root, "rev-parse", "--path-format=absolute", "--git-common-dir")
+    value = git_output(root, "rev-parse", "--path-format=absolute", "--git-common-dir")
     return str(Path(value).resolve()) if value else None
 
 
@@ -351,21 +354,21 @@ def _checkout_record(
     root = path.expanduser().resolve()
     exists = root.exists() and root.is_dir()
     working_tree = (
-        _git_output(root, "rev-parse", "--is-inside-work-tree") == "true" if exists else False
+        git_output(root, "rev-parse", "--is-inside-work-tree") == "true" if exists else False
     )
-    head = _git_output(root, "rev-parse", "HEAD") if exists else None
-    branch = _git_output(root, "symbolic-ref", "--short", "-q", "HEAD") if working_tree else None
+    head = git_output(root, "rev-parse", "HEAD") if exists else None
+    branch = git_output(root, "symbolic-ref", "--short", "-q", "HEAD") if working_tree else None
     status = (
-        _git_output(root, "status", "--porcelain=v1", "--untracked-files=all")
+        git_output(root, "status", "--porcelain=v1", "--untracked-files=all")
         if working_tree
         else None
     )
     upstream = (
-        _git_output(root, "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{upstream}")
+        git_output(root, "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{upstream}")
         if exists
         else None
     )
-    ahead, behind = _ahead_behind(root, upstream) if exists and upstream else (None, None)
+    ahead, behind = ahead_behind(root, upstream) if exists and upstream else (None, None)
     worktree_record = (
         next(
             (
@@ -438,16 +441,16 @@ def _repository_class(root: Path, origin: str | None) -> str:
 
 
 def _local_branches(root: Path) -> list[str]:
-    output = _git_output(root, "for-each-ref", "--format=%(refname:short)", "refs/heads")
+    output = git_output(root, "for-each-ref", "--format=%(refname:short)", "refs/heads")
     return sorted(output.splitlines()) if output else []
 
 
-def _ahead_behind(
+def ahead_behind(
     root: Path, upstream: str | None, *, head: str = "HEAD"
 ) -> tuple[int | None, int | None]:
     if not upstream:
         return None, None
-    output = _git_output(root, "rev-list", "--left-right", "--count", f"{head}...{upstream}")
+    output = git_output(root, "rev-list", "--left-right", "--count", f"{head}...{upstream}")
     if not output:
         return None, None
     parts = output.split()
@@ -467,7 +470,7 @@ def _git_run(root: Path, *args: str) -> str | None:
     return str(result["stdout"]) if result["returncode"] == 0 else None
 
 
-def _git_output(root: Path, *args: str) -> str | None:
+def git_output(root: Path, *args: str) -> str | None:
     output = _git_run(root, *args)
     if output is None:
         return None

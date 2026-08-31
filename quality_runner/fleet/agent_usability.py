@@ -220,7 +220,7 @@ def assess_agent_usability(
 
     applicable_lanes = [lane for lane in lanes if lane["applicable"]]
     covered_lane_count = sum(
-        1 for lane in applicable_lanes if isinstance(lane.get("score"), int) and lane["score"] >= 3
+        1 for lane in applicable_lanes if _score_at_least(lane.get("score"), 3)
     )
     if not applicable_lanes:
         status = "not_applicable"
@@ -275,6 +275,10 @@ def assess_agent_usability(
             "inventory_truncated": document_inventory_truncated or skill_inventory_truncated,
         },
     }
+
+
+def _score_at_least(value: object, minimum: int) -> bool:
+    return isinstance(value, int) and not isinstance(value, bool) and value >= minimum
 
 
 def _documentation_lane(**values: Any) -> dict[str, Any]:

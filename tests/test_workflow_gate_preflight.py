@@ -491,12 +491,15 @@ def test_refresh_payload_total_timeout_scope_is_distinct_from_verify_phase(
 
 
 def test_verify_gate_kills_process_group_when_workflow_timeout_interrupts(
-    tmp_path: Path, monkeypatch: object
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     from quality_runner import gate_verification, process_runner
 
     killed_groups: list[tuple[int, int]] = []
     execution_root = tmp_path / "isolated"
+    monkeypatch.setenv("QUALITY_RUNNER_CACHE_DIR", str(tmp_path / "external"))
+    monkeypatch.delenv("UV_CACHE_DIR", raising=False)
+    monkeypatch.delenv("XDG_CACHE_HOME", raising=False)
 
     class FakeProcess:
         pid = 12345

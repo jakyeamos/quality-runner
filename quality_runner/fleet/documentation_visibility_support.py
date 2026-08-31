@@ -4,7 +4,7 @@ import json
 import re
 import subprocess
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from quality_runner.fleet.contracts import DEPLOYMENT_MARKERS, MAX_DOCUMENT_BYTES, relative_path
 
@@ -195,11 +195,22 @@ def collect_newcomer_evidence(root: Path) -> dict[str, Any]:
             "valid": False,
             "reason": str(error),
         }
-    tasks = payload.get("tasks") if isinstance(payload, dict) else None
+    if not isinstance(payload, dict):
+        return {
+            "status": "invalid",
+            "path": relative_path(root, path),
+            "valid": False,
+            "reason": "developer-legibility evidence must be a JSON object",
+        }
+    payload = cast(dict[str, Any], payload)
+    tasks_value = payload.get("tasks")
+    tasks = cast(list[object], tasks_value) if isinstance(tasks_value, list) else []
     passed = {
-        str(item.get("id"))
-        for item in tasks or []
-        if isinstance(item, dict) and item.get("status") == "passed" and item.get("evidence")
+        str(typed_item.get("id"))
+        for item in tasks
+        if isinstance(item, dict)
+        for typed_item in [cast(dict[str, Any], item)]
+        if typed_item.get("status") == "passed" and typed_item.get("evidence")
     }
     try:
         head = subprocess.run(
@@ -346,11 +357,16 @@ def collect_diagrams(
         if path.suffix.lower() in _DIAGRAM_SUFFIXES
         and any(marker in path.as_posix().lower() for marker in _DIAGRAM_MARKERS)
     ][:64]
-    linked_paths = [
-        str(item["target"])
-        for item in link_evidence.get("links", [])
-        if isinstance(item, dict) and str(item.get("target", "")) in diagram_files
-    ]
+    raw_links = link_evidence.get("links")
+    links = cast(list[object], raw_links) if isinstance(raw_links, list) else []
+    linked_paths: list[str] = []
+    for item in links:
+        if not isinstance(item, dict):
+            continue
+        typed_item = cast(dict[str, Any], item)
+        target = str(typed_item.get("target", ""))
+        if target in diagram_files:
+            linked_paths.append(target)
     combined = "\n".join(documents.values()).lower()
     inline_count = len(
         re.findall(

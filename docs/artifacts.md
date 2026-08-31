@@ -6,7 +6,7 @@
 `quality-runner-onboarding-evidence/v1` envelope and optionally writes a
 `quality-runner-onboarding-check/v1` receipt when `--output` is explicit. The
 input binds approved producer results to the fleet matrix digest and the target
-repository's exact branch and commit. The output records live provenance,
+repository's exact branch/ref and commit. The output records live provenance,
 contract checks, surface decisions, and blocker identifiers.
 
 The distributed schemas are
@@ -27,7 +27,7 @@ admission contract.
 `quality-runner release-boundary` writes
 `<repo>/.quality-runner/release-boundary.json` using schema
 `quality-runner-release-boundary/v2`. The receipt is a privacy-safe consumer
-handoff: it contains the repository identifier, exact branch and commit,
+handoff: it contains the repository identifier, exact branch/ref and commit,
 producer version, change-matrix digest, wheel and sdist names and digests,
 sanitized public-adapter fixture digests, check results, and blocking check IDs.
 It never contains the absolute repository or matrix path.

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
-from typing import Any
+from typing import Any, cast
 
 from quality_runner.fleet.maturity_model_contract import (
     PILLAR_DEFINITIONS,
@@ -232,9 +232,11 @@ def build_repository_maturity(
 def pillar_means(models: Sequence[Mapping[str, Any]]) -> dict[str, float | None]:
     values: dict[str, list[float]] = {str(item["id"]): [] for item in PILLAR_DEFINITIONS}
     for model in models:
-        for pillar in model.get("pillars", []):
-            if not isinstance(pillar, dict):
+        pillars = model.get("pillars", [])
+        for raw in cast(list[object], pillars):
+            if not isinstance(raw, dict):
                 continue
+            pillar = cast(dict[str, Any], raw)
             pillar_id = str(pillar.get("id", ""))
             score = pillar.get("score")
             if pillar_id in values and isinstance(score, (int, float)):

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import Any
+from typing import Any, cast
 
 from quality_runner.fleet.contracts import DIMENSION_LABELS
 
@@ -185,22 +185,11 @@ def _join_details(details: list[str]) -> str:
     return f"{'; '.join(details[:-1])}; and {details[-1]}"
 
 
-def _join_labels(labels: list[str]) -> str:
-    if len(labels) <= 1:
-        return labels[0] if labels else "one or more required dimensions"
-    if len(labels) == 2:
-        return f"{labels[0]} and {labels[1]}"
-    return f"{', '.join(labels[:-1])}, and {labels[-1]}"
-
-
 def quality_outcome_counts(projections: list[dict[str, Any]]) -> dict[str, int]:
     counts: dict[str, int] = {}
     for projection in projections:
         outcome = projection.get("quality_outcome")
-        state = (
-            str(outcome.get("state", "evidence_unknown"))
-            if isinstance(outcome, Mapping)
-            else "evidence_unknown"
-        )
+        outcome_payload = cast(dict[str, Any], outcome) if isinstance(outcome, Mapping) else {}
+        state = str(outcome_payload.get("state", "evidence_unknown"))
         counts[state] = counts.get(state, 0) + 1
     return dict(sorted(counts.items()))

@@ -497,27 +497,6 @@ def _stable_similarity_fingerprint(
     return hashlib.sha256(payload.encode()).hexdigest()[:16]
 
 
-def _status_entry(
-    *,
-    tool: str,
-    status: str,
-    command: list[str] | None = None,
-    exit_code: int | None = None,
-    stderr_tail: str = "",
-    stdout_tail: str = "",
-) -> dict[str, Any]:
-    entry: dict[str, Any] = {"tool": tool, "status": status}
-    if command is not None:
-        entry["command"] = command
-    if exit_code is not None:
-        entry["exit_code"] = exit_code
-    if stderr_tail:
-        entry["stderr_tail"] = stderr_tail
-    if stdout_tail:
-        entry["stdout_tail"] = stdout_tail
-    return entry
-
-
 def _tail(value: str | bytes | None, *, limit: int = 500) -> str:
     if value is None:
         return ""

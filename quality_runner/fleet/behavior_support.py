@@ -4,7 +4,7 @@ import json
 import subprocess
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from quality_runner.fleet.behavior_contract import MAX_FILE_BYTES
 
@@ -24,7 +24,11 @@ def read_object(path: Path) -> tuple[dict[str, Any], str | None]:
         value = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, UnicodeError, json.JSONDecodeError) as error:
         return {}, f"could not read valid JSON: {error}"
-    return (value, None) if isinstance(value, dict) else ({}, "JSON root must be an object")
+    return (
+        (cast(dict[str, Any], value), None)
+        if isinstance(value, dict)
+        else ({}, "JSON root must be an object")
+    )
 
 
 def git_lines(root: Path, *args: str) -> list[str]:
@@ -73,15 +77,21 @@ def string_value(value: object) -> str | None:
 def string_values(value: object) -> list[str]:
     if not isinstance(value, list):
         return []
-    return [item.strip() for item in value if isinstance(item, str) and item.strip()]
+    return [
+        item.strip() for item in cast(list[object], value) if isinstance(item, str) and item.strip()
+    ]
 
 
 def object_values(value: object) -> list[dict[str, Any]]:
-    return [item for item in value if isinstance(item, dict)] if isinstance(value, list) else []
+    return (
+        [cast(dict[str, Any], item) for item in cast(list[object], value) if isinstance(item, dict)]
+        if isinstance(value, list)
+        else []
+    )
 
 
 def object_value(value: object) -> dict[str, Any]:
-    return value if isinstance(value, dict) else {}
+    return cast(dict[str, Any], value) if isinstance(value, dict) else {}
 
 
 def iso_timestamp(value: object) -> datetime | None:

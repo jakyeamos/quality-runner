@@ -6,7 +6,7 @@ import subprocess
 from collections.abc import Callable, Sequence
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from quality_runner._version import __version__
 from quality_runner.artifacts import prepare_safe_directory, write_json
@@ -168,7 +168,7 @@ def _refresh_repository(
     source_checkout = next(
         (
             checkout
-            for checkout in repository.get("checkouts", [])
+            for checkout in _object_mappings(cast(object, repository.get("checkouts", [])))
             if checkout.get("checkout_id") == target.get("checkout_id")
         ),
         None,
@@ -309,18 +309,24 @@ def _incomplete_refresh_diagnostics(
         return None
 
     phase_payloads = refresh.get("runs")
+    phase_payloads_map = (
+        cast(dict[str, Any], phase_payloads) if isinstance(phase_payloads, dict) else {}
+    )
     timings = refresh.get("phase_timings")
+    timings_map = cast(dict[str, Any], timings) if isinstance(timings, dict) else {}
     phases: dict[str, dict[str, Any]] = {}
     for phase in ("inspect", "run", "verify"):
         compact: dict[str, Any] = {}
-        if isinstance(phase_payloads, dict) and isinstance(phase_payloads.get(phase), dict):
-            phase_payload = phase_payloads[phase]
+        phase_value = phase_payloads_map.get(phase)
+        if isinstance(phase_value, dict):
+            phase_payload = cast(dict[str, Any], phase_value)
             for key in ("run_id", "status", "reason", "timeout_scope", "timeout_seconds"):
                 value = phase_payload.get(key)
                 if value is not None and isinstance(value, (str, int, float, bool)):
                     compact[key] = value
-        if isinstance(timings, dict) and isinstance(timings.get(phase), dict):
-            timing_status = timings[phase].get("status")
+        timing_value = timings_map.get(phase)
+        if isinstance(timing_value, dict):
+            timing_status = cast(dict[str, Any], timing_value).get("status")
             if isinstance(timing_status, str):
                 compact["timing_status"] = timing_status
         if compact:
@@ -337,10 +343,12 @@ def _incomplete_refresh_diagnostics(
 def _incomplete_refresh_reason(diagnostics: dict[str, Any]) -> str:
     phases = diagnostics.get("phases")
     if isinstance(phases, dict):
+        phases_map = cast(dict[str, Any], phases)
         for phase in ("inspect", "run", "verify"):
-            details = phases.get(phase)
+            details = phases_map.get(phase)
             if not isinstance(details, dict):
                 continue
+            details = cast(dict[str, Any], details)
             status = details.get("status") or details.get("timing_status")
             reason = details.get("reason")
             if status not in {None, "completed", "passed"} or reason:
@@ -385,10 +393,8 @@ def _resolve_detector_target(repository: dict[str, Any], *, override: str | None
     branch = str(target["branch"])
     checkouts = [
         checkout
-        for checkout in repository.get("checkouts", [])
-        if isinstance(checkout, dict)
-        and branch in checkout.get("local_branches", [])
-        and checkout.get("path")
+        for checkout in _object_mappings(cast(object, repository.get("checkouts", [])))
+        if branch in _string_list(checkout.get("local_branches", [])) and checkout.get("path")
     ]
     checkouts.sort(
         key=lambda checkout: (checkout.get("primary") is not True, str(checkout["path"]))
@@ -427,7 +433,7 @@ def _merge_external_detector(
         payload = json.loads(scan_path.read_text(encoding="utf-8"))
         if not isinstance(payload, dict):
             raise ValueError(f"external detector scan target is not an object: {scan_path}")
-        merged = merge_anti_slop_scan(payload, detector_result)
+        merged = merge_anti_slop_scan(cast(dict[str, Any], payload), detector_result)
         write_json(scan_path, merged)
         write_json(
             scan_path.parent / "anti-slop-detector.json",
@@ -441,9 +447,12 @@ def _finding_count(root: Path, run_ids: list[str]) -> int | None:
         if not path.is_file():
             continue
         payload = json.loads(path.read_text(encoding="utf-8"))
+        if not isinstance(payload, dict):
+            continue
+        payload = cast(dict[str, Any], payload)
         findings = payload.get("findings")
         if isinstance(findings, list):
-            return len(findings)
+            return len(cast(list[object], cast(object, findings)))
     return None
 
 
@@ -457,6 +466,20 @@ def _artifact_root(output_dir: Path | None, refresh_id: str) -> Path:
         base = output_dir.expanduser().resolve()
         return base if base.name == refresh_id else base / refresh_id
     return DEFAULT_DETECTOR_REFRESH_ROOT.expanduser().resolve() / refresh_id
+
+
+def _object_mappings(value: object) -> list[dict[str, Any]]:
+    if not isinstance(value, list):
+        return []
+    values = cast(list[object], cast(object, value))
+    return [cast(dict[str, Any], cast(object, item)) for item in values if isinstance(item, dict)]
+
+
+def _string_list(value: object) -> list[str]:
+    if not isinstance(value, list):
+        return []
+    values = cast(list[object], cast(object, value))
+    return [item for item in values if isinstance(item, str)]
 
 
 def _git(root: Path, *args: str) -> subprocess.CompletedProcess[str]:

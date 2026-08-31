@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 DEPLOYMENT_EVIDENCE_SCHEMA = "quality-runner-web-deployment-evidence/v1"
 
@@ -16,19 +16,28 @@ def load_deployment_evidence(
         payload = json.loads(path.expanduser().resolve().read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as error:
         return None, f"Deployment evidence could not be read: {error}"
-    if not isinstance(payload, dict) or payload.get("schema") != DEPLOYMENT_EVIDENCE_SCHEMA:
+    if not isinstance(payload, dict):
         return None, f"Deployment evidence must use schema {DEPLOYMENT_EVIDENCE_SCHEMA}."
-    target = payload.get("target")
-    routes = payload.get("routes")
-    if not isinstance(target, dict) or not isinstance(routes, list) or not routes:
+    payload = cast(dict[str, Any], payload)
+    if payload.get("schema") != DEPLOYMENT_EVIDENCE_SCHEMA:
+        return None, f"Deployment evidence must use schema {DEPLOYMENT_EVIDENCE_SCHEMA}."
+    target_value = payload.get("target")
+    routes_value = payload.get("routes")
+    if not isinstance(target_value, dict) or not isinstance(routes_value, list) or not routes_value:
         return None, "Deployment evidence requires a target and at least one route."
+    target = cast(dict[str, Any], target_value)
+    raw_routes = cast(list[object], routes_value)
     target_commit = target.get("commit")
     if head_sha and target_commit != head_sha:
         return None, "Deployment evidence commit does not match the repository HEAD."
     if target.get("kind") != "deployment" or not target.get("url"):
         return None, "Deployment evidence target must identify a deployment URL."
-    if not all(isinstance(route, dict) and isinstance(route.get("route"), str) for route in routes):
+    if not all(
+        isinstance(route, dict) and isinstance(cast(dict[str, Any], route).get("route"), str)
+        for route in raw_routes
+    ):
         return None, "Every deployment evidence route must be an object with a route string."
+    payload["routes"] = [cast(dict[str, Any], route) for route in raw_routes]
     return payload, None
 
 
@@ -37,7 +46,9 @@ def deployment_checks(
     *,
     configured_routes: list[str],
 ) -> list[dict[str, Any]]:
-    routes = [dict(item) for item in payload["routes"]]
+    routes_value = payload["routes"]
+    raw_routes = cast(list[object], routes_value) if isinstance(routes_value, list) else []
+    routes = [cast(dict[str, Any], item) for item in raw_routes if isinstance(item, dict)]
     required_routes = set(configured_routes)
     observed_routes = {str(item.get("route")) for item in routes if not item.get("not_found_probe")}
     route_gap = sorted(required_routes - observed_routes)
