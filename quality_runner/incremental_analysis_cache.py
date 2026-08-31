@@ -167,16 +167,14 @@ class IncrementalAnalysisCache:
         prior = self._index.get(lookup_key)
         prior_record = prior if isinstance(prior, dict) else None
         prior_signature = prior_record.get("source_signature") if prior_record is not None else None
+        source_text: str | None = None
+        content_sha256 = prior_record.get("content_sha256") if prior_record is not None else None
         if isinstance(prior_signature, dict) and prior_signature == signature:
-            content_sha256 = (
-                prior_record.get("content_sha256") if prior_record is not None else None
-            )
             if isinstance(content_sha256, str) and content_sha256:
                 identity = self._identity_for_file(
                     relative_path=relative_path,
                     source_text="",
                     content_sha256=content_sha256,
-                    source_signature=signature,
                 )
                 reasons = self._invalidation_reasons(prior, identity)
                 if not reasons:
@@ -190,16 +188,33 @@ class IncrementalAnalysisCache:
             else:
                 self._record_miss(relative_path, ["cache-index-corrupt"])
         else:
-            reason = "missing-entry" if prior is None else "source-stat-changed"
-            self._record_miss(relative_path, [reason])
+            source_text = _read_source_text(source_path)
+            self._stats.source_bytes_read += len(source_text.encode("utf-8"))
+            identity = self._identity_for_file(
+                relative_path=relative_path,
+                source_text=source_text,
+                content_sha256=None,
+            )
+            reasons = self._invalidation_reasons(prior, identity)
+            if not reasons:
+                cached = self._read_cached_result(prior, identity, validate)
+                if cached is not None:
+                    self._stats.cache_hits += 1
+                    self._last_content_sha256[relative_path] = str(identity["content_sha256"])
+                    if prior_record is not None:
+                        prior_record["source_signature"] = signature
+                        self._index_dirty = True
+                    return cached
+                reasons = [self._cache_read_failure_reason(prior)]
+            self._record_miss(relative_path, reasons)
 
-        source_text = _read_source_text(source_path)
-        self._stats.source_bytes_read += len(source_text.encode("utf-8"))
+        if source_text is None:
+            source_text = _read_source_text(source_path)
+            self._stats.source_bytes_read += len(source_text.encode("utf-8"))
         identity = self._identity_for_file(
             relative_path=relative_path,
             source_text=source_text,
             content_sha256=None,
-            source_signature=signature,
         )
         self._last_content_sha256[relative_path] = str(identity["content_sha256"])
         result = compute(source_text)
@@ -207,6 +222,7 @@ class IncrementalAnalysisCache:
             lookup_key=lookup_key,
             identity=identity,
             result=result,
+            source_signature=signature,
         )
         return result
 
@@ -300,7 +316,6 @@ class IncrementalAnalysisCache:
         relative_path: str,
         source_text: str,
         content_sha256: str | None,
-        source_signature: dict[str, int] | None = None,
     ) -> dict[str, object]:
         return {
             "analysis_kind": self._analysis_kind,
@@ -312,7 +327,6 @@ class IncrementalAnalysisCache:
             "dependency_state_sha256": self._dependency_state_identity,
             "analysis_context_sha256": self._context_identity,
             "repository_root_sha256": _sha256_text(str(self._identity_root)),
-            "source_signature": source_signature,
         }
 
     def _load_index(self) -> None:
@@ -434,6 +448,7 @@ class IncrementalAnalysisCache:
         lookup_key: str,
         identity: dict[str, object],
         result: AnalysisResult,
+        source_signature: dict[str, int] | None = None,
     ) -> None:
         if not self._persist:
             return
@@ -451,7 +466,11 @@ class IncrementalAnalysisCache:
         if not _atomic_write_json(entry_path, payload):
             self._stats.write_failures += 1
             return
-        self._index[lookup_key] = {**identity, "cache_key": cache_key}
+        self._index[lookup_key] = {
+            **identity,
+            "cache_key": cache_key,
+            "source_signature": source_signature,
+        }
         self._index_dirty = True
         self._index_status = "ready"
 
