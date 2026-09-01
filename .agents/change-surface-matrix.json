@@ -2,7 +2,7 @@
   "schema_version": "change-surface-matrix/v1",
   "subject": {"kind": "repository", "id": "quality-runner"},
   "owner": "quality-runner-maintainers",
-  "last_reviewed": "2026-08-24",
+  "last_reviewed": "2026-09-01",
   "surfaces": [
     {
       "id": "matrix-maintenance",

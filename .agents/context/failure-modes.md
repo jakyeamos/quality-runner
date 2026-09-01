@@ -1,6 +1,6 @@
 # Common failure modes and recovery
 
-Last reviewed: 2026-08-02
+Last reviewed: 2026-09-01
 
 - **Locked environment unavailable:** restore the documented `uv sync --locked
   --all-groups` environment. Do not replace locked commands with an unpinned
@@ -8,9 +8,11 @@ Last reviewed: 2026-08-02
 - **Pre-CR reports `no-changes`:** this is expected on an unchanged checkout;
   use the full ladder for baseline evidence and run Pre-CR only after a real
   changed-line slice exists.
-- **Dirty target or unsafe worktree:** preserve the checkout and use an
-  explicitly disposable worktree. Never clean or reset a user tree to make a
-  gate run.
+- **Dirty target or unsafe gate execution:** preserve the checkout. Run the
+  Quality Runner gate in an explicitly disposable worktree when the target
+  cannot be safely inspected in place. This is a gate-execution prerequisite,
+  not a general implementation-lane rule; a dirty `dev` alone does not select
+  a feature branch. Never clean or reset a user tree to make a gate run.
 - **Gate timeout or unavailable tool:** retain the timeout/availability result,
   identify the missing prerequisite, and rerun only after the environment is
   repaired. Do not turn a timeout into a pass.
