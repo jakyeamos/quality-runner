@@ -24,6 +24,10 @@
     "summary": { "type": "object" },
     "accountability": { "type": "array", "items": { "type": "object" } },
     "findings": { "type": "array", "items": { "$ref": "#/$defs/finding" } },
+    "complexity_metrics": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/complexity_metric" }
+    },
     "detector_evidence": { "type": "array", "items": { "$ref": "#/$defs/detector_evidence" } },
     "detector_relations": { "type": "array", "items": { "type": "object" } },
     "duplicate_clusters": { "type": "array", "items": { "type": "object" } },
@@ -103,7 +107,15 @@
         "evidence_needed": {
           "type": "array",
           "items": { "type": "string", "minLength": 1 }
-        }
+        },
+        "subtype": { "type": "string", "minLength": 1 },
+        "symbol": { "type": "string", "minLength": 1 },
+        "metric": { "type": "string", "minLength": 1 },
+        "language": { "type": "string", "minLength": 1 },
+        "value": { "type": "integer" },
+        "threshold": { "type": "integer", "minimum": 1 },
+        "baseline_value": { "type": "integer", "minimum": 0 },
+        "current_value": { "type": "integer", "minimum": 0 }
       },
       "additionalProperties": false,
       "allOf": [
@@ -115,6 +127,33 @@
           "then": { "required": ["verification_requirements"] }
         }
       ]
+    },
+    "complexity_metric": {
+      "type": "object",
+      "required": [
+        "file",
+        "line",
+        "symbol",
+        "language",
+        "metric",
+        "value",
+        "threshold",
+        "decision_counts"
+      ],
+      "properties": {
+        "file": { "type": "string", "minLength": 1 },
+        "line": { "type": "integer", "minimum": 1 },
+        "symbol": { "type": "string", "minLength": 1 },
+        "language": { "enum": ["python", "javascript"] },
+        "metric": { "const": "cyclomatic-complexity" },
+        "value": { "type": "integer", "minimum": 1 },
+        "threshold": { "type": "integer", "minimum": 1 },
+        "decision_counts": {
+          "type": "object",
+          "additionalProperties": { "type": "integer", "minimum": 1 }
+        }
+      },
+      "additionalProperties": false
     },
     "detector_evidence": {
       "type": "object",

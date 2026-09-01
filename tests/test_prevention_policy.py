@@ -7,6 +7,10 @@ from pathlib import Path
 import pytest
 
 from quality_runner.code_quality import create_code_quality_scan
+from quality_runner.code_quality_complexity import (
+    complexity_metrics,
+    complexity_regression_findings,
+)
 
 
 def _large_source_rules(root: Path) -> set[str]:
@@ -98,6 +102,133 @@ def test_nested_ternary_ambiguous_syntax_fixture_is_not_enforced(tmp_path: Path)
     )
 
     assert _nested_ternary_rules(tmp_path) == []
+
+
+def test_complexity_regression_reports_changed_function_increases() -> None:
+    baseline = [
+        {
+            "file": "src/service.py",
+            "line": 4,
+            "symbol": "run",
+            "language": "python",
+            "metric": "cyclomatic-complexity",
+            "value": 2,
+            "threshold": 15,
+            "decision_counts": {"if": 1},
+        }
+    ]
+    current = [
+        {
+            **baseline[0],
+            "value": 4,
+            "decision_counts": {"if": 3},
+        }
+    ]
+
+    findings = complexity_regression_findings(
+        baseline_metrics=baseline,
+        current_metrics=current,
+        changed_paths=["src/service.py"],
+    )
+
+    assert len(findings) == 1
+    assert findings[0]["rule_id"] == "complexity-regression"
+    assert findings[0]["subtype"] == "increase"
+    assert findings[0]["baseline_value"] == 2
+    assert findings[0]["current_value"] == 4
+    assert (
+        complexity_regression_findings(
+            baseline_metrics=baseline,
+            current_metrics=current,
+            changed_paths=["src/other.py"],
+        )
+        == []
+    )
+
+
+def test_complexity_regression_uses_qualified_python_symbols_and_skips_ambiguous_names() -> None:
+    source = """
+class First:
+    def run(self, value):
+        if value:
+            return 1
+        return 0
+
+class Second:
+    def run(self, value):
+        if value:
+            return 1
+        return 0
+"""
+    metrics = complexity_metrics("src/service.py", source, source.splitlines())
+
+    assert {item["symbol"] for item in metrics} == {"First.run", "Second.run"}
+    assert (
+        complexity_regression_findings(
+            baseline_metrics=[{**item, "value": 1} for item in metrics],
+            current_metrics=[
+                {**item, "value": 2} if item["symbol"] == "First.run" else {**item, "value": 1}
+                for item in metrics
+            ],
+            changed_paths=["src/service.py"],
+        )[0]["symbol"]
+        == "First.run"
+    )
+
+    assert (
+        complexity_regression_findings(
+            baseline_metrics=[
+                {**metrics[0], "value": 1},
+                {**metrics[0], "value": 1},
+            ],
+            current_metrics=metrics,
+            changed_paths=["src/service.py"],
+        )
+        == []
+    )
+
+
+def test_complexity_reduction_observation_is_opt_in_and_requires_no_test_change() -> None:
+    baseline = [
+        {
+            "file": "src/service.py",
+            "line": 4,
+            "symbol": "run",
+            "language": "python",
+            "metric": "cyclomatic-complexity",
+            "value": 10,
+            "threshold": 15,
+            "decision_counts": {"if": 9},
+        }
+    ]
+    current = [{**baseline[0], "value": 4, "decision_counts": {"if": 3}}]
+
+    assert (
+        complexity_regression_findings(
+            baseline_metrics=baseline,
+            current_metrics=current,
+            changed_paths=["src/service.py"],
+        )
+        == []
+    )
+    findings = complexity_regression_findings(
+        baseline_metrics=baseline,
+        current_metrics=current,
+        changed_paths=["src/service.py"],
+        report_unverified_reductions=True,
+    )
+    assert [finding["rule_id"] for finding in findings] == [
+        "complexity-reduction-without-test-change"
+    ]
+    assert (
+        complexity_regression_findings(
+            baseline_metrics=baseline,
+            current_metrics=current,
+            changed_paths=["src/service.py", "tests/test_service.py"],
+            report_unverified_reductions=True,
+        )
+        == []
+    )
 
 
 def test_large_source_file_occurrence_fingerprint_is_stable_across_line_growth(

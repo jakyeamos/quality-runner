@@ -317,20 +317,24 @@ def _test_quality_findings(relative_path: str, line: str, line_number: int) -> l
     if not _is_test_file(relative_path):
         return []
     findings: list[dict[str, Any]] = []
-    javascript_tautology = _is_javascript_source_file(relative_path) and bool(
-        re.search(
+    subtype: str | None = None
+    if _is_javascript_source_file(relative_path):
+        if re.search(
             r"\bexpect\(\s*(true|false)\s*\)\.(?:toBe|toEqual|toStrictEqual)\(\s*\1\s*\)",
             line,
-        )
-        or re.search(
+        ):
+            subtype = "literal"
+        elif re.search(
             r"\bexpect\(\s*([A-Za-z_$][\w$]*)\s*\)\.(?:toBe|toEqual|toStrictEqual)\(\s*\1\s*\)",
             line,
-        )
-    )
-    python_tautology = relative_path.endswith(".py") and bool(
-        re.search(r"^\s*assert\s+(?:True|([A-Za-z_]\w*)\s*==\s*\1)\s*(?:#.*)?$", line)
-    )
-    if javascript_tautology or python_tautology:
+        ):
+            subtype = "self-comparison"
+    elif relative_path.endswith(".py"):
+        if re.search(r"^\s*assert\s+True\s*(?:#.*)?$", line):
+            subtype = "literal"
+        elif re.search(r"^\s*assert\s+([A-Za-z_]\w*)\s*==\s*\1\s*(?:#.*)?$", line):
+            subtype = "self-comparison"
+    if subtype is not None:
         findings.append(
             _finding(
                 category="improve-tests",
@@ -351,6 +355,7 @@ def _test_quality_findings(relative_path: str, line: str, line_number: int) -> l
                 evidence_needed=[
                     "Identify the externally observable behavior or invariant this test should prove."
                 ],
+                subtype=subtype,
             )
         )
     if _is_javascript_source_file(relative_path) and "console.log(" in line:

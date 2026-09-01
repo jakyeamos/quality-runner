@@ -7,6 +7,7 @@ from typing import Any, cast
 from quality_runner.cache_modes import CacheMode
 from quality_runner.code_quality_architecture import architecture_findings
 from quality_runner.code_quality_bundles import bundle_budget_findings
+from quality_runner.code_quality_complexity import complexity_metrics
 from quality_runner.code_quality_duplicates import extract_functions
 from quality_runner.code_quality_findings import (
     CATEGORY_ORDER,
@@ -114,6 +115,7 @@ def create_code_quality_scan(
     effective_persist_cache = persist_cache and str(cache_mode) != "disabled"
     findings: list[dict[str, Any]] = []
     extracted_functions: list[dict[str, Any]] = []
+    complexity_metric_rows: list[dict[str, Any]] = []
     accountability: list[dict[str, Any]] = []
     scanned_files: list[dict[str, Any]] = []
 
@@ -138,6 +140,7 @@ def create_code_quality_scan(
                         disabled_groups=disabled_groups,
                         large_file_lines=policy["large_file_lines"],
                         fat_router_lines=policy["fat_router_lines"],
+                        complexity_thresholds=cast(dict[str, int], policy["complexity_thresholds"]),
                     )
                 ),
                 validate=_valid_code_quality_file_result,
@@ -154,6 +157,7 @@ def create_code_quality_scan(
                     disabled_groups=disabled_groups,
                     large_file_lines=policy["large_file_lines"],
                     fat_router_lines=policy["fat_router_lines"],
+                    complexity_thresholds=cast(dict[str, int], policy["complexity_thresholds"]),
                 ),
                 validate=_valid_code_quality_file_result,
             )
@@ -172,6 +176,7 @@ def create_code_quality_scan(
         )
         findings.extend(_dict_list_result(file_result, "findings"))
         extracted_functions.extend(_dict_list_result(file_result, "extracted_functions"))
+        complexity_metric_rows.extend(_dict_list_result(file_result, "complexity_metrics"))
 
     deferred_checks: list[dict[str, str]] = []
     semantic_similarity_clusters = 0
@@ -301,6 +306,12 @@ def create_code_quality_scan(
             "semantic_similarity_backend": policy["similarity_backend"],
             "semantic_similarity_tools": semantic_similarity_tools,
             "semantic_similarity_timing": semantic_similarity_timing,
+            "complexity_functions": len(complexity_metric_rows),
+            "complexity_hotspots": sum(
+                1
+                for finding in sorted_findings
+                if finding.get("rule_id") == "high-cyclomatic-complexity"
+            ),
             **quality_summary_fields(
                 backend=policy["similarity_backend"],
                 enabled=policy["similarity_enabled"],
@@ -317,6 +328,14 @@ def create_code_quality_scan(
         },
         "accountability": accountability,
         "findings": sorted_findings,
+        "complexity_metrics": sorted(
+            complexity_metric_rows,
+            key=lambda item: (
+                str(item.get("file")),
+                int(item.get("line", 0)),
+                str(item.get("symbol")),
+            ),
+        ),
         "duplicate_clusters": duplicate_clusters,
         "skipped_files": sorted(skipped_files, key=_skipped_file_path),
         "quality_skills": quality_skills,
@@ -344,6 +363,7 @@ def _analyze_code_quality_file(
     disabled_groups: set[str],
     large_file_lines: int,
     fat_router_lines: int,
+    complexity_thresholds: dict[str, int],
 ) -> dict[str, object]:
     lines = source_analysis_cache.redacted_lines_for_source(
         source_text=source_text,
@@ -360,8 +380,14 @@ def _analyze_code_quality_file(
             disabled_groups=disabled_groups,
             large_file_lines=large_file_lines,
             fat_router_lines=fat_router_lines,
+            complexity_thresholds=complexity_thresholds,
         ),
         "extracted_functions": extract_functions(relative_path, lines),
+        "complexity_metrics": (
+            []
+            if "simplify" in disabled_groups
+            else complexity_metrics(relative_path, text, lines, complexity_thresholds)
+        ),
     }
 
 
@@ -370,6 +396,7 @@ def _valid_code_quality_file_result(result: dict[str, object]) -> bool:
         _string_list_result(result, "redacted_lines")
         _dict_list_result(result, "findings")
         _dict_list_result(result, "extracted_functions")
+        _dict_list_result(result, "complexity_metrics")
     except ValueError:
         return False
     return True

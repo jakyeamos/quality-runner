@@ -751,3 +751,174 @@ def test_test_quality_findings_are_bounded_and_include_remediation_dispositions(
         audit_findings["structural-improve-tests-removed-behavior-lock"]["suggested_disposition"]
         == "delete_candidate"
     )
+
+
+def test_test_quality_subtypes_flag_tautologies_without_flagging_interaction_contracts(
+    tmp_path: Path,
+) -> None:
+    from quality_runner.code_quality import create_code_quality_scan
+
+    _write(
+        tmp_path / "src" / "tautologies.test.ts",
+        "\n".join(
+            [
+                "test('literal', () => {",
+                "  expect(true).toBe(true);",
+                "});",
+                "test('self comparison', () => {",
+                "  expect(value).toEqual(value);",
+                "});",
+                "test('derived expected', () => {",
+                "  const actual = service.load();",
+                "  const expected_value = actual;",
+                "  expect(actual).toEqual(expected_value);",
+                "});",
+                "test('mock echo', () => {",
+                "  repo.save(item);",
+                "  const recorded = repo.save.mock.calls[0][0];",
+                "  expect(repo.save).toHaveBeenCalledWith(recorded);",
+                "});",
+                "test('legitimate interaction', () => {",
+                "  repo.save(item);",
+                "  expect(repo.save).toHaveBeenCalledWith(item);",
+                "});",
+            ]
+        ),
+    )
+    _write(
+        tmp_path / "tests" / "test_tautologies.py",
+        "\n".join(
+            [
+                "def test_derived_expected():",
+                "    actual = service.load()",
+                "    expected_value = actual",
+                "    assert actual == expected_value",
+                "",
+                "def test_mock_echo():",
+                "    recorded = mock.call_args.args[0]",
+                "    mock.assert_called_with(recorded)",
+                "",
+                "def test_legitimate_interaction():",
+                "    repo.save.assert_called_with(item)",
+            ]
+        ),
+    )
+
+    result = create_code_quality_scan(tmp_path, scan={"run_id": "scan-001"}, config={})
+    weak = [
+        finding for finding in result["findings"] if finding["rule_id"] == "weak-test-assertion"
+    ]
+
+    assert {finding["subtype"] for finding in weak} == {
+        "literal",
+        "self-comparison",
+        "derived-expected",
+        "mock-echo",
+    }
+    assert {
+        finding["confidence"]
+        for finding in weak
+        if finding["subtype"] in {"literal", "self-comparison"}
+    } == {"high"}
+    assert {
+        finding["severity"]
+        for finding in weak
+        if finding["subtype"] in {"derived-expected", "mock-echo"}
+    } == {"observation"}
+    assert not any(
+        finding["file"] == "src/tautologies.test.ts"
+        and "legitimate interaction" in finding["evidence"]
+        for finding in weak
+    )
+    assert not any(
+        finding["file"] == "tests/test_tautologies.py" and "repo.save" in finding["evidence"]
+        for finding in weak
+    )
+
+
+def test_code_quality_reports_language_aware_complexity_metrics_and_hotspots(
+    tmp_path: Path,
+) -> None:
+    from quality_runner.code_quality import create_code_quality_scan
+
+    _write(
+        tmp_path / "src" / "branchy.py",
+        "\n".join(
+            [
+                "def branchy(value, other):",
+                "    if value:",
+                "        return 1",
+                "    if other:",
+                "        return 2",
+                "    for item in values:",
+                "        if item:",
+                "            return item",
+                "    return 0",
+            ]
+        ),
+    )
+    _write(
+        tmp_path / "src" / "branchy.ts",
+        "\n".join(
+            [
+                "export function branchy(value: boolean, other: boolean) {",
+                "  if (value) return 1;",
+                "  if (other) return 2;",
+                "  for (const item of values) {",
+                "    if (item) return item;",
+                "  }",
+                "  return 0;",
+                "}",
+            ]
+        ),
+    )
+
+    result = create_code_quality_scan(
+        tmp_path,
+        scan={"run_id": "scan-001"},
+        config={
+            "structural_scan": {
+                "complexity_thresholds": {"python": 3, "javascript": 2},
+            }
+        },
+    )
+    hotspots = [
+        finding
+        for finding in result["findings"]
+        if finding["rule_id"] == "high-cyclomatic-complexity"
+    ]
+
+    assert result["summary"]["complexity_functions"] == 2
+    assert result["summary"]["complexity_hotspots"] == 2
+    assert {(item["language"], item["threshold"]) for item in result["complexity_metrics"]} == {
+        ("python", 3),
+        ("javascript", 2),
+    }
+    assert {(item["language"], item["value"]) for item in hotspots} == {
+        ("python", 5),
+        ("javascript", 5),
+    }
+    assert all("decision counts:" in item["evidence"] for item in hotspots)
+
+
+def test_code_quality_can_disable_complexity_with_the_simplify_group(
+    tmp_path: Path,
+) -> None:
+    from quality_runner.code_quality import create_code_quality_scan
+
+    _write(
+        tmp_path / "src" / "branchy.py",
+        "def branchy(value):\n    if value:\n        return 1\n    if not value:\n        return 2\n    return 0\n",
+    )
+
+    result = create_code_quality_scan(
+        tmp_path,
+        scan={"run_id": "scan-001"},
+        config={"structural_scan": {"disabled_rule_groups": ["simplify"]}},
+    )
+
+    assert result["complexity_metrics"] == []
+    assert result["summary"]["complexity_functions"] == 0
+    assert not any(
+        finding["rule_id"] == "high-cyclomatic-complexity" for finding in result["findings"]
+    )

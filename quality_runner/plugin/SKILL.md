@@ -71,6 +71,11 @@ not become task failures. Do not copy every QR finding into static agent rules;
 promote a repeatedly trusted deterministic finding into a behavior-verified QR
 rule or a faster native checker with its own maturity evidence.
 
+When complexity evidence is present, inspect `complexity.baseline_metrics_available`,
+`regression_count`, and `regressions`. Exact path-and-symbol matching keeps
+changed-function increases review-only. Complexity is not proof of test
+adequacy; mutation-testing results remain optional external evidence.
+
 ## Repository onboarding admission
 
 When adding or registering a repository, read the fleet repository-onboarding

@@ -15,6 +15,18 @@
     "snapshot": { "$ref": "workspace-snapshot.schema.json" },
     "changed_paths": { "type": "array", "items": { "type": "string" } },
     "coverage": { "type": "object" },
+    "complexity": {
+      "type": "object",
+      "properties": {
+        "baseline_metrics_available": { "type": "boolean" },
+        "regression_count": { "type": "integer", "minimum": 0 },
+        "regressions": {
+          "type": "array",
+          "items": { "$ref": "code-quality-scan.schema.json#/$defs/finding" }
+        }
+      },
+      "additionalProperties": false
+    },
     "normalized_findings": { "$ref": "normalized-findings.schema.json" },
     "delta": { "type": "object" },
     "prevention_readiness": { "$ref": "prevention-readiness.schema.json" },

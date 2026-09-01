@@ -41,6 +41,14 @@ def _finding(
     suggested_disposition: str | None = None,
     disposition_rationale: str | None = None,
     evidence_needed: list[str] | None = None,
+    subtype: str | None = None,
+    symbol: str | None = None,
+    metric: str | None = None,
+    language: str | None = None,
+    value: int | None = None,
+    threshold: int | None = None,
+    baseline_value: int | None = None,
+    current_value: int | None = None,
 ) -> dict[str, Any]:
     redacted_evidence = redact_secret_like_literals(evidence).strip()
     fingerprint = _fingerprint(rule_id, file, redacted_evidence)
@@ -70,6 +78,22 @@ def _finding(
         finding["disposition_rationale"] = disposition_rationale
     if evidence_needed:
         finding["evidence_needed"] = evidence_needed
+    for key, string_value in (
+        ("subtype", subtype),
+        ("symbol", symbol),
+        ("metric", metric),
+        ("language", language),
+    ):
+        if isinstance(string_value, str) and string_value:
+            finding[key] = string_value
+    for key, numeric_value in (
+        ("value", value),
+        ("threshold", threshold),
+        ("baseline_value", baseline_value),
+        ("current_value", current_value),
+    ):
+        if isinstance(numeric_value, int) and not isinstance(numeric_value, bool):
+            finding[key] = numeric_value
     return finding
 
 

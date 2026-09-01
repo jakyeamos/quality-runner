@@ -181,6 +181,20 @@ a pass. The command never modifies a source checkout.
   static scan means only that these bounded patterns were not found, not that
   every remaining test is valuable. Dynamic or mutation evidence can strengthen
   a disposition when available but is not silently substituted when absent.
+  `weak-test-assertion` findings identify their subtype: `literal` and
+  `self-comparison` are high-confidence tautologies, while `derived-expected`
+  and `mock-echo` are lower-confidence observations that require review of the
+  test's oracle. Deliberate interaction assertions such as
+  `repo.save.assert_called_with(item)` are not treated as mock echoes merely
+  because they inspect a mock.
+  Complexity metrics are recorded separately under the root
+  `complexity_metrics` array. `high-cyclomatic-complexity` findings identify
+  the function, language, threshold, score, and decision counts. Task-check
+  artifacts expose matching changed-function increases under `complexity` as
+  `complexity-regression` observations; optional reduction observations are
+  emitted only when configured. These static signals do not substitute for
+  semantic tests or mutation evidence, and QR does not execute or require a
+  mutation-testing provider.
   Category ownership is intentionally non-overlapping: `debloat` owns repository-
   shape pressure, `simplify` owns local control-flow complexity, `deduplicate`
   owns repeated implementations, `ponytail` owns concrete speculative

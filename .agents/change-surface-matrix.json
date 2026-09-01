@@ -2,7 +2,7 @@
   "schema_version": "change-surface-matrix/v1",
   "subject": {"kind": "repository", "id": "quality-runner"},
   "owner": "quality-runner-maintainers",
-  "last_reviewed": "2026-08-24",
+  "last_reviewed": "2026-09-01",
   "surfaces": [
     {
       "id": "matrix-maintenance",
@@ -35,6 +35,22 @@
         "uv run --locked ruff check .",
         "uv run --locked basedpyright",
         "For maturity changes, verify dimension-to-capability-to-pillar aggregation, reverse producer coverage, explicit capability applicability, evidence coverage, missing capabilities, and confirmed-risk-only critical caps."
+      ],
+      "status": "applicable"
+    },
+    {
+      "id": "complexity-and-test-quality-signals",
+      "scope": "local",
+      "distribution": "public_core",
+      "path": "quality_runner/code_quality_complexity.py, quality_runner/code_quality_complexity_parsers.py, quality_runner/code_quality_test_quality.py, quality_runner/schemas/, docs/artifacts.md, docs/cli.md, docs/standards-profiles.md, quality_runner/plugin/SKILL.md, and focused tests",
+      "owner": "quality-runner-maintainers",
+      "condition": "Cyclomatic-complexity metrics, changed-function regression evidence, or tautological-test classification behavior changes",
+      "operations": ["add", "change", "remove"],
+      "validation": [
+        "Run focused code-quality, task-prevention, and structural-config tests for complexity and weak-test-assertion subtypes.",
+        "Validate code-quality-scan, task-baseline, and task-check artifacts against their schemas.",
+        "Confirm high-confidence literal/self-comparison findings, review-only data-flow observations, and no false positive for ordinary mock interaction assertions.",
+        "Confirm complexity thresholds are language-aware and configurable, changed-function increases retain baseline/current evidence, and mutation testing remains optional external evidence."
       ],
       "status": "applicable"
     },

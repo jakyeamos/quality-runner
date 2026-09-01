@@ -46,3 +46,19 @@ def test_task_check_schema_supports_all_cli_outcomes_and_canonical_evidence() ->
         "analysis",
         "evidence",
     } <= set(payload["properties"])
+
+
+def test_task_check_schema_declares_complexity_regression_evidence() -> None:
+    schema_root = Path(schema_constants.__file__).parent / "schemas"
+    payload = json.loads((schema_root / "task-check.schema.json").read_text(encoding="utf-8"))
+
+    complexity = payload["properties"]["complexity"]
+    assert complexity["properties"]["baseline_metrics_available"] == {"type": "boolean"}
+    assert complexity["properties"]["regression_count"] == {
+        "type": "integer",
+        "minimum": 0,
+    }
+    assert complexity["properties"]["regressions"]["items"] == {
+        "$ref": "code-quality-scan.schema.json#/$defs/finding"
+    }
+    assert complexity["additionalProperties"] is False

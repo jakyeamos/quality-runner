@@ -45,6 +45,8 @@ similarity_enabled = true
 similarity_threshold = 0.9
 similarity_min_lines = 10
 similarity_max_pairs = 20
+complexity_thresholds = { python = 15, javascript = 20 }
+report_unverified_complexity_reductions = false
 
 [quality_runner.readiness]
 evidence_file = ".quality-runner/release-evidence.json"
@@ -107,6 +109,20 @@ artifacts.
 Structural scan findings are default-on and non-blocking. Repos can disable
 rule groups, tune large-file/router thresholds, or preserve accepted dispositions
 by stable finding fingerprint.
+
+The `simplify` group measures cyclomatic complexity per Python and
+JavaScript/TypeScript function. The default advisory thresholds are 15 for
+Python and 20 for JavaScript; repositories can tune them by language with
+`complexity_thresholds`. Code-quality artifacts include the function symbol,
+score, threshold, and counted decision types so a reviewer can inspect the
+measurement. Task baselines compare changed functions with a matching
+file-and-symbol metric and report increases as `complexity-regression`
+observations, even when the function remains below its advisory threshold.
+`report_unverified_complexity_reductions = true` additionally reports a large
+reduction when no changed test file is present, but this is opt-in and remains
+an observation. Complexity is a review signal, not proof of behavioral
+correctness; Quality Runner does not require mutation testing, and any mutation
+results remain optional external evidence.
 
 Opt-in architecture contracts add repo-specific import-boundary and
 pattern-boundary rules under `[quality_runner.architecture]`. See

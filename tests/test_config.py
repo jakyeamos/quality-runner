@@ -271,6 +271,8 @@ def test_load_repo_config_reads_structural_scan_policy_and_accepted_dispositions
                 'include_ignored_paths = [".aios/shadow-worktrees/approved"]',
                 "large_file_lines = 900",
                 "fat_router_lines = 300",
+                "complexity_thresholds = { python = 12, javascript = 18 }",
+                "report_unverified_complexity_reductions = true",
                 "",
                 "[[quality_runner.accepted_dispositions]]",
                 'fingerprint = "abc123"',
@@ -291,6 +293,8 @@ def test_load_repo_config_reads_structural_scan_policy_and_accepted_dispositions
         "include_ignored_paths": [".aios/shadow-worktrees/approved"],
         "large_file_lines": 900,
         "fat_router_lines": 300,
+        "complexity_thresholds": {"python": 12, "javascript": 18},
+        "report_unverified_complexity_reductions": True,
     }
     assert config["accepted_dispositions"] == [
         {

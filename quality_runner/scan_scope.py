@@ -4,6 +4,7 @@ import os
 from pathlib import Path
 from typing import Any, cast
 
+from quality_runner.code_quality_complexity import DEFAULT_COMPLEXITY_THRESHOLDS
 from quality_runner.code_quality_paths import (
     artifact_directory_reason,
     ignored_directory_reason,
@@ -87,6 +88,23 @@ def structural_scan_policy(config: dict[str, Any]) -> dict[str, Any]:
     similarity_max_pairs = policy.get("similarity_max_pairs")
     similarity_timeout_seconds = policy.get("similarity_timeout_seconds")
     similarity_include_tests = policy.get("similarity_include_tests")
+    complexity_thresholds = policy.get("complexity_thresholds")
+    report_unverified_complexity_reductions = policy.get("report_unverified_complexity_reductions")
+    resolved_complexity_thresholds = {
+        **DEFAULT_COMPLEXITY_THRESHOLDS,
+        **(
+            {
+                language: threshold
+                for language, threshold in cast(dict[str, Any], complexity_thresholds).items()
+                if language in DEFAULT_COMPLEXITY_THRESHOLDS
+                and isinstance(threshold, int)
+                and not isinstance(threshold, bool)
+                and threshold > 0
+            }
+            if isinstance(complexity_thresholds, dict)
+            else {}
+        ),
+    }
     resolved: dict[str, Any] = {
         "disabled_rule_groups": [
             item for item in cast(list[object], disabled) if isinstance(item, str)
@@ -110,6 +128,10 @@ def structural_scan_policy(config: dict[str, Any]) -> dict[str, Any]:
         "similarity_max_pairs": similarity_max_pairs,
         "similarity_timeout_seconds": similarity_timeout_seconds,
         "similarity_include_tests": similarity_include_tests,
+        "complexity_thresholds": resolved_complexity_thresholds,
+        "report_unverified_complexity_reductions": report_unverified_complexity_reductions
+        if isinstance(report_unverified_complexity_reductions, bool)
+        else False,
     }
     return {**resolved, **similarity_policy_defaults(resolved)}
 

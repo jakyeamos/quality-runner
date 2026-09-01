@@ -668,6 +668,14 @@ does not install these tools. Disable or tune similarity under
 `[quality_runner.structural_scan]` (for example `similarity_enabled = false` or
 `disabled_rule_groups = ["deduplicate"]`).
 
+The same structural-scan policy records language-aware cyclomatic-complexity
+metrics for Python and JavaScript/TypeScript functions. Configure per-language
+advisory thresholds with `complexity_thresholds`; task checks compare matching
+changed functions and expose complexity increases as review observations.
+Optional reduction observations can be enabled with
+`report_unverified_complexity_reductions = true`. These metrics are static
+signals and do not replace semantic or mutation-test evidence.
+
 ## DOI-Ready Research Release
 
 Quality Runner is prepared as an independent software-methods artifact. See

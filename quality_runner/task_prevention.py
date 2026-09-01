@@ -17,8 +17,10 @@ from quality_runner.artifacts import (
     write_json,
     write_text,
 )
+from quality_runner.code_quality_complexity import complexity_regression_findings
 from quality_runner.config import CONFIG_FILE_NAME, load_repo_config
 from quality_runner.core.audit_contracts import AuditRequest
+from quality_runner.scan_scope import structural_scan_policy
 from quality_runner.schema_constants import (
     TASK_BASELINE_SCHEMA,
     TASK_CHECK_SCHEMA,
@@ -202,11 +204,6 @@ def check_task(repo_root: Path, *, task_id: str) -> dict[str, Any]:
             cache_repo_root=repo_root,
             snapshot_digest=str(snapshot["snapshot_digest"]),
         )
-        findings = normalize_findings(
-            code_quality_scan=cast(dict[str, Any], analysis.code_quality_scan),
-            security_scan=cast(dict[str, Any], analysis.security_scan),
-            prevention=prevention,
-        )
         readiness = evaluate_readiness(repo_root=repo_root, prevention=prevention)
         if any(gate.get("state") == "certified" for gate in readiness["gates"]):
             attach_git_metadata(
@@ -221,6 +218,23 @@ def check_task(repo_root: Path, *, task_id: str) -> dict[str, Any]:
         )
 
     changed = changed_paths(cast(dict[str, Any], baseline["snapshot"]), snapshot)
+    code_quality_scan = dict(cast(dict[str, Any], analysis.code_quality_scan))
+    regressions = complexity_regression_findings(
+        baseline_metrics=baseline.get("complexity_metrics"),
+        current_metrics=code_quality_scan.get("complexity_metrics"),
+        changed_paths=changed,
+        report_unverified_reductions=bool(
+            structural_scan_policy(config)["report_unverified_complexity_reductions"]
+        ),
+    )
+    current_code_findings = code_quality_scan.get("findings")
+    if isinstance(current_code_findings, list) and regressions:
+        code_quality_scan["findings"] = [*current_code_findings, *regressions]
+    findings = normalize_findings(
+        code_quality_scan=code_quality_scan,
+        security_scan=cast(dict[str, Any], analysis.security_scan),
+        prevention=prevention,
+    )
     delta = compare_findings(
         baseline=cast(dict[str, Any], baseline["normalized_findings"]),
         current=findings,
@@ -255,6 +269,11 @@ def check_task(repo_root: Path, *, task_id: str) -> dict[str, Any]:
         "snapshot": snapshot,
         "changed_paths": changed,
         "coverage": findings["coverage"],
+        "complexity": {
+            "baseline_metrics_available": isinstance(baseline.get("complexity_metrics"), list),
+            "regression_count": len(regressions),
+            "regressions": regressions,
+        },
         "normalized_findings": findings,
         "delta": delta,
         "prevention_readiness": readiness,
@@ -330,6 +349,7 @@ def _capture_baseline(
         "source": snapshot["source"],
         "snapshot": snapshot,
         "normalized_findings": findings,
+        "complexity_metrics": analysis.code_quality_scan.get("complexity_metrics", []),
         "coverage": findings["coverage"],
         "prevention_readiness": readiness,
         "analysis": _analysis_evidence(analysis),

@@ -65,6 +65,7 @@ def test_file_quality_findings(relative_path: str, text: str) -> list[dict[str, 
                 ],
             )
         )
+    findings.extend(_derived_expected_findings(relative_path, cases))
     return findings
 
 
@@ -224,3 +225,192 @@ def _contains_only_absence_assertions(relative_path: str, body: str) -> bool:
         assertions = re.findall(r"\bexpect\s*\(", body)
         absence_assertions = _JS_ABSENCE_ASSERTION.findall(body)
     return bool(assertions) and len(assertions) == len(absence_assertions)
+
+
+def _derived_expected_findings(
+    relative_path: str,
+    cases: Sequence[Mapping[str, Any]],
+) -> list[dict[str, Any]]:
+    findings: list[dict[str, Any]] = []
+    for case in cases:
+        body = str(case["body"])
+        aliases = _derived_aliases(relative_path, body)
+        for match in _derived_assertions(relative_path, body, aliases):
+            actual = str(match["actual"])
+            expected = str(match["expected"])
+            line = _case_line(relative_path, case, body, int(match["offset"]))
+            findings.append(
+                finding(
+                    category="improve-tests",
+                    severity="observation",
+                    confidence="medium",
+                    file=relative_path,
+                    line=line,
+                    rule_id="weak-test-assertion",
+                    evidence=(
+                        f"assertion compares {actual} with {expected}, where {expected} was "
+                        f"directly derived from {actual}"
+                    ),
+                    expected_improvement=(
+                        "Derive the expected value independently from the behavior under test, "
+                        "then assert the externally observable result."
+                    ),
+                    risk=(
+                        "An expected value copied from the observed value can pass while the "
+                        "underlying behavior is wrong."
+                    ),
+                    verification=verification_for_path(relative_path),
+                    remediation_bucket="tests, E2E, scripts, CI cleanup",
+                    suggested_disposition="insufficient_evidence",
+                    disposition_rationale=(
+                        "The static data-flow match is suspicious but requires review of the "
+                        "test's intended oracle."
+                    ),
+                    evidence_needed=[
+                        "Confirm the expected value is independently specified rather than an alias of the actual result."
+                    ],
+                    subtype="derived-expected",
+                )
+            )
+        for match in _mock_echo_assertions(relative_path, body):
+            mock = str(match["mock"])
+            expected = str(match["expected"])
+            line = _case_line(relative_path, case, body, int(match["offset"]))
+            findings.append(
+                finding(
+                    category="improve-tests",
+                    severity="observation",
+                    confidence="low",
+                    file=relative_path,
+                    line=line,
+                    rule_id="weak-test-assertion",
+                    evidence=(
+                        f"mock interaction assertion uses {expected}, read from {mock}'s recorded call data"
+                    ),
+                    expected_improvement=(
+                        "Assert the contract input or output independently of the mock's recorded call history."
+                    ),
+                    risk=(
+                        "An assertion that re-reads a mock's own call record can validate the recorder "
+                        "rather than the interaction."
+                    ),
+                    verification=verification_for_path(relative_path),
+                    remediation_bucket="tests, E2E, scripts, CI cleanup",
+                    suggested_disposition="insufficient_evidence",
+                    disposition_rationale=(
+                        "The mock/data-flow pattern needs review to distinguish an echo of the "
+                        "recorder from a deliberate interaction assertion."
+                    ),
+                    evidence_needed=[
+                        "Confirm the expected call argument originates outside the mock's call history."
+                    ],
+                    subtype="mock-echo",
+                )
+            )
+    return findings
+
+
+def _derived_aliases(relative_path: str, body: str) -> dict[str, str]:
+    if relative_path.endswith(".py"):
+        pattern = re.compile(
+            r"(?:^|[;\n])\s*(?P<expected>[A-Za-z_]\w*)\s*=\s*"
+            r"(?P<actual>[A-Za-z_]\w*)\s*;?(?=\s*(?:[;\n]|$))",
+            re.MULTILINE,
+        )
+    else:
+        pattern = re.compile(
+            r"(?:^|[;\n])\s*(?:const|let|var)\s+"
+            r"(?P<expected>[A-Za-z_$][\w$]*)\s*=\s*"
+            r"(?P<actual>[A-Za-z_$][\w$]*)\s*;?(?=\s*(?:[;\n]|$))",
+            re.MULTILINE,
+        )
+    aliases: dict[str, str] = {}
+    for match in pattern.finditer(body):
+        expected = match.group("expected")
+        actual = match.group("actual")
+        if expected.lower().replace("_", "") in {
+            "expected",
+            "want",
+            "oracle",
+            "expectedvalue",
+        }:
+            aliases[expected] = actual
+    return aliases
+
+
+def _derived_assertions(
+    relative_path: str,
+    body: str,
+    aliases: dict[str, str],
+) -> list[dict[str, Any]]:
+    if not aliases:
+        return []
+    if relative_path.endswith(".py"):
+        pattern = re.compile(
+            r"\bassert\s+(?P<actual>[A-Za-z_]\w*)\s*==\s*(?P<expected>[A-Za-z_]\w*)"
+        )
+    else:
+        pattern = re.compile(
+            r"\bexpect\(\s*(?P<actual>[A-Za-z_$][\w$]*)\s*\)\.(?:toBe|toEqual|toStrictEqual)\(\s*(?P<expected>[A-Za-z_$][\w$]*)\s*\)"
+        )
+    return [
+        {**match.groupdict(), "offset": match.start()}
+        for match in pattern.finditer(body)
+        if aliases.get(match.group("expected")) == match.group("actual")
+    ]
+
+
+def _mock_echo_assertions(relative_path: str, body: str) -> list[dict[str, Any]]:
+    mock_path = r"[A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)*"
+    if relative_path.endswith(".py"):
+        recorded = re.compile(
+            rf"\b(?P<mock>{mock_path})\.assert_called_(?:once_)?with\s*\(\s*"
+            r"(?P<expected>[A-Za-z_]\w*)\s*\)"
+        )
+        aliases = {
+            match.group("expected"): match.group("mock")
+            for match in re.finditer(
+                rf"(?:^|[;\n])\s*(?P<expected>[A-Za-z_]\w*)\s*=\s*"
+                rf"(?P<mock>{mock_path})\.call_args\.args\[\d+\]"
+                r"\s*;?(?=\s*(?:[;\n]|$))",
+                body,
+                re.MULTILINE,
+            )
+        }
+        matches: list[dict[str, Any]] = []
+        for match in recorded.finditer(body):
+            mock = match.group("mock")
+            expected = match.group("expected")
+            if aliases.get(expected) == mock:
+                matches.append({"mock": mock, "expected": expected, "offset": match.start()})
+        return matches
+    aliases = {
+        match.group("expected"): match.group("mock")
+        for match in re.finditer(
+            rf"(?:^|[;\n])\s*(?:const|let|var)\s+(?P<expected>[A-Za-z_$][\w$]*)\s*=\s*"
+            rf"(?P<mock>{mock_path})\.mock\.calls\[\d+\]\[\d+\]"
+            r"\s*;?(?=\s*(?:[;\n]|$))",
+            body,
+            re.MULTILINE,
+        )
+    }
+    pattern = re.compile(
+        rf"\bexpect\(\s*(?P<mock>{mock_path})\s*\)\.toHaveBeen(?:CalledWith|LastCalledWith)\(\s*"
+        r"(?P<expected>[A-Za-z_$][\w$]*)\s*\)"
+    )
+    return [
+        {**match.groupdict(), "offset": match.start()}
+        for match in pattern.finditer(body)
+        if aliases.get(match.group("expected")) == match.group("mock")
+    ]
+
+
+def _case_line(
+    relative_path: str,
+    case: Mapping[str, Any],
+    body: str,
+    offset: int,
+) -> int:
+    header_line = int(case["line"])
+    body_line_offset = 0 if not relative_path.endswith(".py") else 1
+    return header_line + body_line_offset + body.count("\n", 0, offset)

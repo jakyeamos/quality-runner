@@ -44,6 +44,16 @@ def parse_structural_scan_section(
         "quality_runner.structural_scan.max_text_files",
         warnings,
     )
+    complexity_thresholds = _positive_int_mapping(
+        config.get("complexity_thresholds"),
+        "quality_runner.structural_scan.complexity_thresholds",
+        warnings,
+    )
+    report_unverified_complexity_reductions = _bool_value(
+        config.get("report_unverified_complexity_reductions"),
+        "quality_runner.structural_scan.report_unverified_complexity_reductions",
+        warnings,
+    )
     similarity_enabled = _bool_value(
         config.get("similarity_enabled"),
         "quality_runner.structural_scan.similarity_enabled",
@@ -83,6 +93,10 @@ def parse_structural_scan_section(
         result["fat_router_lines"] = fat_router_lines
     if max_text_files is not None:
         result["max_text_files"] = max_text_files
+    if complexity_thresholds is not None:
+        result["complexity_thresholds"] = complexity_thresholds
+    if report_unverified_complexity_reductions is not None:
+        result["report_unverified_complexity_reductions"] = report_unverified_complexity_reductions
     if similarity_enabled is not None:
         result["similarity_enabled"] = similarity_enabled
     if similarity_threshold is not None:
@@ -122,6 +136,32 @@ def _positive_int(value: object, field: str, warnings: list[dict[str, str]]) -> 
         _warning("invalid_quality_runner_config_field", f"{field} must be a positive integer")
     )
     return None
+
+
+def _positive_int_mapping(
+    value: object,
+    field: str,
+    warnings: list[dict[str, str]],
+) -> dict[str, int] | None:
+    if value is None:
+        return None
+    if not isinstance(value, dict):
+        warnings.append(_warning("invalid_quality_runner_config_field", f"{field} must be a table"))
+        return None
+    result: dict[str, int] = {}
+    for key, item in cast(dict[object, object], value).items():
+        if not isinstance(key, str) or key not in {"python", "javascript"}:
+            warnings.append(
+                _warning(
+                    "invalid_quality_runner_config_field",
+                    f"{field} supports only python and javascript keys",
+                )
+            )
+            continue
+        parsed = _positive_int(item, f"{field}.{key}", warnings)
+        if parsed is not None:
+            result[key] = parsed
+    return result
 
 
 def _bool_value(value: object, field: str, warnings: list[dict[str, str]]) -> bool | None:

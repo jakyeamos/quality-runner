@@ -13,6 +13,10 @@
     "source": { "type": "object" },
     "snapshot": { "$ref": "workspace-snapshot.schema.json" },
     "normalized_findings": { "$ref": "normalized-findings.schema.json" },
+    "complexity_metrics": {
+      "type": "array",
+      "items": { "$ref": "code-quality-scan.schema.json#/$defs/complexity_metric" }
+    },
     "coverage": { "type": "object" },
     "prevention_readiness": { "$ref": "prevention-readiness.schema.json" },
     "analysis": {

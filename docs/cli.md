@@ -253,6 +253,13 @@ Every task-check result includes a status-specific `next_action`.
 `task-check.json` is canonical; `task-check.md` is the derived human projection.
 A `pass` still requires any other repository-required checks to pass.
 
+When complexity evidence is present, the baseline contains `complexity_metrics`
+and the check result contains a `complexity` object. Matching is exact on the
+repository-relative path and qualified function symbol. A changed-function
+increase is reported as a review-only `complexity-regression` observation;
+optional reduction observations are disabled by default. These static values
+do not certify semantic tests or run mutation testing.
+
 Persisted legacy findings remain visible and are non-blocking. A finding can be
 reported as resolved only when follow-up coverage is complete and comparable;
 otherwise it is `unknown`. Matching is deterministic and never guesses through

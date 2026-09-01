@@ -4,6 +4,7 @@ import re
 from typing import Any
 
 from quality_runner.code_quality_api_rules import api_contract_findings, api_line_findings
+from quality_runner.code_quality_complexity import complexity_findings
 from quality_runner.code_quality_findings import finding
 from quality_runner.code_quality_paths import (
     has_motion_without_reduced_motion,
@@ -38,6 +39,7 @@ def _scan_file(
     disabled_groups: set[str],
     large_file_lines: int,
     fat_router_lines: int,
+    complexity_thresholds: dict[str, int] | None = None,
 ) -> list[dict[str, Any]]:
     findings: list[dict[str, Any]] = []
     is_javascript_source = is_javascript_source_file(relative_path)
@@ -166,6 +168,16 @@ def _scan_file(
 
     if "speed" not in disabled_groups:
         findings.extend(python_performance_findings(relative_path, text, lines))
+
+    if "simplify" not in disabled_groups:
+        findings.extend(
+            complexity_findings(
+                relative_path,
+                text,
+                lines,
+                thresholds=complexity_thresholds,
+            )
+        )
 
     if (
         "ui_structural" not in disabled_groups
