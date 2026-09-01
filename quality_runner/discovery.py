@@ -25,6 +25,7 @@ from quality_runner.scan_scope_resolver import (
 )
 from quality_runner.schema_constants import REPO_SCAN_SCHEMA
 from quality_runner.surfaces import detect_surfaces
+from quality_runner.verification_signals import analyze_verification_signals
 
 
 def inspect_repo(
@@ -143,6 +144,10 @@ def _inspect_repo_uncached(
         "repo_surfaces": repo_surfaces,
         "scripts": scripts,
         "quality_commands": quality_commands,
+        "verification_signals": analyze_verification_signals(
+            scripts=scripts,
+            quality_commands=quality_commands,
+        ),
         "aggregate_coverage": analyze_aggregate_coverage(
             scripts=scripts,
             quality_commands=quality_commands,

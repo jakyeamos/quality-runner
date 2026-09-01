@@ -85,6 +85,7 @@
       "items": { "$ref": "#/$defs/aggregateCoverage" },
       "default": []
     },
+    "verification_signals": { "$ref": "#/$defs/verificationSignals" },
     "generated_code": {
       "type": "array",
       "items": { "$ref": "#/$defs/generatedCode" },
@@ -202,6 +203,38 @@
         "uncovered_gate_ids": { "type": "array", "items": { "type": "string" } },
         "opaque": { "type": "boolean" },
         "reason": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "verificationSignals": {
+      "type": "object",
+      "required": ["coverage", "mutation"],
+      "properties": {
+        "coverage": { "$ref": "#/$defs/verificationSignal" },
+        "mutation": { "$ref": "#/$defs/verificationSignal" }
+      },
+      "additionalProperties": false
+    },
+    "verificationSignal": {
+      "type": "object",
+      "required": ["status", "execution", "observations"],
+      "properties": {
+        "status": { "enum": ["declared", "not_declared", "unknown"] },
+        "execution": { "const": "not_observed" },
+        "observations": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/verificationObservation" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "verificationObservation": {
+      "type": "object",
+      "required": ["source", "source_type", "evidence"],
+      "properties": {
+        "source": { "type": "string", "minLength": 1 },
+        "source_type": { "type": "string", "minLength": 1 },
+        "evidence": { "type": "string", "minLength": 1 }
       },
       "additionalProperties": false
     },
