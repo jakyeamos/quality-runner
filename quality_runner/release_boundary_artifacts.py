@@ -125,12 +125,16 @@ def clean_room_install_check(wheel: Path) -> dict[str, Any]:
         with tempfile.TemporaryDirectory(prefix="quality-runner-release-") as temporary:
             root = Path(temporary)
             venv = root / "venv"
+            bootstrap_environment = os.environ.copy()
+            for variable in ("PYTHONHOME", "PYTHONPATH", "VIRTUAL_ENV"):
+                bootstrap_environment.pop(variable, None)
             subprocess.run(
                 [sys.executable, "-m", "venv", str(venv)],
                 check=True,
                 capture_output=True,
                 text=True,
                 timeout=120,
+                env=bootstrap_environment,
             )
             executable_dir = venv / ("Scripts" if os.name == "nt" else "bin")
             python = executable_dir / ("python.exe" if os.name == "nt" else "python")
@@ -143,6 +147,7 @@ def clean_room_install_check(wheel: Path) -> dict[str, Any]:
                 capture_output=True,
                 text=True,
                 timeout=120,
+                env=bootstrap_environment,
             )
             home = root / "home"
             home.mkdir()

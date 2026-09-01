@@ -13,6 +13,7 @@ from quality_runner.release_boundary import (
     release_boundary_payload,
     write_release_boundary_report,
 )
+from quality_runner.release_boundary_artifacts import clean_room_install_check
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -292,3 +293,31 @@ def test_public_pronto_fixture_satisfies_the_feed_contract() -> None:
     )
 
     validate_maturity_feed(fixture)
+
+
+def test_clean_room_bootstrap_drops_parent_python_environment(tmp_path: Path, monkeypatch) -> None:
+    calls: list[tuple[list[str], dict[str, object]]] = []
+
+    def fake_run(arguments: list[str], **kwargs: object) -> subprocess.CompletedProcess[str]:
+        calls.append((arguments, kwargs))
+        return subprocess.CompletedProcess(arguments, 0, stdout="", stderr="")
+
+    monkeypatch.setenv("PYTHONHOME", "/tmp/foreign-python")
+    monkeypatch.setenv("PYTHONPATH", str(tmp_path))
+    monkeypatch.setenv("VIRTUAL_ENV", "/tmp/foreign-venv")
+    monkeypatch.setattr("quality_runner.release_boundary_artifacts.subprocess.run", fake_run)
+    monkeypatch.setattr(
+        "quality_runner.release_boundary_artifacts.shutil.which", lambda *_args, **_kwargs: None
+    )
+
+    result = clean_room_install_check(tmp_path / "quality_runner.whl")
+
+    assert result == {"id": "clean_room_install", "status": "passed", "integrations_present": []}
+    assert len(calls) == 4
+    bootstrap_environment = calls[0][1]["env"]
+    assert calls[1][1]["env"] is bootstrap_environment
+    assert isinstance(bootstrap_environment, dict)
+    assert all(
+        variable not in bootstrap_environment
+        for variable in ("PYTHONHOME", "PYTHONPATH", "VIRTUAL_ENV")
+    )
