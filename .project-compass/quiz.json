@@ -27,7 +27,29 @@
       "answers": [],
       "started_at": "2026-08-14T23:24:00Z",
       "updated_at": "2026-08-14T23:24:00Z"
+    },
+    {
+      "id": "subsystem-bootstrap-20260908",
+      "mode": "brownfield",
+      "compass_id": "project",
+      "scope_kind": "root",
+      "status": "active",
+      "questions": [
+        {
+          "id": "boundary",
+          "category": "subsystem-reconciliation",
+          "prompt": "I retained audit collection, review handoff, and consumer contracts, and propose a separate task-verification boundary for baseline lineage and release eligibility. Should task verification stand alone or remain inside audit collection?"
+        },
+        {
+          "id": "handoff",
+          "category": "subsystem-reconciliation",
+          "prompt": "The feed contract already separates coherent publication from quality readiness. Is the proposed split correct: QR owns identity/freshness and evidence meaning, while each consumer owns presentation and live readback?"
+        }
+      ],
+      "answers": [],
+      "started_at": "2026-09-08T21:07:16.177750+00:00",
+      "updated_at": "2026-09-08T21:07:16.177750+00:00"
     }
   ],
-  "updated_at": "2026-08-14T23:24:00Z"
+  "updated_at": "2026-09-08T21:07:16.177750+00:00"
 }

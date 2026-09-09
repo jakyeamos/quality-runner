@@ -1,0 +1,166 @@
+{
+  "schema_version": 1,
+  "revision": 1,
+  "project": {
+    "name": "Quality Runner consumer contracts",
+    "identity": "The Quality Runner adapter and consumer-contract boundary.",
+    "audience": "Pronto, Mac Control, web-readiness, and other approved consumers of quality evidence.",
+    "core_loop": "Define a consumer contract, produce a compatible feed, read it back, and preserve source and freshness provenance.",
+    "north_star": "Every downstream consumer receives the contract it expects without elevating adapter output above producer truth.",
+    "not_this": [
+      "Inventing product readiness",
+      "Treating a feed fixture as live consumer proof",
+      "Owning downstream UI behavior"
+    ]
+  },
+  "scope": {
+    "id": "consumer-contracts",
+    "kind": "subsystem",
+    "parent_id": "project",
+    "purpose": "Keep published and integrated quality feeds compatible with downstream consumers and their evidence boundaries.",
+    "boundary": "Owns public-adapter fixtures and integration documentation under fixtures/contracts/public-adapters and docs/integrations; core audit semantics remain outside this child.",
+    "non_goals": [
+      "Inventing product readiness",
+      "Treating a feed fixture as live consumer proof",
+      "Owning downstream UI behavior"
+    ],
+    "parent_outcomes": [
+      "scoped-audit-plan",
+      "review-ready-output"
+    ],
+    "paths": [
+      "fixtures/contracts/public-adapters",
+      "docs/integrations/mac-control-ideal-state.md",
+      "docs/integrations/pronto-maturity-feed.md",
+      "docs/integrations/web-readiness.md"
+    ]
+  },
+  "targets": {
+    "mvp": {
+      "definition": "The scoped boundary is explicitly ratified, its parent outcome is clear, and its smallest local proof is repeatable."
+    },
+    "complete_product": {
+      "definition": "The scoped boundary remains aligned through changes, interfaces, and user-visible or consumer-facing verification."
+    }
+  },
+  "pillars": [
+    {
+      "id": "consumer-contracts-purpose",
+      "name": "Draft scoped purpose",
+      "outcomes": [
+        {
+          "id": "consumer-contracts-aligned-boundary",
+          "name": "The Quality Runner consumer contracts boundary advances its parent outcome without silently taking on sibling responsibilities.",
+          "targets": [
+            "mvp",
+            "complete_product"
+          ],
+          "maturity": 25,
+          "confidence": "low",
+          "layers": {
+            "intended": "Drafted from explicit repository documentation; pending owner quiz and ratification.",
+            "planned": "Local proof and sibling contracts are pending the boundary decision.",
+            "implemented": "Observed implementation paths: fixtures/contracts/public-adapters, docs/integrations/mac-control-ideal-state.md, docs/integrations/pronto-maturity-feed.md, docs/integrations/web-readiness.md.",
+            "verified": "No independently scoped end-to-end proof has been accepted yet."
+          },
+          "evidence": [
+            {
+              "ref": "README.md",
+              "note": "Repository documentation used to draft this child boundary; not treated as user intent until quiz review.",
+              "observed_at": "2026-08-14T23:31:00Z"
+            },
+            {
+              "ref": ".agents/context/README.md",
+              "note": "Repository documentation used to draft this child boundary; not treated as user intent until quiz review.",
+              "observed_at": "2026-08-14T23:31:00Z"
+            },
+            {
+              "ref": "docs/integration-boundaries.md",
+              "note": "Repository documentation used to draft this child boundary; not treated as user intent until quiz review.",
+              "observed_at": "2026-08-14T23:31:00Z"
+            },
+            {
+              "ref": "docs/architecture-contracts.md",
+              "note": "Repository documentation used to draft this child boundary; not treated as user intent until quiz review.",
+              "observed_at": "2026-08-14T23:31:00Z"
+            }
+          ],
+          "blockers": [
+            {
+              "kind": "product-decision",
+              "summary": "Owner must ratify, split, merge, or retire this draft child Compass through the realignment quiz before it becomes active truth."
+            },
+            {
+              "kind": "verification",
+              "summary": "An independently scoped local proof and its neighboring handoffs are not yet established."
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "source_layers": {
+    "intended": [
+      {
+        "ref": "README.md",
+        "note": "Explicit repository documentation is the current basis for this draft; owner quiz remains open.",
+        "observed_at": "2026-08-14T23:31:00Z"
+      },
+      {
+        "ref": ".agents/context/README.md",
+        "note": "Explicit repository documentation is the current basis for this draft; owner quiz remains open.",
+        "observed_at": "2026-08-14T23:31:00Z"
+      },
+      {
+        "ref": "docs/integration-boundaries.md",
+        "note": "Explicit repository documentation is the current basis for this draft; owner quiz remains open.",
+        "observed_at": "2026-08-14T23:31:00Z"
+      },
+      {
+        "ref": "docs/architecture-contracts.md",
+        "note": "Explicit repository documentation is the current basis for this draft; owner quiz remains open.",
+        "observed_at": "2026-08-14T23:31:00Z"
+      }
+    ],
+    "planned": [],
+    "implemented": [
+      {
+        "ref": "fixtures/contracts/public-adapters",
+        "note": "Observed implementation or contract path used as evidence only.",
+        "observed_at": "2026-08-14T23:31:00Z"
+      },
+      {
+        "ref": "docs/integrations/mac-control-ideal-state.md",
+        "note": "Observed implementation or contract path used as evidence only.",
+        "observed_at": "2026-08-14T23:31:00Z"
+      },
+      {
+        "ref": "docs/integrations/pronto-maturity-feed.md",
+        "note": "Observed implementation or contract path used as evidence only.",
+        "observed_at": "2026-08-14T23:31:00Z"
+      },
+      {
+        "ref": "docs/integrations/web-readiness.md",
+        "note": "Observed implementation or contract path used as evidence only.",
+        "observed_at": "2026-08-14T23:31:00Z"
+      }
+    ],
+    "verified": []
+  },
+  "drift": [
+    {
+      "kind": "verification-gap",
+      "summary": "This child boundary is a draft derived from repository documentation and has not yet been ratified or independently verified.",
+      "status": "open",
+      "observed_at": "2026-08-14T23:31:00Z",
+      "evidence": [
+        {
+          "ref": "README.md",
+          "note": "Draft boundary needs explicit owner confirmation and local proof.",
+          "observed_at": "2026-08-14T23:31:00Z"
+        }
+      ]
+    }
+  ],
+  "updated_at": "2026-08-14T23:31:00Z"
+}

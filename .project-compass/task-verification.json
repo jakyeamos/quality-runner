@@ -1,0 +1,143 @@
+{
+  "schema_version": 1,
+  "revision": 1,
+  "project": {
+    "name": "task-verification",
+    "identity": "Compare a task with its immutable baseline and require exact-current evidence before release eligibility.",
+    "audience": "Repository developers and the users of this bounded capability.",
+    "core_loop": "Compare a task with its immutable baseline and require exact-current evidence before release eligibility.",
+    "north_star": "Compare a task with its immutable baseline and require exact-current evidence before release eligibility.",
+    "not_this": [
+      "Preserve baseline lineage; configuration or tool identity drift requires explicit reconciliation.",
+      "New enforced findings, unknown delta evidence, and failed required certified gates block eligibility.",
+      "Fast or cached observations cannot substitute for exact-current authoritative release evidence."
+    ]
+  },
+  "scope": {
+    "id": "task-verification",
+    "kind": "subsystem",
+    "parent_id": "project",
+    "purpose": "Compare a task with its immutable baseline and require exact-current evidence before release eligibility.",
+    "boundary": "Proposed source ownership for the exact paths listed here; canonical specifications remain authoritative for detailed behavior.",
+    "non_goals": [
+      "Preserve baseline lineage; configuration or tool identity drift requires explicit reconciliation.",
+      "New enforced findings, unknown delta evidence, and failed required certified gates block eligibility.",
+      "Fast or cached observations cannot substitute for exact-current authoritative release evidence."
+    ],
+    "parent_outcomes": [
+      "scoped-audit-plan",
+      "review-ready-output"
+    ],
+    "paths": [
+      "quality_runner/cli_task.py",
+      "quality_runner/schemas/task-baseline.schema.json",
+      "quality_runner/schemas/task-check.schema.json",
+      "quality_runner/schemas/task-record.schema.json",
+      "quality_runner/task_contract.py",
+      "quality_runner/task_findings.py",
+      "quality_runner/task_prevention.py",
+      "quality_runner/task_readiness.py",
+      "quality_runner/task_snapshot.py",
+      "quality_runner/task_snapshot_git.py"
+    ]
+  },
+  "targets": {
+    "mvp": {
+      "definition": "Compare a task with its immutable baseline and require exact-current evidence before release eligibility."
+    },
+    "complete_product": {
+      "definition": "The same outcome remains dependable across its documented consumers and failure cases."
+    }
+  },
+  "pillars": [
+    {
+      "id": "task-verification-purpose",
+      "name": "Compare a task with its immutable baseline and require exact-current evidence before release eligibility.",
+      "outcomes": [
+        {
+          "id": "task-verification-aligned-boundary",
+          "name": "Compare a task with its immutable baseline and require exact-current evidence before release eligibility.",
+          "targets": [
+            "mvp",
+            "complete_product"
+          ],
+          "maturity": 25,
+          "confidence": "medium",
+          "layers": {
+            "intended": "Compare a task with its immutable baseline and require exact-current evidence before release eligibility. The proposed boundary does not supersede the linked canonical decisions.",
+            "planned": "No implementation or admission is authorized by this bootstrap.",
+            "implemented": "Source and existing regression tests are inventoried at 1913ec18131bc868c53f20f29d0973f740dbb06a. See development.json for exact paths.",
+            "verified": "No current subsystem behavior receipt is claimed. Legacy regression tests and desired-outcome acceptance remain distinct."
+          },
+          "evidence": [
+            {
+              "ref": "docs/prevention-readiness.md",
+              "observed_at": "2026-09-08T21:07:16.177750+00:00",
+              "note": "Documented constraint source; new subsystem ownership remains proposed."
+            },
+            {
+              "ref": "docs/cli.md",
+              "observed_at": "2026-09-08T21:07:16.177750+00:00",
+              "note": "Documented constraint source; new subsystem ownership remains proposed."
+            }
+          ],
+          "blockers": [
+            {
+              "kind": "product-decision",
+              "summary": "Confirm or correct the proposed ownership and unresolved handoffs through the focused bootstrap quiz."
+            },
+            {
+              "kind": "verification",
+              "summary": "Run reviewed source-bound proof for an actual task; satisfy separately documented admission and live-consumer requirements."
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "source_layers": {
+    "intended": [
+      {
+        "ref": "docs/prevention-readiness.md",
+        "observed_at": "2026-09-08T21:07:16.177750+00:00",
+        "note": "Documented constraint source; new subsystem ownership remains proposed."
+      },
+      {
+        "ref": "docs/cli.md",
+        "observed_at": "2026-09-08T21:07:16.177750+00:00",
+        "note": "Documented constraint source; new subsystem ownership remains proposed."
+      }
+    ],
+    "planned": [],
+    "implemented": [
+      {
+        "ref": "quality_runner/cli_task.py",
+        "observed_at": "2026-09-08T21:07:16.177750+00:00",
+        "note": "Observed on the committed bootstrap baseline; not proof of desired behavior."
+      },
+      {
+        "ref": "quality_runner/schemas/task-baseline.schema.json",
+        "observed_at": "2026-09-08T21:07:16.177750+00:00",
+        "note": "Observed on the committed bootstrap baseline; not proof of desired behavior."
+      },
+      {
+        "ref": "quality_runner/schemas/task-check.schema.json",
+        "observed_at": "2026-09-08T21:07:16.177750+00:00",
+        "note": "Observed on the committed bootstrap baseline; not proof of desired behavior."
+      },
+      {
+        "ref": "quality_runner/schemas/task-record.schema.json",
+        "observed_at": "2026-09-08T21:07:16.177750+00:00",
+        "note": "Observed on the committed bootstrap baseline; not proof of desired behavior."
+      },
+      {
+        "ref": "quality_runner/task_contract.py",
+        "observed_at": "2026-09-08T21:07:16.177750+00:00",
+        "note": "Observed on the committed bootstrap baseline; not proof of desired behavior."
+      }
+    ],
+    "verified": []
+  },
+  "drift": [],
+  "updated_at": "2026-09-08T21:07:16.177750+00:00"
+}

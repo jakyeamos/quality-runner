@@ -29,6 +29,13 @@
       "path": "consumer-contracts.json",
       "parent_id": "project",
       "status": "draft"
+    },
+    {
+      "id": "task-verification",
+      "kind": "subsystem",
+      "path": "task-verification.json",
+      "parent_id": "project",
+      "status": "draft"
     }
   ],
   "links": [
@@ -47,7 +54,23 @@
       "kind": "handoff",
       "summary": "Producer evidence feeds external contracts; consumer applicability and readback remain open.",
       "status": "unknown"
+    },
+    {
+      "id": "audit-evidence-engine-to-task-verification",
+      "from": "audit-evidence-engine",
+      "to": "task-verification",
+      "kind": "handoff",
+      "summary": "Task comparison depends on normalized audit findings and source identity. Ownership and end-to-end evidence remain unresolved.",
+      "status": "unknown"
+    },
+    {
+      "id": "task-verification-to-review-handoff-output",
+      "from": "task-verification",
+      "to": "review-handoff-output",
+      "kind": "handoff",
+      "summary": "Review output must preserve exact-current eligibility, baseline lineage, and blocked states. Ownership and end-to-end evidence remain unresolved.",
+      "status": "unknown"
     }
   ],
-  "updated_at": "2026-08-14T23:31:00Z"
+  "updated_at": "2026-09-08T21:07:16.177750+00:00"
 }

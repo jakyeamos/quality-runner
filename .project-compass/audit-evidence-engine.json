@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "revision": 1,
+  "revision": 2,
   "project": {
     "name": "Quality Runner audit and evidence engine",
     "identity": "The Quality Runner engine for bounded inspection, evidence contracts, and findings.",
@@ -17,7 +17,7 @@
     "id": "audit-evidence-engine",
     "kind": "subsystem",
     "parent_id": "project",
-    "purpose": "Inspect a scoped repository, normalize evidence, and produce an explainable quality audit without mutating the target.",
+    "purpose": "Inspect bounded repository inputs and normalize explainable audit evidence without performing remediation.",
     "boundary": "Owns audit, discovery, evidence normalization, contract and finding production in quality_runner and quality_evidence_contract; remediation execution and consumer presentation remain outside this child.",
     "non_goals": [
       "Mutating source repositories",
@@ -28,10 +28,14 @@
       "scoped-audit-plan"
     ],
     "paths": [
+      "quality_evidence_contract/__init__.py",
+      "quality_evidence_contract/core.py",
+      "quality_runner/application/read_only_audit.py",
       "quality_runner/audit.py",
       "quality_runner/audit_evidence.py",
-      "quality_runner/application/read_only_audit.py",
-      "quality_evidence_contract"
+      "quality_runner/discovery.py",
+      "quality_runner/findings.py",
+      "quality_runner/scan_scope.py"
     ]
   },
   "targets": {
@@ -57,41 +61,31 @@
           "maturity": 25,
           "confidence": "low",
           "layers": {
-            "intended": "Drafted from explicit repository documentation; pending owner quiz and ratification.",
-            "planned": "Local proof and sibling contracts are pending the boundary decision.",
-            "implemented": "Observed implementation paths: quality_runner/audit.py, quality_runner/audit_evidence.py, quality_runner/application/read_only_audit.py, quality_evidence_contract.",
-            "verified": "No independently scoped end-to-end proof has been accepted yet."
+            "intended": "Inspect bounded repository inputs and normalize explainable audit evidence without performing remediation. The proposed boundary does not supersede the linked canonical decisions.",
+            "planned": "No implementation or admission is authorized by this bootstrap.",
+            "implemented": "Source and existing regression tests are inventoried at 1913ec18131bc868c53f20f29d0973f740dbb06a. See development.json for exact paths.",
+            "verified": "No current subsystem behavior receipt is claimed. Legacy regression tests and desired-outcome acceptance remain distinct."
           },
           "evidence": [
             {
-              "ref": "README.md",
-              "note": "Repository documentation used to draft this child boundary; not treated as user intent until quiz review.",
-              "observed_at": "2026-08-14T23:31:00Z"
-            },
-            {
-              "ref": ".agents/context/README.md",
-              "note": "Repository documentation used to draft this child boundary; not treated as user intent until quiz review.",
-              "observed_at": "2026-08-14T23:31:00Z"
+              "ref": ".agents/context/architecture.md",
+              "observed_at": "2026-09-08T21:07:16.177750+00:00",
+              "note": "Documented constraint source; new subsystem ownership remains proposed."
             },
             {
               "ref": "docs/integration-boundaries.md",
-              "note": "Repository documentation used to draft this child boundary; not treated as user intent until quiz review.",
-              "observed_at": "2026-08-14T23:31:00Z"
-            },
-            {
-              "ref": "docs/architecture-contracts.md",
-              "note": "Repository documentation used to draft this child boundary; not treated as user intent until quiz review.",
-              "observed_at": "2026-08-14T23:31:00Z"
+              "observed_at": "2026-09-08T21:07:16.177750+00:00",
+              "note": "Documented constraint source; new subsystem ownership remains proposed."
             }
           ],
           "blockers": [
             {
               "kind": "product-decision",
-              "summary": "Owner must ratify, split, merge, or retire this draft child Compass through the realignment quiz before it becomes active truth."
+              "summary": "Confirm or correct the proposed ownership and unresolved handoffs through the focused bootstrap quiz."
             },
             {
               "kind": "verification",
-              "summary": "An independently scoped local proof and its neighboring handoffs are not yet established."
+              "summary": "Run reviewed source-bound proof for an actual task; satisfy separately documented admission and live-consumer requirements."
             }
           ]
         }
@@ -101,47 +95,42 @@
   "source_layers": {
     "intended": [
       {
-        "ref": "README.md",
-        "note": "Explicit repository documentation is the current basis for this draft; owner quiz remains open.",
-        "observed_at": "2026-08-14T23:31:00Z"
-      },
-      {
-        "ref": ".agents/context/README.md",
-        "note": "Explicit repository documentation is the current basis for this draft; owner quiz remains open.",
-        "observed_at": "2026-08-14T23:31:00Z"
+        "ref": ".agents/context/architecture.md",
+        "observed_at": "2026-09-08T21:07:16.177750+00:00",
+        "note": "Documented constraint source; new subsystem ownership remains proposed."
       },
       {
         "ref": "docs/integration-boundaries.md",
-        "note": "Explicit repository documentation is the current basis for this draft; owner quiz remains open.",
-        "observed_at": "2026-08-14T23:31:00Z"
-      },
-      {
-        "ref": "docs/architecture-contracts.md",
-        "note": "Explicit repository documentation is the current basis for this draft; owner quiz remains open.",
-        "observed_at": "2026-08-14T23:31:00Z"
+        "observed_at": "2026-09-08T21:07:16.177750+00:00",
+        "note": "Documented constraint source; new subsystem ownership remains proposed."
       }
     ],
     "planned": [],
     "implemented": [
       {
-        "ref": "quality_runner/audit.py",
-        "note": "Observed implementation or contract path used as evidence only.",
-        "observed_at": "2026-08-14T23:31:00Z"
+        "ref": "quality_evidence_contract/__init__.py",
+        "observed_at": "2026-09-08T21:07:16.177750+00:00",
+        "note": "Observed on the committed bootstrap baseline; not proof of desired behavior."
       },
       {
-        "ref": "quality_runner/audit_evidence.py",
-        "note": "Observed implementation or contract path used as evidence only.",
-        "observed_at": "2026-08-14T23:31:00Z"
+        "ref": "quality_evidence_contract/core.py",
+        "observed_at": "2026-09-08T21:07:16.177750+00:00",
+        "note": "Observed on the committed bootstrap baseline; not proof of desired behavior."
       },
       {
         "ref": "quality_runner/application/read_only_audit.py",
-        "note": "Observed implementation or contract path used as evidence only.",
-        "observed_at": "2026-08-14T23:31:00Z"
+        "observed_at": "2026-09-08T21:07:16.177750+00:00",
+        "note": "Observed on the committed bootstrap baseline; not proof of desired behavior."
       },
       {
-        "ref": "quality_evidence_contract",
-        "note": "Observed implementation or contract path used as evidence only.",
-        "observed_at": "2026-08-14T23:31:00Z"
+        "ref": "quality_runner/audit.py",
+        "observed_at": "2026-09-08T21:07:16.177750+00:00",
+        "note": "Observed on the committed bootstrap baseline; not proof of desired behavior."
+      },
+      {
+        "ref": "quality_runner/audit_evidence.py",
+        "observed_at": "2026-09-08T21:07:16.177750+00:00",
+        "note": "Observed on the committed bootstrap baseline; not proof of desired behavior."
       }
     ],
     "verified": []
@@ -161,5 +150,5 @@
       ]
     }
   ],
-  "updated_at": "2026-08-14T23:31:00Z"
+  "updated_at": "2026-09-08T21:07:16.177750+00:00"
 }
