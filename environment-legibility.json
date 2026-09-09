@@ -2,7 +2,7 @@
   "schema": "quality-runner-environment-legibility/v1",
   "subject": "quality-runner",
   "owner": "quality-runner-maintainers",
-  "last_reviewed": "2026-08-02",
+  "last_reviewed": "2026-09-09",
   "controls": [
     {"dimension": "architecture_boundaries", "evidence": [".agents/context/architecture.md", "docs/architecture-contracts.md"], "validation": ["python3 scripts/check_environment_contract.py"], "validation_evidence": ["tests/test_environment_contract.py::test_current_repository_environment_contract_passes"], "enforcement": {"mode": "routed", "gate": "environment_contract"}},
     {"dimension": "coding_conventions", "evidence": [".agents/context/conventions.md", "pyproject.toml"], "validation": ["uv run --locked ruff check .", "uv run --locked ruff format --check ."], "validation_evidence": ["tests/test_environment_contract.py::test_current_repository_environment_contract_passes"], "enforcement": {"mode": "required", "gate": "lint"}},
