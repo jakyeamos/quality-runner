@@ -33,7 +33,7 @@
       "mode": "brownfield",
       "compass_id": "project",
       "scope_kind": "root",
-      "status": "complete",
+      "status": "active",
       "questions": [
         {
           "id": "boundary",
@@ -46,33 +46,10 @@
           "prompt": "The feed contract already separates coherent publication from quality readiness. Is the proposed split correct: QR owns identity/freshness and evidence meaning, while each consumer owns presentation and live readback?"
         }
       ],
-      "answers": [
-        {
-          "question_id": "boundary",
-          "value": "Audit collection, separate task verification, review handoff, and consumer contracts are accepted boundaries. QR owns evidence meaning and freshness; consumers own presentation and live readback.",
-          "status": "explicit",
-          "source": {
-            "ref": ".project-compass/decisions/subsystem-ratification-20260909.md",
-            "observed_at": "2026-09-09T17:41:29.704939+00:00",
-            "note": "Owner accepted the bounded reconciliation question."
-          },
-          "answered_at": "2026-09-09T17:41:29.704939+00:00"
-        },
-        {
-          "question_id": "handoff",
-          "value": "Audit collection, separate task verification, review handoff, and consumer contracts are accepted boundaries. QR owns evidence meaning and freshness; consumers own presentation and live readback.",
-          "status": "explicit",
-          "source": {
-            "ref": ".project-compass/decisions/subsystem-ratification-20260909.md",
-            "observed_at": "2026-09-09T17:41:29.704939+00:00",
-            "note": "Owner accepted the bounded reconciliation question."
-          },
-          "answered_at": "2026-09-09T17:41:29.704939+00:00"
-        }
-      ],
+      "answers": [],
       "started_at": "2026-09-08T21:07:16.177750+00:00",
-      "updated_at": "2026-09-09T17:41:29.704939+00:00"
+      "updated_at": "2026-09-08T21:07:16.177750+00:00"
     }
   ],
-  "updated_at": "2026-09-09T17:41:29.704939+00:00"
+  "updated_at": "2026-09-08T21:07:16.177750+00:00"
 }

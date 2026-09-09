@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "revision": 2,
+  "revision": 1,
   "project": {
     "name": "task-verification",
     "identity": "Compare a task with its immutable baseline and require exact-current evidence before release eligibility.",
@@ -64,8 +64,8 @@
           "maturity": 25,
           "confidence": "medium",
           "layers": {
-            "intended": "Compare a task with its immutable baseline and require exact-current evidence before release eligibility. The accepted boundary does not supersede the linked canonical decisions.",
-            "planned": "Complete the explicitly authorized verification repairs within this accepted boundary. Feature admission and release remain separately governed.",
+            "intended": "Compare a task with its immutable baseline and require exact-current evidence before release eligibility. The proposed boundary does not supersede the linked canonical decisions.",
+            "planned": "No implementation or admission is authorized by this bootstrap.",
             "implemented": "Source and existing regression tests are inventoried at 1913ec18131bc868c53f20f29d0973f740dbb06a. See development.json for exact paths.",
             "verified": "No current subsystem behavior receipt is claimed. Legacy regression tests and desired-outcome acceptance remain distinct."
           },
@@ -79,14 +79,13 @@
               "ref": "docs/cli.md",
               "observed_at": "2026-09-08T21:07:16.177750+00:00",
               "note": "Documented constraint source; new subsystem ownership remains proposed."
-            },
-            {
-              "ref": ".project-compass/decisions/subsystem-ratification-20260909.md",
-              "observed_at": "2026-09-09T17:41:29.704939+00:00",
-              "note": "Owner accepted subsystem ownership and preservation constraints; not behavior verification."
             }
           ],
           "blockers": [
+            {
+              "kind": "product-decision",
+              "summary": "Confirm or correct the proposed ownership and unresolved handoffs through the focused bootstrap quiz."
+            },
             {
               "kind": "verification",
               "summary": "Run reviewed source-bound proof for an actual task; satisfy separately documented admission and live-consumer requirements."
@@ -107,11 +106,6 @@
         "ref": "docs/cli.md",
         "observed_at": "2026-09-08T21:07:16.177750+00:00",
         "note": "Documented constraint source; new subsystem ownership remains proposed."
-      },
-      {
-        "ref": ".project-compass/decisions/subsystem-ratification-20260909.md",
-        "observed_at": "2026-09-09T17:41:29.704939+00:00",
-        "note": "Explicit owner acceptance on 2026-09-09."
       }
     ],
     "planned": [],
@@ -145,5 +139,5 @@
     "verified": []
   },
   "drift": [],
-  "updated_at": "2026-09-09T17:41:29.704939+00:00"
+  "updated_at": "2026-09-08T21:07:16.177750+00:00"
 }
