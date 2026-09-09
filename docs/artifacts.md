@@ -804,3 +804,9 @@ and a next action, not a finding conclusion; the frozen v1 report retains only
 its established fields. Its fix-prompts artifact records that no review
 completed. All review artifacts and state are local; Quality Runner does not
 edit source files or call remote services.
+
+Fleet audit artifact persistence, show, replay, and report projection are owned by
+`quality_runner/fleet/audit_artifacts.py`. The audit orchestrator retains its
+existing imports for CLI and consumer compatibility. This extraction changes
+module ownership only: artifact schemas, privacy, hashes, replay checks, and
+manual publication review remain unchanged.

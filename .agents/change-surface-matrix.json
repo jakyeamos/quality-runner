@@ -5,7 +5,7 @@
     "id": "quality-runner"
   },
   "owner": "quality-runner-maintainers",
-  "last_reviewed": "2026-09-08",
+  "last_reviewed": "2026-09-09",
   "surfaces": [
     {
       "id": "matrix-maintenance",
@@ -45,7 +45,8 @@
         "uv run --locked pytest -q tests/test_code_quality.py::test_test_quality_findings_are_bounded_and_include_remediation_dispositions tests/test_phase1_semantics.py::test_actionability_requires_author_decision_for_test_quality_dispositions",
         "uv run --locked ruff check .",
         "uv run --locked basedpyright",
-        "For maturity changes, verify dimension-to-capability-to-pillar aggregation, reverse producer coverage, explicit capability applicability, evidence coverage, missing capabilities, and confirmed-risk-only critical caps."
+        "For maturity changes, verify dimension-to-capability-to-pillar aggregation, reverse producer coverage, explicit capability applicability, evidence coverage, missing capabilities, and confirmed-risk-only critical caps.",
+        "Fleet artifact extraction: public audit imports remain compatible; show/replay/report and maturity feed regression checks preserve schema, hashes, privacy and read-only behavior. No schema or consumer interface change."
       ],
       "status": "applicable"
     },

@@ -5,7 +5,7 @@
     "id": "quality-runner"
   },
   "owner": "quality-runner-maintainers",
-  "last_reviewed": "2026-09-08",
+  "last_reviewed": "2026-09-09",
   "surfaces": [
     {
       "id": "python-source-and-contracts",
