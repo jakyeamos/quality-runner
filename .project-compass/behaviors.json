@@ -23,31 +23,31 @@
       "spec_ref": "docs/integration-boundaries.md"
     },
     {
-      "id": "executed-verification-evidence",
+      "id": "verification",
       "spec_ref": "docs/artifacts.md"
     },
     {
-      "id": "fleet-artifact-replay",
+      "id": "fleet-replay",
       "spec_ref": "docs/artifacts.md"
     },
     {
-      "id": "review-handoff-provenance",
+      "id": "review-handoff",
       "spec_ref": "docs/integration-boundaries.md"
     },
     {
-      "id": "maturity-publication-coherence",
+      "id": "feed-coherence",
       "spec_ref": "docs/integrations/pronto-maturity-feed.md"
     },
     {
-      "id": "task-readiness-gates",
+      "id": "task-readiness",
       "spec_ref": "docs/prevention-readiness.md"
     },
     {
-      "id": "immutable-task-source",
+      "id": "task-source",
       "spec_ref": "docs/prevention-readiness.md"
     },
     {
-      "id": "declared-environment-contract",
+      "id": "environment",
       "spec_ref": "README.md"
     }
   ]

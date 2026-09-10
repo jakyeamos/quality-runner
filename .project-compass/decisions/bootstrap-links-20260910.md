@@ -9,3 +9,5 @@ The root environment proof supports repeatable scoped audits, not semantic verif
 The reviewed pilot bindings opt into affected-scope preservation checks. This makes missing links in affected intent a blocker; it does not hide unrelated inventory gaps or replace Quality Runner release verification.
 
 Completion scope review explicitly includes the previously unmapped retained history files and existing environment declaration. These are maintenance of the accepted map and verification environment, without changing product ownership.
+
+Packet-size dogfood retained every proof and constraint while shortening newly introduced behavior identifiers and the metadata handoff explanation. No external consumer had adopted these new identifiers. The original comparison revision remains unchanged.
