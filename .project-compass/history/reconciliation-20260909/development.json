@@ -1,0 +1,292 @@
+{
+  "schema": "compass-development/v1",
+  "revision": 1,
+  "inventory": {
+    "source": "git-tracked",
+    "include": [
+      "quality_runner/**",
+      "quality_evidence_contract/**",
+      "repo_quality_certifier/**"
+    ],
+    "exclude": [],
+    "behavior_ref": ".pronto/behavior-assurance.json"
+  },
+  "bindings": [
+    {
+      "id": "audit-evidence-engine-sources",
+      "compass_id": "audit-evidence-engine",
+      "authority": "proposed",
+      "decision_id": "audit-evidence-engine-bootstrap-proposal",
+      "paths": [
+        "quality_evidence_contract/__init__.py",
+        "quality_evidence_contract/core.py",
+        "quality_runner/application/read_only_audit.py",
+        "quality_runner/audit.py",
+        "quality_runner/audit_evidence.py",
+        "quality_runner/discovery.py",
+        "quality_runner/findings.py",
+        "quality_runner/scan_scope.py"
+      ],
+      "outcomes": [
+        "audit-evidence-engine-aligned-boundary"
+      ],
+      "references": [
+        ".agents/context/architecture.md",
+        "docs/integration-boundaries.md",
+        "tests/test_read_only_gate_mutations.py",
+        "tests/test_verification_contract.py"
+      ],
+      "constraints": [
+        "Source repositories are audit inputs; writes are bounded evidence artifacts, not remediation.",
+        "Configured commands and static findings never become executed verification or provider proof.",
+        "Missing, stale, and unsupported evidence remain explicit."
+      ],
+      "dependencies": [],
+      "proof": [
+        {
+          "id": "regression-1",
+          "receipt": ".project-compass/evidence/audit-evidence-engine-1.json",
+          "command": [
+            "uv",
+            "run",
+            "--locked",
+            "pytest",
+            "-q",
+            "tests/test_read_only_gate_mutations.py"
+          ],
+          "oracle_ref": ".agents/context/architecture.md"
+        },
+        {
+          "id": "regression-2",
+          "receipt": ".project-compass/evidence/audit-evidence-engine-2.json",
+          "command": [
+            "uv",
+            "run",
+            "--locked",
+            "pytest",
+            "-q",
+            "tests/test_verification_contract.py"
+          ],
+          "oracle_ref": ".agents/context/architecture.md"
+        }
+      ]
+    },
+    {
+      "id": "review-handoff-output-sources",
+      "compass_id": "review-handoff-output",
+      "authority": "proposed",
+      "decision_id": "review-handoff-output-bootstrap-proposal",
+      "paths": [
+        "quality_runner/application/review_projection.py",
+        "quality_runner/application/review_reporting.py",
+        "quality_runner/application/review_responses.py",
+        "quality_runner/remediation_delta.py"
+      ],
+      "outcomes": [
+        "review-handoff-output-aligned-boundary"
+      ],
+      "references": [
+        "docs/integration-boundaries.md",
+        "docs/artifacts.md",
+        "tests/test_review_v1_contracts.py"
+      ],
+      "constraints": [
+        "Projection never upgrades evidence strength or silently executes remediation.",
+        "QR-native planning and GSD planning remain independent; QR does not rewrite GSD state.",
+        "Preserve stable remediation identifiers and links to the originating audit."
+      ],
+      "dependencies": [
+        "quality_runner/findings.py"
+      ],
+      "proof": [
+        {
+          "id": "regression-1",
+          "receipt": ".project-compass/evidence/review-handoff-output-1.json",
+          "command": [
+            "uv",
+            "run",
+            "--locked",
+            "pytest",
+            "-q",
+            "tests/test_review_v1_contracts.py"
+          ],
+          "oracle_ref": "docs/integration-boundaries.md"
+        }
+      ]
+    },
+    {
+      "id": "consumer-contracts-sources",
+      "compass_id": "consumer-contracts",
+      "authority": "proposed",
+      "decision_id": "consumer-contracts-bootstrap-proposal",
+      "paths": [
+        "fixtures/contracts/public-adapters/mac-control-ideal-state.json",
+        "fixtures/contracts/public-adapters/pronto-custody-validation.json",
+        "fixtures/contracts/public-adapters/pronto-detector-refresh.json",
+        "fixtures/contracts/public-adapters/pronto-maturity-feed.json",
+        "quality_runner/behavior_receipts.py",
+        "quality_runner/cli_behavior.py",
+        "quality_runner/fleet/behavior_assurance.py",
+        "quality_runner/fleet/behavior_contract.py",
+        "quality_runner/fleet/behavior_support.py",
+        "quality_runner/fleet/maturity_feed.py"
+      ],
+      "outcomes": [
+        "consumer-contracts-aligned-boundary"
+      ],
+      "references": [
+        "docs/integrations/pronto-maturity-feed.md",
+        "docs/integration-boundaries.md",
+        ".pronto/behavior-assurance.json",
+        "tests/test_maturity_feed.py",
+        "tests/test_behavior_assurance.py"
+      ],
+      "constraints": [
+        "Checkpoint components must match audit time, target identity, and hashes; publication coherence does not imply quality readiness.",
+        "Legacy behavior contracts remain compatible without pretending edge evidence exists.",
+        "Tier 1 and Tier 2 observations never widen Tier-0 release readiness; no self-issued independent edge verification."
+      ],
+      "dependencies": [
+        "quality_runner/findings.py",
+        "quality_evidence_contract/__init__.py"
+      ],
+      "proof": [
+        {
+          "id": "regression-1",
+          "receipt": ".project-compass/evidence/consumer-contracts-1.json",
+          "command": [
+            "uv",
+            "run",
+            "--locked",
+            "pytest",
+            "-q",
+            "tests/test_maturity_feed.py"
+          ],
+          "oracle_ref": "docs/integrations/pronto-maturity-feed.md"
+        },
+        {
+          "id": "regression-2",
+          "receipt": ".project-compass/evidence/consumer-contracts-2.json",
+          "command": [
+            "uv",
+            "run",
+            "--locked",
+            "pytest",
+            "-q",
+            "tests/test_behavior_assurance.py"
+          ],
+          "oracle_ref": "docs/integrations/pronto-maturity-feed.md"
+        }
+      ],
+      "behavior_ids": [
+        "behavior-contract-compatibility",
+        "edge-receipt-producer",
+        "whole-inventory-projection"
+      ]
+    },
+    {
+      "id": "task-verification-sources",
+      "compass_id": "task-verification",
+      "authority": "proposed",
+      "decision_id": "task-verification-bootstrap-proposal",
+      "paths": [
+        "quality_runner/cli_task.py",
+        "quality_runner/schemas/task-baseline.schema.json",
+        "quality_runner/schemas/task-check.schema.json",
+        "quality_runner/schemas/task-record.schema.json",
+        "quality_runner/task_contract.py",
+        "quality_runner/task_findings.py",
+        "quality_runner/task_prevention.py",
+        "quality_runner/task_readiness.py",
+        "quality_runner/task_snapshot.py",
+        "quality_runner/task_snapshot_git.py"
+      ],
+      "outcomes": [
+        "task-verification-aligned-boundary"
+      ],
+      "references": [
+        "docs/prevention-readiness.md",
+        "docs/cli.md",
+        "tests/test_task_readiness.py",
+        "tests/test_task_snapshot.py",
+        "tests/test_cli_task.py"
+      ],
+      "constraints": [
+        "Preserve baseline lineage; configuration or tool identity drift requires explicit reconciliation.",
+        "New enforced findings, unknown delta evidence, and failed required certified gates block eligibility.",
+        "Fast or cached observations cannot substitute for exact-current authoritative release evidence."
+      ],
+      "dependencies": [
+        "quality_runner/application/read_only_audit.py",
+        "quality_runner/findings.py"
+      ],
+      "proof": [
+        {
+          "id": "regression-1",
+          "receipt": ".project-compass/evidence/task-verification-1.json",
+          "command": [
+            "uv",
+            "run",
+            "--locked",
+            "pytest",
+            "-q",
+            "tests/test_task_readiness.py"
+          ],
+          "oracle_ref": "docs/prevention-readiness.md"
+        },
+        {
+          "id": "regression-2",
+          "receipt": ".project-compass/evidence/task-verification-2.json",
+          "command": [
+            "uv",
+            "run",
+            "--locked",
+            "pytest",
+            "-q",
+            "tests/test_task_snapshot.py"
+          ],
+          "oracle_ref": "docs/prevention-readiness.md"
+        },
+        {
+          "id": "regression-3",
+          "receipt": ".project-compass/evidence/task-verification-3.json",
+          "command": [
+            "uv",
+            "run",
+            "--locked",
+            "pytest",
+            "-q",
+            "tests/test_cli_task.py"
+          ],
+          "oracle_ref": "docs/prevention-readiness.md"
+        }
+      ]
+    }
+  ],
+  "decisions": [
+    {
+      "id": "audit-evidence-engine-bootstrap-proposal",
+      "summary": "Proposed ownership and proof links derived from .agents/context/architecture.md, docs/integration-boundaries.md. Existing decisions remain authoritative; quiz ratification is pending.",
+      "source": ".project-compass/BOOTSTRAP.md",
+      "status": "proposed"
+    },
+    {
+      "id": "review-handoff-output-bootstrap-proposal",
+      "summary": "Proposed ownership and proof links derived from docs/integration-boundaries.md, docs/artifacts.md. Existing decisions remain authoritative; quiz ratification is pending.",
+      "source": ".project-compass/BOOTSTRAP.md",
+      "status": "proposed"
+    },
+    {
+      "id": "consumer-contracts-bootstrap-proposal",
+      "summary": "Proposed ownership and proof links derived from docs/integrations/pronto-maturity-feed.md, docs/integration-boundaries.md, .pronto/behavior-assurance.json. Existing decisions remain authoritative; quiz ratification is pending.",
+      "source": ".project-compass/BOOTSTRAP.md",
+      "status": "proposed"
+    },
+    {
+      "id": "task-verification-bootstrap-proposal",
+      "summary": "Proposed ownership and proof links derived from docs/prevention-readiness.md, docs/cli.md. Existing decisions remain authoritative; quiz ratification is pending.",
+      "source": ".project-compass/BOOTSTRAP.md",
+      "status": "proposed"
+    }
+  ]
+}

@@ -1,0 +1,54 @@
+{
+  "schema": "compass-behavior-inventory/v1",
+  "scope": "Ratified pilot boundaries plus references to the existing Pronto behavior inventory. Canonical scenario records remain in Pronto; unmapped behavior stays visible.",
+  "behaviors": [
+    {
+      "id": "behavior-contract-compatibility",
+      "spec_ref": ".pronto/behavior-assurance.json#/behaviors/0"
+    },
+    {
+      "id": "edge-receipt-producer",
+      "spec_ref": ".pronto/behavior-assurance.json#/behaviors/1"
+    },
+    {
+      "id": "whole-inventory-projection",
+      "spec_ref": ".pronto/behavior-assurance.json#/behaviors/2"
+    },
+    {
+      "id": "fleet-custody-validation",
+      "spec_ref": ".pronto/behavior-assurance.json#/behaviors/3"
+    },
+    {
+      "id": "read-only-audit",
+      "spec_ref": "docs/integration-boundaries.md"
+    },
+    {
+      "id": "executed-verification-evidence",
+      "spec_ref": "docs/artifacts.md"
+    },
+    {
+      "id": "fleet-artifact-replay",
+      "spec_ref": "docs/artifacts.md"
+    },
+    {
+      "id": "review-handoff-provenance",
+      "spec_ref": "docs/integration-boundaries.md"
+    },
+    {
+      "id": "maturity-publication-coherence",
+      "spec_ref": "docs/integrations/pronto-maturity-feed.md"
+    },
+    {
+      "id": "task-readiness-gates",
+      "spec_ref": "docs/prevention-readiness.md"
+    },
+    {
+      "id": "immutable-task-source",
+      "spec_ref": "docs/prevention-readiness.md"
+    },
+    {
+      "id": "declared-environment-contract",
+      "spec_ref": "README.md"
+    }
+  ]
+}

@@ -5,7 +5,7 @@
     "id": "quality-runner"
   },
   "owner": "quality-runner-maintainers",
-  "last_reviewed": "2026-08-15",
+  "last_reviewed": "2026-09-10",
   "surfaces": [
     {
       "id": "python-source-and-contracts",
@@ -14,7 +14,11 @@
       "path": "quality_runner/",
       "owner": "quality-runner-maintainers",
       "condition": "Python implementation, CLI, MCP, or artifact behavior changes",
-      "operations": ["add", "change", "remove"],
+      "operations": [
+        "add",
+        "change",
+        "remove"
+      ],
       "validation": [
         "uv run --locked pytest -q tests/test_fleet_audit.py",
         "uv run --locked pytest -q tests/test_fleet_dynamic.py tests/test_discovery_standards_capabilities.py",
@@ -31,7 +35,11 @@
       "path": "docs/cli.md and quality_runner/schemas/",
       "owner": "quality-runner-maintainers",
       "condition": "CLI, MCP, schema, or artifact contract changes",
-      "operations": ["add", "change", "remove"],
+      "operations": [
+        "add",
+        "change",
+        "remove"
+      ],
       "validation": [
         "uv run --locked pytest -q tests/test_cli.py tests/test_artifact_contracts.py",
         "uv run --locked qr release-smoke --json"
@@ -45,11 +53,36 @@
       "path": ".github/workflows/",
       "owner": "quality-runner-maintainers",
       "condition": "CI, packaging, release, or deployment boundary changes",
-      "operations": ["add", "change", "remove"],
+      "operations": [
+        "add",
+        "change",
+        "remove"
+      ],
       "validation": [
         "python3 scripts/check_environment_contract.py",
         "uv build",
         "uv run --locked qr release-smoke --json"
+      ],
+      "status": "applicable"
+    },
+    {
+      "id": "project-compass",
+      "scope": "local",
+      "distribution": "local_only",
+      "path": ".project-compass/",
+      "owner": "repository-owner",
+      "condition": "A subsystem boundary, source path, outcome, relationship, canonical reference, quiz, or intent decision changes.",
+      "operations": [
+        "add",
+        "change",
+        "remove"
+      ],
+      "validation": [
+        "Validate the full Compass family with the installed canonical helper; preserve draft authority and unresolved relationships.",
+        "Check exact changed paths and shared consumers through change-context; proposed mappings never establish accepted coverage.",
+        "Preserve retired and superseded history, reconcile quiz decisions, and invalidate affected source-bound proof.",
+        "After folding a branch, refresh the family and source-bound evidence against the integrated revision.",
+        "Inspect behavior/specification/proof links separately from current verification; preserve unmapped custody behavior and the newer strict-typing audit implementation."
       ],
       "status": "applicable"
     }

@@ -14,28 +14,28 @@
       "kind": "subsystem",
       "path": "audit-evidence-engine.json",
       "parent_id": "project",
-      "status": "active"
+      "status": "draft"
     },
     {
       "id": "review-handoff-output",
       "kind": "subsystem",
       "path": "review-handoff-output.json",
       "parent_id": "project",
-      "status": "active"
+      "status": "draft"
     },
     {
       "id": "consumer-contracts",
       "kind": "subsystem",
       "path": "consumer-contracts.json",
       "parent_id": "project",
-      "status": "active"
+      "status": "draft"
     },
     {
       "id": "task-verification",
       "kind": "subsystem",
       "path": "task-verification.json",
       "parent_id": "project",
-      "status": "active"
+      "status": "draft"
     }
   ],
   "links": [
@@ -44,33 +44,33 @@
       "from": "audit-evidence-engine",
       "to": "review-handoff-output",
       "kind": "handoff",
-      "summary": "Audit evidence feeds review-ready output; serialization and preservation boundaries are governed by the accepted ownership decision. Intent ownership accepted on 2026-09-09; this is not end-to-end implementation proof.",
-      "status": "aligned"
+      "summary": "Audit evidence feeds review-ready output; serialization and preservation boundaries remain to be ratified.",
+      "status": "unknown"
     },
     {
       "id": "audit-evidence-engine-to-consumer-contracts",
       "from": "audit-evidence-engine",
       "to": "consumer-contracts",
       "kind": "handoff",
-      "summary": "Producer evidence feeds external contracts; consumers own applicability and live readback. Intent ownership accepted on 2026-09-09; this is not end-to-end implementation proof.",
-      "status": "aligned"
+      "summary": "Producer evidence feeds external contracts; consumer applicability and readback remain open.",
+      "status": "unknown"
     },
     {
       "id": "audit-evidence-engine-to-task-verification",
       "from": "audit-evidence-engine",
       "to": "task-verification",
       "kind": "handoff",
-      "summary": "Task comparison depends on normalized audit findings and source identity. Intent ownership accepted on 2026-09-09; this is not end-to-end implementation proof.",
-      "status": "aligned"
+      "summary": "Task comparison depends on normalized audit findings and source identity. Ownership and end-to-end evidence remain unresolved.",
+      "status": "unknown"
     },
     {
       "id": "task-verification-to-review-handoff-output",
       "from": "task-verification",
       "to": "review-handoff-output",
       "kind": "handoff",
-      "summary": "Review output must preserve exact-current eligibility, baseline lineage, and blocked states. Intent ownership accepted on 2026-09-09; this is not end-to-end implementation proof.",
-      "status": "aligned"
+      "summary": "Review output must preserve exact-current eligibility, baseline lineage, and blocked states. Ownership and end-to-end evidence remain unresolved.",
+      "status": "unknown"
     }
   ],
-  "updated_at": "2026-09-09T17:41:29.704939+00:00"
+  "updated_at": "2026-09-08T21:07:16.177750+00:00"
 }

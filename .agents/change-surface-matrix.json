@@ -1,14 +1,21 @@
 {
   "schema_version": "change-surface-matrix/v1",
-  "subject": {"kind": "repository", "id": "quality-runner"},
+  "subject": {
+    "kind": "repository",
+    "id": "quality-runner"
+  },
   "owner": "quality-runner-maintainers",
-  "last_reviewed": "2026-08-28",
+  "last_reviewed": "2026-09-10",
   "change_records": [
     {
       "id": "strict-zero-ci-gates-20260828",
       "status": "implemented",
       "owner": "quality-runner-maintainers",
-      "affected_surfaces": ["quality-engine", "ci-and-release", "matrix-maintenance"],
+      "affected_surfaces": [
+        "quality-engine",
+        "ci-and-release",
+        "matrix-maintenance"
+      ],
       "contracts": [
         "strict BasedPyright diagnostics remain at zero for the declared package scope",
         "fleet audit public payload imports, artifact paths, schemas, hashes, and projections remain compatible",
@@ -79,7 +86,11 @@
       "path": ".agents/change-surface-matrix.json",
       "owner": "quality-runner-maintainers",
       "condition": "A material feature, functionality, behavior, CLI/API, workflow, data, integration, security/privacy, or quality/release change is added or changed.",
-      "operations": ["add", "change", "remove"],
+      "operations": [
+        "add",
+        "change",
+        "remove"
+      ],
       "validation": [
         "Update this matrix in the same change with affected surfaces, contracts, documentation, tests, evidence, owners, and projections.",
         "For a purely internal refactor or isolated fix with no matrix impact, record a reviewed no-impact reason in the same change record; omission is not an implicit no-impact decision."
@@ -93,7 +104,11 @@
       "path": "quality_runner/, quality_evidence_contract/, repo_quality_certifier/, and public documentation",
       "owner": "quality-runner-maintainers",
       "condition": "scan, audit-coverage, policy, finding, CLI, certification, or public documentation behavior changes",
-      "operations": ["add", "change", "remove"],
+      "operations": [
+        "add",
+        "change",
+        "remove"
+      ],
       "validation": [
         "uv run --locked pytest -q",
         "malformed subprocess stdout/stderr decoding regression preserves bounded fleet evidence",
@@ -102,7 +117,8 @@
         "uv run --locked pytest -q tests/test_code_quality.py::test_test_quality_findings_are_bounded_and_include_remediation_dispositions tests/test_phase1_semantics.py::test_actionability_requires_author_decision_for_test_quality_dispositions",
         "uv run --locked ruff check .",
         "uv run --locked basedpyright",
-        "For maturity changes, verify dimension-to-capability-to-pillar aggregation, reverse producer coverage, explicit capability applicability, evidence coverage, missing capabilities, and confirmed-risk-only critical caps."
+        "For maturity changes, verify dimension-to-capability-to-pillar aggregation, reverse producer coverage, explicit capability applicability, evidence coverage, missing capabilities, and confirmed-risk-only critical caps.",
+        "Fleet artifact extraction: public audit imports remain compatible; show/replay/report and maturity feed regression checks preserve schema, hashes, privacy and read-only behavior. No schema or consumer interface change."
       ],
       "status": "applicable"
     },
@@ -113,7 +129,11 @@
       "path": "quality_runner/onboarding.py, quality_runner/onboarding_quality.py, quality_runner/cli_onboarding.py, packaged onboarding schemas, global repository-onboarding change matrix, tests, plugin contract, .agents/context/commands.md, and operator documentation",
       "owner": "Quality Runner and workspace onboarding owners",
       "condition": "Repository onboarding readiness, evidence-envelope, exact-ref, executable-quality, negative-control, producer allowlist, or machine-receipt behavior changes.",
-      "operations": ["add", "change", "remove"],
+      "operations": [
+        "add",
+        "change",
+        "remove"
+      ],
       "validation": [
         "uv run --locked pytest -q tests/test_onboarding.py tests/test_entrypoints.py",
         "uv run --locked ruff check quality_runner/onboarding.py quality_runner/onboarding_quality.py quality_runner/cli_onboarding.py tests/test_onboarding.py",
@@ -134,7 +154,11 @@
       "path": "quality_runner/fleet/documentation_visibility.py, quality_runner/fleet/documentation_visibility_support.py, docs/maturity-gates.md, and Pronto route projection",
       "owner": "Quality Runner and Pronto integration owners",
       "condition": "Developer-legibility lanes, naming/comment/docstring policy, maturity caps, newcomer evidence, score, or consumer projection changes.",
-      "operations": ["add", "change", "remove"],
+      "operations": [
+        "add",
+        "change",
+        "remove"
+      ],
       "validation": [
         "uv run --locked pytest -q tests/test_documentation_visibility.py tests/test_fleet_audit.py tests/test_repository_maturity.py",
         "uv run --locked ruff check quality_runner/fleet/documentation_visibility.py quality_runner/fleet/documentation_visibility_support.py tests/test_documentation_visibility.py",
@@ -150,7 +174,11 @@
       "path": "quality_runner/fleet/long_running_tasks.py, fleet standard reports, quality-runner-maturity-feed/v2, and Pronto maturity remediation",
       "owner": "Quality Runner and Pronto integration owners",
       "condition": "Long-running task qualification, heartbeat/diagnostic evidence, optimization evidence, maturity dimensions, or downstream triage behavior changes.",
-      "operations": ["add", "change", "remove"],
+      "operations": [
+        "add",
+        "change",
+        "remove"
+      ],
       "validation": [
         "uv run --locked pytest -q tests/test_long_running_tasks.py tests/test_fleet_standard_audit.py tests/test_repository_maturity.py tests/test_maturity_feed.py",
         "qr fleet audit run --all --standard long-running-tasks --json",
@@ -169,7 +197,11 @@
       "path": "quality_runner/cache_*.py, quality_runner/fleet/cache_design.py, .quality-runner.toml, cache-design standard-report evidence, maturity feed, and Pronto",
       "owner": "Quality Runner and Pronto integration owners",
       "condition": "derived-storage classification, cache lifecycle policy, cache bounds, standard scoring, redacted feed projection, or consumer presentation changes",
-      "operations": ["add", "change", "remove"],
+      "operations": [
+        "add",
+        "change",
+        "remove"
+      ],
       "validation": [
         "uv run pytest -q tests/test_cache_design.py tests/test_cache_limits.py tests/test_fleet_standard_audit.py tests/test_maturity_feed.py",
         "uv run --locked qr fleet audit run --all --standard cache-design --json",
@@ -187,8 +219,20 @@
       "path": "installed qr, plugins, Pronto, quality-runner-fleet-scope/v1, quality-runner-maturity-feed/v2, quality-runner-cache-design-assessment-v1, and quality-runner-repository-maturity/v2",
       "owner": "integration-owner",
       "condition": "command, plugin, audit-coverage, fleet scope, measurement confidence, feed schema, taxonomy, publication behavior, maturity pillar, applicability, coverage, cap, or source-dimension changes",
-      "operations": ["add", "change", "remove"],
-      "validation": ["qr fleet replay", "qr fleet feed", "scope-manifest population count/hash validation", "high-confidence static/dynamic/gap/replay regressions", "consumer contract readback in Pronto, including measurement confidence, v1 migration labeling, and v2 capability/pillar projection", "uv run --locked pytest -q tests/test_repository_maturity.py tests/test_release_boundary.py::test_public_pronto_fixture_satisfies_the_feed_contract", "uv run --locked pytest -q tests/test_error_codes.py"],
+      "operations": [
+        "add",
+        "change",
+        "remove"
+      ],
+      "validation": [
+        "qr fleet replay",
+        "qr fleet feed",
+        "scope-manifest population count/hash validation",
+        "high-confidence static/dynamic/gap/replay regressions",
+        "consumer contract readback in Pronto, including measurement confidence, v1 migration labeling, and v2 capability/pillar projection",
+        "uv run --locked pytest -q tests/test_repository_maturity.py tests/test_release_boundary.py::test_public_pronto_fixture_satisfies_the_feed_contract",
+        "uv run --locked pytest -q tests/test_error_codes.py"
+      ],
       "status": "applicable"
     },
     {
@@ -201,7 +245,11 @@
       "path": "quality_runner/fleet/custody.py, quality_runner/cli_fleet.py, quality_runner/cli.py, quality_runner/schemas/custody-validation.schema.json, tests/test_fleet_custody.py, docs/integrations/pronto-custody.md, and Pronto custody consumer readback",
       "owner": "Quality Runner and Pronto integration owners",
       "condition": "Isolated-change custody state, receipt integrity classification, granular disposition taxonomy, adoption readiness, WIP safety, or read-only authority boundaries change.",
-      "operations": ["add", "change", "remove"],
+      "operations": [
+        "add",
+        "change",
+        "remove"
+      ],
       "validation": [
         "uv run --locked pytest -q tests/test_fleet_custody.py",
         "uv run --locked ruff check quality_runner/fleet/custody.py quality_runner/cli_fleet.py quality_runner/cli.py tests/test_fleet_custody.py",
@@ -221,7 +269,11 @@
       "path": ".mac-control/ideal-state.json, the installed validator, and the public maturity contract",
       "owner": "Quality Runner and integration owners",
       "condition": "manifest schema, semantic dimension, source grounding, provider boundary, score, or disposition behavior changes",
-      "operations": ["add", "change", "remove"],
+      "operations": [
+        "add",
+        "change",
+        "remove"
+      ],
       "validation": [
         "uv run --locked pytest -q tests/test_mac_control.py",
         "consumer contract readback"
@@ -238,7 +290,11 @@
       "path": "qr fleet detector refresh, repository-local .quality-runner/runs, Pronto quality ingestion, and operator documentation",
       "owner": "Quality Runner and Pronto integration owners",
       "condition": "exact-target detector scanning, external detector adapters, pinned producer provenance, ruleset/configuration cache invalidation, overlap/deduplication, skill-pack selection, publication, status taxonomy, or consumer orchestration changes",
-      "operations": ["add", "change", "remove"],
+      "operations": [
+        "add",
+        "change",
+        "remove"
+      ],
       "validation": [
         "uv run --locked pytest -q tests/test_fleet_detector_refresh.py",
         "production refresh callback signature bind in the detector refresh happy-path test",
@@ -260,7 +316,11 @@
       "path": ".github/workflows/, packaging metadata, and docs/release.md",
       "owner": "quality-runner-maintainers",
       "condition": "CI, packaging, release, or distribution boundary behavior changes",
-      "operations": ["add", "change", "remove"],
+      "operations": [
+        "add",
+        "change",
+        "remove"
+      ],
       "validation": [
         "uv run --locked pytest -q tests/test_entrypoints.py tests/test_release_boundary.py",
         "uv run --locked quality-runner release-smoke --json",
@@ -275,9 +335,34 @@
       "path": "private fleet inventories, Pronto wiring, machine paths, credentials, and operator planning",
       "owner": "local-operator",
       "condition": "a change depends on a particular workstation, private repository, account, or fleet inventory",
-      "operations": ["add", "change", "remove"],
+      "operations": [
+        "add",
+        "change",
+        "remove"
+      ],
       "validation": [
         "uv run --locked quality-runner release-boundary . --dist-dir dist --json"
+      ],
+      "status": "applicable"
+    },
+    {
+      "id": "project-compass",
+      "scope": "local",
+      "distribution": "local_only",
+      "path": ".project-compass/",
+      "owner": "repository-owner",
+      "condition": "A subsystem boundary, source path, outcome, relationship, canonical reference, quiz, or intent decision changes.",
+      "operations": [
+        "add",
+        "change",
+        "remove"
+      ],
+      "validation": [
+        "Validate the full Compass family with the installed canonical helper; preserve draft authority and unresolved relationships.",
+        "Check exact changed paths and shared consumers through change-context; proposed mappings never establish accepted coverage.",
+        "Preserve retired and superseded history, reconcile quiz decisions, and invalidate affected source-bound proof.",
+        "After folding a branch, refresh the family and source-bound evidence against the integrated revision.",
+        "Inspect behavior/specification/proof links separately from current verification; preserve unmapped custody behavior and the newer strict-typing audit implementation."
       ],
       "status": "applicable"
     }
@@ -291,7 +376,9 @@
         "quality_evidence_contract/*.py",
         "repo_quality_certifier/*.py"
       ],
-      "local_only_globs": [".agents/context/archives/qr-rollout-20260702.md"],
+      "local_only_globs": [
+        ".agents/context/archives/qr-rollout-20260702.md"
+      ],
       "forbidden_patterns": [
         {
           "id": "personal-home-path",
@@ -310,7 +397,9 @@
           "quality_evidence_contract/",
           "repo_quality_certifier/"
         ],
-        "allow_globs": ["quality_runner-*.dist-info/*"]
+        "allow_globs": [
+          "quality_runner-*.dist-info/*"
+        ]
       },
       "sdist": {
         "allow_paths": [

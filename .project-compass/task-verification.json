@@ -1,81 +1,82 @@
 {
   "schema_version": 1,
-  "revision": 3,
+  "revision": 2,
   "project": {
-    "name": "Quality Runner audit and evidence engine",
-    "identity": "The Quality Runner engine for bounded inspection, evidence contracts, and findings.",
-    "audience": "Developers, agents, and fleet consumers that need reproducible quality evidence.",
-    "core_loop": "Discover the target, detect capabilities and standards, run bounded inspections, and emit evidence-backed findings.",
-    "north_star": "A quality result is scoped, explainable, and honest about what was not observed.",
+    "name": "task-verification",
+    "identity": "Compare a task with its immutable baseline and require exact-current evidence before release eligibility.",
+    "audience": "Repository developers and the users of this bounded capability.",
+    "core_loop": "Compare a task with its immutable baseline and require exact-current evidence before release eligibility.",
+    "north_star": "Compare a task with its immutable baseline and require exact-current evidence before release eligibility.",
     "not_this": [
-      "Mutating source repositories",
-      "Claiming consumer parity from source tests",
-      "Owning Pronto local inventory"
+      "Preserve baseline lineage; configuration or tool identity drift requires explicit reconciliation.",
+      "New enforced findings, unknown delta evidence, and failed required certified gates block eligibility.",
+      "Fast or cached observations cannot substitute for exact-current authoritative release evidence."
     ]
   },
   "scope": {
-    "id": "audit-evidence-engine",
+    "id": "task-verification",
     "kind": "subsystem",
     "parent_id": "project",
-    "purpose": "Inspect bounded repository inputs and normalize explainable audit evidence without performing remediation.",
-    "boundary": "Owns audit, discovery, evidence normalization, contract and finding production in quality_runner and quality_evidence_contract; remediation execution and consumer presentation remain outside this child.",
+    "purpose": "Compare a task with its immutable baseline and require exact-current evidence before release eligibility.",
+    "boundary": "Proposed source ownership for the exact paths listed here; canonical specifications remain authoritative for detailed behavior.",
     "non_goals": [
-      "Mutating source repositories",
-      "Claiming consumer parity from source tests",
-      "Owning Pronto local inventory"
+      "Preserve baseline lineage; configuration or tool identity drift requires explicit reconciliation.",
+      "New enforced findings, unknown delta evidence, and failed required certified gates block eligibility.",
+      "Fast or cached observations cannot substitute for exact-current authoritative release evidence."
     ],
     "parent_outcomes": [
-      "scoped-audit-plan"
+      "scoped-audit-plan",
+      "review-ready-output"
     ],
     "paths": [
-      "quality_evidence_contract/__init__.py",
-      "quality_evidence_contract/core.py",
-      "quality_runner/application/read_only_audit.py",
-      "quality_runner/audit.py",
-      "quality_runner/audit_evidence.py",
-      "quality_runner/discovery.py",
-      "quality_runner/findings.py",
-      "quality_runner/scan_scope.py",
-      "quality_runner/fleet/audit.py",
-      "quality_runner/fleet/audit_artifacts.py"
+      "quality_runner/cli_task.py",
+      "quality_runner/schemas/task-baseline.schema.json",
+      "quality_runner/schemas/task-check.schema.json",
+      "quality_runner/schemas/task-record.schema.json",
+      "quality_runner/task_contract.py",
+      "quality_runner/task_findings.py",
+      "quality_runner/task_prevention.py",
+      "quality_runner/task_readiness.py",
+      "quality_runner/task_snapshot.py",
+      "quality_runner/task_snapshot_git.py"
     ]
   },
   "targets": {
     "mvp": {
-      "definition": "The scoped boundary is explicitly ratified, its parent outcome is clear, and its smallest local proof is repeatable."
+      "definition": "Compare a task with its immutable baseline and require exact-current evidence before release eligibility."
     },
     "complete_product": {
-      "definition": "The scoped boundary remains aligned through changes, interfaces, and user-visible or consumer-facing verification."
+      "definition": "The same outcome remains dependable across its documented consumers and failure cases."
     }
   },
   "pillars": [
     {
-      "id": "audit-evidence-engine-purpose",
-      "name": "Accepted scoped purpose",
+      "id": "task-verification-purpose",
+      "name": "Compare a task with its immutable baseline and require exact-current evidence before release eligibility.",
       "outcomes": [
         {
-          "id": "audit-evidence-engine-aligned-boundary",
-          "name": "The Quality Runner audit and evidence engine boundary advances its parent outcome without silently taking on sibling responsibilities.",
+          "id": "task-verification-aligned-boundary",
+          "name": "Compare a task with its immutable baseline and require exact-current evidence before release eligibility.",
           "targets": [
             "mvp",
             "complete_product"
           ],
           "maturity": 25,
-          "confidence": "low",
+          "confidence": "medium",
           "layers": {
-            "intended": "Inspect bounded repository inputs and normalize explainable audit evidence without performing remediation. The accepted boundary does not supersede the linked canonical decisions.",
+            "intended": "Compare a task with its immutable baseline and require exact-current evidence before release eligibility. The accepted boundary does not supersede the linked canonical decisions.",
             "planned": "Complete the explicitly authorized verification repairs within this accepted boundary. Feature admission and release remain separately governed.",
             "implemented": "Source and existing regression tests are inventoried at 1913ec18131bc868c53f20f29d0973f740dbb06a. See development.json for exact paths.",
             "verified": "No current subsystem behavior receipt is claimed. Legacy regression tests and desired-outcome acceptance remain distinct."
           },
           "evidence": [
             {
-              "ref": ".agents/context/architecture.md",
+              "ref": "docs/prevention-readiness.md",
               "observed_at": "2026-09-08T21:07:16.177750+00:00",
               "note": "Documented constraint source; new subsystem ownership remains proposed."
             },
             {
-              "ref": "docs/integration-boundaries.md",
+              "ref": "docs/cli.md",
               "observed_at": "2026-09-08T21:07:16.177750+00:00",
               "note": "Documented constraint source; new subsystem ownership remains proposed."
             },
@@ -98,12 +99,12 @@
   "source_layers": {
     "intended": [
       {
-        "ref": ".agents/context/architecture.md",
+        "ref": "docs/prevention-readiness.md",
         "observed_at": "2026-09-08T21:07:16.177750+00:00",
         "note": "Documented constraint source; new subsystem ownership remains proposed."
       },
       {
-        "ref": "docs/integration-boundaries.md",
+        "ref": "docs/cli.md",
         "observed_at": "2026-09-08T21:07:16.177750+00:00",
         "note": "Documented constraint source; new subsystem ownership remains proposed."
       },
@@ -116,47 +117,33 @@
     "planned": [],
     "implemented": [
       {
-        "ref": "quality_evidence_contract/__init__.py",
+        "ref": "quality_runner/cli_task.py",
         "observed_at": "2026-09-08T21:07:16.177750+00:00",
         "note": "Observed on the committed bootstrap baseline; not proof of desired behavior."
       },
       {
-        "ref": "quality_evidence_contract/core.py",
+        "ref": "quality_runner/schemas/task-baseline.schema.json",
         "observed_at": "2026-09-08T21:07:16.177750+00:00",
         "note": "Observed on the committed bootstrap baseline; not proof of desired behavior."
       },
       {
-        "ref": "quality_runner/application/read_only_audit.py",
+        "ref": "quality_runner/schemas/task-check.schema.json",
         "observed_at": "2026-09-08T21:07:16.177750+00:00",
         "note": "Observed on the committed bootstrap baseline; not proof of desired behavior."
       },
       {
-        "ref": "quality_runner/audit.py",
+        "ref": "quality_runner/schemas/task-record.schema.json",
         "observed_at": "2026-09-08T21:07:16.177750+00:00",
         "note": "Observed on the committed bootstrap baseline; not proof of desired behavior."
       },
       {
-        "ref": "quality_runner/audit_evidence.py",
+        "ref": "quality_runner/task_contract.py",
         "observed_at": "2026-09-08T21:07:16.177750+00:00",
         "note": "Observed on the committed bootstrap baseline; not proof of desired behavior."
       }
     ],
     "verified": []
   },
-  "drift": [
-    {
-      "kind": "verification-gap",
-      "summary": "Ownership ratified on 2026-09-09. Current source-bound proof and independently required admission/consumer checks remain obligations.",
-      "status": "open",
-      "observed_at": "2026-08-14T23:31:00Z",
-      "evidence": [
-        {
-          "ref": "README.md",
-          "note": "Draft boundary needs explicit owner confirmation and local proof.",
-          "observed_at": "2026-08-14T23:31:00Z"
-        }
-      ]
-    }
-  ],
+  "drift": [],
   "updated_at": "2026-09-09T17:41:29.704939+00:00"
 }

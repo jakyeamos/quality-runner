@@ -1,0 +1,165 @@
+{
+  "schema_version": 1,
+  "revision": 1,
+  "project": {
+    "name": "Quality Runner audit and evidence engine",
+    "identity": "The Quality Runner engine for bounded inspection, evidence contracts, and findings.",
+    "audience": "Developers, agents, and fleet consumers that need reproducible quality evidence.",
+    "core_loop": "Discover the target, detect capabilities and standards, run bounded inspections, and emit evidence-backed findings.",
+    "north_star": "A quality result is scoped, explainable, and honest about what was not observed.",
+    "not_this": [
+      "Mutating source repositories",
+      "Claiming consumer parity from source tests",
+      "Owning Pronto local inventory"
+    ]
+  },
+  "scope": {
+    "id": "audit-evidence-engine",
+    "kind": "subsystem",
+    "parent_id": "project",
+    "purpose": "Inspect a scoped repository, normalize evidence, and produce an explainable quality audit without mutating the target.",
+    "boundary": "Owns audit, discovery, evidence normalization, contract and finding production in quality_runner and quality_evidence_contract; remediation execution and consumer presentation remain outside this child.",
+    "non_goals": [
+      "Mutating source repositories",
+      "Claiming consumer parity from source tests",
+      "Owning Pronto local inventory"
+    ],
+    "parent_outcomes": [
+      "scoped-audit-plan"
+    ],
+    "paths": [
+      "quality_runner/audit.py",
+      "quality_runner/audit_evidence.py",
+      "quality_runner/application/read_only_audit.py",
+      "quality_evidence_contract"
+    ]
+  },
+  "targets": {
+    "mvp": {
+      "definition": "The scoped boundary is explicitly ratified, its parent outcome is clear, and its smallest local proof is repeatable."
+    },
+    "complete_product": {
+      "definition": "The scoped boundary remains aligned through changes, interfaces, and user-visible or consumer-facing verification."
+    }
+  },
+  "pillars": [
+    {
+      "id": "audit-evidence-engine-purpose",
+      "name": "Draft scoped purpose",
+      "outcomes": [
+        {
+          "id": "audit-evidence-engine-aligned-boundary",
+          "name": "The Quality Runner audit and evidence engine boundary advances its parent outcome without silently taking on sibling responsibilities.",
+          "targets": [
+            "mvp",
+            "complete_product"
+          ],
+          "maturity": 25,
+          "confidence": "low",
+          "layers": {
+            "intended": "Drafted from explicit repository documentation; pending owner quiz and ratification.",
+            "planned": "Local proof and sibling contracts are pending the boundary decision.",
+            "implemented": "Observed implementation paths: quality_runner/audit.py, quality_runner/audit_evidence.py, quality_runner/application/read_only_audit.py, quality_evidence_contract.",
+            "verified": "No independently scoped end-to-end proof has been accepted yet."
+          },
+          "evidence": [
+            {
+              "ref": "README.md",
+              "note": "Repository documentation used to draft this child boundary; not treated as user intent until quiz review.",
+              "observed_at": "2026-08-14T23:31:00Z"
+            },
+            {
+              "ref": ".agents/context/README.md",
+              "note": "Repository documentation used to draft this child boundary; not treated as user intent until quiz review.",
+              "observed_at": "2026-08-14T23:31:00Z"
+            },
+            {
+              "ref": "docs/integration-boundaries.md",
+              "note": "Repository documentation used to draft this child boundary; not treated as user intent until quiz review.",
+              "observed_at": "2026-08-14T23:31:00Z"
+            },
+            {
+              "ref": "docs/architecture-contracts.md",
+              "note": "Repository documentation used to draft this child boundary; not treated as user intent until quiz review.",
+              "observed_at": "2026-08-14T23:31:00Z"
+            }
+          ],
+          "blockers": [
+            {
+              "kind": "product-decision",
+              "summary": "Owner must ratify, split, merge, or retire this draft child Compass through the realignment quiz before it becomes active truth."
+            },
+            {
+              "kind": "verification",
+              "summary": "An independently scoped local proof and its neighboring handoffs are not yet established."
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "source_layers": {
+    "intended": [
+      {
+        "ref": "README.md",
+        "note": "Explicit repository documentation is the current basis for this draft; owner quiz remains open.",
+        "observed_at": "2026-08-14T23:31:00Z"
+      },
+      {
+        "ref": ".agents/context/README.md",
+        "note": "Explicit repository documentation is the current basis for this draft; owner quiz remains open.",
+        "observed_at": "2026-08-14T23:31:00Z"
+      },
+      {
+        "ref": "docs/integration-boundaries.md",
+        "note": "Explicit repository documentation is the current basis for this draft; owner quiz remains open.",
+        "observed_at": "2026-08-14T23:31:00Z"
+      },
+      {
+        "ref": "docs/architecture-contracts.md",
+        "note": "Explicit repository documentation is the current basis for this draft; owner quiz remains open.",
+        "observed_at": "2026-08-14T23:31:00Z"
+      }
+    ],
+    "planned": [],
+    "implemented": [
+      {
+        "ref": "quality_runner/audit.py",
+        "note": "Observed implementation or contract path used as evidence only.",
+        "observed_at": "2026-08-14T23:31:00Z"
+      },
+      {
+        "ref": "quality_runner/audit_evidence.py",
+        "note": "Observed implementation or contract path used as evidence only.",
+        "observed_at": "2026-08-14T23:31:00Z"
+      },
+      {
+        "ref": "quality_runner/application/read_only_audit.py",
+        "note": "Observed implementation or contract path used as evidence only.",
+        "observed_at": "2026-08-14T23:31:00Z"
+      },
+      {
+        "ref": "quality_evidence_contract",
+        "note": "Observed implementation or contract path used as evidence only.",
+        "observed_at": "2026-08-14T23:31:00Z"
+      }
+    ],
+    "verified": []
+  },
+  "drift": [
+    {
+      "kind": "verification-gap",
+      "summary": "This child boundary is a draft derived from repository documentation and has not yet been ratified or independently verified.",
+      "status": "open",
+      "observed_at": "2026-08-14T23:31:00Z",
+      "evidence": [
+        {
+          "ref": "README.md",
+          "note": "Draft boundary needs explicit owner confirmation and local proof.",
+          "observed_at": "2026-08-14T23:31:00Z"
+        }
+      ]
+    }
+  ],
+  "updated_at": "2026-08-14T23:31:00Z"
+}
