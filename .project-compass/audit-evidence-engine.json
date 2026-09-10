@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "revision": 3,
+  "revision": 4,
   "project": {
     "name": "Quality Runner audit and evidence engine",
     "identity": "The Quality Runner engine for bounded inspection, evidence contracts, and findings.",
@@ -37,7 +37,9 @@
       "quality_runner/findings.py",
       "quality_runner/scan_scope.py",
       "quality_runner/fleet/audit.py",
-      "quality_runner/fleet/audit_artifacts.py"
+      "quality_runner/fleet/audit_artifacts.py",
+      "quality_runner/worktree_verify.py",
+      "tests/test_worktree_verify.py"
     ]
   },
   "targets": {

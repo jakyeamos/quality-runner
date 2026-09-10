@@ -102,23 +102,26 @@ def _open_disposable_worktree(
 
     try:
         _git(root, "worktree", "add", "--detach", str(worktree_path), base_head)
-    except subprocess.CalledProcessError:
-        _clean_failed_worktree_add(repo_root=root, worktree_path=worktree_path)
+        relative_execution_root = worktree_path.relative_to(root).as_posix()
+        return WorktreeSession(
+            mode="disposable",
+            repo_root=root,
+            execution_root=worktree_path,
+            verification_context={
+                "worktree_mode": "disposable",
+                "base_head": base_head,
+                "execution_root": relative_execution_root,
+                "mutations_isolated": True,
+                "dirty_source_worktree": dirty,
+            },
+            mutations_isolated=True,
+        )
+    except BaseException:
+        # Cancellation can arrive after Git registers the checkout but before
+        # the caller enters its session cleanup. Preserve the original error.
+        with _cleanup_signal_shield():
+            _clean_failed_worktree_add(repo_root=root, worktree_path=worktree_path)
         raise
-    relative_execution_root = worktree_path.relative_to(root).as_posix()
-    return WorktreeSession(
-        mode="disposable",
-        repo_root=root,
-        execution_root=worktree_path,
-        verification_context={
-            "worktree_mode": "disposable",
-            "base_head": base_head,
-            "execution_root": relative_execution_root,
-            "mutations_isolated": True,
-            "dirty_source_worktree": dirty,
-        },
-        mutations_isolated=True,
-    )
 
 
 def _close_disposable_worktree(*, repo_root: Path, worktree_path: Path) -> None:

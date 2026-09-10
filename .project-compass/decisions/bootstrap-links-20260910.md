@@ -11,3 +11,5 @@ The reviewed pilot bindings opt into affected-scope preservation checks. This ma
 Completion scope review explicitly includes the previously unmapped retained history files and existing environment declaration. These are maintenance of the accepted map and verification environment, without changing product ownership.
 
 Packet-size dogfood retained every proof and constraint while shortening newly introduced behavior identifiers and the metadata handoff explanation. No external consumer had adopted these new identifiers. The original comparison revision remains unchanged.
+
+The release check exposed a cancellation leak in disposable verification setup. The audit/evidence binding now explicitly includes `quality_runner/worktree_verify.py` and its worktree tests, under the existing verification behavior and source-preservation constraint. The real-Git timeout and keyboard-interruption cases fail before the repair and pass afterward. Canonical CLI documentation specifies cleanup; accepted purpose and acceptance obligations remain unchanged. Completion must account for this expanded repair scope and rerun affected proof.

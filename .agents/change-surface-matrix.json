@@ -8,6 +8,31 @@
   "last_reviewed": "2026-09-10",
   "change_records": [
     {
+      "id": "disposable-creation-interruption-20260910",
+      "status": "implemented",
+      "owner": "quality-runner-maintainers",
+      "affected_surfaces": [
+        "matrix-maintenance",
+        "quality-engine"
+      ],
+      "contracts": [
+        "Cancellation while creating a disposable verification checkout cleans its temporary path and Git registration and propagates the original interruption."
+      ],
+      "documentation": [
+        "docs/cli.md"
+      ],
+      "tests": [
+        "tests/test_worktree_verify.py::test_disposable_worktree_cleans_registration_when_creation_is_interrupted",
+        "tests/test_verification_application.py::test_interrupted_disposable_verification_cleans_worktree_and_registration"
+      ],
+      "evidence": [
+        "Deterministic timeout and keyboard-interruption fixtures fail before the fix; all 13 worktree and application tests pass afterward."
+      ],
+      "projections": [
+        "Internal lifecycle repair; CLI flags, result schemas, installed skill routes, and consumer evidence semantics are unchanged."
+      ]
+    },
+    {
       "id": "strict-zero-ci-gates-20260828",
       "status": "implemented",
       "owner": "quality-runner-maintainers",

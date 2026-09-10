@@ -1,6 +1,6 @@
 {
   "schema": "compass-development/v1",
-  "revision": 4,
+  "revision": 5,
   "inventory": {
     "source": "git-tracked",
     "include": [
@@ -27,7 +27,9 @@
         "quality_runner/findings.py",
         "quality_runner/scan_scope.py",
         "quality_runner/fleet/audit.py",
-        "quality_runner/fleet/audit_artifacts.py"
+        "quality_runner/fleet/audit_artifacts.py",
+        "quality_runner/worktree_verify.py",
+        "tests/test_worktree_verify.py"
       ],
       "outcomes": [
         "audit-evidence-engine-aligned-boundary"
@@ -36,7 +38,8 @@
         ".agents/context/architecture.md",
         "docs/integration-boundaries.md",
         "tests/test_read_only_gate_mutations.py",
-        "tests/test_verification_contract.py"
+        "tests/test_verification_contract.py",
+        "docs/cli.md"
       ],
       "constraints": [
         "Source repositories are audit inputs; writes are bounded evidence artifacts, not remediation.",
@@ -70,7 +73,9 @@
             "--locked",
             "pytest",
             "-q",
-            "tests/test_verification_contract.py"
+            "tests/test_verification_contract.py",
+            "tests/test_worktree_verify.py",
+            "tests/test_verification_application.py"
           ],
           "oracle_ref": "docs/artifacts.md",
           "behavior_ids": [

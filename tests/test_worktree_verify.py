@@ -231,6 +231,34 @@ def test_disposable_worktree_cleans_prepared_path_and_registration_when_add_fail
     assert not worktree_path.exists()
 
 
+@pytest.mark.parametrize("interruption", [TimeoutError, KeyboardInterrupt])
+def test_disposable_worktree_cleans_registration_when_creation_is_interrupted(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, interruption: type[BaseException]
+) -> None:
+    from quality_runner import worktree_verify
+
+    _init_git_repo(tmp_path)
+    worktree_path = tmp_path / ".quality-runner" / "worktrees" / "interrupted-add"
+    original_git = worktree_verify._git
+
+    def interrupt_after_add(repo: Path, *args: str) -> str:
+        result = original_git(repo, *args)
+        if args[:2] == ("worktree", "add"):
+            raise interruption("interrupted creation")
+        return result
+
+    monkeypatch.setattr(worktree_verify, "_git", interrupt_after_add)
+    with pytest.raises(interruption, match="interrupted creation"):
+        with gate_worktree_session(
+            repo_root=tmp_path, run_id="interrupted-add", worktree_mode="disposable"
+        ):
+            pytest.fail("interrupted creation must not yield a session")
+
+    assert not worktree_path.exists()
+    assert str(worktree_path) not in original_git(tmp_path, "worktree", "list", "--porcelain")
+    assert (tmp_path / "tracked.txt").read_text() == "original\n"
+
+
 def test_disposable_worktree_refuses_symlinked_worktree_ancestor(tmp_path: Path) -> None:
     _init_git_repo(tmp_path)
     external = tmp_path / "external"

@@ -444,6 +444,8 @@ request with `in-place` mode is rejected. Disposable mode verifies `HEAD` in a
 separate checkout and removes that checkout afterward; it protects the ordinary
 source worktree from normal gate mutations, but it is not a host sandbox for an
 arbitrary authorized command.
+Timeouts and keyboard interruptions during checkout creation also remove the
+temporary checkout and Git registration before propagating the interruption.
 
 `--allow-dirty-worktree-verify` permits a disposable verification against
 `HEAD` while retaining local source edits. It does not verify those edits.
