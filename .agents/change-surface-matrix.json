@@ -8,6 +8,33 @@
   "last_reviewed": "2026-09-10",
   "change_records": [
     {
+      "id": "env-flag-identity-20260910",
+      "status": "implemented",
+      "owner": "quality-runner-maintainers",
+      "affected_surfaces": [
+        "quality-engine",
+        "matrix-maintenance",
+        "project-compass"
+      ],
+      "contracts": [
+        "Distinct environment variables on one line retain separate finding identities; documentation matches complete identifiers. Genuine duplicate ambiguity remains fail-closed."
+      ],
+      "documentation": [
+        "docs/artifacts.md",
+        ".project-compass/decisions/bootstrap-links-20260910.md"
+      ],
+      "tests": [
+        "tests/test_env_flag_identity.py",
+        "tests/test_task_findings.py"
+      ],
+      "evidence": [
+        "External candidate reproduction failed two cases before repair and passed five after repair; repository and release checks recorded separately."
+      ],
+      "projections": [
+        "Existing finding schema is unchanged; consumers receive corrected evidence and fingerprints. No CLI syntax or skill workflow change."
+      ]
+    },
+    {
       "id": "disposable-creation-interruption-20260910",
       "status": "implemented",
       "owner": "quality-runner-maintainers",

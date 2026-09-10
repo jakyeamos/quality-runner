@@ -185,7 +185,9 @@ def _undocumented_env_flags(scanned_files: list[dict[str, Any]]) -> list[dict[st
 
     findings: list[dict[str, Any]] = []
     for env_name, env_occurrences in sorted(occurrences.items()):
-        if len(env_occurrences) != 1 or env_name in documentation_text:
+        if len(env_occurrences) != 1 or re.search(
+            rf"\b{re.escape(env_name)}\b", documentation_text
+        ):
             continue
         occurrence = env_occurrences[0]
         findings.append(
@@ -194,7 +196,7 @@ def _undocumented_env_flags(scanned_files: list[dict[str, Any]]) -> list[dict[st
                 file=str(occurrence["file"]),
                 line=int(occurrence["line"]),
                 rule_id="undocumented-env-flag",
-                evidence=str(occurrence["evidence"]),
+                evidence=f"{env_name}: {occurrence['evidence']}",
                 expected=f"Document {env_name} or remove the one-off configuration branch.",
                 risk="Undocumented single-read flags become invisible behavior switches.",
             )

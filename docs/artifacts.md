@@ -111,6 +111,13 @@ entries block the task.
 than grouped audit summaries. Each occurrence retains detector, stable rule ID,
 source fingerprint, deterministic occurrence fingerprint, path and location,
 severity, confidence, coverage reference, and enforcement eligibility.
+Environment-flag findings include the complete variable name in evidence, so
+multiple flags on one source line retain distinct identities. Documentation
+matches complete identifiers: documenting `GITHUB_BASE_SHA` does not document
+`BASE_SHA`. Older receipts remain readable; comparing evidence across this
+detector correction requires an explicitly approved lineage-preserving rebaseline.
+Genuinely ambiguous duplicate occurrences remain blocking.
+
 Repeated detector fingerprints are disambiguated by repository path and stable
 same-file order. Indistinguishable duplicates at the same location remain
 ambiguous and block matching.

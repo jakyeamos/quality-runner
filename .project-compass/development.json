@@ -1,6 +1,6 @@
 {
   "schema": "compass-development/v1",
-  "revision": 5,
+  "revision": 6,
   "inventory": {
     "source": "git-tracked",
     "include": [
@@ -29,7 +29,9 @@
         "quality_runner/fleet/audit.py",
         "quality_runner/fleet/audit_artifacts.py",
         "quality_runner/worktree_verify.py",
-        "tests/test_worktree_verify.py"
+        "tests/test_worktree_verify.py",
+        "quality_runner/code_quality_ponytail.py",
+        "tests/test_env_flag_identity.py"
       ],
       "outcomes": [
         "audit-evidence-engine-aligned-boundary"
@@ -75,7 +77,9 @@
             "-q",
             "tests/test_verification_contract.py",
             "tests/test_worktree_verify.py",
-            "tests/test_verification_application.py"
+            "tests/test_verification_application.py",
+            "tests/test_env_flag_identity.py",
+            "tests/test_task_findings.py"
           ],
           "oracle_ref": "docs/artifacts.md",
           "behavior_ids": [
