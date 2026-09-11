@@ -1,0 +1,173 @@
+{
+  "schema_version": 1,
+  "revision": 3,
+  "project": {
+    "name": "Quality Runner consumer contracts",
+    "identity": "The Quality Runner adapter and consumer-contract boundary.",
+    "audience": "Pronto, Mac Control, web-readiness, and other approved consumers of quality evidence.",
+    "core_loop": "Define a consumer contract, produce a compatible feed, read it back, and preserve source and freshness provenance.",
+    "north_star": "Every downstream consumer receives the contract it expects without elevating adapter output above producer truth.",
+    "not_this": [
+      "Inventing product readiness",
+      "Treating a feed fixture as live consumer proof",
+      "Owning downstream UI behavior"
+    ]
+  },
+  "scope": {
+    "id": "consumer-contracts",
+    "kind": "subsystem",
+    "parent_id": "project",
+    "purpose": "Expose versioned evidence to Pronto and other consumers without inventing readiness or downstream proof.",
+    "boundary": "Owns public-adapter fixtures and integration documentation under fixtures/contracts/public-adapters and docs/integrations; core audit semantics remain outside this child.",
+    "non_goals": [
+      "Inventing product readiness",
+      "Treating a feed fixture as live consumer proof",
+      "Owning downstream UI behavior"
+    ],
+    "parent_outcomes": [
+      "scoped-audit-plan",
+      "review-ready-output"
+    ],
+    "paths": [
+      "fixtures/contracts/public-adapters/mac-control-ideal-state.json",
+      "fixtures/contracts/public-adapters/pronto-custody-validation.json",
+      "fixtures/contracts/public-adapters/pronto-detector-refresh.json",
+      "fixtures/contracts/public-adapters/pronto-maturity-feed.json",
+      "quality_runner/behavior_receipts.py",
+      "quality_runner/cli_behavior.py",
+      "quality_runner/fleet/behavior_assurance.py",
+      "quality_runner/fleet/behavior_contract.py",
+      "quality_runner/fleet/behavior_support.py",
+      "quality_runner/fleet/maturity_feed.py"
+    ]
+  },
+  "targets": {
+    "mvp": {
+      "definition": "The scoped boundary is explicitly ratified, its parent outcome is clear, and its smallest local proof is repeatable."
+    },
+    "complete_product": {
+      "definition": "The scoped boundary remains aligned through changes, interfaces, and user-visible or consumer-facing verification."
+    }
+  },
+  "pillars": [
+    {
+      "id": "consumer-contracts-purpose",
+      "name": "Accepted scoped purpose",
+      "outcomes": [
+        {
+          "id": "consumer-contracts-aligned-boundary",
+          "name": "The Quality Runner consumer contracts boundary advances its parent outcome without silently taking on sibling responsibilities.",
+          "targets": [
+            "mvp",
+            "complete_product"
+          ],
+          "maturity": 25,
+          "confidence": "low",
+          "layers": {
+            "intended": "Expose versioned evidence to Pronto and other consumers without inventing readiness or downstream proof. The accepted boundary does not supersede the linked canonical decisions.",
+            "planned": "Complete the explicitly authorized verification repairs within this accepted boundary. Feature admission and release remain separately governed.",
+            "implemented": "Source and existing regression tests are inventoried at 1913ec18131bc868c53f20f29d0973f740dbb06a. See development.json for exact paths.",
+            "verified": "No current subsystem behavior receipt is claimed. Legacy regression tests and desired-outcome acceptance remain distinct."
+          },
+          "evidence": [
+            {
+              "ref": "docs/integrations/pronto-maturity-feed.md",
+              "observed_at": "2026-09-08T21:07:16.177750+00:00",
+              "note": "Documented constraint source; new subsystem ownership remains proposed."
+            },
+            {
+              "ref": "docs/integration-boundaries.md",
+              "observed_at": "2026-09-08T21:07:16.177750+00:00",
+              "note": "Documented constraint source; new subsystem ownership remains proposed."
+            },
+            {
+              "ref": ".pronto/behavior-assurance.json",
+              "observed_at": "2026-09-08T21:07:16.177750+00:00",
+              "note": "Documented constraint source; new subsystem ownership remains proposed."
+            },
+            {
+              "ref": ".project-compass/decisions/subsystem-ratification-20260909.md",
+              "observed_at": "2026-09-09T17:41:29.704939+00:00",
+              "note": "Owner accepted subsystem ownership and preservation constraints; not behavior verification."
+            }
+          ],
+          "blockers": [
+            {
+              "kind": "verification",
+              "summary": "Run reviewed source-bound proof for an actual task; satisfy separately documented admission and live-consumer requirements."
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "source_layers": {
+    "intended": [
+      {
+        "ref": "docs/integrations/pronto-maturity-feed.md",
+        "observed_at": "2026-09-08T21:07:16.177750+00:00",
+        "note": "Documented constraint source; new subsystem ownership remains proposed."
+      },
+      {
+        "ref": "docs/integration-boundaries.md",
+        "observed_at": "2026-09-08T21:07:16.177750+00:00",
+        "note": "Documented constraint source; new subsystem ownership remains proposed."
+      },
+      {
+        "ref": ".pronto/behavior-assurance.json",
+        "observed_at": "2026-09-08T21:07:16.177750+00:00",
+        "note": "Documented constraint source; new subsystem ownership remains proposed."
+      },
+      {
+        "ref": ".project-compass/decisions/subsystem-ratification-20260909.md",
+        "observed_at": "2026-09-09T17:41:29.704939+00:00",
+        "note": "Explicit owner acceptance on 2026-09-09."
+      }
+    ],
+    "planned": [],
+    "implemented": [
+      {
+        "ref": "fixtures/contracts/public-adapters/mac-control-ideal-state.json",
+        "observed_at": "2026-09-08T21:07:16.177750+00:00",
+        "note": "Observed on the committed bootstrap baseline; not proof of desired behavior."
+      },
+      {
+        "ref": "fixtures/contracts/public-adapters/pronto-custody-validation.json",
+        "observed_at": "2026-09-08T21:07:16.177750+00:00",
+        "note": "Observed on the committed bootstrap baseline; not proof of desired behavior."
+      },
+      {
+        "ref": "fixtures/contracts/public-adapters/pronto-detector-refresh.json",
+        "observed_at": "2026-09-08T21:07:16.177750+00:00",
+        "note": "Observed on the committed bootstrap baseline; not proof of desired behavior."
+      },
+      {
+        "ref": "fixtures/contracts/public-adapters/pronto-maturity-feed.json",
+        "observed_at": "2026-09-08T21:07:16.177750+00:00",
+        "note": "Observed on the committed bootstrap baseline; not proof of desired behavior."
+      },
+      {
+        "ref": "quality_runner/behavior_receipts.py",
+        "observed_at": "2026-09-08T21:07:16.177750+00:00",
+        "note": "Observed on the committed bootstrap baseline; not proof of desired behavior."
+      }
+    ],
+    "verified": []
+  },
+  "drift": [
+    {
+      "kind": "verification-gap",
+      "summary": "Ownership ratified on 2026-09-09. Current source-bound proof and independently required admission/consumer checks remain obligations.",
+      "status": "open",
+      "observed_at": "2026-08-14T23:31:00Z",
+      "evidence": [
+        {
+          "ref": "README.md",
+          "note": "Draft boundary needs explicit owner confirmation and local proof.",
+          "observed_at": "2026-08-14T23:31:00Z"
+        }
+      ]
+    }
+  ],
+  "updated_at": "2026-09-09T17:41:29.704939+00:00"
+}

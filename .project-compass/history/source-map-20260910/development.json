@@ -1,0 +1,564 @@
+{
+  "schema": "compass-development/v1",
+  "revision": 6,
+  "inventory": {
+    "source": "git-tracked",
+    "include": [
+      "quality_runner/**",
+      "quality_evidence_contract/**",
+      "repo_quality_certifier/**"
+    ],
+    "exclude": [],
+    "behavior_ref": ".project-compass/behaviors.json"
+  },
+  "bindings": [
+    {
+      "id": "audit-evidence-engine-sources",
+      "compass_id": "audit-evidence-engine",
+      "authority": "accepted",
+      "decision_id": "audit-evidence-engine-ratified-20260909",
+      "paths": [
+        "quality_evidence_contract/__init__.py",
+        "quality_evidence_contract/core.py",
+        "quality_runner/application/read_only_audit.py",
+        "quality_runner/audit.py",
+        "quality_runner/audit_evidence.py",
+        "quality_runner/discovery.py",
+        "quality_runner/findings.py",
+        "quality_runner/scan_scope.py",
+        "quality_runner/fleet/audit.py",
+        "quality_runner/fleet/audit_artifacts.py",
+        "quality_runner/worktree_verify.py",
+        "tests/test_worktree_verify.py",
+        "quality_runner/code_quality_ponytail.py",
+        "tests/test_env_flag_identity.py"
+      ],
+      "outcomes": [
+        "audit-evidence-engine-aligned-boundary"
+      ],
+      "references": [
+        ".agents/context/architecture.md",
+        "docs/integration-boundaries.md",
+        "tests/test_read_only_gate_mutations.py",
+        "tests/test_verification_contract.py",
+        "docs/cli.md"
+      ],
+      "constraints": [
+        "Source repositories are audit inputs; writes are bounded evidence artifacts, not remediation.",
+        "Configured commands and static findings never become executed verification or provider proof.",
+        "Missing, stale, and unsupported evidence remain explicit."
+      ],
+      "dependencies": [],
+      "proof": [
+        {
+          "id": "regression-1",
+          "receipt": ".project-compass/evidence/audit-evidence-engine-1.json",
+          "command": [
+            "uv",
+            "run",
+            "--locked",
+            "pytest",
+            "-q",
+            "tests/test_read_only_gate_mutations.py"
+          ],
+          "oracle_ref": "docs/integration-boundaries.md",
+          "behavior_ids": [
+            "read-only-audit"
+          ]
+        },
+        {
+          "id": "regression-2",
+          "receipt": ".project-compass/evidence/audit-evidence-engine-2.json",
+          "command": [
+            "uv",
+            "run",
+            "--locked",
+            "pytest",
+            "-q",
+            "tests/test_verification_contract.py",
+            "tests/test_worktree_verify.py",
+            "tests/test_verification_application.py",
+            "tests/test_env_flag_identity.py",
+            "tests/test_task_findings.py"
+          ],
+          "oracle_ref": "docs/artifacts.md",
+          "behavior_ids": [
+            "verification"
+          ]
+        },
+        {
+          "id": "fleet-artifacts",
+          "receipt": ".project-compass/evidence/fleet-artifacts.json",
+          "command": [
+            "uv",
+            "run",
+            "--locked",
+            "pytest",
+            "-q",
+            "tests/test_fleet_audit.py",
+            "tests/test_fleet_standard_audit.py",
+            "tests/test_fleet_certification.py"
+          ],
+          "oracle_ref": "docs/artifacts.md",
+          "behavior_ids": [
+            "fleet-replay"
+          ]
+        }
+      ],
+      "behavior_ids": [
+        "read-only-audit",
+        "verification",
+        "fleet-replay"
+      ]
+    },
+    {
+      "id": "review-handoff-output-sources",
+      "compass_id": "review-handoff-output",
+      "authority": "accepted",
+      "decision_id": "review-handoff-output-ratified-20260909",
+      "paths": [
+        "quality_runner/application/review_projection.py",
+        "quality_runner/application/review_reporting.py",
+        "quality_runner/application/review_responses.py",
+        "quality_runner/remediation_delta.py"
+      ],
+      "outcomes": [
+        "review-handoff-output-aligned-boundary"
+      ],
+      "references": [
+        "docs/integration-boundaries.md",
+        "docs/artifacts.md",
+        "tests/test_review_v1_contracts.py"
+      ],
+      "constraints": [
+        "Projection never upgrades evidence strength or silently executes remediation.",
+        "QR-native planning and GSD planning remain independent; QR does not rewrite GSD state.",
+        "Preserve stable remediation identifiers and links to the originating audit."
+      ],
+      "dependencies": [
+        "quality_runner/findings.py"
+      ],
+      "proof": [
+        {
+          "id": "regression-1",
+          "receipt": ".project-compass/evidence/review-handoff-output-1.json",
+          "command": [
+            "uv",
+            "run",
+            "--locked",
+            "pytest",
+            "-q",
+            "tests/test_review_v1_contracts.py"
+          ],
+          "oracle_ref": "docs/integration-boundaries.md",
+          "behavior_ids": [
+            "review-handoff"
+          ]
+        }
+      ],
+      "behavior_ids": [
+        "review-handoff"
+      ]
+    },
+    {
+      "id": "consumer-contracts-sources",
+      "compass_id": "consumer-contracts",
+      "authority": "accepted",
+      "decision_id": "consumer-contracts-ratified-20260909",
+      "paths": [
+        "fixtures/contracts/public-adapters/mac-control-ideal-state.json",
+        "fixtures/contracts/public-adapters/pronto-custody-validation.json",
+        "fixtures/contracts/public-adapters/pronto-detector-refresh.json",
+        "fixtures/contracts/public-adapters/pronto-maturity-feed.json",
+        "quality_runner/behavior_receipts.py",
+        "quality_runner/cli_behavior.py",
+        "quality_runner/fleet/behavior_assurance.py",
+        "quality_runner/fleet/behavior_contract.py",
+        "quality_runner/fleet/behavior_support.py",
+        "quality_runner/fleet/maturity_feed.py"
+      ],
+      "outcomes": [
+        "consumer-contracts-aligned-boundary"
+      ],
+      "references": [
+        "docs/integrations/pronto-maturity-feed.md",
+        "docs/integration-boundaries.md",
+        ".pronto/behavior-assurance.json",
+        "tests/test_maturity_feed.py",
+        "tests/test_behavior_assurance.py"
+      ],
+      "constraints": [
+        "Checkpoint components must match audit time, target identity, and hashes; publication coherence does not imply quality readiness.",
+        "Legacy behavior contracts remain compatible without pretending edge evidence exists.",
+        "Tier 1 and Tier 2 observations never widen Tier-0 release readiness; no self-issued independent edge verification."
+      ],
+      "dependencies": [
+        "quality_runner/findings.py",
+        "quality_evidence_contract/__init__.py",
+        "quality_runner/fleet/audit.py",
+        "quality_runner/fleet/audit_artifacts.py"
+      ],
+      "proof": [
+        {
+          "id": "regression-1",
+          "receipt": ".project-compass/evidence/consumer-contracts-1.json",
+          "command": [
+            "uv",
+            "run",
+            "--locked",
+            "pytest",
+            "-q",
+            "tests/test_maturity_feed.py"
+          ],
+          "oracle_ref": "docs/integrations/pronto-maturity-feed.md",
+          "behavior_ids": [
+            "feed-coherence"
+          ]
+        },
+        {
+          "id": "regression-2",
+          "receipt": ".project-compass/evidence/consumer-contracts-2.json",
+          "command": [
+            "uv",
+            "run",
+            "--locked",
+            "pytest",
+            "-q",
+            "tests/test_behavior_assurance.py"
+          ],
+          "oracle_ref": "docs/integrations/pronto-behavior-assurance.md",
+          "behavior_ids": [
+            "behavior-contract-compatibility",
+            "edge-receipt-producer",
+            "whole-inventory-projection"
+          ]
+        }
+      ],
+      "behavior_ids": [
+        "behavior-contract-compatibility",
+        "edge-receipt-producer",
+        "whole-inventory-projection",
+        "feed-coherence"
+      ]
+    },
+    {
+      "id": "task-verification-sources",
+      "compass_id": "task-verification",
+      "authority": "accepted",
+      "decision_id": "task-verification-ratified-20260909",
+      "paths": [
+        "quality_runner/cli_task.py",
+        "quality_runner/schemas/task-baseline.schema.json",
+        "quality_runner/schemas/task-check.schema.json",
+        "quality_runner/schemas/task-record.schema.json",
+        "quality_runner/task_contract.py",
+        "quality_runner/task_findings.py",
+        "quality_runner/task_prevention.py",
+        "quality_runner/task_readiness.py",
+        "quality_runner/task_snapshot.py",
+        "quality_runner/task_snapshot_git.py"
+      ],
+      "outcomes": [
+        "task-verification-aligned-boundary"
+      ],
+      "references": [
+        "docs/prevention-readiness.md",
+        "docs/cli.md",
+        "tests/test_task_readiness.py",
+        "tests/test_task_snapshot.py",
+        "tests/test_cli_task.py"
+      ],
+      "constraints": [
+        "Preserve baseline lineage; configuration or tool identity drift requires explicit reconciliation.",
+        "New enforced findings, unknown delta evidence, and failed required certified gates block eligibility.",
+        "Fast or cached observations cannot substitute for exact-current authoritative release evidence."
+      ],
+      "dependencies": [
+        "quality_runner/application/read_only_audit.py",
+        "quality_runner/findings.py"
+      ],
+      "proof": [
+        {
+          "id": "regression-1",
+          "receipt": ".project-compass/evidence/task-verification-1.json",
+          "command": [
+            "uv",
+            "run",
+            "--locked",
+            "pytest",
+            "-q",
+            "tests/test_task_readiness.py"
+          ],
+          "oracle_ref": "docs/prevention-readiness.md",
+          "behavior_ids": [
+            "task-readiness"
+          ]
+        },
+        {
+          "id": "regression-2",
+          "receipt": ".project-compass/evidence/task-verification-2.json",
+          "command": [
+            "uv",
+            "run",
+            "--locked",
+            "pytest",
+            "-q",
+            "tests/test_task_snapshot.py"
+          ],
+          "oracle_ref": "docs/prevention-readiness.md",
+          "behavior_ids": [
+            "task-source"
+          ]
+        },
+        {
+          "id": "task-cli-1",
+          "receipt": ".project-compass/evidence/task-cli-1.json",
+          "command": [
+            "uv",
+            "run",
+            "--locked",
+            "pytest",
+            "-q",
+            "tests/test_cli_task.py::test_task_clean_check_passes_and_writes_canonical_artifacts",
+            "tests/test_cli_task.py::test_task_new_promoted_finding_is_violation"
+          ],
+          "oracle_ref": "docs/prevention-readiness.md",
+          "behavior_ids": [
+            "task-source"
+          ]
+        },
+        {
+          "id": "task-cli-2",
+          "receipt": ".project-compass/evidence/task-cli-2.json",
+          "command": [
+            "uv",
+            "run",
+            "--locked",
+            "pytest",
+            "-q",
+            "tests/test_cli_task.py::test_task_persisted_legacy_debt_alone_passes",
+            "tests/test_cli_task.py::test_task_required_uncertified_gate_is_blocked"
+          ],
+          "oracle_ref": "docs/prevention-readiness.md",
+          "behavior_ids": [
+            "task-source"
+          ]
+        },
+        {
+          "id": "task-cli-3",
+          "receipt": ".project-compass/evidence/task-cli-3.json",
+          "command": [
+            "uv",
+            "run",
+            "--locked",
+            "pytest",
+            "-q",
+            "tests/test_cli_task.py::test_task_certified_gate_failure_is_violation",
+            "tests/test_cli_task.py::test_task_missing_record_is_invalid_invocation"
+          ],
+          "oracle_ref": "docs/prevention-readiness.md",
+          "behavior_ids": [
+            "task-source"
+          ]
+        },
+        {
+          "id": "task-cli-4-single-1",
+          "receipt": ".project-compass/evidence/task-cli-4-single-1.json",
+          "command": [
+            "uv",
+            "run",
+            "--locked",
+            "pytest",
+            "-q",
+            "tests/test_cli_task.py::test_task_rebaseline_is_explicit_and_preserves_lineage"
+          ],
+          "oracle_ref": "docs/prevention-readiness.md",
+          "behavior_ids": [
+            "task-source"
+          ]
+        },
+        {
+          "id": "task-cli-4-single-2",
+          "receipt": ".project-compass/evidence/task-cli-4-single-2.json",
+          "command": [
+            "uv",
+            "run",
+            "--locked",
+            "pytest",
+            "-q",
+            "tests/test_cli_task.py::test_task_baseline_ref_scans_immutable_revision_for_pr_delta"
+          ],
+          "oracle_ref": "docs/prevention-readiness.md",
+          "behavior_ids": [
+            "task-source"
+          ]
+        },
+        {
+          "id": "task-cli-5-single-1",
+          "receipt": ".project-compass/evidence/task-cli-5-single-1.json",
+          "command": [
+            "uv",
+            "run",
+            "--locked",
+            "pytest",
+            "-q",
+            "tests/test_cli_task.py::test_task_rebaseline_preserves_immutable_pr_target"
+          ],
+          "oracle_ref": "docs/prevention-readiness.md",
+          "behavior_ids": [
+            "task-source"
+          ]
+        },
+        {
+          "id": "task-cli-5-single-2",
+          "receipt": ".project-compass/evidence/task-cli-5-single-2.json",
+          "command": [
+            "uv",
+            "run",
+            "--locked",
+            "pytest",
+            "-q",
+            "tests/test_cli_task.py::test_task_pr_check_evaluates_effective_merge_when_target_is_ahead"
+          ],
+          "oracle_ref": "docs/prevention-readiness.md",
+          "behavior_ids": [
+            "task-source"
+          ]
+        }
+      ],
+      "behavior_ids": [
+        "task-readiness",
+        "task-source"
+      ]
+    },
+    {
+      "id": "foundation-maintenance",
+      "compass_id": "project",
+      "authority": "accepted",
+      "decision_id": "foundation-preservation-20260909",
+      "paths": [
+        ".agents/change-surface-matrix.json",
+        ".project-compass/.gitignore",
+        ".project-compass/BOOTSTRAP.md",
+        ".project-compass/audit-evidence-engine.json",
+        ".project-compass/compasses.json",
+        ".project-compass/consumer-contracts.json",
+        ".project-compass/decisions/subsystem-ratification-20260909.md",
+        ".project-compass/development.json",
+        ".project-compass/history/reconciliation-20260909/BOOTSTRAP.md",
+        ".project-compass/history/reconciliation-20260909/audit-evidence-engine.json",
+        ".project-compass/history/reconciliation-20260909/compasses.json",
+        ".project-compass/history/reconciliation-20260909/consumer-contracts.json",
+        ".project-compass/history/reconciliation-20260909/development.json",
+        ".project-compass/history/reconciliation-20260909/quiz.json",
+        ".project-compass/history/reconciliation-20260909/review-handoff-output.json",
+        ".project-compass/history/reconciliation-20260909/task-verification.json",
+        ".project-compass/quiz.json",
+        ".project-compass/review-handoff-output.json",
+        ".project-compass/task-verification.json",
+        "change-surface-matrix.json",
+        "docs/artifacts.md",
+        ".project-compass/behaviors.json",
+        ".project-compass/decisions/bootstrap-links-20260910.md",
+        ".project-compass/history/audit-evidence-engine-revision-1.json",
+        ".project-compass/history/consumer-contracts-revision-1.json",
+        ".project-compass/history/review-handoff-output-revision-1.json",
+        "environment-legibility.json"
+      ],
+      "outcomes": [
+        "scoped-audit-plan",
+        "review-ready-output"
+      ],
+      "constraints": [
+        "Preserve canonical root intent and prior decision history.",
+        "Metadata and environment checks do not establish application acceptance or deployment readiness."
+      ],
+      "references": [
+        ".project-compass/contract.json",
+        ".project-compass/decisions/subsystem-ratification-20260909.md",
+        "README.md",
+        ".project-compass/decisions/bootstrap-links-20260910.md"
+      ],
+      "dependencies": [],
+      "proof": [
+        {
+          "id": "repository-contract",
+          "receipt": ".project-compass/evidence/foundation-maintenance.json",
+          "command": [
+            "python3",
+            "scripts/check_environment_contract.py"
+          ],
+          "oracle_ref": "README.md",
+          "behavior_ids": [
+            "environment"
+          ]
+        }
+      ],
+      "behavior_ids": [
+        "environment"
+      ],
+      "handoff_review": "Maintenance preserves the ratified map and environment. Declared subsystems own evidence and consumer handoffs; metadata grants no mutation, publication or release authority."
+    }
+  ],
+  "decisions": [
+    {
+      "id": "audit-evidence-engine-bootstrap-proposal",
+      "summary": "Proposed ownership and proof links derived from .agents/context/architecture.md, docs/integration-boundaries.md. Existing decisions remain authoritative; quiz ratification is pending.",
+      "source": ".project-compass/BOOTSTRAP.md",
+      "status": "superseded"
+    },
+    {
+      "id": "review-handoff-output-bootstrap-proposal",
+      "summary": "Proposed ownership and proof links derived from docs/integration-boundaries.md, docs/artifacts.md. Existing decisions remain authoritative; quiz ratification is pending.",
+      "source": ".project-compass/BOOTSTRAP.md",
+      "status": "superseded"
+    },
+    {
+      "id": "consumer-contracts-bootstrap-proposal",
+      "summary": "Proposed ownership and proof links derived from docs/integrations/pronto-maturity-feed.md, docs/integration-boundaries.md, .pronto/behavior-assurance.json. Existing decisions remain authoritative; quiz ratification is pending.",
+      "source": ".project-compass/BOOTSTRAP.md",
+      "status": "superseded"
+    },
+    {
+      "id": "task-verification-bootstrap-proposal",
+      "summary": "Proposed ownership and proof links derived from docs/prevention-readiness.md, docs/cli.md. Existing decisions remain authoritative; quiz ratification is pending.",
+      "source": ".project-compass/BOOTSTRAP.md",
+      "status": "superseded"
+    },
+    {
+      "id": "audit-evidence-engine-ratified-20260909",
+      "summary": "Audit collection, separate task verification, review handoff, and consumer contracts are accepted boundaries. QR owns evidence meaning and freshness; consumers own presentation and live readback.",
+      "source": ".project-compass/decisions/subsystem-ratification-20260909.md",
+      "status": "accepted",
+      "supersedes": "audit-evidence-engine-bootstrap-proposal"
+    },
+    {
+      "id": "review-handoff-output-ratified-20260909",
+      "summary": "Audit collection, separate task verification, review handoff, and consumer contracts are accepted boundaries. QR owns evidence meaning and freshness; consumers own presentation and live readback.",
+      "source": ".project-compass/decisions/subsystem-ratification-20260909.md",
+      "status": "accepted",
+      "supersedes": "review-handoff-output-bootstrap-proposal"
+    },
+    {
+      "id": "consumer-contracts-ratified-20260909",
+      "summary": "Audit collection, separate task verification, review handoff, and consumer contracts are accepted boundaries. QR owns evidence meaning and freshness; consumers own presentation and live readback.",
+      "source": ".project-compass/decisions/subsystem-ratification-20260909.md",
+      "status": "accepted",
+      "supersedes": "consumer-contracts-bootstrap-proposal"
+    },
+    {
+      "id": "task-verification-ratified-20260909",
+      "summary": "Audit collection, separate task verification, review handoff, and consumer contracts are accepted boundaries. QR owns evidence meaning and freshness; consumers own presentation and live readback.",
+      "source": ".project-compass/decisions/subsystem-ratification-20260909.md",
+      "status": "accepted",
+      "supersedes": "task-verification-bootstrap-proposal"
+    },
+    {
+      "id": "foundation-preservation-20260909",
+      "summary": "Maintain the accepted subsystem map and existing root intent while repairing the explicitly selected verification blockers. No root product purpose, activation, admission, or release change.",
+      "source": ".project-compass/decisions/subsystem-ratification-20260909.md",
+      "status": "accepted"
+    }
+  ],
+  "preservation": "compass-preservation/v1"
+}

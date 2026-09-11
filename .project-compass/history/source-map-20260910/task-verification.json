@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "revision": 3,
+  "revision": 2,
   "project": {
     "name": "task-verification",
     "identity": "Compare a task with its immutable baseline and require exact-current evidence before release eligibility.",
@@ -29,52 +29,16 @@
       "review-ready-output"
     ],
     "paths": [
-      "quality_runner/application/gate_verification.py",
-      "quality_runner/application/verification_v1_artifacts.py",
-      "quality_runner/application/verification_workflows.py",
       "quality_runner/cli_task.py",
-      "quality_runner/core/verification_contracts.py",
-      "quality_runner/dependency_setup.py",
-      "quality_runner/fleet/certification.py",
-      "quality_runner/fleet/dynamic.py",
-      "quality_runner/fleet/dynamic_commands.py",
-      "quality_runner/fleet/dynamic_scan.py",
-      "quality_runner/gate_controller.py",
-      "quality_runner/gate_execution.py",
-      "quality_runner/gate_execution_policy.py",
-      "quality_runner/gate_provenance.py",
-      "quality_runner/gate_verification.py",
-      "quality_runner/git_branches.py",
-      "quality_runner/invariants.py",
-      "quality_runner/lifecycle_status.py",
-      "quality_runner/package_preflight.py",
-      "quality_runner/prevention_config.py",
-      "quality_runner/process_runner.py",
-      "quality_runner/read_only_git.py",
-      "quality_runner/refresh_timeout.py",
-      "quality_runner/refresh_timeout_context.py",
-      "quality_runner/refresh_workflow.py",
-      "quality_runner/release_boundary.py",
-      "quality_runner/release_boundary_artifacts.py",
-      "quality_runner/release_capability_policy.py",
-      "quality_runner/release_smoke.py",
-      "quality_runner/rollout.py",
       "quality_runner/schemas/task-baseline.schema.json",
       "quality_runner/schemas/task-check.schema.json",
       "quality_runner/schemas/task-record.schema.json",
-      "quality_runner/strict_baseline.py",
       "quality_runner/task_contract.py",
       "quality_runner/task_findings.py",
       "quality_runner/task_prevention.py",
       "quality_runner/task_readiness.py",
       "quality_runner/task_snapshot.py",
-      "quality_runner/task_snapshot_git.py",
-      "quality_runner/timeout_baseline.py",
-      "quality_runner/timeout_baseline_support.py",
-      "quality_runner/timeout_diagnostics.py",
-      "quality_runner/verification_contract.py",
-      "quality_runner/workflow_internal.py",
-      "quality_runner/workflow_verify.py"
+      "quality_runner/task_snapshot_git.py"
     ]
   },
   "targets": {
@@ -176,15 +140,10 @@
         "ref": "quality_runner/task_contract.py",
         "observed_at": "2026-09-08T21:07:16.177750+00:00",
         "note": "Observed on the committed bootstrap baseline; not proof of desired behavior."
-      },
-      {
-        "ref": ".project-compass/decisions/source-map-20260910.md",
-        "observed_at": "2026-09-10T22:32:32.284809+00:00",
-        "note": "Expanded exact module map and cross-consumer imports; no new verified behavior claim."
       }
     ],
     "verified": []
   },
   "drift": [],
-  "updated_at": "2026-09-10T22:32:32.284809+00:00"
+  "updated_at": "2026-09-09T17:41:29.704939+00:00"
 }

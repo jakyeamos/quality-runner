@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "revision": 4,
+  "revision": 3,
   "project": {
     "name": "Quality Runner review and handoff output",
     "identity": "The Quality Runner projection and reporting boundary for human and agent review.",
@@ -28,74 +28,10 @@
       "review-ready-output"
     ],
     "paths": [
-      "quality_runner/adoption.py",
-      "quality_runner/agent_review_policy.py",
-      "quality_runner/application/fresh_review.py",
-      "quality_runner/application/review_context_factory.py",
       "quality_runner/application/review_projection.py",
       "quality_runner/application/review_reporting.py",
       "quality_runner/application/review_responses.py",
-      "quality_runner/application/review_v1_reports.py",
-      "quality_runner/application/review_v1_serializers.py",
-      "quality_runner/bug_learning.py",
-      "quality_runner/bug_learning_promotion.py",
-      "quality_runner/bug_learning_registry.py",
-      "quality_runner/controller_report_batch_scope.py",
-      "quality_runner/controller_report_builder.py",
-      "quality_runner/controller_report_defaults.py",
-      "quality_runner/controller_report_validation.py",
-      "quality_runner/controller_reports.py",
-      "quality_runner/core/review_contracts.py",
-      "quality_runner/core/review_packets.py",
-      "quality_runner/delivery_contract.py",
-      "quality_runner/delivery_contract_support.py",
-      "quality_runner/fix_proposals.py",
-      "quality_runner/gate_resolution_bridge.py",
-      "quality_runner/handoff_gate_suggestions.py",
-      "quality_runner/handoff_gate_summary.py",
-      "quality_runner/handoff_gate_summary_markdown.py",
-      "quality_runner/handoff_lint.py",
-      "quality_runner/handoff_markdown.py",
-      "quality_runner/handoff_status.py",
-      "quality_runner/intent.py",
-      "quality_runner/maintenance_surface_review.py",
-      "quality_runner/phase_automation.py",
-      "quality_runner/phase_builder.py",
-      "quality_runner/phase_closure.py",
-      "quality_runner/phase_contract.py",
-      "quality_runner/phase_documents.py",
-      "quality_runner/phase_planning.py",
-      "quality_runner/phase_planning_helpers.py",
-      "quality_runner/phase_sources.py",
-      "quality_runner/phase_store.py",
-      "quality_runner/planning.py",
-      "quality_runner/planning_markdown.py",
-      "quality_runner/planning_slices.py",
-      "quality_runner/remediation_clusters.py",
-      "quality_runner/remediation_context.py",
-      "quality_runner/remediation_context_summary.py",
-      "quality_runner/remediation_delta.py",
-      "quality_runner/remediation_domains.py",
-      "quality_runner/remediation_wiring.py",
-      "quality_runner/resolution.py",
-      "quality_runner/review_adapters.py",
-      "quality_runner/review_artifacts.py",
-      "quality_runner/review_context.py",
-      "quality_runner/review_delta.py",
-      "quality_runner/review_execution_artifacts.py",
-      "quality_runner/review_loop.py",
-      "quality_runner/review_report.py",
-      "quality_runner/review_response_files.py",
-      "quality_runner/review_state.py",
-      "quality_runner/review_types.py",
-      "quality_runner/review_worker.py",
-      "quality_runner/security/_codex_handoff.py",
-      "quality_runner/security/handoff.py",
-      "quality_runner/security/review_obligations.py",
-      "quality_runner/skill_review.py",
-      "quality_runner/slice_enrichment.py",
-      "quality_runner/slice_specs.py",
-      "quality_runner/workflow_review_metadata.py"
+      "quality_runner/remediation_delta.py"
     ]
   },
   "targets": {
@@ -192,11 +128,6 @@
         "ref": "quality_runner/remediation_delta.py",
         "observed_at": "2026-09-08T21:07:16.177750+00:00",
         "note": "Observed on the committed bootstrap baseline; not proof of desired behavior."
-      },
-      {
-        "ref": ".project-compass/decisions/source-map-20260910.md",
-        "observed_at": "2026-09-10T22:32:32.284809+00:00",
-        "note": "Expanded exact module map and cross-consumer imports; no new verified behavior claim."
       }
     ],
     "verified": []
@@ -216,5 +147,5 @@
       ]
     }
   ],
-  "updated_at": "2026-09-10T22:32:32.284809+00:00"
+  "updated_at": "2026-09-09T17:41:29.704939+00:00"
 }

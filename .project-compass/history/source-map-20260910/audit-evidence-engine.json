@@ -1,0 +1,166 @@
+{
+  "schema_version": 1,
+  "revision": 5,
+  "project": {
+    "name": "Quality Runner audit and evidence engine",
+    "identity": "The Quality Runner engine for bounded inspection, evidence contracts, and findings.",
+    "audience": "Developers, agents, and fleet consumers that need reproducible quality evidence.",
+    "core_loop": "Discover the target, detect capabilities and standards, run bounded inspections, and emit evidence-backed findings.",
+    "north_star": "A quality result is scoped, explainable, and honest about what was not observed.",
+    "not_this": [
+      "Mutating source repositories",
+      "Claiming consumer parity from source tests",
+      "Owning Pronto local inventory"
+    ]
+  },
+  "scope": {
+    "id": "audit-evidence-engine",
+    "kind": "subsystem",
+    "parent_id": "project",
+    "purpose": "Inspect bounded repository inputs and normalize explainable audit evidence without performing remediation.",
+    "boundary": "Owns audit, discovery, evidence normalization, contract and finding production in quality_runner and quality_evidence_contract; remediation execution and consumer presentation remain outside this child.",
+    "non_goals": [
+      "Mutating source repositories",
+      "Claiming consumer parity from source tests",
+      "Owning Pronto local inventory"
+    ],
+    "parent_outcomes": [
+      "scoped-audit-plan"
+    ],
+    "paths": [
+      "quality_evidence_contract/__init__.py",
+      "quality_evidence_contract/core.py",
+      "quality_runner/application/read_only_audit.py",
+      "quality_runner/audit.py",
+      "quality_runner/audit_evidence.py",
+      "quality_runner/discovery.py",
+      "quality_runner/findings.py",
+      "quality_runner/scan_scope.py",
+      "quality_runner/fleet/audit.py",
+      "quality_runner/fleet/audit_artifacts.py",
+      "quality_runner/worktree_verify.py",
+      "tests/test_worktree_verify.py",
+      "quality_runner/code_quality_ponytail.py",
+      "tests/test_env_flag_identity.py"
+    ]
+  },
+  "targets": {
+    "mvp": {
+      "definition": "The scoped boundary is explicitly ratified, its parent outcome is clear, and its smallest local proof is repeatable."
+    },
+    "complete_product": {
+      "definition": "The scoped boundary remains aligned through changes, interfaces, and user-visible or consumer-facing verification."
+    }
+  },
+  "pillars": [
+    {
+      "id": "audit-evidence-engine-purpose",
+      "name": "Accepted scoped purpose",
+      "outcomes": [
+        {
+          "id": "audit-evidence-engine-aligned-boundary",
+          "name": "The Quality Runner audit and evidence engine boundary advances its parent outcome without silently taking on sibling responsibilities.",
+          "targets": [
+            "mvp",
+            "complete_product"
+          ],
+          "maturity": 25,
+          "confidence": "low",
+          "layers": {
+            "intended": "Inspect bounded repository inputs and normalize explainable audit evidence without performing remediation. The accepted boundary does not supersede the linked canonical decisions.",
+            "planned": "Complete the explicitly authorized verification repairs within this accepted boundary. Feature admission and release remain separately governed.",
+            "implemented": "Source and existing regression tests are inventoried at 1913ec18131bc868c53f20f29d0973f740dbb06a. See development.json for exact paths.",
+            "verified": "No current subsystem behavior receipt is claimed. Legacy regression tests and desired-outcome acceptance remain distinct."
+          },
+          "evidence": [
+            {
+              "ref": ".agents/context/architecture.md",
+              "observed_at": "2026-09-08T21:07:16.177750+00:00",
+              "note": "Documented constraint source; new subsystem ownership remains proposed."
+            },
+            {
+              "ref": "docs/integration-boundaries.md",
+              "observed_at": "2026-09-08T21:07:16.177750+00:00",
+              "note": "Documented constraint source; new subsystem ownership remains proposed."
+            },
+            {
+              "ref": ".project-compass/decisions/subsystem-ratification-20260909.md",
+              "observed_at": "2026-09-09T17:41:29.704939+00:00",
+              "note": "Owner accepted subsystem ownership and preservation constraints; not behavior verification."
+            }
+          ],
+          "blockers": [
+            {
+              "kind": "verification",
+              "summary": "Run reviewed source-bound proof for an actual task; satisfy separately documented admission and live-consumer requirements."
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "source_layers": {
+    "intended": [
+      {
+        "ref": ".agents/context/architecture.md",
+        "observed_at": "2026-09-08T21:07:16.177750+00:00",
+        "note": "Documented constraint source; new subsystem ownership remains proposed."
+      },
+      {
+        "ref": "docs/integration-boundaries.md",
+        "observed_at": "2026-09-08T21:07:16.177750+00:00",
+        "note": "Documented constraint source; new subsystem ownership remains proposed."
+      },
+      {
+        "ref": ".project-compass/decisions/subsystem-ratification-20260909.md",
+        "observed_at": "2026-09-09T17:41:29.704939+00:00",
+        "note": "Explicit owner acceptance on 2026-09-09."
+      }
+    ],
+    "planned": [],
+    "implemented": [
+      {
+        "ref": "quality_evidence_contract/__init__.py",
+        "observed_at": "2026-09-08T21:07:16.177750+00:00",
+        "note": "Observed on the committed bootstrap baseline; not proof of desired behavior."
+      },
+      {
+        "ref": "quality_evidence_contract/core.py",
+        "observed_at": "2026-09-08T21:07:16.177750+00:00",
+        "note": "Observed on the committed bootstrap baseline; not proof of desired behavior."
+      },
+      {
+        "ref": "quality_runner/application/read_only_audit.py",
+        "observed_at": "2026-09-08T21:07:16.177750+00:00",
+        "note": "Observed on the committed bootstrap baseline; not proof of desired behavior."
+      },
+      {
+        "ref": "quality_runner/audit.py",
+        "observed_at": "2026-09-08T21:07:16.177750+00:00",
+        "note": "Observed on the committed bootstrap baseline; not proof of desired behavior."
+      },
+      {
+        "ref": "quality_runner/audit_evidence.py",
+        "observed_at": "2026-09-08T21:07:16.177750+00:00",
+        "note": "Observed on the committed bootstrap baseline; not proof of desired behavior."
+      }
+    ],
+    "verified": []
+  },
+  "drift": [
+    {
+      "kind": "verification-gap",
+      "summary": "Ownership ratified on 2026-09-09. Current source-bound proof and independently required admission/consumer checks remain obligations.",
+      "status": "open",
+      "observed_at": "2026-08-14T23:31:00Z",
+      "evidence": [
+        {
+          "ref": "README.md",
+          "note": "Draft boundary needs explicit owner confirmation and local proof.",
+          "observed_at": "2026-08-14T23:31:00Z"
+        }
+      ]
+    }
+  ],
+  "updated_at": "2026-09-09T17:41:29.704939+00:00"
+}
