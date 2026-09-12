@@ -218,6 +218,7 @@ def _native_candidates(
             extracted = _extract_python_functions(path, text)
         else:
             extracted = _extract_braced_functions(path, text, language)
+        _qualify_nested_declarations(extracted)
         for candidate in extracted:
             if _int_value(candidate.get("line_count"), default=0) < min_lines:
                 continue
@@ -231,6 +232,25 @@ def _native_candidates(
             candidates.append(candidate)
     candidates.sort(key=_candidate_sort_key)
     return candidates
+
+
+def _qualify_nested_declarations(functions: list[dict[str, object]]) -> None:
+    for candidate in functions:
+        start = _int_value(candidate.get("line"), default=0)
+        end = _int_value(candidate.get("end_line"), default=0)
+        parents = sorted(
+            (
+                other
+                for other in functions
+                if _int_value(other.get("line"), default=0) < start
+                and _int_value(other.get("end_line"), default=0) >= end
+            ),
+            key=_candidate_sort_key,
+        )
+        if parents:
+            candidate["qualified_name"] = ".".join(
+                str(item["name"]) for item in [*parents, candidate]
+            )
 
 
 def _extract_python_functions(path: str, text: str) -> list[dict[str, object]]:
@@ -333,6 +353,9 @@ def _candidate_ref(candidate: Mapping[str, object]) -> dict[str, object]:
         "line": _int_value(candidate.get("line"), default=0),
         "end_line": _int_value(candidate.get("end_line"), default=0),
         "name": str(candidate["name"]),
+        **(
+            {"qualified_name": candidate["qualified_name"]} if "qualified_name" in candidate else {}
+        ),
         "line_count": _int_value(candidate.get("line_count"), default=0),
     }
 

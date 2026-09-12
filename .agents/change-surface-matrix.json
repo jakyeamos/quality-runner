@@ -31,6 +31,7 @@
         "malformed subprocess stdout/stderr decoding regression preserves bounded fleet evidence",
         "pnpm dynamic dependency setup regressions under a compatible Node runtime: exact declared pnpm 10 lock semantics, fleet-owned pnpm 11 frozen-store behavior, prepared Corepack and metadata caches, and canonical-parent local dependency resolution",
         "collision-safe remediation wiring ID regression for normalized path collisions",
+        "Repository identity is caller-cwd independent and shared by linked worktrees; native nested-function similarity identities preserve enclosing declaration scope under line shifts, same-name insertions and partner changes while ambiguous scopes remain blocked.",
         "uv run --locked pytest -q tests/test_code_quality.py::test_test_quality_findings_are_bounded_and_include_remediation_dispositions tests/test_phase1_semantics.py::test_actionability_requires_author_decision_for_test_quality_dispositions",
         "uv run --locked ruff check .",
         "uv run --locked basedpyright",

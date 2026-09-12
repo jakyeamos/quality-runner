@@ -191,7 +191,7 @@ def _repository_identity(repo_root: Path) -> dict[str, str]:
         raise SnapshotError(f"repository path must be the Git root: {repo_root}")
     head = _git(repo_root, "rev-parse", "HEAD").strip()
     common_dir = _git(repo_root, "rev-parse", "--git-common-dir").strip()
-    identity = hashlib.sha256(str(Path(common_dir).resolve()).encode()).hexdigest()
+    identity = hashlib.sha256(str((repo_root / common_dir).resolve()).encode()).hexdigest()
     return {
         "root": str(repo_root),
         "identity": identity,

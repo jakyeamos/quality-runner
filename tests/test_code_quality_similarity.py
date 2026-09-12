@@ -492,3 +492,93 @@ def test_similarity_disabled_skips_scanners(
 
     run.assert_not_called()
     assert result["scanner_status"][0]["status"] == "skipped"
+
+
+def _scoped_refresh_source(parent: str) -> str:
+    return f"""function {parent}() {{
+  async function refresh(value) {{
+    const cleaned = value.trim();
+    if (!cleaned) {{
+      return "empty";
+    }}
+    return cleaned.toUpperCase();
+  }}
+  return refresh;
+}}
+"""
+
+
+@pytest.mark.parametrize("change", ["blank-lines", "new-same-name", "other-partner"])
+def test_native_similarity_uses_stable_enclosing_declaration_identity(
+    tmp_path: Path, change: str
+) -> None:
+    from quality_runner.code_quality_similarity import semantic_similarity_scan
+
+    partner = """async function reload(value) {
+  const cleaned = value.trim();
+  if (!cleaned) {
+    return "empty";
+  }
+  return cleaned.toUpperCase();
+}
+"""
+    source = (
+        _scoped_refresh_source("CasePicker") + _scoped_refresh_source("SnapshotForCase") + partner
+    )
+    changed = {
+        "blank-lines": "\n\n" + source.replace("  async", "\n  async"),
+        "new-same-name": _scoped_refresh_source("OtherScreen") + source,
+        "other-partner": partner.replace("reload", "loadAgain") + source,
+    }[change]
+
+    def selected(text: str) -> dict[str, str]:
+        result = semantic_similarity_scan(
+            tmp_path,
+            scanned_files=[{"path": "judge.tsx", "text": text}],
+            policy=_policy(
+                similarity_backend="native",
+                similarity_min_lines=5,
+                similarity_threshold=1.0,
+                similarity_max_pairs=100,
+            ),
+            disabled_groups=set(),
+        )
+        matches = {}
+        for cluster, finding in zip(result["clusters"], result["findings"], strict=True):
+            candidates = cluster["candidates"]
+            if sorted(candidate["name"] for candidate in candidates) != ["refresh", "reload"]:
+                continue
+            refresh = next(candidate for candidate in candidates if candidate["name"] == "refresh")
+            matches[str(refresh.get("qualified_name", refresh["name"]))] = finding["fingerprint"]
+        return matches
+
+    original = selected(source)
+    assert set(original) == {"CasePicker.refresh", "SnapshotForCase.refresh"}
+    assert len(set(original.values())) == 2
+    updated = selected(changed)
+    assert {name: updated[name] for name in original} == original
+
+
+def test_native_same_scope_names_do_not_gain_location_based_identity(tmp_path: Path) -> None:
+    from quality_runner.code_quality_similarity import semantic_similarity_scan
+
+    source = _scoped_refresh_source("SameParent") * 2
+    report = semantic_similarity_scan(
+        tmp_path,
+        scanned_files=[{"path": "judge.tsx", "text": source}],
+        policy=_policy(
+            similarity_backend="native",
+            similarity_threshold=1.0,
+            similarity_min_lines=5,
+            similarity_max_pairs=100,
+        ),
+        disabled_groups=set(),
+    )
+    refreshes = [
+        candidate
+        for cluster in report["clusters"]
+        for candidate in cluster["candidates"]
+        if candidate["name"] == "refresh"
+    ]
+    assert {candidate["qualified_name"] for candidate in refreshes} == {"SameParent.refresh"}
+    assert len({candidate["line"] for candidate in refreshes}) == 2

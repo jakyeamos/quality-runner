@@ -489,9 +489,14 @@ def _stable_similarity_fingerprint(
 ) -> str:
     parts: list[str] = []
     for candidate in sorted(
-        candidates, key=lambda item: (str(item.get("file", "")), str(item.get("name", "")))
+        candidates,
+        key=lambda item: (
+            str(item.get("file", "")),
+            str(item.get("qualified_name", item.get("name", ""))),
+        ),
     ):
-        parts.append(f"{candidate.get('file', '')}:{candidate.get('name', '')}")
+        name = candidate.get("qualified_name", candidate.get("name", ""))
+        parts.append(f"{candidate.get('file', '')}:{name}")
     normalized = " ".join(parts)
     payload = f"{rule_id}:{normalized}:{round(similarity_pct, 2)}"
     return hashlib.sha256(payload.encode()).hexdigest()[:16]

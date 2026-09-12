@@ -105,7 +105,11 @@ prior baseline.
 executable modes, and symlink targets. It represents tracked modifications,
 tracked deletions, and untracked non-ignored files without substituting `HEAD`.
 Every default or configured exclusion is recorded; unreadable or unsafe source
-entries block the task.
+entries block the task. Repository identity hashes the resolved Git common
+directory, interpreting relative Git output against the target repository root.
+Caller working directory does not change identity; linked worktrees share it
+while retaining distinct snapshot roots. Existing incorrect baselines remain
+historical evidence and need an explicitly reviewed rebaseline, not rewriting.
 
 `normalized-findings.json` contains occurrence-level module evidence rather
 than grouped audit summaries. Each occurrence retains detector, stable rule ID,
@@ -113,7 +117,16 @@ source fingerprint, deterministic occurrence fingerprint, path and location,
 severity, confidence, coverage reference, and enforcement eligibility.
 Repeated detector fingerprints are disambiguated by repository path and stable
 same-file order. Indistinguishable duplicates at the same location remain
-ambiguous and block matching.
+ambiguous and block matching. Native similarity candidates nested inside named
+function declarations carry an optional `qualified_name` from their enclosing
+declaration spans, collected before candidate filtering and pair truncation.
+Fingerprints use that identity while retaining the display name. Line shifts,
+new differently scoped same-name declarations, and partner changes do not
+rename existing declarations. Top-level legacy identities remain unchanged.
+This bounded extractor does not establish all language scopes: external
+scanner candidates and indistinguishable same-scope names retain their prior
+ambiguity; strict matching is unchanged. Historical affected nested-function
+fingerprints need reviewed lineage reconciliation before release comparison.
 
 `prevention-readiness.json` records every proposed native gate as `candidate`,
 `certified`, `blocked`, or `unavailable`, including resolved command path and
