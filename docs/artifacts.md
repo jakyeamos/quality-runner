@@ -121,9 +121,17 @@ version, bootstrap strategy, owner, scope, timeout, mutation risk, and local,
 CI, repeatability, and intentional-failure evidence.
 
 `task-check.json` is canonical. Its derived Markdown renders the same status,
-blockers, gates, coverage, and finding buckets:
+mode, release-readiness status, blockers, gates, coverage, and finding buckets:
 `new_enforced`, `persisted`, `resolved`, `waived`, `advisory`,
 `out_of_scope`, and `unknown`.
+
+The authoritative task-check mode is the only mode that can set
+`release_readiness.eligible` to `true`. Its predicate requires no new enforced
+occurrence, no unknown or invalid delta evidence, complete comparable coverage,
+unchanged evidence and repository identity, complete promotion evidence, and
+passing required certified gates. A `--fast` check records the same canonical
+artifact shape with `mode: "fast"`, skips certified gates, and remains
+explicitly ineligible even when its finding feedback status is `pass`.
 
 ## Fleet Certification Artifacts
 

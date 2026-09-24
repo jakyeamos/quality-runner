@@ -1,0 +1,77 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://quality-runner.dev/schemas/rule-registry.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "repository", "exact_rules", "dynamic_rule_families", "warnings", "summary"],
+  "properties": {
+    "schema": {"const": "quality-runner-rule-registry/v1"},
+    "repository": {"type": "string"},
+    "exact_rules": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["detector", "rule_id", "provider", "source", "verification", "promotion"],
+        "properties": {
+          "detector": {"type": "string"},
+          "rule_id": {"type": "string", "minLength": 1},
+          "provider": {"enum": ["builtin", "skill_pack", "skill_pack_review"]},
+          "source": {"type": "string"},
+          "verification": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["status", "evidence_refs", "missing_evidence"],
+            "properties": {
+              "status": {"enum": ["unverified", "behavior-verified"]},
+              "evidence_refs": {"type": "array", "items": {"type": "string"}},
+              "missing_evidence": {
+                "type": "array",
+                "items": {"enum": ["positive", "negative", "boundary"]},
+                "uniqueItems": true
+              }
+            }
+          },
+          "promotion": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["state", "owner", "evidence_refs"],
+            "properties": {
+              "state": {"type": "string"},
+              "owner": {"type": ["string", "null"]},
+              "evidence_refs": {"type": "array", "items": {"type": "string"}}
+            }
+          }
+        }
+      }
+    },
+    "dynamic_rule_families": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["pattern", "provider", "source"],
+        "properties": {
+          "pattern": {"type": "string"},
+          "provider": {"type": "string"},
+          "source": {"type": "string"}
+        }
+      }
+    },
+    "warnings": {"type": "array", "items": {"type": "object"}},
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["exact_rule_count", "builtin_exact_rule_count", "skill_pack_exact_rule_count", "dynamic_family_count", "behavior_verified_exact_rule_count", "unverified_exact_rule_count", "promoted_exact_rule_count"],
+      "properties": {
+        "exact_rule_count": {"type": "integer", "minimum": 0},
+        "builtin_exact_rule_count": {"type": "integer", "minimum": 0},
+        "skill_pack_exact_rule_count": {"type": "integer", "minimum": 0},
+        "dynamic_family_count": {"type": "integer", "minimum": 0},
+        "behavior_verified_exact_rule_count": {"type": "integer", "minimum": 0},
+        "unverified_exact_rule_count": {"type": "integer", "minimum": 0},
+        "promoted_exact_rule_count": {"type": "integer", "minimum": 0}
+      }
+    }
+  }
+}

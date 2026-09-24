@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 
 from quality_runner.fleet.mac_control_contracts import (
     EVIDENCE_PRODUCER_KINDS,
@@ -9,8 +9,8 @@ from quality_runner.fleet.mac_control_contracts import (
     MAC_CONTROL_MANIFEST_RELATIVE_PATH,
     MAC_CONTROL_PREVIOUS_EVIDENCE_SCHEMA,
     VERIFICATION_RESULTS,
-    _nonempty,
-    _normalize_token,
+    nonempty,
+    normalize_token,
     object_list,
     object_mapping,
     string_list,
@@ -22,9 +22,7 @@ def task_entries(value: object) -> list[dict[str, Any]]:
     if not isinstance(value, list):
         return []
     entries: list[dict[str, Any]] = []
-    for task in value:
-        if not isinstance(task, dict):
-            continue
+    for task in object_list(cast(object, value)):
         entries.append(
             {
                 "task_id": str(task.get("task_id", "")),
@@ -70,10 +68,11 @@ def merge_task_evidence(
         errors.append("evidence sidecar tasks must be an array")
         return
     seen_task_ids: set[str] = set()
-    for item in value:
-        if not isinstance(item, dict):
+    for raw_item in cast(list[object], value):
+        if not isinstance(raw_item, dict):
             errors.append("evidence task entry must be an object")
             continue
+        item = object_mapping(cast(object, raw_item))
         task_id = str(item.get("task_id", ""))
         task = by_id.get(task_id)
         if task is None:
@@ -96,13 +95,14 @@ def validate_evidence_producer(value: object) -> list[str]:
     if not isinstance(value, dict):
         return ["evidence sidecar producer must be an object"]
     errors: list[str] = []
-    if not _nonempty(value.get("id")):
+    producer = object_mapping(cast(object, value))
+    if not nonempty(producer.get("id")):
         errors.append("evidence sidecar producer.id is required")
-    if _normalize_token(value.get("kind")) not in EVIDENCE_PRODUCER_KINDS:
+    if normalize_token(producer.get("kind")) not in EVIDENCE_PRODUCER_KINDS:
         errors.append(
             "evidence sidecar producer.kind must be mac_control, browser_connector, or app_connector"
         )
-    if not _nonempty(value.get("version")):
+    if not nonempty(producer.get("version")):
         errors.append("evidence sidecar producer.version is required")
     return errors
 
@@ -111,23 +111,22 @@ def semantic_source_paths(manifest: object) -> list[str]:
     if not isinstance(manifest, dict):
         return []
     paths = {MAC_CONTROL_MANIFEST_RELATIVE_PATH.as_posix()}
-    tasks = manifest.get("tasks")
+    manifest_map = object_mapping(cast(object, manifest))
+    tasks = manifest_map.get("tasks")
     if not isinstance(tasks, list):
         return sorted(paths)
-    for task in tasks:
-        if not isinstance(task, dict):
-            continue
+    for task in object_list(cast(object, tasks)):
         evidence = task.get("semantic_evidence")
         if not isinstance(evidence, dict):
             continue
-        for claim in evidence.values():
+        for claim in object_mapping(cast(object, evidence)).values():
             if not isinstance(claim, dict):
                 continue
-            refs = claim.get("source_refs")
+            refs = object_mapping(cast(object, claim)).get("source_refs")
             if not isinstance(refs, list):
                 continue
-            for ref in refs:
-                if isinstance(ref, dict) and _nonempty(ref.get("path")):
+            for ref in object_list(cast(object, refs)):
+                if nonempty(ref.get("path")):
                     paths.add(str(ref["path"]).strip())
     return sorted(paths)
 
@@ -152,10 +151,11 @@ def _merge_v2_task_evidence(task: dict[str, Any], item: dict[str, Any], errors: 
         errors.append(message)
         task["measurement_errors"] = [message]
         return
+    attempt_values = cast(list[object], attempts)
     candidates = {
         str(candidate.get("id", "")).strip(): candidate
         for candidate in object_list(task.get("route_candidates"))
-        if _nonempty(candidate.get("id"))
+        if nonempty(candidate.get("id"))
     }
     oracle = object_mapping(task.get("verification_oracle"))
     semantic = object_mapping(task.get("semantic_evidence"))
@@ -167,11 +167,12 @@ def _merge_v2_task_evidence(task: dict[str, Any], item: dict[str, Any], errors: 
     success_count = 0
     evidence: list[str] = []
     selected_routes: set[str] = set()
-    for index, attempt in enumerate(attempts):
+    for index, raw_attempt in enumerate(attempt_values):
         label = f"evidence task {task_id} attempts[{index}]"
-        if not isinstance(attempt, dict):
+        if not isinstance(raw_attempt, dict):
             task_errors.append(f"{label} must be an object")
             continue
+        attempt = object_mapping(cast(object, raw_attempt))
         attempt_id = str(attempt.get("attempt_id", "")).strip()
         if not attempt_id:
             task_errors.append(f"{label}.attempt_id is required")
@@ -185,10 +186,10 @@ def _merge_v2_task_evidence(task: dict[str, Any], item: dict[str, Any], errors: 
         else:
             selected_routes.add(selected_route)
         for timestamp in ("started_at", "completed_at"):
-            if not _nonempty(attempt.get(timestamp)):
+            if not nonempty(attempt.get(timestamp)):
                 task_errors.append(f"{label}.{timestamp} is required")
-        execution_result = _normalize_token(attempt.get("execution_result"))
-        verification_result = _normalize_token(attempt.get("verification_result"))
+        execution_result = normalize_token(attempt.get("execution_result"))
+        verification_result = normalize_token(attempt.get("verification_result"))
         if execution_result not in EXECUTION_RESULTS:
             task_errors.append(f"{label}.execution_result is unsupported")
         if verification_result not in VERIFICATION_RESULTS:
@@ -198,16 +199,16 @@ def _merge_v2_task_evidence(task: dict[str, Any], item: dict[str, Any], errors: 
         receipt_id = str(receipt.get("receipt_id", "")).strip()
         if not receipt_id:
             task_errors.append(f"{label}.receipt.receipt_id is required")
-        if not _nonempty(receipt.get("schema")):
+        if not nonempty(receipt.get("schema")):
             task_errors.append(f"{label}.receipt.schema is required")
-        receipt_provider = _normalize_token(receipt.get("provider"))
-        receipt_method = _normalize_token(receipt.get("method"))
+        receipt_provider = normalize_token(receipt.get("provider"))
+        receipt_method = normalize_token(receipt.get("method"))
         if candidate is not None:
-            if receipt_provider != _normalize_token(candidate.get("provider")):
+            if receipt_provider != normalize_token(candidate.get("provider")):
                 task_errors.append(
                     f"{label}.receipt.provider must match the selected route provider"
                 )
-            if receipt_method != _normalize_token(candidate.get("method")):
+            if receipt_method != normalize_token(candidate.get("method")):
                 task_errors.append(f"{label}.receipt.method must match the selected route method")
         receipt_digest = str(receipt.get("sha256", "")).strip().casefold()
         if len(receipt_digest) != 64 or any(
@@ -221,18 +222,18 @@ def _merge_v2_task_evidence(task: dict[str, Any], item: dict[str, Any], errors: 
             != str(oracle.get("oracle_id", "")).strip()
         ):
             task_errors.append(f"{label}.postcondition.oracle_id must match the task oracle")
-        if _normalize_token(postcondition.get("kind")) != _normalize_token(oracle.get("kind")):
+        if normalize_token(postcondition.get("kind")) != normalize_token(oracle.get("kind")):
             task_errors.append(f"{label}.postcondition.kind must match the task oracle")
         expected = str(postcondition.get("expected_state", "")).strip()
         if expected != str(oracle.get("expected_state", "")).strip():
             task_errors.append(f"{label}.postcondition.expected_state must match the task oracle")
-        operator = _normalize_token(postcondition.get("operator"))
-        if operator != _normalize_token(outcome_claims.get("operator")):
+        operator = normalize_token(postcondition.get("operator"))
+        if operator != normalize_token(outcome_claims.get("operator")):
             task_errors.append(
                 f"{label}.postcondition.operator must match verifiable_outcomes evidence"
             )
-        readback_provider = _normalize_token(postcondition.get("readback_provider"))
-        if readback_provider != _normalize_token(outcome_claims.get("readback_provider")):
+        readback_provider = normalize_token(postcondition.get("readback_provider"))
+        if readback_provider != normalize_token(outcome_claims.get("readback_provider")):
             task_errors.append(
                 f"{label}.postcondition.readback_provider must match verifiable_outcomes evidence"
             )
@@ -255,12 +256,12 @@ def _merge_v2_task_evidence(task: dict[str, Any], item: dict[str, Any], errors: 
         if attempt_id:
             evidence.append(f"postcondition:{attempt_id}:{verification_result or 'unknown'}")
 
-    task["attempts"] = len(attempts)
+    task["attempts"] = len(attempt_values)
     task["successes"] = success_count
     task["selected_route"] = next(iter(selected_routes)) if len(selected_routes) == 1 else ""
     task["evidence"] = sorted(set(evidence))
     task["measurement_errors"] = sorted(set(task_errors))
-    task["measurement_valid"] = not task_errors and bool(attempts)
+    task["measurement_valid"] = not task_errors and bool(attempt_values)
     errors.extend(task_errors)
 
 

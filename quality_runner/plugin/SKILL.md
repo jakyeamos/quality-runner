@@ -48,7 +48,16 @@ qr task start /path/to/repo --task-id <stable-task-id> --json
 During editing, use only repository-native checks whose current applicability
 and maturity are established by repository evidence. Do not infer that a
 command is preventative merely because it appears in a manifest or CI file.
-Candidate QR gates remain advisory and are not executed by `qr task check`.
+For shorter QR feedback cycles, use the provisional fast mode:
+
+```bash
+qr task check /path/to/repo --task-id <stable-task-id> --fast --json
+```
+
+Fast mode reuses the complete cached finding analysis but skips certified gate
+execution. Its `pass` status is useful implementation feedback only; its
+`release_readiness.eligible` value is always false. Candidate QR gates remain
+advisory and are not executed by either task mode.
 
 After editing, run the authoritative QR checkpoint before declaring the
 implementation complete:
@@ -66,8 +75,13 @@ Interpret the result as follows:
 - `invalid` requires correcting the invocation or prevention configuration.
 
 Read the emitted `task-check.json` as the authority and `task-check.md` as its
-human projection. Persisted legacy and advisory findings remain visible but do
-not become task failures. Do not copy every QR finding into static agent rules;
+human projection. Only an authoritative check whose
+`release_readiness.eligible` value is true satisfies the QR task release
+predicate. The predicate requires no new enforced occurrence, no unknown or
+invalid delta evidence, complete comparable coverage, unchanged evidence
+identity, and passing required certified gates; resolved findings do not cancel
+new findings through a scalar count. Persisted legacy and advisory findings
+remain visible but do not become task failures. Do not copy every QR finding into static agent rules;
 promote a repeatedly trusted deterministic finding into a behavior-verified QR
 rule or a faster native checker with its own maturity evidence.
 
@@ -100,7 +114,8 @@ new coverage only if a requested restoration or another durable contract
 creates a real accidental-failure path.
 
 This is a baseline and completion/CI checkpoint, not a continuous-save or
-editor-hook workflow. Re-run it after correcting violations or blockers. Use
+editor-hook workflow. Re-run the fast check after correcting implementation
+violations, then run the authoritative check before completion. Use
 `qr task rebaseline --reason ...` only when configuration, policy, rule-pack,
 QR version, or toolchain evidence genuinely changed; never enlarge a baseline
 silently.

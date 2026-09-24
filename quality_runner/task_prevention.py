@@ -27,9 +27,12 @@ from quality_runner.schema_constants import (
 from quality_runner.task_contract import (
     TASK_ANALYSIS_MODE,
     TASK_CACHE_MODE,
+    TASK_CHECK_MODE_AUTHORITATIVE,
+    TASK_CHECK_MODE_FAST,
     contract_hashes,
     deduplicate_blockers,
     drift_blockers,
+    release_readiness,
     render_task_check_markdown,
     task_next_action,
 )
@@ -63,7 +66,11 @@ def task_command_payload(args: Any) -> dict[str, Any]:
                 intent_path=Path(args.intent).expanduser() if args.intent else None,
             )
         if args.task_action == "check":
-            return check_task(repo_root, task_id=args.task_id)
+            return check_task(
+                repo_root,
+                task_id=args.task_id,
+                fast=bool(getattr(args, "fast", False)),
+            )
         if args.task_action == "rebaseline":
             return rebaseline_task(repo_root, task_id=args.task_id, reason=args.reason)
     except (FileNotFoundError, NotADirectoryError, ValueError) as error:
@@ -169,7 +176,7 @@ def rebaseline_task(repo_root: Path, *, task_id: str, reason: str) -> dict[str, 
     }
 
 
-def check_task(repo_root: Path, *, task_id: str) -> dict[str, Any]:
+def check_task(repo_root: Path, *, task_id: str, fast: bool = False) -> dict[str, Any]:
     _validate_task_id(task_id)
     record = _load_task_record(repo_root, task_id)
     baseline_run_id = str(record["baseline_run_id"])
@@ -178,7 +185,9 @@ def check_task(repo_root: Path, *, task_id: str) -> dict[str, Any]:
     if config.get("warnings"):
         return _invalid_config(config)
     prevention = _prevention(config)
-    run_id = f"{generated_run_id()}-task-check"
+    check_mode = TASK_CHECK_MODE_FAST if fast else TASK_CHECK_MODE_AUTHORITATIVE
+    run_suffix = "task-fast-check" if fast else "task-check"
+    run_id = f"{generated_run_id()}-{run_suffix}"
     run_dir = prepare_artifact_dir(repo_root, run_id)
 
     include_paths = tuple(
@@ -208,17 +217,21 @@ def check_task(repo_root: Path, *, task_id: str) -> dict[str, Any]:
             prevention=prevention,
         )
         readiness = evaluate_readiness(repo_root=repo_root, prevention=prevention)
-        if any(gate.get("state") == "certified" for gate in readiness["gates"]):
+        if not fast and any(gate.get("state") == "certified" for gate in readiness["gates"]):
             attach_git_metadata(
                 repo_root,
                 snapshot_root,
                 source=cast(dict[str, Any], snapshot["source"]),
             )
-        gate_results, gate_blockers = run_certified_gates(
-            snapshot_root=snapshot_root,
-            repo_root=repo_root,
-            readiness=readiness,
-        )
+        if fast:
+            gate_results: list[dict[str, Any]] = []
+            gate_blockers: list[dict[str, str]] = []
+        else:
+            gate_results, gate_blockers = run_certified_gates(
+                snapshot_root=snapshot_root,
+                repo_root=repo_root,
+                readiness=readiness,
+            )
 
     changed = changed_paths(cast(dict[str, Any], baseline["snapshot"]), snapshot)
     delta = compare_findings(
@@ -228,13 +241,18 @@ def check_task(repo_root: Path, *, task_id: str) -> dict[str, Any]:
         dispositions=cast(list[dict[str, Any]], config.get("accepted_dispositions", [])),
         required_modules=cast(list[str], prevention.get("required_modules", [])),
     )
+    repository_blockers = _repository_blockers(baseline, snapshot)
+    contract_blockers = drift_blockers(baseline, repo_root, config, readiness)
+    promotion_blockers = promotion_issues(prevention)
+    delta_blockers = cast(list[dict[str, str]], delta["blockers"])
+    readiness_blockers = _required_readiness_blockers(readiness)
     blockers = [
-        *_repository_blockers(baseline, snapshot),
-        *drift_blockers(baseline, repo_root, config, readiness),
-        *promotion_issues(prevention),
-        *cast(list[dict[str, str]], delta["blockers"]),
+        *repository_blockers,
+        *contract_blockers,
+        *promotion_blockers,
+        *delta_blockers,
         *gate_blockers,
-        *_required_readiness_blockers(readiness),
+        *readiness_blockers,
     ]
     failures = required_gate_failures(gate_results)
     decision = (
@@ -244,10 +262,21 @@ def check_task(repo_root: Path, *, task_id: str) -> dict[str, Any]:
         if delta["counts"]["new_enforced"] or failures
         else "pass"
     )
+    readiness_evidence = release_readiness(
+        mode=check_mode,
+        delta=delta,
+        repository_blockers=repository_blockers,
+        contract_blockers=contract_blockers,
+        promotion_blockers=promotion_blockers,
+        gate_blockers=gate_blockers,
+        readiness_blockers=readiness_blockers,
+        required_gate_failures=failures,
+    )
     payload = {
         "schema": TASK_CHECK_SCHEMA,
         "status": decision,
-        "next_action": task_next_action(decision),
+        "next_action": task_next_action(decision, mode=check_mode),
+        "mode": check_mode,
         "task_id": task_id,
         "run_id": run_id,
         "baseline_run_id": baseline_run_id,
@@ -261,6 +290,7 @@ def check_task(repo_root: Path, *, task_id: str) -> dict[str, Any]:
         "gate_results": gate_results,
         "required_gate_failures": failures,
         "blockers": deduplicate_blockers(blockers),
+        "release_readiness": readiness_evidence,
         "analysis": _analysis_evidence(analysis),
         "evidence": {
             **contract_hashes(repo_root, config),
@@ -275,7 +305,7 @@ def check_task(repo_root: Path, *, task_id: str) -> dict[str, Any]:
     write_json(safe_child_file(run_dir, "task-check.json"), payload)
     write_text(safe_child_file(run_dir, "task-check.md"), render_task_check_markdown(payload))
     checks = [*cast(list[str], record.get("checks", [])), run_id]
-    record.update({"checks": checks, "last_status": decision})
+    record.update({"checks": checks, "last_status": decision, "last_check_mode": check_mode})
     _write_task_record(repo_root, task_id, record)
     return payload
 

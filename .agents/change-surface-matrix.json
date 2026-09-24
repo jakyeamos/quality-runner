@@ -2,7 +2,63 @@
   "schema_version": "change-surface-matrix/v1",
   "subject": {"kind": "repository", "id": "quality-runner"},
   "owner": "quality-runner-maintainers",
-  "last_reviewed": "2026-08-24",
+  "last_reviewed": "2026-08-26",
+  "change_records": [
+    {
+      "id": "canonical-rule-registry-20260923",
+      "status": "implemented",
+      "owner": "quality-runner-maintainers",
+      "affected_surfaces": ["quality-engine", "fleet-consumers", "matrix-maintenance"],
+      "contracts": ["quality-runner-rule-registry/v1"],
+      "documentation": ["docs/cli.md", "docs/prevention-readiness.md", ".agents/context/commands.md"],
+      "tests": ["tests/test_rule_registry.py"],
+      "evidence": ["uv run --locked pytest -q tests/test_rule_registry.py"],
+      "projections": ["qr rules registry <repository> --json"]
+    },
+    {
+      "id": "fleet-artifact-boundary-repair-20260911",
+      "status": "implemented",
+      "owner": "quality-runner-maintainers",
+      "affected_surfaces": ["quality-engine"],
+      "no_impact_reason": "Internal extraction of existing fleet artifact persistence/read helpers preserves public audit, replay, report entry points, artifact schemas and defaults; no provider or consumer interface changes. The CLI timeout fixture keeps its one-second verify deadline and all timeout artifact assertions; only its outer setup watchdog allows full-suite contention.",
+      "tests": ["tests/test_code_quality_boundaries.py", "tests/test_fleet_audit.py", "tests/test_maturity_feed.py", "tests/test_cli.py::test_cli_refresh_workflow_timeout_records_reason"]
+    },
+    {
+      "id": "task-feedback-loop-20260826",
+      "status": "in_progress",
+      "owner": "quality-runner-maintainers",
+      "affected_surfaces": ["quality-engine", "ci-and-release", "matrix-maintenance"],
+      "contracts": [
+        "quality-runner-task-check-v0.1",
+        "quality-runner-task-record-v0.1",
+        "release_readiness predicate: no_new_enforced_findings"
+      ],
+      "documentation": [
+        "README.md",
+        "docs/cli.md",
+        "docs/agent-usage.md",
+        "docs/artifacts.md",
+        "docs/prevention-readiness.md",
+        "quality_runner/plugin/SKILL.md",
+        ".agents/context/commands.md"
+      ],
+      "tests": [
+        "tests/test_cli_task.py",
+        "tests/test_task_contract.py",
+        "tests/test_task_schemas.py"
+      ],
+      "evidence": [
+        "qr task start run 20260826T200008Z-064ba825-task-start",
+        "uv run --locked pytest -q tests/test_task_contract.py tests/test_task_schemas.py",
+        "uv run --locked ruff check quality_runner/task_contract.py quality_runner/task_prevention.py quality_runner/cli_task.py tests/test_task_contract.py tests/test_task_schemas.py tests/test_cli_task.py"
+      ],
+      "projections": [
+        ".quality-runner/runs/<check-run-id>/task-check.json",
+        ".quality-runner/runs/<check-run-id>/task-check.md",
+        ".github/workflows/ci.yml prevention job"
+      ]
+    }
+  ],
   "surfaces": [
     {
       "id": "matrix-maintenance",
@@ -22,7 +78,7 @@
       "id": "quality-engine",
       "scope": "local",
       "distribution": "public_core",
-      "path": "quality_runner/, quality_evidence_contract/, repo_quality_certifier/, and public documentation",
+      "path": "quality_runner/, quality_evidence_contract/, repo_quality_certifier/, task prevention schemas, tests, and public documentation",
       "owner": "quality-runner-maintainers",
       "condition": "scan, audit-coverage, policy, finding, CLI, certification, or public documentation behavior changes",
       "operations": ["add", "change", "remove"],
@@ -34,6 +90,7 @@
         "uv run --locked pytest -q tests/test_code_quality.py::test_test_quality_findings_are_bounded_and_include_remediation_dispositions tests/test_phase1_semantics.py::test_actionability_requires_author_decision_for_test_quality_dispositions",
         "uv run --locked ruff check .",
         "uv run --locked basedpyright",
+        "uv run --locked pytest -q tests/test_cli_task.py tests/test_task_contract.py tests/test_task_schemas.py",
         "For maturity changes, verify dimension-to-capability-to-pillar aggregation, reverse producer coverage, explicit capability applicability, evidence coverage, missing capabilities, and confirmed-risk-only critical caps."
       ],
       "status": "applicable"
@@ -195,6 +252,7 @@
       "operations": ["add", "change", "remove"],
       "validation": [
         "uv run --locked pytest -q tests/test_entrypoints.py tests/test_release_boundary.py",
+        "uv run --locked pytest -q tests/test_cli_task.py tests/test_task_schemas.py",
         "uv run --locked quality-runner release-smoke --json",
         "uv build"
       ],

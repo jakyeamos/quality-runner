@@ -34,6 +34,7 @@ from quality_runner.cli_remediation import add_remediation_commands
 from quality_runner.cli_repo_hygiene import add_repo_hygiene_commands
 from quality_runner.cli_review import add_review_command
 from quality_runner.cli_rollout import add_rollout_command
+from quality_runner.cli_rules import add_rule_commands
 from quality_runner.cli_security import add_security_commands
 from quality_runner.cli_skills import add_skill_commands
 from quality_runner.cli_task import add_task_commands
@@ -131,6 +132,7 @@ def build_parser(prog: str = CANONICAL_PROGRAM) -> argparse.ArgumentParser:
     add_candidate_commands(subparsers)
     add_security_commands(subparsers)
     add_task_commands(subparsers)
+    add_rule_commands(subparsers)
     add_onboarding_commands(subparsers)
 
     run_parser = subparsers.add_parser("run", help="Inspect a repo and write audit artifacts")

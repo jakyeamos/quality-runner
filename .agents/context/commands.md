@@ -15,6 +15,7 @@ uv run --locked pip-audit
 uv build
 python3 scripts/check_environment_contract.py
 gitleaks detect --source . --no-banner --redact
+uv run --locked qr rules registry . --json
 uv run --locked qr onboarding check /path/to/repository \
   --matrix ~/.agents/repository-onboarding-change-matrix.json \
   --evidence /path/to/repository/.quality-runner/onboarding-evidence.json \
@@ -136,6 +137,12 @@ Quality commands must be bounded and offline-capable. They must not publish,
 deploy, tag, push, call a provider, collect credentials, or execute a
 remediation action. If a dependency cache, tool, or gate is unavailable, keep
 the result visible as unknown or blocked.
+
+For task-scoped implementation feedback, capture a baseline before edits, use
+`uv run --locked qr task check /path/to/repository --task-id ID --fast --json`
+at meaningful boundaries, and run the default `qr task check` before
+completion. Fast mode skips certified native gates and is never release-ready;
+the authoritative result must report `release_readiness.eligible: true`.
 
 BasedPyright is certified over the declared package scope in standard mode.
 Repository-wide strict mode is not certified: the 0.7.0 fold exposed a large

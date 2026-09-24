@@ -11,6 +11,7 @@
     "baseline_run_id": { "type": "string", "minLength": 1 },
     "lineage": { "type": "array", "items": { "type": "string" }, "minItems": 1 },
     "checks": { "type": "array", "items": { "type": "string" } },
-    "last_status": { "enum": ["pass", "violation", "blocked"] }
+    "last_status": { "enum": ["pass", "violation", "blocked"] },
+    "last_check_mode": { "enum": ["authoritative", "fast"] }
   }
 }

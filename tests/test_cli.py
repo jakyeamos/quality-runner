@@ -952,7 +952,8 @@ def test_cli_refresh_workflow_timeout_records_reason(tmp_path: Path) -> None:
         check=True,
         capture_output=True,
         text=True,
-        timeout=10,
+        # Allow setup/scanning overhead; the asserted verify deadline remains one second.
+        timeout=60,
     )
 
     payload = json.loads(result.stdout)

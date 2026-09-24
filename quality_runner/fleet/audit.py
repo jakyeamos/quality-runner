@@ -1,14 +1,13 @@
 from __future__ import annotations
 
-import json
 from collections.abc import Sequence
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any, cast
 
-from quality_runner.artifacts import prepare_safe_directory, write_json, write_text
+from quality_runner.artifacts import write_json, write_text
 from quality_runner.ci_gate_audit import audit_ci_gate_candidates
-from quality_runner.fleet import audit_coverage
+from quality_runner.fleet import audit_artifacts, audit_coverage
 from quality_runner.fleet.contracts import (
     FLEET_AUDIT_SCHEMA,
     FLEET_FINDING_SCHEMA,
@@ -41,13 +40,14 @@ from quality_runner.fleet.dynamic import (
 from quality_runner.fleet.legibility import audit_repository, build_remediation_plan
 from quality_runner.fleet.mac_control import mac_control_audit_payload
 from quality_runner.fleet.replay_integrity import replay_manifest_errors
-from quality_runner.fleet.reporting import plan_markdown, report_markdown, summary_markdown
+from quality_runner.fleet.reporting import report_markdown
 from quality_runner.fleet.scope_manifest import load_fleet_scope_manifest, population_coverage
 from quality_runner.fleet.standard_audit import build_standard_report
 from quality_runner.fleet.static_scan import static_scan_repository as _static_scan_repository
 from quality_runner.fleet.summary import build_fleet_summary
 
-DEFAULT_FLEET_ROOT = Path("~/.quality-runner/fleet-audit")
+DEFAULT_FLEET_ROOT = audit_artifacts.DEFAULT_FLEET_ROOT
+resolve_artifact_root = audit_artifacts.resolve_artifact_root
 DEFAULT_DYNAMIC_MAX_AGE_DAYS = 30
 DEFAULT_DYNAMIC_TIMEOUT_SECONDS = 120
 
@@ -111,7 +111,7 @@ def fleet_audit_payload(
         digest(custody_disposition_payload) if custody_disposition_payload else None,
         fleet_policy,
     )
-    artifact_root = _artifact_root(output_dir, audit_id)
+    artifact_root = audit_artifacts.artifact_root(output_dir, audit_id)
     repositories = repositories_for_scope(
         root, resolved_repository_paths, fleet_policy=fleet_policy
     )
@@ -288,7 +288,7 @@ def fleet_audit_payload(
                 "live": mac_control_live,
             }
     inventory["maturity_checkpoint"] = maturity_checkpoint
-    artifact_paths = _write_audit_artifacts(
+    artifact_paths = audit_artifacts.write_audit_artifacts(
         artifact_root=artifact_root,
         inventory=inventory,
         results=results,
@@ -317,7 +317,7 @@ def fleet_audit_payload(
         "artifact_root": str(artifact_root),
         "artifact_paths": artifact_paths,
         "summary": summary,
-        "standard_report": _read_json(Path(artifact_paths["standard_report_json"]))
+        "standard_report": audit_artifacts.read_json(Path(artifact_paths["standard_report_json"]))
         if "standard_report_json" in artifact_paths
         else None,
         "maturity_feed": (
@@ -345,7 +345,7 @@ def local_environment_audit_payload(
     resolved_as_of = parse_as_of(as_of)
     audit_id = stable_id("local-audit", str(root), resolved_as_of)
     result = audit_repository(repository=repository, as_of=resolved_as_of, run_id=audit_id)
-    artifact_root = _artifact_root(output_dir, audit_id, local=True)
+    artifact_root = audit_artifacts.artifact_root(output_dir, audit_id, local=True)
     summary = build_fleet_summary(
         audit_id=audit_id,
         as_of=resolved_as_of,
@@ -353,7 +353,7 @@ def local_environment_audit_payload(
         dynamic=False,
         changed_only=True,
     )
-    paths = _write_audit_artifacts(
+    paths = audit_artifacts.write_audit_artifacts(
         artifact_root=artifact_root,
         inventory={
             "schema": FLEET_INVENTORY_SCHEMA,
@@ -413,9 +413,9 @@ def _mac_control_repository_paths(repositories: Sequence[dict[str, Any]]) -> lis
 def fleet_show_payload(
     *, repo_id: str, audit_id: str | None = None, output_dir: Path | None = None
 ) -> dict[str, Any]:
-    artifact_root = _resolve_artifact_root(output_dir, audit_id)
+    artifact_root = audit_artifacts.resolve_artifact_root(output_dir, audit_id)
     path = artifact_root / "findings" / f"{repo_id}.json"
-    payload = _read_json(path)
+    payload = audit_artifacts.read_json(path)
     return {
         "schema": FLEET_FINDING_SCHEMA,
         "status": "found",
@@ -430,14 +430,14 @@ def fleet_show_payload(
 def fleet_replay_payload(
     *, audit_id: str | None = None, output_dir: Path | None = None
 ) -> dict[str, Any]:
-    artifact_root = _resolve_artifact_root(output_dir, audit_id)
-    inventory = _read_json(artifact_root / "inventory.json")
-    summary = _read_json(artifact_root / "summary.json")
-    manifest = _read_json(artifact_root / "replay-manifest.json")
+    artifact_root = audit_artifacts.resolve_artifact_root(output_dir, audit_id)
+    inventory = audit_artifacts.read_json(artifact_root / "inventory.json")
+    summary = audit_artifacts.read_json(artifact_root / "summary.json")
+    manifest = audit_artifacts.read_json(artifact_root / "replay-manifest.json")
     results: list[dict[str, Any]] = []
     findings_root = artifact_root / "findings"
     for path in sorted(findings_root.glob("*.json")):
-        results.append(_read_json(path))
+        results.append(audit_artifacts.read_json(path))
     rebuilt = build_fleet_summary(
         audit_id=str(inventory["audit_id"]),
         as_of=str(inventory["as_of"]),
@@ -469,8 +469,8 @@ def fleet_replay_payload(
 def fleet_report_payload(
     *, audit_id: str | None = None, output_dir: Path | None = None
 ) -> dict[str, Any]:
-    artifact_root = _resolve_artifact_root(output_dir, audit_id)
-    summary = _read_json(artifact_root / "summary.json")
+    artifact_root = audit_artifacts.resolve_artifact_root(output_dir, audit_id)
+    summary = audit_artifacts.read_json(artifact_root / "summary.json")
     projection = public_projection(summary)
     report = {
         "schema": FLEET_REPORT_SCHEMA,
@@ -487,96 +487,10 @@ def fleet_report_payload(
         standard_report_path = artifact_root / "standard-report.json"
         if standard_report_path.is_file():
             report["standard"] = standard
-            report["standard_report"] = _read_json(standard_report_path)
+            report["standard_report"] = audit_artifacts.read_json(standard_report_path)
             report["publication"]["canonical_maturity_feed"] = "not_applicable"
     paths = {
         "report_json": str(write_json(artifact_root / "report.json", report)),
         "report_md": str(write_text(artifact_root / "report.md", report_markdown(report))),
     }
     return {**report, "artifact_root": str(artifact_root), "artifact_paths": paths}
-
-
-def _write_audit_artifacts(
-    *,
-    artifact_root: Path,
-    inventory: dict[str, Any],
-    results: list[dict[str, Any]],
-    summary: dict[str, Any],
-    standard_report: dict[str, Any] | None = None,
-) -> dict[str, str]:
-    prepare_safe_directory(artifact_root)
-    findings_dir = prepare_safe_directory(artifact_root / "findings")
-    plans_dir = prepare_safe_directory(artifact_root / "plans")
-    write_json(artifact_root / "inventory.json", inventory)
-    write_json(artifact_root / "summary.json", summary)
-    write_text(artifact_root / "summary.md", summary_markdown(summary))
-    if standard_report is not None:
-        write_json(artifact_root / "standard-report.json", standard_report)
-    for result in results:
-        repo_id = str(result["repo_id"])
-        write_json(findings_dir / f"{repo_id}.json", result)
-        plan = result.get("plan", {})
-        write_json(plans_dir / f"{repo_id}.json", plan)
-        write_text(plans_dir / f"{repo_id}.md", plan_markdown(plan))
-    replay_manifest = {
-        "schema": FLEET_REPLAY_SCHEMA,
-        "audit_id": inventory["audit_id"],
-        "as_of": inventory["as_of"],
-        "inventory_hash": digest(inventory),
-        "summary_hash": digest(summary),
-        "finding_hashes": {str(result["repo_id"]): digest(result) for result in results},
-        "provenance_hash": digest({"inventory": inventory, "summary": summary}),
-    }
-    write_json(artifact_root / "replay-manifest.json", replay_manifest)
-    paths = {
-        "inventory_json": str(artifact_root / "inventory.json"),
-        "summary_json": str(artifact_root / "summary.json"),
-        "summary_md": str(artifact_root / "summary.md"),
-        "replay_manifest": str(artifact_root / "replay-manifest.json"),
-        "findings_dir": str(findings_dir),
-        "plans_dir": str(plans_dir),
-    }
-    if standard_report is not None:
-        paths["standard_report_json"] = str(artifact_root / "standard-report.json")
-    return paths
-
-
-def _artifact_root(output_dir: Path | None, audit_id: str, *, local: bool = False) -> Path:
-    if output_dir is not None:
-        base = output_dir.expanduser().resolve()
-        return base if base.name == audit_id else base / audit_id
-    base = DEFAULT_FLEET_ROOT.expanduser().resolve()
-    return base / (f"local/{audit_id}" if local else audit_id)
-
-
-def _resolve_artifact_root(output_dir: Path | None, audit_id: str | None) -> Path:
-    if output_dir is not None:
-        candidate = output_dir.expanduser().resolve()
-        if (candidate / "inventory.json").is_file():
-            return candidate
-        if audit_id:
-            return candidate / audit_id
-        return _latest_audit(candidate)
-    base = DEFAULT_FLEET_ROOT.expanduser().resolve()
-    if audit_id:
-        direct = base / audit_id
-        if direct.is_dir():
-            return direct
-        local = base / "local" / audit_id
-        if local.is_dir():
-            return local
-    return _latest_audit(base)
-
-
-resolve_artifact_root = _resolve_artifact_root
-
-
-def _latest_audit(root: Path) -> Path:
-    candidates = [path for path in root.glob("**/inventory.json") if path.is_file()]
-    if not candidates:
-        raise FileNotFoundError(f"no fleet audit artifacts found under {root}")
-    return max(candidates, key=lambda path: path.stat().st_mtime).parent
-
-
-def _read_json(path: Path) -> dict[str, Any]:
-    return json.loads(path.read_text(encoding="utf-8"))
