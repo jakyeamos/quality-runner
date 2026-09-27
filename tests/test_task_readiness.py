@@ -285,3 +285,33 @@ def test_certified_bootstrap_records_resolved_version(tmp_path: Path) -> None:
     assert blockers == []
     assert results[0]["bootstrap"]["command_path"] == sys.executable
     assert results[0]["bootstrap"]["command_version"].startswith("Python ")
+
+
+def test_uv_bootstrap_uses_validated_launcher_when_uv_is_not_on_path(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    uv_launcher = tmp_path / "uv"
+    uv_launcher.symlink_to(sys.executable)
+    monkeypatch.setenv("UV", str(uv_launcher))
+    monkeypatch.setenv("PATH", "/usr/bin:/bin")
+    readiness = evaluate_readiness(
+        repo_root=tmp_path,
+        prevention={
+            "gates": [
+                _gate(
+                    f"{sys.executable} --version",
+                    bootstrap="uv --version",
+                )
+            ]
+        },
+    )
+
+    results, blockers = run_certified_gates(
+        snapshot_root=tmp_path,
+        repo_root=tmp_path,
+        readiness=readiness,
+    )
+
+    assert blockers == []
+    assert results[0]["bootstrap"]["status"] == "passed"
+    assert results[0]["bootstrap"]["command_path"] == str(uv_launcher.resolve())

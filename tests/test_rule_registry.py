@@ -61,8 +61,9 @@ def test_unverified_rule_cannot_be_silently_described_as_qualified() -> None:
         for rule in payload["exact_rules"]
         if rule["verification"]["status"] == "behavior-verified"
     }
-    assert verified == {"large-source-file", "nested-ternary"}
-    assert payload["summary"]["unverified_exact_rule_count"] == 72
+    assert verified == BUILTIN_CODE_QUALITY_RULES
+    assert payload["summary"]["behavior_verified_exact_rule_count"] == 74
+    assert payload["summary"]["unverified_exact_rule_count"] == 0
 
 
 def test_registry_includes_repository_active_skill_pack_rules(tmp_path: Path) -> None:

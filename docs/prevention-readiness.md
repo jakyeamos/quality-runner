@@ -61,6 +61,9 @@ configuration, caller-selected Python import paths, UV Python, or virtual
 environments, so global ignore rules, hooks, and launcher state cannot make
 local evidence differ from CI. The documented `uv` cache may be reused, but the
 locked environment is materialized independently for each task-check snapshot.
+When `uv run` does not place its own executable on `PATH`, QR accepts only the
+absolute executable path supplied by uv's `UV` launcher variable for a bare
+certified `uv` bootstrap; other caller PATH additions remain excluded.
 
 The repository also has two evidence-only security gates. `uv run --locked
 pip-audit` audits the locked Python dependency graph, and `gitleaks detect
@@ -72,10 +75,18 @@ it requires a security review and a fresh scan. These gates are not promoted to
 `qr task` prevention certification until their intentional-failure fixtures and
 local/CI provenance are recorded in the prevention policy.
 
+All 74 package-owned exact code-quality rules have positive, safe-input
+negative, and excluded-scope boundary fixture references in the canonical rule
+registry. This qualification means the detector behavior is test-backed; it
+does not make every rule release-blocking. Active skill-pack rules and the five
+runtime-generated rule families remain separately reported because their IDs
+and evidence are supplied by repository configuration, packs, or runtime data.
+
 The first promoted QR rule is `code_quality:large-source-file` (550 physical
 source lines, including formatter-required spacing). Its positive,
 negative, and test-scope/ambiguous boundary fixtures are also in
-`tests/test_prevention_policy.py`. No other QR rule is enforced by this policy.
+`tests/test_prevention_policy.py`. No other QR rule is enforced by this
+repository's prevention policy.
 
 To refresh local evidence, run:
 

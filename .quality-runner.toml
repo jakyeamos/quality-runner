@@ -46,7 +46,7 @@ state = "behavior-verified"
 owner = "quality-runner-maintainers"
 rationale = "Large source files increase review cost and concentrate change risk."
 paths = ["quality_runner/**/*.py", "quality_runner/*.py", "quality_evidence_contract/**/*.py", "repo_quality_certifier/**/*.py"]
-confidence_threshold = 1.0
+confidence_threshold = 0.3
 evidence_refs = [
   "positive:tests/test_prevention_policy.py::test_large_source_file_positive_promotion_fixture",
   "negative:tests/test_prevention_policy.py::test_large_source_file_negative_promotion_fixture",

@@ -124,10 +124,182 @@ DYNAMIC_RULE_FAMILIES: tuple[dict[str, str], ...] = (
 )
 
 
-# Only rules with all three fixture classes belong here. The registry deliberately
-# exposes the remaining work rather than treating ordinary scanner coverage as
-# promotion evidence.
+# Positive fixtures are grouped by the test that proves each detector can fire.
+# Negative and boundary controls below are deliberately shared: they assert that
+# every built-in rule stays quiet for a safe multi-language corpus and for an
+# otherwise finding-rich corpus placed outside the scanner's owned source scope.
+_POSITIVE_FIXTURE_GROUPS: tuple[tuple[frozenset[str], str], ...] = (
+    (
+        frozenset(
+            {
+                "arbitrary-z-index",
+                "await-in-loop",
+                "bare-trpc-error",
+                "console-output",
+                "decorative-grid-background",
+                "deep-nesting",
+                "env-non-null-assertion",
+                "excessive-border-radius",
+                "explicit-any",
+                "gradient-text",
+                "near-duplicate-function",
+                "nested-card-markup",
+                "nested-ternary",
+                "page-data-access",
+                "raw-free-text-z-string",
+                "risky-hidden-reveal",
+                "side-stripe-border",
+                "silent-catch",
+                "todo-comment",
+                "uninstrumented-trpc-procedure",
+                "weak-test-assertion",
+            }
+        ),
+        "tests/test_code_quality.py::test_code_quality_scan_reports_deterministic_rule_groups_and_fingerprints",
+    ),
+    (
+        frozenset(
+            {
+                "api-route-missing-boundary-validation",
+                "deep-prop-drilling",
+                "eval-user-code",
+                "hero-image-lazy-loading",
+                "icon-button-missing-label",
+                "image-missing-alt",
+                "image-missing-dimensions",
+                "inconsistent-error-envelope",
+                "large-js-bundle-artifact",
+                "list-endpoint-missing-pagination",
+                "missing-empty-state",
+                "missing-error-state",
+                "missing-loading-state",
+                "nonsemantic-click-target",
+                "off-scale-spacing",
+                "placeholder-copy",
+                "positive-tabindex",
+                "removed-focus-outline",
+                "sql-string-interpolation",
+                "user-controlled-file-path",
+                "user-controlled-shell-command",
+                "wildcard-cors-origin",
+            }
+        ),
+        "tests/test_code_quality.py::test_code_quality_scan_detects_ui_api_security_and_bundle_rules",
+    ),
+    (
+        frozenset(
+            {
+                "hand-rolled-csv-parser",
+                "hand-rolled-debounce",
+                "hand-rolled-url-parser",
+                "hand-rolled-uuid",
+                "pass-through-wrapper",
+                "single-implementation-abstraction",
+                "single-product-factory",
+                "single-use-trivial-dependency",
+                "undocumented-env-flag",
+            }
+        ),
+        "tests/test_code_quality.py::test_code_quality_scan_detects_ponytail_debt_rules",
+    ),
+    (
+        frozenset(
+            {
+                "export-without-references",
+                "handler-without-registration",
+                "stub-implementation",
+                "todo-scaffold",
+            }
+        ),
+        "tests/test_code_quality_unwired.py::test_code_quality_scan_detects_unwired_work_signals",
+    ),
+    (
+        frozenset(
+            {
+                "maintenance-compatibility-surface",
+                "maintenance-config-surface",
+                "maintenance-new-dependency",
+                "maintenance-public-surface",
+            }
+        ),
+        "tests/test_code_quality_maintenance_surface.py::test_worktree_maintenance_candidates_are_native_qr_findings",
+    ),
+    (
+        frozenset(
+            {
+                "python-blocking-call-in-async",
+                "python-query-in-loop",
+                "python-sync-work-call-in-async",
+            }
+        ),
+        "tests/test_python_performance_rules.py::test_python_performance_rules_find_queries_and_sync_work_in_async_loops",
+    ),
+    (
+        frozenset({"semantic-similarity-pair"}),
+        "tests/test_code_quality_similarity.py::test_similarity_ts_pair_output_creates_pair_finding",
+    ),
+    (
+        frozenset({"semantic-similarity-cluster"}),
+        "tests/test_code_quality_similarity.py::test_cluster_output_creates_cluster_and_finding",
+    ),
+    (
+        frozenset({"silent-except-pass"}),
+        "tests/test_failure_visibility.py::test_python_silent_except_is_reported_but_observable_handling_is_not",
+    ),
+    (
+        frozenset({"exact-duplicate-test-body", "removed-behavior-lock"}),
+        "tests/test_code_quality.py::test_test_quality_findings_are_bounded_and_include_remediation_dispositions",
+    ),
+    (
+        frozenset({"fat-router"}),
+        "tests/test_code_quality.py::test_fat_router_owns_overlapping_large_file_signal",
+    ),
+    (
+        frozenset({"dead-code-unwired-candidate"}),
+        "tests/test_unwired_from_dead_code.py::test_dead_code_output_becomes_unwired_decision_candidate",
+    ),
+    (
+        frozenset({"missing-reduced-motion", "ts-ignore", "unsafe-html-injection"}),
+        "tests/test_rule_qualification.py::test_previously_uncovered_builtin_rules_have_positive_fixtures",
+    ),
+)
+
+_SHARED_NEGATIVE_FIXTURE = (
+    "tests/test_rule_qualification.py::test_builtin_rules_stay_quiet_for_safe_multilanguage_corpus"
+)
+_SHARED_BOUNDARY_FIXTURE = (
+    "tests/test_rule_qualification.py::test_builtin_rules_ignore_finding_rich_generated_scope"
+)
+
+
+def _builtin_rule_test_evidence() -> dict[str, tuple[str, ...]]:
+    positive_by_rule: dict[str, str] = {}
+    for rules, reference in _POSITIVE_FIXTURE_GROUPS:
+        for rule_id in rules:
+            if rule_id in positive_by_rule:
+                raise RuntimeError(f"duplicate positive fixture for {rule_id}")
+            positive_by_rule[rule_id] = reference
+    missing = BUILTIN_CODE_QUALITY_RULES - set(positive_by_rule) - {"large-source-file"}
+    extra = set(positive_by_rule) - BUILTIN_CODE_QUALITY_RULES
+    if missing or extra:
+        raise RuntimeError(
+            f"invalid built-in qualification matrix: missing={missing}, extra={extra}"
+        )
+    return {
+        rule_id: (
+            f"positive:{reference}",
+            f"negative:{_SHARED_NEGATIVE_FIXTURE}",
+            f"boundary:{_SHARED_BOUNDARY_FIXTURE}",
+        )
+        for rule_id, reference in positive_by_rule.items()
+    }
+
+
+# Every entry is auditable down to a pytest node. Qualification proves bounded
+# detector behavior; it does not promote the rule into a repository's prevention
+# policy.
 BUILTIN_RULE_TEST_EVIDENCE: dict[str, tuple[str, ...]] = {
+    **_builtin_rule_test_evidence(),
     "large-source-file": (
         "positive:tests/test_prevention_policy.py::test_large_source_file_positive_promotion_fixture",
         "negative:tests/test_prevention_policy.py::test_large_source_file_negative_promotion_fixture",

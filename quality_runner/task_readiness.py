@@ -154,7 +154,7 @@ def _run_bootstrap(
             "stdout": "",
             "stderr": str(error),
         }
-    command_path = shutil.which(argv[0], path=_search_path(environment_paths))
+    command_path = _resolve_executable(argv[0], environment_paths)
     if command_path is None:
         return {
             "command": command,
@@ -433,6 +433,24 @@ def _environment_paths(repo_root: Path, values: list[object]) -> list[Path]:
 def _search_path(environment_paths: list[Path]) -> str:
     existing = os.environ.get("PATH", "")
     return os.pathsep.join([*(str(path) for path in environment_paths), existing])
+
+
+def _resolve_executable(command: str, environment_paths: list[Path]) -> str | None:
+    resolved = shutil.which(command, path=_search_path(environment_paths))
+    if resolved is not None:
+        return resolved
+    # `uv run` intentionally need not add uv itself to PATH, but it provides
+    # the exact launcher as UV. Preserve the isolated PATH contract while
+    # allowing a certified bare `uv` bootstrap to reuse that validated binary.
+    if command != "uv":
+        return None
+    launcher = os.environ.get("UV")
+    if not launcher:
+        return None
+    candidate = Path(launcher).expanduser()
+    if not candidate.is_absolute() or not candidate.is_file() or not os.access(candidate, os.X_OK):
+        return None
+    return str(candidate.resolve())
 
 
 def _command_version(

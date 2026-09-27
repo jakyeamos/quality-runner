@@ -7,6 +7,8 @@ from pathlib import Path
 import pytest
 
 from quality_runner.code_quality import create_code_quality_scan
+from quality_runner.config import load_repo_config
+from quality_runner.task_findings import normalize_findings
 
 
 def _large_source_rules(root: Path) -> set[str]:
@@ -66,6 +68,29 @@ def test_large_source_file_ambiguous_test_scope_fixture_is_not_enforced(tmp_path
     source.write_text("\n".join(f"value_{index} = {index}" for index in range(6)))
 
     assert "large-source-file" not in _large_source_rules(tmp_path)
+
+
+def test_repository_policy_enforces_the_detector_confidence_it_promotes(tmp_path: Path) -> None:
+    source = tmp_path / "quality_runner" / "large.py"
+    source.parent.mkdir()
+    source.write_text("\n".join(f"value_{index} = {index}" for index in range(551)))
+    scan = create_code_quality_scan(
+        tmp_path,
+        scan={"run_id": "repository-policy-confidence"},
+        config={"structural_scan": {"large_file_lines": 550, "similarity_enabled": False}},
+    )
+
+    normalized = normalize_findings(
+        code_quality_scan=scan,
+        security_scan={"coverage": "complete", "candidates": []},
+        prevention=load_repo_config(Path(__file__).resolve().parents[1])["prevention"],
+    )
+
+    occurrence = next(
+        item for item in normalized["occurrences"] if item["rule_id"] == "large-source-file"
+    )
+    assert occurrence["confidence"] == "low"
+    assert occurrence["enforcement_eligible"] is True
 
 
 def test_nested_ternary_positive_promotion_fixture(tmp_path: Path) -> None:
