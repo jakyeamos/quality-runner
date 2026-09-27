@@ -9,8 +9,82 @@ from typing import Any
 from quality_runner.fleet.contracts import digest
 
 FLEET_SCOPE_MANIFEST_SCHEMA = "quality-runner-fleet-scope/v1"
+FLEET_SCOPE_BUILD_SCHEMA = "quality-runner-fleet-scope-build/v1"
 _ELIGIBILITY = {"eligible", "excluded"}
 _DISTRIBUTION_VISIBILITY = {"public", "private", "local"}
+
+
+def build_fleet_scope_manifest_from_pronto_status(
+    status_path: Path,
+    *,
+    projects_root: Path,
+    output_path: Path,
+    authority: str = "Pronto status snapshot",
+) -> dict[str, Any]:
+    """Write an exact QR fleet scope from a current Pronto status snapshot."""
+
+    source = status_path.expanduser().resolve()
+    try:
+        status = json.loads(source.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as error:
+        raise ValueError(f"Pronto status snapshot is not valid JSON: {source}") from error
+    if not isinstance(status, dict):
+        raise ValueError("Pronto status snapshot must be a JSON object")
+    generated_at = _required_string(status, "generated_at")
+    try:
+        datetime.fromisoformat(generated_at.replace("Z", "+00:00"))
+    except ValueError as error:
+        raise ValueError("Pronto status generated_at must be ISO-8601") from error
+    raw_repositories = status.get("repositories")
+    if not isinstance(raw_repositories, list) or not raw_repositories:
+        raise ValueError("Pronto status repositories must be a non-empty array")
+
+    root = projects_root.expanduser().resolve()
+    repositories: list[dict[str, str]] = []
+    seen: set[str] = set()
+    for index, item in enumerate(raw_repositories):
+        if not isinstance(item, dict):
+            raise ValueError(f"Pronto status repository {index} must be an object")
+        raw_path = _required_string(item, "path")
+        repository = Path(raw_path).expanduser().resolve()
+        try:
+            repository.relative_to(root)
+        except ValueError as error:
+            raise ValueError(f"Pronto repository is outside projects_root: {repository}") from error
+        normalized_path = str(repository)
+        if normalized_path in seen:
+            raise ValueError(f"Pronto repository path is duplicated: {repository}")
+        if not (repository / ".git").exists():
+            raise ValueError(f"Pronto repository is not an accessible Git checkout: {repository}")
+        seen.add(normalized_path)
+        repositories.append(
+            {
+                "path": normalized_path,
+                "eligibility": "eligible",
+                "reason": "present in the exact Pronto repository status snapshot",
+            }
+        )
+
+    manifest = {
+        "schema": FLEET_SCOPE_MANIFEST_SCHEMA,
+        "authority": authority,
+        "generated_at": generated_at,
+        "repositories": sorted(repositories, key=lambda item: item["path"]),
+    }
+    target = output_path.expanduser().resolve()
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+    validated = load_fleet_scope_manifest(target, projects_root=root)
+    return {
+        "schema": FLEET_SCOPE_BUILD_SCHEMA,
+        "status": "written",
+        "source": str(source),
+        "output": str(target),
+        "generated_at": generated_at,
+        "repository_count": validated["eligible_repository_count"],
+        "manifest_hash": validated["manifest_hash"],
+        "eligible_path_hash": validated["eligible_path_hash"],
+    }
 
 
 def load_fleet_scope_manifest(path: Path, *, projects_root: Path) -> dict[str, Any]:

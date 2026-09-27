@@ -43,6 +43,8 @@ package-only surfaces, honors repository gate timeouts only within the CLI
 ceiling, and never runs discovered mutating or unknown-risk formatters.
 
 ```sh
+uv run --locked qr fleet scope build --pronto-status /path/to/pronto-status.json \
+  --projects-root /bounded/root --output /private/path/fleet-scope.json --json
 uv run --locked qr fleet audit run --scope-manifest /path/to/fleet-scope.json \
   --projects-root /bounded/root --dynamic --no-changed-only --json
 uv run --locked qr fleet audit replay --audit-id AUDIT_ID --json

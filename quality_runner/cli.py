@@ -79,6 +79,8 @@ Advanced operations:
   release-smoke, and worker handoff tools
 
 Fleet environment audit:
+  fleet scope build --pronto-status PATH
+                               build an exact validated fleet scope manifest
   fleet detector refresh --all  publish full exact-target detector evidence for Pronto
   fleet certify --scope-manifest PATH
                                run proof checks and emit explicit certification counts

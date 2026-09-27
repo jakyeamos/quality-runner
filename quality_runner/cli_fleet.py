@@ -21,6 +21,7 @@ from quality_runner.fleet.mac_control import (
     mac_control_replay_payload,
     mac_control_report_payload,
 )
+from quality_runner.fleet.scope_manifest import build_fleet_scope_manifest_from_pronto_status
 from quality_runner.fleet.workspace_policy import fleet_workspace_target_payload
 
 
@@ -30,6 +31,18 @@ def add_fleet_commands(subparsers: Any) -> None:
         help="Run bounded fleet audits and explicit detector-evidence publication",
     )
     fleet_actions = fleet_parser.add_subparsers(dest="fleet_action", required=True)
+    scope_parser = fleet_actions.add_parser(
+        "scope", help="Build an exact fleet scope manifest from repository authority evidence"
+    )
+    scope_actions = scope_parser.add_subparsers(dest="scope_action", required=True)
+    scope_build = scope_actions.add_parser(
+        "build", help="Build a validated scope manifest from a Pronto status JSON snapshot"
+    )
+    scope_build.add_argument("--pronto-status", required=True)
+    scope_build.add_argument("--projects-root", required=True)
+    scope_build.add_argument("--output", required=True)
+    scope_build.add_argument("--authority", default="Pronto status snapshot")
+    scope_build.add_argument("--json", action="store_true")
     detector_parser = fleet_actions.add_parser(
         "detector", help="Refresh full detector evidence at exact repository targets"
     )
@@ -349,6 +362,15 @@ def add_fleet_commands(subparsers: Any) -> None:
 
 
 def fleet_command_payload(args: argparse.Namespace) -> dict[str, Any]:
+    if args.fleet_action == "scope":
+        if args.scope_action != "build":
+            raise ValueError(f"unsupported fleet scope action: {args.scope_action}")
+        return build_fleet_scope_manifest_from_pronto_status(
+            Path(args.pronto_status),
+            projects_root=Path(args.projects_root),
+            output_path=Path(args.output),
+            authority=args.authority,
+        )
     if args.fleet_action == "certify":
         return fleet_certification_payload(
             projects_root=Path(args.projects_root),

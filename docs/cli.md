@@ -192,6 +192,25 @@ it never protects a ref, grants custody, or deletes a worktree. JAS enforces
 the policy at task-lane creation, while Pronto projects the observed policy
 and drift.
 
+## `quality-runner fleet scope build`
+
+Builds the exact private fleet population consumed by certification from a
+current `pronto status --json` snapshot. The command fails closed if a path is
+duplicated, outside the bounded root, missing, or not an accessible Git
+checkout. It preserves the Pronto snapshot timestamp and writes a validated
+`quality-runner-fleet-scope/v1` manifest with deterministic population hashes.
+
+```bash
+qr fleet scope build \
+  --pronto-status /path/to/pronto-status.json \
+  --projects-root /bounded/root \
+  --output /private/path/fleet-scope.json \
+  --json
+```
+
+The output path is explicit because repository paths are private operator
+evidence and must not be embedded in the public package or documentation.
+
 ## `quality-runner fleet certify`
 
 Runs the complete read-only fleet proof stack for an exact scope manifest and

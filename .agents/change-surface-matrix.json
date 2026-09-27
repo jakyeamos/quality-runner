@@ -173,7 +173,7 @@
       "contract_fixtures": [
         "fixtures/contracts/public-adapters/pronto-maturity-feed.json"
       ],
-      "path": "installed qr, plugins, Pronto, quality-runner-fleet-scope/v1, quality-runner-maturity-feed/v2, quality-runner-cache-design-assessment-v1, and quality-runner-repository-maturity/v2",
+      "path": "installed qr, plugins, Pronto, qr fleet scope build, quality-runner-fleet-scope/v1, quality-runner-maturity-feed/v2, quality-runner-cache-design-assessment-v1, and quality-runner-repository-maturity/v2",
       "owner": "integration-owner",
       "condition": "command, plugin, audit-coverage, fleet scope, measurement confidence, feed schema, taxonomy, publication behavior, maturity pillar, applicability, coverage, cap, or source-dimension changes",
       "operations": ["add", "change", "remove"],
