@@ -23,6 +23,7 @@ from quality_runner.cli_handoff import add_handoff_commands
 from quality_runner.cli_human_summary import human_summary
 from quality_runner.cli_journeys import add_journey_commands
 from quality_runner.cli_maintenance_surface import add_maintenance_surface_command
+from quality_runner.cli_model_audit import add_model_audit_commands
 from quality_runner.cli_onboarding import add_onboarding_commands
 from quality_runner.cli_outcome import OUTCOME_SCHEMA, render_outcome
 from quality_runner.cli_payload import payload_for_args
@@ -75,7 +76,7 @@ Compatibility commands remain available:
 Advanced operations:
   task, refresh, rollout, gate, controller-report, skill, proposal, remediation,
   plan, phase, candidates, repo-hygiene, policy-surfaces, onboarding, security,
-  release-smoke, and worker handoff tools
+  model-audit, release-smoke, and worker handoff tools
 
 Fleet environment audit:
   fleet detector refresh --all  publish full exact-target detector evidence for Pronto
@@ -273,6 +274,7 @@ def build_parser(prog: str = CANONICAL_PROGRAM) -> argparse.ArgumentParser:
 
     add_rollout_command(subparsers)
     add_review_command(subparsers)
+    add_model_audit_commands(subparsers)
 
     exclusions_parser = subparsers.add_parser(
         "exclusions",
@@ -456,6 +458,8 @@ def main(argv: list[str] | None = None) -> int:
     ):
         return 1
     if parsed.command == "skill" and payload.get("status") == "rejected":
+        return 1
+    if parsed.command == "model-audit" and payload.get("status") == "partial":
         return 1
     if parsed.command == "release-smoke" and payload.get("status") != "passed":
         return 1

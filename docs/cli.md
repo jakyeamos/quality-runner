@@ -1143,3 +1143,9 @@ For planning loops, pass `--analysis-mode balanced` and
 boundaries. `--cache-mode disabled` is diagnostic only. See
 [Planning and Delivery Contracts](planning-contracts.md) for the receipt fields
 and blocker rules.
+
+## Refreshable model audits
+
+Use `qr model-audit` for saved audit profiles, retained source snapshots,
+separate verification and explicit model comparisons. CLI and MCP share the
+[model-audit contract](model-audits.md). Reports grant no implementation authority.

@@ -15,6 +15,9 @@ Quality Runner turns repository facts, local standards, and available quality
 gates into versioned artifacts that another agent or human maintainer can review
 before approving implementation work.
 
+See [Refreshable model audits](docs/model-audits.md) to compare fresh reviewers
+against retained source snapshots and separately verified findings.
+
 ## Architecture
 
 The pipeline is intentionally small: repository discovery compiles facts and

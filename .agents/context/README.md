@@ -3,7 +3,7 @@ id: quality-runner.repo-context
 title: Quality Runner Repository Context
 tier: project
 status: active
-last_reviewed: 2026-08-17
+last_reviewed: 2026-11-01
 applies_when:
   - repo_context
 tags:
@@ -30,6 +30,7 @@ packet that matches the task; do not load the whole repository or generated
 | Packaging, release, and rollback | [deployment](deployment.md) |
 | Public CLI or MCP behavior | `docs/cli.md`, `quality_runner/cli.py`, `quality_runner/mcp.py` |
 | Quality-gate execution behavior | `docs/cli.md`, `quality_runner/gate_execution.py`, `quality_runner/verification_contract.py` |
+| Refreshable model audits | `docs/model-audits.md`, `quality_runner/model_audit/` |
 | Artifact or schema changes | `docs/artifacts.md`, `quality_runner/schemas/`, `tests/` |
 
 The runner is provider-neutral and AIOS-independent. Generated evidence may

@@ -804,3 +804,9 @@ and a next action, not a finding conclusion; the frozen v1 report retains only
 its established fields. Its fix-prompts artifact records that no review
 completed. All review artifacts and state are local; Quality Runner does not
 edit source files or call remote services.
+
+## Refreshable model audits
+
+Use `qr model-audit` for saved audit profiles, retained source snapshots,
+separate verification and explicit model comparisons. CLI and MCP share the
+[model-audit contract](model-audits.md). Reports grant no implementation authority.

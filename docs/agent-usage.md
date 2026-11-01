@@ -501,3 +501,9 @@ When stopping, report:
 - Verification commands and results
 - Commit hashes and push status
 - Remaining blockers or next recommended phase
+
+## Refreshable model audits
+
+Use `qr model-audit` for saved audit profiles, retained source snapshots,
+separate verification and explicit model comparisons. CLI and MCP share the
+[model-audit contract](model-audits.md). Reports grant no implementation authority.

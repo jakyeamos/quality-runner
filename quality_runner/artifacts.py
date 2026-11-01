@@ -263,6 +263,14 @@ def cleanup_artifacts(
 def _auto_preserved_run_ids(entries: list[Path]) -> set[str]:
     preserved: set[str] = set()
     for entry in entries:
+        # Audit snapshots and lineage are durable comparison evidence, including
+        # incomplete or malformed runs. Ordinary age/count pruning cannot retire them.
+        if any(
+            (entry / name).exists() or (entry / name).is_symlink()
+            for name in ("model-audit-retention.json", "model-audit-manifest.json")
+        ):
+            preserved.add(entry.name)
+            continue
         if entry.name in {"active", "blocked", "current", "preserved"}:
             preserved.add(entry.name)
             continue

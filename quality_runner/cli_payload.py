@@ -31,6 +31,7 @@ from quality_runner.cli_gate import (
 )
 from quality_runner.cli_handoff import handoff_command_payload
 from quality_runner.cli_maintenance_surface import maintenance_surface_command_payload
+from quality_runner.cli_model_audit import model_audit_payload
 from quality_runner.cli_onboarding import onboarding_command_payload
 from quality_runner.cli_phase import phase_command_payload
 from quality_runner.cli_planning import planning_command_payload
@@ -77,6 +78,8 @@ def payload_for_args(
 ) -> dict[str, Any]:
     if args.command == "doctor":
         return doctor_payload(include_environment=True)
+    if args.command == "model-audit":
+        return model_audit_payload({**vars(args), "action": args.model_audit_action})
     if args.command == "behavior":
         return assurance_command_payload(args)
     if args.command == "ci-gate-audit":

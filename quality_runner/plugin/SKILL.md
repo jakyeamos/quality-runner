@@ -28,6 +28,17 @@ standard CI families. Treat every result as a recommendation: inspect its
 invariant, evidence, negative-control state, and provenance, then require an
 explicit repository-owned profile before calling the gate required.
 
+For an explicitly requested model-upgrade audit, use `qr model-audit` or
+`quality_runner_model_audit`. Prepare retained inputs with a saved profile and
+explicit reviewer settings, run the reviewer separately, then record and verify.
+Use `--baseline-run-id` to retain history and `--reuse-inputs-from` to control
+source inputs. Model claims remain unverified until separate evidence is bound.
+Omitted findings remain unresolved. Read `docs/model-audits.md` for the exact
+contract; a model upgrade alone never authorizes implementation. Advisory or
+feasibility questions alone do not authorize preparation, provider execution
+or fleet discovery. A report may expose unverified claims before verification;
+"newly verified" does not establish which model first discovered the problem.
+
 Preferred MCP tools:
 
 - `quality_runner_audit_outcome` to inspect or plan with a clear remediation outcome.

@@ -151,3 +151,9 @@ published, blocked, or unsupported repository. It does not execute discovered
 gates. Missing phase artifacts remain unpublished while the fleet ledger keeps
 compact phase status, timeout, and reason diagnostics. Follow with `pronto
 quality refresh --json` unless Pronto owns the combined invocation.
+
+## Refreshable model audits
+
+Use `qr model-audit` for saved audit profiles, retained source snapshots,
+separate verification and explicit model comparisons. CLI and MCP share the
+[model-audit contract](../../docs/model-audits.md). Reports grant no implementation authority.

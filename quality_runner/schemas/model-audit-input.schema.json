@@ -1,0 +1,326 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Refreshable model audit inputs",
+  "oneOf": [
+    {
+      "$ref": "#/$defs/profile"
+    },
+    {
+      "$ref": "#/$defs/reviewer"
+    },
+    {
+      "$ref": "#/$defs/selection"
+    },
+    {
+      "$ref": "#/$defs/verification"
+    }
+  ],
+  "$defs": {
+    "profile": {
+      "type": "object",
+      "required": [
+        "schema",
+        "id",
+        "revision",
+        "purpose",
+        "constraints",
+        "criteria",
+        "include_paths",
+        "exclude_paths"
+      ],
+      "properties": {
+        "schema": {
+          "const": "quality-runner-model-audit-profile/v1"
+        },
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 16384
+        },
+        "revision": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 16384
+        },
+        "purpose": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 16384
+        },
+        "constraints": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 16384
+          },
+          "minItems": 0,
+          "maxItems": 256
+        },
+        "criteria": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "id",
+              "prompt"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 16384
+              },
+              "prompt": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 16384
+              }
+            },
+            "additionalProperties": false
+          },
+          "minItems": 1,
+          "maxItems": 64
+        },
+        "include_paths": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 16384
+          },
+          "minItems": 1,
+          "maxItems": 256
+        },
+        "exclude_paths": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 16384
+          },
+          "minItems": 0,
+          "maxItems": 256
+        }
+      },
+      "additionalProperties": false
+    },
+    "reviewer": {
+      "type": "object",
+      "required": [
+        "reviewer_id",
+        "model",
+        "provider",
+        "effort",
+        "harness",
+        "tools",
+        "budget"
+      ],
+      "properties": {
+        "reviewer_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 16384
+        },
+        "model": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 16384
+        },
+        "provider": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 16384
+        },
+        "effort": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 16384
+        },
+        "harness": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 16384
+        },
+        "tools": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 16384
+          },
+          "minItems": 0,
+          "maxItems": 256
+        },
+        "budget": {
+          "type": "object",
+          "required": [
+            "seconds",
+            "max_findings"
+          ],
+          "properties": {
+            "seconds": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 86400
+            },
+            "max_findings": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 256
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "selection": {
+      "type": "object",
+      "required": [
+        "schema",
+        "repositories"
+      ],
+      "properties": {
+        "schema": {
+          "const": "quality-runner-model-audit-selection/v1"
+        },
+        "repositories": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "repo_path",
+              "run_id"
+            ],
+            "properties": {
+              "repo_path": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 16384
+              },
+              "run_id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 16384
+              }
+            },
+            "additionalProperties": false
+          },
+          "minItems": 1,
+          "maxItems": 256
+        }
+      },
+      "additionalProperties": false
+    },
+    "verification": {
+      "type": "object",
+      "required": [
+        "schema",
+        "run_id",
+        "manifest_digest",
+        "response_digest",
+        "verifier_id",
+        "independent",
+        "findings"
+      ],
+      "properties": {
+        "schema": {
+          "const": "quality-runner-model-audit-verification/v1"
+        },
+        "run_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 16384
+        },
+        "manifest_digest": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "response_digest": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "verifier_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 16384
+        },
+        "independent": {
+          "const": true
+        },
+        "findings": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "fingerprint",
+              "canonical_key",
+              "criterion_id",
+              "verdict",
+              "method",
+              "evidence"
+            ],
+            "properties": {
+              "fingerprint": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 16384
+              },
+              "canonical_key": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 16384
+              },
+              "criterion_id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 16384
+              },
+              "verdict": {
+                "enum": [
+                  "verified",
+                  "disputed",
+                  "unverified"
+                ]
+              },
+              "method": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 16384
+              },
+              "evidence": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": [
+                    "path",
+                    "sha256"
+                  ],
+                  "properties": {
+                    "path": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 16384
+                    },
+                    "sha256": {
+                      "type": "string",
+                      "pattern": "^[0-9a-f]{64}$"
+                    }
+                  },
+                  "additionalProperties": false
+                },
+                "minItems": 1,
+                "maxItems": 16
+              }
+            },
+            "additionalProperties": false
+          },
+          "minItems": 1,
+          "maxItems": 256
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

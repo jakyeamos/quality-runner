@@ -10,6 +10,7 @@ from typing import Any, cast
 from quality_runner import __version__
 from quality_runner.application.audit_workflows import inspect_payload, run_payload
 from quality_runner.artifacts import artifact_run_ids, artifact_text_file
+from quality_runner.cli_model_audit import model_audit_mcp_tool, model_audit_payload
 from quality_runner.cli_review import review_mcp_payload, review_mcp_tool
 from quality_runner.doctor_contract import doctor_payload
 from quality_runner.fix_proposals import propose_fix
@@ -185,6 +186,7 @@ def list_tools() -> list[dict[str, Any]]:
             "inputSchema": propose_fix_schema,
         },
         review_mcp_tool(),
+        model_audit_mcp_tool(),
         delivery_contract_tool(),
         *journey_tools(),
     ]
@@ -192,6 +194,8 @@ def list_tools() -> list[dict[str, Any]]:
 
 def call_tool(name: str, arguments: dict[str, Any] | None = None) -> dict[str, Any]:
     args = arguments or {}
+    if name == "quality_runner_model_audit":
+        return _tool_result(model_audit_payload(args))
     if name == "quality_runner_doctor":
         return _tool_result(doctor_payload(include_environment=False))
 

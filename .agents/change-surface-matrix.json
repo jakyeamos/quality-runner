@@ -2,7 +2,7 @@
   "schema_version": "change-surface-matrix/v1",
   "subject": {"kind": "repository", "id": "quality-runner"},
   "owner": "quality-runner-maintainers",
-  "last_reviewed": "2026-08-28",
+  "last_reviewed": "2026-11-01",
   "change_records": [
     {
       "id": "strict-zero-ci-gates-20260828",
@@ -69,6 +69,34 @@
         "head_sha remains independently read from Git even when symbolic-ref cannot resolve HEAD"
       ],
       "projections": []
+    },
+    {
+      "id": "refreshable-model-audits-20261101",
+      "status": "implemented",
+      "owner": "quality-runner-maintainers",
+      "affected_surfaces": [
+        "refreshable-model-audits"
+      ],
+      "contracts": [
+        "Model claims require separate verification; omission never resolves findings.",
+        "Fixed-source comparisons record harness, effort, provider, tools and budget confounders.",
+        "Evidence remains local and never grants implementation authority."
+      ],
+      "documentation": [
+        "docs/model-audits.md",
+        ".agents/context/commands.md"
+      ],
+      "tests": [
+        "uv run --locked pytest -q tests/test_model_audit.py",
+        "uv run --locked basedpyright --project pyrightconfig.strict.json",
+        "Exercise prepare/record/verify/report/fleet through the public CLI and Pronto bridge."
+      ],
+      "evidence": [
+        "Focused regression fixtures and public-surface verification required before handoff."
+      ],
+      "projections": [
+        "Read-only explicit Pronto model-audit bridge."
+      ]
     }
   ],
   "surfaces": [
@@ -280,6 +308,25 @@
         "uv run --locked quality-runner release-boundary . --dist-dir dist --json"
       ],
       "status": "applicable"
+    },
+    {
+      "id": "refreshable-model-audits",
+      "scope": "repository",
+      "path": "quality_runner/model_audit/, quality_runner/cli_model_audit.py, CLI/MCP, plugin, schemas, docs/model-audits.md",
+      "owner": "quality-runner-maintainers",
+      "condition": "Model audit profiles, provenance, verification, retention, comparison or projection changes.",
+      "operations": [
+        "add",
+        "change",
+        "remove"
+      ],
+      "validation": [
+        "uv run --locked pytest -q tests/test_model_audit.py",
+        "uv run --locked basedpyright --project pyrightconfig.strict.json",
+        "Exercise prepare/record/verify/report/fleet through the public CLI and Pronto bridge."
+      ],
+      "status": "applicable",
+      "distribution": "public_core"
     }
   ],
   "release_boundary": {

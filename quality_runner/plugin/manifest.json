@@ -31,6 +31,10 @@
     "run": {
       "command": "quality-runner",
       "args": ["run"]
+    },
+    "model-audit": {
+      "command": "quality-runner",
+      "args": ["model-audit"]
     }
   },
   "mcp": {
@@ -50,7 +54,8 @@
       "quality_runner_review_outcome",
       "quality_runner_verify_outcome",
       "quality_runner_runs_outcome",
-      "quality_runner_delivery_contract"
+      "quality_runner_delivery_contract",
+      "quality_runner_model_audit"
     ]
   },
   "skill": "SKILL.md"
