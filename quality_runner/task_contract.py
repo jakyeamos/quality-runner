@@ -153,6 +153,7 @@ def contract_hashes(repo_root: Path, config: dict[str, Any]) -> dict[str, str]:
     prevention = cast(dict[str, Any], prevention) if isinstance(prevention, dict) else {}
     return {
         "quality_runner_version": __version__,
+        "task_analysis_contract": "source-with-current-policy-v1",
         "configuration_hash": hashlib.sha256(config_content).hexdigest(),
         "promoted_policy_hash": hash_payload(prevention),
         "rule_pack_hash": rule_pack_hash(),
@@ -174,6 +175,7 @@ def drift_blockers(
     previous = cast(dict[str, str], baseline.get("evidence", {}))
     labels = {
         "quality_runner_version": "Quality Runner version",
+        "task_analysis_contract": "task analysis contract",
         "configuration_hash": "configuration",
         "promoted_policy_hash": "promoted policy",
         "rule_pack_hash": "rule pack",

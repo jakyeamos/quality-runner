@@ -143,6 +143,12 @@ before completion. Fast mode skips certified native gates and is never
 release-ready; release-check reuses exact-current authoritative and gate receipts
 when valid, otherwise runs live, and fails unless `release_readiness.eligible: true`.
 
+After an approved task policy or coverage repair, use
+`qr task rebaseline /path/to/repository --task-id ID --preserve-source --reason
+"Reviewed policy repair" --json`. Recovery must prove the original source
+manifest against its recorded Git revision before changing the active baseline.
+Preserve an unrecoverable baseline and report its missing source evidence.
+
 For the global Codex adapter, configure the installed `qr dogfood codex-hook
 --json` command for `SessionStart`, `UserPromptSubmit`, and `Stop`. It is inert
 outside Git repositories enrolled with

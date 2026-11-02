@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import hashlib
 import json
-import shutil
 import time
 from datetime import UTC, datetime
 from pathlib import Path
@@ -17,7 +16,7 @@ from quality_runner.artifacts import (
     validate_path_segment,
     write_json,
 )
-from quality_runner.config import CONFIG_FILE_NAME, load_repo_config
+from quality_runner.config import load_repo_config
 from quality_runner.core.audit_contracts import AnalysisMode, AuditRequest
 from quality_runner.schema_constants import (
     TASK_BASELINE_SCHEMA,
@@ -49,6 +48,11 @@ from quality_runner.task_findings import (
     compare_findings,
     normalize_findings,
     promotion_issues,
+)
+from quality_runner.task_policy_snapshot import (
+    overlay_task_policy,
+    rebaseline_source_ref,
+    verify_preserved_source,
 )
 from quality_runner.task_readiness import (
     evaluate_readiness,
@@ -93,7 +97,12 @@ def task_command_payload(args: Any) -> dict[str, Any]:
             )
             return _with_dogfood(repo_root, args.task_id, "release_check", payload, started)
         if args.task_action == "rebaseline":
-            payload = rebaseline_task(repo_root, task_id=args.task_id, reason=args.reason)
+            payload = rebaseline_task(
+                repo_root,
+                task_id=args.task_id,
+                reason=args.reason,
+                preserve_source=bool(getattr(args, "preserve_source", False)),
+            )
             return _with_dogfood(repo_root, args.task_id, "rebaseline", payload, started)
     except (FileNotFoundError, NotADirectoryError, ValueError) as error:
         return _error_payload("invalid", "invalid_task_contract", str(error))
@@ -150,7 +159,9 @@ def start_task(
     }
 
 
-def rebaseline_task(repo_root: Path, *, task_id: str, reason: str) -> dict[str, Any]:
+def rebaseline_task(
+    repo_root: Path, *, task_id: str, reason: str, preserve_source: bool = False
+) -> dict[str, Any]:
     _validate_task_id(task_id)
     if not reason.strip():
         return _error_payload("invalid", "missing_rebaseline_reason", "reason must not be empty")
@@ -164,13 +175,7 @@ def rebaseline_task(repo_root: Path, *, task_id: str, reason: str) -> dict[str, 
         previous,
         "task-baseline.json",
     )
-    previous_source = cast(dict[str, Any], previous_baseline.get("source", {}))
-    baseline_ref = (
-        str(previous_source["head_sha"])
-        if previous_source.get("kind") == "git_revision"
-        and isinstance(previous_source.get("head_sha"), str)
-        else None
-    )
+    baseline_ref = rebaseline_source_ref(previous_baseline, preserve_source=preserve_source)
     run_id = f"{generated_run_id()}-task-rebaseline"
     baseline = _capture_baseline(
         repo_root,
@@ -180,6 +185,7 @@ def rebaseline_task(repo_root: Path, *, task_id: str, reason: str) -> dict[str, 
         intent=None,
         reason=reason.strip(),
         supersedes=previous,
+        expected_snapshot=previous_baseline["snapshot"] if preserve_source else None,
     )
     lineage = [*cast(list[str], record.get("lineage", [])), run_id]
     record.update({"baseline_run_id": run_id, "lineage": lineage})
@@ -253,6 +259,7 @@ def check_task(
         merge_target_ref=merge_target_ref,
         include_paths=include_paths,
     ) as (snapshot_root, snapshot):
+        overlay_task_policy(repo_root, snapshot_root)
         analysis = _analyze(
             snapshot_root,
             run_id,
@@ -351,6 +358,7 @@ def _capture_baseline(
     intent: dict[str, Any] | None,
     reason: str | None,
     supersedes: str | None,
+    expected_snapshot: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     config = load_repo_config(repo_root)
     prevention = prevention_config(config)
@@ -363,8 +371,9 @@ def _capture_baseline(
         baseline_ref=baseline_ref,
         include_paths=include_paths,
     ) as (snapshot_root, snapshot):
-        if baseline_ref is not None:
-            _overlay_config(repo_root, snapshot_root)
+        if expected_snapshot is not None:
+            snapshot = verify_preserved_source(expected_snapshot, snapshot)
+        overlay_task_policy(repo_root, snapshot_root)
         analysis = _analyze(
             snapshot_root,
             run_id,
@@ -399,7 +408,7 @@ def _capture_baseline(
         "intent": intent,
         "reason": reason,
         "supersedes": supersedes,
-        "analysis_policy_overlay": baseline_ref is not None,
+        "analysis_policy_overlay": True,
     }
     write_json(safe_child_file(run_dir, "workspace-snapshot.json"), snapshot)
     write_json(safe_child_file(run_dir, "normalized-findings.json"), findings)
@@ -433,15 +442,6 @@ def _analyze(
         cache_context_identity=snapshot_digest,
     )
     return analyze_read_only_audit(request)
-
-
-def _overlay_config(repo_root: Path, snapshot_root: Path) -> None:
-    source = repo_root / CONFIG_FILE_NAME
-    target = snapshot_root / CONFIG_FILE_NAME
-    if source.is_file():
-        shutil.copyfile(source, target)
-    elif target.exists():
-        target.unlink()
 
 
 def _intent_payload(repo_root: Path, path: Path | None) -> dict[str, Any] | None:

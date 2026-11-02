@@ -39,7 +39,12 @@
       "type": "object",
       "required": ["analysis_mode", "cache_mode", "performance", "cache_summary"]
     },
-    "evidence": { "type": "object" },
+    "evidence": {
+      "type": "object",
+      "properties": {
+        "task_analysis_contract": { "const": "source-with-current-policy-v1" }
+      }
+    },
     "error": { "type": "object" },
     "warnings": { "type": "array" },
     "dogfood_telemetry": { "$ref": "dogfood-capture.schema.json" },

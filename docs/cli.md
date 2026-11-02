@@ -313,6 +313,25 @@ For a task started from `--baseline-ref`, rebaseline rescans the original
 resolved target SHA with the new policy; it does not silently switch a PR task
 to the current workspace.
 
+When repairing coverage or policy for an existing workspace task, add
+`--preserve-source`. The runner reconstructs the original recorded Git revision
+and requires its complete file manifest, executable modes, symlink targets, and
+snapshot digest to match the original baseline. It then reanalyzes that source
+under the current policy, retaining the original workspace or PR comparison
+semantics and immutable lineage. Dirty, untracked, deleted, or otherwise
+unrecoverable baseline content blocks the operation without changing the active
+baseline. It never substitutes the current implementation for missing original
+source. Without this option, workspace rebaseline explicitly captures the
+current workspace, as before.
+
+Task start, check, and rebaseline apply the current repository
+`.quality-runner.toml`, including when Git ignores that file. Policy is an
+analysis overlay; its contract hash is recorded separately from the source
+snapshot. Symlinked policy files are rejected. Other ignored files remain
+excluded. The `source-with-current-policy-v1` task analysis contract prevents
+older policy-blind receipts from authorizing release, and cached checks must
+belong to the active baseline run.
+
 The prevention policy lives under `[quality_runner.prevention]`. Native gates
 do not become certified merely because their commands are discoverable or
 already appear in CI. See [Prevention Readiness](prevention-readiness.md) for

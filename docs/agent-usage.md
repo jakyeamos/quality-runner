@@ -68,6 +68,13 @@ changes, review that change and use `task rebaseline --reason ...`; never
 silently enlarge the baseline. PR-target tasks preserve the originally resolved
 target SHA across rebaseline.
 
+For a policy or coverage repair, use `task rebaseline --preserve-source --reason
+...` to reanalyze the original source, never the current edits. This requires an
+exact match between the recorded snapshot and its Git revision; unrecoverable
+dirty source blocks recovery. Task scans apply the current policy even when
+Git ignores `.quality-runner.toml`. Older analysis contracts and receipts from
+a superseded baseline cannot authorize release.
+
 Read `task-check.json` as the canonical result and `task-check.md` as its human
 projection. The emitted `next_action` explains the required response for
 `pass`, `violation`, `blocked`, or `invalid`; a passing QR result still does not

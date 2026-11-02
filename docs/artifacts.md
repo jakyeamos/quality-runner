@@ -102,6 +102,15 @@ The task record preserves the active baseline and its complete rebaseline
 lineage. A rebaseline creates a new baseline directory and never overwrites the
 prior baseline.
 
+`rebaseline --preserve-source` retains the original snapshot and source metadata
+only after exact reconstruction from the recorded Git revision. It fails closed
+when source bytes or modes cannot be recovered. Current policy is applied
+separately, including a Git-ignored `.quality-runner.toml`; the baseline records
+`analysis_policy_overlay: true`. Baseline and check `evidence` include
+`task_analysis_contract: source-with-current-policy-v1` and the current policy
+hash. Earlier receipts require explicit rebaseline; passing check reuse also
+requires the active `baseline_run_id`.
+
 `workspace-snapshot.json` hashes normalized repository-relative paths, content,
 executable modes, and symlink targets. It represents tracked modifications,
 tracked deletions, and untracked non-ignored files without substituting `HEAD`.

@@ -136,6 +136,14 @@ violations, then run the authoritative check before completion. Use
 QR version, or toolchain evidence genuinely changed; never enlarge a baseline
 silently.
 
+For an approved policy or coverage repair, prefer `qr task rebaseline
+--preserve-source --reason ...`. It reconstructs and verifies the original
+source before refreshing analysis, preserving the before/after comparison.
+If dirty or untracked baseline bytes cannot be recovered, retain the baseline
+and report the blocker; do not substitute current edits. Task scans apply the
+current `.quality-runner.toml` even when Git ignores it. Legacy analysis
+contracts and receipts from another baseline remain ineligible.
+
 Fresh Review is two phase: first prepare the packet, then submit a locally
 supplied response bound to that packet. A packet-ready outcome is not a clean
 review. Select findings explicitly before giving its fixer prompts to a separate

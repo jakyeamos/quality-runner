@@ -61,7 +61,11 @@ def reusable_authoritative_check(
     digest = str(snapshot.get("snapshot_digest"))
     for source_run_id in reversed(cast(list[str], record.get("checks", []))):
         candidate = _load_candidate(repo_root, source_run_id)
-        if candidate is None or not _candidate_matches(candidate, digest, expected_evidence):
+        if (
+            candidate is None
+            or candidate.get("baseline_run_id") != record["baseline_run_id"]
+            or not _candidate_matches(candidate, digest, expected_evidence)
+        ):
             continue
         gate_results = cast(list[dict[str, Any]], candidate.get("gate_results", []))
         if any(

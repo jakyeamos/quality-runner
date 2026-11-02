@@ -19,7 +19,12 @@
       "type": "object",
       "required": ["analysis_mode", "cache_mode", "performance", "cache_summary"]
     },
-    "evidence": { "type": "object" },
+    "evidence": {
+      "type": "object",
+      "properties": {
+        "task_analysis_contract": { "const": "source-with-current-policy-v1" }
+      }
+    },
     "intent": { "type": ["object", "null"] },
     "reason": { "type": ["string", "null"] },
     "supersedes": { "type": ["string", "null"] },

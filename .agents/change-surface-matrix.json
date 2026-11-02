@@ -2,8 +2,50 @@
   "schema_version": "change-surface-matrix/v1",
   "subject": {"kind": "repository", "id": "quality-runner"},
   "owner": "quality-runner-maintainers",
-  "last_reviewed": "2026-08-31",
+  "last_reviewed": "2026-11-02",
   "change_records": [
+    {
+      "id": "task-policy-source-recovery-20261102",
+      "status": "implemented",
+      "owner": "quality-runner-maintainers",
+      "affected_surfaces": [
+        "quality-engine",
+        "agent-workflow",
+        "artifact-contracts"
+      ],
+      "contracts": [
+        "All task analyses apply current regular-file policy even when Git ignores it; source snapshots remain independent.",
+        "Source-preserving rebaseline proves exact original bytes, modes, paths and repository identity, or leaves the active baseline unchanged.",
+        "Task analysis contract drift and receipt baseline identity prevent stale release authorization."
+      ],
+      "documentation": [
+        "docs/cli.md",
+        "docs/artifacts.md",
+        "docs/agent-usage.md",
+        "quality_runner/plugin/SKILL.md",
+        ".agents/context/README.md",
+        ".agents/context/commands.md"
+      ],
+      "evidence": [
+        "tests/test_task_policy_recovery.py: real CLI and Git regression cases; see private task receipts for command results."
+      ],
+      "projections": [
+        "task-baseline.json",
+        "task-check.json",
+        "task-check.md",
+        "Codex lifecycle release checkpoint"
+      ],
+      "no_impact": [
+        "MCP has no dedicated task endpoints; the existing CLI task adapter owns the new option.",
+        "Fleet publication and remediation authority are unchanged."
+      ],
+      "tests": [
+        "tests/test_task_policy_recovery.py",
+        "tests/test_cli_task.py",
+        "tests/test_task_schemas.py",
+        "tests/test_task_contract.py"
+      ]
+    },
     {
       "id": "task-fast-feedback-receipts-20260831",
       "status": "implemented",
