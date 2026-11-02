@@ -21,11 +21,10 @@ packet that matches the task.
   finding.
 - `.quality-runner.toml` owns the repository's required blocker gates for the
   dependency audit and environment contract. Keep the checker in CI and the
-  release workflow. The certified BasedPyright gate covers the full declared
-  package scope in standard mode. Repository-wide strict mode remains a visible
-  migration candidate until its existing findings are remediated and the gate
-  satisfies the same certification evidence; do not hide that debt with broad
-  suppressions.
+  release workflow. Both standard and strict BasedPyright cover the full declared
+  package scope.
+  Strict diagnostics must remain at zero under the pinned baseline ratchet in
+  CI; do not increase the baseline or hide findings with broad suppressions.
 
 The environment contract is executable through
 `python3 scripts/check_environment_contract.py` and is required by

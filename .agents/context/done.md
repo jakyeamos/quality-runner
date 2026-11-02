@@ -1,6 +1,6 @@
 # Definition of done
 
-Last reviewed: 2026-08-02
+Last reviewed: 2026-11-02
 
 A Quality Runner change is complete only when:
 
@@ -8,10 +8,10 @@ A Quality Runner change is complete only when:
   surfaces agree;
 - behavior-focused tests cover the changed public contract or confirmed
   regression;
-- locked pytest, Ruff lint, Ruff format, certified BasedPyright, Vulture,
+- locked pytest, Ruff lint, Ruff format, standard and strict BasedPyright, Vulture,
   dependency audit, package build, and the environment contract pass;
-- repository-wide strict BasedPyright is claimed only after its findings are
-  remediated and the expanded scope has repeatable local and CI evidence;
+- the pinned strict baseline remains at zero diagnostics, and current local
+  results are distinguished from the exact revision covered by hosted CI;
 - safety boundaries still refuse unauthorized source mutation, remote calls,
   credential collection, and remediation execution;
 - generated evidence contains provenance and redaction metadata and no private

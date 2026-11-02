@@ -1,13 +1,14 @@
 # Coding and artifact conventions
 
-Last reviewed: 2026-08-02
+Last reviewed: 2026-11-02
 
 - Target Python 3.12 or newer and preserve the locked `uv` environment.
 - Add explicit public return types and typed boundaries for new production
   code. Fix real type errors; do not add broad ignores or casts that hide them.
-- Keep the certified full-package BasedPyright gate in standard mode. Treat the
-  repository-wide strictness backlog as a candidate migration requiring
-  source-level remediation and fresh certification evidence.
+- Preserve the full-package standard and strict BasedPyright checks. Strict
+  diagnostics must remain at zero, with the pinned baseline ratchet enforced
+  in CI. Narrow untyped input only after validating its runtime container;
+  keep field values checked instead of asserting an unverified domain type.
 - Keep CLI, MCP, artifact, and schema contracts deterministic. Sort emitted
   collections where order is not semantically meaningful.
 - Preserve evidence provenance, run IDs, schema versions, and redaction

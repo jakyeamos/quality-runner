@@ -1,19 +1,19 @@
 # Strict type-checking burndown
 
-BasedPyright standard mode remains the certified repository gate. Strict mode
-is a separate, advisory ratchet until its migration evidence supports
-promotion.
+The full declared package scope is checked in both standard and strict modes.
+The strict cleanup was merged into `dev` in PR #18, and CI enforces the pinned
+zero-diagnostic baseline. Branch reconciliation must preserve that cleanup
+while applying the same strict checks to newly integrated modules.
 
 The baseline is occurrence-aware and records the pinned tool/config identity:
 
 ```sh
-uv run --locked python scripts/check_strict_baseline.py --update \
-  --reason "initial strict inventory on merged main"
+uv run --locked basedpyright --project pyrightconfig.strict.json
 uv run --locked python scripts/check_strict_baseline.py
 ```
 
-The first command is an intentional baseline change and must be reviewed with
-the reason for the rebaseline. The second command exits with:
+The first command checks the source directly. The second checks diagnostics
+and baseline identity, and exits with:
 
 - `0` when strict diagnostics are unchanged or reduced;
 - `1` when new diagnostics appear;
@@ -25,5 +25,7 @@ Repeated identical diagnostics are matched by stable source order. If a
 repeated diagnostic group changes size, the command fails closed as unknown
 instead of guessing which occurrence was added or resolved.
 
-The initial burndown baseline is intentionally a measurement artifact. It does
-not promote strict mode, waive findings, or replace the standard CI gate.
+The baseline contains zero diagnostics. Do not use `--update` to accept new
+debt. An intentional tool or configuration migration requires a reviewed
+reason and fresh equivalent coverage; it must preserve the zero-error target.
+The strict ratchet complements the standard CI check.

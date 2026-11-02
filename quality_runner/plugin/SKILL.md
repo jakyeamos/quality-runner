@@ -48,13 +48,24 @@ qr task start /path/to/repo --task-id <stable-task-id> --json
 During editing, use only repository-native checks whose current applicability
 and maturity are established by repository evidence. Do not infer that a
 command is preventative merely because it appears in a manifest or CI file.
-Candidate QR gates remain advisory and are not executed by `qr task check`.
+For shorter QR feedback cycles, use the provisional fast mode:
 
-After editing, run the authoritative QR checkpoint before declaring the
+```bash
+qr task check /path/to/repo --task-id <stable-task-id> --fast
+```
+
+Fast mode runs balanced finding analysis with validated content-cache reuse and
+skips certified gate execution. Deferred full-analysis findings are carried
+forward rather than reported as resolved. Its `pass` status is useful
+implementation feedback only; its
+`release_readiness.eligible` value is always false. Candidate QR gates remain
+advisory and are not executed by either task mode.
+
+After editing, run the fail-closed QR release checkpoint before declaring the
 implementation complete:
 
 ```bash
-qr task check /path/to/repo --task-id <stable-task-id> --json
+qr task release-check /path/to/repo --task-id <stable-task-id> --json
 ```
 
 Interpret the result as follows:
@@ -66,10 +77,29 @@ Interpret the result as follows:
 - `invalid` requires correcting the invocation or prevention configuration.
 
 Read the emitted `task-check.json` as the authority and `task-check.md` as its
-human projection. Persisted legacy and advisory findings remain visible but do
-not become task failures. Do not copy every QR finding into static agent rules;
+human projection. `release-check` runs only authoritative evidence and exits
+zero only when `release_readiness.eligible` is true, satisfying the QR task release
+predicate. The predicate requires no new enforced occurrence, no unknown or
+invalid delta evidence, complete comparable coverage, unchanged evidence
+identity, and passing required certified gates; resolved findings do not cancel
+new findings through a scalar count. Persisted legacy and advisory findings
+remain visible but do not become task failures. Do not copy every QR finding into static agent rules;
 promote a repeatedly trusted deterministic finding into a behavior-verified QR
 rule or a faster native checker with its own maturity evidence.
+
+When Codex has the global lifecycle adapter installed, do not create a second
+manual baseline for the same session. `qr dogfood codex-hook --json` handles
+`SessionStart`, `UserPromptSubmit`, and `Stop` for repositories
+that contain `.quality-runner.toml`; it ignores unenrolled repositories. The
+Stop path skips unchanged work and otherwise enforces an exact matching
+authoritative release receipt. If changed work lacks one, Stop blocks promptly
+with the explicit release-check command and never launches the expensive scan
+itself. Release-check may reuse evidence only when snapshot, policy, toolchain,
+QR version, and required gate identity all match exactly. Use
+`qr dogfood report --json` to inspect local, HMAC-pseudonymous adoption,
+latency, per-gate/bootstrap timing, receipt reuse, delta, gate, and cache metrics. Telemetry
+never contains prompts, source paths, finding bodies, or raw identifiers, and a
+degraded capture never substitutes for the task gate result.
 
 ## Repository onboarding admission
 
@@ -100,10 +130,19 @@ new coverage only if a requested restoration or another durable contract
 creates a real accidental-failure path.
 
 This is a baseline and completion/CI checkpoint, not a continuous-save or
-editor-hook workflow. Re-run it after correcting violations or blockers. Use
+editor-hook workflow. Re-run the fast check after correcting implementation
+violations, then run the authoritative check before completion. Use
 `qr task rebaseline --reason ...` only when configuration, policy, rule-pack,
 QR version, or toolchain evidence genuinely changed; never enlarge a baseline
 silently.
+
+For an approved policy or coverage repair, prefer `qr task rebaseline
+--preserve-source --reason ...`. It reconstructs and verifies the original
+source before refreshing analysis, preserving the before/after comparison.
+If dirty or untracked baseline bytes cannot be recovered, retain the baseline
+and report the blocker; do not substitute current edits. Task scans apply the
+current `.quality-runner.toml` even when Git ignores it. Legacy analysis
+contracts and receipts from another baseline remain ineligible.
 
 Fresh Review is two phase: first prepare the packet, then submit a locally
 supplied response bound to that packet. A packet-ready outcome is not a clean

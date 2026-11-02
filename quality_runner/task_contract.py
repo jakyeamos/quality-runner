@@ -7,12 +7,59 @@ from typing import Any, cast
 
 from quality_runner import __version__
 from quality_runner.config import CONFIG_FILE_NAME
+from quality_runner.core.audit_contracts import AnalysisMode
 
-TASK_ANALYSIS_MODE = "full"
+TASK_ANALYSIS_MODE: AnalysisMode = "full"
+TASK_FAST_ANALYSIS_MODE: AnalysisMode = "balanced"
 TASK_CACHE_MODE = "external"
+TASK_CHECK_MODE_AUTHORITATIVE = "authoritative"
+TASK_CHECK_MODE_FAST = "fast"
+TASK_RELEASE_ENFORCEMENT_ADVISORY = "advisory"
+TASK_RELEASE_ENFORCEMENT_REQUIRED = "required"
 
 
-def task_next_action(status: str) -> str:
+def task_next_action(
+    status: str,
+    *,
+    mode: str = TASK_CHECK_MODE_AUTHORITATIVE,
+    enforcement: str = TASK_RELEASE_ENFORCEMENT_ADVISORY,
+) -> str:
+    if mode == TASK_CHECK_MODE_FAST:
+        actions = {
+            "pass": (
+                "Fast Quality Runner feedback passes. Run `qr task release-check` before "
+                "declaring the implementation complete."
+            ),
+            "violation": (
+                "Fix every new enforced finding, or record an eligible exact-fingerprint "
+                "disposition, then rerun `qr task check --fast`; run "
+                "`qr task release-check` before completion."
+            ),
+            "blocked": (
+                "Resolve every blocker, using `qr task rebaseline` with an explicit reason "
+                "only when the evidence contract changed, then rerun `qr task check --fast` "
+                "and `qr task release-check`."
+            ),
+        }
+        return actions.get(status, task_next_action(status))
+    if enforcement == TASK_RELEASE_ENFORCEMENT_REQUIRED:
+        actions = {
+            "pass": (
+                "Quality Runner release evidence passes. Complete any remaining "
+                "repository-required checks before declaring the implementation complete."
+            ),
+            "violation": (
+                "Fix every new enforced finding and failed certified gate, or record an "
+                "eligible exact-fingerprint disposition, then rerun "
+                "`qr task release-check`."
+            ),
+            "blocked": (
+                "Resolve every blocker, using `qr task rebaseline` with an explicit reason "
+                "only when the evidence contract changed, then rerun "
+                "`qr task release-check`."
+            ),
+        }
+        return actions.get(status, task_next_action(status))
     actions = {
         "pass": (
             "Quality Runner evidence passes. Complete any remaining repository-required "
@@ -33,6 +80,72 @@ def task_next_action(status: str) -> str:
     return actions.get(status, actions["invalid"])
 
 
+def release_readiness(
+    *,
+    mode: str,
+    delta: dict[str, Any],
+    repository_blockers: list[dict[str, str]],
+    contract_blockers: list[dict[str, str]],
+    promotion_blockers: list[dict[str, str]],
+    gate_blockers: list[dict[str, str]],
+    readiness_blockers: list[dict[str, str]],
+    required_gate_failures: list[dict[str, Any]],
+) -> dict[str, Any]:
+    counts = cast(dict[str, int], delta.get("counts", {}))
+    delta_blockers = cast(list[dict[str, str]], delta.get("blockers", []))
+    criteria = {
+        "authoritative_check": mode == TASK_CHECK_MODE_AUTHORITATIVE,
+        "no_new_enforced_findings": counts.get("new_enforced", 0) == 0,
+        "no_unknown_findings": counts.get("unknown", 0) == 0,
+        "comparable_coverage_complete": not any(
+            item.get("code") in {"required_coverage_incomplete", "incomplete_comparable_coverage"}
+            for item in delta_blockers
+        ),
+        "finding_delta_valid": not delta_blockers,
+        "evidence_contract_unchanged": not contract_blockers,
+        "repository_identity_matches": not repository_blockers,
+        "promotion_evidence_complete": not promotion_blockers,
+        "required_certified_gates_passed": (
+            mode == TASK_CHECK_MODE_AUTHORITATIVE
+            and not gate_blockers
+            and not readiness_blockers
+            and not required_gate_failures
+        ),
+    }
+    blocking_reasons = [name for name, passed in criteria.items() if not passed]
+    return {
+        "status": "ready" if not blocking_reasons else "ineligible",
+        "eligible": not blocking_reasons,
+        "mode": mode,
+        "predicate": "no_new_enforced_findings",
+        "criteria": criteria,
+        "blocking_reasons": blocking_reasons,
+    }
+
+
+def enforce_release_eligibility(
+    *,
+    decision: str,
+    enforcement: str,
+    readiness: dict[str, Any],
+    blockers: list[dict[str, str]],
+) -> tuple[str, list[dict[str, str]]]:
+    if enforcement != TASK_RELEASE_ENFORCEMENT_REQUIRED or readiness.get("eligible") is True:
+        return decision, blockers
+    if decision != "pass":
+        return decision, blockers
+    return (
+        "blocked",
+        [
+            *blockers,
+            {
+                "code": "release_readiness_ineligible",
+                "message": "release-check requires every release readiness criterion to pass",
+            },
+        ],
+    )
+
+
 def contract_hashes(repo_root: Path, config: dict[str, Any]) -> dict[str, str]:
     config_path = repo_root / CONFIG_FILE_NAME
     config_content = config_path.read_bytes() if config_path.is_file() else b"<absent>"
@@ -40,6 +153,7 @@ def contract_hashes(repo_root: Path, config: dict[str, Any]) -> dict[str, str]:
     prevention = cast(dict[str, Any], prevention) if isinstance(prevention, dict) else {}
     return {
         "quality_runner_version": __version__,
+        "task_analysis_contract": "source-with-current-policy-v1",
         "configuration_hash": hashlib.sha256(config_content).hexdigest(),
         "promoted_policy_hash": hash_payload(prevention),
         "rule_pack_hash": rule_pack_hash(),
@@ -61,6 +175,7 @@ def drift_blockers(
     previous = cast(dict[str, str], baseline.get("evidence", {}))
     labels = {
         "quality_runner_version": "Quality Runner version",
+        "task_analysis_contract": "task analysis contract",
         "configuration_hash": "configuration",
         "promoted_policy_hash": "promoted policy",
         "rule_pack_hash": "rule pack",
@@ -81,10 +196,14 @@ def drift_blockers(
 def render_task_check_markdown(payload: dict[str, Any]) -> str:
     delta = cast(dict[str, Any], payload["delta"])
     counts = cast(dict[str, int], delta["counts"])
+    readiness = cast(dict[str, Any], payload["release_readiness"])
     lines = [
         f"# Quality Runner task check: {payload['task_id']}",
         "",
         f"- Status: **{payload['status']}**",
+        f"- Mode: **{payload['mode']}**",
+        f"- Release enforcement: **{payload['release_enforcement']}**",
+        f"- Release readiness: **{readiness['status']}**",
         f"- Baseline: `{payload['baseline_run_id']}`",
         f"- Check run: `{payload['run_id']}`",
         f"- Changed paths: {len(cast(list[str], payload['changed_paths']))}",
@@ -123,6 +242,24 @@ def deduplicate_blockers(items: list[dict[str, str]]) -> list[dict[str, str]]:
     return [
         {"code": code, "message": message}
         for code, message in sorted({(item["code"], item["message"]) for item in items})
+    ]
+
+
+def prevention_config(config: dict[str, Any]) -> dict[str, Any]:
+    value = config.get("prevention")
+    return cast(dict[str, Any], value) if isinstance(value, dict) else {}
+
+
+def repository_blockers(baseline: dict[str, Any], snapshot: dict[str, Any]) -> list[dict[str, str]]:
+    baseline_repo = cast(dict[str, Any], baseline.get("repository", {}))
+    current_repo = cast(dict[str, Any], snapshot.get("repository", {}))
+    if baseline_repo.get("identity") == current_repo.get("identity"):
+        return []
+    return [
+        {
+            "code": "repository_identity_mismatch",
+            "message": "task baseline belongs to a different Git repository",
+        }
     ]
 
 

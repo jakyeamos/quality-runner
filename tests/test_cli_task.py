@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -60,6 +61,10 @@ def _qr(repo: Path, *args: str) -> subprocess.CompletedProcess[str]:
         check=False,
         capture_output=True,
         text=True,
+        env={
+            **os.environ,
+            "QUALITY_RUNNER_DOGFOOD_STATE_DIR": str(repo / ".quality-runner" / "test-dogfood"),
+        },
     )
 
 
@@ -72,6 +77,11 @@ def test_task_clean_check_passes_and_writes_canonical_artifacts(tmp_path: Path) 
     assert check.returncode == 0
     payload = json.loads(check.stdout)
     assert payload["status"] == "pass"
+    assert payload["mode"] == "authoritative"
+    assert payload["release_enforcement"] == "advisory"
+    assert payload["release_readiness"]["status"] == "ready"
+    assert payload["release_readiness"]["eligible"] is True
+    assert all(payload["release_readiness"]["criteria"].values())
     assert "remaining repository-required checks" in payload["next_action"]
     assert payload["delta"]["counts"]["new_enforced"] == 0
     assert payload["analysis"]["analysis_mode"] == "full"
@@ -81,6 +91,125 @@ def test_task_clean_check_passes_and_writes_canonical_artifacts(tmp_path: Path) 
     run_dir = repo / ".quality-runner" / "runs" / payload["run_id"]
     assert (run_dir / "task-check.json").is_file()
     assert (run_dir / "task-check.md").is_file()
+    assert "Release readiness: **ready**" in (run_dir / "task-check.md").read_text()
+
+
+def test_task_release_check_requires_eligible_authoritative_evidence(tmp_path: Path) -> None:
+    repo = _init_repo(tmp_path)
+    assert _qr(repo, "start", "--task-id", "release-clean").returncode == 0
+
+    check = _qr(repo, "release-check", "--task-id", "release-clean")
+    payload = json.loads(check.stdout)
+
+    assert check.returncode == 0
+    assert payload["status"] == "pass"
+    assert payload["mode"] == "authoritative"
+    assert payload["release_enforcement"] == "required"
+    assert payload["release_readiness"]["eligible"] is True
+    assert "release evidence passes" in payload["next_action"]
+    record = json.loads((repo / ".quality-runner" / "tasks" / "release-clean.json").read_text())
+    assert record["last_release_enforcement"] == "required"
+
+
+def test_task_release_check_reuses_exact_authoritative_receipt(tmp_path: Path) -> None:
+    repo = _init_repo(tmp_path)
+    assert _qr(repo, "start", "--task-id", "release-reuse").returncode == 0
+    authoritative = _qr(repo, "check", "--task-id", "release-reuse")
+    authoritative_payload = json.loads(authoritative.stdout)
+
+    release = _qr(repo, "release-check", "--task-id", "release-reuse")
+    payload = json.loads(release.stdout)
+
+    assert authoritative.returncode == release.returncode == 0
+    assert payload["release_enforcement"] == "required"
+    assert payload["release_readiness"]["eligible"] is True
+    assert payload["receipt_reuse"] == {
+        "status": "hit",
+        "source_run_id": authoritative_payload["run_id"],
+    }
+    assert (
+        payload["snapshot"]["snapshot_digest"]
+        == authoritative_payload["snapshot"]["snapshot_digest"]
+    )
+
+
+def test_task_release_check_rejects_new_enforced_findings(tmp_path: Path) -> None:
+    repo = _init_repo(tmp_path)
+    assert _qr(repo, "start", "--task-id", "release-finding").returncode == 0
+    (repo / "app.py").write_text(
+        "\n".join(f"value_{index} = {index}" for index in range(8)) + "\n",
+        encoding="utf-8",
+    )
+
+    check = _qr(repo, "release-check", "--task-id", "release-finding")
+    payload = json.loads(check.stdout)
+
+    assert check.returncode == 1
+    assert payload["status"] == "violation"
+    assert payload["release_enforcement"] == "required"
+    assert payload["release_readiness"]["eligible"] is False
+    assert "rerun `qr task release-check`" in payload["next_action"]
+
+
+def test_task_release_check_does_not_accept_fast_mode() -> None:
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "quality_runner",
+            "task",
+            "release-check",
+            "--help",
+        ],
+        cwd=ROOT,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 0
+    assert "--fast" not in result.stdout
+
+
+def test_task_fast_check_is_provisional_and_skips_certified_gates(tmp_path: Path) -> None:
+    command = json.dumps(f'{sys.executable} -c "raise SystemExit(7)"')
+    bootstrap = json.dumps(f"{sys.executable} --version")
+    gate = "\n".join(
+        [
+            "[[quality_runner.prevention.gates]]",
+            'id = "intentional-failure"',
+            f"command = {command}",
+            'state = "certified"',
+            "required = true",
+            'owner = "quality"',
+            'rationale = "Intentional failure fixture."',
+            f"bootstrap = {bootstrap}",
+            'mutation_risk = "read-only"',
+            'scope = "fixture"',
+            "timeout_seconds = 10",
+            'evidence_refs = ["failure-fixture:tests/test_cli_task.py", "repeat-pass:tests/test_cli_task.py", "local:tests/test_cli_task.py", "ci:.github/workflows/ci.yml"]',
+        ]
+    )
+    repo = _init_repo(tmp_path, extra_policy=gate)
+    assert _qr(repo, "start", "--task-id", "fast").returncode == 0
+
+    check = _qr(repo, "check", "--task-id", "fast", "--fast")
+    payload = json.loads(check.stdout)
+
+    assert check.returncode == 0
+    assert payload["status"] == "pass"
+    assert payload["mode"] == "fast"
+    assert payload["release_enforcement"] == "advisory"
+    assert payload["gate_results"] == []
+    assert payload["required_gate_failures"] == []
+    assert payload["release_readiness"]["status"] == "ineligible"
+    assert payload["release_readiness"]["eligible"] is False
+    assert payload["release_readiness"]["criteria"]["authoritative_check"] is False
+    assert payload["analysis"]["analysis_mode"] == "balanced"
+    assert "`qr task release-check`" in payload["next_action"]
+
+    record = json.loads((repo / ".quality-runner" / "tasks" / "fast.json").read_text())
+    assert record["last_check_mode"] == "fast"
 
 
 def test_task_new_promoted_finding_is_violation(tmp_path: Path) -> None:

@@ -213,8 +213,12 @@ result because a count or evidence field is missing.
 ## `quality-runner task`
 
 `task` is the preventative implementation-loop contract. It compares the exact
-post-edit workspace with a pre-edit baseline, runs only native gates that have
-been certified for preventative use, and never edits repository source.
+post-edit workspace with a pre-edit baseline, never edits repository source,
+and separates fast implementation feedback from authoritative evidence and
+release enforcement. The default `task check` runs native gates that have been
+certified for preventative use; `--fast` skips those gates for a lower-latency
+provisional check. `task release-check` runs authoritative evidence and exits
+zero only when release readiness is eligible.
 
 Start before editing:
 
@@ -237,9 +241,36 @@ Then evaluate tracked edits, tracked deletions, and untracked non-ignored files:
 qr task check /path/to/repo --task-id feature-123 --json
 ```
 
-Run this as the authoritative completion checkpoint and after correcting a
-violation or blocker. It is not a continuous-save or editor-hook command. Use
-applicable mature native checks for faster implementation-time feedback.
+For implementation-time feedback at meaningful boundaries, use the fast mode:
+
+```bash
+qr task check /path/to/repo --task-id feature-123 --fast --json
+```
+
+Fast mode runs the bounded balanced finding analysis and does not execute
+certified native gates. Deferred full-analysis modules carry baseline findings
+forward instead of claiming resolution. A fast `pass` is provisional: it never
+produces release-ready evidence. Omit `--json` for the compact terminal summary;
+the canonical JSON and Markdown artifacts are still persisted.
+
+For completion and the CI task checkpoint, enforce the release predicate:
+
+```bash
+qr task release-check /path/to/repo --task-id feature-123 --json
+```
+
+`release-check` has no `--fast` option. It first looks for passing authoritative
+evidence bound to the exact current snapshot, policy hashes, toolchain hash, QR
+version, and required gate results. A match creates a new required release
+receipt without rerunning analysis or gates; any mismatch runs the full check.
+It records
+`release_enforcement: "required"`; ordinary checks record `"advisory"`.
+
+The default check is an authoritative diagnostic checkpoint. Release-check is
+the fail-closed completion checkpoint. Rerun the appropriate command after
+correcting a violation or blocker. Neither mode is a continuous-save or
+editor-hook command; use applicable mature native checks when even faster
+feedback is needed.
 
 The check status and process exit code are:
 
@@ -248,6 +279,16 @@ The check status and process exit code are:
 - invalid invocation or configuration / `2`
 - `blocked` / `3`: coverage, matching, prerequisites, readiness, or workspace
   evidence is incomplete or unverifiable
+
+Fast mode uses the same status/exit mapping for finding feedback, but a fast
+`pass` remains non-release-eligible because certified gates were not executed.
+The machine-readable `release_readiness` object is the explicit release
+predicate. It is eligible only when the check is authoritative, has no new
+enforced findings, has no unknown findings or delta blockers, has complete
+comparable coverage, has unchanged evidence identity and repository identity,
+has complete promotion evidence, and has passing required certified gates.
+This is a set-based occurrence check: resolved findings do not cancel out a
+new enforced occurrence through a scalar count or net delta.
 
 Every task-check result includes a status-specific `next_action`.
 `task-check.json` is canonical; `task-check.md` is the derived human projection.
@@ -272,10 +313,65 @@ For a task started from `--baseline-ref`, rebaseline rescans the original
 resolved target SHA with the new policy; it does not silently switch a PR task
 to the current workspace.
 
+When repairing coverage or policy for an existing workspace task, add
+`--preserve-source`. The runner reconstructs the original recorded Git revision
+and requires its complete file manifest, executable modes, symlink targets, and
+snapshot digest to match the original baseline. It then reanalyzes that source
+under the current policy, retaining the original workspace or PR comparison
+semantics and immutable lineage. Dirty, untracked, deleted, or otherwise
+unrecoverable baseline content blocks the operation without changing the active
+baseline. It never substitutes the current implementation for missing original
+source. Without this option, workspace rebaseline explicitly captures the
+current workspace, as before.
+
+Task start, check, and rebaseline apply the current repository
+`.quality-runner.toml`, including when Git ignores that file. Policy is an
+analysis overlay; its contract hash is recorded separately from the source
+snapshot. Symlinked policy files are rejected. Other ignored files remain
+excluded. The `source-with-current-policy-v1` task analysis contract prevents
+older policy-blind receipts from authorizing release, and cached checks must
+belong to the active baseline run.
+
 The prevention policy lives under `[quality_runner.prevention]`. Native gates
 do not become certified merely because their commands are discoverable or
 already appear in CI. See [Prevention Readiness](prevention-readiness.md) for
 the promotion, gate-certification, waiver, and evidence requirements.
+
+## `quality-runner dogfood`
+
+`dogfood` is the local observability and Codex lifecycle adapter for the task
+contract. It does not change source files, install dependencies, call a remote
+service, or authorize release independently of `task release-check`.
+
+```bash
+qr dogfood codex-hook --json
+qr dogfood report --json
+```
+
+`codex-hook` reads one Codex hook JSON object from standard input. In a Git
+repository containing `.quality-runner.toml`, `SessionStart` and
+`UserPromptSubmit` idempotently create a task baseline keyed
+to the Codex session. `Stop` returns immediately for an unchanged workspace or
+matching eligible release evidence. Changed work without that evidence blocks
+immediately and tells the agent to run `task release-check`; the hook does not
+hide a multi-minute scan inside task completion.
+Repositories without a Quality Runner configuration are ignored.
+
+`report` summarizes the local SQLite event store. The report includes adoption
+coverage, event and result counts, operation-latency percentiles, time to first
+feedback and release check, release eligibility, finding deltas, changed-path
+counts, per-gate and bootstrap latency percentiles, authoritative receipt reuse,
+gate failures, and analysis-cache behavior. Event and report schemas
+are `quality-runner-dogfood-event-v0.1` and
+`quality-runner-dogfood-report-v0.1`.
+
+The default store is `~/.local/state/quality-runner/dogfood/`; tests and bounded
+operators may override it with `QUALITY_RUNNER_DOGFOOD_STATE_DIR`. A mode-0600
+local key HMAC-pseudonymizes repository and task identifiers. Prompts, source
+paths, finding bodies, and raw identifiers are excluded. Capture is fail-open
+for task enforcement because telemetry is observability, not quality evidence;
+every failed capture remains visible as `degraded` in CLI output or a hook
+system message.
 
 ## `quality-runner self-update`
 

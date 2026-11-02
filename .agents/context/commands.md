@@ -1,6 +1,6 @@
 # Canonical commands and quality gates
 
-Last reviewed: 2026-08-24
+Last reviewed: 2026-11-02
 
 Run from the repository root with the locked development environment:
 
@@ -10,6 +10,8 @@ uv run --locked pytest -q
 uv run --locked ruff check .
 uv run --locked ruff format --check .
 uv run --locked basedpyright
+uv run --locked basedpyright --project pyrightconfig.strict.json
+uv run --locked python scripts/check_strict_baseline.py
 uv run --locked vulture quality_runner quality_evidence_contract repo_quality_certifier tests scripts --min-confidence 70
 uv run --locked pip-audit
 uv build
@@ -25,6 +27,7 @@ uv run --locked qr fleet audit run --all \
 uv run --locked qr fleet audit run --all \
   --projects-root /path/to/projects \
   --standard matrix-maintenance --json
+uv run --locked qr dogfood report --json
 ```
 
 The onboarding command is read-only unless `--output` is explicit and exits
@@ -137,11 +140,35 @@ deploy, tag, push, call a provider, collect credentials, or execute a
 remediation action. If a dependency cache, tool, or gate is unavailable, keep
 the result visible as unknown or blocked.
 
-BasedPyright is certified over the declared package scope in standard mode.
-Repository-wide strict mode is not certified: the 0.7.0 fold exposed a large
-existing backlog when the environment branch enabled it without end-to-end
-proof. Keep that migration visible as candidate work, fix findings at their
-source, and do not add broad ignores or replace errors with casts.
+For task-scoped implementation feedback, capture a baseline before edits, use
+`uv run --locked qr task check /path/to/repository --task-id ID --fast`
+at meaningful boundaries, and run
+`uv run --locked qr task release-check /path/to/repository --task-id ID --json`
+before completion. Fast mode skips certified native gates and is never
+release-ready; release-check reuses exact-current authoritative and gate receipts
+when valid, otherwise runs live, and fails unless `release_readiness.eligible: true`.
+
+After an approved task policy or coverage repair, use
+`qr task rebaseline /path/to/repository --task-id ID --preserve-source --reason
+"Reviewed policy repair" --json`. Recovery must prove the original source
+manifest against its recorded Git revision before changing the active baseline.
+Preserve an unrecoverable baseline and report its missing source evidence.
+
+For the global Codex adapter, configure the installed `qr dogfood codex-hook
+--json` command for `SessionStart`, `UserPromptSubmit`, and `Stop`. It is inert
+outside Git repositories enrolled with
+`.quality-runner.toml`. Validate positive baseline capture, an unchanged Stop,
+a changed eligible Stop, and a changed blocked Stop before broad use. A changed
+blocked Stop must return promptly and must not launch the release scan. The local
+report must preserve pseudonymous identifiers and exclude prompts, source
+paths, finding bodies, and raw names.
+
+Both standard and strict BasedPyright cover the declared package scope.
+The strict cleanup was integrated into `dev` in PR #18; its zero-diagnostic
+baseline is enforced by CI. Run both commands and the pinned baseline check
+above after integrating new code. Fix findings at their source; do not raise
+the zero baseline or replace real type errors with suppressions. See
+`docs/strict-type-burndown.md` for baseline identity and failure semantics.
 
 For missing Pronto findings evidence, use `qr fleet detector refresh --all
 --projects-root ROOT --json`. This explicit lane runs full deterministic

@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://quality-runner.dev/schemas/dogfood-event.schema.json",
+  "title": "Quality Runner Dogfood Event",
+  "type": "object",
+  "required": ["schema", "event_id", "event_name", "occurred_at", "repository_id", "task_id", "quality_runner_version", "dimensions"],
+  "properties": {
+    "schema": { "const": "quality-runner-dogfood-event-v0.1" },
+    "event_id": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "event_name": { "type": "string", "pattern": "^quality_runner\\.task\\." },
+    "occurred_at": { "type": "string", "format": "date-time" },
+    "repository_id": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "task_id": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "quality_runner_version": { "type": "string" },
+    "dimensions": { "type": "object" }
+  },
+  "additionalProperties": false
+}

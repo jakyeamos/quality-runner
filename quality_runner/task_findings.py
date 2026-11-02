@@ -67,6 +67,7 @@ def compare_findings(
     changed_paths: list[str],
     dispositions: list[dict[str, Any]],
     required_modules: list[str],
+    preserve_incomplete_baseline: bool = False,
     now: datetime | None = None,
 ) -> dict[str, Any]:
     result: dict[str, list[dict[str, Any]]] = {name: [] for name in DELTA_BUCKETS}
@@ -111,6 +112,11 @@ def compare_findings(
         module = str(occurrence.get("coverage_ref") or "")
         if current_coverage.get(module) == "complete":
             result["resolved"].append(occurrence)
+        elif preserve_incomplete_baseline:
+            # A provisional scan may intentionally defer whole-repository
+            # modules. Carry their prior occurrence forward instead of
+            # claiming either resolution or unknown release evidence.
+            result["persisted"].append(occurrence)
         else:
             unknown = {
                 **occurrence,

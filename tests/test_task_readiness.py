@@ -45,6 +45,59 @@ def test_candidate_gate_remains_advisory(tmp_path: Path) -> None:
     assert readiness["gates"][0]["state"] == "candidate"
 
 
+def test_repo_local_toolchain_identity_is_stable_across_worktrees(tmp_path: Path) -> None:
+    first_root = tmp_path / "first"
+    second_root = tmp_path / "second"
+
+    assert task_readiness._portable_command_path(
+        first_root, first_root / ".venv/bin/pytest"
+    ) == task_readiness._portable_command_path(second_root, second_root / ".venv/bin/pytest")
+
+
+def test_readiness_hash_is_stable_for_equivalent_worktrees(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def fake_gate(
+        *,
+        repo_root: Path,
+        configured: dict[str, object],
+        global_environment_paths: object,
+    ) -> dict[str, object]:
+        del configured, global_environment_paths
+        return {
+            "id": "pytest",
+            "command_path": str(repo_root / ".venv/bin/pytest"),
+            "command_version": "pytest 9.0.2",
+            "state": "certified",
+        }
+
+    monkeypatch.setattr(task_readiness, "_evaluate_gate", fake_gate)
+
+    first = evaluate_readiness(
+        repo_root=tmp_path / "first",
+        prevention={"gates": [{"id": "pytest"}]},
+    )
+    second = evaluate_readiness(
+        repo_root=tmp_path / "second",
+        prevention={"gates": [{"id": "pytest"}]},
+    )
+
+    assert first["toolchain_hash"] == second["toolchain_hash"]
+
+
+def test_toolchain_identity_preserves_relative_and_external_path_differences(
+    tmp_path: Path,
+) -> None:
+    repo_root = tmp_path / "repo"
+
+    assert task_readiness._portable_command_path(
+        repo_root, repo_root / ".venv/bin/pytest"
+    ) != task_readiness._portable_command_path(repo_root, repo_root / "tools/pytest")
+    assert task_readiness._portable_command_path(repo_root, "/usr/bin/python3") != (
+        task_readiness._portable_command_path(repo_root, "/opt/homebrew/bin/python3")
+    )
+
+
 def test_declared_unavailable_gate_preserves_evidence(tmp_path: Path) -> None:
     readiness = evaluate_readiness(
         repo_root=tmp_path,
@@ -131,6 +184,8 @@ def test_certified_gate_pass_and_intentional_failure(tmp_path: Path) -> None:
     )
     assert blockers == []
     assert pass_results[0]["status"] == "passed"
+    assert pass_results[0]["duration_seconds"] >= 0
+    assert pass_results[0]["bootstrap"]["duration_seconds"] >= 0
 
     failing = evaluate_readiness(
         repo_root=tmp_path,
@@ -144,6 +199,42 @@ def test_certified_gate_pass_and_intentional_failure(tmp_path: Path) -> None:
     assert blockers == []
     assert fail_results[0]["status"] == "failed"
     assert required_gate_failures(fail_results) == fail_results
+
+
+def test_certified_gate_receipt_reuses_only_exact_snapshot(tmp_path: Path) -> None:
+    marker = tmp_path / "gate-count.txt"
+    command = (
+        f"{sys.executable} -c "
+        f'"from pathlib import Path; p=Path({str(marker)!r}); '
+        "p.write_text(p.read_text() + 'x' if p.exists() else 'x')\""
+    )
+    readiness = evaluate_readiness(repo_root=tmp_path, prevention={"gates": [_gate(command)]})
+
+    first, first_blockers = run_certified_gates(
+        snapshot_root=tmp_path,
+        repo_root=tmp_path,
+        readiness=readiness,
+        snapshot_digest="snapshot-one",
+    )
+    second, second_blockers = run_certified_gates(
+        snapshot_root=tmp_path,
+        repo_root=tmp_path,
+        readiness=readiness,
+        snapshot_digest="snapshot-one",
+    )
+    third, third_blockers = run_certified_gates(
+        snapshot_root=tmp_path,
+        repo_root=tmp_path,
+        readiness=readiness,
+        snapshot_digest="snapshot-two",
+    )
+
+    assert first_blockers == second_blockers == third_blockers == []
+    assert "receipt_reuse" not in first[0]
+    assert second[0]["receipt_reuse"]["status"] == "hit"
+    assert second[0]["duration_seconds"] == 0.0
+    assert "receipt_reuse" not in third[0]
+    assert marker.read_text() == "xx"
 
 
 def test_certified_gate_timeout_is_unknown_evidence(tmp_path: Path) -> None:

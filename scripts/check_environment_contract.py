@@ -221,7 +221,7 @@ def _check_strict_config(root: Path, errors: list[str]) -> None:
         errors.append(f"invalid pyrightconfig.strict.json: {error.__class__.__name__}")
         return
     if not isinstance(config, dict) or config.get("typeCheckingMode") != "strict":
-        errors.append("pyrightconfig.strict.json must remain the advisory strict configuration")
+        errors.append("pyrightconfig.strict.json must remain the repository strict configuration")
 
 
 def _check_pre_cr(root: Path, errors: list[str]) -> None:

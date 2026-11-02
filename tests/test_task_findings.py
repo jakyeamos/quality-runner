@@ -180,6 +180,22 @@ def test_incomplete_follow_up_coverage_makes_absence_unknown_not_resolved() -> N
     }
 
 
+def test_provisional_comparison_carries_incomplete_baseline_forward() -> None:
+    result = compare_findings(
+        baseline=_payload([_occurrence("deferred")]),
+        current=_payload([], coverage="partial"),
+        changed_paths=["src/app.py"],
+        dispositions=[],
+        required_modules=[],
+        preserve_incomplete_baseline=True,
+    )
+
+    assert result["counts"]["persisted"] == 1
+    assert result["counts"]["resolved"] == 0
+    assert result["counts"]["unknown"] == 0
+    assert result["blockers"] == []
+
+
 def test_exact_fingerprint_waiver_requires_owner_reason_evidence_and_future_expiry() -> None:
     result = compare_findings(
         baseline=_payload([]),

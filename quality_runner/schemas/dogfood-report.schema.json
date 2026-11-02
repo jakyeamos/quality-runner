@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://quality-runner.dev/schemas/dogfood-report.schema.json",
+  "title": "Quality Runner Dogfood Report",
+  "type": "object",
+  "required": ["schema", "status", "privacy", "coverage", "feedback_loop"],
+  "properties": {
+    "schema": { "const": "quality-runner-dogfood-report-v0.1" },
+    "status": { "enum": ["passed", "empty", "degraded"] },
+    "privacy": { "type": "object" },
+    "coverage": { "type": "object" },
+    "feedback_loop": { "type": "object" },
+    "error": { "type": "object" }
+  },
+  "additionalProperties": false
+}

@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Run the advisory BasedPyright strict ratchet.
+"""Enforce the pinned, occurrence-aware BasedPyright strict baseline.
 
-The repository's certified type gate remains ``uv run --locked basedpyright``
-in standard mode.  This command is the evidence-producing burndown lane.
+CI requires this zero-diagnostic ratchet alongside the standard-mode gate.
+Tool or coverage drift fails closed instead of accepting a new baseline.
 """
 
 from __future__ import annotations

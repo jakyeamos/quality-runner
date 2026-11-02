@@ -29,6 +29,20 @@ def add_task_commands(subparsers: Any) -> None:
         help="Run the authoritative completion check for the exact current workspace",
     )
     _common_arguments(check)
+    check.add_argument(
+        "--fast",
+        action="store_true",
+        help=(
+            "Skip certified gate execution for provisional implementation-time feedback; "
+            "never release evidence"
+        ),
+    )
+
+    release_check = actions.add_parser(
+        "release-check",
+        help="Run the authoritative check and fail unless release readiness is eligible",
+    )
+    _common_arguments(release_check)
 
     rebaseline = actions.add_parser(
         "rebaseline",
@@ -36,6 +50,11 @@ def add_task_commands(subparsers: Any) -> None:
     )
     _common_arguments(rebaseline)
     rebaseline.add_argument("--reason", required=True, help="Why a new baseline is required")
+    rebaseline.add_argument(
+        "--preserve-source",
+        action="store_true",
+        help="Rescan the original source under current policy only after exact Git recovery proof",
+    )
 
 
 def _common_arguments(parser: argparse.ArgumentParser) -> None:

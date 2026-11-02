@@ -7,6 +7,8 @@
   "properties": {
     "schema": { "const": "quality-runner-task-check-v0.1" },
     "status": { "enum": ["pass", "violation", "blocked", "invalid"] },
+    "mode": { "enum": ["authoritative", "fast"] },
+    "release_enforcement": { "enum": ["advisory", "required"] },
     "next_action": { "type": "string", "minLength": 1 },
     "task_id": { "type": "string" },
     "run_id": { "type": "string" },
@@ -21,12 +23,38 @@
     "gate_results": { "type": "array" },
     "required_gate_failures": { "type": "array" },
     "blockers": { "type": "array" },
+    "release_readiness": {
+      "type": "object",
+      "required": ["status", "eligible", "mode", "predicate", "criteria", "blocking_reasons"],
+      "properties": {
+        "status": { "enum": ["ready", "ineligible"] },
+        "eligible": { "type": "boolean" },
+        "mode": { "enum": ["authoritative", "fast"] },
+        "predicate": { "const": "no_new_enforced_findings" },
+        "criteria": { "type": "object" },
+        "blocking_reasons": { "type": "array", "items": { "type": "string" } }
+      }
+    },
     "analysis": {
       "type": "object",
       "required": ["analysis_mode", "cache_mode", "performance", "cache_summary"]
     },
-    "evidence": { "type": "object" },
+    "evidence": {
+      "type": "object",
+      "properties": {
+        "task_analysis_contract": { "const": "source-with-current-policy-v1" }
+      }
+    },
     "error": { "type": "object" },
-    "warnings": { "type": "array" }
+    "warnings": { "type": "array" },
+    "dogfood_telemetry": { "$ref": "dogfood-capture.schema.json" },
+    "receipt_reuse": {
+      "type": "object",
+      "required": ["status", "source_run_id"],
+      "properties": {
+        "status": { "enum": ["hit", "miss"] },
+        "source_run_id": { "type": ["string", "null"] }
+      }
+    }
   }
 }

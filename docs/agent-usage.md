@@ -21,14 +21,18 @@ Use the task workflow at meaningful evidence boundaries:
 | Boundary | Required behavior |
 | --- | --- |
 | Before source edits | Capture one task baseline. |
-| During editing | Use applicable repository-native checks whose current maturity is established. |
-| Before completion | Run the authoritative `qr task check`. |
+| During editing | Use `qr task check --fast` at meaningful boundaries, plus applicable repository-native checks whose current maturity is established. |
+| Before completion | Run `qr task release-check` and require exit zero. |
 | After a violation or blocker | Correct the cause and rerun the task check. |
 | Pull request | Use an immutable target revision as the baseline. |
 | Nightly or rule-pack change | Run the full repository audit for debt visibility and reconciliation. |
 
-The task check is deliberately not required on every save. Agent instructions
-guide implementation behavior; they do not replace QR's baseline, coverage,
+The task check is deliberately not required on every save. Fast task checks
+skip certified native gates and are useful for short feedback cycles, but even
+a fast `pass` is provisional and cannot authorize release. Authoritative task
+checks can report release-ready evidence, but `release-check` is the fail-closed
+process boundary agents should use for completion. Agent instructions guide
+implementation behavior; they do not replace QR's baseline, coverage,
 matching, readiness, or policy evidence. Do not translate every advisory
 finding into a static prohibition. Promote a repeatedly trusted deterministic
 finding into a behavior-verified QR rule or a faster native checker, with
@@ -41,18 +45,35 @@ For ordinary implementation work, capture the task baseline before editing:
 qr task start /path/to/repo --task-id <stable-task-id> --json
 ```
 
+During implementation, check the exact workspace without waiting for the
+certified gates:
+
+```bash
+qr task check /path/to/repo --task-id <stable-task-id> --fast
+```
+
 After editing and before declaring the implementation complete:
 
 ```bash
-qr task check /path/to/repo --task-id <stable-task-id> --json
+qr task release-check /path/to/repo --task-id <stable-task-id> --json
 ```
 
 Fix new enforced findings and failed certified gates. Do not treat persisted
-legacy debt as a task failure, and do not interpret `blocked` as a pass. When
+legacy debt as a task failure, and do not interpret `blocked` as a pass. The
+release-check result's `release_readiness.eligible` must be true before the
+task is considered QR-ready; its exit code enforces that predicate, and a fast
+result is explicitly ineligible. When
 configuration, rule packs, promoted policy, the toolchain, or the QR version
 changes, review that change and use `task rebaseline --reason ...`; never
 silently enlarge the baseline. PR-target tasks preserve the originally resolved
 target SHA across rebaseline.
+
+For a policy or coverage repair, use `task rebaseline --preserve-source --reason
+...` to reanalyze the original source, never the current edits. This requires an
+exact match between the recorded snapshot and its Git revision; unrecoverable
+dirty source blocks recovery. Task scans apply the current policy even when
+Git ignores `.quality-runner.toml`. Older analysis contracts and receipts from
+a superseded baseline cannot authorize release.
 
 Read `task-check.json` as the canonical result and `task-check.md` as its human
 projection. The emitted `next_action` explains the required response for
@@ -68,6 +89,36 @@ stay advisory.
 QR owns evidence and policy evaluation only. The implementing agent still owns
 source changes and decides how to correct a violation; QR does not edit code,
 drive the agent, install prerequisites, commit, or push.
+
+### Automatic Codex dogfooding
+
+The global Codex adapter can make the same protocol automatic for enrolled
+repositories. Configure `qr dogfood codex-hook --json` for `SessionStart`,
+`UserPromptSubmit`, and `Stop`. The adapter derives a
+pseudonymous task ID from the Codex session, starts at most one baseline, skips
+the release scan when the workspace is unchanged, reuses exact matching
+eligible release evidence, and otherwise blocks task completion until the
+authoritative release check is eligible.
+
+Changed work without an exact eligible release receipt blocks immediately and
+returns the explicit `qr task release-check` command. The Stop hook never starts
+the expensive authoritative scan. A release check may reuse a prior passing
+authoritative check only when the snapshot, policy, toolchain, QR version, and
+required gate evidence all match exactly.
+
+The adapter accepts `PreToolUse` as an idempotent compatibility event, but the
+global default omits it: `SessionStart` and `UserPromptSubmit` already establish
+the baseline, while a process launch before every tool call would lengthen the
+feedback loop for enrolled and unenrolled work.
+
+Keep the global instruction declarative: agents must use the QR baseline and
+non-positive finding delta, but QR's executable hook remains the enforcement
+boundary. Never silently rebaseline. A telemetry failure must be reported but
+must not weaken or replace the underlying task result. Inspect aggregate local
+behavior with `qr dogfood report --json`; the store excludes prompts, source
+paths, finding bodies, and raw repository or task identifiers. The report adds
+per-gate/bootstrap latency and exact-receipt reuse rates so regressions are
+visible without collecting source content.
 
 ## Admit a new repository only from executable evidence
 

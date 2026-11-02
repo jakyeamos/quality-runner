@@ -12,11 +12,23 @@ the gate as a usable candidate.
 
 Prevention uses a hybrid feedback model:
 
-- Agent guidance requires a task baseline and an authoritative completion
-  check, and explains how to respond to each result.
+- Agent guidance requires a task baseline and a fail-closed
+  `qr task release-check` before completion, and explains how to respond to
+  each result.
+- `qr task check --fast` provides provisional finding feedback during
+  implementation with balanced analysis and validated content-cache reuse,
+  without executing certified gates; it cannot authorize release.
 - Mature repository-native checks provide faster feedback during editing.
 - QR independently verifies the exact workspace, task-relative finding delta,
   comparable coverage, policy hashes, and certified gate evidence.
+- Repository-local executable paths use a repository-relative identity so
+  equivalent isolated worktrees do not create false toolchain drift; external
+  executable paths remain absolute and distinct.
+
+An exact-snapshot passing gate receipt may skip repeated gate execution only
+when QR version, command and tool version, bootstrap, timeout, scope, and
+mutation policy still match. An exact authoritative task receipt has the same
+fail-closed identity rule and is the only reusable input to `release-check`.
 
 Static agent rules are not evidence that a check ran and cannot distinguish
 legacy debt from a new occurrence, incomplete coverage from resolution, or a
@@ -35,12 +47,13 @@ created by `uv sync --locked --all-groups --python 3.13`:
 | Ruff format | 0.15.10 | `ruff format --check .` | `uv run --locked ruff format --check .` |
 | BasedPyright | 1.39.0 | `basedpyright` | `uv run --locked basedpyright` |
 
-The certified BasedPyright command covers the declared package scope in
-standard mode. Repository-wide strict mode is a migration candidate, not a
-certified gate: the combined 0.7.0 fold proved that enabling it produces a
-large existing backlog. It must not become required until that debt is fixed
-and repeat-pass, intentional-failure, local, and CI evidence is refreshed for
-the expanded mode.
+The registered task-prevention BasedPyright command covers the declared
+package scope in standard mode. CI also requires the strict ratchet in
+`scripts/check_strict_baseline.py`, whose baseline contains zero diagnostics
+after the cleanup merged in PR #18. Run the direct strict command and the
+ratchet alongside the standard check; a passing task-prevention receipt alone
+does not prove strict typing passed. The strict failure and occurrence-aware
+baseline fixtures remain in `tests/test_strict_debt.py`.
 
 `tests/test_prevention_policy.py` supplies repeat-pass and intentional-failure
 fixtures for each gate. `.github/workflows/ci.yml` runs the equivalent pinned

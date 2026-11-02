@@ -3,7 +3,7 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: GPT-5.6 modernization
 status: complete
-last_updated: "2026-08-28T21:24:15Z"
+last_updated: "2026-11-02T20:41:13Z"
 progress:
   total_phases: 8
   completed_phases: 8
@@ -31,17 +31,26 @@ See `.planning/PROJECT.md` for the established product boundary and
 **Core value:** Give developers and agents trustworthy local evidence before
 they authorize repository changes.
 
-**Current focus:** Fold the post-v0.6.0 feature branches into an isolated
-`0.7.0` release candidate while preserving ambiguous dirty worktrees.
+**Current focus:** Maintain one strict-clean `dev` history containing the task
+feedback, baseline-recovery, and scan-performance repairs. Preserve unrelated
+workspaces and keep release publication separate.
 
 ## Current Position
 
-- Branch: `codex/main-fold-v0-7-0` in the isolated worktree
-  `/private/tmp/quality-runner-main-fold-v0-7-0-20260801`
-- Baseline: verified `origin/main` at `9f6c677`; eligible feature history is
-  merged through `189cbb7`, including the full-audit, environment-legibility,
-  governed bug-learning, semantic-invariant, fleet/security, and task-prevention
-  lines.
+- Integration branch: `codex/qr-dev-reconciliation-20261102`, based on canonical
+  `dev` at `a3670c6`; PR #18 is already merged there.
+- Source history: `codex/qr-baseline-repair-20261102` at `b10c25a` is merged
+  with both parent histories preserved. The change matrix retains both sides'
+  records, and the fleet audit helper retains the strict-clean implementation.
+- The combined source initially exposed 46 strict diagnostics, including a
+  missing fleet import confirmed by a failing behavioral test. The repaired
+  source reports zero strict diagnostics across 398 package files, and the
+  pinned zero-baseline ratchet passes without changing the baseline.
+- Local suite: 1,285 tests pass. Standard typing, Ruff lint and formatting,
+  Vulture, dependency audit, environment contract, and secret scan pass.
+- Exact-current task release and public package-boundary receipts are retained
+  under the task's private evidence directory; do not infer their state from
+  this historical planning summary.
 - Release metadata and readiness discovery fixes: `e3f5f5f`; PR #5 merged at
   `c6e92cc`, tag `v0.6.0` and PyPI publication are verified.
 - Audit and planning: complete
@@ -65,12 +74,11 @@ they authorize repository changes.
 
 ## Active Phase
 
-- **Phase:** release-fold
-- **Slug:** quality-runner-0-7-0
-- **Status:** In progress
-- **Completion gate:** All eligible feature history is folded from verified
-  remote `main`, the missing `v0.6.0` GitHub Release baseline is reconciled,
-  and the complete `0.7.0` release ladder passes on the isolated candidate.
+- **Phase:** dev-reconciliation
+- **Slug:** strict-zero-task-feedback
+- **Status:** Implementation and local validation complete
+- **Integration rule:** Promote only the reviewed candidate after its exact-current
+  task release gate passes. Keep the existing zero-error CI ratchet enabled.
 
 ## Key Decisions
 
@@ -118,13 +126,21 @@ they authorize repository changes.
 
 ## Next Step
 
-Merge PR #18 (`codex/strict-zero-pr-reconciliation`) into canonical `dev` after
-review so the strict-zero implementation, release-boundary fix, and completed
-maturity state become authoritative there. Keep the `v0.7.0` tag and PyPI
-publication separate until the candidate is reviewed and promoted through the
-documented release lane.
+Continue development from the reconciled strict-clean `dev` history. Keep
+standard and strict typing, the zero-baseline ratchet, and the authoritative
+task release check in the verification path. The `v0.7.0` tag and PyPI
+publication remain separate release actions requiring explicit approval.
 
 ## Recent Progress
+
+- 2026-11-02: Reconciled canonical `dev` with the installed task/baseline-repair
+  line. Resolved both merge conflicts, restored the fleet import, and checked
+  dictionary containers before narrowing receipt and telemetry fields.
+  Strict diagnostics are zero; all 1,285 tests pass. Updated stale guidance
+  that still described strict mode as an unfinished migration. No strict
+  configuration, baseline counts, ignores, or required gates were weakened.
+- 2026-08-28: PR #18 merged at `a3670c6`; the strict-zero cleanup is canonical
+  in `dev`. Earlier entries below describe their historical publication state.
 
 - 2026-08-28: `ca1b21f` completes the strict BasedPyright maturity promotion:
   the pinned local command reports zero diagnostics, the strict baseline delta

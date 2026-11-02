@@ -459,22 +459,62 @@ check the exact dirty workspace before declaring completion:
 ```bash
 qr task start /path/to/repo --task-id feature-123 --json
 # edit externally
-qr task check /path/to/repo --task-id feature-123 --json
+qr task check /path/to/repo --task-id feature-123 --fast
+qr task release-check /path/to/repo --task-id feature-123 --json
 ```
 
-Use repository-native checks for fast feedback during editing only after their
-current applicability and maturity have been established. `qr task check` is
-the authoritative completion and CI checkpoint, not a continuous-save or
-editor-hook loop. Re-run it after correcting a violation or blocker.
+Use `qr task check --fast` at meaningful implementation boundaries for
+compact provisional feedback; it runs the bounded balanced analysis, skips
+certified native gates, and is never release eligible. Use `--json` only when
+the full machine projection is needed; canonical artifacts are persisted either
+way. Use repository-native checks for even faster feedback only after
+their current applicability and maturity have been established. The default
+`qr task check` is an authoritative diagnostic checkpoint.
+`qr task release-check` reuses exact-current authoritative evidence when its
+snapshot, policy, toolchain, QR version, and required gate receipts still match;
+otherwise it runs fresh authoritative evidence. It fails unless
+`release_readiness.eligible` is true; use it for completion and CI. Neither is
+a continuous-save or editor-hook loop. Re-run the appropriate command after
+correcting a violation or blocker.
 
 The result is `pass`, `violation`, or `blocked`. Existing findings remain
 visible without blocking unrelated work; only behavior-verified promoted rules
 and certified native gates can enforce policy. QR does not assume that a
-discovered or CI-listed command is mature. Each check includes a status-specific
-`next_action`; `task-check.json` remains canonical and `task-check.md` is its
-human projection. See
+discovered or CI-listed command is mature. An authoritative result is
+release-eligible only when its `release_readiness.eligible` predicate is true.
+The dedicated `release-check` command enforces that predicate at the process
+boundary:
+no new enforced occurrence, no unknown or invalid delta evidence, complete
+comparable coverage, unchanged evidence identity, and passing required
+certified gates. Resolved findings never offset a new finding through a scalar
+count. Each check includes a status-specific `next_action`;
+`task-check.json` remains canonical and `task-check.md` is its human projection.
+See
 [Prevention Readiness](docs/prevention-readiness.md) and the
 [`task` CLI contract](docs/cli.md#quality-runner-task).
+
+Codex can automate this contract for every repository enrolled with
+`.quality-runner.toml`. Install the lifecycle command as a global
+`SessionStart`, `UserPromptSubmit`, and `Stop` hook. The first two events
+idempotently capture a session baseline; `Stop` allows unchanged
+work without an expensive scan and otherwise blocks immediately until an
+eligible exact-current authoritative release receipt exists. The hook never
+starts the expensive release scan itself. It ignores repositories that are not enrolled.
+
+```bash
+qr dogfood codex-hook --json # receives the Codex hook payload on stdin
+qr dogfood report --json
+```
+
+Dogfood telemetry stays local under
+`~/.local/state/quality-runner/dogfood/`. It records HMAC-pseudonymous task and
+repository identifiers, event/status counts, check latency, time to first
+feedback, time to release check, finding deltas, changed-path counts, per-gate
+and bootstrap latency, receipt-reuse rates, gate failures, and cache use. It
+never records prompt text, source paths, finding
+bodies, or raw task/repository names. Telemetry failure is fail-open for the QR
+gate and remains explicit as `dogfood_telemetry.status: degraded` or a hook
+system message.
 
 Quality Runner writes artifacts under the target repo:
 
