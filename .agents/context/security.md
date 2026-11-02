@@ -1,6 +1,6 @@
 # Security and approval constraints
 
-Last reviewed: 2026-08-02
+Last reviewed: 2026-11-01
 
 Quality Runner is local-first. It may read bounded repository files and write
 `.quality-runner/runs/<run-id>/` artifacts in a target repository. It must not
@@ -11,6 +11,12 @@ Generated evidence can contain sensitive repository details. Secret-like
 literals must be redacted before persistence, but artifacts are not a promise
 that every possible secret is removed. Do not commit `.env` files, keys,
 credentials, raw prompts, transcripts, private paths, or unpublished evidence.
+
+The explicit model-audit snapshot is a separate retention contract: selected
+tracked source bytes are kept unchanged for reproducible comparison. Select
+public-safe inputs before preparing or sharing a review packet; the snapshot
+is private local evidence, is not redacted, and must remain under the ignored
+run directory. See `docs/model-audits.md`.
 
 Discovered quality commands are evidence-only unless the caller explicitly
 authorizes disposable execution. Disposable worktrees must be isolated,
