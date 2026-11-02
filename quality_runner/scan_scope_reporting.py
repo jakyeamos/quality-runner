@@ -4,7 +4,7 @@ import os
 from pathlib import Path, PurePosixPath
 
 from quality_runner.code_quality_paths import TEXT_EXTENSIONS
-from quality_runner.core.audit_contracts import AuditPayload
+from quality_runner.core.audit_contracts import AuditPayload, TextFileLimit
 from quality_runner.scan_exclusions import ALWAYS_EXCLUDED_PATH_PARTS, record_scan_activity
 
 TEXT_FILE_NAMES = {"Dockerfile", "Makefile"}
@@ -60,7 +60,7 @@ def fast_skipped_directory_entry(root: Path, path: Path, reason: str) -> AuditPa
 def scan_budget_summary(
     *,
     scanned_files: int,
-    max_text_files: int,
+    max_text_files: TextFileLimit,
     skipped_files: list[AuditPayload],
 ) -> AuditPayload:
     skipped_by_budget = [

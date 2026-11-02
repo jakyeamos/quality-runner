@@ -83,6 +83,64 @@ def test_revision_snapshot_is_not_replaced_by_dirty_head(tmp_path: Path) -> None
         assert manifest["source"]["head_sha"] == baseline_sha
 
 
+@pytest.mark.parametrize("merge", [False, True])
+def test_workspace_snapshot_preserves_ignored_scan_config(tmp_path: Path, merge: bool) -> None:
+    repo = _repo(tmp_path)
+    (repo / ".gitignore").write_text(".quality-runner.toml\nprivate.env\n", encoding="utf-8")
+    _git(repo, "add", ".gitignore")
+    _git(repo, "commit", "-m", "ignore local configuration")
+    config = repo / ".quality-runner.toml"
+    config.write_text(
+        '[quality_runner.structural_scan]\nmax_text_files = "unlimited"\n', encoding="utf-8"
+    )
+    (repo / "private.env").write_text("private fixture\n", encoding="utf-8")
+
+    with workspace_snapshot(repo, merge_target_ref="HEAD" if merge else None) as (root, first):
+        assert (root / config.name).read_bytes() == config.read_bytes()
+        assert not (root / "private.env").exists()
+        assert any(entry["path"] == config.name for entry in first["entries"])
+    config.write_text("[quality_runner.structural_scan]\nmax_text_files = 1\n", encoding="utf-8")
+    with workspace_snapshot(repo, merge_target_ref="HEAD" if merge else None) as (_, second):
+        assert config.name in changed_paths(first, second)
+
+
+@pytest.mark.parametrize("merge", [False, True])
+def test_ignored_scan_config_cannot_escape_snapshot(tmp_path: Path, merge: bool) -> None:
+    repo = _repo(tmp_path)
+    (repo / ".gitignore").write_text(".quality-runner.toml\n", encoding="utf-8")
+    (repo / ".quality-runner.toml").symlink_to("../outside.toml")
+
+    with pytest.raises(SnapshotError, match="symlink"):
+        with workspace_snapshot(repo, merge_target_ref="HEAD" if merge else None):
+            pass
+
+
+@pytest.mark.parametrize("merge", [False, True])
+@pytest.mark.parametrize("ignore_target", [False, True])
+def test_config_link_requires_target_in_snapshot(
+    tmp_path: Path, merge: bool, ignore_target: bool
+) -> None:
+    repo = _repo(tmp_path)
+    (repo / ".gitignore").write_text(
+        ".quality-runner.toml\n" + ("private-config.toml\n" if ignore_target else ""),
+        encoding="utf-8",
+    )
+    (repo / "private-config.toml").write_text(
+        '[quality_runner.structural_scan]\nmax_text_files = "unlimited"\n', encoding="utf-8"
+    )
+    (repo / ".quality-runner.toml").symlink_to("private-config.toml")
+
+    if ignore_target:
+        with pytest.raises(SnapshotError, match="configuration symlink target"):
+            with workspace_snapshot(repo, merge_target_ref="HEAD" if merge else None):
+                pass
+    else:
+        with workspace_snapshot(repo, merge_target_ref="HEAD" if merge else None) as (root, _):
+            assert (root / ".quality-runner.toml").read_bytes() == (
+                repo / "private-config.toml"
+            ).read_bytes()
+
+
 def test_snapshot_records_default_exclusions_and_allows_explicit_include(tmp_path: Path) -> None:
     repo = _repo(tmp_path)
     dependency = repo / "node_modules" / "fixture.txt"

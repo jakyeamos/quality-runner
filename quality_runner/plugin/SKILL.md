@@ -17,6 +17,13 @@ source files. Discovered gates remain evidence-only unless a user explicitly
 authorizes `--execute-gates --worktree-mode disposable`; that runs local
 commands in a disposable checkout, not a sandbox.
 
+For a review without a text-file count cap, configure
+`[quality_runner.structural_scan] max_text_files = "unlimited"` before the task
+baseline. CLI, MCP, and Python scans share this setting. Inspect exclusions,
+other budgets, coverage, and review obligations separately; unlimited does not
+mean every file type or every review obligation has been covered. Positive
+integers keep finite limits, and zero is invalid. See `docs/cli.md#text-file-budgets`.
+
 When a repository requires `failure_visibility`, inspect its negative-path
 contract and machine-readable readback instead of treating script discovery as
 proof. Read `evidence_state`: `configured` and `covered` are not passing;

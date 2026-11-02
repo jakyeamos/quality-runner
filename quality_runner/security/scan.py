@@ -24,6 +24,7 @@ from quality_runner.security.capabilities import (
 from quality_runner.security.config import security_settings
 from quality_runner.security.scan_support import string_or_none
 from quality_runner.security_surface_paths import is_api_route_path, is_webhook_path
+from quality_runner.structural_scan_config_parse import text_file_limit
 
 RAW_CONTENT_MARKERS = (
     "dangerouslysetinnerhtml",
@@ -344,9 +345,9 @@ def _scan_files(
     if isinstance(generated, list):
         generated_paths = {item for item in cast(list[object], generated) if isinstance(item, str)}
     skipped_files: list[AuditPayload] = []
-    max_text_files = 5000
-    if structural is not None and isinstance(structural.get("max_text_files"), int):
-        max_text_files = structural["max_text_files"]
+    max_text_files = text_file_limit(structural.get("max_text_files") if structural else None)
+    if max_text_files is None:
+        max_text_files = 5000
 
     scanned: list[dict[str, Any]] = []
     for path in discover_text_files(

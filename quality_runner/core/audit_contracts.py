@@ -9,6 +9,7 @@ type AuditArtifactPaths = dict[str, str]
 type ScanExclusionOverlay = list[str] | dict[str, list[str]]
 type AnalysisMode = Literal["balanced", "full"]
 type CacheMode = Literal["repo", "external", "disabled"]
+type TextFileLimit = int | Literal["unlimited"]
 
 
 class AuditWarning(TypedDict):
@@ -56,7 +57,7 @@ class TextScanScope:
     repo_root: Path
     files: tuple[ScannedTextFile, ...]
     skipped_files: tuple[AuditPayload, ...]
-    max_text_files: int
+    max_text_files: TextFileLimit
     scan_exclusions: tuple[str, ...]
     security_surface_paths: tuple[str, ...] = ()
     source_analysis_cache: object | None = None

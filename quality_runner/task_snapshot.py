@@ -12,6 +12,7 @@ from fnmatch import fnmatch
 from pathlib import Path, PurePosixPath
 from typing import Any
 
+from quality_runner.config import CONFIG_FILE_NAME
 from quality_runner.schema_constants import WORKSPACE_SNAPSHOT_SCHEMA
 from quality_runner.task_snapshot_git import (
     SnapshotError,
@@ -110,6 +111,12 @@ def workspace_snapshot(
                 "head_sha": repository["head_sha"],
                 "baseline_ref": None,
             }
+        if (
+            baseline_ref is None
+            and (repo_root / CONFIG_FILE_NAME).is_symlink()
+            and not (snapshot_root / CONFIG_FILE_NAME).is_file()
+        ):
+            raise SnapshotError("configuration symlink target is unavailable in the snapshot")
         manifest = {
             "schema": WORKSPACE_SNAPSHOT_SCHEMA,
             "repository": repository,
@@ -229,8 +236,11 @@ def _copy_workspace(
     exclusions: list[dict[str, str]] = [
         {"path": name, "reason": "quality_runner_internal"} for name in sorted(ALWAYS_EXCLUDED)
     ]
-    for raw in sorted(item for item in payload.split(b"\0") if item):
-        path = _decode_git_path(raw)
+    paths = {_decode_git_path(raw) for raw in payload.split(b"\0") if raw}
+    config_path = repo_root / CONFIG_FILE_NAME
+    if config_path.exists() or config_path.is_symlink():
+        paths.add(CONFIG_FILE_NAME)
+    for path in sorted(paths):
         exclusion = _exclusion_reason(path, include_paths)
         if exclusion is not None:
             exclusions.append({"path": path, "reason": exclusion})
@@ -357,6 +367,9 @@ def _copy_merge_workspace(
         "HEAD",
     )
     head_paths = {_decode_git_path(raw) for raw in head_payload.split(b"\0") if raw}
+    config_path = repo_root / CONFIG_FILE_NAME
+    if CONFIG_FILE_NAME not in head_paths and (config_path.exists() or config_path.is_symlink()):
+        untracked_paths.add(CONFIG_FILE_NAME)
     for path in sorted(untracked_paths):
         if path not in head_paths and _path_collides_with_entries(path, entries_by_path):
             raise SnapshotError(

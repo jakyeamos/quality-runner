@@ -1,5 +1,18 @@
 # Artifact Contract
 
+Text scan budgets expose `scan_budget.max_text_files` as a positive integer
+or the literal `"unlimited"`. Unlimited scans report `budget_exceeded: false`
+and `skipped_text_files: 0` for the file-count budget; exclusions and other
+incomplete-coverage reasons remain separate. Exclusion preflight preserves the
+same literal in `config.timeout_signals.structural_max_text_files`, with null
+still meaning no explicit setting. Consumers must not coerce unlimited to a
+finite default. Effective-scope fingerprints retain the configured value.
+
+Workspace and merge-workspace snapshot manifests include an ignored
+`.quality-runner.toml` using the usual file digest and safe-entry checks, so
+configuration changes affect snapshot identity without including other ignored
+files. Historical revision snapshots remain revision-bound.
+
 ## Repository-onboarding evidence and receipt
 
 `qr onboarding check` consumes a caller-assembled

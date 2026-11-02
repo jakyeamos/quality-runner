@@ -2,8 +2,48 @@
   "schema_version": "change-surface-matrix/v1",
   "subject": {"kind": "repository", "id": "quality-runner"},
   "owner": "quality-runner-maintainers",
-  "last_reviewed": "2026-08-28",
+  "last_reviewed": "2026-11-01",
   "change_records": [
+    {
+      "id": "unlimited-text-file-budget-20261102",
+      "status": "implemented",
+      "owner": "quality-runner-maintainers",
+      "affected_surfaces": [
+        "quality-engine",
+        "fleet-consumers",
+        "matrix-maintenance"
+      ],
+      "contracts": [
+        "max_text_files accepts a positive integer or the literal unlimited; omitted settings retain existing defaults and invalid values emit warnings",
+        "shared and standalone structural/security text discovery preserve exclusions and other analysis budgets while unlimited disables only the text-file count cap",
+        "budget artifacts and preflight retain the unlimited literal; effective-scope fingerprints include the configured limit",
+        "workspace and merge-workspace snapshots retain and hash ignored root configuration while preserving unrelated ignored files, revision identity, collision checks, and symlink boundaries"
+      ],
+      "documentation": [
+        "README.md",
+        "docs/cli.md",
+        "docs/artifacts.md",
+        "quality_runner/plugin/SKILL.md",
+        ".agents/context/README.md"
+      ],
+      "tests": [
+        "tests/test_unlimited_scan_budget.py",
+        "tests/test_task_snapshot.py",
+        "tests/test_read_only_audit.py",
+        "tests/test_code_quality_boundaries.py",
+        "tests/test_exclusion_preflight.py"
+      ],
+      "evidence": [
+        "fresh CLI full-analysis fixture: unlimited scans 2502 files; finite 2 scans 2; invalid 0 warns and retains the finite default",
+        "regression fixtures: standalone security detects a sink after 5000 files; ignored scan configuration survives both workspace snapshot modes without exposing other ignored files",
+        "environment-legibility.json review renewed after checking its routed architecture, conventions, security, failure-mode, example, deployment, and validation evidence; no control or dependency policy changed"
+      ],
+      "projections": [
+        "CLI, MCP, and Python workflows consume the shared repository configuration; no additional flag or MCP parameter is introduced",
+        "Existing artifact schemas permit the budget value; consumers must preserve its integer-or-unlimited contract",
+        "Installed binaries and public distributions require separate integration/release verification; source changes do not claim publication"
+      ]
+    },
     {
       "id": "strict-zero-ci-gates-20260828",
       "status": "implemented",

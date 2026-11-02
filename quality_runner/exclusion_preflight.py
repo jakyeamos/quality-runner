@@ -23,7 +23,6 @@ from quality_runner.exclusion_preflight_support import (
     file_sha256,
     json_safe,
     path_has_symlink_component,
-    positive_int,
     protected_path_reasons,
     relative_path_error,
     repository_fingerprint,
@@ -41,6 +40,7 @@ from quality_runner.scan_exclusions import (
     scan_exclusion_contract,
     scan_exclusion_overlay_parts,
 )
+from quality_runner.structural_scan_config_parse import text_file_limit
 
 
 def generated_run_id() -> str:
@@ -83,7 +83,7 @@ def build_exclusion_packet(repo_root: Path, run_id: str) -> dict[str, object]:
             "structural_scan": json_safe(config.get("structural_scan")),
             "gate_timeouts": gate_timeouts,
             "timeout_signals": {
-                "structural_max_text_files": positive_int(
+                "structural_max_text_files": text_file_limit(
                     dict_value(config.get("structural_scan")).get("max_text_files")
                 ),
                 "configured_gate_timeouts": gate_timeouts,

@@ -669,6 +669,19 @@ does not install these tools. Disable or tune similarity under
 `[quality_runner.structural_scan]` (for example `similarity_enabled = false` or
 `disabled_rule_groups = ["deduplicate"]`).
 
+To remove the text-file count cap for an exhaustive scan, set:
+
+```toml
+[quality_runner.structural_scan]
+max_text_files = "unlimited"
+```
+
+This applies to structural and security text scanning through the CLI, MCP,
+and Python workflows. Positive integers still set a finite cap; omitting the
+setting preserves the defaults. Exclusions, supported file types, symlink
+protection, and separate time or analysis budgets still apply. See
+[text-file budgets](docs/cli.md#text-file-budgets) for coverage details.
+
 ## DOI-Ready Research Release
 
 Quality Runner is prepared as an independent software-methods artifact. See

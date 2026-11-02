@@ -2,6 +2,16 @@ from __future__ import annotations
 
 from typing import Any, cast
 
+from quality_runner.core.audit_contracts import TextFileLimit
+
+
+def text_file_limit(value: object) -> TextFileLimit | None:
+    if value == "unlimited":
+        return "unlimited"
+    if isinstance(value, int) and not isinstance(value, bool) and value > 0:
+        return value
+    return None
+
 
 def parse_structural_scan_section(
     value: object,
@@ -39,11 +49,14 @@ def parse_structural_scan_section(
         "quality_runner.structural_scan.fat_router_lines",
         warnings,
     )
-    max_text_files = _positive_int(
-        config.get("max_text_files"),
-        "quality_runner.structural_scan.max_text_files",
-        warnings,
-    )
+    max_text_files = text_file_limit(config.get("max_text_files"))
+    if config.get("max_text_files") is not None and max_text_files is None:
+        warnings.append(
+            _warning(
+                "invalid_quality_runner_config_field",
+                'quality_runner.structural_scan.max_text_files must be a positive integer or "unlimited"',
+            )
+        )
     similarity_enabled = _bool_value(
         config.get("similarity_enabled"),
         "quality_runner.structural_scan.similarity_enabled",

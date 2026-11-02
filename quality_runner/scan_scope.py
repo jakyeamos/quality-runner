@@ -12,7 +12,12 @@ from quality_runner.code_quality_paths import (
     top_level_ignored_directory_reason,
     under_generated_path,
 )
-from quality_runner.core.audit_contracts import AuditPayload, ScannedTextFile, TextScanScope
+from quality_runner.core.audit_contracts import (
+    AuditPayload,
+    ScannedTextFile,
+    TextFileLimit,
+    TextScanScope,
+)
 from quality_runner.scan_exclusions import (
     normalize_scan_exclusion_module,
     record_scan_activity,
@@ -44,6 +49,7 @@ from quality_runner.scan_scope_resolver import (
 )
 from quality_runner.semantic_similarity_policy import similarity_policy_defaults
 from quality_runner.source_analysis_cache import SourceAnalysisCache
+from quality_runner.structural_scan_config_parse import text_file_limit
 
 # The formatter's required two-line top-level spacing makes the historical
 # 500-line boundary unstable for otherwise unchanged modules. Keep the rule
@@ -79,7 +85,7 @@ def structural_scan_policy(config: dict[str, Any]) -> dict[str, Any]:
     disabled = policy.get("disabled_rule_groups")
     large_file_lines = policy.get("large_file_lines")
     fat_router_lines = policy.get("fat_router_lines")
-    max_text_files = policy.get("max_text_files")
+    max_text_files = text_file_limit(policy.get("max_text_files"))
     similarity_enabled = policy.get("similarity_enabled")
     similarity_backend = policy.get("similarity_backend")
     similarity_threshold = policy.get("similarity_threshold")
@@ -100,9 +106,7 @@ def structural_scan_policy(config: dict[str, Any]) -> dict[str, Any]:
         "fat_router_lines": fat_router_lines
         if isinstance(fat_router_lines, int) and fat_router_lines > 0
         else DEFAULT_FAT_ROUTER_LINES,
-        "max_text_files": max_text_files
-        if isinstance(max_text_files, int) and max_text_files > 0
-        else DEFAULT_MAX_TEXT_FILES,
+        "max_text_files": max_text_files if max_text_files is not None else DEFAULT_MAX_TEXT_FILES,
         "similarity_enabled": similarity_enabled,
         "similarity_backend": similarity_backend,
         "similarity_threshold": similarity_threshold,
@@ -186,7 +190,7 @@ def discover_scan_inventory(
     generated_paths: set[str],
     include_ignored_paths: set[str],
     scan_exclusions: list[str],
-    max_text_files: int,
+    max_text_files: TextFileLimit,
     focus_paths: tuple[str, ...] = (),
     include_paths: tuple[str, ...] = (),
 ) -> dict[str, Any]:
@@ -278,7 +282,9 @@ def discover_scan_inventory(
             metrics["text_candidates"] += 1
             if focus_paths and not _path_in_focus(relative_path, focus_paths):
                 continue
-            if scan_budget_exceeded or len(text_paths) >= max_text_files:
+            if scan_budget_exceeded or (
+                max_text_files != "unlimited" and len(text_paths) >= max_text_files
+            ):
                 scan_budget_exceeded = True
                 skipped_files.append({"path": relative_path, "reason": "scan budget exceeded"})
                 metrics["skipped_paths"] += 1
@@ -318,7 +324,7 @@ def discover_text_files(
     generated_paths: set[str],
     include_ignored_paths: set[str],
     scan_exclusions: list[str],
-    max_text_files: int,
+    max_text_files: TextFileLimit,
     focus_paths: tuple[str, ...] = (),
     include_paths: tuple[str, ...] = (),
 ) -> list[Path]:
@@ -391,7 +397,7 @@ def discover_text_files(
             if focus_paths and not _path_in_focus(relative_path, focus_paths):
                 continue
             if is_text_file(path):
-                if len(files) >= max_text_files:
+                if max_text_files != "unlimited" and len(files) >= max_text_files:
                     skipped_files.append({"path": relative_path, "reason": "scan budget exceeded"})
                     scan_budget_exceeded = True
                     continue

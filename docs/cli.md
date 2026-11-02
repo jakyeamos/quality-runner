@@ -1,5 +1,40 @@
 # CLI Reference
 
+## Text-file budgets
+
+Set the shared structural/security text-file limit in the target repository's
+`.quality-runner.toml`:
+
+```toml
+[quality_runner.structural_scan]
+max_text_files = "unlimited"
+```
+
+The literal `"unlimited"` removes the text-file count cap. Positive integers
+retain a finite cap. Zero, negative values, booleans, and other strings are
+invalid configuration and emit warnings; they do not mean unlimited. Omitted
+settings retain the existing 2,500-file shared/structural default and the
+5,000-file standalone security default. CLI, MCP, and Python workflows use
+the same repository setting; no extra command-line flag is required.
+
+The setting preserves exclusions, generated-file filtering, supported text
+extensions, symlink protection, and focus/include scopes. It does not remove
+separate performance, gate, similarity, or security-surface metadata budgets.
+Use full analysis and inspect coverage, deferred checks, and review obligations
+before describing a review as exhaustive. Unlimited mode may take more time
+and memory on large repositories.
+
+Workspace and merge-workspace task snapshots retain `.quality-runner.toml`
+even when Git ignores it, record it in the snapshot digest, and keep unrelated
+ignored files excluded. Revision snapshots retain their historical contents;
+task baselines with an explicit revision continue to record their existing
+analysis-policy overlay. Configure the limit before starting a task baseline;
+changing it afterward still requires an explicit lineage-preserving rebaseline.
+
+The scan budget artifact reports `max_text_files` as `"unlimited"` or the
+effective positive integer. Unlimited mode does not emit file-count budget
+exhaustion or substitute a large sentinel number.
+
 Quality Runner provides a canonical short console script and a compatibility
 alias:
 
