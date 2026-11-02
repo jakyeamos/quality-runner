@@ -5,6 +5,25 @@
   "last_reviewed": "2026-11-02",
   "change_records": [
     {
+      "id": "inheritance-scan-index-20261102",
+      "status": "implemented",
+      "owner": "quality-runner-maintainers",
+      "affected_surfaces": ["quality-engine"],
+      "contracts": [
+        "Single-implementation abstraction detection indexes inheritance clauses once per corpus while preserving finding and identifier-boundary semantics."
+      ],
+      "tests": ["tests/test_ponytail_scan_scale.py", "tests/test_code_quality.py"],
+      "evidence": [
+        "The real detector exceeded the eight-second regression budget before repair; name-boundary cases passed before repair.",
+        "Exact-current release evidence includes the detector hash; original task source is preserved when refreshing its baseline."
+      ],
+      "no_impact": [
+        "Reviewed internal performance fix: no CLI, schema, rule selection, severity, public findings, publication, or remediation contract changes. Existing agent and user commands remain valid."
+      ],
+      "documentation": [],
+      "projections": []
+    },
+    {
       "id": "task-policy-source-recovery-20261102",
       "status": "implemented",
       "owner": "quality-runner-maintainers",

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import re
+from collections import Counter
 from pathlib import Path
 from typing import Any, cast
 
@@ -74,13 +75,20 @@ def _single_implementation_abstractions(
                 }
             )
 
+    implementation_counts: Counter[str] = Counter()
+    for clause in re.finditer(r"\b(?:implements|extends)\s+([A-Za-z0-9_,\s]*)", code_text):
+        # Include the next character so an excluded Unicode letter cannot turn
+        # a partial identifier into an apparent word boundary.
+        names = re.findall(
+            r"\b[A-Z][A-Za-z0-9_]*\b",
+            clause.group(1) + code_text[clause.end() : clause.end() + 1],
+        )
+        implementation_counts.update(set(names))
+
     findings: list[dict[str, Any]] = []
     for declaration in declarations:
         name = str(declaration["name"])
-        implementation_count = len(
-            re.findall(rf"\b(?:implements|extends)\s+[A-Za-z0-9_,\s]*\b{name}\b", code_text)
-        )
-        if implementation_count != 1:
+        if implementation_counts[name] != 1:
             continue
         findings.append(
             _ponytail_finding(
