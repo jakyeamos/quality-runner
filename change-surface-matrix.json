@@ -5,7 +5,7 @@
     "id": "quality-runner"
   },
   "owner": "quality-runner-maintainers",
-  "last_reviewed": "2026-08-15",
+  "last_reviewed": "2026-11-03",
   "surfaces": [
     {
       "id": "python-source-and-contracts",
@@ -35,6 +35,19 @@
       "validation": [
         "uv run --locked pytest -q tests/test_cli.py tests/test_artifact_contracts.py",
         "uv run --locked qr release-smoke --json"
+      ],
+      "status": "applicable"
+    },
+    {
+      "id": "quality-skill-packs",
+      "scope": "external",
+      "distribution": "public_core",
+      "path": "docs/examples/*.toml and docs/quality-skills.md",
+      "owner": "quality-runner-maintainers",
+      "condition": "Public starter Quality Skill content or its usage guidance changes",
+      "operations": ["add", "change", "remove"],
+      "validation": [
+        "uv run --locked qr skill ingest docs/examples/performance-readiness.toml --repo-path . --id performance-readiness --json"
       ],
       "status": "applicable"
     },

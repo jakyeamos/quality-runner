@@ -476,8 +476,13 @@ intentional integration test, snapshot, fixture, or exception.
 ### Starter pack: Performance Readiness
 
 The [Performance Readiness starter pack](examples/performance-readiness.toml)
-reviews measurement quality, hot paths, I/O and concurrency, runtime scaling,
-and load verification. Python scans also emit native, source-bounded
+reviews measurement quality, hot paths, data-layout and cache tradeoffs, I/O and
+concurrency, runtime scaling, and load verification. It requires profiling
+before structural changes and compares candidates with a baseline under the same
+representative workload. Contiguous or packed storage, SoA/AoS, inline buffers,
+and bitsets remain workload-specific candidates; caching is a measured tradeoff
+across correctness, memory, freshness, and invalidation, including cold, warm,
+and post-mutation behavior. Python scans also emit native, source-bounded
 observations for database calls inside repeated loop bodies, synchronous
 database or known blocking calls inside `async def`, and un-awaited refresh,
 rebuild, ingest, migration, or backfill calls on async paths.
@@ -565,12 +570,16 @@ boundary change.
 
 The [Performance Readiness starter pack](examples/performance-readiness.toml)
 adds low-confidence observations for broad projections and recognizable
-blocking calls. Its agent reviews cover measurement, hot paths, scaling, I/O and
-concurrency, bundle/runtime behavior, and load verification.
+blocking calls. Its agent reviews cover measurement, hot paths, data-layout and
+cache tradeoffs, scaling, I/O and concurrency, bundle/runtime behavior, and load
+verification.
 
 The pack does not declare code slow from static shape alone. Performance
 findings should identify the workload, runtime path, and missing measurement or
-verification evidence needed to confirm the risk.
+verification evidence needed to confirm the risk. Layout and cache changes are
+workload-specific candidates: profile first and compare against a baseline under
+the same representative workload. Source shape alone does not justify a data
+representation change or adding/removing a cache.
 
 ### Starter pack: Motion Quality
 
