@@ -486,6 +486,8 @@ def main(argv: list[str] | None = None) -> int:
         return 1
     if parsed.command == "repo-hygiene" and payload.get("status") in {"fail", "blocked"}:
         return 1
+    if parsed.command == "web-readiness" and payload.get("status") in {"blocked", "unknown"}:
+        return 1
     if parsed.command == "candidates" and payload.get("status") not in {
         "passed",
         "completed",

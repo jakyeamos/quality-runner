@@ -1239,3 +1239,13 @@ For planning loops, pass `--analysis-mode balanced` and
 boundaries. `--cache-mode disabled` is diagnostic only. See
 [Planning and Delivery Contracts](planning-contracts.md) for the receipt fields
 and blocker rules.
+
+## Web readiness and performance evidence
+
+`qr web-readiness REPO --performance-evidence RECEIPT --json` imports optional
+project-owned lab measurements against explicit repository budgets. It can be
+combined with `--deployment-evidence`. Source-only and missing required evidence
+remain unknown; blocked and unknown reports exit 1. The report is written to
+`.quality-runner/web-readiness.json`, or `--output PATH`.
+See [the web-readiness contract](integrations/web-readiness.md) for applicability,
+producer trust, exact commit/scenario/freshness checks, metric units, and policy.

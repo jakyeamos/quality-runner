@@ -3,7 +3,7 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: GPT-5.6 modernization
 status: complete
-last_updated: "2026-11-02T20:41:13Z"
+last_updated: "2026-11-03T21:13:00Z"
 progress:
   total_phases: 8
   completed_phases: 8
@@ -31,11 +31,25 @@ See `.planning/PROJECT.md` for the established product boundary and
 **Core value:** Give developers and agents trustworthy local evidence before
 they authorize repository changes.
 
-**Current focus:** Maintain one strict-clean `dev` history containing the task
-feedback, baseline-recovery, and scan-performance repairs. Preserve unrelated
-workspaces and keep release publication separate.
+**Current focus:** Maintain proactive, project-owned performance acceptance in
+the existing web-readiness path. Preserve strict typing and task release gates;
+keep browser-producer trust, real-project adoption and publication explicit.
 
 ## Current Position
+
+- Proactive web performance: optional lab receipt import and explicit repository
+  budgets are implemented, with production build provenance, exact tracked HEAD,
+  freshness, scenario, aggregation and policy checks. Missing measurements remain
+  unknown. Build-file inventory is distinguished from route transfer.
+- Scoped verification: 49 web-readiness tests pass, plus direct CLI pass,
+  over-budget, stale and missing-evidence exercises. Full and release results
+  belong to exact-current task receipts, not this historical summary.
+- Existing performance reviews are refined in place in the portable starter;
+  no universal targets, telemetry, browser dependency or fleet activation added.
+- Real-repository pilot remains unverified due to unresolved workspace custody;
+  fixture results do not establish application performance or field compliance.
+
+### Prior dev reconciliation evidence
 
 - Integration branch: `codex/qr-dev-reconciliation-20261102`, based on canonical
   `dev` at `a3670c6`; PR #18 is already merged there.
@@ -74,9 +88,9 @@ workspaces and keep release publication separate.
 
 ## Active Phase
 
-- **Phase:** dev-reconciliation
-- **Slug:** strict-zero-task-feedback
-- **Status:** Implementation and local validation complete
+- **Phase:** proactive-performance
+- **Slug:** project-owned-web-budgets
+- **Status:** Implemented; real-repository pilot blocked on workspace custody
 - **Integration rule:** Promote only the reviewed candidate after its exact-current
   task release gate passes. Keep the existing zero-error CI ratchet enabled.
 

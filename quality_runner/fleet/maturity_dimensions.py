@@ -424,7 +424,12 @@ def _web_assessments(root: Path, config: dict[str, Any], as_of: str) -> dict[str
             "route_titles",
             "primary_heading",
         },
-        "performance": {"javascript_bundle_budget"},
+        "performance": {"javascript_bundle_budget"}
+        | {
+            str(item.get("id"))
+            for item in checks
+            if str(item.get("id", "")).startswith("performance")
+        },
         "critical_user_journeys": {"deployment_route_coverage", "console_errors", "asset_errors"},
         "web_readiness": {str(item.get("id")) for item in checks},
     }

@@ -2,6 +2,17 @@
 
 All notable changes to Quality Runner are documented here.
 
+## Unreleased
+
+- Add optional project-owned lab performance budgets and bounded production-build
+  receipts to `qr web-readiness --performance-evidence`, with exact tracked HEAD,
+  scenario, freshness and sample validation. Missing measurements stay unknown.
+- Distinguish legacy build-file gzip inventory from route transfer, preserve
+  unknown performance in fleet projections, and make blocked/unknown web reports
+  exit nonzero as documented.
+- Refine the performance-readiness starter around proactive journey acceptance,
+  measured cause paths, correct caching, comparable evidence and scoped completion.
+
 ## 0.7.0 - 2026-08-01
 
 - Added delivery contracts, phase contracts, performance evidence, and

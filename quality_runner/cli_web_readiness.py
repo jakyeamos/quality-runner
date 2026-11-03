@@ -30,6 +30,11 @@ def add_web_readiness_command(
         help="Project-owned browser evidence using quality-runner-web-deployment-evidence/v1",
     )
     parser.add_argument(
+        "--performance-evidence",
+        default=None,
+        help="Project-owned lab measurements using quality-runner-web-performance-evidence/v1",
+    )
+    parser.add_argument(
         "--output",
         default=None,
         help=f"Report path (default: {DEFAULT_REPORT_PATH} inside the repository)",
@@ -45,6 +50,11 @@ def web_readiness_command_payload(args: argparse.Namespace, *, repo_root: Path) 
         repo_root,
         config=load_repo_config(repo_root),
         deployment_evidence_path=deployment_path,
+        performance_evidence_path=(
+            Path(args.performance_evidence).expanduser().resolve()
+            if args.performance_evidence
+            else None
+        ),
     )
     output = (
         Path(args.output).expanduser().resolve() if args.output else repo_root / DEFAULT_REPORT_PATH

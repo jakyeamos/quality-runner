@@ -1,6 +1,6 @@
 id = "performance-readiness"
 name = "Performance Readiness"
-version = "0.1.0"
+version = "0.2.0"
 description = "Source-level performance risk signals and high-recall review criteria for measurement, hot paths, I/O, runtime scaling, and load verification."
 
 [[deterministic_rules]]
@@ -44,6 +44,17 @@ measurement command. Cite the exact hot path, benchmark, metric, or missing
 artifact. Prefer high recall and use low confidence when runtime and traffic
 are external to the repository. Do not call code slow from complexity or style
 alone; identify the measurement evidence that is missing or contradictory.
+Apply review when a change materially affects journey latency, responsiveness,
+resource cost, or constrained conditions; ordinary copy/docs changes do not need
+a performance campaign. Identify affected journeys and supported device, input,
+network, cache, and data conditions during design. Reuse repository-owned budgets
+and tolerances. If absent, request a representative baseline and a provisional
+target tied to user need, owner, evidence, and uncertainty. Current behavior is
+not proof of acceptability. Do not invent percentage speedups, perfect scores,
+zero-growth requirements, or universal bundle limits. Record baseline/candidate
+revision, production build, tool/version, repeatable command, scenario and sample
+variability. Separate source hypotheses, artifact estimates, lab observations,
+and existing authorized field data; never turn missing measurements into a pass.
 """
 
 [[agent_reviews]]
@@ -62,6 +73,16 @@ serializer, cache, or pool configuration and explain the growth or contention
 path. Prefer high recall and use low confidence when query planners, data size,
 or runtime caching are not visible. Do not assert a performance defect without
 identifying the workload or scaling mechanism that makes it plausible.
+Follow the measured bottleneck across server, queries, network and client work.
+For data-backed changes, inspect query count and plans at representative volume,
+result correctness, and write/storage costs before prescribing indexes. For
+layout or allocation changes, profile access patterns before choosing contiguous
+storage, packed/index handles, inline buffers, bitsets or SoA/AoS. Preserve bounds,
+identity, lifetime, resizing and concurrency semantics. Prefer simpler structures
+when no meaningful benefit is measured. Cache changes require measured benefit,
+bounded memory, freshness/invalidation and post-mutation verification; caching
+is a tradeoff, not inherently a failure. Do not remove caches wholesale or add
+unmeasured caches reflexively.
 """
 
 [[agent_reviews]]
@@ -80,6 +101,13 @@ cleanup gaps. Cite the exact call, loop, task group, queue, timeout, or retry
 configuration. Prefer high recall and use low confidence when framework
 execution semantics are not visible. Distinguish intentional serialization
 from accidental sequential work.
+Before changing request sequencing, distinguish independent work from required
+ordering and side effects. Verify delayed, failed, stale-response and recovery
+states, preserving input and avoiding duplicate actions. Measure representative
+response sizes, dependency chains, and service limits. For delivery/cache changes,
+inspect actual headers and encoding plus cold/warm and post-mutation behavior;
+verify authorization and tenant variation so private data cannot cross users.
+Do not imply new offline support or production telemetry without project scope.
 """
 
 [[agent_reviews]]
@@ -98,6 +126,19 @@ asset, effect, cache, or build configuration. Prefer high recall and use low
 confidence when bundler output, browser traces, or device profiles are absent.
 Do not infer a user-visible performance failure without identifying the runtime
 path and missing evidence.
+Review cost when a runtime dependency, asset, script or client boundary is added:
+inspect affected production routes, actual transfer, execution/hydration, requests,
+first-use latency and maintenance cost. A gzip sum across build files is inventory,
+not per-route transfer or proof of speed. Remove only confirmed unused work after
+checking consumers; justify necessary growth against delivered capability and
+journey budgets. Defer optional work only when both initial and first-use journeys
+benefit. Keep the actual LCP image discoverable/eager; size media for its rendered
+use and reserve geometry. Lazy-load offscreen noncritical media, avoid blanket
+preloads, and verify font visibility, fallback and layout during swap/failure.
+In React, inspect state/effect ownership and measured render costs before manual
+memoization; verify actual compiler settings. Moving work to the server can add
+backend/response cost. Exercise supported device capability and input methods,
+not just a narrow desktop viewport, and preserve accessibility and required UX.
 """
 
 [[agent_reviews]]
@@ -116,4 +157,32 @@ the changed surface and nearest available verification artifact. Prefer high
 recall and use low confidence when performance testing is delegated to an
 external environment. Prefer measurement-first remediation over speculative
 micro-optimizations.
+Choose the smallest repeatable check for the affected cause path; broaden for
+shared runtime/build/loading changes or evidence of wider effects. Use existing
+build/test/CI gates for reliable project-owned budgets, with owner, rationale,
+conditions, sample count, freshness and producer provenance. Noisy or unverified
+checks remain report-only with the prevention gap explicit. Never silently loosen
+limits, rebaseline failures, or substitute an unavailable check with green.
+For web journeys select relevant LCP, INP, CLS and task-completion measures.
+Navigation-only Lighthouse/TBT is not INP; exercise interactions and later layout
+shifts. Lab samples are not field compliance: field assessment needs the relevant
+collection window, page/origin scope and device-specific p75 for all required
+metrics. Use only existing authorized field evidence. Finish when scoped
+acceptance and existing required gates pass with behavior preserved; retain exact
+unmet/pre-existing targets as partial, and stop unrelated optimization.
 """
+
+
+[[sources]]
+id = "proactive-performance-2026-11"
+ref = "https://web.dev/articles/vitals"
+version = "accessed-2026-11-03"
+date = "2026-11-03"
+changes = "Original proactive review criteria; journey-owned budgets, comparable evidence, lab/field distinctions and bounded completion. No copied implementation."
+
+[[sources]]
+id = "lighthouse-ci-assertions"
+ref = "https://github.com/GoogleChrome/lighthouse-ci/blob/main/docs/configuration.md"
+version = "accessed-2026-11-03"
+date = "2026-11-03"
+changes = "Measurement and assertion pattern reference; explicit budgets, repeated runs and declared aggregation. No code copied."

@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import Any, cast
 
+from quality_runner.web_performance_contract import parse_performance_budgets
+
 DEFAULT_BUNDLE_BUDGET_GZIP_BYTES = 200_000
 DEFAULT_TOTAL_BUNDLE_BUDGET_GZIP_BYTES = 800_000
 VALID_APPLICABILITY = {"public_web", "internal_web", "not_applicable", "unknown"}
@@ -56,6 +58,14 @@ def parse_web_readiness_section(
         DEFAULT_TOTAL_BUNDLE_BUDGET_GZIP_BYTES,
     )
 
+    budgets, budget_errors = parse_performance_budgets(value.get("performance_budgets"))
+    warnings.extend(_warning(error) for error in budget_errors)
+    explicit_budgets = sum(
+        isinstance(value.get(field), int)
+        and not isinstance(value.get(field), bool)
+        and value[field] > 0
+        for field in ("bundle_budget_gzip_bytes", "total_bundle_budget_gzip_bytes")
+    )
     return {
         "applicability": applicability,
         "reason": reason.strip() if isinstance(reason, str) else None,
@@ -63,6 +73,9 @@ def parse_web_readiness_section(
         "build_roots": build_roots,
         "bundle_budget_gzip_bytes": bundle_budget,
         "total_bundle_budget_gzip_bytes": total_bundle_budget,
+        "bundle_budget_origin": ("legacy_defaults", "mixed", "repository")[explicit_budgets],
+        "performance_budgets": budgets,
+        "performance_budget_errors": budget_errors,
     }
 
 
