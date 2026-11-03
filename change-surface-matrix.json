@@ -40,6 +40,19 @@
       "status": "applicable"
     },
     {
+      "id": "quality-skill-packs",
+      "scope": "external",
+      "distribution": "public_core",
+      "path": "docs/examples/*.toml and docs/quality-skills.md",
+      "owner": "quality-runner-maintainers",
+      "condition": "Public starter Quality Skill content or its usage guidance changes",
+      "operations": ["add", "change", "remove"],
+      "validation": [
+        "uv run --locked qr skill ingest docs/examples/performance-readiness.toml --repo-path . --id performance-readiness --json"
+      ],
+      "status": "applicable"
+    },
+    {
       "id": "ci-and-release",
       "scope": "external",
       "distribution": "public_core",
