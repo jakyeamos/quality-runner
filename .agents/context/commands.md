@@ -178,3 +178,10 @@ published, blocked, or unsupported repository. It does not execute discovered
 gates. Missing phase artifacts remain unpublished while the fleet ledger keeps
 compact phase status, timeout, and reason diagnostics. Follow with `pronto
 quality refresh --json` unless Pronto owns the combined invocation.
+
+For performance-sensitive web changes, use existing project-owned measurements
+with `qr web-readiness REPO --performance-evidence RECEIPT --json`. Read
+`docs/integrations/web-readiness.md` before adding budgets or writing a producer.
+Do not infer route transfer or speed from the legacy build-file gzip inventory.
+The optional import validates lab evidence; it does not run a browser, certify
+field metrics, or substitute for required task release checks.

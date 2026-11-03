@@ -123,7 +123,9 @@ qr web-readiness /path/to/repo \
 ```
 
 See the [web-readiness evidence contract](docs/integrations/web-readiness.md)
-for policy, bundle budgets, evidence levels, schemas, and producer examples.
+for policy, project-owned lab performance budgets, evidence levels, schemas, and
+producer examples. Import repeated measurements with `--performance-evidence`;
+build-file inventory is reported separately from measured route transfer.
 
 Before a new repository is admitted to the fleet, use the global matrix's
 fail-closed onboarding decision. The command validates approved producer

@@ -2,8 +2,57 @@
   "schema_version": "change-surface-matrix/v1",
   "subject": {"kind": "repository", "id": "quality-runner"},
   "owner": "quality-runner-maintainers",
-  "last_reviewed": "2026-11-02",
+  "last_reviewed": "2026-11-03",
   "change_records": [
+    {
+      "id": "proactive-web-performance-20261103",
+      "status": "implemented",
+      "owner": "quality-runner-maintainers",
+      "affected_surfaces": [
+        "quality-engine",
+        "fleet-consumers",
+        "matrix-maintenance",
+        "ci-and-release"
+      ],
+      "contracts": [
+        "Optional project-owned lab budgets use explicit metric, scenario, owner, rationale, aggregation, freshness and warn/block policy; there are no new default runtime thresholds.",
+        "Performance receipt v1 is bounded and rejects malformed, stale, wrong-commit and mismatched-context data. Producer-authored build identity is not independently attested.",
+        "Build-file gzip inventory is labeled separately from route transfer; legacy thresholds remain compatible.",
+        "Web readiness exits nonzero for blocked/unknown and fleet performance preserves unknown declared measurements."
+      ],
+      "documentation": [
+        ".agents/context/commands.md",
+        "docs/cli.md",
+        "docs/integrations/web-readiness.md",
+        "docs/examples/performance-readiness.toml",
+        "README.md",
+        "CHANGELOG.md"
+      ],
+      "tests": [
+        "tests/test_web_readiness.py::test_cli_imports_repeated_lab_measurements",
+        "tests/test_web_readiness.py::test_invalid_evidence_never_passes",
+        "tests/test_web_readiness.py::test_missing_evidence_respects_declared_policy",
+        "tests/test_web_readiness.py::test_invalid_budget_remains_blocking",
+        "tests/test_web_readiness.py::test_artifact_defaults_are_labeled_without_changing_legacy_results",
+        "tests/test_web_readiness.py::test_fleet_performance_keeps_unmeasured_budgets_unknown"
+      ],
+      "evidence": [
+        "49 focused tests pass, including actual CLI integration, invalid inputs and fleet propagation.",
+        "Direct CLI exercise: ready/pass exit 0; over-budget and stale blocked exit 1; missing evidence unknown exit 1.",
+        "Pack comparison retains two deterministic findings and five review IDs while refining guidance; no new pack activation."
+      ],
+      "no_impact": [
+        "No web-readiness MCP endpoint exists; CLI JSON remains the machine interface. Feed schema/pillars and Pronto consumer fields remain unchanged; only the existing performance dimension includes new checks.",
+        "No browser dependency, telemetry, deployment, release publication, universal budget or fleet rollout. A real-repository pilot remains unverified; fixture validation is not application performance proof."
+      ],
+      "projections": [
+        "CLI help and JSON report",
+        "Packaged web-performance-evidence schema",
+        "Fleet performance dimension",
+        "Portable performance-readiness starter pack",
+        "Agent commands and public producer documentation"
+      ]
+    },
     {
       "id": "dev-task-strict-reconciliation-20261102",
       "status": "implemented",

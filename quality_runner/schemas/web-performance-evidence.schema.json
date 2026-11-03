@@ -1,0 +1,200 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://quality-runner.local/schemas/web-performance-evidence.schema.json",
+  "title": "Project-owned lab performance evidence for Quality Runner",
+  "description": "QR additionally checks unique budget IDs, finite samples, exact tracked HEAD, freshness, scenario, sample count and repository budgets. Producer attests build identity; QR does not execute or authenticate the producer.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "observed_at",
+    "target",
+    "tool",
+    "command",
+    "measurements"
+  ],
+  "properties": {
+    "schema": {
+      "const": "quality-runner-web-performance-evidence/v1"
+    },
+    "observed_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "target": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "commit",
+        "build_mode",
+        "build_id"
+      ],
+      "properties": {
+        "commit": {
+          "type": "string",
+          "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})$"
+        },
+        "build_mode": {
+          "const": "production"
+        },
+        "build_id": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        }
+      }
+    },
+    "tool": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "version"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "\\S"
+        },
+        "version": {
+          "type": "string",
+          "pattern": "\\S"
+        }
+      }
+    },
+    "command": {
+      "type": "string",
+      "pattern": "\\S"
+    },
+    "measurements": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 1000,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "budget_id",
+          "metric",
+          "method",
+          "scenario",
+          "samples"
+        ],
+        "properties": {
+          "budget_id": {
+            "type": "string",
+            "pattern": "\\S"
+          },
+          "metric": {
+            "enum": [
+              "lcp_ms",
+              "inp_ms",
+              "cls",
+              "js_transfer_bytes"
+            ]
+          },
+          "method": {
+            "enum": [
+              "navigation",
+              "interaction"
+            ]
+          },
+          "scenario": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "route",
+              "journey",
+              "device",
+              "network",
+              "cpu",
+              "cache",
+              "dataset"
+            ],
+            "properties": {
+              "route": {
+                "type": "string",
+                "pattern": "^/"
+              },
+              "journey": {
+                "type": "string",
+                "pattern": "\\S"
+              },
+              "device": {
+                "enum": [
+                  "mobile",
+                  "desktop"
+                ]
+              },
+              "network": {
+                "type": "string",
+                "pattern": "\\S"
+              },
+              "cpu": {
+                "type": "string",
+                "pattern": "\\S"
+              },
+              "cache": {
+                "enum": [
+                  "cold",
+                  "warm"
+                ]
+              },
+              "dataset": {
+                "type": "string",
+                "pattern": "\\S"
+              }
+            }
+          },
+          "samples": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 1000,
+            "items": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1.7976931348623157e+308
+            }
+          }
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "metric": {
+                  "const": "inp_ms"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "method": {
+                  "const": "interaction"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "metric": {
+                  "const": "js_transfer_bytes"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "samples": {
+                  "items": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 1.7976931348623157e+308
+                  }
+                }
+              }
+            }
+          }
+        ]
+      }
+    }
+  }
+}

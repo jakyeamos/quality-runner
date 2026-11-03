@@ -8,7 +8,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, cast
 
-from quality_runner import web_readiness_deployment
+from quality_runner import web_readiness_deployment, web_readiness_performance
 from quality_runner.code_quality_bundles import JS_BUNDLE_DIRS
 from quality_runner.web_readiness_config import (
     DEFAULT_BUNDLE_BUDGET_GZIP_BYTES,
@@ -43,6 +43,7 @@ def create_web_readiness_report(
     *,
     config: dict[str, Any] | None = None,
     deployment_evidence_path: Path | None = None,
+    performance_evidence_path: Path | None = None,
     generated_at: str | None = None,
 ) -> dict[str, Any]:
     root = repo_root.expanduser().resolve()
@@ -68,6 +69,15 @@ def create_web_readiness_report(
 
     checks = _source_checks(root)
     checks.append(_bundle_check(root, web_config))
+    checks.extend(
+        web_readiness_performance.performance_checks(
+            root,
+            web_config,
+            performance_evidence_path,
+            head_sha=head_sha,
+            observed_at=observed_at,
+        )
+    )
     target: dict[str, Any] = {"kind": "source", "commit": head_sha}
     route_config = web_config.get("routes")
     configured_routes = (
@@ -373,6 +383,7 @@ def _bundle_check(root: Path, config: dict[str, Any]) -> dict[str, Any]:
     detail = (
         f"Inspected {len(bundles)} artifact(s): {total} total gzipped bytes; "
         f"per-file budget {per_file_budget}, total budget {total_budget}."
+        " Build artifact inventory is not measured route transfer or user-experience speed."
     )
     if oversized:
         detail += " Oversized: " + ", ".join(f"{path} ({size})" for path, size in oversized[:8])
@@ -384,7 +395,15 @@ def _bundle_check(root: Path, config: dict[str, Any]) -> dict[str, Any]:
         "failed" if failed else "passed",
         "artifact_inspected",
         detail,
-        evidence=[{"path": path, "gzip_bytes": size} for path, size in bundles[:100]],
+        evidence=[
+            {
+                "path": path,
+                "gzip_bytes": size,
+                "measurement_scope": "build_artifact_inventory",
+                "budget_origin": config.get("bundle_budget_origin", "legacy_defaults"),
+            }
+            for path, size in bundles[:100]
+        ],
     )
 
 
