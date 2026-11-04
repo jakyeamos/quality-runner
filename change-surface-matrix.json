@@ -40,12 +40,12 @@
       "status": "applicable"
     },
     {
-      "id": "quality-skill-packs",
+      "id": "performance-readiness-skill-pack",
       "scope": "external",
       "distribution": "public_core",
-      "path": "docs/examples/*.toml and docs/quality-skills.md",
+      "path": "docs/examples/performance-readiness.toml and Performance Readiness guidance in docs/quality-skills.md",
       "owner": "quality-runner-maintainers",
-      "condition": "Public starter Quality Skill content or its usage guidance changes",
+      "condition": "Performance Readiness starter pack content or its usage guidance changes",
       "operations": ["add", "change", "remove"],
       "validation": [
         "uv run --locked qr skill ingest docs/examples/performance-readiness.toml --repo-path . --id performance-readiness --json"
